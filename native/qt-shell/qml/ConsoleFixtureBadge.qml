@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Shapes
 import QtQuick.Effects
 import "LightingParityHelpers.js" as LightingHelpers
@@ -9,7 +10,7 @@ Item {
     property int cct: 5600
     property int intensity: 100
     property bool on: false
-    property real rotation: 0
+    property real beamRotation: 0
     property bool selected: false
     property bool stale: false
     property string kind: "profile"
@@ -54,7 +55,7 @@ Item {
                 centerY: beamCone.height / 2
                 radiusX: root.beamReach
                 radiusY: root.beamReach
-                startAngle: -90 + root.rotation - root.beamAngleDegrees / 2
+                startAngle: -90 + root.beamRotation - root.beamAngleDegrees / 2
                 sweepAngle: root.beamAngleDegrees
                 moveToStart: false
             }

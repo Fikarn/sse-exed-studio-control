@@ -20,6 +20,14 @@ Item {
         return planningShortcutsEnabled() && engineController.planningModeSection === "board"
     }
 
+    function lightingShortcutsEnabled() {
+        return operatorShortcutsEnabled() && engineController.workspaceMode === "lighting"
+    }
+
+    function lightingPanelReady() {
+        return lightingShortcutsEnabled() && !!rootWindow.lightingWorkspacePanelRef
+    }
+
     Shortcut {
         sequence: "L"
         enabled: root.operatorShortcutsEnabled()
@@ -131,8 +139,41 @@ Item {
 
     Shortcut {
         sequence: "E"
-        enabled: root.operatorShortcutsEnabled()
+        enabled: root.operatorShortcutsEnabled() && !root.lightingShortcutsEnabled()
         onActivated: engineController.exportSupportBackup()
+    }
+
+    Shortcut {
+        sequence: "Space"
+        enabled: root.lightingPanelReady()
+        onActivated: rootWindow.lightingWorkspacePanelRef.fireNextCue()
+    }
+
+    Shortcut {
+        sequence: "Backspace"
+        enabled: root.lightingPanelReady()
+        onActivated: rootWindow.lightingWorkspacePanelRef.firePreviousCue()
+    }
+
+    Shortcut {
+        sequence: "C"
+        enabled: root.lightingPanelReady()
+        onActivated: rootWindow.lightingWorkspacePanelRef.addCueAfterSelection()
+    }
+
+    Shortcut {
+        sequence: "F"
+        enabled: root.lightingPanelReady()
+        onActivated: rootWindow.lightingWorkspacePanelRef.openAddFixtureDialogForVerify()
+    }
+
+    Shortcut {
+        sequence: "Ctrl+M"
+        enabled: root.lightingPanelReady()
+        onActivated: {
+            const panel = rootWindow.lightingWorkspacePanelRef
+            panel.dmxOverlayVisible = !panel.dmxOverlayVisible
+        }
     }
 
     Shortcut {
@@ -147,6 +188,15 @@ Item {
                  || rootWindow.keyboardHelpVisible
                  || rootWindow.planningTimeReportVisible
                  || rootWindow.planningProjectDetailVisible
-        onActivated: rootWindow.closeTransientPanels()
+                 || (!!rootWindow.lightingWorkspacePanelRef
+                     && rootWindow.lightingWorkspacePanelRef.dmxOverlayVisible)
+        onActivated: {
+            if (!!rootWindow.lightingWorkspacePanelRef
+                && rootWindow.lightingWorkspacePanelRef.dmxOverlayVisible) {
+                rootWindow.lightingWorkspacePanelRef.dmxOverlayVisible = false
+                return
+            }
+            rootWindow.closeTransientPanels()
+        }
     }
 }

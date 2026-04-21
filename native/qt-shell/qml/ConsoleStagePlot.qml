@@ -161,7 +161,7 @@ Rectangle {
                     cct: Number(fixtureItem.fixture.cct || 5600)
                     intensity: Number(fixtureItem.fixture.intensity || 0)
                     on: Boolean(fixtureItem.fixture.on)
-                    rotation: Number(fixtureItem.fixture.spatialRotation || 0)
+                    beamRotation: Number(fixtureItem.fixture.spatialRotation || 0)
                     selected: root.selectionLookup[fixtureItem.fixture.id] === true
                     stale: fixtureItem.fixture.spatialX === undefined || fixtureItem.fixture.spatialX === null
                     kind: String(fixtureItem.fixture.kind || "profile")
