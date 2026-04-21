@@ -1648,6 +1648,43 @@ void EngineProcess::updatePlanningTask(
   m_process.write(buildRequest("planning-task-update", "planning.task.update", params));
 }
 
+void EngineProcess::reschedulePlanningTask(
+  const QString &taskId,
+  const QVariant &scheduledStart,
+  const QVariant &scheduledDuration
+) {
+  if (m_process.state() != QProcess::Running || taskId.isEmpty()) {
+    return;
+  }
+
+  QJsonObject params{{"taskId", taskId}};
+
+  if (scheduledStart.isValid()) {
+    if (scheduledStart.isNull()) {
+      params.insert("scheduledStart", QJsonValue::Null);
+    } else {
+      const QString trimmed = scheduledStart.toString().trimmed();
+      params.insert("scheduledStart", trimmed.isEmpty() ? QJsonValue::Null : QJsonValue(trimmed));
+    }
+  }
+
+  if (scheduledDuration.isValid()) {
+    if (scheduledDuration.isNull()) {
+      params.insert("scheduledDurationSeconds", QJsonValue::Null);
+    } else {
+      bool ok = false;
+      const qint64 asInt = scheduledDuration.toLongLong(&ok);
+      if (ok) {
+        params.insert("scheduledDurationSeconds", QJsonValue(asInt));
+      } else {
+        params.insert("scheduledDurationSeconds", QJsonValue::Null);
+      }
+    }
+  }
+
+  m_process.write(buildRequest("planning-task-reschedule", "planning.task.reschedule", params));
+}
+
 void EngineProcess::deletePlanningTask(const QString &taskId) {
   if (m_process.state() != QProcess::Running || taskId.isEmpty()) {
     return;

@@ -386,6 +386,11 @@ public:
     const QString &dueDate,
     const QString &labelsCsv
   );
+  Q_INVOKABLE void reschedulePlanningTask(
+    const QString &taskId,
+    const QVariant &scheduledStart,
+    const QVariant &scheduledDuration
+  );
   Q_INVOKABLE void deletePlanningTask(const QString &taskId);
   Q_INVOKABLE void movePlanningTask(const QString &taskId, const QString &direction);
   Q_INVOKABLE void addPlanningChecklistItem(const QString &taskId, const QString &text);

@@ -97,6 +97,15 @@ QtObject {
     readonly property int textXl: 24
     readonly property int textHero: 30
 
+    readonly property color timelineTrack: surfaceDefault
+    readonly property color timelineNowTint: Qt.rgba(accentPrimary.r, accentPrimary.g, accentPrimary.b, 0.14)
+    readonly property color timelineGridLine: Qt.rgba(studio500.r, studio500.g, studio500.b, 0.10)
+    readonly property int timelineLaneHeight: 84
+    readonly property int timelineLaneCompact: 48
+    readonly property int timelineLaneHeadWidth: 280
+    readonly property int timelineScaleHeight: 36
+    readonly property int scheduleBlockRadius: radiusBadge
+
     function statusColor(status) {
         switch (status) {
         case "healthy":
