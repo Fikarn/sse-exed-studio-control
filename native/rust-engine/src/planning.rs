@@ -1,8 +1,10 @@
 use crate::planning_settings::{
-    is_valid_dashboard_view, is_valid_deck_mode, is_valid_sort_by, is_valid_view_filter,
-    DASHBOARD_VIEW_KEY, DECK_MODE_KEY, DEFAULT_DASHBOARD_VIEW, DEFAULT_DECK_MODE, DEFAULT_SORT_BY,
-    DEFAULT_VIEW_FILTER, PLANNING_SETTINGS_PREFIX, SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY,
-    SORT_BY_KEY, VIEW_FILTER_KEY,
+    is_valid_dashboard_view, is_valid_deck_mode, is_valid_mode_section, is_valid_sort_by,
+    is_valid_timeline_hour, is_valid_view_filter, DASHBOARD_VIEW_KEY, DECK_MODE_KEY,
+    DEFAULT_DASHBOARD_VIEW, DEFAULT_DECK_MODE, DEFAULT_MODE_SECTION, DEFAULT_SORT_BY,
+    DEFAULT_TIMELINE_END_HOUR, DEFAULT_TIMELINE_START_HOUR, DEFAULT_VIEW_FILTER,
+    MODE_SECTION_KEY, PLANNING_SETTINGS_PREFIX, SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY,
+    SORT_BY_KEY, TIMELINE_END_HOUR_KEY, TIMELINE_START_HOUR_KEY, VIEW_FILTER_KEY,
 };
 use crate::storage::{apply_settings, list_settings_by_prefix, open_connection, EngineResult};
 use serde::{Deserialize, Serialize};
@@ -98,6 +100,12 @@ pub struct PlanningSettingsSnapshot {
     pub dashboard_view: String,
     #[serde(rename = "deckMode")]
     pub deck_mode: String,
+    #[serde(rename = "modeSection")]
+    pub mode_section: String,
+    #[serde(rename = "timelineStartHour")]
+    pub timeline_start_hour: i64,
+    #[serde(rename = "timelineEndHour")]
+    pub timeline_end_hour: i64,
     #[serde(rename = "selectedProjectId")]
     pub selected_project_id: Option<String>,
     #[serde(rename = "selectedTaskId")]
@@ -251,6 +259,9 @@ pub struct PlanningSettingsUpdateRequest {
     sort_by: Option<String>,
     dashboard_view: Option<String>,
     deck_mode: Option<String>,
+    mode_section: Option<String>,
+    timeline_start_hour: Option<i64>,
+    timeline_end_hour: Option<i64>,
     selected_project_id: Option<Option<String>>,
     selected_task_id: Option<Option<String>>,
 }
@@ -428,6 +439,18 @@ impl PlanningSettingsSnapshot {
                 .get(DECK_MODE_KEY)
                 .cloned()
                 .unwrap_or_else(|| String::from(DEFAULT_DECK_MODE)),
+            mode_section: settings
+                .get(MODE_SECTION_KEY)
+                .cloned()
+                .unwrap_or_else(|| String::from(DEFAULT_MODE_SECTION)),
+            timeline_start_hour: settings
+                .get(TIMELINE_START_HOUR_KEY)
+                .and_then(|value| value.parse::<i64>().ok())
+                .unwrap_or_else(|| DEFAULT_TIMELINE_START_HOUR.parse::<i64>().unwrap_or(9)),
+            timeline_end_hour: settings
+                .get(TIMELINE_END_HOUR_KEY)
+                .and_then(|value| value.parse::<i64>().ok())
+                .unwrap_or_else(|| DEFAULT_TIMELINE_END_HOUR.parse::<i64>().unwrap_or(22)),
             selected_project_id: settings.get(SELECTED_PROJECT_ID_KEY).cloned(),
             selected_task_id: settings.get(SELECTED_TASK_ID_KEY).cloned(),
         }
@@ -588,6 +611,9 @@ pub fn parse_planning_settings_update(
         sort_by: None,
         dashboard_view: None,
         deck_mode: None,
+        mode_section: None,
+        timeline_start_hour: None,
+        timeline_end_hour: None,
         selected_project_id: None,
         selected_task_id: None,
     };
@@ -640,6 +666,36 @@ pub fn parse_planning_settings_update(
         request.deck_mode = Some(deck_mode.to_string());
     }
 
+    if let Some(value) = params.get("modeSection") {
+        let mode_section = value
+            .as_str()
+            .ok_or_else(|| String::from("modeSection must be a string"))?;
+        if !is_valid_mode_section(mode_section) {
+            return Err(String::from("modeSection must be one of: timeline, board"));
+        }
+        request.mode_section = Some(mode_section.to_string());
+    }
+
+    if let Some(value) = params.get("timelineStartHour") {
+        let hour = value
+            .as_i64()
+            .ok_or_else(|| String::from("timelineStartHour must be an integer"))?;
+        if !is_valid_timeline_hour(hour) {
+            return Err(String::from("timelineStartHour must be between 0 and 23"));
+        }
+        request.timeline_start_hour = Some(hour);
+    }
+
+    if let Some(value) = params.get("timelineEndHour") {
+        let hour = value
+            .as_i64()
+            .ok_or_else(|| String::from("timelineEndHour must be an integer"))?;
+        if !is_valid_timeline_hour(hour) {
+            return Err(String::from("timelineEndHour must be between 0 and 23"));
+        }
+        request.timeline_end_hour = Some(hour);
+    }
+
     if let Some(value) = params.get("selectedProjectId") {
         request.selected_project_id = Some(parse_nullable_string(value, "selectedProjectId")?);
     }
@@ -652,6 +708,9 @@ pub fn parse_planning_settings_update(
         && request.sort_by.is_none()
         && request.dashboard_view.is_none()
         && request.deck_mode.is_none()
+        && request.mode_section.is_none()
+        && request.timeline_start_hour.is_none()
+        && request.timeline_end_hour.is_none()
         && request.selected_project_id.is_none()
         && request.selected_task_id.is_none()
     {
@@ -685,6 +744,15 @@ pub fn update_planning_settings(
     }
     if let Some(deck_mode) = &request.deck_mode {
         updates.push((DECK_MODE_KEY, deck_mode.clone()));
+    }
+    if let Some(mode_section) = &request.mode_section {
+        updates.push((MODE_SECTION_KEY, mode_section.clone()));
+    }
+    if let Some(hour) = request.timeline_start_hour {
+        updates.push((TIMELINE_START_HOUR_KEY, hour.to_string()));
+    }
+    if let Some(hour) = request.timeline_end_hour {
+        updates.push((TIMELINE_END_HOUR_KEY, hour.to_string()));
     }
 
     if request.selected_project_id.is_some() || request.selected_task_id.is_some() {
@@ -2012,6 +2080,9 @@ fn update_selection_after_mutation(
         sort_by: None,
         dashboard_view: None,
         deck_mode: None,
+        mode_section: None,
+        timeline_start_hour: None,
+        timeline_end_hour: None,
         selected_project_id,
         selected_task_id,
     };

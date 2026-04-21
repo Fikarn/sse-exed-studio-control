@@ -13,7 +13,6 @@ Row {
     }
 
     spacing: chipSpacing
-    implicitHeight: theme.compactControlHeight
 
     function toneAccent(tone) {
         switch (tone) {

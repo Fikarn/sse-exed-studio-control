@@ -10,7 +10,6 @@ Rectangle {
     property int collapsedHeight: 28
     property int expandedHeight: 120
 
-    signal expandedChanged()
     signal taskDragStarted(string taskId)
     signal taskClicked(string taskId)
 

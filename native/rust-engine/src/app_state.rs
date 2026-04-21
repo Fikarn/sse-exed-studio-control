@@ -1,7 +1,8 @@
 use crate::bootstrap::RuntimeContext;
 use crate::planning_settings::{
-    DASHBOARD_VIEW_KEY, DECK_MODE_KEY, PLANNING_SETTINGS_PREFIX, SELECTED_PROJECT_ID_KEY,
-    SELECTED_TASK_ID_KEY, SORT_BY_KEY, VIEW_FILTER_KEY,
+    DASHBOARD_VIEW_KEY, DECK_MODE_KEY, MODE_SECTION_KEY, PLANNING_SETTINGS_PREFIX,
+    SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY, SORT_BY_KEY, TIMELINE_END_HOUR_KEY,
+    TIMELINE_START_HOUR_KEY, VIEW_FILTER_KEY,
 };
 use crate::shell_settings::ShellSettingsSnapshot;
 use serde_json::{json, Value};
@@ -155,6 +156,15 @@ pub fn build_app_snapshot(
             "sortBy": planning_settings.get(SORT_BY_KEY).cloned().unwrap_or_else(|| String::from("manual")),
             "dashboardView": planning_settings.get(DASHBOARD_VIEW_KEY).cloned().unwrap_or_else(|| String::from("kanban")),
             "deckMode": planning_settings.get(DECK_MODE_KEY).cloned().unwrap_or_else(|| String::from("project")),
+            "modeSection": planning_settings.get(MODE_SECTION_KEY).cloned().unwrap_or_else(|| String::from("timeline")),
+            "timelineStartHour": planning_settings
+                .get(TIMELINE_START_HOUR_KEY)
+                .and_then(|value| value.parse::<i64>().ok())
+                .unwrap_or(9),
+            "timelineEndHour": planning_settings
+                .get(TIMELINE_END_HOUR_KEY)
+                .and_then(|value| value.parse::<i64>().ok())
+                .unwrap_or(22),
             "selectedProjectId": planning_settings.get(SELECTED_PROJECT_ID_KEY).cloned(),
             "selectedTaskId": planning_settings.get(SELECTED_TASK_ID_KEY).cloned(),
         },

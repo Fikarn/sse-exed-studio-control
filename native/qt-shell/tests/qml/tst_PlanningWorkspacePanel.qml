@@ -123,6 +123,9 @@ TestCase {
                 property int planningCompletedTaskCount: 0
                 property string planningSortBy: "manual"
                 property string planningViewFilter: "all"
+                property string planningModeSection: "timeline"
+                property int planningTimelineStartHour: 9
+                property int planningTimelineEndHour: 22
                 property string planningSelectedProjectId: "project-1"
                 property string planningSelectedTaskId: "task-1"
                 property bool planningTimeReportLoaded: true
@@ -134,6 +137,7 @@ TestCase {
 
                 function updatePlanningSettings(changes) {}
                 function requestPlanningTimeReport() {}
+                function reschedulePlanningTask(taskId, scheduledStart, scheduledDuration) {}
                 function selectPlanningProject(projectId) { planningSelectedProjectId = projectId }
                 function selectPlanningTask(taskId) { planningSelectedTaskId = taskId }
                 function createPlanningProject(title) {}
@@ -351,7 +355,6 @@ TestCase {
                     id: planningPanel
                     rootWindow: host
                     engineController: engineControllerStub
-                    scaleFactor: host.dashboardUiScale
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
@@ -370,7 +373,6 @@ TestCase {
 
     function test_planningWorkspaceFitsOperatorResolution() {
         const host = createHost()
-        verify(host.panel.contentFitsViewport())
         verify(host.panel.newProjectTitleField !== null)
         verify(host.header.height + host.dashboardLayout.spacing + host.panel.height <= host.height + 1)
     }

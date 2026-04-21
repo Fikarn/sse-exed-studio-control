@@ -16,6 +16,10 @@ Item {
         return operatorShortcutsEnabled() && engineController.workspaceMode === "planning"
     }
 
+    function planningBoardModeActive() {
+        return planningShortcutsEnabled() && engineController.planningModeSection === "board"
+    }
+
     Shortcut {
         sequence: "L"
         enabled: root.operatorShortcutsEnabled()
@@ -71,32 +75,47 @@ Item {
 
     Shortcut {
         sequence: "0"
-        enabled: root.planningShortcutsEnabled()
+        enabled: root.planningBoardModeActive()
         onActivated: engineController.updatePlanningSettings({ "viewFilter": "all" })
     }
 
     Shortcut {
         sequence: "1"
-        enabled: root.planningShortcutsEnabled()
+        enabled: root.planningBoardModeActive()
         onActivated: engineController.updatePlanningSettings({ "viewFilter": "todo" })
     }
 
     Shortcut {
         sequence: "2"
-        enabled: root.planningShortcutsEnabled()
+        enabled: root.planningBoardModeActive()
         onActivated: engineController.updatePlanningSettings({ "viewFilter": "in-progress" })
     }
 
     Shortcut {
         sequence: "3"
-        enabled: root.planningShortcutsEnabled()
+        enabled: root.planningBoardModeActive()
         onActivated: engineController.updatePlanningSettings({ "viewFilter": "blocked" })
     }
 
     Shortcut {
         sequence: "4"
-        enabled: root.planningShortcutsEnabled()
+        enabled: root.planningBoardModeActive()
         onActivated: engineController.updatePlanningSettings({ "viewFilter": "done" })
+    }
+
+    Shortcut {
+        sequence: "Shift+B"
+        enabled: root.planningShortcutsEnabled()
+        onActivated: {
+            const next = engineController.planningModeSection === "board" ? "timeline" : "board"
+            engineController.updatePlanningSettings({ "modeSection": next })
+        }
+    }
+
+    Shortcut {
+        sequence: "Shift+T"
+        enabled: root.planningShortcutsEnabled()
+        onActivated: engineController.updatePlanningSettings({ "modeSection": "timeline" })
     }
 
     Shortcut {

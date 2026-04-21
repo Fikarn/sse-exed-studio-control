@@ -131,6 +131,9 @@ class EngineProcess : public QObject {
   Q_PROPERTY(int planningCompletedTaskCount READ planningCompletedTaskCount NOTIFY planningSnapshotChanged)
   Q_PROPERTY(QString planningViewFilter READ planningViewFilter NOTIFY planningSnapshotChanged)
   Q_PROPERTY(QString planningSortBy READ planningSortBy NOTIFY planningSnapshotChanged)
+  Q_PROPERTY(QString planningModeSection READ planningModeSection NOTIFY planningSnapshotChanged)
+  Q_PROPERTY(int planningTimelineStartHour READ planningTimelineStartHour NOTIFY planningSnapshotChanged)
+  Q_PROPERTY(int planningTimelineEndHour READ planningTimelineEndHour NOTIFY planningSnapshotChanged)
   Q_PROPERTY(QString planningSelectedProjectId READ planningSelectedProjectId NOTIFY planningSnapshotChanged)
   Q_PROPERTY(QString planningSelectedTaskId READ planningSelectedTaskId NOTIFY planningSnapshotChanged)
   Q_PROPERTY(bool planningTimeReportLoaded READ planningTimeReportLoaded NOTIFY planningTimeReportChanged)
@@ -285,6 +288,9 @@ public:
   int planningCompletedTaskCount() const;
   QString planningViewFilter() const;
   QString planningSortBy() const;
+  QString planningModeSection() const;
+  int planningTimelineStartHour() const;
+  int planningTimelineEndHour() const;
   QString planningSelectedProjectId() const;
   QString planningSelectedTaskId() const;
   bool planningTimeReportLoaded() const;
@@ -577,6 +583,9 @@ private:
   int m_planningCompletedTaskCount = 0;
   QString m_planningViewFilter = "all";
   QString m_planningSortBy = "manual";
+  QString m_planningModeSection = "timeline";
+  int m_planningTimelineStartHour = 9;
+  int m_planningTimelineEndHour = 22;
   QString m_planningSelectedProjectId;
   QString m_planningSelectedTaskId;
   bool m_planningTimeReportLoaded = false;

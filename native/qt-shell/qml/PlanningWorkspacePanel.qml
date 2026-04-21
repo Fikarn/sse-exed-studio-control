@@ -8,19 +8,285 @@ Item {
     objectName: "planning-workspace-panel"
     required property var rootWindow
     required property var engineController
-    property real scaleFactor: 1.0
+
     property bool createProjectDialogVisible: false
     property bool importDialogVisible: false
     property alias newProjectTitleField: createProjectDialog.titleField
-    readonly property bool fullscreenOperatorSurface: rootWindow && rootWindow.visibility === Window.FullScreen
-    readonly property bool widescreenMonitor: fullscreenOperatorSurface || width >= 1450
+    property date timelineDay: todayAtMidnight()
+    property date clockNow: new Date()
+    property string selectedBlockId: ""
+
+    readonly property bool timelineMode: !!engineController && engineController.planningModeSection !== "board"
+    readonly property int timelineStartHour: engineController ? engineController.planningTimelineStartHour : 9
+    readonly property int timelineEndHour: engineController ? engineController.planningTimelineEndHour : 22
 
     ConsoleTheme {
         id: theme
     }
 
+    Timer {
+        id: clockTimer
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: root.clockNow = new Date()
+    }
+
+    function todayAtMidnight() {
+        const now = new Date()
+        now.setHours(0, 0, 0, 0)
+        return now
+    }
+
+    function timelineStart() {
+        const base = new Date(root.timelineDay.getTime())
+        base.setHours(root.timelineStartHour, 0, 0, 0)
+        return base
+    }
+
+    function timelineEnd() {
+        const base = new Date(root.timelineDay.getTime())
+        const endHour = Math.max(root.timelineStartHour + 1, root.timelineEndHour)
+        base.setHours(endHour, 0, 0, 0)
+        return base
+    }
+
+    function parseIsoDate(iso) {
+        if (!iso) {
+            return null
+        }
+        const parsed = new Date(iso)
+        if (isNaN(parsed.getTime())) {
+            return null
+        }
+        return parsed
+    }
+
+    function taskIsScheduledToday(task) {
+        if (!task || !task.scheduledStart || !task.scheduledDurationSeconds) {
+            return false
+        }
+        const parsed = parseIsoDate(task.scheduledStart)
+        if (!parsed) {
+            return false
+        }
+        const dayStart = new Date(root.timelineDay.getTime())
+        dayStart.setHours(0, 0, 0, 0)
+        const dayEnd = new Date(dayStart.getTime() + 24 * 3600 * 1000)
+        return parsed.getTime() >= dayStart.getTime() && parsed.getTime() < dayEnd.getTime()
+    }
+
+    function filteredTasksForLanes() {
+        if (!engineController || !engineController.planningTasks) {
+            return []
+        }
+        const filter = engineController.planningViewFilter || "all"
+        const tasks = engineController.planningTasks
+        const out = []
+        for (let i = 0; i < tasks.length; i += 1) {
+            const task = tasks[i]
+            if (filter === "todo" && task.completed) continue
+            if (filter === "done" && !task.completed) continue
+            if (filter === "in-progress" && !task.isRunning) continue
+            if (filter === "blocked" && !isBlockedTask(task)) continue
+            out.push(task)
+        }
+        return out
+    }
+
+    function isBlockedTask(task) {
+        if (!task || !task.labels) {
+            return false
+        }
+        for (let i = 0; i < task.labels.length; i += 1) {
+            const label = String(task.labels[i]).toLowerCase()
+            if (label === "blocked" || label === "block") {
+                return true
+            }
+        }
+        return false
+    }
+
+    function buildLanes() {
+        const scheduled = filteredTasksForLanes().filter(taskIsScheduledToday)
+        const byProject = {}
+        const projects = engineController && engineController.planningProjects ? engineController.planningProjects : []
+        for (let i = 0; i < projects.length; i += 1) {
+            byProject[projects[i].id] = {
+                "title": projects[i].title,
+                "blocks": [],
+                "runningTaskCount": 0
+            }
+        }
+        for (let i = 0; i < scheduled.length; i += 1) {
+            const task = scheduled[i]
+            const projectId = task.projectId
+            if (!byProject[projectId]) {
+                continue
+            }
+            const start = parseIsoDate(task.scheduledStart)
+            if (!start) {
+                continue
+            }
+            byProject[projectId].blocks.push({
+                "taskId": task.id,
+                "title": task.title,
+                "meta": task.priority ? task.priority.toUpperCase() : "",
+                "status": task.completed ? "done" : task.isRunning ? "running" : "todo",
+                "running": !!task.isRunning,
+                "blocked": isBlockedTask(task),
+                "start": start,
+                "duration": Math.max(900, Number(task.scheduledDurationSeconds) || 900)
+            })
+            if (task.isRunning) {
+                byProject[projectId].runningTaskCount += 1
+            }
+        }
+        const lanes = []
+        for (let i = 0; i < projects.length; i += 1) {
+            const lane = byProject[projects[i].id]
+            if (lane && lane.blocks.length > 0) {
+                lanes.push(lane)
+            }
+        }
+        return lanes
+    }
+
+    function unscheduledTasks() {
+        const tasks = filteredTasksForLanes()
+        const out = []
+        for (let i = 0; i < tasks.length; i += 1) {
+            if (!taskIsScheduledToday(tasks[i])) {
+                out.push({
+                    "taskId": tasks[i].id,
+                    "title": tasks[i].title,
+                    "priority": tasks[i].priority
+                })
+            }
+        }
+        return out
+    }
+
+    function statChips() {
+        const projectCount = engineController ? engineController.planningProjectCount : 0
+        const running = engineController ? engineController.planningRunningTaskCount : 0
+        const taskCount = engineController ? engineController.planningTaskCount : 0
+        const completed = engineController ? engineController.planningCompletedTaskCount : 0
+        return [
+            { "key": "projects", "label": "PROJECTS", "value": String(projectCount), "tone": "default" },
+            { "key": "running", "label": "RUNNING", "value": String(running), "tone": running > 0 ? "ok" : "default" },
+            { "key": "tasks", "label": "TASKS", "value": String(taskCount), "tone": "default" },
+            { "key": "done", "label": "DONE", "value": String(completed), "tone": "default" }
+        ]
+    }
+
+    function toggleMode() {
+        const next = root.timelineMode ? "board" : "timeline"
+        engineController.updatePlanningSettings({ "modeSection": next })
+    }
+
+    function nudgeDay(delta) {
+        const next = new Date(root.timelineDay.getTime())
+        next.setDate(next.getDate() + delta)
+        root.timelineDay = next
+    }
+
+    function snapDayToToday() {
+        root.timelineDay = todayAtMidnight()
+    }
+
+    function nudgeScale(hours) {
+        const start = Math.max(0, Math.min(22, root.timelineStartHour - (hours < 0 ? 1 : 0)))
+        const end = Math.max(root.timelineStartHour + 1, Math.min(23, root.timelineEndHour + (hours > 0 ? 1 : 0)))
+        engineController.updatePlanningSettings({
+            "timelineStartHour": start,
+            "timelineEndHour": end
+        })
+    }
+
+    function nudgeSelectedBlock(deltaSeconds) {
+        if (!root.selectedBlockId) {
+            return
+        }
+        const tasks = engineController && engineController.planningTasks ? engineController.planningTasks : []
+        for (let i = 0; i < tasks.length; i += 1) {
+            if (tasks[i].id === root.selectedBlockId) {
+                const current = parseIsoDate(tasks[i].scheduledStart)
+                if (!current) {
+                    return
+                }
+                const next = new Date(current.getTime() + deltaSeconds * 1000)
+                engineController.reschedulePlanningTask(
+                    tasks[i].id,
+                    next.toISOString(),
+                    tasks[i].scheduledDurationSeconds
+                )
+                return
+            }
+        }
+    }
+
+    function selectAdjacentBlock(direction) {
+        const lanes = buildLanes()
+        if (lanes.length === 0) {
+            return
+        }
+        const flat = []
+        for (let i = 0; i < lanes.length; i += 1) {
+            for (let j = 0; j < lanes[i].blocks.length; j += 1) {
+                flat.push({ "laneIndex": i, "block": lanes[i].blocks[j] })
+            }
+        }
+        if (flat.length === 0) {
+            return
+        }
+        let currentIdx = -1
+        for (let i = 0; i < flat.length; i += 1) {
+            if (flat[i].block.taskId === root.selectedBlockId) {
+                currentIdx = i
+                break
+            }
+        }
+        if (direction === "nudge-left") {
+            root.nudgeSelectedBlock(-900)
+            return
+        }
+        if (direction === "nudge-right") {
+            root.nudgeSelectedBlock(900)
+            return
+        }
+        if (currentIdx < 0) {
+            root.selectedBlockId = flat[0].block.taskId
+            engineController.selectPlanningTask(root.selectedBlockId)
+            return
+        }
+        const curLane = flat[currentIdx].laneIndex
+        if (direction === "lane-up") {
+            for (let i = currentIdx - 1; i >= 0; i -= 1) {
+                if (flat[i].laneIndex < curLane) {
+                    root.selectedBlockId = flat[i].block.taskId
+                    engineController.selectPlanningTask(root.selectedBlockId)
+                    return
+                }
+            }
+        } else if (direction === "lane-down") {
+            for (let i = currentIdx + 1; i < flat.length; i += 1) {
+                if (flat[i].laneIndex > curLane) {
+                    root.selectedBlockId = flat[i].block.taskId
+                    engineController.selectPlanningTask(root.selectedBlockId)
+                    return
+                }
+            }
+        }
+    }
+
     function focusSearch() {
-        planningToolbarPanel.focusSearch()
+        if (root.timelineMode) {
+            timelineSearchField.forceActiveFocus()
+            Qt.callLater(function() { timelineSearchField.selectAll() })
+        } else {
+            boardToolbar.focusSearch()
+        }
     }
 
     function openCreateProjectDialog(defaultStatus) {
@@ -34,278 +300,259 @@ Item {
         importDialogVisible = true
     }
 
-    function contentFitsViewport() {
-        return planningContentLayout.implicitHeight * scaleFactor <= planningScrollView.height + 1
-    }
-
     visible: !!engineController && engineController.workspaceMode === "planning"
     Layout.fillWidth: true
     Layout.fillHeight: true
 
-    ScrollView {
-        id: planningScrollView
+    ColumnLayout {
         anchors.fill: parent
-        clip: true
-        contentWidth: availableWidth
+        spacing: theme.spacing2
+
+        Rectangle {
+            id: workspaceToolbar
+            Layout.fillWidth: true
+            Layout.preferredHeight: theme.toolbarHeight
+            color: Qt.rgba(theme.surfaceSoft.r, theme.surfaceSoft.g, theme.surfaceSoft.b, 0.92)
+            border.color: theme.surfaceBorder
+            border.width: 1
+            radius: theme.radiusCard
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: theme.spacing4
+                anchors.rightMargin: theme.spacing4
+                spacing: theme.spacing3
+
+                RowLayout {
+                    spacing: 2
+
+                    ConsoleButton {
+                        objectName: "planning-mode-timeline"
+                        tone: "workspaceTab"
+                        compact: true
+                        dense: true
+                        text: "Timeline"
+                        active: root.timelineMode
+                        onClicked: {
+                            if (!root.timelineMode) {
+                                engineController.updatePlanningSettings({ "modeSection": "timeline" })
+                            }
+                        }
+                    }
+
+                    ConsoleButton {
+                        objectName: "planning-mode-board"
+                        tone: "workspaceTab"
+                        compact: true
+                        dense: true
+                        text: "Board"
+                        active: !root.timelineMode
+                        onClicked: {
+                            if (root.timelineMode) {
+                                engineController.updatePlanningSettings({ "modeSection": "board" })
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 1
+                    Layout.preferredHeight: 20
+                    color: theme.surfaceStroke
+                }
+
+                ConsoleStatChipRow {
+                    id: workspaceChipRow
+                    stats: root.statChips()
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                Label {
+                    visible: root.timelineMode
+                    text: "NOW " + Qt.formatTime(root.clockNow, "HH:mm:ss")
+                    color: theme.accentPrimary
+                    font.family: theme.monoFontFamily
+                    font.pixelSize: theme.textXxs
+                    font.weight: Font.DemiBold
+                }
+
+                RowLayout {
+                    visible: root.timelineMode
+                    spacing: 2
+
+                    ConsoleButton {
+                        objectName: "planning-day-prev"
+                        tone: "icon"
+                        compact: true
+                        dense: true
+                        text: ""
+                        iconText: "‹"
+                        onClicked: root.nudgeDay(-1)
+                    }
+
+                    ConsoleButton {
+                        objectName: "planning-day-today"
+                        tone: "chip"
+                        compact: true
+                        dense: true
+                        text: Qt.formatDate(root.timelineDay, "ddd d MMM")
+                        onClicked: root.snapDayToToday()
+                    }
+
+                    ConsoleButton {
+                        objectName: "planning-day-next"
+                        tone: "icon"
+                        compact: true
+                        dense: true
+                        text: ""
+                        iconText: "›"
+                        onClicked: root.nudgeDay(1)
+                    }
+                }
+
+                ConsoleTextField {
+                    id: timelineSearchField
+                    visible: root.timelineMode
+                    objectName: "planning-timeline-search-field"
+                    dense: true
+                    Layout.preferredWidth: 220
+                    placeholderText: "Search tasks..."
+                    text: rootWindow.planningSearchQuery
+                    onTextEdited: rootWindow.planningSearchQuery = text
+
+                    Binding {
+                        target: timelineSearchField
+                        property: "text"
+                        value: rootWindow.planningSearchQuery
+                        when: !timelineSearchField.activeFocus
+                    }
+                }
+
+                ConsoleButton {
+                    objectName: "planning-time-report-toggle"
+                    tone: "icon"
+                    compact: true
+                    dense: true
+                    active: root.rootWindow.planningTimeReportVisible
+                    text: ""
+                    iconText: "☰"
+                    ToolTip.visible: hovered
+                    ToolTip.text: root.rootWindow.planningTimeReportVisible ? "Hide time report" : "Time report"
+                    onClicked: {
+                        root.rootWindow.planningTimeReportVisible = !root.rootWindow.planningTimeReportVisible
+                        if (root.rootWindow.planningTimeReportVisible) {
+                            engineController.requestPlanningTimeReport()
+                        }
+                    }
+                }
+
+                ConsoleButton {
+                    objectName: "planning-open-create-project"
+                    tone: "primary"
+                    compact: true
+                    dense: true
+                    text: "New Project"
+                    iconText: "+"
+                    onClicked: root.openCreateProjectDialog("todo")
+                }
+            }
+        }
 
         Item {
-            width: planningScrollView.availableWidth
-            height: Math.max(
-                        planningScrollView.height,
-                        planningContentHost.height * root.scaleFactor
-                    )
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
             Item {
-                id: planningContentHost
-                width: parent.width / root.scaleFactor
-                height: Math.max(
-                            planningScrollView.height / root.scaleFactor,
-                            planningContentLayout.implicitHeight
-                        )
-                scale: root.scaleFactor
-                transformOrigin: Item.TopLeft
+                id: timelineSection
+                anchors.fill: parent
+                visible: root.timelineMode
 
                 ColumnLayout {
-                    id: planningContentLayout
-                    width: parent.width
-                    spacing: root.widescreenMonitor ? theme.spacing3 : theme.spacing6
+                    anchors.fill: parent
+                    spacing: theme.spacing2
 
                     ConsoleSurface {
                         Layout.fillWidth: true
+                        Layout.fillHeight: true
                         tone: "default"
-                        padding: root.widescreenMonitor ? 6 : 14
-                        implicitHeight: planningOverviewLayout.implicitHeight + (root.widescreenMonitor ? 12 : 28)
+                        padding: 0
 
-                        ColumnLayout {
-                            id: planningOverviewLayout
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            spacing: root.widescreenMonitor ? theme.spacing3 : theme.spacing6
+                        ConsoleTimeline {
+                            id: planningTimeline
+                            anchors.fill: parent
+                            start: root.timelineStart()
+                            end: root.timelineEnd()
+                            clockNow: root.clockNow
+                            lanes: root.buildLanes()
+                            selectedBlockId: root.selectedBlockId
+                            focus: timelineSection.visible
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: root.widescreenMonitor ? theme.spacing4 : theme.spacing6
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    Layout.minimumWidth: 0
-                                    Layout.alignment: Qt.AlignVCenter
-                                    spacing: root.widescreenMonitor ? 1 : 4
-
-                                    Label {
-                                        text: "Planning Workspace"
-                                        color: theme.studio500
-                                        font.family: theme.uiFontFamily
-                                        font.pixelSize: theme.textXxs
-                                        font.weight: Font.DemiBold
-                                        font.capitalization: Font.AllUppercase
-                                        font.letterSpacing: 1.1
-                                    }
-
-                                    Label {
-                                        text: "Prep, handoffs, and timers stay visible without stealing the console."
-                                        color: theme.studio100
-                                        font.family: theme.uiFontFamily
-                                        font.pixelSize: root.widescreenMonitor ? theme.textSm + 1 : theme.textLg
-                                        font.weight: Font.DemiBold
-                                        wrapMode: Text.WordWrap
-                                        Layout.fillWidth: true
-                                        Layout.maximumWidth: root.widescreenMonitor ? 760 : Number.POSITIVE_INFINITY
-                                    }
-
-                                    Label {
-                                        text: "Use planning as an always-on sidecar: fast to scan, dense enough to monitor, and contained to its own panel."
-                                        color: theme.studio400
-                                        font.family: theme.uiFontFamily
-                                        font.pixelSize: root.widescreenMonitor ? theme.textXxs : theme.textSm
-                                        wrapMode: Text.WordWrap
-                                        Layout.fillWidth: true
-                                        Layout.maximumWidth: root.widescreenMonitor ? 760 : Number.POSITIVE_INFINITY
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    visible: root.widescreenMonitor
-                                    Layout.preferredWidth: 920
-                                    Layout.maximumWidth: 920
-                                    Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
-                                    spacing: theme.spacing2
-
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: theme.spacing2
-
-                                        PlanningSummaryGrid {
-                                            Layout.fillWidth: true
-                                            compact: true
-                                            rootWindow: root.rootWindow
-                                            engineController: root.engineController
-                                        }
-
-                                        ConsoleButton {
-                                            objectName: "planning-open-create-project"
-                                            tone: "primary"
-                                            text: "New Project"
-                                            iconText: "+"
-                                            compact: true
-                                            dense: true
-                                            onClicked: root.openCreateProjectDialog("todo")
-                                        }
-
-                                        Rectangle {
-                                            radius: theme.radiusBadge
-                                            color: Qt.rgba(theme.studio950.r, theme.studio950.g, theme.studio950.b, 0.5)
-                                            border.width: 1
-                                            border.color: theme.surfaceBorder
-                                            implicitHeight: theme.compactControlHeight
-                                            implicitWidth: planningActionRail.implicitWidth + 8
-
-                                            RowLayout {
-                                                id: planningActionRail
-                                                anchors.centerIn: parent
-                                                spacing: 2
-
-                                                ConsoleButton {
-                                                    objectName: "planning-time-report-toggle-inline"
-                                                    tone: "icon"
-                                                    active: root.rootWindow.planningTimeReportVisible
-                                                    text: ""
-                                                    iconText: "\u2630"
-                                                    compact: true
-                                                    dense: true
-                                                    ToolTip.visible: hovered
-                                                    ToolTip.text: root.rootWindow.planningTimeReportVisible ? "Hide time report" : "Open time report"
-                                                    onClicked: {
-                                                        root.rootWindow.planningTimeReportVisible = !root.rootWindow.planningTimeReportVisible
-                                                        if (root.rootWindow.planningTimeReportVisible) {
-                                                            engineController.requestPlanningTimeReport()
-                                                        }
-                                                    }
-                                                }
-
-                                                ConsoleButton {
-                                                    objectName: "planning-export-backup-button"
-                                                    tone: "icon"
-                                                    text: ""
-                                                    iconText: "\u2193"
-                                                    compact: true
-                                                    dense: true
-                                                    ToolTip.visible: hovered
-                                                    ToolTip.text: "Export data"
-                                                    onClicked: engineController.exportSupportBackup()
-                                                }
-
-                                                ConsoleButton {
-                                                    objectName: "planning-import-button"
-                                                    tone: "icon"
-                                                    text: ""
-                                                    iconText: "\u2191"
-                                                    compact: true
-                                                    dense: true
-                                                    ToolTip.visible: hovered
-                                                    ToolTip.text: "Import data"
-                                                    onClicked: root.openImportDialog()
-                                                }
-                                            }
-                                        }
+                            onBlockClicked: (taskId) => {
+                                root.selectedBlockId = taskId
+                                engineController.selectPlanningTask(taskId)
+                            }
+                            onBlockDragReleased: (taskId, newStart) => {
+                                const tasks = engineController && engineController.planningTasks ? engineController.planningTasks : []
+                                for (let i = 0; i < tasks.length; i += 1) {
+                                    if (tasks[i].id === taskId) {
+                                        engineController.reschedulePlanningTask(
+                                            taskId,
+                                            newStart.toISOString(),
+                                            tasks[i].scheduledDurationSeconds
+                                        )
+                                        return
                                     }
                                 }
                             }
-
-                            PlanningSummaryGrid {
-                                visible: !root.widescreenMonitor
-                                rootWindow: root.rootWindow
-                                engineController: root.engineController
-                            }
-
-                            RowLayout {
-                                visible: !root.widescreenMonitor
-                                Layout.fillWidth: true
-                                spacing: theme.spacing4
-
-                                Item {
-                                    Layout.fillWidth: true
-                                }
-
-                                ConsoleButton {
-                                    objectName: "planning-open-create-project"
-                                    tone: "primary"
-                                    text: "New Project"
-                                    onClicked: root.openCreateProjectDialog("todo")
-                                }
-
-                                ConsoleButton {
-                                    objectName: "planning-export-backup-button"
-                                    tone: "secondary"
-                                    text: "Export"
-                                    onClicked: engineController.exportSupportBackup()
-                                }
-
-                                ConsoleButton {
-                                    objectName: "planning-import-button"
-                                    tone: "secondary"
-                                    text: "Import"
-                                    onClicked: root.openImportDialog()
+                            onSelectionChangeRequested: (direction) => root.selectAdjacentBlock(direction)
+                            onDayNudgeRequested: (delta) => root.nudgeDay(delta)
+                            onScaleNudgeRequested: (hours) => root.nudgeScale(hours)
+                            onSnapScaleToNowRequested: root.snapDayToToday()
+                            onOpenSelectedBlockRequested: {
+                                if (root.selectedBlockId) {
+                                    const tasks = engineController && engineController.planningTasks ? engineController.planningTasks : []
+                                    for (let i = 0; i < tasks.length; i += 1) {
+                                        if (tasks[i].id === root.selectedBlockId && tasks[i].projectId) {
+                                            root.rootWindow.openPlanningProjectDetail(tasks[i].projectId)
+                                            return
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
-                    ConsoleSurface {
-                        visible: !!engineController && engineController.planningProjectCount === 0
+                    ConsoleUnscheduledTray {
+                        id: unscheduledTray
                         Layout.fillWidth: true
-                        tone: "soft"
-                        padding: 18
-                        implicitHeight: planningEmptyStateLayout.implicitHeight + 36
-
-                        RowLayout {
-                            id: planningEmptyStateLayout
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            spacing: theme.spacing6
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 4
-
-                                Label {
-                                    text: "No projects yet"
-                                    color: theme.studio050
-                                    font.family: theme.uiFontFamily
-                                    font.pixelSize: theme.textMd
-                                    font.weight: Font.DemiBold
-                                }
-
-                                Label {
-                                    text: "Click New Project or press N to build the first planning board."
-                                    color: theme.studio400
-                                    font.family: theme.uiFontFamily
-                                    font.pixelSize: theme.textSm
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true
-                                }
-                            }
-
-                            ConsoleButton {
-                                tone: "primary"
-                                text: "New Project"
-                                onClicked: root.openCreateProjectDialog("todo")
-                            }
-                        }
+                        tasks: root.unscheduledTasks()
                     }
+                }
+            }
+
+            Item {
+                id: boardSection
+                anchors.fill: parent
+                visible: !root.timelineMode
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: theme.spacing2
 
                     PlanningToolbarPanel {
-                        id: planningToolbarPanel
+                        id: boardToolbar
                         rootWindow: root.rootWindow
                         engineController: root.engineController
                     }
 
                     PlanningBoardPanel {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
                         rootWindow: root.rootWindow
                         engineController: root.engineController
-                        Layout.fillWidth: true
                         onOpenProjectDetail: function(projectId) {
                             root.rootWindow.openPlanningProjectDetail(projectId)
                         }

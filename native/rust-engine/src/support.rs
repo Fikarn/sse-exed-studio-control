@@ -141,6 +141,12 @@ struct SupportPlanningSettingsArchive {
     pub dashboard_view: String,
     #[serde(rename = "deckMode")]
     pub deck_mode: String,
+    #[serde(default, rename = "modeSection")]
+    pub mode_section: Option<String>,
+    #[serde(default, rename = "timelineStartHour")]
+    pub timeline_start_hour: Option<i64>,
+    #[serde(default, rename = "timelineEndHour")]
+    pub timeline_end_hour: Option<i64>,
     #[serde(rename = "selectedProjectId")]
     pub selected_project_id: Option<String>,
     #[serde(rename = "selectedTaskId")]
@@ -370,6 +376,9 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
                 sort_by: planning_snapshot.settings.sort_by,
                 dashboard_view: planning_snapshot.settings.dashboard_view,
                 deck_mode: planning_snapshot.settings.deck_mode,
+                mode_section: Some(planning_snapshot.settings.mode_section),
+                timeline_start_hour: Some(planning_snapshot.settings.timeline_start_hour),
+                timeline_end_hour: Some(planning_snapshot.settings.timeline_end_hour),
                 selected_project_id: planning_snapshot.settings.selected_project_id,
                 selected_task_id: planning_snapshot.settings.selected_task_id,
             },
@@ -452,6 +461,9 @@ fn clear_support_settings(transaction: &Transaction<'_>) -> Result<(), rusqlite:
         SORT_BY_KEY,
         DASHBOARD_VIEW_KEY,
         DECK_MODE_KEY,
+        crate::planning_settings::MODE_SECTION_KEY,
+        crate::planning_settings::TIMELINE_START_HOUR_KEY,
+        crate::planning_settings::TIMELINE_END_HOUR_KEY,
         SELECTED_PROJECT_ID_KEY,
         SELECTED_TASK_ID_KEY,
         WORKSPACE_KEY,
@@ -613,6 +625,31 @@ fn write_support_settings(
     settings_restored += 1;
     upsert_setting(transaction, DECK_MODE_KEY, &planning.deck_mode)?;
     settings_restored += 1;
+
+    if let Some(mode_section) = &planning.mode_section {
+        upsert_setting(
+            transaction,
+            crate::planning_settings::MODE_SECTION_KEY,
+            mode_section,
+        )?;
+        settings_restored += 1;
+    }
+    if let Some(hour) = planning.timeline_start_hour {
+        upsert_setting(
+            transaction,
+            crate::planning_settings::TIMELINE_START_HOUR_KEY,
+            &hour.to_string(),
+        )?;
+        settings_restored += 1;
+    }
+    if let Some(hour) = planning.timeline_end_hour {
+        upsert_setting(
+            transaction,
+            crate::planning_settings::TIMELINE_END_HOUR_KEY,
+            &hour.to_string(),
+        )?;
+        settings_restored += 1;
+    }
 
     if let Some(project_id) = &planning.selected_project_id {
         upsert_setting(transaction, SELECTED_PROJECT_ID_KEY, project_id)?;

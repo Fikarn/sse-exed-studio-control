@@ -55,6 +55,7 @@ TestCase {
 
                 property bool operatorUiReady: true
                 property string workspaceMode: "planning"
+                property string planningModeSection: "board"
                 property string lastWorkspaceMode: ""
                 property var lastPlanningSettingsUpdate: null
                 property int planningTimeReportRequests: 0
@@ -134,7 +135,7 @@ TestCase {
         compare(host.engine.lastWorkspaceMode, "planning")
     }
 
-    function test_planningFocusShortcutsTargetExpectedFields() {
+    function test_planningGlobalShortcutsTargetExpectedFields() {
         const host = createHost()
         resetFocus(host)
 

@@ -732,6 +732,18 @@ QString EngineProcess::planningSortBy() const {
   return m_planningSortBy;
 }
 
+QString EngineProcess::planningModeSection() const {
+  return m_planningModeSection;
+}
+
+int EngineProcess::planningTimelineStartHour() const {
+  return m_planningTimelineStartHour;
+}
+
+int EngineProcess::planningTimelineEndHour() const {
+  return m_planningTimelineEndHour;
+}
+
 QString EngineProcess::planningSelectedProjectId() const {
   return m_planningSelectedProjectId;
 }
@@ -2364,6 +2376,9 @@ void EngineProcess::resetPlanningSnapshot(const QString &details) {
   m_planningCompletedTaskCount = 0;
   m_planningViewFilter = "all";
   m_planningSortBy = "manual";
+  m_planningModeSection = "timeline";
+  m_planningTimelineStartHour = 9;
+  m_planningTimelineEndHour = 22;
   m_planningSelectedProjectId.clear();
   m_planningSelectedTaskId.clear();
   emit planningSnapshotChanged();
@@ -3182,6 +3197,11 @@ void EngineProcess::processMessage(const QJsonObject &object) {
       static_cast<int>(counts.value("completedTaskCount").toInteger(0));
     m_planningViewFilter = settings.value("viewFilter").toString("all");
     m_planningSortBy = settings.value("sortBy").toString("manual");
+    m_planningModeSection = settings.value("modeSection").toString("timeline");
+    m_planningTimelineStartHour =
+      static_cast<int>(settings.value("timelineStartHour").toInteger(9));
+    m_planningTimelineEndHour =
+      static_cast<int>(settings.value("timelineEndHour").toInteger(22));
     m_planningSelectedProjectId = settings.value("selectedProjectId").toString();
     m_planningSelectedTaskId = settings.value("selectedTaskId").toString();
     m_planningSnapshotLoaded = true;
