@@ -2626,61 +2626,41 @@ ApplicationWindow {
                     }
                 }
 
-                Rectangle {
-                    radius: 14
-                    color: "#0c1320"
-                    border.color: "#35506b"
-                    border.width: 1
+                ConsoleSurface {
+                    objectName: "workspace-fallback-panel"
+                    tone: "soft"
+                    padding: 20
 
-                    ScrollView {
-                        anchors.fill: parent
-                        anchors.margins: 14
-                        clip: true
-                        contentWidth: availableWidth
+                    ColumnLayout {
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.margins: 4
+                        spacing: theme.spacing4
 
-                        ColumnLayout {
-                            width: parent.width
-                            spacing: 10
+                        Label {
+                            text: "Unknown workspace"
+                            color: theme.studio050
+                            font.family: theme.uiFontFamily
+                            font.pixelSize: theme.textLg
+                            font.weight: Font.DemiBold
+                        }
 
-                            Label {
-                                text: root.workspaceLabel(engineController.workspaceMode) + " Workspace"
-                                color: "#f5f7fb"
-                                font.pixelSize: 18
-                                font.weight: Font.DemiBold
-                            }
+                        Label {
+                            text: "The engine reported a workspace mode the operator surface does not know how to render. Return to Planning to recover."
+                            color: theme.studio300
+                            font.family: theme.uiFontFamily
+                            font.pixelSize: theme.textSm
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                        }
 
-                            Label {
-                                text: root.workspaceSummary(engineController.workspaceMode)
-                                color: "#d6dce5"
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                            }
-
-                            ConsoleSurface {
-                                Layout.fillWidth: true
-                                tone: "soft"
-                                padding: 14
-                                implicitHeight: workspaceFallbackLayout.implicitHeight + 28
-
-                                ColumnLayout {
-                                    id: workspaceFallbackLayout
-                                    anchors.top: parent.top
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    spacing: 6
-
-                                    Label {
-                                        text: "View State"
-                                        color: "#8ea4c0"
-                                        font.pixelSize: 12
-                                    }
-
-                                    Label {
-                                        text: "Filter " + root.formatEnumLabel(engineController.planningViewFilter) + " | Sort " + root.formatEnumLabel(engineController.planningSortBy) + "\nWorkspace " + root.workspaceLabel(engineController.workspaceMode)
-                                        color: "#f5f7fb"
-                                        wrapMode: Text.WordWrap
-                                        Layout.fillWidth: true
-                                    }
+                        ConsoleButton {
+                            tone: "primary"
+                            text: "Return to Planning"
+                            onClicked: {
+                                if (engineController) {
+                                    engineController.setWorkspaceMode("planning")
                                 }
                             }
                         }
