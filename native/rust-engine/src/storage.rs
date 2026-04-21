@@ -18,7 +18,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const STORAGE_SCHEMA_VERSION: i64 = 2;
+const STORAGE_SCHEMA_VERSION: i64 = 3;
 
 pub struct StorageBootstrap {
     pub schema_version: i64,
@@ -344,7 +344,7 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
         schema_version = 1;
     }
 
-    if schema_version < STORAGE_SCHEMA_VERSION {
+    if schema_version < 2 {
         let transaction = connection.transaction()?;
         transaction.execute_batch(
             r#"
@@ -403,6 +403,21 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
 
             CREATE INDEX IF NOT EXISTS activity_log_timestamp_idx
               ON activity_log(timestamp DESC);
+            "#,
+        )?;
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (2)", [])?;
+        transaction.commit()?;
+        schema_version = 2;
+    }
+
+    if schema_version < STORAGE_SCHEMA_VERSION {
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(
+            r#"
+            ALTER TABLE tasks ADD COLUMN scheduled_start TEXT;
+            ALTER TABLE tasks ADD COLUMN scheduled_duration_seconds INTEGER;
+            CREATE INDEX IF NOT EXISTS tasks_scheduled_start_idx
+              ON tasks(scheduled_start) WHERE scheduled_start IS NOT NULL;
             "#,
         )?;
         transaction.execute(
@@ -824,5 +839,99 @@ mod tests {
             error,
             ImportLegacyError::ExistingDataRequiresForce
         ));
+    }
+
+    #[test]
+    fn migrate_schema_v3_is_idempotent() {
+        let test_dir = TestDir::new("storage-migrate-idempotent");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        initialize_database(&db_path).expect("initial migration should succeed");
+
+        let mut connection = open_connection(&db_path).expect("connection should open");
+        let resolved = migrate_schema(&mut connection).expect("second migration should succeed");
+        assert_eq!(resolved, 3);
+
+        let version_3_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 3",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count should query");
+        assert_eq!(version_3_count, 1);
+    }
+
+    #[test]
+    fn migrate_schema_v2_db_loads_on_v3_binary() {
+        let test_dir = TestDir::new("storage-migrate-v2-v3");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        {
+            let mut connection = open_connection(&db_path).expect("connection should open");
+            connection
+                .execute_batch(
+                    r#"
+                    CREATE TABLE schema_migrations (
+                      version INTEGER PRIMARY KEY,
+                      applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    INSERT INTO schema_migrations(version) VALUES (1);
+                    CREATE TABLE projects (
+                      id TEXT PRIMARY KEY,
+                      title TEXT NOT NULL,
+                      description TEXT NOT NULL,
+                      status TEXT NOT NULL,
+                      priority TEXT NOT NULL,
+                      created_at TEXT NOT NULL,
+                      last_updated TEXT NOT NULL,
+                      sort_order INTEGER NOT NULL
+                    );
+                    CREATE TABLE tasks (
+                      id TEXT PRIMARY KEY,
+                      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                      title TEXT NOT NULL,
+                      description TEXT NOT NULL,
+                      priority TEXT NOT NULL,
+                      due_date TEXT,
+                      labels_json TEXT NOT NULL,
+                      is_running INTEGER NOT NULL DEFAULT 0,
+                      total_seconds INTEGER NOT NULL DEFAULT 0,
+                      last_started TEXT,
+                      completed INTEGER NOT NULL DEFAULT 0,
+                      sort_order INTEGER NOT NULL,
+                      created_at TEXT NOT NULL
+                    );
+                    INSERT INTO schema_migrations(version) VALUES (2);
+                    INSERT INTO projects(id, title, description, status, priority, created_at, last_updated, sort_order)
+                      VALUES ('p1', 'Legacy project', '', 'todo', 'p1', '2026-04-20T10:00:00Z', '2026-04-20T10:00:00Z', 0);
+                    INSERT INTO tasks(id, project_id, title, description, priority, due_date, labels_json, is_running, total_seconds, last_started, completed, sort_order, created_at)
+                      VALUES ('t1', 'p1', 'Legacy task', '', 'p1', NULL, '[]', 0, 0, NULL, 0, 0, '2026-04-20T10:00:00Z');
+                    "#,
+                )
+                .expect("v2 schema should seed");
+        }
+
+        initialize_database(&db_path).expect("v3 migration should succeed");
+
+        let connection = open_connection(&db_path).expect("connection should reopen");
+        let (scheduled_start, scheduled_duration): (Option<String>, Option<i64>) = connection
+            .query_row(
+                "SELECT scheduled_start, scheduled_duration_seconds FROM tasks WHERE id = 't1'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("row should load");
+        assert!(scheduled_start.is_none());
+        assert!(scheduled_duration.is_none());
+
+        let version_3_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 3",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count should query");
+        assert_eq!(version_3_count, 1);
     }
 }

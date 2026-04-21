@@ -68,6 +68,10 @@ pub struct PlanningTask {
     pub order: i64,
     #[serde(rename = "createdAt")]
     pub created_at: String,
+    #[serde(default, rename = "scheduledStart")]
+    pub scheduled_start: Option<String>,
+    #[serde(default, rename = "scheduledDurationSeconds")]
+    pub scheduled_duration_seconds: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -327,6 +331,13 @@ pub struct PlanningTaskDeleteRequest {
 }
 
 #[derive(Debug)]
+pub struct PlanningTaskRescheduleRequest {
+    task_id: String,
+    scheduled_start: Option<Option<String>>,
+    scheduled_duration_seconds: Option<Option<i64>>,
+}
+
+#[derive(Debug)]
 pub struct PlanningTaskChecklistAddRequest {
     task_id: String,
     text: String,
@@ -393,6 +404,8 @@ struct PlanningTaskRow {
     completed: bool,
     order: i64,
     created_at: String,
+    scheduled_start: Option<String>,
+    scheduled_duration_seconds: Option<i64>,
 }
 
 impl PlanningSettingsSnapshot {
@@ -454,6 +467,8 @@ pub fn read_planning_snapshot(
             completed: task.completed,
             order: task.order,
             created_at: task.created_at,
+            scheduled_start: task.scheduled_start,
+            scheduled_duration_seconds: task.scheduled_duration_seconds,
         })
         .collect::<Vec<_>>();
 
@@ -1483,6 +1498,103 @@ pub fn apply_planning_task_delete(
     })
 }
 
+pub fn parse_planning_task_reschedule_request(
+    params: &Value,
+) -> Result<PlanningTaskRescheduleRequest, String> {
+    let task_id = parse_required_string_field(params, "taskId")?;
+
+    let scheduled_start = if params.get("scheduledStart").is_some() {
+        Some(parse_optional_nullable_string_field(params, "scheduledStart")?)
+    } else {
+        None
+    };
+    let scheduled_duration_seconds = if params.get("scheduledDurationSeconds").is_some() {
+        Some(parse_optional_nullable_i64_field(
+            params,
+            "scheduledDurationSeconds",
+        )?)
+    } else {
+        None
+    };
+
+    if let Some(Some(seconds)) = scheduled_duration_seconds {
+        if seconds < 0 {
+            return Err(String::from(
+                "scheduledDurationSeconds must be non-negative",
+            ));
+        }
+    }
+
+    if scheduled_start.is_none() && scheduled_duration_seconds.is_none() {
+        return Err(String::from(
+            "planning.task.reschedule requires scheduledStart or scheduledDurationSeconds",
+        ));
+    }
+
+    Ok(PlanningTaskRescheduleRequest {
+        task_id,
+        scheduled_start,
+        scheduled_duration_seconds,
+    })
+}
+
+pub fn apply_planning_task_reschedule(
+    db_path: &Path,
+    request: &PlanningTaskRescheduleRequest,
+) -> Result<PlanningTaskMutationResult, PlanningCommandError> {
+    let mut connection = open_connection(db_path)
+        .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
+    let transaction = connection
+        .transaction()
+        .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
+    let task = load_task_row(&transaction, &request.task_id)?;
+    let now = current_timestamp(&transaction)?;
+
+    let next_scheduled_start = match &request.scheduled_start {
+        Some(value) => value.clone(),
+        None => task.scheduled_start.clone(),
+    };
+    let next_scheduled_duration = match request.scheduled_duration_seconds {
+        Some(value) => value,
+        None => task.scheduled_duration_seconds,
+    };
+
+    transaction
+        .execute(
+            "UPDATE tasks
+             SET scheduled_start = ?2,
+                 scheduled_duration_seconds = ?3
+             WHERE id = ?1",
+            rusqlite::params![request.task_id, next_scheduled_start, next_scheduled_duration],
+        )
+        .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
+
+    let mut changes: Vec<&'static str> = Vec::new();
+    if request.scheduled_start.is_some() {
+        changes.push("scheduledStart");
+    }
+    if request.scheduled_duration_seconds.is_some() {
+        changes.push("scheduledDurationSeconds");
+    }
+
+    append_activity_entry(
+        &transaction,
+        "task",
+        &request.task_id,
+        "rescheduled",
+        &format!("Rescheduled {}", changes.join(", ")),
+        &now,
+    )?;
+    prune_activity_log(&transaction)?;
+
+    transaction
+        .commit()
+        .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
+
+    let (task, context) = read_task_and_context(db_path, &request.task_id)?;
+    Ok(PlanningTaskMutationResult { task, context })
+}
+
 pub fn parse_planning_task_checklist_add_request(
     params: &Value,
 ) -> Result<PlanningTaskChecklistAddRequest, String> {
@@ -1956,7 +2068,9 @@ fn load_task_row(
                 last_started,
                 completed,
                 sort_order,
-                created_at
+                created_at,
+                scheduled_start,
+                scheduled_duration_seconds
              FROM tasks
              WHERE id = ?1",
             [task_id],
@@ -1977,6 +2091,8 @@ fn load_task_row(
                     completed: row.get::<_, i64>(10)? != 0,
                     order: row.get(11)?,
                     created_at: row.get(12)?,
+                    scheduled_start: row.get(13)?,
+                    scheduled_duration_seconds: row.get(14)?,
                 })
             },
         )
@@ -2654,6 +2770,20 @@ fn parse_optional_i64_field(params: &Value, name: &str) -> Result<Option<i64>, S
         .transpose()
 }
 
+fn parse_optional_nullable_i64_field(
+    params: &Value,
+    name: &str,
+) -> Result<Option<i64>, String> {
+    match params.get(name) {
+        Some(value) if value.is_null() => Ok(None),
+        Some(value) => value
+            .as_i64()
+            .map(Some)
+            .ok_or_else(|| format!("{name} must be an integer or null")),
+        None => Ok(None),
+    }
+}
+
 fn parse_optional_bool_field(params: &Value, name: &str) -> Result<Option<bool>, String> {
     params
         .get(name)
@@ -2826,7 +2956,9 @@ fn read_tasks(connection: &rusqlite::Connection) -> EngineResult<Vec<PlanningTas
             t.last_started,
             t.completed,
             t.sort_order,
-            t.created_at
+            t.created_at,
+            t.scheduled_start,
+            t.scheduled_duration_seconds
          FROM tasks t
          INNER JOIN projects p ON p.id = t.project_id
          ORDER BY p.sort_order ASC, t.sort_order ASC, t.created_at ASC",
@@ -2849,6 +2981,8 @@ fn read_tasks(connection: &rusqlite::Connection) -> EngineResult<Vec<PlanningTas
             completed: row.get::<_, i64>(10)? != 0,
             order: row.get(11)?,
             created_at: row.get(12)?,
+            scheduled_start: row.get(13)?,
+            scheduled_duration_seconds: row.get(14)?,
         })
     })?;
 
@@ -3526,5 +3660,92 @@ mod tests {
         assert_eq!(snapshot.activity_log[0].action, "checklist_removed");
         assert_eq!(snapshot.activity_log[1].action, "checklist_updated");
         assert_eq!(snapshot.activity_log[2].action, "checklist_added");
+    }
+
+    #[test]
+    fn planning_task_reschedule_persists_both_fields() {
+        let test_dir = TestDir::new("planning-task-reschedule-set");
+        let db_path = test_dir.path().join("native.sqlite3");
+        let source_path = test_dir.path().join("legacy-db.json");
+        seed_planning_state(&db_path, &source_path);
+
+        let request = parse_planning_task_reschedule_request(&json!({
+            "taskId": "task-1",
+            "scheduledStart": "2026-04-21T19:30:00Z",
+            "scheduledDurationSeconds": 1800
+        }))
+        .expect("reschedule should parse");
+        let result = apply_planning_task_reschedule(&db_path, &request)
+            .expect("reschedule should apply");
+
+        assert_eq!(
+            result.task.scheduled_start.as_deref(),
+            Some("2026-04-21T19:30:00Z")
+        );
+        assert_eq!(result.task.scheduled_duration_seconds, Some(1800));
+
+        let planning_settings = list_settings_by_prefix(&db_path, PLANNING_SETTINGS_PREFIX)
+            .expect("planning settings should load");
+        let snapshot =
+            read_planning_snapshot(&db_path, &planning_settings).expect("snapshot should load");
+        assert_eq!(snapshot.activity_log[0].action, "rescheduled");
+    }
+
+    #[test]
+    fn planning_task_reschedule_clears_both_fields() {
+        let test_dir = TestDir::new("planning-task-reschedule-clear");
+        let db_path = test_dir.path().join("native.sqlite3");
+        let source_path = test_dir.path().join("legacy-db.json");
+        seed_planning_state(&db_path, &source_path);
+
+        let set = parse_planning_task_reschedule_request(&json!({
+            "taskId": "task-1",
+            "scheduledStart": "2026-04-21T19:30:00Z",
+            "scheduledDurationSeconds": 1800
+        }))
+        .expect("reschedule should parse");
+        apply_planning_task_reschedule(&db_path, &set).expect("initial set should apply");
+
+        let clear = parse_planning_task_reschedule_request(&json!({
+            "taskId": "task-1",
+            "scheduledStart": Value::Null,
+            "scheduledDurationSeconds": Value::Null
+        }))
+        .expect("clear should parse");
+        let cleared = apply_planning_task_reschedule(&db_path, &clear)
+            .expect("clear should apply");
+
+        assert!(cleared.task.scheduled_start.is_none());
+        assert!(cleared.task.scheduled_duration_seconds.is_none());
+    }
+
+    #[test]
+    fn planning_task_reschedule_leaves_unspecified_fields_untouched() {
+        let test_dir = TestDir::new("planning-task-reschedule-partial");
+        let db_path = test_dir.path().join("native.sqlite3");
+        let source_path = test_dir.path().join("legacy-db.json");
+        seed_planning_state(&db_path, &source_path);
+
+        let set = parse_planning_task_reschedule_request(&json!({
+            "taskId": "task-1",
+            "scheduledStart": "2026-04-21T19:30:00Z",
+            "scheduledDurationSeconds": 1800
+        }))
+        .expect("reschedule should parse");
+        apply_planning_task_reschedule(&db_path, &set).expect("initial set should apply");
+
+        let partial = parse_planning_task_reschedule_request(&json!({
+            "taskId": "task-1",
+            "scheduledStart": "2026-04-21T20:00:00Z"
+        }))
+        .expect("partial reschedule should parse");
+        let updated = apply_planning_task_reschedule(&db_path, &partial)
+            .expect("partial reschedule should apply");
+
+        assert_eq!(
+            updated.task.scheduled_start.as_deref(),
+            Some("2026-04-21T20:00:00Z")
+        );
+        assert_eq!(updated.task.scheduled_duration_seconds, Some(1800));
     }
 }

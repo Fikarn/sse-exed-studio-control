@@ -39,15 +39,16 @@ use crate::planning::{
     apply_planning_project_create, apply_planning_project_delete, apply_planning_project_reorder,
     apply_planning_project_update, apply_planning_selection, apply_planning_task_checklist_add,
     apply_planning_task_checklist_delete, apply_planning_task_checklist_update,
-    apply_planning_task_create, apply_planning_task_delete, apply_planning_task_timer,
-    apply_planning_task_toggle_complete, apply_planning_task_update,
+    apply_planning_task_create, apply_planning_task_delete, apply_planning_task_reschedule,
+    apply_planning_task_timer, apply_planning_task_toggle_complete, apply_planning_task_update,
     parse_planning_project_create_request, parse_planning_project_delete_request,
     parse_planning_project_reorder_request, parse_planning_project_update_request,
     parse_planning_selection_request, parse_planning_settings_update,
     parse_planning_task_checklist_add_request, parse_planning_task_checklist_delete_request,
     parse_planning_task_checklist_update_request, parse_planning_task_create_request,
-    parse_planning_task_delete_request, parse_planning_task_timer_request,
-    parse_planning_task_toggle_complete_request, parse_planning_task_update_request,
+    parse_planning_task_delete_request, parse_planning_task_reschedule_request,
+    parse_planning_task_timer_request, parse_planning_task_toggle_complete_request,
+    parse_planning_task_update_request,
     parse_planning_time_report_request, read_planning_context, read_planning_snapshot,
     read_planning_time_report, update_planning_settings, PlanningCommandError,
 };
@@ -1043,6 +1044,35 @@ impl EngineApp {
                 }
                 Err(message) => Self::reply(invalid_params(request.id, message)),
             },
+            "planning.task.reschedule" => {
+                match parse_planning_task_reschedule_request(&request.params) {
+                    Ok(reschedule_request) => {
+                        match apply_planning_task_reschedule(
+                            &self.runtime.db_path,
+                            &reschedule_request,
+                        ) {
+                            Ok(result) => Self::reply_with_planning_change(
+                                ok_response(
+                                    request.id,
+                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                                ),
+                                "task-rescheduled",
+                                Some(result.task.project_id.as_str()),
+                                Some(result.task.id.as_str()),
+                            ),
+                            Err(error) => match error {
+                                PlanningCommandError::InvalidParams(message) => {
+                                    Self::reply(invalid_params(request.id, message))
+                                }
+                                PlanningCommandError::Storage(message) => Self::reply(
+                                    error_response(request.id, "STORAGE_ERROR", message),
+                                ),
+                            },
+                        }
+                    }
+                    Err(message) => Self::reply(invalid_params(request.id, message)),
+                }
+            }
             "planning.task.delete" => match parse_planning_task_delete_request(&request.params) {
                 Ok(delete_request) => {
                     match apply_planning_task_delete(&self.runtime.db_path, &delete_request) {
