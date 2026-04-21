@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Svg)
 
 qt_standard_project_setup(REQUIRES 6.5)
 qt_policy(SET QTP0004 NEW)
@@ -31,6 +31,7 @@ qt_add_qml_module(sse_exed_native
     QtQuick
     QtQuick.Controls
     QtQuick.Layouts
+    QtQuick.Effects
   RESOURCES
     assets/fonts/IBMPlexSans-Regular.ttf
     assets/fonts/IBMPlexSans-Medium.ttf
@@ -41,6 +42,16 @@ qt_add_qml_module(sse_exed_native
     assets/fonts/IBMPlexMono-SemiBold.ttf
     assets/fonts/IBMPlexMono-Bold.ttf
     assets/fonts/OFL.txt
+    assets/icons/lucide/clipboard-list.svg
+    assets/icons/lucide/lamp.svg
+    assets/icons/lucide/audio-waveform.svg
+    assets/icons/lucide/wrench.svg
+    assets/icons/lucide/info.svg
+    assets/icons/lucide/circle-help.svg
+    assets/icons/lucide/external-link.svg
+    assets/icons/lucide/arrow-left.svg
+    assets/icons/lucide/triangle-alert.svg
+    assets/icons/lucide/LICENSE.txt
   QML_FILES
     qml/Main.qml
     qml/ParityCaptureHarness.qml
@@ -53,6 +64,7 @@ qt_add_qml_module(sse_exed_native
     qml/ConsoleTextArea.qml
     qml/ConsoleComboBox.qml
     qml/ConsoleBadge.qml
+    qml/ConsoleIcon.qml
     qml/ConsoleStatusBadge.qml
     qml/ConsoleStatCard.qml
     qml/ConsoleTabButton.qml
@@ -109,6 +121,7 @@ target_link_libraries(sse_exed_native
     Qt6::Qml
     Qt6::Quick
     Qt6::QuickControls2
+    Qt6::Svg
 )
 
 if(BUILD_TESTING)
@@ -125,7 +138,23 @@ if(BUILD_TESTING)
       Qt6::Qml
       Qt6::Quick
       Qt6::QuickTest
+      Qt6::Svg
       Qt6::Test
+  )
+
+  qt_add_resources(sse_exed_native_qmltests "sse_exed_native_qmltests_icons"
+    PREFIX "/qt/qml/StudioControl"
+    BASE "${CMAKE_CURRENT_SOURCE_DIR}"
+    FILES
+      assets/icons/lucide/clipboard-list.svg
+      assets/icons/lucide/lamp.svg
+      assets/icons/lucide/audio-waveform.svg
+      assets/icons/lucide/wrench.svg
+      assets/icons/lucide/info.svg
+      assets/icons/lucide/circle-help.svg
+      assets/icons/lucide/external-link.svg
+      assets/icons/lucide/arrow-left.svg
+      assets/icons/lucide/triangle-alert.svg
   )
 
   add_test(
