@@ -16,6 +16,8 @@ ApplicationWindow {
     }
 
     property real dashboardUiScale: 1.0
+    property string parityFrozenClock: "14:22:08 UTC"
+    property string parityFrozenUptime: "01:23:45"
     property bool dashboardScene: scene === "dashboard-idle"
     property bool setupWizardScene: scene === "setup-required"
     property bool setupScene: scene === "setup-control-selected"
@@ -148,9 +150,12 @@ ApplicationWindow {
             property string storageDetails: "Stored locally in the native operator shell database."
             property bool lightingEnabled: true
             property bool lightingReachable: true
+            property int lightingUniverse: 1
             property bool audioOscEnabled: true
             property bool audioVerified: true
             property bool audioConnected: true
+            property string audioSendHost: "127.0.0.1"
+            property int audioSendPort: 9000
             property bool controlSurfaceSnapshotLoaded: true
             property string controlSurfaceBaseUrl: "http://127.0.0.1:38201"
             property bool controlSurfaceAvailable: true
@@ -258,6 +263,8 @@ ApplicationWindow {
         function exportCompanionConfig() {}
         function requestControlSurfaceSnapshot() {}
         function runControlSurfaceProbe() {}
+        function requestLightingSnapshot() {}
+        function requestAudioSnapshot() {}
         function exportShellDiagnostics() {}
         function openAppDataDirectory() {}
         function openLogsDirectory() {}
