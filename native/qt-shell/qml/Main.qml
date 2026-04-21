@@ -10,6 +10,8 @@ ApplicationWindow {
     property QtObject engineController: null
     property bool shellSmokeTest: false
     property bool parityCaptureMode: false
+    property string parityFrozenClock: parityCaptureMode ? "14:22:08 UTC" : ""
+    property string parityFrozenUptime: parityCaptureMode ? "01:23:45" : ""
     property string operatorVerifyAction: ""
     property bool operatorVerifyActionCompleted: false
     property bool operatorVerifyReadyForScreenshot: false
@@ -2597,6 +2599,7 @@ ApplicationWindow {
                     rootWindow: root
                     engineController: root.engineController
                     scaleFactor: root.dashboardUiScale
+                    parityFrozen: root.parityCaptureMode
                     Component.onCompleted: root.lightingWorkspacePanelRef = lightingWorkspacePanel
                     Component.onDestruction: {
                         if (root.lightingWorkspacePanelRef === lightingWorkspacePanel) {
