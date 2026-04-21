@@ -290,7 +290,7 @@ Item {
                     }
 
                     RowLayout {
-                        visible: false
+                        visible: true
                         Layout.fillWidth: true
                         spacing: 8
 
@@ -312,7 +312,7 @@ Item {
                     }
 
                     Item {
-                        visible: true
+                        visible: root.activeSection === "commissioning"
                         Layout.fillWidth: true
                         implicitHeight: commissioningLayout.implicitHeight
 
@@ -366,7 +366,7 @@ Item {
                     }
 
                     Item {
-                        visible: false
+                        visible: root.activeSection === "support"
                         Layout.fillWidth: true
                         implicitHeight: supportLayout.implicitHeight
 
@@ -377,26 +377,30 @@ Item {
                             columnSpacing: 12
                             rowSpacing: 12
 
-                            Rectangle {
-                                radius: 12
-                                color: "#101826"
-                                border.color: "#2a3b55"
-                                border.width: 1
+                            ConsoleSurface {
+                                tone: "soft"
+                                padding: theme.spacing6
                                 Layout.fillWidth: true
-                                implicitHeight: backupArchiveLayout.implicitHeight + 24
+                                implicitHeight: backupArchiveLayout.implicitHeight + 2 * padding
 
                                 ColumnLayout {
                                     id: backupArchiveLayout
                                     anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 8
+                                    spacing: theme.spacing4
 
-                                    Label { text: "Backup Archive"; color: "#8ea4c0"; font.pixelSize: 12 }
+                                    Label {
+                                        text: "Backup Archive"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
+                                    }
                                     Label {
                                         text: engineController.supportSnapshotLoaded
                                               ? engineController.supportDetails
                                               : "Support snapshot is waiting for the engine."
-                                        color: "#f5f7fb"
+                                        color: theme.studio050
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textSm
                                         wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
                                     }
@@ -405,7 +409,9 @@ Item {
                                               + (engineController.supportBackupDir.length > 0
                                                  ? engineController.supportBackupDir
                                                  : "unavailable")
-                                        color: "#8ea4c0"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WrapAnywhere
                                         Layout.fillWidth: true
                                     }
@@ -413,27 +419,32 @@ Item {
                                         text: engineController.supportLatestBackupPath.length > 0
                                               ? "Latest archive: " + engineController.supportLatestBackupPath
                                               : "No backup archive has been created yet."
-                                        color: "#8ea4c0"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WrapAnywhere
                                         Layout.fillWidth: true
                                     }
                                     RowLayout {
-                                        spacing: 8
+                                        spacing: theme.spacing4
 
-                                        Button {
+                                        ConsoleButton {
                                             text: "Export Backup"
+                                            tone: "primary"
                                             enabled: engineController.operatorUiReady
                                             onClicked: engineController.exportSupportBackup()
                                         }
 
-                                        Button {
+                                        ConsoleButton {
                                             text: "Open Backups"
+                                            tone: "secondary"
                                             enabled: engineController.supportBackupDir.length > 0
                                             onClicked: engineController.openSupportBackupDirectory()
                                         }
 
-                                        Button {
+                                        ConsoleButton {
                                             text: "Refresh"
+                                            tone: "ghost"
                                             enabled: engineController.operatorUiReady
                                             onClicked: engineController.requestSupportSnapshot()
                                         }
@@ -441,26 +452,30 @@ Item {
                                 }
                             }
 
-                            Rectangle {
-                                radius: 12
-                                color: "#101826"
-                                border.color: "#2a3b55"
-                                border.width: 1
+                            ConsoleSurface {
+                                tone: "soft"
+                                padding: theme.spacing6
                                 Layout.fillWidth: true
-                                implicitHeight: availableBackupsLayout.implicitHeight + 24
+                                implicitHeight: availableBackupsLayout.implicitHeight + 2 * padding
 
                                 ColumnLayout {
                                     id: availableBackupsLayout
                                     anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 8
+                                    spacing: theme.spacing4
 
-                                    Label { text: "Available Backups"; color: "#8ea4c0"; font.pixelSize: 12 }
+                                    Label {
+                                        text: "Available Backups"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
+                                    }
 
                                     Label {
                                         visible: engineController.supportBackupCount === 0
                                         text: "No JSON backup archives are present in the backup directory."
-                                        color: "#b4c0cf"
+                                        color: theme.studio300
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textSm
                                         wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
                                     }
@@ -470,23 +485,24 @@ Item {
 
                                         Rectangle {
                                             property var entry: engineController.supportBackupFiles[index]
-                                            radius: 10
-                                            color: "#0c1320"
-                                            border.color: "#24344a"
+                                            radius: theme.radiusBadge
+                                            color: Qt.rgba(theme.surfaceDefault.r, theme.surfaceDefault.g, theme.surfaceDefault.b, 0.94)
+                                            border.color: theme.surfaceBorder
                                             border.width: 1
                                             Layout.fillWidth: true
-                                            implicitHeight: backupEntryLayout.implicitHeight + 18
+                                            implicitHeight: backupEntryLayout.implicitHeight + 2 * theme.spacing4
 
                                             ColumnLayout {
                                                 id: backupEntryLayout
                                                 anchors.fill: parent
-                                                anchors.margins: 8
-                                                spacing: 2
+                                                anchors.margins: theme.spacing4
+                                                spacing: theme.spacing2
 
                                                 Label {
                                                     text: entry.name
-                                                    color: "#f5f7fb"
-                                                    font.pixelSize: 11
+                                                    color: theme.studio050
+                                                    font.family: theme.uiFontFamily
+                                                    font.pixelSize: theme.textXs
                                                     font.weight: Font.DemiBold
                                                     wrapMode: Text.WrapAnywhere
                                                     Layout.fillWidth: true
@@ -496,8 +512,9 @@ Item {
                                                     text: root.rootWindow.formatFileSize(entry.sizeBytes)
                                                           + " | "
                                                           + root.rootWindow.formatUnixTimestamp(entry.modifiedAt)
-                                                    color: "#8ea4c0"
-                                                    font.pixelSize: 10
+                                                    color: theme.studio500
+                                                    font.family: theme.uiFontFamily
+                                                    font.pixelSize: theme.textXxs
                                                     wrapMode: Text.WordWrap
                                                     Layout.fillWidth: true
                                                 }
@@ -507,30 +524,34 @@ Item {
                                 }
                             }
 
-                            Rectangle {
-                                radius: 12
-                                color: "#101826"
-                                border.color: "#2a3b55"
-                                border.width: 1
+                            ConsoleSurface {
+                                tone: "soft"
+                                padding: theme.spacing6
                                 Layout.fillWidth: true
-                                implicitHeight: restoreDiagnosticsLayout.implicitHeight + 24
+                                implicitHeight: restoreDiagnosticsLayout.implicitHeight + 2 * padding
 
                                 ColumnLayout {
                                     id: restoreDiagnosticsLayout
                                     anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 8
+                                    spacing: theme.spacing4
 
-                                    Label { text: "Restore And Diagnostics"; color: "#8ea4c0"; font.pixelSize: 12 }
+                                    Label {
+                                        text: "Restore And Diagnostics"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
+                                    }
                                     Label {
                                         text: engineController.supportSnapshotLoaded
                                               ? engineController.supportRestoreDetails
                                               : "Support restore state is waiting for the engine."
-                                        color: "#f5f7fb"
+                                        color: theme.studio050
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textSm
                                         wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
                                     }
-                                    TextField {
+                                    ConsoleTextField {
                                         Layout.fillWidth: true
                                         text: root.rootWindow.supportRestorePathDraft
                                         placeholderText: "Path to backup JSON"
@@ -538,17 +559,19 @@ Item {
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        spacing: 8
+                                        spacing: theme.spacing4
 
-                                        Button {
+                                        ConsoleButton {
                                             text: "Restore Backup"
+                                            tone: "primary"
                                             enabled: root.rootWindow.supportRestorePathDraft.trim().length > 0
                                                      && engineController.operatorUiReady
                                             onClicked: engineController.restoreSupportBackup(root.rootWindow.supportRestorePathDraft)
                                         }
 
-                                        Button {
+                                        ConsoleButton {
                                             text: "Export Shell Diagnostics"
+                                            tone: "secondary"
                                             onClicked: engineController.exportShellDiagnostics()
                                         }
                                     }
@@ -556,104 +579,127 @@ Item {
                                         text: engineController.shellDiagnosticsExportPath.length > 0
                                               ? "Shell diagnostics: " + engineController.shellDiagnosticsExportPath
                                               : "No shell diagnostics bundle exported yet."
-                                        color: "#8ea4c0"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WrapAnywhere
                                         Layout.fillWidth: true
                                     }
                                 }
                             }
 
-                            Rectangle {
-                                radius: 12
-                                color: "#101826"
-                                border.color: "#2a3b55"
-                                border.width: 1
+                            ConsoleSurface {
+                                tone: "soft"
+                                padding: theme.spacing6
                                 Layout.fillWidth: true
-                                implicitHeight: installUpdateLayout.implicitHeight + 24
+                                implicitHeight: installUpdateLayout.implicitHeight + 2 * padding
 
                                 ColumnLayout {
                                     id: installUpdateLayout
                                     anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 8
+                                    spacing: theme.spacing4
 
-                                    Label { text: "Install And Update"; color: "#8ea4c0"; font.pixelSize: 12 }
+                                    Label {
+                                        text: "Install And Update"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
+                                    }
                                     Label {
                                         text: "Use offline installers or the maintenance-tool update repository instead of background auto-updates."
-                                        color: "#f5f7fb"
+                                        color: theme.studio050
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textSm
                                         wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
                                     }
                                     Label {
                                         text: "Preferred installer for " + root.rootWindow.hostPlatformLabel() + ": " + root.rootWindow.hostInstallerArtifact()
-                                        color: "#8ea4c0"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WrapAnywhere
                                         Layout.fillWidth: true
                                     }
                                     Label {
                                         text: "Update repository archive: " + root.rootWindow.hostUpdateArtifact()
-                                        color: "#8ea4c0"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WrapAnywhere
                                         Layout.fillWidth: true
                                     }
                                     Label {
                                         text: "Current engine version: " + engineController.engineVersion + " | Protocol: " + engineController.protocolVersion
-                                        color: "#8ea4c0"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WordWrap
                                         Layout.fillWidth: true
                                     }
                                 }
                             }
 
-                            Rectangle {
-                                radius: 12
-                                color: "#101826"
-                                border.color: "#2a3b55"
-                                border.width: 1
+                            ConsoleSurface {
+                                tone: "soft"
+                                padding: theme.spacing6
                                 Layout.fillWidth: true
-                                implicitHeight: runtimePathsLayout.implicitHeight + 24
+                                implicitHeight: runtimePathsLayout.implicitHeight + 2 * padding
 
                                 ColumnLayout {
                                     id: runtimePathsLayout
                                     anchors.fill: parent
-                                    anchors.margins: 12
-                                    spacing: 8
+                                    spacing: theme.spacing4
 
-                                    Label { text: "Runtime Paths"; color: "#8ea4c0"; font.pixelSize: 12 }
+                                    Label {
+                                        text: "Runtime Paths"
+                                        color: theme.studio500
+                                        font.family: theme.uiFontFamily
+                                        font.pixelSize: theme.textXs
+                                    }
                                     Label {
                                         text: "App data: " + engineController.appDataPath
-                                        color: "#f5f7fb"
+                                        color: theme.studio050
+                                        font.family: theme.monoFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WrapAnywhere
                                         Layout.fillWidth: true
                                     }
                                     Label {
                                         text: "Database: " + engineController.databasePath
-                                        color: "#8ea4c0"
+                                        color: theme.studio500
+                                        font.family: theme.monoFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WrapAnywhere
                                         Layout.fillWidth: true
                                     }
                                     Label {
                                         text: "Logs: " + engineController.logsPath
-                                        color: "#8ea4c0"
+                                        color: theme.studio500
+                                        font.family: theme.monoFontFamily
+                                        font.pixelSize: theme.textXs
                                         wrapMode: Text.WrapAnywhere
                                         Layout.fillWidth: true
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        spacing: 8
+                                        spacing: theme.spacing4
 
-                                        Button {
+                                        ConsoleButton {
                                             text: "Open App Data"
+                                            tone: "secondary"
                                             onClicked: engineController.openAppDataDirectory()
                                         }
 
-                                        Button {
+                                        ConsoleButton {
                                             text: "Open Logs"
+                                            tone: "secondary"
                                             onClicked: engineController.openLogsDirectory()
                                         }
 
-                                        Button {
+                                        ConsoleButton {
                                             text: "Open Engine Log"
+                                            tone: "ghost"
                                             enabled: engineController.engineLogPath.length > 0
                                             onClicked: engineController.openEngineLogFile()
                                         }
