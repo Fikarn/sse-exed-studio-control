@@ -2542,7 +2542,6 @@ ApplicationWindow {
                     anchors.bottom: parent.bottom
                     rootWindow: root
                     engineController: root.engineController
-                    scaleFactor: root.dashboardUiScale
                     enabled: false
                 }
             }
@@ -2585,7 +2584,6 @@ ApplicationWindow {
                     id: planningWorkspacePanel
                     rootWindow: root
                     engineController: root.engineController
-                    scaleFactor: root.dashboardUiScale
                     Component.onCompleted: root.planningWorkspacePanelRef = planningWorkspacePanel
                     Component.onDestruction: {
                         if (root.planningWorkspacePanelRef === planningWorkspacePanel) {

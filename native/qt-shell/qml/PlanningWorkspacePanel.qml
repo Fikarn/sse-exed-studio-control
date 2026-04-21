@@ -15,6 +15,7 @@ Item {
     property date timelineDay: todayAtMidnight()
     property date clockNow: new Date()
     property string selectedBlockId: ""
+    property bool parityFrozen: false
 
     readonly property bool timelineMode: !!engineController && engineController.planningModeSection !== "board"
     readonly property int timelineStartHour: engineController ? engineController.planningTimelineStartHour : 9
@@ -27,7 +28,7 @@ Item {
     Timer {
         id: clockTimer
         interval: 1000
-        running: true
+        running: !root.parityFrozen
         repeat: true
         onTriggered: root.clockNow = new Date()
     }
@@ -488,6 +489,7 @@ Item {
                             clockNow: root.clockNow
                             lanes: root.buildLanes()
                             selectedBlockId: root.selectedBlockId
+                            parityFrozen: root.parityFrozen
                             focus: timelineSection.visible
 
                             onBlockClicked: (taskId) => {

@@ -16,7 +16,20 @@ ApplicationWindow {
     }
 
     property real dashboardUiScale: 1.0
-    property string parityFrozenClock: "14:22:08 UTC"
+    property bool planningTimelineScene: scene === "planning-timeline-healthy"
+                                         || scene === "planning-timeline-empty"
+                                         || scene === "planning-timeline-zero-filter"
+                                         || scene === "planning-timeline-all-unscheduled"
+                                         || scene === "planning-timeline-drag"
+    property bool planningBoardScene: scene === "planning-board-healthy"
+                                      || scene === "planning-board-zero-filter"
+    property bool planningScene: planningTimelineScene || planningBoardScene
+    property bool planningEmptyScene: scene === "planning-timeline-empty"
+    property bool planningAllUnscheduledScene: scene === "planning-timeline-all-unscheduled"
+    property bool planningZeroFilterScene: scene === "planning-timeline-zero-filter"
+                                           || scene === "planning-board-zero-filter"
+    property bool planningDragScene: scene === "planning-timeline-drag"
+    property string parityFrozenClock: planningTimelineScene ? "19:42:00 UTC" : "14:22:08 UTC"
     property string parityFrozenUptime: "01:23:45"
     property bool dashboardScene: scene === "dashboard-idle"
     property bool setupWizardScene: scene === "setup-required"
@@ -81,6 +94,8 @@ ApplicationWindow {
             "completed": false,
             "isRunning": true,
             "totalSeconds": 780,
+            "scheduledStart": "2026-04-21T18:30:00.000Z",
+            "scheduledDurationSeconds": 2700,
             "checklist": [
                 { "id": "check-1", "text": "Confirm board title opens detail", "done": false },
                 { "id": "check-2", "text": "Confirm close returns to board", "done": true }
@@ -97,6 +112,8 @@ ApplicationWindow {
             "completed": false,
             "isRunning": false,
             "totalSeconds": 120,
+            "scheduledStart": "2026-04-21T19:30:00.000Z",
+            "scheduledDurationSeconds": 1800,
             "checklist": []
         },
         {
@@ -108,8 +125,40 @@ ApplicationWindow {
             "dueDate": "",
             "labels": ["startup"],
             "completed": false,
-            "isRunning": false,
+            "isRunning": true,
             "totalSeconds": 220,
+            "scheduledStart": "2026-04-21T17:00:00.000Z",
+            "scheduledDurationSeconds": 3600,
+            "checklist": []
+        },
+        {
+            "id": "task-4",
+            "projectId": "project-3",
+            "title": "Capture baseline screenshots",
+            "description": "",
+            "priority": "p1",
+            "dueDate": "",
+            "labels": ["blocked"],
+            "completed": false,
+            "isRunning": false,
+            "totalSeconds": 0,
+            "scheduledStart": "2026-04-21T18:00:00.000Z",
+            "scheduledDurationSeconds": 1800,
+            "checklist": []
+        },
+        {
+            "id": "task-5",
+            "projectId": "project-2",
+            "title": "Draft pass-1 handoff checklist",
+            "description": "",
+            "priority": "p3",
+            "dueDate": "",
+            "labels": [],
+            "completed": false,
+            "isRunning": false,
+            "totalSeconds": 0,
+            "scheduledStart": null,
+            "scheduledDurationSeconds": null,
             "checklist": []
         }
     ]
@@ -131,9 +180,44 @@ ApplicationWindow {
             "timestamp": "2026-04-17T13:00:00.000Z"
         }
     ]
-    property var projects: scene === "planning-empty" ? [] : baseProjects
-    property var tasks: scene === "planning-empty" ? [] : baseTasks
-    property var activityLog: scene === "planning-empty" ? [] : baseActivityLog
+    function stripSchedule(list) {
+        const out = []
+        for (let index = 0; index < list.length; index += 1) {
+            const copy = {}
+            for (const key in list[index]) {
+                copy[key] = list[index][key]
+            }
+            copy.scheduledStart = null
+            copy.scheduledDurationSeconds = null
+            out.push(copy)
+        }
+        return out
+    }
+
+    function shiftFirstTaskForDrag(list) {
+        const out = []
+        for (let index = 0; index < list.length; index += 1) {
+            const copy = {}
+            for (const key in list[index]) {
+                copy[key] = list[index][key]
+            }
+            if (copy.id === "task-1") {
+                copy.scheduledStart = "2026-04-21T19:15:00.000Z"
+            }
+            out.push(copy)
+        }
+        return out
+    }
+
+    property var projects: root.planningEmptyScene ? [] : baseProjects
+    property var tasks: root.planningEmptyScene
+                        ? []
+                        : root.planningAllUnscheduledScene
+                          ? stripSchedule(baseTasks)
+                          : root.planningDragScene
+                            ? shiftFirstTaskForDrag(baseTasks)
+                            : baseTasks
+    property var activityLog: root.planningEmptyScene ? [] : baseActivityLog
 
     width: captureWidth
     height: captureHeight
@@ -229,9 +313,14 @@ ApplicationWindow {
         property int planningRunningTaskCount: 1
         property int planningCompletedTaskCount: 0
         property string planningSortBy: "manual"
-        property string planningViewFilter: "all"
+        property string planningViewFilter: root.planningZeroFilterScene ? "done" : "all"
+        property string planningModeSection: root.planningBoardScene ? "board" : "timeline"
+        property int planningTimelineStartHour: 9
+        property int planningTimelineEndHour: 22
         property string planningSelectedProjectId: root.projects.length > 0 && root.scene !== "dashboard-idle" ? "project-1" : ""
-        property string planningSelectedTaskId: root.tasks.length > 0 && root.scene !== "dashboard-idle" ? "task-1" : ""
+        property string planningSelectedTaskId: root.planningDragScene
+                                                ? "task-1"
+                                                : root.tasks.length > 0 && root.scene !== "dashboard-idle" ? "task-1" : ""
         property bool planningTimeReportLoaded: true
         property int planningTotalTrackedSeconds: 1120
         property var planningTimeByProject: [
@@ -252,6 +341,7 @@ ApplicationWindow {
             }
         }
         function requestPlanningTimeReport() {}
+        function reschedulePlanningTask(taskId, scheduledStart, scheduledDuration) {}
         function selectPlanningProject(projectId) { planningSelectedProjectId = projectId }
         function selectPlanningTask(taskId) { planningSelectedTaskId = taskId }
         function createPlanningProject(title) {}
@@ -660,7 +750,6 @@ ApplicationWindow {
                     id: planningWorkspacePanel
                     rootWindow: root
                     engineController: engineControllerStub
-                    scaleFactor: root.dashboardUiScale
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     opacity: root.setupWizardScene ? 1.0 : 1.0
@@ -684,11 +773,19 @@ ApplicationWindow {
             }
 
             PlanningWorkspacePanel {
+                id: planningMainPanel
                 rootWindow: root
                 engineController: engineControllerStub
-                scaleFactor: root.dashboardUiScale
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                parityFrozen: root.planningScene
+                timelineDay: root.planningScene
+                              ? new Date("2026-04-21T00:00:00.000Z")
+                              : planningMainPanel.todayAtMidnight()
+                clockNow: root.planningScene
+                          ? new Date("2026-04-21T19:42:00.000Z")
+                          : new Date()
+                selectedBlockId: root.planningDragScene ? "task-1" : ""
             }
         }
 

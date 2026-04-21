@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Effects
 import QtQuick.Layouts
 
 Rectangle {
@@ -14,6 +13,7 @@ Rectangle {
     property bool selected: false
     property bool draggable: true
     property bool dragging: false
+    property bool parityFrozen: false
 
     signal blockClicked()
     signal dragStarted()
@@ -29,22 +29,14 @@ Rectangle {
                                                            : theme.studio500
 
     radius: theme.scheduleBlockRadius
-    color: running ? Qt.rgba(theme.accentPrimary.r, theme.accentPrimary.g, theme.accentPrimary.b, 0.18)
+    color: running ? Qt.rgba(theme.accentPrimary.r, theme.accentPrimary.g, theme.accentPrimary.b, 0.22)
          : blocked ? Qt.rgba(theme.accentRed.r, theme.accentRed.g, theme.accentRed.b, 0.20)
          : status === "done" ? Qt.rgba(theme.accentGreen.r, theme.accentGreen.g, theme.accentGreen.b, 0.15)
                              : Qt.rgba(theme.studio800.r, theme.studio800.g, theme.studio800.b, 0.94)
-    border.width: 1
+    border.width: root.dragging ? 2 : 1
     border.color: selected ? Qt.rgba(theme.accentPrimary.r, theme.accentPrimary.g, theme.accentPrimary.b, 0.72)
-                           : Qt.rgba(root.statusTint.r, root.statusTint.g, root.statusTint.b, 0.38)
-
-    layer.enabled: running || dragging
-    layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowColor: dragging ? theme.elevation2Shadow : theme.accentPrimaryGlow
-        shadowVerticalOffset: dragging ? theme.elevation2OffsetY : 0
-        shadowBlur: dragging ? theme.elevation2Blur / 32.0 : 0.35
-        shadowOpacity: dragging ? 0.66 : 0.8
-    }
+                : root.dragging ? Qt.rgba(theme.accentPrimary.r, theme.accentPrimary.g, theme.accentPrimary.b, 0.85)
+                                : Qt.rgba(root.statusTint.r, root.statusTint.g, root.statusTint.b, 0.38)
 
     Rectangle {
         anchors.left: parent.left
@@ -56,7 +48,7 @@ Rectangle {
     }
 
     SequentialAnimation on opacity {
-        running: root.running
+        running: root.running && !root.parityFrozen
         loops: Animation.Infinite
         NumberAnimation { from: 0.82; to: 1.0; duration: 900; easing.type: Easing.InOutQuad }
         NumberAnimation { from: 1.0; to: 0.82; duration: 900; easing.type: Easing.InOutQuad }

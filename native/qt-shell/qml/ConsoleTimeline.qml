@@ -13,6 +13,7 @@ Rectangle {
     property string selectedBlockId: ""
     property bool laneCompressionActive: false
     property int laneHeight: theme.timelineLaneHeight
+    property bool parityFrozen: false
 
     signal blockClicked(string taskId)
     signal blockDragReleased(string taskId, date newStart)
@@ -331,6 +332,7 @@ Rectangle {
                             running: modelData && modelData.running ? true : false
                             blocked: modelData && modelData.blocked ? true : false
                             selected: root.selectedBlockId.length > 0 && root.selectedBlockId === taskId
+                            parityFrozen: root.parityFrozen
 
                             onBlockClicked: root.blockClicked(taskId)
                             onDragFinished: (deltaX) => {

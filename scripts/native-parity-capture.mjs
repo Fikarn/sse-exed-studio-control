@@ -18,8 +18,13 @@ const resolutionFilter = resolutionArg ? resolutionArg.slice("--resolution=".len
 
 const scenes = [
   { name: "dashboard-idle", engine: false },
-  { name: "planning-populated", engine: false },
-  { name: "planning-empty", engine: false },
+  { name: "planning-timeline-healthy", engine: false },
+  { name: "planning-timeline-empty", engine: false },
+  { name: "planning-timeline-zero-filter", engine: false },
+  { name: "planning-timeline-all-unscheduled", engine: false },
+  { name: "planning-timeline-drag", engine: false },
+  { name: "planning-board-healthy", engine: false },
+  { name: "planning-board-zero-filter", engine: false },
   { name: "project-detail-open", engine: false },
   { name: "time-report-open", engine: false },
   { name: "shortcuts-open", engine: false },
@@ -141,6 +146,7 @@ for (const resolution of selectedResolutions) {
     const captureEnv = {
       QML_DISABLE_DISK_CACHE: "1",
       QT_QUICK_CONTROLS_STYLE: "Basic",
+      TZ: "UTC",
     };
 
     if (onscreenMode) {
