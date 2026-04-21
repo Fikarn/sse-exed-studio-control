@@ -179,14 +179,43 @@ function fixtureTypeBadgeLabel(typeId) {
 
 function fixtureAccentColor(fixture) {
     const item = fixture || {}
-    const cct = Number(item.cct || 5600)
-    if (cct <= 3200) {
-        return "#ff9f4d"
+    return kelvinToColor(Number(item.cct || 5600))
+}
+
+// Canonical CCT→color ramp (v2.2). Preserves three anchor hues from prior
+// ad-hoc copies and linearly interpolates between them in sRGB space.
+// Anchors: 2700 K → #ff8a3c, 3200 K → #ffb35c, 4400 K → #ffd38b,
+//          5600 K → #fff5e6, 6500 K → #eaf0ff.
+function kelvinToColor(k) {
+    const value = Number.isFinite(k) ? k : 5600
+    const stops = [
+        { "k": 2700, "r": 0xff, "g": 0x8a, "b": 0x3c },
+        { "k": 3200, "r": 0xff, "g": 0xb3, "b": 0x5c },
+        { "k": 4400, "r": 0xff, "g": 0xd3, "b": 0x8b },
+        { "k": 5600, "r": 0xff, "g": 0xf5, "b": 0xe6 },
+        { "k": 6500, "r": 0xea, "g": 0xf0, "b": 0xff }
+    ]
+
+    if (value <= stops[0].k) {
+        return Qt.rgba(stops[0].r / 255, stops[0].g / 255, stops[0].b / 255, 1)
     }
-    if (cct <= 4400) {
-        return "#ffcd7d"
+    const last = stops[stops.length - 1]
+    if (value >= last.k) {
+        return Qt.rgba(last.r / 255, last.g / 255, last.b / 255, 1)
     }
-    return "#e9f1ff"
+
+    for (let index = 0; index < stops.length - 1; index += 1) {
+        const lo = stops[index]
+        const hi = stops[index + 1]
+        if (value >= lo.k && value <= hi.k) {
+            const t = (value - lo.k) / (hi.k - lo.k)
+            const r = lo.r + (hi.r - lo.r) * t
+            const g = lo.g + (hi.g - lo.g) * t
+            const b = lo.b + (hi.b - lo.b) * t
+            return Qt.rgba(r / 255, g / 255, b / 255, 1)
+        }
+    }
+    return Qt.rgba(1, 1, 1, 1)
 }
 
 function effectOptions() {

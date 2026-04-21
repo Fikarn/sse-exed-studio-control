@@ -106,6 +106,31 @@ QtObject {
     readonly property int timelineScaleHeight: 36
     readonly property int scheduleBlockRadius: radiusBadge
 
+    // Lighting v2.2 — stage plot, cue rail, inspector, control strip
+    readonly property color stageCanvas: "#08090e"
+    readonly property color stageOutline: Qt.rgba(studio500.r, studio500.g, studio500.b, 0.35)
+    readonly property color stageGridLine: Qt.rgba(studio500.r, studio500.g, studio500.b, 0.08)
+    readonly property color stageGridMajor: Qt.rgba(studio500.r, studio500.g, studio500.b, 0.18)
+    readonly property color stageSelectionFill: Qt.rgba(accentPrimary.r, accentPrimary.g, accentPrimary.b, 0.18)
+    readonly property color stageSelectionStroke: accentPrimary
+    readonly property color cueActiveTint: Qt.rgba(accentPrimary.r, accentPrimary.g, accentPrimary.b, 0.20)
+    readonly property color cueNextHint: Qt.rgba(accentAmber.r, accentAmber.g, accentAmber.b, 0.22)
+    readonly property color dmxReachableTint: Qt.rgba(accentGreen.r, accentGreen.g, accentGreen.b, 0.18)
+    readonly property color dmxUnreachableTint: Qt.rgba(accentRed.r, accentRed.g, accentRed.b, 0.22)
+    readonly property color beamConeTint: Qt.rgba(accentAmber.r, accentAmber.g, accentAmber.b, 0.14)
+
+    readonly property int stagePlotMinHeight: 520
+    readonly property int cueRailWidth2k: 380
+    readonly property int cueRailWidth1080: 300
+    readonly property int inspectorWidth2k: 440
+    readonly property int inspectorWidth1080: 340
+    readonly property int controlStripHeight2k: 140
+    readonly property int controlStripHeight1080: 112
+    readonly property int cueRowHeight: 56
+    readonly property int cueRowHeightCompact: 44
+    readonly property int fixtureDotRadius: 22
+    readonly property int fixtureDotRadiusCompact: 18
+
     function statusColor(status) {
         switch (status) {
         case "healthy":

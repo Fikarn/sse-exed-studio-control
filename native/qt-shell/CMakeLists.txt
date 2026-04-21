@@ -75,6 +75,13 @@ qt_add_qml_module(sse_exed_native
     qml/ConsoleKanbanCard.qml
     qml/ConsoleUnscheduledTray.qml
     qml/ConsoleModal.qml
+    qml/ConsoleFixtureBadge.qml
+    qml/ConsoleStagePlot.qml
+    qml/ConsoleCueRail.qml
+    qml/ConsoleGoBar.qml
+    qml/ConsoleInspector.qml
+    qml/ConsoleDmxPeek.qml
+    qml/ConsoleChipRow.qml
     qml/OperatorParityHelpers.js
     qml/OperatorShortcutLayer.qml
     qml/SafetyHoldButton.qml

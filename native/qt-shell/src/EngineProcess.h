@@ -78,6 +78,8 @@ class EngineProcess : public QObject {
   Q_PROPERTY(QString lightingSelectedFixtureId READ lightingSelectedFixtureId NOTIFY lightingSnapshotChanged)
   Q_PROPERTY(QVariantMap lightingCameraMarker READ lightingCameraMarker NOTIFY lightingSnapshotChanged)
   Q_PROPERTY(QVariantMap lightingSubjectMarker READ lightingSubjectMarker NOTIFY lightingSnapshotChanged)
+  Q_PROPERTY(QVariantList lightingCues READ lightingCues NOTIFY lightingSnapshotChanged)
+  Q_PROPERTY(QString lightingActiveCueId READ lightingActiveCueId NOTIFY lightingSnapshotChanged)
   Q_PROPERTY(bool lightingDmxMonitorLoaded READ lightingDmxMonitorLoaded NOTIFY lightingDmxMonitorChanged)
   Q_PROPERTY(QVariantList lightingDmxChannels READ lightingDmxChannels NOTIFY lightingDmxMonitorChanged)
   Q_PROPERTY(bool audioSnapshotLoaded READ audioSnapshotLoaded NOTIFY audioSnapshotChanged)
@@ -235,6 +237,8 @@ public:
   QString lightingSelectedFixtureId() const;
   QVariantMap lightingCameraMarker() const;
   QVariantMap lightingSubjectMarker() const;
+  QVariantList lightingCues() const;
+  QString lightingActiveCueId() const;
   bool lightingDmxMonitorLoaded() const;
   QVariantList lightingDmxChannels() const;
   bool audioSnapshotLoaded() const;
@@ -328,6 +332,10 @@ public:
   Q_INVOKABLE void createLightingFixture(const QVariantMap &fixture);
   Q_INVOKABLE void updateLightingFixture(const QString &fixtureId, const QVariantMap &changes);
   Q_INVOKABLE void deleteLightingFixture(const QString &fixtureId);
+  Q_INVOKABLE void createLightingCue(const QVariantMap &params);
+  Q_INVOKABLE void updateLightingCue(const QString &cueId, const QVariantMap &changes);
+  Q_INVOKABLE void deleteLightingCue(const QString &cueId);
+  Q_INVOKABLE void fireLightingCue(const QString &cueId, const QVariant &fadeOverrideMs = QVariant());
   Q_INVOKABLE void updateLightingSettings(const QVariantMap &changes);
   Q_INVOKABLE void setLightingFixturePower(const QString &fixtureId, bool on);
   Q_INVOKABLE void setLightingAllPower(bool on);
@@ -530,6 +538,8 @@ private:
   QString m_lightingSelectedFixtureId;
   QVariantMap m_lightingCameraMarker;
   QVariantMap m_lightingSubjectMarker;
+  QVariantList m_lightingCues;
+  QString m_lightingActiveCueId;
   bool m_lightingDmxMonitorLoaded = false;
   QVariantList m_lightingDmxChannels;
   bool m_audioSnapshotLoaded = false;

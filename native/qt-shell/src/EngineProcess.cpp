@@ -520,6 +520,14 @@ QVariantMap EngineProcess::lightingSubjectMarker() const {
   return m_lightingSubjectMarker;
 }
 
+QVariantList EngineProcess::lightingCues() const {
+  return m_lightingCues;
+}
+
+QString EngineProcess::lightingActiveCueId() const {
+  return m_lightingActiveCueId;
+}
+
 bool EngineProcess::lightingDmxMonitorLoaded() const {
   return m_lightingDmxMonitorLoaded;
 }
@@ -1206,6 +1214,77 @@ void EngineProcess::deleteLightingFixture(const QString &fixtureId) {
     {"fixtureId", trimmedFixtureId},
   };
   m_process.write(buildRequest("lighting-fixture-delete", "lighting.fixture.delete", params));
+}
+
+void EngineProcess::createLightingCue(const QVariantMap &params) {
+  if (m_process.state() != QProcess::Running) {
+    setFailure("Cannot create a lighting cue because the engine is not running.", "ENGINE_NOT_RUNNING");
+    return;
+  }
+
+  if (params.isEmpty()) {
+    return;
+  }
+
+  const QJsonObject payload = QJsonObject::fromVariantMap(params);
+  m_process.write(buildRequest("lighting-cue-create", "lighting.cue.create", payload));
+}
+
+void EngineProcess::updateLightingCue(const QString &cueId, const QVariantMap &changes) {
+  if (m_process.state() != QProcess::Running) {
+    setFailure("Cannot update a lighting cue because the engine is not running.", "ENGINE_NOT_RUNNING");
+    return;
+  }
+
+  const QString trimmedCueId = cueId.trimmed();
+  if (trimmedCueId.isEmpty() || changes.isEmpty()) {
+    return;
+  }
+
+  QJsonObject payload = QJsonObject::fromVariantMap(changes);
+  payload.insert("cueId", trimmedCueId);
+  m_process.write(buildRequest("lighting-cue-update", "lighting.cue.update", payload));
+}
+
+void EngineProcess::deleteLightingCue(const QString &cueId) {
+  if (m_process.state() != QProcess::Running) {
+    setFailure("Cannot delete a lighting cue because the engine is not running.", "ENGINE_NOT_RUNNING");
+    return;
+  }
+
+  const QString trimmedCueId = cueId.trimmed();
+  if (trimmedCueId.isEmpty()) {
+    return;
+  }
+
+  const QJsonObject payload{
+    {"cueId", trimmedCueId},
+  };
+  m_process.write(buildRequest("lighting-cue-delete", "lighting.cue.delete", payload));
+}
+
+void EngineProcess::fireLightingCue(const QString &cueId, const QVariant &fadeOverrideMs) {
+  if (m_process.state() != QProcess::Running) {
+    setFailure("Cannot fire a lighting cue because the engine is not running.", "ENGINE_NOT_RUNNING");
+    return;
+  }
+
+  const QString trimmedCueId = cueId.trimmed();
+  if (trimmedCueId.isEmpty()) {
+    return;
+  }
+
+  QJsonObject payload{
+    {"cueId", trimmedCueId},
+  };
+  if (fadeOverrideMs.isValid() && !fadeOverrideMs.isNull()) {
+    bool ok = false;
+    const double fadeValue = fadeOverrideMs.toDouble(&ok);
+    if (ok) {
+      payload.insert("fadeOverrideMs", fadeValue);
+    }
+  }
+  m_process.write(buildRequest("lighting-cue-fire", "lighting.cue.fire", payload));
 }
 
 void EngineProcess::updateLightingSettings(const QVariantMap &changes) {
@@ -2309,6 +2388,8 @@ void EngineProcess::resetLightingSnapshot(const QString &details) {
   m_lightingSelectedFixtureId.clear();
   m_lightingCameraMarker.clear();
   m_lightingSubjectMarker.clear();
+  m_lightingCues.clear();
+  m_lightingActiveCueId.clear();
   emit lightingSnapshotChanged();
 }
 
@@ -2972,6 +3053,8 @@ void EngineProcess::processMessage(const QJsonObject &object) {
     m_lightingSelectedFixtureId = result.value("selectedFixtureId").toString();
     m_lightingCameraMarker = result.value("cameraMarker").toObject().toVariantMap();
     m_lightingSubjectMarker = result.value("subjectMarker").toObject().toVariantMap();
+    m_lightingCues = result.value("cues").toArray().toVariantList();
+    m_lightingActiveCueId = result.value("activeCueId").toString();
     m_lightingSnapshotLoaded = true;
     m_lightingDetails = result.value("summary").toString(
       QString("Lighting status '%1', bridge '%2', universe %3.")
