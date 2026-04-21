@@ -23,16 +23,19 @@ Button {
 
     implicitHeight: tone === "workspaceTab" ? theme.toolbarHeight
                    : tone === "monoRail" ? 22
+                   : tone === "stepFooter" ? 48
                    : compact || dense ? theme.compactControlHeight
                    : theme.controlHeight
     implicitWidth: Math.max(background ? background.implicitWidth : 0, contentRow.implicitWidth + leftPadding + rightPadding)
     leftPadding: tone === "icon" ? 0
                 : tone === "workspaceTab" ? (iconSvgName.length > 0 ? 16 : 14)
                 : tone === "monoRail" ? 6
+                : tone === "stepFooter" ? 20
                 : iconText.length > 0 ? (dense ? 9 : 10) : (dense ? 10 : 12)
     rightPadding: tone === "icon" ? 0
                  : tone === "workspaceTab" ? 18
                  : tone === "monoRail" ? 6
+                 : tone === "stepFooter" ? 20
                  : dense ? 10 : 12
     topPadding: 0
     bottomPadding: 0
@@ -62,7 +65,7 @@ Button {
                                             : Qt.rgba(theme.accentRed.r, theme.accentRed.g, theme.accentRed.b, 0.16)
         }
 
-        if (tone === "primary") {
+        if (tone === "primary" || tone === "stepFooter") {
             return root.down ? Qt.darker(theme.accentPrimary, 1.18)
                              : root.hovered ? Qt.lighter(theme.accentPrimary, 1.04)
                                             : theme.accentPrimary
@@ -117,7 +120,7 @@ Button {
             return Qt.rgba(theme.accentRed.r, theme.accentRed.g, theme.accentRed.b, 0.44)
         }
 
-        if (tone === "primary") {
+        if (tone === "primary" || tone === "stepFooter") {
             return Qt.rgba(theme.accentPrimary.r, theme.accentPrimary.g, theme.accentPrimary.b, 0.44)
         }
 
@@ -153,7 +156,7 @@ Button {
             return theme.studio050
         }
 
-        if (tone === "primary") {
+        if (tone === "primary" || tone === "stepFooter") {
             return theme.studio950
         }
 

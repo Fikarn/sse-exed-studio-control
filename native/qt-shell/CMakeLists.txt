@@ -67,6 +67,7 @@ qt_add_qml_module(sse_exed_native
     qml/ConsoleIcon.qml
     qml/ConsoleStatusBadge.qml
     qml/ConsoleStatCard.qml
+    qml/ConsoleStepHeader.qml
     qml/ConsoleTabButton.qml
     qml/ConsoleModal.qml
     qml/OperatorParityHelpers.js

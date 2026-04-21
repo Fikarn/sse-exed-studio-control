@@ -50,6 +50,9 @@ QtObject {
 
     readonly property color accentPrimarySoft: "#2e99ba92"
     readonly property color accentPrimaryGlow: "#1499ba92"
+    readonly property color bgStepActive: "#14101a10"
+
+    readonly property int stepIndicatorWidth: 72
 
     readonly property color focusRing: "#99ba92"
     readonly property int focusRingWidth: 2
