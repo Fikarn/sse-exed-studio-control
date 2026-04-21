@@ -20,9 +20,15 @@ ApplicationWindow {
     property string parityFrozenUptime: "01:23:45"
     property bool dashboardScene: scene === "dashboard-idle"
     property bool setupWizardScene: scene === "setup-required"
+    property bool setupSupportReadyScene: scene === "setup-support-ready"
+    property bool setupSupportEmptyScene: scene === "setup-support-empty"
+    property bool setupRunnerVerifyScene: scene === "setup-runner-verify-live"
     property bool setupScene: scene === "setup-control-selected"
                               || scene === "setup-control-page-nav"
                               || scene === "setup-control-dial-selected"
+                              || setupSupportReadyScene
+                              || setupSupportEmptyScene
+                              || setupRunnerVerifyScene
     property string planningSearchQuery: ""
     property bool planningTimeReportVisible: scene === "time-report-open"
     property bool keyboardHelpVisible: scene === "shortcuts-open"
@@ -36,7 +42,7 @@ ApplicationWindow {
                                                     : scene === "setup-control-dial-selected"
                                                       ? "proj-dial-1-press"
                                                       : "proj-btn-7"
-    property bool controlSurfaceOverviewVerifyMode: false
+    property bool controlSurfaceOverviewVerifyMode: root.setupRunnerVerifyScene
     property var baseProjects: [
         {
             "id": "project-1",
@@ -140,6 +146,12 @@ ApplicationWindow {
 
             property bool operatorUiReady: true
             property string workspaceMode: root.setupScene ? "setup" : "planning"
+            property string startupTargetSurface: "dashboard"
+            property string commissioningStage: root.setupSupportReadyScene || root.setupSupportEmptyScene
+                                                ? "ready"
+                                                : "in-progress"
+            property string lightingBridgeIp: "127.0.0.1"
+            property int audioReceivePort: 9001
             property string healthStatus: "healthy"
             property string stateLabel: "Running"
             property string startupPhaseLabel: "Ready"
@@ -164,12 +176,14 @@ ApplicationWindow {
             property string supportDetails: "Native support archives protect planning, lighting, audio, and setup state."
             property string supportRestoreDetails: "Restore from a native support backup archive."
             property string supportBackupDir: "/tmp/backups"
-            property string supportLatestBackupPath: "/tmp/backups/latest.json"
-            property int supportBackupCount: 2
-            property var supportBackupFiles: [
-                { "name": "backup-a.json", "sizeBytes": 200, "modifiedAt": "2026-04-17T12:00:00Z" },
-                { "name": "backup-b.json", "sizeBytes": 180, "modifiedAt": "2026-04-17T13:00:00Z" }
-            ]
+            property string supportLatestBackupPath: root.setupSupportEmptyScene ? "" : "/tmp/backups/latest.json"
+            property int supportBackupCount: root.setupSupportEmptyScene ? 0 : 2
+            property var supportBackupFiles: root.setupSupportEmptyScene
+                ? []
+                : [
+                    { "name": "backup-a.json", "sizeBytes": 200, "modifiedAt": "2026-04-17T12:00:00Z" },
+                    { "name": "backup-b.json", "sizeBytes": 180, "modifiedAt": "2026-04-17T13:00:00Z" }
+                ]
             property string shellDiagnosticsExportPath: ""
             property string appDataPath: "/tmp/appdata"
             property string databasePath: "/tmp/appdata/state.sqlite"
@@ -269,6 +283,10 @@ ApplicationWindow {
         function openAppDataDirectory() {}
         function openLogsDirectory() {}
         function openEngineLogFile() {}
+        function openDiagnosticsDirectory() {}
+        function runLightingProbe(ip, universe) {}
+        function runAudioProbe(sendHost, sendPort, receivePort) {}
+        function updateCommissioningStage(stage) { commissioningStage = stage }
     }
 
     function planningResultCount() {
@@ -675,12 +693,23 @@ ApplicationWindow {
         }
 
         SetupWorkspacePanel {
+            id: setupWorkspacePanel
             visible: root.setupScene
             anchors.fill: parent
             anchors.margins: 16
             rootWindow: root
             engineController: engineControllerStub
             scaleFactor: 1.0
+            activeSection: root.setupSupportReadyScene || root.setupSupportEmptyScene
+                           ? "support"
+                           : "commissioning"
+            activeStepId: root.setupRunnerVerifyScene
+                          ? "verify"
+                          : (root.scene === "setup-control-selected"
+                             || root.scene === "setup-control-page-nav"
+                             || root.scene === "setup-control-dial-selected")
+                            ? "map"
+                            : "import"
         }
 
         SetupWizardOverlay {

@@ -675,8 +675,10 @@ Item {
                             tone: "soft"
                             padding: theme.spacing6
                             Layout.fillWidth: true
+                            implicitHeight: diagnosticsCardLayout.implicitHeight + 2 * padding
 
                             ColumnLayout {
+                                id: diagnosticsCardLayout
                                 anchors.fill: parent
                                 spacing: theme.spacing4
 
