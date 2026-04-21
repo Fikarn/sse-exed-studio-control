@@ -161,6 +161,7 @@ Item {
                             onViewModeSelected: function(nextViewMode) {
                                 root.viewMode = nextViewMode
                             }
+                            onAddLightRequested: lightingSidebarPanel.addLightDialogVisible = true
                         }
 
                         LightingSidebarPanel {
