@@ -10,6 +10,9 @@ Button {
     property string iconText: ""
     property string iconFontFamily: theme.uiFontFamily
     property bool dense: false
+    property string subtitle: ""
+    property string iconSvgName: ""
+    property int iconSvgPixelSize: tone === "workspaceTab" ? 18 : 16
     property int iconPixelSize: tone === "icon"
                                  ? (dense ? theme.textXs : theme.textSm)
                                  : (dense ? theme.textXxs : theme.textXs)
@@ -18,10 +21,19 @@ Button {
         id: theme
     }
 
-    implicitHeight: compact || dense ? theme.compactControlHeight : theme.controlHeight
+    implicitHeight: tone === "workspaceTab" ? theme.toolbarHeight
+                   : tone === "monoRail" ? 22
+                   : compact || dense ? theme.compactControlHeight
+                   : theme.controlHeight
     implicitWidth: Math.max(background ? background.implicitWidth : 0, contentRow.implicitWidth + leftPadding + rightPadding)
-    leftPadding: tone === "icon" ? 0 : iconText.length > 0 ? (dense ? 9 : 10) : (dense ? 10 : 12)
-    rightPadding: tone === "icon" ? 0 : dense ? 10 : 12
+    leftPadding: tone === "icon" ? 0
+                : tone === "workspaceTab" ? (iconSvgName.length > 0 ? 16 : 14)
+                : tone === "monoRail" ? 6
+                : iconText.length > 0 ? (dense ? 9 : 10) : (dense ? 10 : 12)
+    rightPadding: tone === "icon" ? 0
+                 : tone === "workspaceTab" ? 18
+                 : tone === "monoRail" ? 6
+                 : dense ? 10 : 12
     topPadding: 0
     bottomPadding: 0
     hoverEnabled: true
@@ -78,6 +90,20 @@ Button {
                                             : Qt.rgba(theme.surfaceSoft.r, theme.surfaceSoft.g, theme.surfaceSoft.b, 0.86)
         }
 
+        if (tone === "workspaceTab") {
+            if (active) {
+                return theme.accentPrimaryGlow
+            }
+
+            return root.down ? Qt.rgba(theme.studio750.r, theme.studio750.g, theme.studio750.b, 0.72)
+                             : root.hovered ? Qt.rgba(theme.studio750.r, theme.studio750.g, theme.studio750.b, 0.48)
+                                            : "transparent"
+        }
+
+        if (tone === "monoRail") {
+            return "transparent"
+        }
+
         return root.down ? theme.studio700 : root.hovered ? theme.studio750 : theme.surfaceSoft
     }
 
@@ -105,6 +131,10 @@ Button {
 
         if (tone === "tab") {
             return active ? Qt.rgba(theme.accentPrimary.r, theme.accentPrimary.g, theme.accentPrimary.b, 0.38) : theme.surfaceBorder
+        }
+
+        if (tone === "workspaceTab" || tone === "monoRail") {
+            return "transparent"
         }
 
         return theme.surfaceBorder
@@ -139,16 +169,45 @@ Button {
             return active ? theme.studio050 : theme.studio300
         }
 
+        if (tone === "workspaceTab") {
+            return root.active ? theme.studio050 : root.hovered ? theme.studio100 : theme.studio300
+        }
+
+        if (tone === "monoRail") {
+            return root.hovered ? theme.studio300 : theme.studio500
+        }
+
         return theme.studio100
     }
 
     background: Rectangle {
         implicitWidth: root.tone === "icon" ? root.implicitHeight : 124
-        radius: root.tone === "chip" ? theme.radiusPill : theme.radiusBadge
+        radius: root.tone === "chip" ? theme.radiusPill
+                                     : root.tone === "workspaceTab" || root.tone === "monoRail" ? 0
+                                                                                                 : theme.radiusBadge
         color: root.backgroundColor()
-        border.width: root.tone === "ghost" ? (root.hovered || root.activeFocus ? 1 : 0) : 1
+        border.width: root.tone === "ghost" ? (root.hovered || root.activeFocus ? 1 : 0)
+                                             : root.tone === "workspaceTab" || root.tone === "monoRail" ? 0
+                                                                                                        : 1
         border.color: root.activeFocus ? Qt.rgba(theme.accentPrimary.r, theme.accentPrimary.g, theme.accentPrimary.b, 0.72)
                                        : root.borderColor()
+
+        Rectangle {
+            visible: root.tone === "workspaceTab" && root.active
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 3
+            color: theme.accentPrimary
+        }
+
+        Rectangle {
+            visible: root.tone === "workspaceTab" && root.activeFocus && !root.active
+            anchors.fill: parent
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(theme.accentPrimary.r, theme.accentPrimary.g, theme.accentPrimary.b, 0.72)
+        }
     }
 
     contentItem: Item {
@@ -158,11 +217,22 @@ Button {
         RowLayout {
             id: contentRow
             anchors.centerIn: parent
-            spacing: iconLabel.visible && textLabel.visible ? 6 : 0
+            spacing: (iconLabel.visible || iconSvg.visible) && textStack.visible ? 6 : 0
+
+            ConsoleIcon {
+                id: iconSvg
+                visible: root.iconSvgName.length > 0
+                iconName: root.iconSvgName
+                tint: root.textColor()
+                pixelSize: root.iconSvgPixelSize
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: root.iconSvgPixelSize
+                Layout.preferredHeight: root.iconSvgPixelSize
+            }
 
             Label {
                 id: iconLabel
-                visible: root.iconText.length > 0
+                visible: root.iconText.length > 0 && !iconSvg.visible
                 text: root.iconText
                 color: root.textColor()
                 font.family: root.iconFontFamily
@@ -172,16 +242,36 @@ Button {
                 verticalAlignment: Text.AlignVCenter
             }
 
-            Label {
-                id: textLabel
-                visible: root.text.length > 0
-                text: root.text
-                color: root.textColor()
-                font.family: theme.uiFontFamily
-                font.pixelSize: root.compact || root.dense ? theme.textXs : theme.textSm
-                font.weight: root.active || root.tone === "primary" ? Font.DemiBold : Font.Medium
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+            ColumnLayout {
+                id: textStack
+                visible: textLabel.visible || subtitleLabel.visible
+                spacing: 1
+
+                Label {
+                    id: textLabel
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: root.text.length > 0
+                    text: root.text
+                    color: root.textColor()
+                    font.family: theme.uiFontFamily
+                    font.pixelSize: root.compact || root.dense ? theme.textXs : theme.textSm
+                    font.weight: root.active || root.tone === "primary" ? Font.DemiBold : Font.Medium
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                Label {
+                    id: subtitleLabel
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: root.subtitle.length > 0
+                    text: root.subtitle
+                    color: root.tone === "workspaceTab" && root.active ? theme.studio300 : theme.studio500
+                    font.family: theme.monoFontFamily
+                    font.pixelSize: theme.textXxs
+                    font.weight: Font.Medium
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
         }
     }
