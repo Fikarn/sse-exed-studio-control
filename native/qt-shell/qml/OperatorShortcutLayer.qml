@@ -35,6 +35,12 @@ Item {
     }
 
     Shortcut {
+        sequence: "Shift+S"
+        enabled: root.operatorShortcutsEnabled()
+        onActivated: engineController.setWorkspaceMode("setup")
+    }
+
+    Shortcut {
         sequence: "N"
         enabled: root.planningShortcutsEnabled()
         onActivated: {
