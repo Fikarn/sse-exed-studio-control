@@ -49,14 +49,25 @@ TestCase {
                 property bool audioVerified: true
                 property bool audioConnected: true
                 property int lightingFixtureCount: 12
+                property int lightingUniverse: 1
                 property int audioChannelCount: 18
                 property int planningProjectCount: 7
+                property string engineVersion: "2.1.0"
+                property string protocolVersion: "v3.2"
+                property string storageDetails: "Saved locally"
+                property string audioSendHost: "127.0.0.1"
+                property int audioSendPort: 9000
+                property string planningSelectedProjectId: ""
+                property var planningProjects: []
                 property string lastWorkspaceMode: ""
 
                 function setWorkspaceMode(workspaceMode) {
                     lastWorkspaceMode = workspaceMode
                     this.workspaceMode = workspaceMode
                 }
+
+                function requestLightingSnapshot() {}
+                function requestAudioSnapshot() {}
             }
 
             DashboardHeaderPanel {

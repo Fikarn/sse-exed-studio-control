@@ -4,16 +4,14 @@ import QtQuick.Layouts
 import QtQuick.Window
 import QtQml
 
-ConsoleSurface {
+Rectangle {
     id: root
     objectName: "dashboard-header-panel"
     required property var rootWindow
     required property QtObject engineController
     property real scaleFactor: 1.0
+
     readonly property bool controllerReady: !!engineController
-    readonly property bool fullscreenConsole: rootWindow && rootWindow.visibility === Window.FullScreen
-    readonly property bool splitHeroStatsLayout: fullscreenConsole || width >= 1400
-    readonly property bool widescreenConsole: fullscreenConsole || width >= 1450
     readonly property string liveWorkspaceMode: controllerReady ? engineController.workspaceMode : "planning"
     readonly property string liveHealthStatus: controllerReady ? engineController.healthStatus : "starting"
     readonly property string liveStateLabel: controllerReady ? engineController.stateLabel : "Stopped"
@@ -25,153 +23,43 @@ ConsoleSurface {
     readonly property bool liveAudioOscEnabled: controllerReady && engineController.audioOscEnabled
     readonly property bool liveAudioVerified: controllerReady && engineController.audioVerified
     readonly property bool liveAudioConnected: controllerReady && engineController.audioConnected
-    readonly property string operatorHealthLabel: {
-        const controllerState = liveStateLabel
-        const startupPhase = liveStartupPhaseLabel
-        const healthStatus = liveHealthStatus
-        const appSnapshotLoaded = liveAppSnapshotLoaded
-        const operatorUiReady = liveOperatorUiReady
 
-        if (!controllerReady) {
-            return "Starting"
+    readonly property string liveEngineVersion: controllerReady && engineController.engineVersion ? String(engineController.engineVersion) : ""
+    readonly property string liveProtocolVersion: controllerReady && engineController.protocolVersion ? String(engineController.protocolVersion) : ""
+    readonly property string liveStorageDetails: controllerReady && engineController.storageDetails ? String(engineController.storageDetails) : ""
+    readonly property int liveLightingUniverse: controllerReady && engineController.lightingUniverse !== undefined ? engineController.lightingUniverse : 0
+    readonly property int liveLightingFixtureCount: controllerReady && engineController.lightingFixtureCount !== undefined ? engineController.lightingFixtureCount : 0
+    readonly property string livePlanningSelectedProjectId: controllerReady && engineController.planningSelectedProjectId ? String(engineController.planningSelectedProjectId) : ""
+    readonly property var livePlanningProjects: controllerReady && engineController.planningProjects ? engineController.planningProjects : []
+    readonly property string liveAudioSendHost: controllerReady && engineController.audioSendHost ? String(engineController.audioSendHost) : ""
+    readonly property int liveAudioSendPort: controllerReady && engineController.audioSendPort !== undefined ? engineController.audioSendPort : 0
+
+    readonly property bool snapshotLoading: !liveAppSnapshotLoaded || liveStartupPhaseLabel !== "Ready"
+    readonly property bool hardwareBannerVisible: controllerReady
+                                                   && liveAppSnapshotLoaded
+                                                   && !snapshotLoading
+                                                   && liveLightingEnabled
+                                                   && liveAudioOscEnabled
+                                                   && !liveLightingReachable
+                                                   && !liveAudioConnected
+
+    readonly property int railHeight: 22
+    readonly property int tabStripHeight: 68
+    readonly property int bannerHeight: 30
+
+    property string _liveUtcClock: ""
+    property string _liveUptime: "00:00:00"
+    property real _shellStartMs: 0
+
+    color: theme.studio950
+    border.width: 0
+    implicitWidth: 1400
+    implicitHeight: headerColumn.implicitHeight * scaleFactor
+
+    function selectWorkspace(workspaceId) {
+        if (controllerReady) {
+            engineController.setWorkspaceMode(workspaceId)
         }
-
-        if (controllerState === "Failed") {
-            return "Recovery"
-        }
-
-        if (healthStatus === "degraded") {
-            return "Review"
-        }
-
-        if (healthStatus === "Unavailable" || healthStatus === "Stopped") {
-            return "Recovery"
-        }
-
-        if (rootWindow && rootWindow.operatorSurfaceTarget === "dashboard") {
-            return "Live Sync"
-        }
-
-        if (operatorUiReady || (controllerState === "Running" && startupPhase === "Ready" && appSnapshotLoaded)) {
-            return "Live Sync"
-        }
-
-        if (healthStatus === "healthy") {
-            return "Live Sync"
-        }
-
-        return "Starting"
-    }
-    readonly property color operatorHealthTone: {
-        const controllerState = liveStateLabel
-        const startupPhase = liveStartupPhaseLabel
-        const healthStatus = liveHealthStatus
-        const appSnapshotLoaded = liveAppSnapshotLoaded
-        const operatorUiReady = liveOperatorUiReady
-
-        if (!controllerReady) {
-            return theme.accentAmber
-        }
-
-        if (controllerState === "Failed") {
-            return theme.accentRed
-        }
-
-        if (healthStatus === "degraded") {
-            return theme.accentAmber
-        }
-
-        if (healthStatus === "Unavailable" || healthStatus === "Stopped") {
-            return theme.accentRed
-        }
-
-        if (rootWindow && rootWindow.operatorSurfaceTarget === "dashboard") {
-            return theme.accentGreen
-        }
-
-        if (operatorUiReady || (controllerState === "Running" && startupPhase === "Ready" && appSnapshotLoaded)) {
-            return theme.accentGreen
-        }
-
-        if (healthStatus === "healthy") {
-            return theme.accentGreen
-        }
-
-        return theme.accentAmber
-    }
-
-    tone: "strong"
-    padding: 12
-    Layout.fillWidth: true
-    implicitHeight: headerContent.implicitHeight * scaleFactor + 24
-
-    function operatorCopy() {
-        switch (liveWorkspaceMode) {
-        case "lighting":
-            return {
-                "eyebrow": "Studio Control",
-                "title": "Lighting control stays front and center.",
-                "description": "Keep cue changes, fixture groups, DMX output, and spatial focus points inside one fixed console."
-            }
-        case "audio":
-            return {
-                "eyebrow": "Studio Audio",
-                "title": "Monitor the mix without leaving the console.",
-                "description": "Recall snapshots, adjust channels, and keep OSC connectivity readable during live productions."
-            }
-        case "setup":
-            return {
-                "eyebrow": "Control Surface Setup",
-                "title": "Commissioning stays one step away from the operator surface.",
-                "description": "Reach setup, recovery, backup, and support tools without turning the runtime shell into the primary UI."
-            }
-        default:
-            return {
-                "eyebrow": "Production Planning",
-                "title": "Planning stays visible without taking over the screen.",
-                "description": "Track prep, handoffs, and timing while lighting and audio remain the primary operator surfaces."
-            }
-        }
-    }
-
-    function dmxLabel() {
-        if (!liveLightingEnabled) {
-            return "DMX Off"
-        }
-
-        return liveLightingReachable ? "DMX Ready" : "DMX Down"
-    }
-
-    function dmxTone() {
-        if (!liveLightingEnabled) {
-            return theme.studio500
-        }
-
-        return liveLightingReachable ? theme.accentGreen : theme.accentRed
-    }
-
-    function oscLabel() {
-        if (!liveAudioOscEnabled) {
-            return "OSC Off"
-        }
-
-        if (liveAudioVerified) {
-            return "OSC Ready"
-        }
-
-        return liveAudioConnected ? "OSC Await" : "OSC Down"
-    }
-
-    function oscTone() {
-        if (!liveAudioOscEnabled) {
-            return theme.studio500
-        }
-
-        if (liveAudioVerified) {
-            return theme.accentGreen
-        }
-
-        return liveAudioConnected ? theme.accentAmber : theme.accentRed
     }
 
     function scaleOptions() {
@@ -182,34 +70,125 @@ ConsoleSurface {
         ]
     }
 
-    function lightingStatValue() {
+    function workspaceSubtitle(workspaceId) {
         if (!controllerReady) {
-            return 0
+            return ""
         }
 
-        return liveWorkspaceMode === "lighting" ? engineController.lightingFixtureCount : 0
+        if (workspaceId === "planning") {
+            const id = livePlanningSelectedProjectId
+            if (!id) return ""
+            const projects = livePlanningProjects
+            for (let i = 0; i < projects.length; i++) {
+                const project = projects[i]
+                if (project && project.id === id) {
+                    return project.name || ""
+                }
+            }
+            return ""
+        }
+
+        if (workspaceId === "lighting") {
+            if (liveLightingFixtureCount <= 0) return ""
+            return "universe " + liveLightingUniverse + " · " + liveLightingFixtureCount + " fixtures"
+        }
+
+        if (workspaceId === "audio") {
+            if (liveAudioSendHost.length === 0) return ""
+            return liveAudioSendHost + ":" + liveAudioSendPort
+        }
+
+        return ""
     }
 
-    function audioStatValue() {
-        if (!controllerReady) {
-            return 0
-        }
-
-        return engineController.audioChannelCount
+    function operatorHealthLabel() {
+        if (!controllerReady) return "Starting"
+        if (snapshotLoading) return "Starting"
+        if (liveStateLabel === "Failed") return "Recovery"
+        if (liveHealthStatus === "degraded") return "Degraded"
+        if (liveHealthStatus === "Unavailable" || liveHealthStatus === "Stopped") return "Recovery"
+        if (liveHealthStatus === "healthy") return "Healthy"
+        if (liveOperatorUiReady) return "Healthy"
+        return "Starting"
     }
 
-    function projectStatValue() {
-        if (!controllerReady) {
-            return 0
-        }
-
-        return liveWorkspaceMode === "planning" ? engineController.planningProjectCount : 0
+    function operatorHealthTone() {
+        if (!controllerReady) return theme.accentAmber
+        if (snapshotLoading) return theme.accentAmber
+        if (liveStateLabel === "Failed") return theme.accentRed
+        if (liveHealthStatus === "degraded") return theme.accentAmber
+        if (liveHealthStatus === "Unavailable" || liveHealthStatus === "Stopped") return theme.accentRed
+        if (liveHealthStatus === "healthy" || liveOperatorUiReady) return theme.accentGreen
+        return theme.accentAmber
     }
 
-    function selectWorkspace(workspaceId) {
-        if (controllerReady) {
-            engineController.setWorkspaceMode(workspaceId)
+    function dmxLabel() {
+        if (!liveLightingEnabled) return "DMX OFF"
+        return liveLightingReachable ? "DMX READY" : "DMX DOWN"
+    }
+
+    function dmxTone() {
+        if (!liveLightingEnabled) return theme.studio500
+        return liveLightingReachable ? theme.accentGreen : theme.accentRed
+    }
+
+    function oscLabel() {
+        if (!liveAudioOscEnabled) return "OSC OFF"
+        if (liveAudioVerified) return "OSC VERIFIED"
+        return liveAudioConnected ? "OSC CONNECTED" : "OSC DOWN"
+    }
+
+    function oscTone() {
+        if (!liveAudioOscEnabled) return theme.studio500
+        if (liveAudioVerified) return theme.accentGreen
+        return liveAudioConnected ? theme.accentAmber : theme.accentRed
+    }
+
+    function clockText() {
+        if (rootWindow && typeof rootWindow.parityFrozenClock === "string" && rootWindow.parityFrozenClock.length > 0) {
+            return rootWindow.parityFrozenClock
         }
+        return _liveUtcClock
+    }
+
+    function uptimeText() {
+        if (rootWindow && typeof rootWindow.parityFrozenUptime === "string" && rootWindow.parityFrozenUptime.length > 0) {
+            return rootWindow.parityFrozenUptime
+        }
+        return _liveUptime
+    }
+
+    function _pad(n) {
+        return n < 10 ? "0" + n : String(n)
+    }
+
+    function _refreshClockAndUptime() {
+        const now = new Date()
+        const hh = _pad(now.getUTCHours())
+        const mm = _pad(now.getUTCMinutes())
+        const ss = _pad(now.getUTCSeconds())
+        _liveUtcClock = hh + ":" + mm + ":" + ss + " UTC"
+
+        if (_shellStartMs > 0) {
+            let elapsed = Math.max(0, Math.floor((Date.now() - _shellStartMs) / 1000))
+            const uh = _pad(Math.floor(elapsed / 3600))
+            elapsed = elapsed % 3600
+            const um = _pad(Math.floor(elapsed / 60))
+            const us = _pad(elapsed % 60)
+            _liveUptime = uh + ":" + um + ":" + us
+        }
+    }
+
+    Component.onCompleted: {
+        _shellStartMs = Date.now()
+        _refreshClockAndUptime()
+    }
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: root._refreshClockAndUptime()
     }
 
     ConsoleTheme {
@@ -217,289 +196,430 @@ ConsoleSurface {
     }
 
     Item {
-        anchors.fill: parent
+        id: scaleHost
+        width: parent.width / root.scaleFactor
+        height: headerColumn.implicitHeight
+        scale: root.scaleFactor
+        transformOrigin: Item.TopLeft
 
-        Item {
-            id: headerHost
-            width: parent.width / root.scaleFactor
-            height: headerContent.implicitHeight
-            scale: root.scaleFactor
-            transformOrigin: Item.TopLeft
+        ColumnLayout {
+            id: headerColumn
+            width: parent.width
+            spacing: 0
 
-            ColumnLayout {
-                id: headerContent
-                width: parent.width
-                spacing: theme.spacing5
+            Rectangle {
+                id: monitorRailBg
+                Layout.fillWidth: true
+                Layout.preferredHeight: root.railHeight
+                color: root.hardwareBannerVisible
+                       ? Qt.rgba(theme.accentRed.r, theme.accentRed.g, theme.accentRed.b, 0.1)
+                       : Qt.rgba(theme.studio900.r, theme.studio900.g, theme.studio900.b, 0.6)
+                border.width: 0
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 1
+                    color: theme.surfaceBorder
+                }
 
                 RowLayout {
-                    Layout.fillWidth: true
-                    spacing: theme.spacing4
+                    id: monitorRailRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 16
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 0
+
+                    Item {
+                        id: railLeftCluster
+                        visible: !root.snapshotLoading
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 14
+                        implicitHeight: 14
+
+                        RowLayout {
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 18
+
+                            Label {
+                                text: "ENGINE " + (root.liveEngineVersion.length > 0 ? root.liveEngineVersion : "—")
+                                color: theme.studio500
+                                font.family: theme.monoFontFamily
+                                font.pixelSize: theme.textXxs
+                                font.capitalization: Font.AllUppercase
+                                font.letterSpacing: 0.6
+                            }
+
+                            Label {
+                                text: "PROTO " + (root.liveProtocolVersion.length > 0 ? root.liveProtocolVersion : "—")
+                                color: theme.studio500
+                                font.family: theme.monoFontFamily
+                                font.pixelSize: theme.textXxs
+                                font.capitalization: Font.AllUppercase
+                                font.letterSpacing: 0.6
+                            }
+
+                            Label {
+                                text: "UPTIME " + root.uptimeText()
+                                color: theme.studio500
+                                font.family: theme.monoFontFamily
+                                font.pixelSize: theme.textXxs
+                                font.capitalization: Font.AllUppercase
+                                font.letterSpacing: 0.6
+                            }
+                        }
+                    }
+
+                    Label {
+                        visible: root.snapshotLoading
+                        Layout.fillWidth: true
+                        text: "STARTING ENGINE…"
+                        color: theme.accentAmber
+                        horizontalAlignment: Text.AlignHCenter
+                        font.family: theme.monoFontFamily
+                        font.pixelSize: theme.textXxs
+                        font.weight: Font.DemiBold
+                        font.capitalization: Font.AllUppercase
+                        font.letterSpacing: 1.0
+
+                        SequentialAnimation on opacity {
+                            running: root.snapshotLoading
+                            loops: Animation.Infinite
+                            NumberAnimation { from: 0.55; to: 1.0; duration: 600; easing.type: Easing.InOutQuad }
+                            NumberAnimation { from: 1.0; to: 0.55; duration: 600; easing.type: Easing.InOutQuad }
+                        }
+                    }
 
                     RowLayout {
-                        Layout.fillWidth: true
-                        Layout.minimumWidth: 0
-                        spacing: theme.spacing4
+                        id: railRightCluster
+                        visible: !root.snapshotLoading
+                        spacing: 18
+                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
 
-                        ConsoleBadge {
-                            text: "SSE ExEd Studio Control"
-                            badgeColor: theme.accentBlue
-                            textColor: theme.accentBlue
+                        Label {
+                            objectName: "dashboard-rail-dmx"
+                            text: root.dmxLabel()
+                            color: root.dmxTone()
+                            font.family: theme.monoFontFamily
+                            font.pixelSize: theme.textXxs
+                            font.weight: Font.DemiBold
+                            font.letterSpacing: 0.6
                         }
 
                         Label {
-                            text: "Permanent operator surface for lighting, audio, planning, and deck control"
-                            Layout.fillWidth: true
-                            Layout.minimumWidth: 0
-                            color: theme.studio500
-                            font.family: theme.uiFontFamily
-                            font.pixelSize: 9
-                            font.weight: Font.DemiBold
-                            font.capitalization: Font.AllUppercase
-                            font.letterSpacing: 0.8
-                            elide: Text.ElideRight
-                            visible: root.width >= 1180
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                        spacing: theme.spacing3
-
-                        ConsoleStatusBadge {
-                            objectName: "dashboard-health-storage"
-                            text: "Saved Locally"
-                            toneColor: theme.accentGreen
-                        }
-
-                        ConsoleStatusBadge {
-                            objectName: "dashboard-health-health"
-                            text: root.operatorHealthLabel
-                            toneColor: root.operatorHealthTone
-                        }
-
-                        ConsoleStatusBadge {
-                            objectName: "dashboard-health-dmx"
-                            text: root.dmxLabel()
-                            toneColor: root.dmxTone()
-                            dimmed: !controllerReady || !engineController.lightingEnabled
-                        }
-
-                        ConsoleStatusBadge {
-                            objectName: "dashboard-health-osc"
+                            objectName: "dashboard-rail-osc"
                             text: root.oscLabel()
-                            toneColor: root.oscTone()
-                            dimmed: !controllerReady || !engineController.audioOscEnabled
+                            color: root.oscTone()
+                            font.family: theme.monoFontFamily
+                            font.pixelSize: theme.textXxs
+                            font.weight: Font.DemiBold
+                            font.letterSpacing: 0.6
                         }
 
-                        ConsoleButton {
-                            objectName: "dashboard-setup-button"
-                            text: root.widescreenConsole ? "Control surface setup" : "Setup"
-                            tone: "secondary"
-                            compact: true
-                            dense: true
-                            ToolTip.visible: hovered
-                            ToolTip.text: "Control surface setup"
-                            onClicked: root.selectWorkspace("setup")
+                        Label {
+                            text: root.liveStorageDetails.length > 0
+                                  ? "STORAGE " + root.liveStorageDetails.toUpperCase()
+                                  : "STORAGE —"
+                            color: theme.studio500
+                            font.family: theme.monoFontFamily
+                            font.pixelSize: theme.textXxs
+                            font.letterSpacing: 0.6
+                            elide: Text.ElideRight
+                            Layout.maximumWidth: 320
                         }
 
-                        Rectangle {
-                            radius: theme.radiusBadge
-                            color: Qt.rgba(theme.studio950.r, theme.studio950.g, theme.studio950.b, 0.5)
-                            border.width: 1
-                            border.color: theme.surfaceBorder
-                            implicitHeight: theme.compactControlHeight
-                            implicitWidth: scaleControlRow.implicitWidth + 14
-
-                            RowLayout {
-                                id: scaleControlRow
-                                anchors.centerIn: parent
-                                spacing: 2
-
-                                Repeater {
-                                    model: root.scaleOptions()
-
-                                    ConsoleButton {
-                                        required property var modelData
-                                        objectName: "dashboard-scale-" + modelData.label
-                                        text: modelData.label
-                                        tone: "chip"
-                                        compact: true
-                                        dense: true
-                                        active: Math.abs(root.rootWindow.dashboardUiScale - modelData.value) < 0.001
-                                        onClicked: root.rootWindow.dashboardUiScale = modelData.value
-                                    }
-                                }
-                            }
-                        }
-
-                        ConsoleButton {
-                            objectName: "dashboard-about-button"
-                            text: ""
-                            iconText: "i"
-                            tone: "icon"
-                            compact: true
-                            dense: true
-                            ToolTip.visible: hovered
-                            ToolTip.text: "About SSE ExEd Studio Control"
-                            onClicked: root.rootWindow.aboutDialogVisible = true
-                        }
-
-                        ConsoleButton {
-                            objectName: "dashboard-help-button"
-                            text: ""
-                            iconText: "?"
-                            tone: "icon"
-                            compact: true
-                            dense: true
-                            ToolTip.visible: hovered
-                            ToolTip.text: "Keyboard shortcuts"
-                            onClicked: root.rootWindow.keyboardHelpVisible = true
+                        Label {
+                            text: root.clockText()
+                            color: theme.studio400
+                            font.family: theme.monoFontFamily
+                            font.pixelSize: theme.textXxs
+                            font.weight: Font.DemiBold
+                            font.letterSpacing: 0.8
                         }
                     }
                 }
+            }
 
-                GridLayout {
-                    Layout.fillWidth: true
-                    columns: root.splitHeroStatsLayout ? 2 : 1
-                    columnSpacing: theme.spacing5
-                    rowSpacing: theme.spacing5
+            Rectangle {
+                id: hardwareBanner
+                Layout.fillWidth: true
+                Layout.preferredHeight: root.hardwareBannerVisible ? root.bannerHeight : 0
+                visible: root.hardwareBannerVisible
+                color: Qt.rgba(theme.accentRed.r, theme.accentRed.g, theme.accentRed.b, 0.18)
+                clip: true
 
-                    ConsoleSurface {
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 1
+                    color: Qt.rgba(theme.accentRed.r, theme.accentRed.g, theme.accentRed.b, 0.52)
+                }
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 12
+                    spacing: theme.spacing4
+
+                    ConsoleIcon {
+                        iconName: "triangle-alert"
+                        tint: theme.accentRed
+                        pixelSize: 16
+                    }
+
+                    Label {
+                        text: "HARDWARE UNREACHABLE — DMX + OSC DOWN"
+                        color: theme.studio050
+                        font.family: theme.uiFontFamily
+                        font.pixelSize: theme.textXs
+                        font.weight: Font.DemiBold
+                        font.capitalization: Font.AllUppercase
+                        font.letterSpacing: 0.6
                         Layout.fillWidth: true
-                        Layout.minimumWidth: 0
-                        tone: "soft"
-                        padding: 12
-                        implicitHeight: heroCopyLayout.implicitHeight + 24
+                    }
 
-                        ColumnLayout {
-                            id: heroCopyLayout
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            spacing: theme.spacing3
-
-                            Label {
-                                text: root.operatorCopy().eyebrow
-                                color: theme.accentBlue
-                                font.family: theme.uiFontFamily
-                                font.pixelSize: theme.textXxs
-                                font.weight: Font.DemiBold
-                                font.capitalization: Font.AllUppercase
-                                font.letterSpacing: 1.1
+                    ConsoleButton {
+                        objectName: "dashboard-banner-retry"
+                        text: "Retry"
+                        tone: "secondary"
+                        compact: true
+                        dense: true
+                        onClicked: {
+                            if (!root.controllerReady) return
+                            if (root.engineController.requestLightingSnapshot) {
+                                root.engineController.requestLightingSnapshot()
                             }
-
-                            Label {
-                                text: root.operatorCopy().title
-                                color: theme.studio050
-                                font.family: theme.uiFontFamily
-                                font.pixelSize: root.width >= 1500 ? 24 : root.width >= 1120 ? 21 : 19
-                                font.weight: Font.DemiBold
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
+                            if (root.engineController.requestAudioSnapshot) {
+                                root.engineController.requestAudioSnapshot()
                             }
+                        }
+                    }
 
-                            Label {
-                                text: root.operatorCopy().description
-                                color: theme.studio300
-                                font.family: theme.uiFontFamily
-                                font.pixelSize: 11
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                            }
+                    ConsoleButton {
+                        objectName: "dashboard-banner-open-setup"
+                        text: "Open Setup"
+                        tone: "primary"
+                        compact: true
+                        dense: true
+                        onClicked: root.selectWorkspace("setup")
+                    }
+                }
+            }
+
+            Rectangle {
+                id: tabStripBg
+                Layout.fillWidth: true
+                Layout.preferredHeight: root.tabStripHeight
+                color: theme.studio950
+                border.width: 0
+
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: 1
+                    color: theme.surfaceBorder
+                }
+
+                RowLayout {
+                    id: tabStripRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 12
+                    spacing: theme.spacing4
+
+                    Label {
+                        id: brandMark
+                        text: root.width >= 1680 ? "Studio Control" : "◆"
+                        color: theme.studio200
+                        font.family: theme.uiFontFamily
+                        font.pixelSize: theme.textMd
+                        font.weight: Font.DemiBold
+                        font.letterSpacing: 0.4
+                        Layout.alignment: Qt.AlignVCenter
+                        leftPadding: 4
+                        rightPadding: 12
+                    }
+
+                    Label {
+                        id: sessionMarker
+                        visible: root.width >= 1560 && text.length > 0
+                        text: Qt.application.displayName ? Qt.application.displayName.toLowerCase() : ""
+                        color: theme.studio500
+                        font.family: theme.monoFontFamily
+                        font.pixelSize: theme.textXxs
+                        font.letterSpacing: 0.6
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+
+                    Item {
+                        Layout.preferredWidth: theme.spacing4
+                    }
+
+                    RowLayout {
+                        id: workspaceTabs
+                        spacing: 0
+                        Layout.alignment: Qt.AlignVCenter
+
+                        ConsoleButton {
+                            id: planningTab
+                            objectName: "dashboard-tab-planning"
+                            text: "Planning"
+                            tone: "workspaceTab"
+                            iconSvgName: "clipboard-list"
+                            active: root.liveWorkspaceMode === "planning"
+                            subtitle: active ? root.workspaceSubtitle("planning") : ""
+                            Accessible.name: "Planning workspace, shortcut K"
+                            onClicked: root.selectWorkspace("planning")
+                        }
+
+                        ConsoleButton {
+                            id: lightingTab
+                            objectName: "dashboard-tab-lighting"
+                            text: "Lighting"
+                            tone: "workspaceTab"
+                            iconSvgName: "lamp"
+                            active: root.liveWorkspaceMode === "lighting"
+                            subtitle: active ? root.workspaceSubtitle("lighting") : ""
+                            Accessible.name: "Lighting workspace, shortcut L"
+                            onClicked: root.selectWorkspace("lighting")
+                        }
+
+                        ConsoleButton {
+                            id: audioTab
+                            objectName: "dashboard-tab-audio"
+                            text: "Audio"
+                            tone: "workspaceTab"
+                            iconSvgName: "audio-waveform"
+                            active: root.liveWorkspaceMode === "audio"
+                            subtitle: active ? root.workspaceSubtitle("audio") : ""
+                            Accessible.name: "Audio workspace, shortcut A"
+                            onClicked: root.selectWorkspace("audio")
                         }
                     }
 
                     Item {
-                        Layout.fillWidth: !root.splitHeroStatsLayout
-                        Layout.preferredWidth: root.splitHeroStatsLayout ? 396 : -1
-                        Layout.minimumWidth: root.splitHeroStatsLayout ? 396 : 0
-                        Layout.maximumWidth: root.splitHeroStatsLayout ? 396 : -1
-                        implicitHeight: statsGrid.implicitHeight
+                        Layout.fillWidth: true
+                    }
 
-                        GridLayout {
-                            id: statsGrid
-                            anchors.fill: parent
-                            columns: root.splitHeroStatsLayout || root.width >= 900 ? 3 : 1
-                            columnSpacing: theme.spacing4
-                            rowSpacing: theme.spacing4
+                    ConsoleBadge {
+                        objectName: "dashboard-operator-health"
+                        text: root.operatorHealthLabel()
+                        badgeColor: root.operatorHealthTone()
+                        textColor: theme.studio050
+                        filled: false
+                        uppercase: true
+                        tone: "operator"
+                        Layout.alignment: Qt.AlignVCenter
 
-                            ConsoleStatCard {
-                                Layout.fillWidth: true
-                                label: "Lights"
-                                value: String(root.lightingStatValue())
-                                iconText: "L"
-                                compact: true
-                            }
+                        SequentialAnimation on opacity {
+                            running: root.snapshotLoading
+                            loops: Animation.Infinite
+                            NumberAnimation { from: 0.6; to: 1.0; duration: 600; easing.type: Easing.InOutQuad }
+                            NumberAnimation { from: 1.0; to: 0.6; duration: 600; easing.type: Easing.InOutQuad }
+                        }
+                    }
 
-                            ConsoleStatCard {
-                                Layout.fillWidth: true
-                                label: "Audio"
-                                value: String(root.audioStatValue())
-                                iconText: "A"
-                                compact: true
-                            }
+                    Rectangle {
+                        id: densityChipGroup
+                        radius: theme.radiusBadge
+                        color: Qt.rgba(theme.studio900.r, theme.studio900.g, theme.studio900.b, 0.72)
+                        border.width: 1
+                        border.color: theme.surfaceBorder
+                        implicitHeight: theme.compactControlHeight
+                        implicitWidth: densityChipRow.implicitWidth + 12
+                        Layout.alignment: Qt.AlignVCenter
 
-                            ConsoleStatCard {
-                                Layout.fillWidth: true
-                                label: "Projects"
-                                value: String(root.projectStatValue())
-                                iconText: "P"
-                                accent: true
-                                compact: true
+                        RowLayout {
+                            id: densityChipRow
+                            anchors.centerIn: parent
+                            spacing: 2
+
+                            Repeater {
+                                model: root.scaleOptions()
+
+                                ConsoleButton {
+                                    required property var modelData
+                                    objectName: "dashboard-scale-" + modelData.label
+                                    text: modelData.label
+                                    tone: "chip"
+                                    compact: true
+                                    dense: true
+                                    active: root.rootWindow !== null
+                                            && typeof root.rootWindow.dashboardUiScale === "number"
+                                            && Math.abs(root.rootWindow.dashboardUiScale - modelData.value) < 0.001
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: modelData.title
+                                    onClicked: {
+                                        if (root.rootWindow) {
+                                            root.rootWindow.dashboardUiScale = modelData.value
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-                }
 
-                ConsoleSurface {
-                    Layout.fillWidth: true
-                    tone: "soft"
-                    padding: 6
-                    implicitHeight: dashboardTabsGrid.implicitHeight + 12
-
-                    GridLayout {
-                        id: dashboardTabsGrid
-                        anchors.top: parent.top
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        columns: root.width >= 960 ? 3 : 1
-                        columnSpacing: theme.spacing4
-                        rowSpacing: theme.spacing4
-
-                        ConsoleTabButton {
-                            objectName: "dashboard-tab-lighting"
-                            text: "Lights"
-                            shortcut: "L"
-                            iconText: "L"
-                            compact: true
-                            eyebrow: "Live lighting levels, scenes, and DMX health"
-                            active: controllerReady && engineController.workspaceMode === "lighting"
-                            Layout.fillWidth: true
-                            onClicked: root.selectWorkspace("lighting")
+                    ConsoleButton {
+                        objectName: "dashboard-about-button"
+                        tone: "icon"
+                        iconText: "i"
+                        compact: true
+                        dense: true
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: theme.compactControlHeight
+                        ToolTip.visible: hovered
+                        ToolTip.text: "About SSE ExEd Studio Control"
+                        onClicked: {
+                            if (root.rootWindow) {
+                                root.rootWindow.aboutDialogVisible = true
+                            }
                         }
+                    }
 
-                        ConsoleTabButton {
-                            objectName: "dashboard-tab-audio"
-                            text: "Audio"
-                            shortcut: "A"
-                            iconText: "A"
-                            compact: true
-                            eyebrow: "Mixer channels, routing snapshots, and OSC status"
-                            active: controllerReady && engineController.workspaceMode === "audio"
-                            Layout.fillWidth: true
-                            onClicked: root.selectWorkspace("audio")
+                    ConsoleButton {
+                        objectName: "dashboard-help-button"
+                        tone: "icon"
+                        iconText: "?"
+                        compact: true
+                        dense: true
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: theme.compactControlHeight
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Keyboard shortcuts"
+                        onClicked: {
+                            if (root.rootWindow) {
+                                root.rootWindow.keyboardHelpVisible = true
+                            }
                         }
+                    }
 
-                        ConsoleTabButton {
-                            objectName: "dashboard-tab-planning"
-                            text: "Projects"
-                            shortcut: "K"
-                            iconText: "P"
-                            compact: true
-                            eyebrow: "Run-of-show planning, tasks, timers, and prep notes"
-                            active: !controllerReady || engineController.workspaceMode === "planning"
-                            Layout.fillWidth: true
-                            onClicked: root.selectWorkspace("planning")
+                    ConsoleButton {
+                        objectName: "dashboard-setup-button"
+                        tone: "ghost"
+                        compact: true
+                        dense: true
+                        text: "Setup"
+                        Layout.alignment: Qt.AlignVCenter
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Control surface setup"
+                        onClicked: root.selectWorkspace("setup")
+
+                        ConsoleIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            iconName: "wrench"
+                            tint: theme.studio300
+                            pixelSize: 14
                         }
                     }
                 }
