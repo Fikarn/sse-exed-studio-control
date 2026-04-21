@@ -14,6 +14,7 @@ Rectangle {
     property var editingFixture: null
     property var pendingDeleteFixture: null
     signal viewModeSelected(string nextViewMode)
+    signal addLightRequested()
 
     ConsoleTheme {
         id: theme
@@ -140,8 +141,10 @@ Rectangle {
                         }
 
                         ConsoleButton {
-                            text: "Use Add Light"
+                            text: "Add Light"
+                            tone: "primary"
                             dense: true
+                            onClicked: root.addLightRequested()
                         }
                     }
                 }
