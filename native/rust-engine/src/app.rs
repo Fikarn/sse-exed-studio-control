@@ -19,9 +19,12 @@ use crate::diagnostics::{append_log, read_log_excerpt};
 use crate::exports::{build_control_surface_snapshot, export_companion_config, ExportCommandError};
 use crate::legacy_import::{parse_import_request, ImportLegacyError};
 use crate::lighting::{
-    build_lighting_health_check, create_lighting_fixture, create_lighting_group,
-    create_lighting_scene, delete_lighting_fixture, delete_lighting_group, delete_lighting_scene,
-    parse_lighting_all_power_request, parse_lighting_fixture_create_request,
+    build_lighting_health_check, create_lighting_cue, create_lighting_fixture,
+    create_lighting_group, create_lighting_scene, delete_lighting_cue, delete_lighting_fixture,
+    delete_lighting_group, delete_lighting_scene, fire_lighting_cue,
+    parse_lighting_all_power_request, parse_lighting_cue_create_request,
+    parse_lighting_cue_delete_request, parse_lighting_cue_fire_request,
+    parse_lighting_cue_update_request, parse_lighting_fixture_create_request,
     parse_lighting_fixture_delete_request, parse_lighting_fixture_update_request,
     parse_lighting_group_create_request, parse_lighting_group_delete_request,
     parse_lighting_group_power_request, parse_lighting_group_update_request,
@@ -29,7 +32,7 @@ use crate::lighting::{
     parse_lighting_scene_recall_request, parse_lighting_scene_update_request,
     parse_lighting_settings_update_request, read_lighting_dmx_monitor_snapshot,
     read_lighting_snapshot, recall_lighting_scene, set_lighting_all_power,
-    set_lighting_group_power, update_lighting_fixture, update_lighting_group,
+    set_lighting_group_power, update_lighting_cue, update_lighting_fixture, update_lighting_group,
     update_lighting_scene, update_lighting_settings, LightingCommandError,
 };
 use crate::parity_fixtures::{
@@ -445,6 +448,94 @@ impl EngineApp {
                                 serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
                             ),
                             "all-powered",
+                        ),
+                        Err(error) => match error {
+                            LightingCommandError::Rejected(code, message) => {
+                                Self::reply(error_response(request.id, code, message))
+                            }
+                            LightingCommandError::Storage(message) => {
+                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                            }
+                        },
+                    }
+                }
+                Err(message) => Self::reply(invalid_params(request.id, message)),
+            },
+            "lighting.cue.create" => match parse_lighting_cue_create_request(&request.params) {
+                Ok(create_request) => {
+                    match create_lighting_cue(&self.runtime.db_path, &create_request) {
+                        Ok(result) => Self::reply_with_lighting_change(
+                            ok_response(
+                                request.id,
+                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                            ),
+                            "cue-created",
+                        ),
+                        Err(error) => match error {
+                            LightingCommandError::Rejected(code, message) => {
+                                Self::reply(error_response(request.id, code, message))
+                            }
+                            LightingCommandError::Storage(message) => {
+                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                            }
+                        },
+                    }
+                }
+                Err(message) => Self::reply(invalid_params(request.id, message)),
+            },
+            "lighting.cue.update" => match parse_lighting_cue_update_request(&request.params) {
+                Ok(update_request) => {
+                    match update_lighting_cue(&self.runtime.db_path, &update_request) {
+                        Ok(result) => Self::reply_with_lighting_change(
+                            ok_response(
+                                request.id,
+                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                            ),
+                            "cue-updated",
+                        ),
+                        Err(error) => match error {
+                            LightingCommandError::Rejected(code, message) => {
+                                Self::reply(error_response(request.id, code, message))
+                            }
+                            LightingCommandError::Storage(message) => {
+                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                            }
+                        },
+                    }
+                }
+                Err(message) => Self::reply(invalid_params(request.id, message)),
+            },
+            "lighting.cue.delete" => match parse_lighting_cue_delete_request(&request.params) {
+                Ok(delete_request) => {
+                    match delete_lighting_cue(&self.runtime.db_path, &delete_request) {
+                        Ok(result) => Self::reply_with_lighting_change(
+                            ok_response(
+                                request.id,
+                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                            ),
+                            "cue-deleted",
+                        ),
+                        Err(error) => match error {
+                            LightingCommandError::Rejected(code, message) => {
+                                Self::reply(error_response(request.id, code, message))
+                            }
+                            LightingCommandError::Storage(message) => {
+                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                            }
+                        },
+                    }
+                }
+                Err(message) => Self::reply(invalid_params(request.id, message)),
+            },
+            "lighting.cue.fire" => match parse_lighting_cue_fire_request(&request.params) {
+                Ok(fire_request) => {
+                    match fire_lighting_cue(&self.runtime.db_path, &fire_request) {
+                        Ok(result) => Self::reply_with_lighting_change(
+                            ok_response(
+                                request.id,
+                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                            ),
+                            "cue-fired",
                         ),
                         Err(error) => match error {
                             LightingCommandError::Rejected(code, message) => {

@@ -138,31 +138,21 @@ Extend with a canonical `kelvinToColor(k)` helper so the CCT ramp is one functio
 
 All additions are additive; no existing surface is broken.
 
-### 5a. Schema — SQLite migration v3 → v4
+### 5a. Persistence — blob path (decided during Phase C commit 1)
 
-Two new columns on `lighting_fixtures` (both nullable, no default) and one new table `lighting_cues`:
+**Decision: blob path.** The whole lighting subsystem is already stored as JSON blobs under `app_settings` keys (`LIGHTING_EDITOR_STATE_KEY`, `LIGHTING_BRIDGE_IP_KEY`, etc.) — there is no `lighting_fixtures` table and no `lighting_scenes` table to ALTER. Promoting lighting to first-class SQLite tables is out of scope for the v2.2 redesign; changing the schema to add two tables just for cues would leave the rest of the subsystem on the blob path, split the authoritative source, and break the rollback-by-reinstall guarantee. We take the Phase B scope-note escape and keep everything additive on the blob.
 
-```sql
-ALTER TABLE lighting_fixtures ADD COLUMN rig_z REAL;
-ALTER TABLE lighting_fixtures ADD COLUMN beam_angle_degrees REAL;
+Two additive blob keys:
 
-CREATE TABLE IF NOT EXISTS lighting_cues (
-    id TEXT PRIMARY KEY NOT NULL,
-    ordinal INTEGER NOT NULL,
-    label TEXT NOT NULL,
-    scene_id TEXT,
-    fade_in_ms INTEGER NOT NULL DEFAULT 0,
-    fade_out_ms INTEGER NOT NULL DEFAULT 0,
-    follow_seconds REAL,
-    notes TEXT,
-    FOREIGN KEY(scene_id) REFERENCES lighting_scenes(id) ON DELETE SET NULL
-);
-CREATE INDEX IF NOT EXISTS lighting_cues_ordinal_idx ON lighting_cues(ordinal);
-```
+- `app.lighting.cues` — JSON array of `LightingEditorCueState`.
+- `app.lighting.active_cue_id` — single cue id string (empty = no active cue).
 
-Bump `STORAGE_SCHEMA_VERSION` from `3` to `4` in `native/rust-engine/src/storage.rs`. Add the migration step to the existing `migrate_schema(connection)` function as a new `if schema_version < 4` block after the v2→v3 block. Record `INSERT INTO schema_migrations(version) VALUES (4)` on success.
+Two additive fields on the existing `LightingEditorFixtureState` blob (serde-default so pre-v2.2 JSON deserializes cleanly without migration):
 
-If `lighting_scenes` does not exist yet at migration time (it is currently stored in the `settings` blob, not its own table), the migration first materializes it from the existing JSON blob via a one-time fan-out step before creating `lighting_cues`. This is a secondary additive change — `settings`-blob reads continue to work, but the authoritative source for scenes becomes the new table. **Scope note:** if promoting scenes from blob to table adds meaningful risk, we defer the cue-stack to use a JSON array inside `settings` like scenes do today — decided during Phase C commit 1 review.
+- `rigZ: Option<f64>` — vertical rig height in meters, clamped 0.0–20.0.
+- `beamAngleDegrees: Option<f64>` — beam angle, clamped 1.0–180.0.
+
+No `STORAGE_SCHEMA_VERSION` bump, no ALTER TABLE, no new tables. Rollback to v2.1.x silently drops the new blob keys (the old binary ignores unknown settings keys) and ignores the new fixture fields (serde on the v2.1 shape would read the blob and the unknown fields are skipped). Forward-compat is free because everything is optional.
 
 ### 5b. Rust types — `native/rust-engine/src/lighting.rs`
 
@@ -296,33 +286,33 @@ Fires the `lightingCuesChanged` / `lightingActiveCueIdChanged` signals whenever 
 
 ## 6. Persistence migration plan (explicit)
 
-This is the explicit migration plan CLAUDE.md requires for on-disk format changes.
+This is the explicit migration plan CLAUDE.md requires for on-disk format changes. Under the §5a blob-path decision, the _"migration"_ is the absence of one — no schema version bump, no ALTER TABLE, no new tables.
 
 **What changes on disk**
 
-- `lighting_fixtures` table gains two nullable columns (`rig_z`, `beam_angle_degrees`).
-- New `lighting_cues` table with `id / ordinal / label / scene_id / fade_in_ms / fade_out_ms / follow_seconds / notes`.
-- If the scenes-to-table promotion runs: `lighting_scenes` materializes as a table (currently a JSON blob in `settings`). Authoritative source flips; the blob field is kept populated as a fallback for one version.
-- `schema_migrations` table gains a row `(version=4)`.
+- New `app_settings` key `app.lighting.cues` — JSON array of cue state. Written on first cue creation; absent (== empty cue stack) until then.
+- New `app_settings` key `app.lighting.active_cue_id` — single cue id string. Written on first cue fire; absent (== no active cue) until then.
+- The existing `LightingEditorState` blob (`app.lighting.editor_state`) gains two additive optional fields per fixture (`rigZ`, `beamAngleDegrees`). Serde defaults apply, so pre-v2.2 blobs deserialize with both fields `None`.
+- `STORAGE_SCHEMA_VERSION` **does not change**. No `schema_migrations` row is inserted.
 
 **Forward path (v2.2 planning-only → v2.2.0 full redesign)**
 
-1. First launch runs `migrate_schema(connection)`. v3→v4 block executes both `ALTER TABLE` statements + the `CREATE TABLE IF NOT EXISTS lighting_cues` + its index, then the `schema_migrations` insert. Wrapped in a transaction — if any step fails, the DB stays at v3 and the engine fails to start with a storage error rather than running on a half-migrated schema.
-2. All existing fixtures end up with `rig_z = NULL` and `beam_angle_degrees = NULL`. QML treats nulls as "use fixture-type default" (looked up from a small static map keyed off `fixture_type` — Astra Bi-Color ≈ 50°, Infinibar ≈ 110°, etc.). No UI nag.
-3. `lighting_cues` starts empty. QML renders the **empty state Cr-06**: the cue rail shows the _"No cues yet"_ card and prompts `C` to add one.
+1. First launch reads `app.lighting.editor_state` as before — the JSON blob deserializes cleanly because `rigZ` and `beamAngleDegrees` are `#[serde(default)]`. No startup migration step runs.
+2. All existing fixtures end up with `rig_z = None` and `beam_angle_degrees = None`. QML treats `None` as "use fixture-type default" (a static map keyed off `fixture_type` — Astra Bi-Color ≈ 50°, Infinibar ≈ 110°, etc.). No UI nag.
+3. `app.lighting.cues` is absent. `load_lighting_cues()` returns an empty Vec. QML renders the **empty state Cr-06**: the cue rail shows the _"No cues yet"_ card and prompts `C` to add one.
 4. No user data is altered; this is a pure extension.
 
 **Rollback path (v2.2.0 → earlier v2.2 or v2.1.x)**
 
-1. Older binary reads `schema_migrations`, sees `MAX(version) = 4` but only knows up to v3 (or v2). The existing `if schema_version < STORAGE_SCHEMA_VERSION` guard silently tolerates the higher stored version — the `if` is skipped.
-2. v2.1.x / earlier v2.2 SELECT statements on `lighting_fixtures` use explicit column lists that do not include the two new columns. SQLite tolerates the extra columns — reads succeed.
-3. The `lighting_cues` table is simply ignored — no binary below v4 queries it. The rows persist.
-4. Result: rolling back to an earlier version loses the **cue rail UI** but does **not** lose the data — the cue rows, `rig_z`, `beam_angle_degrees` persist silently and re-appear the next time v2.2.0 is installed.
-5. Caveat to disclose in the v2.2.0 release notes: a rollback also disables the GO bar (because there is no UI), so the operator reverts to manual scene recall. Acceptable for an emergency rollback flow.
+1. Older binary reads `app_settings` with no knowledge of `app.lighting.cues` or `app.lighting.active_cue_id`. The entries sit in the table, unread. No query fails.
+2. Older binary reads `app.lighting.editor_state` and deserializes into its own `LightingEditorFixtureState` shape. `rigZ` / `beamAngleDegrees` are unknown fields to it — serde ignores them by default (no `deny_unknown_fields` in the struct).
+3. The **first time** the older binary writes `app.lighting.editor_state` back (e.g., on any fixture mutation), the two new fields are dropped from the blob. Cue keys survive untouched because the older binary never touches them.
+4. Result: rolling back to an earlier version loses the **cue rail UI** but does **not** lose the cue data — the `app.lighting.cues` blob persists silently and re-appears the next time v2.2.0 is installed. `rigZ` / `beamAngleDegrees` are lost on the next fixture edit in the older binary; they reset to the fixture-type default on re-upgrade.
+5. Caveat for the v2.2.0 release notes: a rollback disables the GO bar (because there is no UI), so the operator reverts to manual scene recall. Acceptable for an emergency rollback flow.
 
 **Backup/export compatibility**
 
-- `exportSupportBackup()` serializes the lighting snapshot via serde — new fields and the `cues` array are included. An older binary re-importing a v2.2-generated backup would deserialize the new fields via `#[serde(default)]` and then **drop them on the next write** because the old schema has no column to store the cue table. Operator-visible effect: the backup contains the cue stack; the older binary ignores it; if v2.2 is reinstalled afterward, the cues reappear.
+- `exportSupportBackup()` serializes the lighting snapshot via serde — the new fields and the `cues` array are included as additional JSON keys. An older binary re-importing a v2.2-generated backup deserializes the existing fields via serde (ignoring the unknown keys). Operator-visible effect: the backup contains the cue stack; the older binary ignores it; if v2.2 is reinstalled afterward, the cues reappear via the `app.lighting.cues` key that the older binary never touched.
 
 **Legacy import (`legacy_import.rs`)**
 
@@ -330,10 +320,10 @@ This is the explicit migration plan CLAUDE.md requires for on-disk format change
 
 **Verification gate**
 
-- New engine unit test covers the v3→v4 migration idempotency (run twice, assert schema unchanged on second run).
-- New engine unit test covers a v3 DB being loaded by a v4 binary (fixtures read cleanly, both new columns are null, `lighting_cues` is empty).
-- New engine unit test for `cue.create / cue.update / cue.delete / cue.fire` round-trip.
-- No new QML structural test is required for the migration itself; the existing engine tests are the authoritative gate.
+- New engine unit test `lighting_cue_crud_round_trip_persists_through_snapshot` covers `cue.create / cue.update / cue.delete / cue.fire` plus ordinal reorder, scene_id reference, `LIGHTING_ACTIVE_CUE_ID_KEY` writes on fire and clear-on-delete.
+- New engine unit test `lighting_cue_create_rejects_missing_scene` covers the reference-integrity check.
+- New engine unit test `lighting_fixture_rig_z_and_beam_angle_round_trip` covers the additive fixture fields through the editor-state blob and snapshot read-back.
+- No new QML structural test is required; the existing engine tests are the authoritative gate.
 
 ## 7. qsettings continuity
 

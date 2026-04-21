@@ -36,7 +36,15 @@ const LIGHTING_FIXTURE_STATE_PREFIX: &str = "app.lighting.fixture.";
 const LIGHTING_CUSTOM_FIXTURE_ID_PREFIX: &str = "fixture-custom-";
 const LIGHTING_CUSTOM_GROUP_ID_PREFIX: &str = "group-custom-";
 const LIGHTING_CUSTOM_SCENE_ID_PREFIX: &str = "scene-custom-";
+const LIGHTING_CUSTOM_CUE_ID_PREFIX: &str = "cue-custom-";
 const DEFAULT_LIGHTING_FIXTURE_TYPE: &str = "astra-bicolor";
+
+const LIGHTING_CUES_KEY: &str = "app.lighting.cues";
+const LIGHTING_ACTIVE_CUE_ID_KEY: &str = "app.lighting.active_cue_id";
+const MAX_FADE_MS: i64 = 60_000;
+const MAX_FOLLOW_SECONDS: f64 = 3_600.0;
+const MAX_CUE_LABEL_LEN: usize = 120;
+const MAX_CUE_NOTES_LEN: usize = 500;
 
 #[derive(Debug, Serialize, Clone)]
 pub struct LightingSnapshot {
@@ -76,6 +84,9 @@ pub struct LightingSnapshot {
     pub fixtures: Vec<LightingFixtureSnapshot>,
     pub groups: Vec<LightingGroupSnapshot>,
     pub scenes: Vec<LightingSceneSnapshot>,
+    pub cues: Vec<LightingCueSnapshot>,
+    #[serde(rename = "activeCueId")]
+    pub active_cue_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -95,6 +106,10 @@ pub struct LightingFixtureSnapshot {
     pub spatial_y: Option<f64>,
     #[serde(rename = "spatialRotation")]
     pub spatial_rotation: f64,
+    #[serde(rename = "rigZ")]
+    pub rig_z: Option<f64>,
+    #[serde(rename = "beamAngleDegrees")]
+    pub beam_angle_degrees: Option<f64>,
     pub on: bool,
     pub intensity: i64,
     pub cct: i64,
@@ -130,6 +145,23 @@ pub struct LightingSceneFixtureSnapshot {
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct LightingCueSnapshot {
+    pub id: String,
+    pub ordinal: i64,
+    pub label: String,
+    #[serde(rename = "sceneId")]
+    pub scene_id: Option<String>,
+    #[serde(rename = "fadeInMs")]
+    pub fade_in_ms: i64,
+    #[serde(rename = "fadeOutMs")]
+    pub fade_out_ms: i64,
+    #[serde(rename = "followSeconds")]
+    pub follow_seconds: Option<f64>,
+    pub notes: Option<String>,
+    pub state: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,6 +207,10 @@ pub struct LightingEditorFixtureState {
     pub spatial_y: Option<f64>,
     #[serde(rename = "spatialRotation", default)]
     pub spatial_rotation: f64,
+    #[serde(rename = "rigZ", default)]
+    pub rig_z: Option<f64>,
+    #[serde(rename = "beamAngleDegrees", default)]
+    pub beam_angle_degrees: Option<f64>,
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
@@ -204,6 +240,23 @@ pub struct LightingEditorSceneFixtureState {
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LightingEditorCueState {
+    pub id: String,
+    pub ordinal: i64,
+    pub label: String,
+    #[serde(rename = "sceneId", default)]
+    pub scene_id: Option<String>,
+    #[serde(rename = "fadeInMs", default)]
+    pub fade_in_ms: i64,
+    #[serde(rename = "fadeOutMs", default)]
+    pub fade_out_ms: i64,
+    #[serde(rename = "followSeconds", default)]
+    pub follow_seconds: Option<f64>,
+    #[serde(default)]
+    pub notes: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -343,6 +396,37 @@ pub struct LightingSceneDeleteResult {
     pub summary: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct LightingCueCreateResult {
+    pub cue: LightingCueSnapshot,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingCueUpdateResult {
+    pub cue: LightingCueSnapshot,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingCueDeleteResult {
+    pub deleted: bool,
+    #[serde(rename = "cueId")]
+    pub cue_id: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingCueFireResult {
+    #[serde(rename = "activeCueId")]
+    pub active_cue_id: String,
+    #[serde(rename = "previousCueId")]
+    pub previous_cue_id: Option<String>,
+    #[serde(rename = "appliedFadeMs")]
+    pub applied_fade_ms: i64,
+    pub summary: String,
+}
+
 #[derive(Debug)]
 pub enum LightingCommandError {
     Rejected(&'static str, String),
@@ -386,6 +470,8 @@ pub struct LightingFixtureUpdateRequest {
     pub spatial_x: Option<Option<f64>>,
     pub spatial_y: Option<Option<f64>>,
     pub spatial_rotation: Option<f64>,
+    pub rig_z: Option<Option<f64>>,
+    pub beam_angle_degrees: Option<Option<f64>>,
 }
 
 #[derive(Debug, Clone)]
@@ -447,6 +533,40 @@ pub struct LightingSceneUpdateRequest {
 #[derive(Debug, Clone)]
 pub struct LightingSceneDeleteRequest {
     pub scene_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingCueCreateRequest {
+    pub label: String,
+    pub after_cue_id: Option<String>,
+    pub scene_id: Option<String>,
+    pub fade_in_ms: Option<i64>,
+    pub fade_out_ms: Option<i64>,
+    pub follow_seconds: Option<Option<f64>>,
+    pub notes: Option<Option<String>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingCueUpdateRequest {
+    pub cue_id: String,
+    pub label: Option<String>,
+    pub scene_id: Option<Option<String>>,
+    pub fade_in_ms: Option<i64>,
+    pub fade_out_ms: Option<i64>,
+    pub follow_seconds: Option<Option<f64>>,
+    pub notes: Option<Option<String>>,
+    pub ordinal: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingCueDeleteRequest {
+    pub cue_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingCueFireRequest {
+    pub cue_id: String,
+    pub fade_override_ms: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -664,6 +784,14 @@ pub fn parse_lighting_fixture_update_request(
         .get("spatialRotation")
         .map(|value| parse_spatial_rotation_value(value, "spatialRotation"))
         .transpose()?;
+    let rig_z = params
+        .get("rigZ")
+        .map(parse_optional_rig_z)
+        .transpose()?;
+    let beam_angle_degrees = params
+        .get("beamAngleDegrees")
+        .map(parse_optional_beam_angle_degrees)
+        .transpose()?;
 
     if on.is_none()
         && name.is_none()
@@ -676,6 +804,8 @@ pub fn parse_lighting_fixture_update_request(
         && spatial_x.is_none()
         && spatial_y.is_none()
         && spatial_rotation.is_none()
+        && rig_z.is_none()
+        && beam_angle_degrees.is_none()
     {
         return Err(String::from(
             "lighting.fixture.update requires one or more supported fields",
@@ -695,6 +825,8 @@ pub fn parse_lighting_fixture_update_request(
         spatial_x,
         spatial_y,
         spatial_rotation,
+        rig_z,
+        beam_angle_degrees,
     })
 }
 
@@ -914,6 +1046,211 @@ pub fn parse_lighting_scene_delete_request(
     })
 }
 
+fn parse_required_cue_label(value: Option<&Value>) -> Result<String, String> {
+    let label = value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+        .ok_or_else(|| String::from("label is required"))?;
+    if label.chars().count() > MAX_CUE_LABEL_LEN {
+        return Err(format!(
+            "label must be {MAX_CUE_LABEL_LEN} characters or fewer"
+        ));
+    }
+    Ok(label)
+}
+
+fn parse_optional_cue_notes(value: &Value) -> Result<Option<String>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let notes = value
+        .as_str()
+        .map(str::trim)
+        .ok_or_else(|| String::from("notes must be a string or null"))?;
+    if notes.is_empty() {
+        return Ok(None);
+    }
+    if notes.chars().count() > MAX_CUE_NOTES_LEN {
+        return Err(format!(
+            "notes must be {MAX_CUE_NOTES_LEN} characters or fewer"
+        ));
+    }
+    Ok(Some(String::from(notes)))
+}
+
+fn parse_optional_follow_seconds(value: &Value) -> Result<Option<f64>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let seconds = value
+        .as_f64()
+        .ok_or_else(|| String::from("followSeconds must be a number or null"))?;
+    if !(0.0..=MAX_FOLLOW_SECONDS).contains(&seconds) {
+        return Err(format!(
+            "followSeconds must be between 0 and {MAX_FOLLOW_SECONDS}"
+        ));
+    }
+    Ok(Some(seconds))
+}
+
+fn parse_fade_ms(value: &Value, field: &str) -> Result<i64, String> {
+    let ms = parse_i64_value(value)?;
+    if !(0..=MAX_FADE_MS).contains(&ms) {
+        return Err(format!("{field} must be between 0 and {MAX_FADE_MS} ms"));
+    }
+    Ok(ms)
+}
+
+pub fn parse_lighting_cue_create_request(
+    params: &Value,
+) -> Result<LightingCueCreateRequest, String> {
+    let label = parse_required_cue_label(params.get("label"))?;
+    let after_cue_id = params
+        .get("afterCueId")
+        .map(|value| parse_optional_trimmed_string_or_null(value, "afterCueId"))
+        .transpose()?
+        .unwrap_or(None);
+    let scene_id = params
+        .get("sceneId")
+        .map(|value| parse_optional_trimmed_string_or_null(value, "sceneId"))
+        .transpose()?
+        .unwrap_or(None);
+    let fade_in_ms = params
+        .get("fadeInMs")
+        .map(|value| parse_fade_ms(value, "fadeInMs"))
+        .transpose()?;
+    let fade_out_ms = params
+        .get("fadeOutMs")
+        .map(|value| parse_fade_ms(value, "fadeOutMs"))
+        .transpose()?;
+    let follow_seconds = params
+        .get("followSeconds")
+        .map(parse_optional_follow_seconds)
+        .transpose()?;
+    let notes = params
+        .get("notes")
+        .map(parse_optional_cue_notes)
+        .transpose()?;
+
+    Ok(LightingCueCreateRequest {
+        label,
+        after_cue_id,
+        scene_id,
+        fade_in_ms,
+        fade_out_ms,
+        follow_seconds,
+        notes,
+    })
+}
+
+pub fn parse_lighting_cue_update_request(
+    params: &Value,
+) -> Result<LightingCueUpdateRequest, String> {
+    let cue_id = params
+        .get("cueId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("cueId is required"))?;
+
+    let label = params
+        .get("label")
+        .map(|value| parse_required_cue_label(Some(value)))
+        .transpose()?;
+    let scene_id = params
+        .get("sceneId")
+        .map(|value| parse_optional_trimmed_string_or_null(value, "sceneId"))
+        .transpose()?;
+    let fade_in_ms = params
+        .get("fadeInMs")
+        .map(|value| parse_fade_ms(value, "fadeInMs"))
+        .transpose()?;
+    let fade_out_ms = params
+        .get("fadeOutMs")
+        .map(|value| parse_fade_ms(value, "fadeOutMs"))
+        .transpose()?;
+    let follow_seconds = params
+        .get("followSeconds")
+        .map(parse_optional_follow_seconds)
+        .transpose()?;
+    let notes = params
+        .get("notes")
+        .map(parse_optional_cue_notes)
+        .transpose()?;
+    let ordinal = params
+        .get("ordinal")
+        .map(parse_positive_i64_value)
+        .transpose()?;
+
+    if label.is_none()
+        && scene_id.is_none()
+        && fade_in_ms.is_none()
+        && fade_out_ms.is_none()
+        && follow_seconds.is_none()
+        && notes.is_none()
+        && ordinal.is_none()
+    {
+        return Err(String::from(
+            "lighting.cue.update requires one or more supported fields",
+        ));
+    }
+
+    Ok(LightingCueUpdateRequest {
+        cue_id: String::from(cue_id),
+        label,
+        scene_id,
+        fade_in_ms,
+        fade_out_ms,
+        follow_seconds,
+        notes,
+        ordinal,
+    })
+}
+
+pub fn parse_lighting_cue_delete_request(
+    params: &Value,
+) -> Result<LightingCueDeleteRequest, String> {
+    let cue_id = params
+        .get("cueId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("cueId is required"))?;
+
+    Ok(LightingCueDeleteRequest {
+        cue_id: String::from(cue_id),
+    })
+}
+
+pub fn parse_lighting_cue_fire_request(
+    params: &Value,
+) -> Result<LightingCueFireRequest, String> {
+    let cue_id = params
+        .get("cueId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("cueId is required"))?;
+    let fade_override_ms = params
+        .get("fadeOverrideMs")
+        .map(|value| {
+            if value.is_null() {
+                Ok(None)
+            } else {
+                parse_fade_ms(value, "fadeOverrideMs").map(Some)
+            }
+        })
+        .transpose()?
+        .flatten();
+
+    Ok(LightingCueFireRequest {
+        cue_id: String::from(cue_id),
+        fade_override_ms,
+    })
+}
+
 pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSnapshot {
     let config = resolve_lighting_config(settings);
     let check_status = lighting_check_status(settings);
@@ -965,6 +1302,13 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         })
         .collect::<Vec<_>>();
     let selected_scene_id = read_selected_scene_id(settings, &scenes);
+    let cue_states = load_lighting_cues(settings);
+    let active_cue_id = read_optional_setting(settings, LIGHTING_ACTIVE_CUE_ID_KEY)
+        .filter(|id| cue_states.iter().any(|cue| cue.id == *id));
+    let cues = cue_states
+        .iter()
+        .map(|cue| lighting_cue_snapshot_from_state(cue, active_cue_id.as_deref()))
+        .collect::<Vec<_>>();
     let status = if !enabled && config.bridge_ip.trim().is_empty() {
         String::from("unconfigured")
     } else if !enabled {
@@ -1011,6 +1355,8 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         fixtures,
         groups,
         scenes,
+        cues,
+        active_cue_id,
     }
 }
 
@@ -1106,6 +1452,8 @@ pub fn import_legacy_lighting_fixture(
                 spatial_x: normalize_optional_coordinate(fixture.spatial_x),
                 spatial_y: normalize_optional_coordinate(fixture.spatial_y),
                 spatial_rotation: normalize_rotation(fixture.spatial_rotation),
+                rig_z: None,
+                beam_angle_degrees: None,
                 intensity: clamp_i64(fixture.intensity, 0, 100),
                 cct: clamp_cct_for_type(
                     fixture.cct,
@@ -1350,6 +1698,8 @@ pub fn create_lighting_fixture(
         spatial_x: None,
         spatial_y: None,
         spatial_rotation: 0.0,
+        rig_z: None,
+        beam_angle_degrees: None,
         intensity: DEFAULT_FIXTURE_INTENSITY,
         cct: default_fixture_cct_for_type(&request.fixture_type),
         on: false,
@@ -1471,6 +1821,12 @@ pub fn update_lighting_fixture(
         }
         if let Some(spatial_rotation) = request.spatial_rotation {
             fixture.spatial_rotation = normalize_rotation(spatial_rotation);
+        }
+        if let Some(rig_z) = request.rig_z {
+            fixture.rig_z = rig_z;
+        }
+        if let Some(beam_angle_degrees) = request.beam_angle_degrees {
+            fixture.beam_angle_degrees = beam_angle_degrees;
         }
 
         fixture.clone()
@@ -2215,6 +2571,333 @@ pub fn delete_lighting_scene(
     })
 }
 
+fn load_lighting_cues(settings: &HashMap<String, String>) -> Vec<LightingEditorCueState> {
+    let mut cues = settings
+        .get(LIGHTING_CUES_KEY)
+        .and_then(|value| serde_json::from_str::<Vec<LightingEditorCueState>>(value).ok())
+        .unwrap_or_default();
+    cues.sort_by_key(|cue| cue.ordinal);
+    resequence_cues(&mut cues);
+    cues
+}
+
+fn resequence_cues(cues: &mut [LightingEditorCueState]) {
+    for (index, cue) in cues.iter_mut().enumerate() {
+        cue.ordinal = (index as i64) + 1;
+    }
+}
+
+fn serialize_lighting_cues(
+    cues: &[LightingEditorCueState],
+) -> Result<String, LightingCommandError> {
+    serde_json::to_string(cues).map_err(|error| LightingCommandError::Storage(error.to_string()))
+}
+
+fn lighting_cue_snapshot_from_state(
+    cue: &LightingEditorCueState,
+    active_cue_id: Option<&str>,
+) -> LightingCueSnapshot {
+    let state = match active_cue_id {
+        Some(id) if id == cue.id => String::from("active"),
+        _ => String::from("pending"),
+    };
+    LightingCueSnapshot {
+        id: cue.id.clone(),
+        ordinal: cue.ordinal,
+        label: cue.label.clone(),
+        scene_id: cue.scene_id.clone(),
+        fade_in_ms: cue.fade_in_ms,
+        fade_out_ms: cue.fade_out_ms,
+        follow_seconds: cue.follow_seconds,
+        notes: cue.notes.clone(),
+        state,
+    }
+}
+
+fn next_custom_cue_id(cues: &[LightingEditorCueState]) -> String {
+    let next_index = cues
+        .iter()
+        .filter_map(|cue| {
+            cue.id
+                .strip_prefix(LIGHTING_CUSTOM_CUE_ID_PREFIX)
+                .and_then(|value| value.parse::<usize>().ok())
+        })
+        .max()
+        .unwrap_or(0)
+        + 1;
+
+    format!("{LIGHTING_CUSTOM_CUE_ID_PREFIX}{next_index}")
+}
+
+pub fn create_lighting_cue(
+    db_path: &Path,
+    request: &LightingCueCreateRequest,
+) -> Result<LightingCueCreateResult, LightingCommandError> {
+    let app_settings = load_lighting_settings(db_path)?;
+    let editor_state = load_lighting_editor_state(&app_settings);
+    if let Some(scene_id) = &request.scene_id {
+        if !editor_state.scenes.iter().any(|scene| &scene.id == scene_id) {
+            return Err(LightingCommandError::Rejected(
+                "LIGHTING_SCENE_NOT_FOUND",
+                format!(
+                    "Lighting cue references scene '{scene_id}' but no matching scene exists."
+                ),
+            ));
+        }
+    }
+
+    let mut cues = load_lighting_cues(&app_settings);
+    let new_id = next_custom_cue_id(&cues);
+    let follow_seconds = request.follow_seconds.unwrap_or(None);
+    let notes = request.notes.clone().unwrap_or(None);
+
+    let insert_index = match &request.after_cue_id {
+        Some(after_id) => cues
+            .iter()
+            .position(|cue| &cue.id == after_id)
+            .map(|idx| idx + 1)
+            .ok_or_else(|| {
+                LightingCommandError::Rejected(
+                    "LIGHTING_CUE_NOT_FOUND",
+                    format!("Lighting cue '{after_id}' is not present in the cue stack."),
+                )
+            })?,
+        None => cues.len(),
+    };
+
+    let new_cue = LightingEditorCueState {
+        id: new_id.clone(),
+        ordinal: (insert_index as i64) + 1,
+        label: request.label.clone(),
+        scene_id: request.scene_id.clone(),
+        fade_in_ms: request.fade_in_ms.unwrap_or(0),
+        fade_out_ms: request.fade_out_ms.unwrap_or(0),
+        follow_seconds,
+        notes,
+    };
+    cues.insert(insert_index, new_cue.clone());
+    resequence_cues(&mut cues);
+    let stored = cues.iter().find(|cue| cue.id == new_id).cloned().unwrap();
+
+    let summary = format!("Lighting cue '{}' was added.", stored.label);
+    let updates = vec![
+        (
+            String::from(LIGHTING_CUES_KEY),
+            serialize_lighting_cues(&cues)?,
+        ),
+        (
+            String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
+            String::from("succeeded"),
+        ),
+        (String::from(LIGHTING_LAST_ACTION_CODE_KEY), String::new()),
+        (
+            String::from(LIGHTING_LAST_ACTION_MESSAGE_KEY),
+            summary.clone(),
+        ),
+    ];
+    persist_lighting_state(db_path, &updates)?;
+
+    let active_cue_id = read_optional_setting(&app_settings, LIGHTING_ACTIVE_CUE_ID_KEY);
+    Ok(LightingCueCreateResult {
+        cue: lighting_cue_snapshot_from_state(&stored, active_cue_id.as_deref()),
+        summary,
+    })
+}
+
+pub fn update_lighting_cue(
+    db_path: &Path,
+    request: &LightingCueUpdateRequest,
+) -> Result<LightingCueUpdateResult, LightingCommandError> {
+    let app_settings = load_lighting_settings(db_path)?;
+    let editor_state = load_lighting_editor_state(&app_settings);
+    if let Some(Some(scene_id)) = &request.scene_id {
+        if !editor_state.scenes.iter().any(|scene| &scene.id == scene_id) {
+            return Err(LightingCommandError::Rejected(
+                "LIGHTING_SCENE_NOT_FOUND",
+                format!(
+                    "Lighting cue references scene '{scene_id}' but no matching scene exists."
+                ),
+            ));
+        }
+    }
+
+    let mut cues = load_lighting_cues(&app_settings);
+    let current_index = cues
+        .iter()
+        .position(|cue| cue.id == request.cue_id)
+        .ok_or_else(|| {
+            LightingCommandError::Rejected(
+                "LIGHTING_CUE_NOT_FOUND",
+                format!("Lighting cue '{}' is not present in the cue stack.", request.cue_id),
+            )
+        })?;
+
+    {
+        let cue = &mut cues[current_index];
+        if let Some(label) = &request.label {
+            cue.label = label.clone();
+        }
+        if let Some(scene_id) = &request.scene_id {
+            cue.scene_id = scene_id.clone();
+        }
+        if let Some(fade_in_ms) = request.fade_in_ms {
+            cue.fade_in_ms = fade_in_ms;
+        }
+        if let Some(fade_out_ms) = request.fade_out_ms {
+            cue.fade_out_ms = fade_out_ms;
+        }
+        if let Some(follow_seconds) = &request.follow_seconds {
+            cue.follow_seconds = *follow_seconds;
+        }
+        if let Some(notes) = &request.notes {
+            cue.notes = notes.clone();
+        }
+    }
+
+    if let Some(target_ordinal) = request.ordinal {
+        let target_index = (target_ordinal.max(1) as usize).saturating_sub(1);
+        let target_index = target_index.min(cues.len().saturating_sub(1));
+        if target_index != current_index {
+            let cue = cues.remove(current_index);
+            cues.insert(target_index, cue);
+        }
+    }
+    resequence_cues(&mut cues);
+    let stored = cues
+        .iter()
+        .find(|cue| cue.id == request.cue_id)
+        .cloned()
+        .unwrap();
+
+    let summary = format!("Lighting cue '{}' was updated.", stored.label);
+    let updates = vec![
+        (
+            String::from(LIGHTING_CUES_KEY),
+            serialize_lighting_cues(&cues)?,
+        ),
+        (
+            String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
+            String::from("succeeded"),
+        ),
+        (String::from(LIGHTING_LAST_ACTION_CODE_KEY), String::new()),
+        (
+            String::from(LIGHTING_LAST_ACTION_MESSAGE_KEY),
+            summary.clone(),
+        ),
+    ];
+    persist_lighting_state(db_path, &updates)?;
+
+    let active_cue_id = read_optional_setting(&app_settings, LIGHTING_ACTIVE_CUE_ID_KEY);
+    Ok(LightingCueUpdateResult {
+        cue: lighting_cue_snapshot_from_state(&stored, active_cue_id.as_deref()),
+        summary,
+    })
+}
+
+pub fn delete_lighting_cue(
+    db_path: &Path,
+    request: &LightingCueDeleteRequest,
+) -> Result<LightingCueDeleteResult, LightingCommandError> {
+    let app_settings = load_lighting_settings(db_path)?;
+    let mut cues = load_lighting_cues(&app_settings);
+    let index = cues
+        .iter()
+        .position(|cue| cue.id == request.cue_id)
+        .ok_or_else(|| {
+            LightingCommandError::Rejected(
+                "LIGHTING_CUE_NOT_FOUND",
+                format!("Lighting cue '{}' is not present in the cue stack.", request.cue_id),
+            )
+        })?;
+    let removed = cues.remove(index);
+    resequence_cues(&mut cues);
+
+    let active_cue_id = read_optional_setting(&app_settings, LIGHTING_ACTIVE_CUE_ID_KEY);
+    let clear_active = active_cue_id.as_deref() == Some(request.cue_id.as_str());
+
+    let summary = format!("Lighting cue '{}' was deleted.", removed.label);
+    let mut updates = vec![
+        (
+            String::from(LIGHTING_CUES_KEY),
+            serialize_lighting_cues(&cues)?,
+        ),
+        (
+            String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
+            String::from("succeeded"),
+        ),
+        (String::from(LIGHTING_LAST_ACTION_CODE_KEY), String::new()),
+        (
+            String::from(LIGHTING_LAST_ACTION_MESSAGE_KEY),
+            summary.clone(),
+        ),
+    ];
+    if clear_active {
+        updates.push((String::from(LIGHTING_ACTIVE_CUE_ID_KEY), String::new()));
+    }
+    persist_lighting_state(db_path, &updates)?;
+
+    Ok(LightingCueDeleteResult {
+        deleted: true,
+        cue_id: request.cue_id.clone(),
+        summary,
+    })
+}
+
+pub fn fire_lighting_cue(
+    db_path: &Path,
+    request: &LightingCueFireRequest,
+) -> Result<LightingCueFireResult, LightingCommandError> {
+    let app_settings = load_lighting_settings(db_path)?;
+    let cues = load_lighting_cues(&app_settings);
+    let target = cues
+        .iter()
+        .find(|cue| cue.id == request.cue_id)
+        .cloned()
+        .ok_or_else(|| {
+            LightingCommandError::Rejected(
+                "LIGHTING_CUE_NOT_FOUND",
+                format!("Lighting cue '{}' is not present in the cue stack.", request.cue_id),
+            )
+        })?;
+
+    let previous_cue_id = read_optional_setting(&app_settings, LIGHTING_ACTIVE_CUE_ID_KEY);
+    let applied_fade_ms = request.fade_override_ms.unwrap_or(target.fade_in_ms);
+
+    if let Some(scene_id) = &target.scene_id {
+        let fade_seconds = (applied_fade_ms as f64) / 1000.0;
+        let recall_request = LightingSceneRecallRequest {
+            scene_id: scene_id.clone(),
+            fade_duration_seconds: fade_seconds.clamp(0.0, 10.0),
+        };
+        recall_lighting_scene(db_path, &recall_request)?;
+    }
+
+    let summary = format!("Lighting cue '{}' fired.", target.label);
+    let updates = vec![
+        (
+            String::from(LIGHTING_ACTIVE_CUE_ID_KEY),
+            target.id.clone(),
+        ),
+        (
+            String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
+            String::from("succeeded"),
+        ),
+        (String::from(LIGHTING_LAST_ACTION_CODE_KEY), String::new()),
+        (
+            String::from(LIGHTING_LAST_ACTION_MESSAGE_KEY),
+            summary.clone(),
+        ),
+    ];
+    persist_lighting_state(db_path, &updates)?;
+
+    Ok(LightingCueFireResult {
+        active_cue_id: target.id,
+        previous_cue_id,
+        applied_fade_ms,
+        summary,
+    })
+}
+
 pub fn build_lighting_health_check(settings: &HashMap<String, String>) -> LightingHealthCheck {
     let snapshot = read_lighting_snapshot(settings);
     LightingHealthCheck {
@@ -2265,6 +2948,8 @@ fn default_lighting_editor_state(
             spatial_x: fixture.spatial_x,
             spatial_y: fixture.spatial_y,
             spatial_rotation: normalize_rotation(fixture.spatial_rotation),
+            rig_z: None,
+            beam_angle_degrees: None,
             intensity: read_fixture_intensity(settings, &fixture.id),
             cct: read_fixture_cct(settings, &fixture.id),
             on: read_fixture_on(settings, &fixture.id),
@@ -2327,6 +3012,8 @@ fn normalize_lighting_editor_state(
                 spatial_x: normalize_optional_coordinate(fixture.spatial_x),
                 spatial_y: normalize_optional_coordinate(fixture.spatial_y),
                 spatial_rotation: normalize_rotation(fixture.spatial_rotation),
+                rig_z: fixture.rig_z,
+                beam_angle_degrees: fixture.beam_angle_degrees,
                 intensity: clamp_i64(fixture.intensity, 0, 100),
                 cct: clamp_cct_for_type(
                     fixture.cct,
@@ -2482,6 +3169,8 @@ fn append_missing_fixture_states(
             spatial_x: normalize_optional_coordinate(inventory_fixture.spatial_x),
             spatial_y: normalize_optional_coordinate(inventory_fixture.spatial_y),
             spatial_rotation: normalize_rotation(inventory_fixture.spatial_rotation),
+            rig_z: None,
+            beam_angle_degrees: None,
             intensity: read_fixture_intensity(settings, &inventory_fixture.id),
             cct: clamp_cct_for_type(
                 read_fixture_cct(settings, &inventory_fixture.id),
@@ -2599,6 +3288,8 @@ fn lighting_fixture_snapshot_from_state(
         spatial_x: fixture.spatial_x,
         spatial_y: fixture.spatial_y,
         spatial_rotation: normalize_rotation(fixture.spatial_rotation),
+        rig_z: fixture.rig_z,
+        beam_angle_degrees: fixture.beam_angle_degrees,
         on: fixture.on,
         intensity: fixture.intensity,
         cct: fixture.cct,
@@ -3304,6 +3995,32 @@ fn parse_spatial_rotation_value(value: &Value, field: &str) -> Result<f64, Strin
     Ok(normalize_rotation(rotation))
 }
 
+fn parse_optional_rig_z(value: &Value) -> Result<Option<f64>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let meters = value
+        .as_f64()
+        .ok_or_else(|| String::from("rigZ must be a finite number or null"))?;
+    if !meters.is_finite() {
+        return Err(String::from("rigZ must be a finite number or null"));
+    }
+    Ok(Some(clamp_f64(meters, 0.0, 20.0)))
+}
+
+fn parse_optional_beam_angle_degrees(value: &Value) -> Result<Option<f64>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let degrees = value
+        .as_f64()
+        .ok_or_else(|| String::from("beamAngleDegrees must be a finite number or null"))?;
+    if !degrees.is_finite() {
+        return Err(String::from("beamAngleDegrees must be a finite number or null"));
+    }
+    Ok(Some(clamp_f64(degrees, 1.0, 180.0)))
+}
+
 fn parse_optional_spatial_marker(
     value: &Value,
     field: &str,
@@ -3791,6 +4508,8 @@ mod tests {
                 spatial_x: None,
                 spatial_y: None,
                 spatial_rotation: None,
+                rig_z: None,
+                beam_angle_degrees: None,
             },
         )
         .expect("fixture update should succeed");
@@ -3868,6 +4587,8 @@ mod tests {
                 spatial_x: None,
                 spatial_y: None,
                 spatial_rotation: None,
+                rig_z: None,
+                beam_angle_degrees: None,
             },
         )
         .expect("fixture reassignment should succeed");
@@ -3942,6 +4663,8 @@ mod tests {
                 spatial_x: Some(Some(0.62)),
                 spatial_y: Some(Some(0.38)),
                 spatial_rotation: Some(225.0),
+                rig_z: None,
+                beam_angle_degrees: None,
             },
         )
         .expect("fixture spatial update should succeed");
@@ -4109,6 +4832,8 @@ mod tests {
                 spatial_x: None,
                 spatial_y: None,
                 spatial_rotation: None,
+                rig_z: None,
+                beam_angle_degrees: None,
             },
         )
         .expect("fixture update should succeed");
@@ -4189,6 +4914,8 @@ mod tests {
                 spatial_x: None,
                 spatial_y: None,
                 spatial_rotation: None,
+                rig_z: None,
+                beam_angle_degrees: None,
             },
         )
         .expect("fixture update should succeed");
@@ -4236,5 +4963,229 @@ mod tests {
             .scenes
             .iter()
             .all(|scene| scene.id != created.scene.id));
+    }
+
+    #[test]
+    fn lighting_cue_crud_round_trip_persists_through_snapshot() {
+        let test_dir = TestDir::new("cue-crud");
+        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        set_settings_owned(
+            test_dir.db_path().as_path(),
+            &[
+                (
+                    String::from(LIGHTING_BRIDGE_IP_KEY),
+                    String::from("2.0.0.10"),
+                ),
+                (
+                    String::from("app.commissioning.check.lighting.status"),
+                    String::from("passed"),
+                ),
+            ],
+        )
+        .expect("lighting state should persist");
+
+        let scene = create_lighting_scene(
+            test_dir.db_path().as_path(),
+            &LightingSceneCreateRequest {
+                name: String::from("Open on Host"),
+            },
+        )
+        .expect("scene create should succeed");
+
+        let first = create_lighting_cue(
+            test_dir.db_path().as_path(),
+            &LightingCueCreateRequest {
+                label: String::from("Cue 1 — Opening"),
+                after_cue_id: None,
+                scene_id: Some(scene.scene.id.clone()),
+                fade_in_ms: Some(1500),
+                fade_out_ms: Some(1500),
+                follow_seconds: Some(Some(4.0)),
+                notes: Some(Some(String::from("hold for applause"))),
+            },
+        )
+        .expect("first cue create should succeed");
+        assert_eq!(first.cue.ordinal, 1);
+        assert_eq!(first.cue.state, "pending");
+
+        let second = create_lighting_cue(
+            test_dir.db_path().as_path(),
+            &LightingCueCreateRequest {
+                label: String::from("Cue 2 — Interview"),
+                after_cue_id: None,
+                scene_id: None,
+                fade_in_ms: None,
+                fade_out_ms: None,
+                follow_seconds: None,
+                notes: None,
+            },
+        )
+        .expect("second cue create should succeed");
+        assert_eq!(second.cue.ordinal, 2);
+
+        let relabeled = update_lighting_cue(
+            test_dir.db_path().as_path(),
+            &LightingCueUpdateRequest {
+                cue_id: first.cue.id.clone(),
+                label: Some(String::from("Cue 1 — Walk On")),
+                scene_id: None,
+                fade_in_ms: None,
+                fade_out_ms: None,
+                follow_seconds: Some(None),
+                notes: Some(None),
+                ordinal: Some(2),
+            },
+        )
+        .expect("cue update should succeed");
+        assert_eq!(relabeled.cue.label, "Cue 1 — Walk On");
+        assert_eq!(relabeled.cue.follow_seconds, None);
+        assert_eq!(relabeled.cue.notes, None);
+        assert_eq!(relabeled.cue.ordinal, 2);
+
+        let fired = fire_lighting_cue(
+            test_dir.db_path().as_path(),
+            &LightingCueFireRequest {
+                cue_id: relabeled.cue.id.clone(),
+                fade_override_ms: Some(500),
+            },
+        )
+        .expect("cue fire should succeed");
+        assert_eq!(fired.active_cue_id, relabeled.cue.id);
+        assert_eq!(fired.applied_fade_ms, 500);
+
+        let snapshot = read_lighting_snapshot(
+            &list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+                .expect("settings should load"),
+        );
+        assert_eq!(snapshot.cues.len(), 2);
+        assert_eq!(snapshot.active_cue_id.as_deref(), Some(relabeled.cue.id.as_str()));
+        let active_cue = snapshot
+            .cues
+            .iter()
+            .find(|cue| cue.id == relabeled.cue.id)
+            .expect("fired cue should appear in snapshot");
+        assert_eq!(active_cue.state, "active");
+
+        let deleted = delete_lighting_cue(
+            test_dir.db_path().as_path(),
+            &LightingCueDeleteRequest {
+                cue_id: relabeled.cue.id.clone(),
+            },
+        )
+        .expect("cue delete should succeed");
+        assert!(deleted.deleted);
+
+        let final_snapshot = read_lighting_snapshot(
+            &list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+                .expect("settings should load"),
+        );
+        assert_eq!(final_snapshot.cues.len(), 1);
+        assert!(final_snapshot.active_cue_id.is_none());
+        assert_eq!(final_snapshot.cues[0].ordinal, 1);
+    }
+
+    #[test]
+    fn lighting_cue_create_rejects_missing_scene() {
+        let test_dir = TestDir::new("cue-missing-scene");
+        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        set_settings_owned(
+            test_dir.db_path().as_path(),
+            &[(
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            )],
+        )
+        .expect("lighting state should persist");
+
+        let result = create_lighting_cue(
+            test_dir.db_path().as_path(),
+            &LightingCueCreateRequest {
+                label: String::from("Orphan Cue"),
+                after_cue_id: None,
+                scene_id: Some(String::from("scene-does-not-exist")),
+                fade_in_ms: None,
+                fade_out_ms: None,
+                follow_seconds: None,
+                notes: None,
+            },
+        );
+        match result {
+            Err(LightingCommandError::Rejected(code, _)) => {
+                assert_eq!(code, "LIGHTING_SCENE_NOT_FOUND");
+            }
+            other => panic!("expected LIGHTING_SCENE_NOT_FOUND, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn lighting_fixture_rig_z_and_beam_angle_round_trip() {
+        let test_dir = TestDir::new("fixture-rig-beam");
+        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        set_settings_owned(
+            test_dir.db_path().as_path(),
+            &[(
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            )],
+        )
+        .expect("lighting state should persist");
+
+        let updated = update_lighting_fixture(
+            test_dir.db_path().as_path(),
+            &LightingFixtureUpdateRequest {
+                fixture_id: String::from("fixture-key-left"),
+                name: None,
+                fixture_type: None,
+                dmx_start_address: None,
+                effect: None,
+                on: None,
+                intensity: None,
+                cct: None,
+                group_id: None,
+                spatial_x: None,
+                spatial_y: None,
+                spatial_rotation: None,
+                rig_z: Some(Some(4.5)),
+                beam_angle_degrees: Some(Some(36.0)),
+            },
+        )
+        .expect("fixture update should succeed");
+        assert_eq!(updated.fixture.rig_z, Some(4.5));
+        assert_eq!(updated.fixture.beam_angle_degrees, Some(36.0));
+
+        let snapshot = read_lighting_snapshot(
+            &list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+                .expect("settings should load"),
+        );
+        let fixture = snapshot
+            .fixtures
+            .iter()
+            .find(|fixture| fixture.id == "fixture-key-left")
+            .expect("fixture should round-trip through snapshot");
+        assert_eq!(fixture.rig_z, Some(4.5));
+        assert_eq!(fixture.beam_angle_degrees, Some(36.0));
+
+        let cleared = update_lighting_fixture(
+            test_dir.db_path().as_path(),
+            &LightingFixtureUpdateRequest {
+                fixture_id: String::from("fixture-key-left"),
+                name: None,
+                fixture_type: None,
+                dmx_start_address: None,
+                effect: None,
+                on: None,
+                intensity: None,
+                cct: None,
+                group_id: None,
+                spatial_x: None,
+                spatial_y: None,
+                spatial_rotation: None,
+                rig_z: Some(None),
+                beam_angle_degrees: Some(None),
+            },
+        )
+        .expect("fixture clear should succeed");
+        assert_eq!(cleared.fixture.rig_z, None);
+        assert_eq!(cleared.fixture.beam_angle_degrees, None);
     }
 }
