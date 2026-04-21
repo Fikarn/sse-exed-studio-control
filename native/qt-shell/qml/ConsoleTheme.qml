@@ -44,6 +44,27 @@ QtObject {
     readonly property color surfaceStrongBottom: "#0f1015"
     readonly property color overlayScrim: "#09090dcc"
 
+    readonly property color surfaceScrim: "#5c0a0a0f"
+    readonly property color surfaceScrimStrong: "#800a0a0f"
+    readonly property color surfaceScrimSoft: "#470a0a0f"
+
+    readonly property color accentPrimarySoft: "#2e99ba92"
+    readonly property color accentPrimaryGlow: "#1499ba92"
+
+    readonly property color focusRing: "#99ba92"
+    readonly property int focusRingWidth: 2
+    readonly property int focusRingOffset: 2
+
+    readonly property color elevation1Shadow: "#4d000000"
+    readonly property int elevation1OffsetY: 2
+    readonly property int elevation1Blur: 8
+
+    readonly property color elevation2Shadow: "#66000000"
+    readonly property int elevation2OffsetY: 6
+    readonly property int elevation2Blur: 20
+
+    readonly property int copyMaxWidth: 760
+
     readonly property int radiusBadge: 6
     readonly property int radiusCard: 10
     readonly property int radiusSoft: 18
