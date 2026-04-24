@@ -54,7 +54,7 @@ Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:build`, `nat
 Every operator-visible change to a native surface must:
 
 1. regenerate the deterministic offscreen `2560×1440` capture for the affected workspace,
-2. produce two consecutive bit-identical runs on the same CI lane before the baseline is accepted,
+2. produce two consecutive bit-identical runs on the same target-host verification lane before the baseline is accepted,
 3. land a baseline commit with `parity: ...` in the subject so reviewers can filter.
 
 Cross-platform pixel equivalence across lanes is not required — macOS and Windows diverge by driver. Per-lane determinism is the gate.
@@ -70,13 +70,13 @@ During the replatform, Qt parity remains the shipping gate. The Tauri replacemen
 - QML structural tests: `native/qt-shell/tests/qml/tst_*.qml`. They assert wiring and behavior, not pixels. They preserve a qsettings org-identifier fix (PR #25) — keep tests hermetic.
 - Engine tests: `cargo test` under `native/rust-engine/`.
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
-- CI lanes: macOS and Windows native verification lanes are **both blocking** on `main` (issue #25 resolved in `55151e3`). Treat a Windows lane failure the same as a macOS failure.
+- Target-host lanes: macOS and Windows native verification are both blocking release gates. Treat a Windows target-host failure the same as a macOS failure.
 
 ## Release posture
 
 - QtIFW offline installers for Windows + macOS, plus QtIFW maintenance-tool update-repository archives.
 - Distribution: GitHub Releases (direct download) + maintenance-tool update channel.
-- Trigger: pushing a `v*` tag runs the GitHub Actions release workflow. Local gate: `npm run release:verify`.
+- Trigger: a `v*` tag identifies the release; local target-host gates build and verify artifacts, then `npm run release:publish -- --tag vX.Y.Z` uploads them to GitHub Releases.
 - Deployment profile: one fixed studio workstation, unsigned controlled deployment. Public signing (Windows cert + Apple Developer) is deferred — see `docs/PRODUCTIZATION_PLAN.md §3`.
 - Persistence compatibility: rollback to a prior tag must remain a reinstall-away. Do not change on-disk formats without an explicit migration plan.
 

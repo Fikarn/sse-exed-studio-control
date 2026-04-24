@@ -55,14 +55,14 @@ Exit criteria:
 
 ### 3. Release Pipeline And Trust
 
-- [x] Keep cross-platform tagged-release automation in place
-- [x] Build native Windows and macOS installers in release automation
-- [x] Build native maintenance-tool update-repository archives in release automation
+- [x] Keep cross-platform tagged-release validation in place
+- [x] Build native Windows and macOS installers on target release hosts
+- [x] Build native maintenance-tool update-repository archives on target release hosts
 - [x] Publish SHA256 manifests for native release artifacts
-- [x] Verify native package, installer, and update-repository artifact identity in CI and release validation
+- [x] Verify native package, installer, and update-repository artifact identity in target-host release validation
 - [x] Add previous-tag continuity checks for native installer and maintenance-tool metadata
-- [x] Add optional macOS signing and notarization hooks to release automation
-- [x] Add optional Windows signing hooks to release automation
+- [x] Add optional macOS signing and notarization hooks to local release validation
+- [x] Add optional Windows signing hooks to local release validation
 - [x] Document the unsigned controlled-deployment posture for Windows and macOS installs
 - [ ] Configure Windows signing secrets and validate a signed installer build if public self-serve distribution becomes necessary
 - [ ] Configure Apple signing and notarization secrets and validate a trusted macOS installer build if public self-serve distribution becomes necessary
@@ -70,7 +70,7 @@ Exit criteria:
 
 Exit criteria:
 
-- tagged releases publish the native installers and update-repository archives
+- tagged releases have locally published native installers and update-repository archives
 - operators have documented manual trust steps for unsigned Windows and macOS installs
 - integrity and rollback checks are available before operator rollout
 
@@ -91,8 +91,8 @@ Exit criteria:
 - [x] Add restart, rollback, and restore acceptance coverage
 - [x] Add packaged continuity and rollback acceptance against preserved native app-data directories
 - [x] Add staged installer/update/reinstall acceptance against preserved native app-data directories
-- [x] Confirm clean-machine Windows install in CI or release validation
-- [x] Confirm clean-machine macOS install in CI or release validation
+- [x] Confirm clean-machine Windows install in target-host release validation
+- [x] Confirm clean-machine macOS install in target-host release validation
 - [x] Verify update application from one tagged native release to the next
 - [x] Verify rollback and reinstall preserve user data
 

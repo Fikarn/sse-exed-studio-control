@@ -10,6 +10,7 @@ release/
 *.log
 npm-debug.log*
 .cache/
+.tools/
 .swift-module-cache/
 .idea/
 .vscode/

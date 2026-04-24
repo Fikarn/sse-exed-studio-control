@@ -103,10 +103,12 @@ npm run tauri:workspaces:qualify
 npm run tauri:visual:review
 npm run tauri:cutover:candidate
 npm run tauri:package:mac:ifw-staged
+npm run tauri:package:mac:ifw-local
 npm run tauri:package:win:ifw-staged
+npm run tauri:package:win:ifw-local
 ```
 
-During the migration, treat the Qt shell as maintenance-only unless the task is a release blocker, CI/release fix, or critical operator defect.
+During the migration, treat the Qt shell as maintenance-only unless the task is a release blocker, release-verification fix, or critical operator defect.
 
 `npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot, persisted restart, and degraded startup/recovery posture. `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence.
 
@@ -114,13 +116,29 @@ Both Tauri qualification lanes and Playwright preview use the fixed local port `
 
 Both Tauri qualification commands write a `summary.json` evidence file. By default the summary is written to a temp directory and the path is printed. For target-host evidence capture, set `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` before running the commands; this directory is intentionally ignored by git.
 
-The promotion gate for replacing the shipping Qt runtime lives in [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md). Do not switch shipping behavior, installer paths, or CI blocking status by inference; use that checklist as the cutover authority.
+The promotion gate for replacing the shipping Qt runtime lives in [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md). Do not switch shipping behavior, installer paths, or target-host gate status by inference; use that checklist as the cutover authority.
 
 `npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, workspace qualification, and visual review serially.
 
 `npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting, Audio, and Planning screenshots at `2560x1440` and `1920x1080`, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. This complements, but does not replace, live human review on the BetterDisplay-backed `2560x1440` surface or the fixed studio monitor.
 
 `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` are Checkpoint C hardening lanes for the replacement shell. They stage the Tauri shell and `studio-control-engine` side by side under `release/tauri-candidate/**`, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository payloads under separate `release/tauri-candidate-installer/**` and `release/tauri-candidate-updates/**` roots, and verify staged payload parity. These lanes are separate from the shipping Qt `native:*` release scripts and do not authorize cutover by themselves.
+
+`npm run tauri:package:mac:ifw-local` and `npm run tauri:package:win:ifw-local` are the target-host replacement-shell packaging gates when QtIFW tools are installed. They build the real offline installer with `binarycreator`, build the real maintenance-tool update repository with `repogen`, verify full artifacts, install the generated candidate through QtIFW, verify the installed shell launches against the bundled engine, verify the maintenance tool can see the package and repository, purge through the maintenance tool, reinstall, and verify operator data survives.
+
+For local macOS QtIFW tools, install into ignored project tooling:
+
+```bash
+python3 -m venv .tools/aqtinstall-venv
+.tools/aqtinstall-venv/bin/python -m pip install --upgrade pip aqtinstall
+mkdir -p .tools/aqt-home
+HOME="$PWD/.tools/aqt-home" .tools/aqtinstall-venv/bin/aqt install-tool mac desktop tools_ifw qt.tools.ifw.47 -O .tools/qt-ifw
+export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"
+export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"
+npm run tauri:package:mac:ifw-local
+```
+
+Use the matching Windows QtIFW tools on a Windows 11 `x64` host for `npm run tauri:package:win:ifw-local`.
 
 ### 2b. Required parity workflow
 
@@ -406,4 +424,4 @@ Release details live in [docs/RELEASE.md](./RELEASE.md), but the short version i
 4. commit release prep
 5. push `main`
 6. create and push tag
-7. let GitHub Actions build the release
+7. publish the locally built target-host artifacts with `npm run release:publish -- --tag vX.Y.Z`

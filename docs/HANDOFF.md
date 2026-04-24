@@ -13,7 +13,7 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - The legacy Electron/Next.js runtime was retired in `v2.1.0`. There is no browser-served or Electron-served path left in the repository.
 - Native packaging, installer, update-repository, and release automation lanes exist, produce signed/unsigned operator-ready artifacts, and are driven from tagged releases.
 - Native operator parity is engineering-complete. Acceptance is layered: deterministic offscreen `2560x1440` captures, real-GPU onscreen spot captures, and the install-time first-launch smoke test shipped in the QtIFW installer.
-- Both native verification lanes (macOS and Windows) are blocking on `main`.
+- Native and replacement-shell verification are target-host gates. GitHub Actions is not the acceptance mechanism for current cutover work, and workflow files are intentionally absent.
 - A one-way legacy-import path (`native/rust-engine/src/legacy_import.rs`) remains so that operators migrating from a pre-`v2.0.0` Electron installation can bring their old `db.json` forward on first native launch. This is the only legacy code that is intentionally retained.
 
 ## Start Here
@@ -53,16 +53,16 @@ Do not reopen these casually:
 
 The highest-value unresolved work is:
 
-1. Keep CI and native verification lanes diagnosable.
-   Both macOS and Windows native lanes are blocking on `main`. If either goes red, diagnose via the per-run `native/build/Testing/Temporary/` and `qt-shell/qmltest-results.{tap,xml}` artifacts that the lanes upload on every run.
+1. Keep target-host evidence complete.
+   macOS Apple Silicon and Windows 11 `x64` remain separate release hosts. Do not claim a cutover gate from a single platform, from stale local artifacts, or from a prepared-only installer layout.
 2. Keep the backlog actionable.
    Do not let real execution work live only in prose documents; open execution issues or milestone items before starting the next major slice.
 3. Keep current-truth docs aligned with the replatform program.
    The shipping Qt runtime and the parallel Tauri replacement track must both be described consistently in `README.md`, `docs/HANDOFF.md`, `docs/ARCHITECTURE.md`, and the ADR set.
 4. Preserve the current frontend replatform checkpoint.
    `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is now tracked in `docs/FRONTEND_CUTOVER_PLAN.md`; do not treat Qt as replaceable until that gate is satisfied.
-5. Keep Tauri CI posture honest.
-   `frontend-foundation`, `tauri-foundation-macos`, and `tauri-foundation-windows` are blocking on `main`, but current GitHub Actions runs in `Fikarn/sse-exed-studio-control` fail before runner execution with empty job steps / no runner assignment. Treat this as an account-level Actions runner/billing blocker until a rerun reaches real job steps; do not count it as green CI or as a code/test failure. `npm run tauri:setup-support:qualify` and `npm run tauri:workspaces:qualify` are local/manual cutover-readiness gates until stable CI display/webview lanes or documented target-host evidence exists. `npm run tauri:visual:review` provides repeatable replacement-shell fixture screenshots and no-scroll checks at `2560x1440` and `1920x1080`, but it does not replace live BetterDisplay or target-monitor review. `npm run tauri:package:mac:ifw-staged` / `npm run tauri:package:win:ifw-staged` now stage the Tauri candidate through separate QtIFW installer/update payload roots without touching the shipping Qt `release/native*` artifacts; real QtIFW installer/update evidence is still required before Checkpoint C. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue and declares the bounded acceptance window plus packaging path; do not treat the Tauri shell as shippable until every gate in `docs/FRONTEND_CUTOVER_PLAN.md` and that issue is satisfied.
+5. Keep Tauri target-host posture honest.
+   GitHub Actions is not the acceptance mechanism for the replacement-shell cutover. `npm run tauri:setup-support:qualify`, `npm run tauri:workspaces:qualify`, and `npm run tauri:visual:review` are local/manual cutover-readiness gates until documented target-host evidence exists. `npm run tauri:package:mac:ifw-staged` / `npm run tauri:package:win:ifw-staged` stage the Tauri candidate through separate QtIFW installer/update payload roots without touching the shipping Qt `release/native*` artifacts. `npm run tauri:package:mac:ifw-local` / `npm run tauri:package:win:ifw-local` are the real QtIFW target-host gates: they build installer/update artifacts, verify full artifacts, install, check maintenance-tool package/repository visibility, purge, reinstall, and verify operator data survives. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue and declares the bounded acceptance window plus packaging path; do not treat the Tauri shell as shippable until every gate in `docs/FRONTEND_CUTOVER_PLAN.md` and that issue is satisfied.
 
 ## Execution Queue
 
@@ -105,7 +105,7 @@ npm run release:verify
 - Prefer one authoritative doc for current truth and link to detail docs instead of duplicating status prose everywhere.
 - Do not check in workstation-specific absolute paths.
 - Keep generated artifacts, transient captures, and local-only clutter out of version control.
-- If CI is red, either fix it or document precisely why the lane is intentionally non-blocking.
+- If a target-host release gate is red, either fix it or document precisely why the lane is intentionally non-blocking.
 
 ## Historical Note
 

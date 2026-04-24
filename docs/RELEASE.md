@@ -14,7 +14,7 @@ The visible product name remains `SSE ExEd Studio Control`.
 
 The native runtime is the only release path:
 
-- Native macOS and Windows jobs build packaged bundles, smoke-test them, build offline installers, and generate maintenance-tool update-repository archives.
+- Native macOS and Windows target-host release lanes build packaged bundles, smoke-test them, build offline installers, and generate maintenance-tool update-repository archives.
 - The legacy Electron runtime was retired in `v2.1.0`; no browser/Electron path remains in the repo.
 - Release readiness depends on packaging, smoke, acceptance, bridge-qualification, and install-time smoke-test gates — plus any open blockers tracked in [docs/HANDOFF.md](./HANDOFF.md).
 
@@ -24,8 +24,10 @@ The replacement-shell candidate packaging path is intentionally separate from th
 
 - `npm run tauri:package:mac:ifw-staged`
 - `npm run tauri:package:win:ifw-staged`
+- `npm run tauri:package:mac:ifw-local`
+- `npm run tauri:package:win:ifw-local`
 
-These commands package the Tauri shell with the side-by-side Rust engine, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository staging, and verify staged payload parity. They write to `release/tauri-candidate*` roots, not `release/native*`, so the current Qt fallback artifacts remain independent during parallel acceptance.
+The staged commands package the Tauri shell with the side-by-side Rust engine, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository staging, and verify staged payload parity. The local commands additionally run real QtIFW `binarycreator` / `repogen`, verify the full installer/update artifacts, install through the generated candidate installer, verify maintenance-tool package/repository visibility, purge, reinstall, and verify operator data survives. They write to `release/tauri-candidate*` roots, not `release/native*`, so the current Qt fallback artifacts remain independent during parallel acceptance.
 
 ## Native Release Artifacts
 
@@ -38,7 +40,7 @@ Each tagged release should publish:
 - `SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt`
 - `SSE-ExEd-Studio-Control-Native-windows-SHA256.txt`
 
-The release workflow may also publish packaged native bundle zips for support and smoke validation:
+Release publication may also include packaged native bundle zips for support and smoke validation:
 
 - `SSE-ExEd-Studio-Control-Native-macOS.zip`
 - `SSE-ExEd-Studio-Control-Native-windows.zip`
@@ -131,11 +133,32 @@ git tag -a v2.0.0 -m "v2.0.0"
 git push origin v2.0.0
 ```
 
-7. GitHub Actions validates release metadata, creates or updates the GitHub release from the changelog section, then builds and uploads the native installers, native update-repository archives, and SHA256 manifests.
+7. Build and verify the platform artifacts on each target release host. The exact command may be `npm run release:verify`, or the explicit platform lane when collecting artifacts for publication:
+
+On macOS Apple Silicon:
+
+```bash
+npm run native:release:mac:local
+```
+
+On Windows 11 `x64`:
+
+```bash
+npm run native:release:win:local
+```
+
+8. Collect the required release artifacts under `release/native-installer/`, `release/native-updates/`, and `release/checksums/` on the publishing workstation.
+9. Publish or update the GitHub Release from the local artifacts:
+
+```bash
+npm run release:publish -- --tag v2.0.0
+```
+
+Use `--dry-run` to confirm the assets that would be uploaded. Use `--clobber` only when intentionally replacing assets on an existing release after re-running the target-host gates.
 
 ## Release Guardrails
 
-These checks run locally or in CI:
+These checks run locally and on target release hosts:
 
 ```bash
 npm run release:check
@@ -174,9 +197,9 @@ The current supported rollout model is one controlled studio workstation, not pu
 
 ## Optional Signing
 
-The repo still includes optional signing hooks for future public-distribution hardening:
+The repo still includes optional signing hooks for future public-distribution hardening.
 
-The release workflow now has optional macOS signing hooks wired in. Configure these GitHub secrets to activate them:
+The local macOS release commands have optional signing hooks wired in. Configure these environment variables or secure local secret values to activate them:
 
 - `SSE_MACOS_CODESIGN_IDENTITY`
 - `SSE_MACOS_NOTARY_KEYCHAIN_PROFILE`
@@ -184,7 +207,7 @@ The release workflow now has optional macOS signing hooks wired in. Configure th
 - `SSE_MACOS_NOTARY_PASSWORD`
 - `SSE_MACOS_NOTARY_TEAM_ID`
 
-The release workflow now also has optional Windows signing hooks. Configure these GitHub secrets to activate them:
+The local Windows release commands also have optional signing hooks. Configure these environment variables or secure local secret values to activate them:
 
 - `SSE_WINDOWS_SIGN_CERT_PATH`
 - `SSE_WINDOWS_SIGN_CERT_BASE64`
@@ -192,8 +215,8 @@ The release workflow now also has optional Windows signing hooks. Configure thes
 - `SSE_WINDOWS_SIGN_TIMESTAMP_URL`
 - `SSE_WINDOWS_SIGNTOOL_PATH`
 
-Use the keychain-profile secret path when possible. The Apple ID credential trio is a fallback when the runner cannot rely on a preloaded keychain profile.
-Prefer `SSE_WINDOWS_SIGN_CERT_BASE64` on GitHub-hosted Windows runners so the certificate can be materialized ephemerally during the signing step.
+Use the keychain-profile path when possible. The Apple ID credential trio is a fallback when the release host cannot rely on a preloaded keychain profile.
+Prefer a local certificate path on the Windows release host; `SSE_WINDOWS_SIGN_CERT_BASE64` remains available when the certificate must be materialized ephemerally.
 
 ## Preflight
 
@@ -239,12 +262,13 @@ On non-target hosts, `npm run release:verify` skips the installer and update-rep
 6. Verify lighting/audio/control-surface recovery signals are visible from the native shell.
 7. Verify the packaged bridge qualification lane passes on a bind-capable macOS and Windows host so localhost bridge bind/listen/HTTP behavior is proven before release.
 8. Create and push a `v*` tag.
-9. Wait for `.github/workflows/release.yml` to publish the native installers and native update-repository archives.
-10. Run `npm run release:anchor:verify -- --tag vX.Y.Z`.
-11. Verify the release includes both platform SHA256 manifests and that they match the uploaded artifacts you intend operators to use.
-12. Smoke-test the generated macOS and Windows installers from GitHub Releases, including the expected unsigned trust flow.
-13. Verify the release includes both platform update-repository archives.
-14. Capture install and update notes for anything that would surprise the next operator or maintainer.
+9. Run the macOS and Windows target-host release lanes and collect the required artifacts on the publishing workstation.
+10. Run `npm run release:publish -- --tag vX.Y.Z`.
+11. Run `npm run release:anchor:verify -- --tag vX.Y.Z`.
+12. Verify the release includes both platform SHA256 manifests and that they match the uploaded artifacts you intend operators to use.
+13. Smoke-test the generated macOS and Windows installers from GitHub Releases, including the expected unsigned trust flow.
+14. Verify the release includes both platform update-repository archives.
+15. Capture install and update notes for anything that would surprise the next operator or maintainer.
 
 ## Final Mile
 
@@ -252,7 +276,7 @@ The release pipeline and packaging lanes are in place. Residual release work is 
 
 ## Manual Rebuilds
 
-If packaging failed after the tag already exists, rerun the `Release` workflow with `workflow_dispatch` and provide the existing `v*` tag. This rebuilds and republishes the tagged release without creating a new version.
+If packaging failed after the tag already exists, rerun the appropriate local target-host release lane, copy the rebuilt artifacts back to the publishing workstation, and run `npm run release:publish -- --tag vX.Y.Z --clobber` only after the rebuilt artifacts pass verification. Do not replace release assets from an unverified local build.
 
 ## Post-release Smoke Test
 

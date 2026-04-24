@@ -1,7 +1,3 @@
-[![CI](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/ci.yml/badge.svg)](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/ci.yml)
-[![Release](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/release.yml/badge.svg)](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/release.yml)
-[![CodeQL](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/codeql.yml/badge.svg)](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/codeql.yml)
-
 # SSE ExEd Studio Control
 
 SSE ExEd Studio Control is a local-first desktop control application for a fixed studio workstation. It combines production planning, lighting control, audio control, and Stream Deck commissioning into one operator-facing surface designed to stay open full-time on a dedicated second monitor.
@@ -158,7 +154,7 @@ npm run native:smoke:failures
 npm run native:acceptance
 ```
 
-On macOS, the native shell build auto-detects common Homebrew Qt prefixes. On Windows CI or local Qt installs, `CMAKE_PREFIX_PATH`, `QT_ROOT_DIR`, `QTDIR`, `QT_DIR`, or `Qt6_DIR` may be used to resolve the Qt CMake package location.
+On macOS, the native shell build auto-detects common Homebrew Qt prefixes. On Windows target-host Qt installs, `CMAKE_PREFIX_PATH`, `QT_ROOT_DIR`, `QTDIR`, `QT_DIR`, or `Qt6_DIR` may be used to resolve the Qt CMake package location.
 
 Common commands:
 
@@ -193,8 +189,9 @@ Releases are changelog-driven and tag-driven:
 5. Commit release metadata
 6. Push `main`
 7. Create and push a `vX.Y.Z` tag
+8. Publish the locally built target-host artifacts with `npm run release:publish -- --tag vX.Y.Z`
 
-The release workflow validates metadata, creates GitHub release notes from `CHANGELOG.md`, builds native Windows and macOS installers, generates native update-repository archives, and uploads the release artifacts to GitHub Releases.
+Release builds are local/target-host gates, not GitHub Actions gates. The macOS Apple Silicon and Windows 11 `x64` release hosts build and verify their own installers, update-repository archives, and SHA256 manifests; `release:publish` uploads the checked artifacts to GitHub Releases using release notes generated from `CHANGELOG.md`.
 
 ## Engineering Standards
 

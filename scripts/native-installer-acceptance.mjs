@@ -29,6 +29,14 @@ function parseTarget(value) {
   throw new Error(`Unsupported installer acceptance target '${value}'. Use --target=macos or --target=windows.`);
 }
 
+function parseRuntime(value) {
+  if (!value || value === "native" || value === "tauri") {
+    return value ?? "native";
+  }
+
+  throw new Error(`Unsupported installer acceptance runtime '${value}'. Use --runtime=native or --runtime=tauri.`);
+}
+
 function countSuppressedLines(text, patterns, writer) {
   if (!text) {
     return 0;
@@ -78,7 +86,30 @@ function normalizeForOutputComparison(value) {
   return value.replaceAll("\\", "/");
 }
 
-function resolveInstallerExecutable(target) {
+function resolveInstallerExecutable(target, runtimeKind) {
+  if (runtimeKind === "tauri") {
+    if (target === "macos") {
+      return path.join(
+        rootDir,
+        "release",
+        "tauri-candidate-installer",
+        "macos",
+        "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.app",
+        "Contents",
+        "MacOS",
+        "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer"
+      );
+    }
+
+    return path.join(
+      rootDir,
+      "release",
+      "tauri-candidate-installer",
+      "windows",
+      "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-Installer.exe"
+    );
+  }
+
   if (target === "macos") {
     return path.join(
       rootDir,
@@ -101,29 +132,37 @@ function resolveInstallerExecutable(target) {
   );
 }
 
-function resolveRepositoryPath(target) {
-  return path.join(rootDir, "release", "native-updates", target, "repository");
+function resolveRepositoryPath(target, runtimeKind) {
+  const rootName = runtimeKind === "tauri" ? "tauri-candidate-updates" : "native-updates";
+  return path.join(rootDir, "release", rootName, target, "repository");
 }
 
-function resolveInstalledRuntime(target, installRoot) {
+function resolveInstalledRuntime(target, installRoot, runtimeKind) {
   if (target === "macos") {
     const payloadPath = path.join(installRoot, releaseIdentity.payloadNames[target]);
+    const shellName = runtimeKind === "tauri" ? "sse-exed-tauri-shell" : "sse_exed_native";
     return {
       label: "macOS",
       payloadPath,
-      shellPath: path.join(payloadPath, "Contents", "MacOS", "sse_exed_native"),
+      shellPath: path.join(payloadPath, "Contents", "MacOS", shellName),
       enginePath: path.join(payloadPath, "Contents", "MacOS", "studio-control-engine"),
-      commandArgs: (statusPath) => ["-platform", "offscreen", "--smoke-test", `--smoke-status-path=${statusPath}`],
+      commandArgs: (statusPath) =>
+        runtimeKind === "tauri"
+          ? ["--smoke-test", `--smoke-status-path=${statusPath}`]
+          : ["-platform", "offscreen", "--smoke-test", `--smoke-status-path=${statusPath}`],
+      requiresOperatorUiReady: runtimeKind !== "tauri",
     };
   }
 
   const payloadPath = path.join(installRoot, releaseIdentity.payloadNames[target]);
+  const shellName = runtimeKind === "tauri" ? "sse-exed-tauri-shell.exe" : "sse_exed_native.exe";
   return {
     label: "Windows",
     payloadPath,
-    shellPath: path.join(payloadPath, "sse_exed_native.exe"),
+    shellPath: path.join(payloadPath, shellName),
     enginePath: path.join(payloadPath, "studio-control-engine.exe"),
     commandArgs: (statusPath) => ["--smoke-test", `--smoke-status-path=${statusPath}`],
+    requiresOperatorUiReady: runtimeKind !== "tauri",
   };
 }
 
@@ -175,15 +214,19 @@ function runCliStep(command, args, acceptanceRoot, stepName, env = {}) {
   const stepRoot = path.join(acceptanceRoot, stepName);
   const stdoutPath = path.join(stepRoot, "stdout.log");
   const stderrPath = path.join(stepRoot, "stderr.log");
+  const homeDir = path.join(acceptanceRoot, "home");
 
   rmSync(stepRoot, { force: true, recursive: true });
   mkdirSync(stepRoot, { recursive: true });
+  mkdirSync(path.join(homeDir, ".cache"), { recursive: true });
 
   const result = spawnSync(command, args, {
     cwd: rootDir,
     encoding: "utf8",
     env: {
       ...process.env,
+      HOME: homeDir,
+      XDG_CACHE_HOME: path.join(homeDir, ".cache"),
       ...env,
     },
   });
@@ -217,15 +260,19 @@ function runCliStep(command, args, acceptanceRoot, stepName, env = {}) {
 function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expectedTarget, env = {}) {
   const stepRoot = path.join(acceptanceRoot, stepName);
   const smokeStatusPath = path.join(stepRoot, "smoke-status.json");
+  const homeDir = path.join(acceptanceRoot, "home");
 
   rmSync(stepRoot, { force: true, recursive: true });
   mkdirSync(stepRoot, { recursive: true });
+  mkdirSync(path.join(homeDir, ".cache"), { recursive: true });
 
   const result = spawnSync(installed.shellPath, installed.commandArgs(smokeStatusPath), {
     cwd: rootDir,
     encoding: "utf8",
     env: {
       ...process.env,
+      HOME: homeDir,
+      XDG_CACHE_HOME: path.join(homeDir, ".cache"),
       ...env,
       SSE_APP_DATA_DIR: runtime.appDataDir,
       SSE_LOG_DIR: runtime.logsDir,
@@ -263,10 +310,12 @@ function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expecte
     smokeStatus.targetSurface === expectedTarget,
     `Installed ${installed.label} acceptance step '${stepName}' reached '${smokeStatus.targetSurface}' instead of '${expectedTarget}'.`
   );
-  assert(
-    smokeStatus.operatorUiReady,
-    `Installed ${installed.label} acceptance step '${stepName}' never reported the operator UI as ready.`
-  );
+  if (installed.requiresOperatorUiReady) {
+    assert(
+      smokeStatus.operatorUiReady,
+      `Installed ${installed.label} acceptance step '${stepName}' never reported the operator UI as ready.`
+    );
+  }
   assert(
     normalizeForOutputComparison(smokeStatus.startedEnginePath ?? "") ===
       normalizeForOutputComparison(installed.enginePath),
@@ -318,6 +367,7 @@ function resolveAcceptanceRoot(explicitRoot, target) {
 
 async function main() {
   const target = parseTarget(readFlag("--target"));
+  const runtimeKind = parseRuntime(readFlag("--runtime"));
   const expectedPlatform = target === "macos" ? "darwin" : "win32";
   if (process.platform !== expectedPlatform) {
     throw new Error(`native-installer-acceptance.mjs target '${target}' must run on a matching host platform.`);
@@ -325,16 +375,16 @@ async function main() {
 
   assert(existsSync(fixturePath), `Fixture missing: ${fixturePath}`);
 
-  const installerExecutable = resolveInstallerExecutable(target);
-  const repositoryPath = resolveRepositoryPath(target);
+  const installerExecutable = resolveInstallerExecutable(target, runtimeKind);
+  const repositoryPath = resolveRepositoryPath(target, runtimeKind);
 
   assert(
     existsSync(installerExecutable),
-    `Native ${target} installer artifact not found at ${installerExecutable}. Run the matching native:installer:*:local command first.`
+    `${runtimeKind === "tauri" ? "Tauri candidate" : "Native"} ${target} installer artifact not found at ${installerExecutable}. Run the matching ${runtimeKind === "tauri" ? "tauri" : "native"}:installer:*:local command first.`
   );
   assert(
     existsSync(repositoryPath),
-    `Native ${target} update repository not found at ${repositoryPath}. Run the matching native:update-repo:*:local command first.`
+    `${runtimeKind === "tauri" ? "Tauri candidate" : "Native"} ${target} update repository not found at ${repositoryPath}. Run the matching ${runtimeKind === "tauri" ? "tauri" : "native"}:update-repo:*:local command first.`
   );
 
   const explicitRoot = resolvePathFromRoot(rootDir, process.env.SSE_NATIVE_INSTALLER_ACCEPTANCE_DIR);
@@ -350,7 +400,7 @@ async function main() {
   mkdirSync(runtime.appDataDir, { recursive: true });
   mkdirSync(runtime.logsDir, { recursive: true });
 
-  console.log(`Native installer acceptance root: ${acceptanceRoot}`);
+  console.log(`${runtimeKind === "tauri" ? "Tauri candidate" : "Native"} installer acceptance root: ${acceptanceRoot}`);
   console.log("Step 1: install the actual offline installer into a clean target root.");
 
   runCliStep(
@@ -360,7 +410,7 @@ async function main() {
     "installer-install"
   );
 
-  let installed = resolveInstalledRuntime(target, installRoot);
+  let installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
   assert(existsSync(installed.payloadPath), `Installed payload missing at ${installed.payloadPath}.`);
   assert(existsSync(installed.shellPath), `Installed shell missing at ${installed.shellPath}.`);
   assert(existsSync(installed.enginePath), `Installed engine missing at ${installed.enginePath}.`);
@@ -464,7 +514,7 @@ async function main() {
     "installer-reinstall"
   );
 
-  installed = resolveInstalledRuntime(target, installRoot);
+  installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
   assert(existsSync(installed.payloadPath), `Reinstalled payload missing at ${installed.payloadPath}.`);
   assert(existsSync(installed.shellPath), `Reinstalled shell missing at ${installed.shellPath}.`);
   assert(existsSync(installed.enginePath), `Reinstalled engine missing at ${installed.enginePath}.`);
@@ -521,7 +571,7 @@ async function main() {
   }
 
   console.log(
-    "Native installer acceptance passed: real installer install, purge, and reinstall preserve operator data."
+    `${runtimeKind === "tauri" ? "Tauri candidate" : "Native"} installer acceptance passed: real installer install, purge, and reinstall preserve operator data.`
   );
 }
 
