@@ -25,6 +25,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `Setup/Support`, `Lighting`, `Audio`, and `Planning` have replacement-shell coverage in fixture, Playwright, and live Tauri qualification lanes.
 - `npm run tauri:setup-support:qualify` covers clean startup, setup/support flows, persisted restart, and bootstrap-failure recovery posture.
 - `npm run tauri:workspaces:qualify` covers commissioned startup plus live Lighting, Audio, and Planning mutations across restart persistence.
+- `npm run tauri:visual:review` captures repeatable replacement-shell fixture screenshots at `2560x1440` and `1920x1080` for Setup/Support recovery, Lighting, Audio, and Planning, and fails on app-level scroll.
 - `frontend-foundation`, `tauri-foundation-macos`, and `tauri-foundation-windows` are blocking CI jobs on `main`.
 - The live Tauri qualification commands remain local/manual cutover-readiness gates until stable CI display/webview lanes or documented target-host evidence exist.
 - `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` stage Tauri candidate payloads through the QtIFW installer/update layout without touching the shipping Qt `release/native*` roots.
@@ -150,6 +151,6 @@ Stop cutover work and re-anchor if any of these are true:
 The next implementation slice after this document should be the smallest gate-hardening task that moves a Checkpoint A, B, or C item from manual to repeatable. Candidate slices are:
 
 - run `npm run tauri:cutover:candidate` with `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` and attach target-host evidence to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
-- attach required `2560x1440` and `1920x1080` visual review notes or screenshots to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
+- run `npm run tauri:visual:review` and attach required `2560x1440` and `1920x1080` visual review notes or screenshots to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - run the packaged Tauri candidate through the real QtIFW installer/update tools on macOS and Windows target hosts before Checkpoint C
 - add stable CI display/webview qualification lanes only if they can replace, not weaken, the target-host evidence requirement
