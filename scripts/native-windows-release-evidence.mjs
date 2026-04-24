@@ -101,9 +101,23 @@ function gitStatusPath(line) {
   return pathPart.includes(renameSeparator) ? pathPart.split(renameSeparator).pop() : pathPart;
 }
 
+function normalizeGitPath(value) {
+  return value.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
 function isAllowedPostReleaseDirtyLine(line) {
   const statusPath = gitStatusPath(line);
   return statusPath.startsWith("native/tauri-shell/gen/schemas/") && statusPath.endsWith(".json");
+}
+
+function isAllowedEvidenceDirtyLine(line, outputBase) {
+  const outputRelativePath = normalizeGitPath(path.relative(rootDir, outputBase));
+  if (!outputRelativePath || outputRelativePath.startsWith("..")) {
+    return false;
+  }
+
+  const statusPath = normalizeGitPath(gitStatusPath(line));
+  return statusPath === outputRelativePath || statusPath.startsWith(`${outputRelativePath}/`);
 }
 
 function resolvePathFromRoot(value) {
@@ -430,9 +444,11 @@ async function main() {
 
     const postReleaseStatus = safeCapture("git", ["status", "--porcelain"]);
     const postReleaseStatusLines = postReleaseStatus.stdout.split(/\r?\n/).filter(Boolean);
-    const allowedPostReleaseStatusLines = postReleaseStatusLines.filter(isAllowedPostReleaseDirtyLine);
+    const allowedPostReleaseStatusLines = postReleaseStatusLines.filter(
+      (line) => isAllowedPostReleaseDirtyLine(line) || isAllowedEvidenceDirtyLine(line, outputBase)
+    );
     const unexpectedPostReleaseStatusLines = postReleaseStatusLines.filter(
-      (line) => !isAllowedPostReleaseDirtyLine(line)
+      (line) => !isAllowedPostReleaseDirtyLine(line) && !isAllowedEvidenceDirtyLine(line, outputBase)
     );
     summary.postReleaseAllowedGitStatus = allowedPostReleaseStatusLines.join("\n");
     summary.postReleaseGitStatus = postReleaseStatusLines.join("\n");
@@ -440,7 +456,7 @@ async function main() {
 
     if (allowedPostReleaseStatusLines.length > 0) {
       summary.notes.push(
-        "native:release:win:local generated platform-specific Tauri schema files; these were recorded and allowed."
+        "native:release:win:local generated platform-specific Tauri schema files and/or target-host evidence files; these were recorded and allowed."
       );
     }
 
