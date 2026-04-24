@@ -1335,7 +1335,7 @@ button.lightingDmxDrawerCell {
   gap: var(--space-4);
   min-height: 100vh;
   min-height: 100dvh;
-  padding: var(--space-4) 0;
+  padding: var(--space-3) 0;
 }
 
 .setupFeedbackBanner {
@@ -1366,9 +1366,9 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentHero,
-.setupIncidentCard,
-.setupIncidentRail {
+.setupIncidentCard {
   display: grid;
+  align-content: start;
   gap: var(--space-4);
 }
 
@@ -1471,7 +1471,8 @@ button.lightingDmxDrawerCell {
 .setupIncidentBackupList,
 .setupIncidentCheckGrid,
 .setupIncidentDetailList,
-.setupIncidentInfoList {
+.setupIncidentInfoList,
+.setupIncidentReferencePanel {
   display: grid;
   gap: var(--space-3);
 }
@@ -1550,8 +1551,9 @@ button.lightingDmxDrawerCell {
   gap: 6px;
 }
 
-.setupIncidentRail {
-  grid-column: 1 / -1;
+.setupIncidentReferencePanel {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-default);
 }
 
 .setupIncidentRailButton {

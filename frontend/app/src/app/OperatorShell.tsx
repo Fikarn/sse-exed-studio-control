@@ -832,6 +832,70 @@ function SetupRecoverySurface({
               </div>
             )}
           </div>
+
+          <div className={styles.setupIncidentReferencePanel}>
+            <div className={styles.setupIncidentSectionLabel}>Reference paths</div>
+            <div className={styles.setupIncidentRailButtons}>
+              <button
+                className={styles.setupIncidentRailButton}
+                disabled={!String(runtimePaths.backupDir ?? "").trim()}
+                onClick={() => {
+                  void performAction("open-archive", () =>
+                    openReferencePath("Archive", String(runtimePaths.backupDir ?? ""))
+                  );
+                }}
+                type="button"
+              >
+                Archive
+              </button>
+              <button
+                className={styles.setupIncidentRailButton}
+                disabled={!String(runtimePaths.updateRepositoryPath ?? "").trim()}
+                onClick={() => {
+                  void performAction("open-update-repo", () =>
+                    openReferencePath("Update repo", String(runtimePaths.updateRepositoryPath ?? ""))
+                  );
+                }}
+                type="button"
+              >
+                Update repo
+              </button>
+              <button
+                className={styles.setupIncidentRailButton}
+                disabled={!String(runtimePaths.appDataDir ?? "").trim()}
+                onClick={() => {
+                  void performAction("open-app-data", () =>
+                    openReferencePath("App data", String(runtimePaths.appDataDir ?? ""))
+                  );
+                }}
+                type="button"
+              >
+                App data
+              </button>
+              <button
+                className={styles.setupIncidentRailButton}
+                disabled={!String(runtimePaths.logsDir ?? runtimePaths.appDataDir ?? "").trim()}
+                onClick={() => {
+                  void performAction("open-diagnostics", () =>
+                    openReferencePath("Diagnostics", String(runtimePaths.logsDir ?? runtimePaths.appDataDir ?? ""))
+                  );
+                }}
+                type="button"
+              >
+                Diagnostics
+              </button>
+              <button
+                className={styles.setupIncidentRailButton}
+                disabled={!String(runtimePaths.logsDir ?? "").trim()}
+                onClick={() => {
+                  void performAction("open-logs", () => openReferencePath("Logs", String(runtimePaths.logsDir ?? "")));
+                }}
+                type="button"
+              >
+                Logs
+              </button>
+            </div>
+          </div>
         </Surface>
 
         <Surface className={styles.setupIncidentCard} padding="lg" tone="raised">
@@ -934,70 +998,6 @@ function SetupRecoverySurface({
                 binaries while incident recovery is in progress.
               </span>
             </div>
-          </div>
-        </Surface>
-
-        <Surface className={styles.setupIncidentRail} padding="lg" tone="raised">
-          <div className={styles.setupIncidentSectionLabel}>Reference paths</div>
-          <div className={styles.setupIncidentRailButtons}>
-            <button
-              className={styles.setupIncidentRailButton}
-              disabled={!String(runtimePaths.backupDir ?? "").trim()}
-              onClick={() => {
-                void performAction("open-archive", () =>
-                  openReferencePath("Archive", String(runtimePaths.backupDir ?? ""))
-                );
-              }}
-              type="button"
-            >
-              Archive
-            </button>
-            <button
-              className={styles.setupIncidentRailButton}
-              disabled={!String(runtimePaths.updateRepositoryPath ?? "").trim()}
-              onClick={() => {
-                void performAction("open-update-repo", () =>
-                  openReferencePath("Update repo", String(runtimePaths.updateRepositoryPath ?? ""))
-                );
-              }}
-              type="button"
-            >
-              Update repo
-            </button>
-            <button
-              className={styles.setupIncidentRailButton}
-              disabled={!String(runtimePaths.appDataDir ?? "").trim()}
-              onClick={() => {
-                void performAction("open-app-data", () =>
-                  openReferencePath("App data", String(runtimePaths.appDataDir ?? ""))
-                );
-              }}
-              type="button"
-            >
-              App data
-            </button>
-            <button
-              className={styles.setupIncidentRailButton}
-              disabled={!String(runtimePaths.logsDir ?? runtimePaths.appDataDir ?? "").trim()}
-              onClick={() => {
-                void performAction("open-diagnostics", () =>
-                  openReferencePath("Diagnostics", String(runtimePaths.logsDir ?? runtimePaths.appDataDir ?? ""))
-                );
-              }}
-              type="button"
-            >
-              Diagnostics
-            </button>
-            <button
-              className={styles.setupIncidentRailButton}
-              disabled={!String(runtimePaths.logsDir ?? "").trim()}
-              onClick={() => {
-                void performAction("open-logs", () => openReferencePath("Logs", String(runtimePaths.logsDir ?? "")));
-              }}
-              type="button"
-            >
-              Logs
-            </button>
           </div>
         </Surface>
       </div>
