@@ -154,3 +154,4 @@ The next implementation slice after this document should be the smallest gate-ha
 - run `npm run tauri:cutover:candidate` with `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` and attach target-host evidence to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - run `npm run tauri:visual:review` and attach required `2560x1440` and `1920x1080` visual review notes or screenshots to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - run `npm run tauri:package:mac:ifw-local` and `npm run tauri:package:win:ifw-local` with real QtIFW tools on matching target hosts before Checkpoint C
+- use `npm run tauri:package:win:evidence` and [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md) to collect the Windows 11 `x64` package-gate evidence bundle when a host becomes available

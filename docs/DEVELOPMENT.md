@@ -106,6 +106,7 @@ npm run tauri:package:mac:ifw-staged
 npm run tauri:package:mac:ifw-local
 npm run tauri:package:win:ifw-staged
 npm run tauri:package:win:ifw-local
+npm run tauri:package:win:evidence
 ```
 
 During the migration, treat the Qt shell as maintenance-only unless the task is a release blocker, release-verification fix, or critical operator defect.
@@ -138,7 +139,7 @@ export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin
 npm run tauri:package:mac:ifw-local
 ```
 
-Use the matching Windows QtIFW tools on a Windows 11 `x64` host for `npm run tauri:package:win:ifw-local`.
+Use the matching Windows QtIFW tools on a Windows 11 `x64` host for `npm run tauri:package:win:ifw-local`. Prefer `npm run tauri:package:win:evidence` when collecting cutover evidence; it wraps the same gate, records host/tool/git context, writes logs, and stores the summary under `artifacts/tauri-qualification/windows-target-host/`. The runbook is [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md).
 
 ### 2b. Required parity workflow
 
