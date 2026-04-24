@@ -16,7 +16,8 @@ If a change improves a secondary feature but increases risk to lighting, audio, 
 - Node.js 20
 - npm
 - Rust stable toolchain
-- Qt 6 desktop SDK
+- Qt Installer Framework for local release packaging
+- Qt 6 desktop SDK only when working on the retained Qt fallback during Checkpoint D
 
 Initial setup:
 
@@ -27,23 +28,24 @@ npm install
 ## Development Entry Points
 
 ```bash
+npm run format:check
+npm run release:check
 npm run native:check
 npm run native:test
-npm run native:build
-npm run native:shell:test
-npm run native:smoke
-npm run native:acceptance
+npm run native:foundation
+npm run frontend:foundation
 ```
 
 ## Validation Expectations
 
 Choose validation based on change risk.
 
-### QML or shell tweaks
+### Tauri shell, React frontend, or operator layout
 
 ```bash
 npm run format:check
-npm run native:shell:test
+npm run frontend:foundation
+npm run tauri:foundation
 ```
 
 ### Engine logic, persistence, or adapters
@@ -51,13 +53,19 @@ npm run native:shell:test
 ```bash
 npm run native:check
 npm run native:test
-npm run native:build
+npm run native:engine:build
 ```
 
-### Native shell, layout, or commissioning
+### Shipping runtime, startup, layout, or commissioning
 
 ```bash
 npm run native:foundation
+```
+
+### Qt fallback retirement work
+
+```bash
+npm run native:qt:foundation
 ```
 
 ### Native persistence, release, or recovery behavior
@@ -75,8 +83,9 @@ npm run release:verify
 ## Repo Conventions
 
 - Keep changes inside the correct layer:
-  - `native/qt-shell/qml/*` for operator UI
-  - `native/qt-shell/src/*` for shell lifecycle and QML adapters
+  - `frontend/*` for selected Tauri-shell operator UI
+  - `native/tauri-shell/*` for selected shell windowing and Tauri integration
+  - `native/qt-shell/*` only for retained fallback work during Checkpoint D
   - `native/rust-engine/*` for engine-owned state, persistence, and device logic
   - `native/protocol/*` for the transport contract
   - `docs/*` for durable product and engineering documentation

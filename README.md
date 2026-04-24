@@ -122,15 +122,20 @@ Prerequisites:
 - Node.js 20
 - npm
 - Rust stable toolchain
-- Qt 6 desktop SDK for local native builds
+- Qt 6 desktop SDK only for retained Qt fallback checks during Checkpoint D
 - Qt Installer Framework for local installer/update generation
 
 ```bash
 npm install
+npm run format:check
+npm run release:check
 npm run native:check
 npm run native:test
-npm run native:build
-npm run native:shell:test
+npm run native:foundation
+npm run frontend:foundation
+npm run tauri:foundation
+npm run tauri:setup-support:qualify
+npm run tauri:workspaces:qualify
 npm run native:package:mac:local
 npm run native:package:mac:smoke
 npm run native:package:mac:clean-smoke
@@ -147,16 +152,10 @@ npm run native:update-repo:win:prepare
 npm run native:update-repo:win:local
 npm run native:release:mac:local
 npm run native:release:win:local
-npm run native:smoke
-npm run native:smoke:clean-start
-npm run native:smoke:bundled-engine
-npm run native:smoke:restart:clean-start
-npm run native:smoke:lifecycle
-npm run native:smoke:failures
 npm run native:acceptance
 ```
 
-On macOS, the native shell build auto-detects common Homebrew Qt prefixes. On Windows target-host Qt installs, `CMAKE_PREFIX_PATH`, `QT_ROOT_DIR`, `QTDIR`, `QT_DIR`, or `Qt6_DIR` may be used to resolve the Qt CMake package location.
+For retained Qt fallback work during Checkpoint D, use `npm run native:qt:foundation`. On macOS, the Qt shell build auto-detects common Homebrew Qt prefixes. On Windows target-host Qt installs, `CMAKE_PREFIX_PATH`, `QT_ROOT_DIR`, `QTDIR`, `QT_DIR`, or `Qt6_DIR` may be used to resolve the Qt CMake package location.
 
 Common commands:
 
@@ -176,7 +175,7 @@ npm run ci
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
-The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement planning is tracked in issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). The next planned slice is validation lane split, not immediate Qt deletion.
+The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement planning is tracked in issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split is complete; the next planned slice is runtime selector lockdown, not immediate Qt deletion.
 
 `npm run clean` removes generated native build output and packaged release folders.
 

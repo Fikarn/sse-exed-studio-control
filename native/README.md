@@ -9,9 +9,9 @@ This directory contains the product runtime:
 
 The native runtime is the only product runtime. The legacy Electron/Next.js path was retired in `v2.1.0`.
 
-`scripts/native-release-runtime.json` selects the shipping release runtime. `v2.2.0` shipped with `tauri` selected; `qt-shell/` remains available as fallback with `SSE_NATIVE_RELEASE_RUNTIME=qt` during the bounded post-release fallback window.
+`scripts/native-release-runtime.json` selects the shipping release runtime. `v2.2.0` shipped with `tauri` selected, and `v2.2.1` is the current published operator-rollout build. The fallback window is closed; `qt-shell/` remains present only until Checkpoint D removes or archives it.
 
-The completed Tauri shipping switch and retained fallback posture are tracked in [`docs/FRONTEND_CUTOVER_PLAN.md`](../docs/FRONTEND_CUTOVER_PLAN.md). Do not start Checkpoint D / Qt retirement from local Tauri success alone.
+The completed Tauri shipping switch and retained fallback posture are tracked in [`docs/FRONTEND_CUTOVER_PLAN.md`](../docs/FRONTEND_CUTOVER_PLAN.md). Checkpoint D sequencing is recorded in [`docs/QT_FALLBACK_RETIREMENT_AUDIT.md`](../docs/QT_FALLBACK_RETIREMENT_AUDIT.md).
 
 ## Repo Commands
 
@@ -20,8 +20,11 @@ From the repo root, prefer the wrapped commands:
 ```bash
 npm run native:check
 npm run native:test
-npm run native:build
-npm run native:shell:test
+npm run native:foundation
+npm run frontend:foundation
+npm run tauri:foundation
+npm run tauri:setup-support:qualify
+npm run tauri:workspaces:qualify
 npm run native:package:mac:local
 npm run native:package:mac:smoke
 npm run native:package:mac:clean-smoke
@@ -38,16 +41,7 @@ npm run native:update-repo:win:prepare
 npm run native:update-repo:win:local
 npm run native:release:mac:local
 npm run native:release:win:local
-npm run native:smoke
-npm run native:smoke:clean-start
-npm run native:smoke:bundled-engine
-npm run native:smoke:restart:clean-start
-npm run native:smoke:lifecycle
-npm run native:smoke:failures
 npm run native:acceptance
-npm run tauri:foundation
-npm run tauri:setup-support:qualify
-npm run tauri:workspaces:qualify
 npm run tauri:cutover:candidate
 ```
 
@@ -64,7 +58,7 @@ cd native/rust-engine
 cargo check
 ```
 
-Qt shell:
+Qt fallback shell, for Checkpoint D fallback-retirement work only:
 
 ```bash
 cmake -S native -B native/build -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt
@@ -88,4 +82,4 @@ Notes:
 - shell settings now persist through the Rust engine, including workspace plus window size/maximized state
 - when native planning tables are empty, the engine will auto-import a legacy `db.json` from `SSE_LEGACY_DB_PATH` or, in repo-local development, from `data/db.json`
 - set `SSE_DISABLE_AUTO_IMPORT=1` to disable startup auto-import
-- `npm run native:shell:test` runs the Qt Quick Test lane for shared native operator-shell logic
+- `npm run native:qt:foundation` runs the retained Qt fallback build, QML tests, and smoke lane while Checkpoint D is open

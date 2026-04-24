@@ -47,7 +47,7 @@ When a workspace needs something new, add a variant to the existing component or
 - C++20.
 - Rust engine compiled and started by the current shell runtime.
 
-Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:build`, `native:check`, `native:test`, `native:shell:test`, `native:foundation`, `native:acceptance`, `frontend:foundation`, `tauri:foundation`, packaging and installer lanes, etc.). Use them; don't invent new ones.
+Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:foundation`, `native:check`, `native:test`, `native:acceptance`, `frontend:foundation`, `tauri:foundation`, packaging and installer lanes, etc.). Use them; don't invent new ones. Retained Qt fallback checks use `npm run native:qt:foundation` during Checkpoint D only.
 
 ## Parity discipline
 
@@ -63,11 +63,11 @@ For live visual verification at true `2560×1440`, use `npm run native:parity:li
 
 Baselines under `artifacts/parity/native/workstation/`.
 
-During the cutover, Qt parity remains the fallback comparison gate. The Tauri shell uses Storybook, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` before the cutover can be declared complete.
+After the shipping switch, Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Qt parity remains only for Checkpoint D fallback-retirement work.
 
 ## Testing posture
 
-- QML structural tests: `native/qt-shell/tests/qml/tst_*.qml`. They assert wiring and behavior, not pixels. They preserve a qsettings org-identifier fix (PR #25) — keep tests hermetic.
+- QML structural tests: `native/qt-shell/tests/qml/tst_*.qml` are retained fallback tests during Checkpoint D. They assert wiring and behavior, not pixels. They preserve a qsettings org-identifier fix (PR #25) — keep tests hermetic while they remain.
 - Engine tests: `cargo test` under `native/rust-engine/`.
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
 - Target-host lanes: macOS and Windows native verification are both blocking release gates. Treat a Windows target-host failure the same as a macOS failure.

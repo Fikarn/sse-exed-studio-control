@@ -212,6 +212,8 @@ QtIFW can only be removed under a separate installer/update replacement plan wit
 
 ### Slice 1: Validation Lane Split
 
+Status: complete. `npm run native:foundation` now delegates to the Tauri-first shipping foundation lane, and the retained Qt fallback validation path is explicit as `npm run native:qt:foundation`.
+
 Goal: make active validation Tauri-first without deleting Qt yet.
 
 Actions:
@@ -323,11 +325,11 @@ Required verification:
 
 ## Recommended Next Slice
 
-The next implementation slice should be Slice 1: Validation Lane Split.
+The next implementation slice should be Slice 2: Runtime Selector Lockdown.
 
 Reason:
 
-- It removes drift from the active developer workflow first.
-- It does not delete fallback code prematurely.
-- It creates a safe base for later selector, packaging, source, and artifact removal.
-- It keeps rollback and target-host release evidence intact while the repository transitions from "Tauri selected with Qt fallback retained" to "Tauri-only".
+- Slice 1 has already made active validation Tauri-first without deleting fallback code.
+- The release selector still permits `SSE_NATIVE_RELEASE_RUNTIME=qt`.
+- Removing or retiring that selector path before source deletion prevents an operator or release engineer from accidentally selecting a broken fallback later.
+- Packaging, signing, source deletion, and parity asset cleanup should wait until the selector is locked down.

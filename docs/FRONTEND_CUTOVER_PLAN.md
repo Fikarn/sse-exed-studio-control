@@ -158,6 +158,6 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The next implementation slice after the `v2.2.1` operator rollout is Checkpoint D Slice 1 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): validation lane split.
+The next implementation slice after validation lane split is Checkpoint D Slice 2 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): runtime selector lockdown.
 
-Do this before deleting Qt fallback code, Qt-specific verification automation, or Qt parity assets. The goal is to make the active validation path Tauri-first while keeping rollback and target-host release evidence intact.
+Do this before deleting Qt fallback code, Qt-specific verification automation, or Qt parity assets. The goal is to remove the ability to accidentally select the Qt fallback as a release runtime before later packaging and source-removal slices.

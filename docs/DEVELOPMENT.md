@@ -50,19 +50,22 @@ Use short branch names such as:
 
 ### 2. Launch the app
 
-For deterministic native screenshot references:
+For selected Tauri-shell visual review:
 
 ```bash
-npm run native:parity:capture
+npm run tauri:visual:review
 ```
 
-For native architecture work:
+For shipping-runtime architecture work:
 
 ```bash
 npm run native:check
 npm run native:test
-npm run native:build
-npm run native:shell:test
+npm run native:foundation
+npm run frontend:foundation
+npm run tauri:foundation
+npm run tauri:setup-support:qualify
+npm run tauri:workspaces:qualify
 npm run native:package:mac:local
 npm run native:package:mac:smoke
 npm run native:package:mac:clean-smoke
@@ -79,16 +82,10 @@ npm run native:update-repo:win:prepare
 npm run native:update-repo:win:local
 npm run native:release:mac:local
 npm run native:release:win:local
-npm run native:smoke
-npm run native:smoke:clean-start
-npm run native:smoke:bundled-engine
-npm run native:smoke:restart:clean-start
-npm run native:smoke:lifecycle
-npm run native:smoke:failures
 npm run native:acceptance
 ```
 
-`npm run native:build` compiles the Rust engine and the Qt shell. On macOS, it auto-detects common Homebrew Qt prefixes. On Windows or custom Qt installs, set `CMAKE_PREFIX_PATH`, `QT_ROOT_DIR`, `QTDIR`, `QT_DIR`, or `Qt6_DIR` if Qt is not discovered automatically.
+`npm run native:foundation` is the active shipping-runtime foundation lane. It runs Rust engine checks/tests plus the selected Tauri foundation. `npm run native:qt:foundation` is retained only for Checkpoint D fallback-retirement work. On macOS, the Qt fallback build auto-detects common Homebrew Qt prefixes. On Windows or custom Qt installs, set `CMAKE_PREFIX_PATH`, `QT_ROOT_DIR`, `QTDIR`, `QT_DIR`, or `Qt6_DIR` if Qt is not discovered automatically.
 
 For the parallel frontend replatform foundation:
 
@@ -110,7 +107,7 @@ npm run tauri:package:win:evidence
 npm run native:release:win:evidence
 ```
 
-During the cutover, treat the Qt shell as fallback-maintenance-only unless the task is a fallback release blocker, release-verification fix, or critical operator defect.
+During Checkpoint D, treat the Qt shell as fallback-retirement-only unless the task is a fallback release blocker, release-verification fix, or critical operator defect.
 
 `npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot, persisted restart, and degraded startup/recovery posture. `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence.
 
@@ -142,20 +139,25 @@ npm run native:release:mac:local
 
 Use the matching Windows QtIFW tools on a Windows 11 `x64` host for `npm run native:release:win:evidence` when collecting post-switch shipping evidence; it wraps `npm run native:release:win:local`, records host/tool/git/runtime context, writes logs, and stores the summary under `artifacts/native-release/windows-target-host/`. `npm run tauri:package:win:evidence` remains useful for candidate evidence under `artifacts/tauri-qualification/windows-target-host/`. The runbook is [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md).
 
-### 2b. Required parity workflow
+### 2b. Visual review and retained Qt parity
 
-When the task changes any operator-visible native surface, do not stop at code or deterministic captures.
+When the task changes any operator-visible selected Tauri surface, do not stop at code. Run the fixture-driven visual lane and inspect the result on the BetterDisplay-backed `2560x1440` review surface or the fixed studio monitor:
 
-Required workflow:
+```bash
+npm run tauri:visual:review
+```
 
-1. build the native shell
-2. launch the real app fullscreen
-3. use `--operator-verify-action` to load a deterministic live state when needed
+Required selected-runtime workflow:
+
+1. build and validate the selected Tauri shell
+2. capture repeatable `2560x1440` and `1920x1080` visual evidence with `tauri:visual:review`
+3. launch the real app fullscreen when human inspection is needed
 4. interact with the live app directly when the workflow being checked depends on it
-5. take a real screenshot
-6. compare against the deterministic `2560x1440` capture set under `artifacts/parity/native/workstation/` before accepting the change
+5. compare against the intended operator state before accepting the change
 
-Current live verify actions include:
+The older Qt parity commands are retained only for Checkpoint D fallback-retirement work. Do not use them as the active Tauri acceptance gate.
+
+Retained Qt live verify actions include:
 
 - `planning-empty`
 - `planning-populated`
@@ -183,7 +185,7 @@ Treat raw window width alone as an invalid authority for operator layout. The pr
 
 Do not accept stale live evidence. If the current native screenshot does not clearly correspond to the deterministic capture being compared, regenerate it before continuing.
 
-For the checked-in live verification loop, use:
+For the retained Qt live verification loop, use:
 
 ```bash
 npm run native:parity:live -- --action=planning-populated
@@ -206,9 +208,9 @@ npm run native:parity:live -- --action=setup-control-dial-selected
 npm run native:parity:live -- --action=planning-populated --interaction=key:N
 ```
 
-That command:
+That retained Qt command:
 
-1. launches the local native build
+1. launches the local Qt native build
 2. waits for a machine-readable ready-for-screenshot signal from the app
 3. optionally drives a checked-in live interaction
 4. captures the real native window
@@ -246,7 +248,7 @@ Reference docs:
 - Apple high-resolution rendering model: <https://developer.apple.com/library/archive/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Explained/Explained.html>
 - BetterDisplay flexible scaling and virtual-screen workflow: <https://github.com/waydabber/BetterDisplay/wiki/Fully-scalable-HiDPI-desktop>
 
-For native startup, lifecycle, and failure coverage:
+For retained Qt fallback startup, lifecycle, and failure coverage during Checkpoint D:
 
 ```bash
 npm run native:smoke:clean-start
@@ -266,11 +268,12 @@ Prefer scoped, reviewable changes over sweeping rewrites. For larger work, break
 
 Match the checks to the risk.
 
-#### Small QML or shell tweaks
+#### Selected Tauri shell or frontend tweaks
 
 ```bash
 npm run format:check
-npm run native:shell:test
+npm run frontend:foundation
+npm run tauri:foundation
 ```
 
 #### Engine changes
@@ -278,13 +281,19 @@ npm run native:shell:test
 ```bash
 npm run native:check
 npm run native:test
-npm run native:build
+npm run native:engine:build
 ```
 
 #### Changes affecting operator flows
 
 ```bash
 npm run native:foundation
+```
+
+#### Retained Qt fallback changes
+
+```bash
+npm run native:qt:foundation
 ```
 
 #### Changes affecting native release or packaging
@@ -311,11 +320,11 @@ Prefer incremental change over rewrites.
 Keep changes in the correct layer:
 
 - `native/qt-shell/qml/...` for operator UI
-- `native/qt-shell/src/...` for shell lifecycle and QML adapters
+- `native/qt-shell/src/...` for fallback shell lifecycle and QML adapters
 - `native/rust-engine/src/...` for domain state, persistence, and device logic
 - `native/protocol/...` for IPC contract changes
-- `frontend/...` for the replacement React/Storybook/Playwright frontend
-- `native/tauri-shell/...` for the replacement native shell
+- `frontend/...` for the selected React/Storybook/Playwright frontend
+- `native/tauri-shell/...` for the selected native shell
 - `docs/...` for process and operator documentation
 
 ### 3. Validate write paths carefully
@@ -403,12 +412,19 @@ If you want a PR, open one before merging.
 - protocol contract validation
 - regression coverage
 
-### Use native shell QML tests for:
+### Use Tauri frontend and shell tests for:
+
+- selected operator UI behavior
+- selected shell integration
+- fixture-driven visual review
+- Playwright-covered workspace behavior
+
+### Use retained Qt shell QML tests for:
 
 - QML module wiring
-- shell-level view-model behavior
+- fallback shell-level view-model behavior during Checkpoint D
 
-### Use native smoke / acceptance / bridge-qualification lanes for:
+### Use Tauri smoke / native acceptance / bridge-qualification lanes for:
 
 - startup and recovery changes
 - lifecycle, routing, and clean-start coverage

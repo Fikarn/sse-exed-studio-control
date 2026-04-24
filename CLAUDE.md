@@ -4,17 +4,18 @@ Entry point for Claude-assisted work in this repo. Keep it short. Follow the poi
 
 ## What this product is
 
-`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. Planning, DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Bundle id `com.sse.exedstudiocontrol`. Current shipping version is `v2.1.0` (2026-04-21) — the legacy Electron/Next.js runtime was retired; there is no browser path.
+`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. Planning, DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`; there is no browser path.
 
 ## Architecture boundary (non-negotiable)
 
 Two processes, separated by an IPC protocol:
 
-- `native/qt-shell/` — Qt 6 / QML. Owns windowing, input, layout. **No device or DB logic in QML.**
+- `native/tauri-shell/` + `frontend/` — selected shipping shell for the current published Tauri runtime, built on `Tauri 2 + React 19.2 + TypeScript + Vite`. **No device or DB logic in React.**
+- `native/qt-shell/` — Qt 6 / QML fallback shell retained until Checkpoint D issue #5 removes or archives it. Owns windowing, input, and layout when explicitly selected as fallback. **No device or DB logic in QML.**
 - `native/rust-engine/` — Rust. Owns state, persistence, device I/O, protocol dispatch.
 - `native/protocol/` — the IPC contract between them. Changes here are contract changes.
 
-Rule: if a change would move product state or device policy into QML, it is going in the wrong direction. Authoritative source: `docs/ARCHITECTURE.md`.
+Rule: if a change would move product state or device policy into QML or React, it is going in the wrong direction. Authoritative source: `docs/ARCHITECTURE.md`.
 
 `Q_PROPERTY` / `Q_INVOKABLE` / signals live in the C++ adapter under `native/qt-shell/src/` (e.g. `EngineProcess.*`), not in the Rust engine. Engine-side additions feed those properties.
 
@@ -42,16 +43,16 @@ When a workspace needs something new, add a variant to the existing component or
 
 - Qt floor: `qt_standard_project_setup(REQUIRES 6.5)` — `QtQuick.Effects` and modern Shapes are already available.
 - C++20.
-- Rust engine compiled and started by the Qt shell.
+- Rust engine compiled and started by the current shell runtime.
 
-Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:build`, `native:check`, `native:test`, `native:shell:test`, `native:foundation`, `native:acceptance`, packaging and installer lanes, etc.). Use them; don't invent new ones.
+Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:foundation`, `native:check`, `native:test`, `native:acceptance`, `frontend:foundation`, `tauri:foundation`, packaging and installer lanes, etc.). Use them; don't invent new ones. Retained Qt fallback checks use `npm run native:qt:foundation` during Checkpoint D only.
 
 ## Parity discipline
 
 Every operator-visible change to a native surface must:
 
 1. regenerate the deterministic offscreen `2560×1440` capture for the affected workspace,
-2. produce two consecutive bit-identical runs on the same CI lane before the baseline is accepted,
+2. produce two consecutive bit-identical runs on the same target-host verification lane before the baseline is accepted,
 3. land a baseline commit with `parity: ...` in the subject so reviewers can filter.
 
 Cross-platform pixel equivalence across lanes is not required — macOS and Windows diverge by driver. Per-lane determinism is the gate.
@@ -60,18 +61,20 @@ For live visual verification at true `2560×1440`, use `npm run native:parity:li
 
 Baselines under `artifacts/parity/native/workstation/`.
 
+After the shipping switch, Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Qt parity remains only for Checkpoint D fallback-retirement work.
+
 ## Testing posture
 
-- QML structural tests: `native/qt-shell/tests/qml/tst_*.qml`. They assert wiring and behavior, not pixels. They preserve a qsettings org-identifier fix (PR #25) — keep tests hermetic.
+- QML structural tests: `native/qt-shell/tests/qml/tst_*.qml` are retained fallback tests during Checkpoint D. They assert wiring and behavior, not pixels. They preserve a qsettings org-identifier fix (PR #25) — keep tests hermetic while they remain.
 - Engine tests: `cargo test` under `native/rust-engine/`.
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
-- CI lanes: macOS and Windows native verification lanes are **both blocking** on `main` (issue #25 resolved in `55151e3`). Treat a Windows lane failure the same as a macOS failure.
+- Target-host lanes: macOS and Windows native verification are both blocking release gates. Treat a Windows target-host failure the same as a macOS failure.
 
 ## Release posture
 
 - QtIFW offline installers for Windows + macOS, plus QtIFW maintenance-tool update-repository archives.
 - Distribution: GitHub Releases (direct download) + maintenance-tool update channel.
-- Trigger: pushing a `v*` tag runs the GitHub Actions release workflow. Local gate: `npm run release:verify`.
+- Trigger: a `v*` tag identifies the release; local target-host gates build and verify artifacts, then `npm run release:publish -- --tag vX.Y.Z` uploads them to GitHub Releases.
 - Deployment profile: one fixed studio workstation, unsigned controlled deployment. Public signing (Windows cert + Apple Developer) is deferred — see `docs/PRODUCTIZATION_PLAN.md §3`.
 - Persistence compatibility: rollback to a prior tag must remain a reinstall-away. Do not change on-disk formats without an explicit migration plan.
 

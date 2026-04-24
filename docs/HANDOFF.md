@@ -61,7 +61,7 @@ The highest-value unresolved work is:
 3. Keep current-truth docs aligned with the replatform program.
    The selected Tauri release runtime and retained Qt fallback must both be described consistently in `README.md`, `docs/HANDOFF.md`, `docs/ARCHITECTURE.md`, and the ADR set.
 4. Preserve the current frontend replatform checkpoint.
-   `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is tracked in `docs/FRONTEND_CUTOVER_PLAN.md`; Checkpoint C is satisfied for published tag `v2.2.0` (`eb166092ad5483a00b6b59137062c86c3193ca53`) with macOS and Windows post-switch target-host release evidence, the final operator-workstation rollout passed on published tag `v2.2.1` (`951a2c4e1f236200f0f017121158bc9969427051`), and Checkpoint D planning is now open in issue #5. Do not remove Qt fallback code without following `docs/QT_FALLBACK_RETIREMENT_AUDIT.md`; the next slice is validation lane split.
+   `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is tracked in `docs/FRONTEND_CUTOVER_PLAN.md`; Checkpoint C is satisfied for published tag `v2.2.0` (`eb166092ad5483a00b6b59137062c86c3193ca53`) with macOS and Windows post-switch target-host release evidence, the final operator-workstation rollout passed on published tag `v2.2.1` (`951a2c4e1f236200f0f017121158bc9969427051`), and Checkpoint D planning is now open in issue #5. Do not remove Qt fallback code without following `docs/QT_FALLBACK_RETIREMENT_AUDIT.md`; validation lane split is complete and the next slice is runtime selector lockdown.
 5. Keep Tauri target-host posture honest.
    GitHub Actions is not the acceptance mechanism for the replacement-shell cutover. `npm run tauri:setup-support:qualify`, `npm run tauri:workspaces:qualify`, and `npm run tauri:visual:review` remain local/manual cutover-readiness gates for future shell changes. The historical `tauri:package:*` lanes remain useful pre-switch evidence under `release/tauri-candidate*`. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`; `npm run native:release:mac:local` passed for published `v2.2.1`, and `npm run native:release:win:evidence` passed on Windows 11 `x64` with evidence bundle `2026-04-24T22-17-55-519Z`. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) records the completed Checkpoint C evidence and closed fallback window; [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) records the passed `v2.2.1` operator rollout. [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) is the only current Checkpoint D / Qt retirement track.
 
@@ -95,10 +95,16 @@ Native baseline:
 ```bash
 npm run native:check
 npm run native:test
-npm run native:build
-npm run native:shell:test
-npm run native:smoke
+npm run native:foundation
+npm run frontend:foundation
+npm run tauri:foundation
 npm run native:acceptance
+```
+
+Retained Qt fallback baseline for Checkpoint D only:
+
+```bash
+npm run native:qt:foundation
 ```
 
 Full release verification (before tagging):
