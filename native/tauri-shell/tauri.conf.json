@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.sse.exedstudiocontrol.replatform",
   "build": {
-    "beforeDevCommand": "node ../scripts/tauri-before-command.mjs dev",
-    "beforeBuildCommand": "node ../scripts/tauri-before-command.mjs build",
+    "beforeDevCommand": "node scripts/tauri-before-command.mjs dev",
+    "beforeBuildCommand": "node scripts/tauri-before-command.mjs build",
     "devUrl": "http://127.0.0.1:4173",
     "frontendDist": "../../frontend/app/dist"
   },

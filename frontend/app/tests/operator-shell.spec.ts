@@ -424,20 +424,21 @@ test("supports planning toolbar search focus and engine-backed time report", asy
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
-  const toolbar = page.getByTestId("planning-toolbar");
+  const timelineTab = workspace.getByRole("tab", { name: "Timeline" });
   const search = workspace.getByLabel("Search planning tasks");
 
+  await timelineTab.click();
   await page.keyboard.press("/");
   await expect(search).toBeFocused();
   await search.fill("stream deck");
   await expect(workspace.getByText("booth_2")).toBeVisible();
   await expect(workspace.getByText("audio")).toHaveCount(0);
 
-  await toolbar.click();
+  await timelineTab.click();
   await page.keyboard.press("KeyS");
   await expect(search).toBeFocused();
 
-  await toolbar.click();
+  await timelineTab.click();
   await page.keyboard.press("KeyR");
   const timeReportDialog = page.getByRole("dialog", { name: "Time report" });
   await expect(timeReportDialog).toBeVisible();
@@ -688,7 +689,13 @@ test("persists lighting cue caret and section view through shell settings", asyn
   await openFixture(page, "lighting-populated");
 
   const workspace = page.getByRole("main");
+  const openingCue = page.getByRole("button", { name: /1\. Opening look/i });
+  const interviewCue = page.getByRole("button", { name: /2\. Interview look/i });
+
+  await openingCue.click();
+  await expect(openingCue).toHaveAttribute("data-selected", "true");
   await page.keyboard.press("ArrowDown");
+  await expect(interviewCue).toHaveAttribute("data-selected", "true");
   await page.keyboard.press("Enter");
   await expect(workspace.locator("p").filter({ hasText: "Lighting cue 'Interview look' fired." })).toBeVisible();
 
@@ -846,7 +853,9 @@ test("edits the selected lighting cue inline from the inspector", async ({ page 
   await openFixture(page, "lighting-populated");
 
   const workspace = page.getByRole("main");
-  await page.getByRole("button", { name: /2\. Interview look/i }).click();
+  const interviewCue = page.getByRole("button", { name: /2\. Interview look/i });
+  await interviewCue.click();
+  await expect(interviewCue).toHaveAttribute("data-selected", "true");
   await page.keyboard.press("KeyE");
   await expect(page.getByLabel("Cue label")).toBeFocused();
   await page.getByLabel("Cue label").fill("Interview tighter");
