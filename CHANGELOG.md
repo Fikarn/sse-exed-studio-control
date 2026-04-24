@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-04-24
+
+### Added
+
+- Selected Tauri 2 + React 19.2 + TypeScript + Vite shell as the shipping release runtime through `scripts/native-release-runtime.json`, while retaining the Qt shell as an explicit fallback runtime.
+- Replacement-shell coverage for Setup/Support, Lighting, Audio, and Planning, including live Tauri workspace qualification, fixture-driven visual review at `2560x1440` and `1920x1080`, and Playwright coverage for operator-critical flows.
+- QtIFW shipping-path release evidence wrappers for macOS Apple Silicon and Windows 11 `x64`, including host/tool/git/runtime summaries for the switched `native:*` Tauri release lane.
+- Windows target-host evidence collection for the post-switch native release path, covering packaged smoke, clean-start smoke, packaged acceptance, bridge verification, installer/update artifacts, continuity, delivery, and real installer acceptance.
+
+### Changed
+
+- The `native:*` release lanes now package the selected Tauri shell beside the bundled Rust engine while preserving the existing product identity, app-data paths, QtIFW package identifier, offline installer posture, and maintenance-tool update repositories.
+- The cutover plan, handoff, architecture, development, release, and Windows target-host runbooks now record Checkpoint C evidence status and the retained Qt fallback boundary.
+- Lighting intentionally remains scoped to the fixed studio rig without pan/tilt controls; Audio follows the locked `Ar+ - Control-room confidence desk` spec; Planning remains a secondary run-of-show workspace.
+
+### Fixed
+
+- Windows release wrappers now launch nested `npm.cmd` commands through the Windows command shell, avoiding `spawnSync npm.cmd EINVAL` on paths with spaces.
+- Windows post-switch evidence validation now allows the evidence collector's own ignored output directory, including Git's collapsed `?? artifacts/native-release/` status, while still rejecting unrelated dirty worktree state.
+- Tauri Windows install smoke now resolves the installed shell/engine layout correctly and tolerates platform-specific generated schema drift during evidence collection.
+
 ## [2.1.0] — 2026-04-21
 
 ### Removed
