@@ -6,6 +6,8 @@ Date: 2026-04-22
 
 Accepted
 
+Post-acceptance update, 2026-04-24: `v2.2.0` shipped the `Tauri 2 + React 19.2 + TypeScript + Vite` shell as the selected release runtime through the `native:*` release lane. The Qt/QML shell remains available only as the fallback runtime during the bounded post-release fallback window; Checkpoint D / Qt retirement is a separate follow-up and is not authorized by this ADR.
+
 ## Context
 
 The shipped product is a native desktop workstation built from a Qt/QML shell and a Rust engine. The engine boundary is correct and must remain authoritative for state, storage, device I/O, safety, and startup policy. The current QML shell is too expensive to evolve into the kind of modern, visually iterated operator surface the product now requires.
@@ -34,4 +36,4 @@ The replacement frontend foundation is:
 - new frontend work should target `frontend/**` and `native/tauri-shell/**`
 - protocol changes are contract changes and must land through `native/protocol/**`
 - Storybook becomes the primary UI lab and Playwright becomes the primary flow/screenshot harness for the new shell
-- Qt CI and release lanes remain authoritative until the Tauri shell proves safer to ship than the Qt shell
+- after `v2.2.0`, the Tauri `native:*` release lane is authoritative while Qt remains a bounded fallback runtime until Checkpoint D

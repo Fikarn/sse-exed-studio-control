@@ -19,9 +19,9 @@ If this document conflicts with those files, fix the conflict before continuing.
 
 ## Current State
 
-- `scripts/native-release-runtime.json` now selects `tauri` as the shipping release runtime for the current cutover candidate.
-- `native/tauri-shell/` plus `frontend/` are the selected replacement shell track for the candidate release path.
-- `native/qt-shell/` remains available as the fallback runtime during the bounded cutover window and can be selected with `SSE_NATIVE_RELEASE_RUNTIME=qt`.
+- `scripts/native-release-runtime.json` now selects `tauri` as the shipping release runtime.
+- `native/tauri-shell/` plus `frontend/` are the selected replacement shell track for the shipping release path.
+- `native/qt-shell/` remains available as the fallback runtime during the bounded post-release fallback window and can be selected with `SSE_NATIVE_RELEASE_RUNTIME=qt`.
 - The Rust engine remains authoritative for state, persistence, device I/O, startup policy, recovery behavior, and support workflows.
 - `Setup/Support`, `Lighting`, `Audio`, and `Planning` have replacement-shell coverage in fixture, Playwright, and live Tauri qualification lanes.
 - `npm run tauri:setup-support:qualify` covers clean startup, setup/support flows, persisted restart, and bootstrap-failure recovery posture.
@@ -32,8 +32,8 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` remain historical/pre-switch candidate evidence lanes under separate `release/tauri-candidate*` roots.
 - The shipping release path is now the `native:*` release lane, which packages the runtime selected by `scripts/native-release-runtime.json` into `release/native*`.
 - macOS Apple Silicon and Windows 11 `x64` post-switch release evidence exists for the switched `native:*` path.
-- Checkpoint C is satisfied for the current Tauri shipping-switch candidate baseline `57c482b386a3af007faf76ec3291584fe5479594`; Checkpoint D / Qt retirement remains out of scope until a separate retirement issue is opened.
-- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue. It declares the bounded acceptance window and packaging path, but does not authorize cutover by itself.
+- Checkpoint C is satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; Checkpoint D / Qt retirement remains out of scope until the bounded fallback window completes and a separate retirement issue is opened.
+- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) records the completed cutover acceptance, target-host evidence, publication digest, and retained fallback posture. It does not authorize Qt retirement by itself.
 
 ## Non-Negotiables
 
@@ -132,7 +132,7 @@ Entry condition: packaging, update, rollback, and clean-machine evidence exists 
 
 Exit condition: the release candidate installs, launches, recovers, updates, and rolls back using the documented release path on macOS Apple Silicon and Windows 11 `x64`.
 
-Status: satisfied for baseline `57c482b386a3af007faf76ec3291584fe5479594` using macOS Apple Silicon post-switch `native:*` release evidence and Windows 11 `x64` target-host evidence bundle `2026-04-24T20-33-41-244Z`.
+Status: satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`. Evidence includes macOS Apple Silicon `npm run native:release:mac:local` exit `0`, Windows 11 `x64` target-host evidence bundle `2026-04-24T20-52-02-256Z`, GitHub Release publication, and `npm run release:anchor:verify -- --tag v2.2.0` with authenticated API access.
 
 ### Checkpoint D: Qt Retirement
 
@@ -154,8 +154,8 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The next implementation slice after this document should be the smallest gate-hardening task that moves a Checkpoint A, B, or C item from manual to repeatable. Candidate slices are:
+The next implementation slice after the `v2.2.0` release should preserve the fallback window and avoid Checkpoint D drift. Candidate slices are:
 
-- keep [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) aligned with the final Checkpoint C evidence digest before any release tag
-- run the normal release verification/tagging process from [RELEASE.md](./RELEASE.md) when the operator release decision is made
-- open a separate Checkpoint D / Qt retirement issue before removing Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets
+- perform operator rollout/install verification from the published `v2.2.0` release assets on the intended workstation
+- keep [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) aligned through the bounded fallback window
+- open a separate Checkpoint D / Qt retirement issue only after the fallback window completes, and before removing Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets

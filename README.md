@@ -11,8 +11,8 @@ This repository is intentionally optimized for a specific deployment profile rat
 
 ## Architecture
 
-- selected native `Tauri + React + TypeScript` operator shell for the current cutover candidate
-- retained `Qt/QML` fallback shell during the bounded cutover window
+- selected native `Tauri + React + TypeScript` operator shell for the shipping runtime
+- retained `Qt/QML` fallback shell during the bounded post-release fallback window
 - separate `Rust` engine (persistence, safety, device logic)
 - offline Qt Installer Framework packages on Windows 11 `x64` and macOS Apple Silicon
 - one-way importer for legacy `db.json` data, invoked once on first native launch for migrating operators
@@ -174,7 +174,7 @@ npm run ci
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
-The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. The current candidate selects Tauri, but the switch is not complete until the gate in [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md) and the issue #3 target-host evidence are satisfied. Qt remains the fallback runtime during the bounded cutover window.
+The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` shipped the Tauri runtime through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence. Qt remains the fallback runtime during the bounded post-release fallback window.
 
 `npm run clean` removes generated native build output and packaged release folders.
 

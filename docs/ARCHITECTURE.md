@@ -13,15 +13,15 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 
 ## Runtime Layers
 
-### Tauri shell (selected shipping runtime for the cutover candidate)
+### Tauri shell (selected shipping runtime)
 
 - owns the native webview shell under `native/tauri-shell/` and `frontend/`
 - owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when the release runtime selector points at `tauri`
 - preserves the same authoritative engine boundary and IPC contract as the Qt shell
 - supervises the Rust engine as a child process through the Tauri bridge
-- has satisfied the [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) Checkpoint C shipping-switch evidence gate for baseline `57c482b386a3af007faf76ec3291584fe5479594`
+- shipped in `v2.2.0` and satisfied the [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) Checkpoint C shipping-switch gate for tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`
 
-### Qt shell (fallback runtime during the bounded cutover window)
+### Qt shell (fallback runtime during the bounded post-release fallback window)
 
 - owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when selected as fallback
 - supervises the Rust engine as a child process
