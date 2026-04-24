@@ -65,7 +65,15 @@ artifacts/tauri-qualification/windows-target-host/latest-summary.json
 
 ## What The Collector Verifies
 
-The collector records host, tool, and git context, then runs:
+The collector records host, tool, and git context, then runs the target-host foundation gate:
+
+```powershell
+npm run tauri:foundation
+```
+
+That gate performs protocol generation, Rust engine build, Tauri shell build, and Tauri smoke coverage. The collector fails if the foundation gate fails or if generated files make the checkout dirty.
+
+The collector then runs the real Windows package gate:
 
 ```powershell
 npm run tauri:package:win:ifw-local
@@ -91,10 +99,11 @@ Attach or summarize these paths on issue #3:
 
 - `artifacts/tauri-qualification/windows-target-host/latest-summary.json`
 - the corresponding timestamped `summary.json`
+- `logs/tauri-foundation.combined.log`
 - `logs/tauri-package-win-ifw-local.combined.log`
 - `installer-acceptance/` if the run fails or if detailed installer logs are requested
 
-The summary is enough for routine gate tracking when the run passes. Keep the full folder until the cutover issue is closed.
+The summary is enough for routine gate tracking when the run passes, but keep both combined logs and the full folder until the cutover issue is closed.
 
 ## Failure Rules
 
@@ -104,6 +113,7 @@ Do not claim Windows evidence if any of these are true:
 - the host is not `x64`
 - the checkout was dirty before the run, unless the issue explicitly records why `--allow-dirty` was used
 - `binarycreator.exe` or `repogen.exe` came from an unknown toolchain
+- `npm run tauri:foundation` failed, was skipped, or made generated files dirty
 - `npm run tauri:package:win:ifw-local` failed or was skipped
 - installer acceptance was not exercised through the generated QtIFW installer
 

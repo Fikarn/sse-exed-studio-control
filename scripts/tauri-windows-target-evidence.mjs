@@ -348,6 +348,7 @@ async function main() {
     allowDirty,
     artifacts: [],
     command: null,
+    commands: [],
     completedAt: null,
     evidenceRoot,
     host: collectHostContext(),
@@ -384,6 +385,27 @@ async function main() {
 
     console.log(`Windows target-host evidence root: ${evidenceRoot}`);
     console.log(`Git commit: ${summary.host.git.sha}`);
+    console.log("Running npm run tauri:foundation");
+
+    const foundationCommand = await runLogged(commandName("npm"), ["run", "tauri:foundation"], {
+      logsDir,
+      name: "tauri-foundation",
+    });
+    summary.commands.push(foundationCommand);
+
+    if (foundationCommand.exitCode !== 0) {
+      summary.command = foundationCommand;
+      throw new Error(`tauri:foundation exited with code ${foundationCommand.exitCode}.`);
+    }
+
+    const postFoundationStatus = safeCapture("git", ["status", "--porcelain"]);
+    summary.postFoundationGitStatus = postFoundationStatus.stdout.trim();
+    if (summary.postFoundationGitStatus && !allowDirty) {
+      throw new Error(
+        `Working tree became dirty after tauri:foundation. Generated artifacts may be stale.\n${summary.postFoundationGitStatus}`
+      );
+    }
+
     console.log("Running npm run tauri:package:win:ifw-local");
 
     const command = await runLogged(commandName("npm"), ["run", "tauri:package:win:ifw-local"], {
@@ -395,6 +417,7 @@ async function main() {
     });
 
     summary.command = command;
+    summary.commands.push(command);
     summary.artifacts = collectArtifacts();
 
     const missingArtifacts = summary.artifacts.filter((artifact) => !artifact.exists);
