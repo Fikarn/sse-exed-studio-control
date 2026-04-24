@@ -1,7 +1,23 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
+
+function resolveEvidenceSha(rootDir) {
+  if (process.env.GITHUB_SHA) {
+    return process.env.GITHUB_SHA;
+  }
+
+  try {
+    return execFileSync("git", ["-C", rootDir, "rev-parse", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
 
 export function createQualificationEvidence({ lane, rootDir }) {
   const explicitRoot = process.env.SSE_TAURI_QUALIFICATION_EVIDENCE_DIR;
@@ -29,7 +45,7 @@ export function createQualificationEvidence({ lane, rootDir }) {
         checks,
         completedAt: completedAt.toISOString(),
         durationMs: completedAt.getTime() - startedAt.getTime(),
-        githubSha: process.env.GITHUB_SHA ?? null,
+        githubSha: resolveEvidenceSha(rootDir),
         lane,
         platform: process.platform,
         startedAt: startedAt.toISOString(),
