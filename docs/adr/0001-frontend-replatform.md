@@ -10,7 +10,7 @@ Post-acceptance update, 2026-04-24: `v2.2.0` shipped the `Tauri 2 + React 19.2 +
 
 ## Context
 
-The shipped product is a native desktop workstation built from a Qt/QML shell and a Rust engine. The engine boundary is correct and must remain authoritative for state, storage, device I/O, safety, and startup policy. The current QML shell is too expensive to evolve into the kind of modern, visually iterated operator surface the product now requires.
+At the time of this decision, the shipped product was a native desktop workstation built from a Qt/QML shell and a Rust engine. The engine boundary was correct and had to remain authoritative for state, storage, device I/O, safety, and startup policy. The QML shell was too expensive to evolve into the kind of modern, visually iterated operator surface the product required.
 
 The repo also needs a frontend workflow that is compatible with component-driven visual development, deterministic fixtures, Playwright/Storybook review artifacts, and Codex-assisted UI iteration.
 

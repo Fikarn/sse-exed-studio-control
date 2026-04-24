@@ -18,7 +18,7 @@ The native runtime is the only release path:
 - The legacy Electron runtime was retired in `v2.1.0`; no browser/Electron path remains in the repo.
 - Release readiness depends on packaging, smoke, acceptance, bridge-qualification, and install-time smoke-test gates — plus any open blockers tracked in [docs/HANDOFF.md](./HANDOFF.md).
 
-The selected native release runtime is controlled by `scripts/native-release-runtime.json` and can be overridden locally with `SSE_NATIVE_RELEASE_RUNTIME=qt` or `SSE_NATIVE_RELEASE_RUNTIME=tauri` for explicit fallback testing. The current cutover candidate selects `tauri`, so the `native:*` release lanes package the Tauri shell with the Rust engine binary staged beside the shell executable while preserving the existing QtIFW installer/update posture.
+The selected native release runtime is controlled by `scripts/native-release-runtime.json` and can be overridden locally with `SSE_NATIVE_RELEASE_RUNTIME=qt` or `SSE_NATIVE_RELEASE_RUNTIME=tauri` for explicit fallback testing. `v2.2.0` shipped with `tauri` selected, so the `native:*` release lanes package the Tauri shell with the Rust engine binary staged beside the shell executable while preserving the existing QtIFW installer/update posture.
 
 The historical replacement-shell candidate packaging path remains available for pre-switch evidence under separate roots:
 
@@ -232,6 +232,12 @@ After the release is published:
 
 ```bash
 npm run release:anchor:verify -- --tag v2.0.0
+```
+
+For private or access-controlled repositories, provide a token that can read releases, for example:
+
+```bash
+GITHUB_TOKEN=$(gh auth token) npm run release:anchor:verify -- --tag v2.0.0
 ```
 
 Platform-specific local verification:

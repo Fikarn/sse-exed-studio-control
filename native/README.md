@@ -2,16 +2,16 @@
 
 This directory contains the product runtime:
 
-- `tauri-shell/`: selected native webview shell for the current cutover candidate
+- `tauri-shell/`: selected native webview shell for the shipping runtime
 - `qt-shell/`: Qt/QML fallback desktop shell
 - `rust-engine/`: Rust control engine
 - `protocol/`: transport and message contract
 
 The native runtime is the only product runtime. The legacy Electron/Next.js path was retired in `v2.1.0`.
 
-During the cutover, `scripts/native-release-runtime.json` selects the shipping release runtime. The current candidate selects `tauri`; `qt-shell/` remains available as fallback with `SSE_NATIVE_RELEASE_RUNTIME=qt`.
+`scripts/native-release-runtime.json` selects the shipping release runtime. `v2.2.0` shipped with `tauri` selected; `qt-shell/` remains available as fallback with `SSE_NATIVE_RELEASE_RUNTIME=qt` during the bounded post-release fallback window.
 
-The promotion gate for completing the Tauri shipping switch lives in [`docs/FRONTEND_CUTOVER_PLAN.md`](../docs/FRONTEND_CUTOVER_PLAN.md). Do not infer cutover readiness from local Tauri success alone.
+The completed Tauri shipping switch and retained fallback posture are tracked in [`docs/FRONTEND_CUTOVER_PLAN.md`](../docs/FRONTEND_CUTOVER_PLAN.md). Do not start Checkpoint D / Qt retirement from local Tauri success alone.
 
 ## Repo Commands
 
