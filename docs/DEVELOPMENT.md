@@ -101,6 +101,8 @@ npm run tauri:foundation
 npm run tauri:setup-support:qualify
 npm run tauri:workspaces:qualify
 npm run tauri:cutover:candidate
+npm run tauri:package:mac:ifw-staged
+npm run tauri:package:win:ifw-staged
 ```
 
 During the migration, treat the Qt shell as maintenance-only unless the task is a release blocker, CI/release fix, or critical operator defect.
@@ -114,6 +116,8 @@ Both Tauri qualification commands write a `summary.json` evidence file. By defau
 The promotion gate for replacing the shipping Qt runtime lives in [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md). Do not switch shipping behavior, installer paths, or CI blocking status by inference; use that checklist as the cutover authority.
 
 `npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, and workspace qualification serially.
+
+`npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` are Checkpoint C hardening lanes for the replacement shell. They stage the Tauri shell and `studio-control-engine` side by side under `release/tauri-candidate/**`, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository payloads under separate `release/tauri-candidate-installer/**` and `release/tauri-candidate-updates/**` roots, and verify staged payload parity. These lanes are separate from the shipping Qt `native:*` release scripts and do not authorize cutover by themselves.
 
 ### 2b. Required parity workflow
 

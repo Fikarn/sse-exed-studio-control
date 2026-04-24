@@ -139,6 +139,21 @@ impl EngineBridge {
         Ok(())
     }
 
+    pub fn summary(&self) -> Result<Option<EngineBootstrapSummary>, String> {
+        let process_guard = self
+            .process
+            .lock()
+            .map_err(|_| "Engine bridge poisoned".to_string())?;
+
+        Ok(process_guard
+            .as_ref()
+            .map(|process| EngineBootstrapSummary {
+                running: true,
+                protocol: PROTOCOL_VERSION,
+                binary_path: process.binary_path.display().to_string(),
+            }))
+    }
+
     fn write_request(&self, request: &RequestEnvelope) -> Result<(), String> {
         let process_guard = self
             .process
@@ -217,7 +232,7 @@ fn spawn_stderr_thread(stderr: ChildStderr) {
     });
 }
 
-fn resolve_runtime_directories() -> Result<(PathBuf, PathBuf), String> {
+pub(crate) fn resolve_runtime_directories() -> Result<(PathBuf, PathBuf), String> {
     let app_data_dir = std::env::var_os("SSE_APP_DATA_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::temp_dir().join("sse-exed-tauri").join("app-data"));
@@ -232,7 +247,7 @@ fn resolve_runtime_directories() -> Result<(PathBuf, PathBuf), String> {
     Ok((app_data_dir, logs_dir))
 }
 
-fn resolve_engine_binary() -> Result<PathBuf, String> {
+pub(crate) fn resolve_engine_binary() -> Result<PathBuf, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let binary_name = if cfg!(target_os = "windows") {
         "studio-control-engine.exe"

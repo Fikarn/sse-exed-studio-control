@@ -1,14 +1,17 @@
 mod engine;
 
 use engine::{EngineBootstrapSummary, EngineBridge};
-use serde_json::Value;
-use studio_control_protocol::RequestEnvelope;
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::{create_dir_all, read_to_string, write};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::process::{Command, Stdio};
+use std::sync::mpsc::{self, Receiver};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use studio_control_protocol::RequestEnvelope;
 use tauri::{Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 struct EngineState {
@@ -31,6 +34,263 @@ struct ShellStartupFailure {
     stage: String,
 }
 
+fn read_arg_value(args: &[String], name: &str) -> Option<String> {
+    let prefix = format!("{name}=");
+    args.iter()
+        .find_map(|value| value.strip_prefix(&prefix).map(ToString::to_string))
+}
+
+fn write_smoke_status(status_path: Option<&str>, status: Value) {
+    let Some(path) = status_path else {
+        return;
+    };
+
+    let output_path = PathBuf::from(path);
+    if let Some(parent) = output_path.parent() {
+        let _ = create_dir_all(parent);
+    }
+    if let Ok(payload) = serde_json::to_vec_pretty(&status) {
+        let _ = write(output_path, payload);
+    }
+}
+
+fn spawn_smoke_reader(stdout: std::process::ChildStdout) -> Receiver<Value> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines() {
+            let Ok(line) = line else {
+                continue;
+            };
+            let Ok(message) = serde_json::from_str::<Value>(&line) else {
+                continue;
+            };
+            let _ = sender.send(message);
+        }
+    });
+    receiver
+}
+
+fn wait_for_smoke_message(receiver: &Receiver<Value>, deadline: Instant) -> Result<Value, String> {
+    let now = Instant::now();
+    if now >= deadline {
+        return Err("Timed out waiting for engine smoke output.".to_string());
+    }
+
+    receiver
+        .recv_timeout(deadline.saturating_duration_since(now))
+        .map_err(|_| "Timed out waiting for engine smoke output.".to_string())
+}
+
+fn write_engine_request(
+    stdin: &mut std::process::ChildStdin,
+    id: &str,
+    method: &str,
+) -> Result<(), String> {
+    serde_json::to_writer(
+        &mut *stdin,
+        &json!({
+            "type": "request",
+            "id": id,
+            "method": method,
+            "params": {}
+        }),
+    )
+    .map_err(|error| format!("Failed to serialize smoke request: {error}"))?;
+    stdin
+        .write_all(b"\n")
+        .map_err(|error| format!("Failed to write smoke request: {error}"))?;
+    stdin
+        .flush()
+        .map_err(|error| format!("Failed to flush smoke request: {error}"))?;
+    Ok(())
+}
+
+fn wait_for_smoke_startup(receiver: &Receiver<Value>, deadline: Instant) -> Result<(), String> {
+    loop {
+        let message = wait_for_smoke_message(receiver, deadline)?;
+        let message_type = message
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+
+        if message_type != "event" {
+            continue;
+        }
+
+        let event = message
+            .get("event")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+
+        if event == "engine.ready" {
+            return Ok(());
+        }
+
+        if event == "engine.startupFailed" {
+            return Err(format!(
+                "Engine startup failed during Tauri smoke: {}",
+                message
+                    .get("payload")
+                    .and_then(|payload| payload.get("message"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown startup failure")
+            ));
+        }
+    }
+}
+
+fn wait_for_smoke_response(
+    receiver: &Receiver<Value>,
+    id: &str,
+    deadline: Instant,
+) -> Result<Value, String> {
+    loop {
+        let message = wait_for_smoke_message(receiver, deadline)?;
+        if message.get("type").and_then(Value::as_str) != Some("response") {
+            continue;
+        }
+        if message.get("id").and_then(Value::as_str) != Some(id) {
+            continue;
+        }
+        if message.get("ok").and_then(Value::as_bool) != Some(true) {
+            return Err(format!("Engine smoke request '{id}' failed: {message}"));
+        }
+        return Ok(message.get("result").cloned().unwrap_or_else(|| json!({})));
+    }
+}
+
+fn run_smoke_test(args: &[String]) -> i32 {
+    let status_path = read_arg_value(args, "--smoke-status-path");
+    let binary_path = match engine::resolve_engine_binary() {
+        Ok(path) => path,
+        Err(message) => {
+            write_smoke_status(
+                status_path.as_deref(),
+                json!({
+                    "finished": true,
+                    "exitCode": 1,
+                    "error": message,
+                }),
+            );
+            eprintln!("{message}");
+            return 1;
+        }
+    };
+    let (app_data_dir, logs_dir) = match engine::resolve_runtime_directories() {
+        Ok(paths) => paths,
+        Err(message) => {
+            write_smoke_status(
+                status_path.as_deref(),
+                json!({
+                    "finished": true,
+                    "exitCode": 1,
+                    "startedEnginePath": binary_path.display().to_string(),
+                    "error": message,
+                }),
+            );
+            eprintln!("{message}");
+            return 1;
+        }
+    };
+
+    let result = (|| -> Result<Value, String> {
+        create_dir_all(&app_data_dir).map_err(|error| error.to_string())?;
+        create_dir_all(&logs_dir).map_err(|error| error.to_string())?;
+
+        let mut child = Command::new(&binary_path)
+            .env(
+                "SSE_PROTOCOL_VERSION",
+                studio_control_protocol::PROTOCOL_VERSION,
+            )
+            .env("SSE_APP_DATA_DIR", &app_data_dir)
+            .env("SSE_LOG_DIR", &logs_dir)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(|error| format!("Failed to start engine: {error}"))?;
+
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "Engine stdin was unavailable.".to_string())?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| "Engine stdout was unavailable.".to_string())?;
+        let receiver = spawn_smoke_reader(stdout);
+        let deadline = Instant::now() + Duration::from_secs(15);
+
+        wait_for_smoke_startup(&receiver, deadline)?;
+        write_engine_request(&mut stdin, "tauri-smoke-app-snapshot", "app.snapshot")?;
+        let app_snapshot =
+            wait_for_smoke_response(&receiver, "tauri-smoke-app-snapshot", deadline)?;
+        drop(stdin);
+
+        let stop_deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < stop_deadline {
+            if child
+                .try_wait()
+                .map_err(|error| format!("Failed to wait for engine smoke exit: {error}"))?
+                .is_some()
+            {
+                break;
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+        if child
+            .try_wait()
+            .map_err(|error| format!("Failed to wait for engine smoke exit: {error}"))?
+            .is_none()
+        {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+
+        Ok(app_snapshot)
+    })();
+
+    match result {
+        Ok(app_snapshot) => {
+            let target_surface = app_snapshot
+                .get("startup")
+                .and_then(|startup| startup.get("targetSurface"))
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
+            write_smoke_status(
+                status_path.as_deref(),
+                json!({
+                    "finished": true,
+                    "exitCode": 0,
+                    "startedEnginePath": binary_path.display().to_string(),
+                    "targetSurface": target_surface,
+                    "appDataPath": app_data_dir.display().to_string(),
+                    "logsPath": logs_dir.display().to_string(),
+                    "protocol": studio_control_protocol::PROTOCOL_VERSION,
+                }),
+            );
+            0
+        }
+        Err(message) => {
+            write_smoke_status(
+                status_path.as_deref(),
+                json!({
+                    "finished": true,
+                    "exitCode": 1,
+                    "startedEnginePath": binary_path.display().to_string(),
+                    "error": message,
+                    "appDataPath": app_data_dir.display().to_string(),
+                    "logsPath": logs_dir.display().to_string(),
+                    "protocol": studio_control_protocol::PROTOCOL_VERSION,
+                }),
+            );
+            eprintln!("{message}");
+            1
+        }
+    }
+}
+
 fn optional_env_path(name: &str) -> Option<String> {
     env::var(name)
         .ok()
@@ -39,10 +299,19 @@ fn optional_env_path(name: &str) -> Option<String> {
 }
 
 fn current_runtime_paths() -> BTreeMap<String, String> {
-    let app_data_dir = optional_env_path("SSE_APP_DATA_DIR")
-        .unwrap_or_else(|| std::env::temp_dir().join("sse-exed-tauri").join("app-data").display().to_string());
-    let logs_dir = optional_env_path("SSE_LOG_DIR")
-        .unwrap_or_else(|| PathBuf::from(&app_data_dir).join("logs").display().to_string());
+    let app_data_dir = optional_env_path("SSE_APP_DATA_DIR").unwrap_or_else(|| {
+        std::env::temp_dir()
+            .join("sse-exed-tauri")
+            .join("app-data")
+            .display()
+            .to_string()
+    });
+    let logs_dir = optional_env_path("SSE_LOG_DIR").unwrap_or_else(|| {
+        PathBuf::from(&app_data_dir)
+            .join("logs")
+            .display()
+            .to_string()
+    });
     let backup_dir = PathBuf::from(&app_data_dir).join("backups");
     let db_path = PathBuf::from(&app_data_dir).join("studio-control.sqlite3");
     let log_file_path = PathBuf::from(&logs_dir).join("engine.log");
@@ -51,7 +320,10 @@ fn current_runtime_paths() -> BTreeMap<String, String> {
         ("appDataDir".to_string(), app_data_dir),
         ("backupDir".to_string(), backup_dir.display().to_string()),
         ("dbPath".to_string(), db_path.display().to_string()),
-        ("logFilePath".to_string(), log_file_path.display().to_string()),
+        (
+            "logFilePath".to_string(),
+            log_file_path.display().to_string(),
+        ),
         ("logsDir".to_string(), logs_dir),
     ]);
 
@@ -79,13 +351,23 @@ fn engine_start(
 }
 
 #[tauri::command]
-fn engine_request(state: tauri::State<'_, EngineState>, request: RequestEnvelope) -> Result<studio_control_protocol::ResponseEnvelope, String> {
+fn engine_request(
+    state: tauri::State<'_, EngineState>,
+    request: RequestEnvelope,
+) -> Result<studio_control_protocol::ResponseEnvelope, String> {
     state.bridge.request(request)
 }
 
 #[tauri::command]
 fn engine_stop(state: tauri::State<'_, EngineState>) -> Result<(), String> {
     state.bridge.stop()
+}
+
+#[tauri::command]
+fn engine_summary(
+    state: tauri::State<'_, EngineState>,
+) -> Result<Option<EngineBootstrapSummary>, String> {
+    state.bridge.summary()
 }
 
 #[tauri::command]
@@ -124,9 +406,11 @@ fn shell_open_path(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn shell_export_diagnostics(report: Value, directory: Option<String>) -> Result<String, String> {
-    let output_dir = directory
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir().join("sse-exed-tauri").join("diagnostics"));
+    let output_dir = directory.map(PathBuf::from).unwrap_or_else(|| {
+        std::env::temp_dir()
+            .join("sse-exed-tauri")
+            .join("diagnostics")
+    });
 
     if !output_dir.is_absolute() {
         return Err("Diagnostics directory must be an absolute path.".to_string());
@@ -178,8 +462,12 @@ fn shell_test_bridge_write_status(status: Value) -> Result<(), String> {
 
     let payload = serde_json::to_vec_pretty(&status)
         .map_err(|error| format!("Failed to serialize shell test status: {error}"))?;
-    write(&output_path, payload)
-        .map_err(|error| format!("Failed to write shell test status {}: {error}", output_path.display()))?;
+    write(&output_path, payload).map_err(|error| {
+        format!(
+            "Failed to write shell test status {}: {error}",
+            output_path.display()
+        )
+    })?;
 
     Ok(())
 }
@@ -195,14 +483,22 @@ fn shell_test_bridge_read_command() -> Result<Option<Value>, String> {
         return Ok(None);
     }
 
-    let payload = read_to_string(&input_path)
-        .map_err(|error| format!("Failed to read shell test command {}: {error}", input_path.display()))?;
+    let payload = read_to_string(&input_path).map_err(|error| {
+        format!(
+            "Failed to read shell test command {}: {error}",
+            input_path.display()
+        )
+    })?;
     if payload.trim().is_empty() {
         return Ok(None);
     }
 
-    let command = serde_json::from_str::<Value>(&payload)
-        .map_err(|error| format!("Failed to parse shell test command {}: {error}", input_path.display()))?;
+    let command = serde_json::from_str::<Value>(&payload).map_err(|error| {
+        format!(
+            "Failed to parse shell test command {}: {error}",
+            input_path.display()
+        )
+    })?;
     Ok(Some(command))
 }
 
@@ -243,14 +539,21 @@ fn route_window_to_preferred_monitor(window: &WebviewWindow) {
     let work_area = monitor.work_area();
     let target_width = window_size.width.min(work_area.size.width);
     let target_height = window_size.height.min(work_area.size.height);
-    let target_x = work_area.position.x + ((work_area.size.width as i32 - target_width as i32) / 2).max(0);
-    let target_y = work_area.position.y + ((work_area.size.height as i32 - target_height as i32) / 2).max(0);
+    let target_x =
+        work_area.position.x + ((work_area.size.width as i32 - target_width as i32) / 2).max(0);
+    let target_y =
+        work_area.position.y + ((work_area.size.height as i32 - target_height as i32) / 2).max(0);
 
     let _ = window.set_size(PhysicalSize::new(target_width, target_height));
     let _ = window.set_position(PhysicalPosition::new(target_x, target_y));
 }
 
 fn main() {
+    let args = env::args().collect::<Vec<_>>();
+    if args.iter().any(|value| value == "--smoke-test") {
+        std::process::exit(run_smoke_test(&args));
+    }
+
     tauri::Builder::default()
         .manage(EngineState {
             bridge: EngineBridge::default(),
@@ -266,6 +569,7 @@ fn main() {
             engine_start,
             engine_request,
             engine_stop,
+            engine_summary,
             shell_open_path,
             shell_export_diagnostics,
             shell_test_bridge_config,

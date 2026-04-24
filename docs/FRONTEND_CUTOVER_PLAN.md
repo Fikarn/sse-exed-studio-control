@@ -27,6 +27,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `npm run tauri:workspaces:qualify` covers commissioned startup plus live Lighting, Audio, and Planning mutations across restart persistence.
 - `frontend-foundation`, `tauri-foundation-macos`, and `tauri-foundation-windows` are blocking CI jobs on `main`.
 - The live Tauri qualification commands remain local/manual cutover-readiness gates until stable CI display/webview lanes or documented target-host evidence exist.
+- `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` stage Tauri candidate payloads through the QtIFW installer/update layout without touching the shipping Qt `release/native*` roots.
 - [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue. It declares the bounded acceptance window and packaging path, but does not authorize cutover by itself.
 
 ## Non-Negotiables
@@ -150,5 +151,5 @@ The next implementation slice after this document should be the smallest gate-ha
 
 - run `npm run tauri:cutover:candidate` with `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` and attach target-host evidence to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - attach required `2560x1440` and `1920x1080` visual review notes or screenshots to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
-- script or verify the packaged Tauri candidate through the declared QtIFW package/update path before Checkpoint C
+- run the packaged Tauri candidate through the real QtIFW installer/update tools on macOS and Windows target hosts before Checkpoint C
 - add stable CI display/webview qualification lanes only if they can replace, not weaken, the target-host evidence requirement

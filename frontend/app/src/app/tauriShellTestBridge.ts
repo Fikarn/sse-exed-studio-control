@@ -10,6 +10,12 @@ interface ShellTestBridgeConfig {
   statusPath?: string | null;
 }
 
+interface EngineSummary {
+  binary_path?: string;
+  protocol?: string;
+  running?: boolean;
+}
+
 interface ShellTestCommandResult {
   action: string;
   error?: string;
@@ -187,6 +193,7 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
 
 export function useTauriShellTestBridge(shellState: ShellState, store: ShellStore) {
   const [config, setConfig] = useState<ShellTestBridgeConfig | null>(null);
+  const [engineSummary, setEngineSummary] = useState<EngineSummary | null>(null);
   const [lastCommand, setLastCommand] = useState<ShellTestCommandResult | null>(null);
   const latestShellStateRef = useRef(shellState);
   const processedCommandIdRef = useRef<string | null>(null);
@@ -217,17 +224,41 @@ export function useTauriShellTestBridge(shellState: ShellState, store: ShellStor
     };
   }, []);
 
+  useEffect(() => {
+    if (!config?.statusPath || !tauriAvailable()) {
+      return;
+    }
+
+    let cancelled = false;
+    void invoke<EngineSummary | null>("engine_summary")
+      .then((result) => {
+        if (!cancelled) {
+          setEngineSummary(result);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEngineSummary(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config?.statusPath, shellState.lifecycle, shellState.lastEvent]);
+
   const statusPayload = useMemo(
     () => ({
       capturedAt: new Date().toISOString(),
       shellState: serializeShellState(shellState),
       testBridge: {
         commandPath: config?.commandPath ?? null,
+        engineSummary: toJsonValue(engineSummary),
         lastCommand,
         statusPath: config?.statusPath ?? null,
       },
     }),
-    [config?.commandPath, config?.statusPath, lastCommand, shellState]
+    [config?.commandPath, config?.statusPath, engineSummary, lastCommand, shellState]
   );
 
   useEffect(() => {

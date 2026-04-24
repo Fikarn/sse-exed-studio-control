@@ -20,6 +20,13 @@ The native runtime is the only release path:
 
 During the frontend replatform, the Qt shell remains the shipping native runtime. The Tauri replacement shell may only enter a release candidate through the cutover gate in [docs/FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md). Unless that plan is changed by a delta spec, the replacement candidate must reuse the QtIFW installer/update posture and package the Tauri shell with the Rust engine binary staged beside the shell executable.
 
+The replacement-shell candidate packaging path is intentionally separate from the shipping Qt release path:
+
+- `npm run tauri:package:mac:ifw-staged`
+- `npm run tauri:package:win:ifw-staged`
+
+These commands package the Tauri shell with the side-by-side Rust engine, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository staging, and verify staged payload parity. They write to `release/tauri-candidate*` roots, not `release/native*`, so the current Qt fallback artifacts remain independent during parallel acceptance.
+
 ## Native Release Artifacts
 
 Each tagged release should publish:
