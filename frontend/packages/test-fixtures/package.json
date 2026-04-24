@@ -1,0 +1,13 @@
+{
+  "name": "@sse/test-fixtures",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "fixtures:check": "node ./src/check-fixtures.mjs",
+    "typecheck": "node ./src/check-fixtures.mjs"
+  }
+}

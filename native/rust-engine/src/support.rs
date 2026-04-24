@@ -918,6 +918,7 @@ mod tests {
                 logs_dir: logs_dir.clone(),
                 log_file_path: logs_dir.join("engine.log"),
                 db_path,
+                update_repository_path: None,
                 storage_ready: true,
                 storage_bootstrap,
                 control_surface_bridge: ControlSurfaceBridgeInfo {

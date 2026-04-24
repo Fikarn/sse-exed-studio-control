@@ -1,0 +1,89 @@
+{
+  "color": {
+    "background": {
+      "950": { "$value": "#09110B" },
+      "900": { "$value": "#101813" },
+      "850": { "$value": "#152019" },
+      "800": { "$value": "#1C2922" },
+      "700": { "$value": "#24342B" }
+    },
+    "surface": {
+      "900": { "$value": "#111914" },
+      "800": { "$value": "#18221B" },
+      "700": { "$value": "#213028" },
+      "600": { "$value": "#2C4036" }
+    },
+    "text": {
+      "strong": { "$value": "#F4F8F2" },
+      "muted": { "$value": "#B7C2BA" },
+      "subtle": { "$value": "#8C978F" }
+    },
+    "primary": {
+      "500": { "$value": "#99BA92" },
+      "400": { "$value": "#B6D8AD" },
+      "700": { "$value": "#62835F" }
+    },
+    "danger": {
+      "500": { "$value": "#D56A65" }
+    },
+    "warning": {
+      "500": { "$value": "#D8A95A" }
+    },
+    "info": {
+      "500": { "$value": "#69A9D1" }
+    },
+    "border": {
+      "default": { "$value": "#2A3B31" },
+      "strong": { "$value": "#406050" }
+    }
+  },
+  "font": {
+    "family": {
+      "sans": { "$value": "\"IBM Plex Sans\", system-ui, sans-serif" },
+      "mono": { "$value": "\"IBM Plex Mono\", ui-monospace, monospace" }
+    },
+    "size": {
+      "sm": { "$value": "12px" },
+      "md": { "$value": "14px" },
+      "lg": { "$value": "16px" },
+      "xl": { "$value": "20px" }
+    },
+    "weight": {
+      "regular": { "$value": "400" },
+      "medium": { "$value": "500" },
+      "semibold": { "$value": "600" }
+    }
+  },
+  "space": {
+    "1": { "$value": "4px" },
+    "2": { "$value": "8px" },
+    "3": { "$value": "12px" },
+    "4": { "$value": "16px" },
+    "5": { "$value": "20px" },
+    "6": { "$value": "24px" }
+  },
+  "radius": {
+    "sm": { "$value": "8px" },
+    "md": { "$value": "14px" },
+    "lg": { "$value": "20px" }
+  },
+  "size": {
+    "controlHeight": { "$value": "36px" },
+    "toolbarHeight": { "$value": "44px" },
+    "monitorRailHeight": { "$value": "52px" },
+    "contextRailWidth": { "$value": "344px" },
+    "workspaceRailWidth": { "$value": "248px" }
+  },
+  "shadow": {
+    "surface": { "$value": "0 14px 38px rgba(0, 0, 0, 0.28)" }
+  },
+  "motion": {
+    "duration": {
+      "fast": { "$value": "120ms" },
+      "normal": { "$value": "180ms" }
+    },
+    "easing": {
+      "standard": { "$value": "cubic-bezier(0.22, 1, 0.36, 1)" }
+    }
+  }
+}

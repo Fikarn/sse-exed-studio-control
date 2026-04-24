@@ -10,6 +10,7 @@ release/
 *.log
 npm-debug.log*
 .cache/
+.swift-module-cache/
 .idea/
 .vscode/
 tmp/
@@ -20,6 +21,11 @@ temp/
 native/build/
 native/**/build/
 native/rust-engine/target/
+native/tauri-shell/target/
 native/qt-shell/CMakeUserPresets.json
 native/qt-shell/assets/fonts/latin-*-normal.ttf
 artifacts/parity/live/
+frontend/**/dist/
+frontend/**/storybook-static/
+frontend/**/playwright-report/
+frontend/**/test-results/

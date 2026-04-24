@@ -1,0 +1,41 @@
+@layer components {
+  .badge {
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    min-height: 28px;
+    padding: 0 var(--space-5);
+    text-transform: uppercase;
+  }
+
+  .healthy,
+  .ready,
+  .connected {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.28);
+    color: var(--color-accent-green);
+  }
+
+  .degraded,
+  .warning {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: var(--color-accent-amber);
+  }
+
+  .idle {
+    background: rgba(160, 160, 184, 0.08);
+    border-color: rgba(160, 160, 184, 0.24);
+    color: var(--color-studio-400);
+  }
+
+  .error {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.28);
+    color: var(--color-accent-red);
+  }
+}

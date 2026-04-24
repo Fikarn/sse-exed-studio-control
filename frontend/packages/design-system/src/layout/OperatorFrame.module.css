@@ -1,0 +1,43 @@
+@layer components {
+  .frame {
+    display: grid;
+    gap: var(--space-8);
+    grid-template:
+      "monitor monitor monitor" minmax(var(--size-monitorRailHeight), auto)
+      "workspace main context" minmax(0, 1fr)
+      / minmax(96px, var(--size-workspaceRailWidth)) minmax(0, 1fr) minmax(320px, var(--size-contextRailWidth));
+    height: 100vh;
+    overflow: hidden;
+    padding: var(--space-8);
+  }
+
+  .monitorRail,
+  .workspaceRail,
+  .main,
+  .contextRail {
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .monitorRail {
+    grid-area: monitor;
+  }
+
+  .workspaceRail {
+    grid-area: workspace;
+  }
+
+  .main {
+    grid-area: main;
+  }
+
+  .contextRail {
+    grid-area: context;
+  }
+
+  @media (max-width: 2100px) {
+    .frame {
+      grid-template-columns: 96px minmax(0, 1fr) minmax(280px, 320px);
+    }
+  }
+}

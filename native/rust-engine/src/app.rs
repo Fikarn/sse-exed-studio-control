@@ -51,9 +51,9 @@ use crate::planning::{
     parse_planning_task_checklist_update_request, parse_planning_task_create_request,
     parse_planning_task_delete_request, parse_planning_task_reschedule_request,
     parse_planning_task_timer_request, parse_planning_task_toggle_complete_request,
-    parse_planning_task_update_request,
-    parse_planning_time_report_request, read_planning_context, read_planning_snapshot,
-    read_planning_time_report, update_planning_settings, PlanningCommandError,
+    parse_planning_task_update_request, parse_planning_time_report_request, read_planning_context,
+    read_planning_snapshot, read_planning_time_report, update_planning_settings,
+    PlanningCommandError,
 };
 use crate::planning_settings::PLANNING_SETTINGS_PREFIX;
 use crate::protocol::{
@@ -106,7 +106,11 @@ impl EngineApp {
                 "engineVersion": env!("CARGO_PKG_VERSION"),
                 "appDataDir": self.runtime.app_data_dir.display().to_string(),
                 "logsDir": self.runtime.logs_dir.display().to_string(),
-                "logFilePath": self.runtime.log_file_path.display().to_string()
+                "logFilePath": self.runtime.log_file_path.display().to_string(),
+                "updateRepositoryPath": self.runtime
+                    .update_repository_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
             }),
         )
     }
@@ -528,25 +532,23 @@ impl EngineApp {
                 Err(message) => Self::reply(invalid_params(request.id, message)),
             },
             "lighting.cue.fire" => match parse_lighting_cue_fire_request(&request.params) {
-                Ok(fire_request) => {
-                    match fire_lighting_cue(&self.runtime.db_path, &fire_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "cue-fired",
+                Ok(fire_request) => match fire_lighting_cue(&self.runtime.db_path, &fire_request) {
+                    Ok(result) => Self::reply_with_lighting_change(
+                        ok_response(
+                            request.id,
+                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
                         ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
+                        "cue-fired",
+                    ),
+                    Err(error) => match error {
+                        LightingCommandError::Rejected(code, message) => {
+                            Self::reply(error_response(request.id, code, message))
+                        }
+                        LightingCommandError::Storage(message) => {
+                            Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                        }
+                    },
+                },
                 Err(message) => Self::reply(invalid_params(request.id, message)),
             },
             "audio.snapshot" => match self.read_audio_snapshot() {
@@ -793,20 +795,20 @@ impl EngineApp {
                     .get("baseUrl")
                     .and_then(|value| value.as_str());
                 match export_companion_config(&self.runtime, base_url_override) {
-                Ok(result) => Self::reply(ok_response(
-                    request.id,
-                    serde_json::to_value(result).unwrap_or_else(|_| json!({})),
-                )),
-                Err(error) => match error {
-                    ExportCommandError::InvalidParams(message) => {
-                        Self::reply(invalid_params(request.id, message))
-                    }
-                    ExportCommandError::Storage(message) => {
-                        Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                    }
+                    Ok(result) => Self::reply(ok_response(
+                        request.id,
+                        serde_json::to_value(result).unwrap_or_else(|_| json!({})),
+                    )),
+                    Err(error) => match error {
+                        ExportCommandError::InvalidParams(message) => {
+                            Self::reply(invalid_params(request.id, message))
+                        }
+                        ExportCommandError::Storage(message) => {
+                            Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                        }
+                    },
                 }
             }
-            },
             "commissioning.update" => match parse_commissioning_update(&request.params) {
                 Ok(updates) => match set_settings(&self.runtime.db_path, &updates) {
                     Ok(()) => match self.read_app_snapshot() {
@@ -1527,7 +1529,11 @@ impl EngineApp {
                 "logsDir": self.runtime.logs_dir.display().to_string(),
                 "logFilePath": self.runtime.log_file_path.display().to_string(),
                 "dbPath": self.runtime.db_path.display().to_string(),
-                "backupDir": self.runtime.backups_dir.display().to_string()
+                "backupDir": self.runtime.backups_dir.display().to_string(),
+                "updateRepositoryPath": self.runtime
+                    .update_repository_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
             },
             "details": {
                 "storage": storage_summary,

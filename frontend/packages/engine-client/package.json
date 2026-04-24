@@ -1,0 +1,13 @@
+{
+  "name": "@sse/engine-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "react": "^19.2.0"
+  }
+}

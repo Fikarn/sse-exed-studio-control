@@ -1,0 +1,27 @@
+@layer components {
+  .card {
+    display: grid;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  .caption {
+    color: var(--color-studio-400);
+    font-size: var(--font-size-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .row {
+    align-items: center;
+    display: flex;
+    gap: var(--space-5);
+    justify-content: space-between;
+  }
+
+  .value {
+    color: var(--color-studio-050);
+    font-size: var(--font-size-md);
+    font-weight: 600;
+  }
+}

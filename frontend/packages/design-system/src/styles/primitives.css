@@ -1,0 +1,41 @@
+:root {
+  color-scheme: dark;
+  font-family: var(--font-family-ui);
+  background:
+    radial-gradient(circle at top, rgba(153, 186, 146, 0.07), transparent 34%),
+    linear-gradient(180deg, var(--color-shell-top), var(--color-shell-base));
+  color: var(--color-studio-100);
+}
+
+body {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 22%),
+    linear-gradient(180deg, var(--color-shell-top), var(--color-shell-base));
+  color: var(--color-studio-100);
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin: 0;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-family-mono);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

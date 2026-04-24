@@ -11,15 +11,18 @@ use std::collections::HashMap;
 pub const APP_SETTINGS_PREFIX: &str = "app.";
 pub const COMMISSIONING_COMPLETED_KEY: &str = "app.commissioning.completed";
 pub const COMMISSIONING_STAGE_KEY: &str = "app.commissioning.stage";
+pub const COMMISSIONING_RUNNER_STAGE_KEY: &str = "app.commissioning.runnerStage";
 pub const HARDWARE_PROFILE_KEY: &str = "app.hardware.profile";
 
 const DEFAULT_COMMISSIONING_COMPLETED: bool = false;
 const DEFAULT_COMMISSIONING_STAGE: &str = "setup-required";
+const DEFAULT_COMMISSIONING_RUNNER_STAGE: &str = "import";
 const DEFAULT_HARDWARE_PROFILE: &str = "sse-fixed-studio-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommissioningSnapshot {
     pub has_completed_setup: bool,
+    pub runner_stage: String,
     pub stage: String,
     pub hardware_profile: String,
 }
@@ -28,6 +31,7 @@ impl Default for CommissioningSnapshot {
     fn default() -> Self {
         Self {
             has_completed_setup: DEFAULT_COMMISSIONING_COMPLETED,
+            runner_stage: String::from(DEFAULT_COMMISSIONING_RUNNER_STAGE),
             stage: String::from(DEFAULT_COMMISSIONING_STAGE),
             hardware_profile: String::from(DEFAULT_HARDWARE_PROFILE),
         }
@@ -37,6 +41,10 @@ impl Default for CommissioningSnapshot {
 impl CommissioningSnapshot {
     pub fn from_settings(settings: &HashMap<String, String>) -> Self {
         let mut snapshot = Self::default();
+        let stored_stage = settings
+            .get(COMMISSIONING_STAGE_KEY)
+            .filter(|stage| is_valid_commissioning_stage(stage))
+            .cloned();
 
         if let Some(completed) = settings
             .get(COMMISSIONING_COMPLETED_KEY)
@@ -45,10 +53,12 @@ impl CommissioningSnapshot {
             snapshot.has_completed_setup = completed;
         }
 
-        if let Some(stage) = settings.get(COMMISSIONING_STAGE_KEY) {
-            if is_valid_commissioning_stage(stage) {
-                snapshot.stage = stage.clone();
+        if let Some(runner_stage) = settings.get(COMMISSIONING_RUNNER_STAGE_KEY) {
+            if is_valid_runner_stage(runner_stage) {
+                snapshot.runner_stage = runner_stage.clone();
             }
+        } else if let Some(stage) = stored_stage.as_deref() {
+            snapshot.runner_stage = runner_stage_from_legacy_stage(stage).to_string();
         }
 
         if let Some(profile) = settings.get(HARDWARE_PROFILE_KEY) {
@@ -57,6 +67,21 @@ impl CommissioningSnapshot {
             }
         }
 
+        if let Some(stage) = stored_stage {
+            snapshot.stage = stage;
+        } else {
+            snapshot.stage = legacy_stage_from_runner_stage(
+                &snapshot.runner_stage,
+                snapshot.has_completed_setup,
+            )
+            .to_string();
+        }
+
+        if snapshot.has_completed_setup || snapshot.stage == "ready" {
+            snapshot.has_completed_setup = true;
+            snapshot.runner_stage = String::from("publish");
+            snapshot.stage = String::from("ready");
+        }
         snapshot
     }
 
@@ -80,6 +105,10 @@ pub fn default_app_settings_entries() -> Vec<(&'static str, &'static str)> {
             },
         ),
         (COMMISSIONING_STAGE_KEY, DEFAULT_COMMISSIONING_STAGE),
+        (
+            COMMISSIONING_RUNNER_STAGE_KEY,
+            DEFAULT_COMMISSIONING_RUNNER_STAGE,
+        ),
         (HARDWARE_PROFILE_KEY, DEFAULT_HARDWARE_PROFILE),
     ]
 }
@@ -124,6 +153,10 @@ pub fn build_app_snapshot(
                 "logFilePath": runtime.log_file_path.display().to_string(),
                 "dbPath": runtime.db_path.display().to_string(),
                 "backupDir": runtime.backups_dir.display().to_string(),
+                "updateRepositoryPath": runtime
+                    .update_repository_path
+                    .as_ref()
+                    .map(|path| path.display().to_string()),
             },
             "controlSurface": {
                 "available": runtime.control_surface_bridge.available,
@@ -136,6 +169,13 @@ pub fn build_app_snapshot(
         },
         "shell": {
             "workspace": shell.workspace,
+            "setup": {
+                "activeSection": shell.setup_active_section,
+            },
+            "lighting": {
+                "currentSectionId": shell.lighting_current_section_id,
+                "selectedCueId": shell.lighting_selected_cue_id,
+            },
             "window": {
                 "width": shell.window_width,
                 "height": shell.window_height,
@@ -146,6 +186,7 @@ pub fn build_app_snapshot(
         },
         "commissioning": {
             "hasCompletedSetup": commissioning.has_completed_setup,
+            "runnerStage": commissioning.runner_stage,
             "stage": commissioning.stage,
             "hardwareProfile": commissioning.hardware_profile,
             "summary": commissioning_summary,
@@ -179,17 +220,69 @@ pub fn build_app_snapshot(
 pub fn parse_commissioning_update(params: &Value) -> Result<Vec<(&'static str, String)>, String> {
     let mut updates = Vec::new();
 
-    if let Some(stage_value) = params.get("stage") {
-        let stage = stage_value
-            .as_str()
-            .ok_or_else(|| String::from("stage must be a string"))?;
+    let stage = params
+        .get("stage")
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or_else(|| String::from("stage must be a string"))
+        })
+        .transpose()?;
+    let runner_stage = params
+        .get("runnerStage")
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or_else(|| String::from("runnerStage must be a string"))
+        })
+        .transpose()?;
 
+    if let Some(stage) = stage {
         if !is_valid_commissioning_stage(stage) {
             return Err(String::from(
                 "stage must be one of: setup-required, in-progress, ready",
             ));
         }
+    }
 
+    if let Some(runner_stage) = runner_stage {
+        if !is_valid_runner_stage(runner_stage) {
+            return Err(String::from(
+                "runnerStage must be one of: import, probe, map, verify, publish",
+            ));
+        }
+    }
+
+    if let (Some(stage), Some(runner_stage)) = (stage, runner_stage) {
+        let stages_match = if runner_stage == "publish" {
+            matches!(stage, "in-progress" | "ready")
+        } else {
+            legacy_stage_from_runner_stage(runner_stage, false) == stage
+        };
+
+        if !stages_match {
+            return Err(String::from(
+                "runnerStage and stage must describe the same commissioning state",
+            ));
+        }
+    }
+
+    if let Some(runner_stage) = runner_stage {
+        updates.push((COMMISSIONING_RUNNER_STAGE_KEY, runner_stage.to_string()));
+        let coarse_stage = match stage {
+            Some(stage) => stage,
+            None => legacy_stage_from_runner_stage(runner_stage, false),
+        };
+        updates.push((COMMISSIONING_STAGE_KEY, coarse_stage.to_string()));
+        updates.push((
+            COMMISSIONING_COMPLETED_KEY,
+            (coarse_stage == "ready").to_string(),
+        ));
+    } else if let Some(stage) = stage {
+        updates.push((
+            COMMISSIONING_RUNNER_STAGE_KEY,
+            runner_stage_from_legacy_stage(stage).to_string(),
+        ));
         updates.push((COMMISSIONING_STAGE_KEY, stage.to_string()));
         updates.push((COMMISSIONING_COMPLETED_KEY, (stage == "ready").to_string()));
     }
@@ -228,6 +321,32 @@ fn is_valid_commissioning_stage(stage: &str) -> bool {
     matches!(stage, "setup-required" | "in-progress" | "ready")
 }
 
+fn is_valid_runner_stage(stage: &str) -> bool {
+    matches!(stage, "import" | "probe" | "map" | "verify" | "publish")
+}
+
+fn legacy_stage_from_runner_stage(runner_stage: &str, has_completed_setup: bool) -> &'static str {
+    match runner_stage {
+        "publish" => {
+            if has_completed_setup {
+                "ready"
+            } else {
+                "in-progress"
+            }
+        }
+        "probe" | "map" | "verify" => "in-progress",
+        _ => "setup-required",
+    }
+}
+
+fn runner_stage_from_legacy_stage(stage: &str) -> &'static str {
+    match stage {
+        "ready" => "publish",
+        "in-progress" => "probe",
+        _ => "import",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,6 +361,7 @@ mod tests {
         let snapshot = CommissioningSnapshot::from_settings(&settings);
 
         assert!(!snapshot.has_completed_setup);
+        assert_eq!(snapshot.runner_stage, "import");
         assert_eq!(snapshot.stage, "setup-required");
         assert_eq!(snapshot.hardware_profile, "sse-fixed-studio-v1");
         assert_eq!(snapshot.startup_surface(), "commissioning");
@@ -256,6 +376,10 @@ mod tests {
             ),
             (String::from(COMMISSIONING_STAGE_KEY), String::from("ready")),
             (
+                String::from(COMMISSIONING_RUNNER_STAGE_KEY),
+                String::from("publish"),
+            ),
+            (
                 String::from(HARDWARE_PROFILE_KEY),
                 String::from("sse-fixed-studio-v2"),
             ),
@@ -264,15 +388,16 @@ mod tests {
         let snapshot = CommissioningSnapshot::from_settings(&settings);
 
         assert!(snapshot.has_completed_setup);
+        assert_eq!(snapshot.runner_stage, "publish");
         assert_eq!(snapshot.stage, "ready");
         assert_eq!(snapshot.hardware_profile, "sse-fixed-studio-v2");
         assert_eq!(snapshot.startup_surface(), "dashboard");
     }
 
     #[test]
-    fn commissioning_update_accepts_stage_and_profile() {
+    fn commissioning_update_accepts_runner_stage_and_profile() {
         let params = json!({
-            "stage": "in-progress",
+            "runnerStage": "verify",
             "hardwareProfile": "sse-fixed-studio-v2"
         });
 
@@ -282,6 +407,7 @@ mod tests {
         assert_eq!(
             updates,
             vec![
+                (COMMISSIONING_RUNNER_STAGE_KEY, String::from("verify")),
                 (COMMISSIONING_STAGE_KEY, String::from("in-progress")),
                 (COMMISSIONING_COMPLETED_KEY, String::from("false")),
                 (HARDWARE_PROFILE_KEY, String::from("sse-fixed-studio-v2")),
@@ -301,6 +427,19 @@ mod tests {
     }
 
     #[test]
+    fn commissioning_snapshot_maps_legacy_stage_when_runner_stage_is_missing() {
+        let settings = HashMap::from([(
+            String::from(COMMISSIONING_STAGE_KEY),
+            String::from("in-progress"),
+        )]);
+
+        let snapshot = CommissioningSnapshot::from_settings(&settings);
+
+        assert_eq!(snapshot.runner_stage, "probe");
+        assert_eq!(snapshot.stage, "in-progress");
+    }
+
+    #[test]
     fn app_snapshot_includes_shell_and_top_level_summaries() {
         let runtime = RuntimeContext {
             app_data_dir: PathBuf::from("/tmp/app-data"),
@@ -308,6 +447,7 @@ mod tests {
             db_path: PathBuf::from("/tmp/studio-control.sqlite3"),
             log_file_path: PathBuf::from("/tmp/logs/engine.log"),
             backups_dir: PathBuf::from("/tmp/backups"),
+            update_repository_path: None,
             protocol_version: String::from("1"),
             storage_ready: true,
             storage_bootstrap: StorageBootstrap {
@@ -337,6 +477,10 @@ mod tests {
             ),
             (String::from(COMMISSIONING_STAGE_KEY), String::from("ready")),
             (
+                String::from(COMMISSIONING_RUNNER_STAGE_KEY),
+                String::from("publish"),
+            ),
+            (
                 String::from(HARDWARE_PROFILE_KEY),
                 String::from("sse-fixed-studio-v2"),
             ),
@@ -356,6 +500,10 @@ mod tests {
             Value::String(String::from(
                 "Target surface 'dashboard', workspace 'audio', commissioning stage 'ready', control surface 'Bridge ready at http://127.0.0.1:38201'."
             ))
+        );
+        assert_eq!(
+            snapshot["commissioning"]["runnerStage"],
+            Value::String(String::from("publish"))
         );
     }
 }

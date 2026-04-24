@@ -1,0 +1,524 @@
+@layer components {
+  @keyframes echoPulse {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-500) 32%, transparent);
+      transform: translateY(0);
+    }
+
+    50% {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--color-primary-500) 42%, transparent),
+        0 0 0 8px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+      transform: translateY(-1px);
+    }
+
+    100% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-500) 0%, transparent);
+      transform: translateY(0);
+    }
+  }
+
+  .workspaceStack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-height: 0;
+    padding: var(--space-4);
+  }
+
+  .degradedBanner,
+  .feedbackBanner,
+  .utilityRow,
+  .footerBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-lg);
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--color-surface-800) 94%, transparent),
+        color-mix(in srgb, var(--color-surface-700) 92%, transparent)
+      ),
+      radial-gradient(
+        circle at top right,
+        color-mix(in srgb, var(--color-primary-500) 12%, transparent),
+        transparent 56%
+      );
+  }
+
+  .degradedBanner {
+    border-color: color-mix(in srgb, var(--color-warning-500) 34%, var(--color-border-default));
+  }
+
+  .feedbackBanner {
+    justify-content: flex-start;
+    color: var(--color-text-muted);
+  }
+
+  .bannerTitle,
+  .modeHeadline,
+  .sectionTitle {
+    margin: 0;
+    font: var(--font-weight-semibold) 22px / 1.15 var(--font-family-sans);
+  }
+
+  .supportPrompt {
+    color: var(--color-text-subtle);
+    font: var(--font-weight-medium) var(--font-size-md) / 1 var(--font-family-sans);
+  }
+
+  .bannerBody,
+  .sectionBody,
+  .dialogBody {
+    margin: 0;
+    color: var(--color-text-muted);
+    font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-sans);
+  }
+
+  .bannerActions,
+  .utilityActions,
+  .inlineActions,
+  .supportRailButtons {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .modeEyebrow,
+  .sectionEyebrow,
+  .selectionLabel,
+  .sideLabel {
+    color: var(--color-text-subtle);
+    font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .utilityMeta {
+    display: grid;
+    gap: 6px;
+    justify-items: center;
+    text-align: center;
+    flex: 1;
+  }
+
+  .runnerLayout {
+    display: grid;
+    gap: var(--space-4);
+    min-height: 0;
+  }
+
+  .stepRail {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .stepButton,
+  .pageTab,
+  .backupRow,
+  .deckButton,
+  .dialChip,
+  .railButton {
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
+    color: inherit;
+    transition:
+      transform var(--motion-duration-fast) ease,
+      border-color var(--motion-duration-fast) ease,
+      background-color var(--motion-duration-fast) ease,
+      box-shadow var(--motion-duration-fast) ease;
+  }
+
+  .stepButton {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    text-align: left;
+  }
+
+  .stepButton[data-active="true"] {
+    border-color: rgba(153, 186, 146, 0.42);
+    background:
+      linear-gradient(180deg, rgba(153, 186, 146, 0.18), rgba(153, 186, 146, 0.05)), var(--color-surface-raised);
+    transform: translateY(-1px);
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+  }
+
+  .stepButton[data-status="error"] {
+    border-color: rgba(239, 68, 68, 0.32);
+  }
+
+  .stepNumber {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary-500) 16%, transparent);
+    color: var(--color-primary-500);
+    font: var(--font-weight-semibold) var(--font-size-sm) / 1 var(--font-family-mono);
+  }
+
+  .stepLabel {
+    font: var(--font-weight-semibold) var(--font-size-md) / 1.2 var(--font-family-sans);
+  }
+
+  .stepHint,
+  .metaCopy,
+  .checkDetail,
+  .emptyState,
+  .readinessList,
+  .supportInfoList,
+  .pathRow {
+    color: var(--color-text-muted);
+    font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+  }
+
+  .runnerBody {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(300px, 0.8fr);
+    gap: var(--space-4);
+    min-height: 0;
+  }
+
+  .runnerMain,
+  .runnerSide,
+  .supportGrid {
+    display: grid;
+    gap: var(--space-4);
+    min-height: 0;
+  }
+
+  .runnerSide {
+    align-content: start;
+  }
+
+  .heroSurface,
+  .sideCard,
+  .supportHero,
+  .supportCard,
+  .supportRail {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .cardHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  .fieldGrid,
+  .metricRow,
+  .checkGrid,
+  .sideList,
+  .backupList {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .fieldGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metricRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .checkGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .field,
+  .checkCard,
+  .selectionCard,
+  .restoreHighlight,
+  .sideRow {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+  }
+
+  .textField {
+    width: 100%;
+    min-height: var(--size-controlHeight);
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
+    color: var(--color-text-strong);
+  }
+
+  .textField:disabled {
+    opacity: 0.7;
+  }
+
+  .checkHeader,
+  .sideRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .checkTitle,
+  .selectionTitle,
+  .dialogTitle {
+    font: var(--font-weight-semibold) var(--font-size-md) / 1.3 var(--font-family-sans);
+    color: var(--color-text-strong);
+  }
+
+  .verifyLead {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .pageTabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .pageTab,
+  .dialChip {
+    padding: 10px 14px;
+  }
+
+  .pageTab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pageTab small {
+    color: var(--color-text-subtle);
+    font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  }
+
+  .pageTab[data-active="true"],
+  .dialChip[data-selected="true"] {
+    border-color: rgba(153, 186, 146, 0.42);
+    background:
+      linear-gradient(180deg, rgba(153, 186, 146, 0.18), rgba(153, 186, 146, 0.05)), var(--color-surface-raised);
+  }
+
+  .deckPreview {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .buttonMatrix {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .deckButton {
+    display: grid;
+    gap: 6px;
+    min-height: 92px;
+    padding: var(--space-3);
+    text-align: left;
+  }
+
+  .deckButton[data-selected="true"] {
+    border-color: rgba(153, 186, 146, 0.42);
+    box-shadow:
+      0 0 0 1px rgba(153, 186, 146, 0.22),
+      0 16px 36px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+  }
+
+  .deckButton[data-echo="true"],
+  .dialChip[data-echo="true"] {
+    animation: echoPulse 300ms ease;
+    border-color: rgba(153, 186, 146, 0.42);
+    background:
+      linear-gradient(180deg, rgba(153, 186, 146, 0.2), rgba(153, 186, 146, 0.08)), var(--color-surface-raised);
+  }
+
+  .deckButton small,
+  .backupRow small {
+    color: var(--color-text-subtle);
+    font: var(--font-weight-medium) var(--font-size-sm) / 1.4 var(--font-family-mono);
+  }
+
+  .dialRow {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .restoreSummary {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: var(--space-4);
+  }
+
+  .restoreField {
+    display: grid;
+  }
+
+  .backupRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    text-align: left;
+  }
+
+  .backupRow strong {
+    display: block;
+    font: var(--font-weight-semibold) var(--font-size-md) / 1.3 var(--font-family-sans);
+    color: var(--color-text-strong);
+  }
+
+  .supportGrid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.8fr);
+    align-items: start;
+  }
+
+  .supportHero {
+    grid-row: span 2;
+  }
+
+  .supportInfoList {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .supportInfoList > div {
+    display: grid;
+    gap: 6px;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+  }
+
+  .supportInfoList strong {
+    color: var(--color-text-strong);
+    font: var(--font-weight-semibold) var(--font-size-sm) / 1.2 var(--font-family-sans);
+  }
+
+  .railButton {
+    padding: 8px 12px;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-text-muted);
+    font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+    letter-spacing: 0.04em;
+  }
+
+  .railButton:hover {
+    border-color: rgba(153, 186, 146, 0.3);
+    color: var(--color-text-strong);
+  }
+
+  .railButton:disabled {
+    cursor: not-allowed;
+    border-color: color-mix(in srgb, var(--color-border-default) 86%, transparent);
+    color: var(--color-text-subtle);
+    opacity: 0.55;
+  }
+
+  .footerBar {
+    margin-top: auto;
+  }
+
+  .emptyState {
+    padding: var(--space-4);
+    border: 1px dashed var(--color-border-default);
+    border-radius: var(--radius-md);
+    text-align: center;
+  }
+
+  .jumpScrim {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: var(--space-6);
+    background: color-mix(in srgb, var(--color-surface-950) 72%, transparent);
+    z-index: 20;
+  }
+
+  .jumpSurface {
+    width: min(520px, 100%);
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .dialogActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  @media (max-width: 1680px) {
+    .runnerBody,
+    .supportGrid {
+      grid-template-columns: 1fr;
+    }
+
+    .supportHero {
+      grid-row: auto;
+    }
+
+    .metricRow,
+    .checkGrid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 1240px) {
+    .stepRail,
+    .fieldGrid,
+    .buttonMatrix,
+    .dialRow,
+    .restoreSummary {
+      grid-template-columns: 1fr;
+    }
+
+    .degradedBanner,
+    .utilityRow,
+    .cardHeader,
+    .footerBar,
+    .checkHeader,
+    .backupRow,
+    .sideRow,
+    .verifyLead {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .bannerActions,
+    .utilityActions,
+    .inlineActions,
+    .supportRailButtons,
+    .dialogActions {
+      width: 100%;
+    }
+
+    .bannerActions > *,
+    .utilityActions > *,
+    .inlineActions > *,
+    .dialogActions > * {
+      flex: 1 1 180px;
+    }
+  }
+}

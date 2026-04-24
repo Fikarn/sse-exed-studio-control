@@ -15,7 +15,8 @@ This repository is intentionally optimized for a specific deployment profile rat
 
 ## Architecture
 
-- native `Qt/QML` operator shell
+- shipping native `Qt/QML` operator shell during the migration
+- parallel `Tauri + React + TypeScript` replacement shell under `native/tauri-shell/` and `frontend/`
 - separate `Rust` engine (persistence, safety, device logic)
 - offline Qt Installer Framework packages on Windows 11 `x64` and macOS Apple Silicon
 - one-way importer for legacy `db.json` data, invoked once on first native launch for migrating operators
@@ -109,8 +110,12 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/RELEASE.md](docs/RELEASE.md): versioning, tagging, installers, and release flow
 - [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
 - [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
+- [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md): acceptance gate for promoting the Tauri replacement shell
 - [docs/archive/](docs/archive/): historical planning and parity documents preserved for reference
-- [native/README.md](native/README.md): native workspace scaffold for the Qt shell, Rust engine, and IPC protocol
+- [native/README.md](native/README.md): native workspace scaffold for the Qt shell, Tauri replacement shell, Rust engine, and IPC protocol
+- [docs/adr/0001-frontend-replatform.md](docs/adr/0001-frontend-replatform.md): locked frontend replatform decision
+- `frontend/`: replacement web frontend workspace and design-system packages
+- `native/tauri-shell/`: replacement native shell track for the replatform
 
 ## Local Development
 
@@ -161,8 +166,19 @@ Common commands:
 npm run clean
 npm run format:check
 npm run native:foundation
+npm run frontend:foundation
+npm run tauri:foundation
+npm run tauri:setup-support:qualify
+npm run tauri:workspaces:qualify
+npm run tauri:cutover:candidate
 npm run ci
 ```
+
+`tauri:setup-support:qualify` and `tauri:workspaces:qualify` launch the real Tauri dev shell on the fixed local port `4173`. Run them serially and do not run them alongside `npm run dev`, `npm run preview`, or Playwright preview.
+
+`tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell. It does not change shipping behavior.
+
+The Tauri shell is not the shipping runtime until the gate in [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md) is satisfied. Qt remains the production runtime during the migration.
 
 `npm run clean` removes generated native build output and packaged release folders.
 

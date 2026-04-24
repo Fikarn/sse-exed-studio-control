@@ -1,0 +1,1846 @@
+{
+  "setup-required": {
+    "appSnapshot": {
+      "runtime": {
+        "protocol": "1",
+        "engineVersion": "0.1.0",
+        "controlSurface": {
+          "available": true,
+          "status": "attention",
+          "summary": "Companion bridge available but setup incomplete."
+        }
+      },
+      "shell": {
+        "workspace": "setup",
+        "window": {
+          "mode": "fullscreen"
+        },
+        "summary": "Commissioning required before operator mode."
+      },
+      "commissioning": {
+        "hasCompletedSetup": false,
+        "runnerStage": "import",
+        "stage": "setup-required",
+        "hardwareProfile": "Studio workstation",
+        "summary": "Setup required to unlock lighting and audio."
+      },
+      "startup": {
+        "targetSurface": "setup",
+        "operatorUiAllowed": false
+      },
+      "summary": "Setup required."
+    },
+    "healthSnapshot": {
+      "status": "attention",
+      "startupPhase": "waiting-for-app-snapshot",
+      "summary": "Storage healthy. Operator mode locked pending setup.",
+      "checks": {
+        "lighting": { "status": "attention", "summary": "Bridge not commissioned." },
+        "audio": { "status": "attention", "summary": "Console not commissioned." },
+        "controlSurface": { "status": "ok", "summary": "Bridge reachable." }
+      }
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": false,
+      "runnerStage": "import",
+      "stage": "setup-required",
+      "summary": "Complete commissioning to unlock operator mode.",
+      "checks": [
+        { "label": "Lighting bridge", "status": "attention", "detail": "Universe not confirmed." },
+        { "label": "Audio console", "status": "attention", "detail": "Connection not verified." },
+        { "label": "Control surface", "status": "ok", "detail": "Companion bridge available." }
+      ]
+    },
+    "supportSnapshot": {
+      "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
+      "backupCount": 0,
+      "latestBackupPath": null,
+      "restoreSummary": "Restore from a native support archive or a legacy db.json export.",
+      "backups": [],
+      "summary": "No backup exported yet.",
+      "recentBackups": []
+    }
+  },
+  "setup-ready": {
+    "appSnapshot": {
+      "runtime": {
+        "protocol": "1",
+        "engineVersion": "0.1.0",
+        "controlSurface": {
+          "available": true,
+          "status": "ok",
+          "summary": "Companion bridge ready."
+        }
+      },
+      "shell": {
+        "workspace": "setup",
+        "window": {
+          "mode": "fullscreen"
+        },
+        "summary": "Operator surface ready."
+      },
+      "commissioning": {
+        "hasCompletedSetup": true,
+        "runnerStage": "publish",
+        "stage": "ready",
+        "hardwareProfile": "Studio workstation",
+        "summary": "Commissioning complete."
+      },
+      "startup": {
+        "targetSurface": "setup",
+        "operatorUiAllowed": true
+      },
+      "summary": "Setup ready."
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "startupPhase": "ready",
+      "summary": "System healthy and ready.",
+      "checks": {
+        "lighting": { "status": "ok", "summary": "DMX bridge online." },
+        "audio": { "status": "ok", "summary": "OSC connection synchronized." },
+        "controlSurface": { "status": "ok", "summary": "Companion bridge responding." }
+      }
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "runnerStage": "publish",
+      "stage": "ready",
+      "summary": "Commissioning complete and operator mode unlocked.",
+      "checks": [
+        { "label": "Lighting bridge", "status": "ok", "detail": "Universe 1 responding." },
+        { "label": "Audio console", "status": "ok", "detail": "OSC sync healthy." },
+        { "label": "Control surface", "status": "ok", "detail": "Profile export current." }
+      ]
+    },
+    "supportSnapshot": {
+      "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
+      "backupCount": 1,
+      "latestBackupPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
+      "restoreSummary": "Restore from a native support archive or a legacy db.json export.",
+      "backups": [
+        {
+          "name": "native-backup-2026-04-22T07-12-00.000Z.json",
+          "path": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
+          "sizeBytes": 4096,
+          "modifiedAt": 1776841920000
+        }
+      ],
+      "summary": "Latest backup exported this morning.",
+      "recentBackups": ["2026-04-22T07:12:00.000Z"]
+    }
+  },
+  "setup-degraded": {
+    "appSnapshot": {
+      "runtime": {
+        "protocol": "1",
+        "engineVersion": "0.1.0",
+        "controlSurface": {
+          "available": true,
+          "status": "attention",
+          "summary": "Companion bridge responding but the deck export is stale."
+        }
+      },
+      "shell": {
+        "workspace": "setup",
+        "window": {
+          "mode": "fullscreen"
+        },
+        "summary": "Operator surface ready with degraded adapters."
+      },
+      "commissioning": {
+        "hasCompletedSetup": true,
+        "runnerStage": "publish",
+        "stage": "ready",
+        "hardwareProfile": "Studio workstation",
+        "summary": "Commissioning complete."
+      },
+      "startup": {
+        "targetSurface": "dashboard",
+        "operatorUiAllowed": true
+      },
+      "summary": "Setup ready with degraded hardware posture."
+    },
+    "healthSnapshot": {
+      "status": "attention",
+      "startupPhase": "ready",
+      "summary": "Operator mode is available, but lighting and control-surface support need attention.",
+      "details": {
+        "lighting": "DMX bridge answered, but the configured universe changed after the last verification pass.",
+        "controlSurface": "Companion export is older than the last planning seed."
+      },
+      "recentLogExcerpt": [
+        "[WARN] Lighting bridge changed universe after commissioning.",
+        "[WARN] Companion profile export is older than the current planning data."
+      ],
+      "checks": {
+        "lighting": { "status": "attention", "summary": "DMX bridge needs re-verification." },
+        "audio": { "status": "ok", "summary": "OSC connection synchronized." },
+        "controlSurface": { "status": "attention", "summary": "Companion export stale." }
+      }
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "runnerStage": "publish",
+      "stage": "ready",
+      "summary": "Commissioning complete and operator mode unlocked.",
+      "checks": [
+        { "label": "Lighting bridge", "status": "attention", "detail": "Universe changed after verification." },
+        { "label": "Audio console", "status": "ok", "detail": "OSC sync healthy." },
+        { "label": "Control surface", "status": "attention", "detail": "Companion export is stale." }
+      ]
+    },
+    "supportSnapshot": {
+      "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
+      "backupCount": 1,
+      "latestBackupPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
+      "restoreSummary": "Restore from a native support archive or a legacy db.json export.",
+      "backups": [
+        {
+          "name": "native-backup-2026-04-22T07-12-00.000Z.json",
+          "path": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
+          "sizeBytes": 4096,
+          "modifiedAt": 1776841920000
+        }
+      ],
+      "summary": "Latest backup exported before the degraded change.",
+      "recentBackups": ["2026-04-22T07:12:00.000Z"]
+    }
+  },
+  "startup-loading": {
+    "startupDelayMs": 600000,
+    "appSnapshot": {
+      "shell": { "workspace": "setup" },
+      "summary": "Starting replacement shell."
+    }
+  },
+  "protocol-mismatch": {
+    "startupFailure": {
+      "stage": "protocol-negotiation",
+      "code": "PROTOCOL_MISMATCH",
+      "message": "Shell expected protocol 1 but engine reported 2.",
+      "requestedProtocol": "1",
+      "supportedProtocol": "2",
+      "paths": {
+        "appDataDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control",
+        "logsDir": "/Users/operator/Library/Logs/SSE ExEd Studio Control",
+        "logFilePath": "/Users/operator/Library/Logs/SSE ExEd Studio Control/studio-control.log",
+        "dbPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/studio-control.sqlite3",
+        "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
+        "updateRepositoryPath": "/Users/operator/Downloads/SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"
+      }
+    }
+  },
+  "bootstrap-failed": {
+    "healthSnapshot": {
+      "status": "error",
+      "summary": "Storage bootstrap failed before the shell could route to operator mode.",
+      "details": {
+        "storage": "SQLite integrity check returned corruption in the primary database file.",
+        "support": "Use the support backup directory to recover a known-good archive."
+      },
+      "recentLogExcerpt": [
+        "[ERROR] pragma integrity_check returned corruption.",
+        "[INFO] Startup aborted before app snapshot."
+      ]
+    },
+    "startupFailure": {
+      "stage": "bootstrap",
+      "code": "BOOTSTRAP_FAILED",
+      "message": "Database integrity check failed during startup.",
+      "paths": {
+        "appDataDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control",
+        "logsDir": "/Users/operator/Library/Logs/SSE ExEd Studio Control",
+        "logFilePath": "/Users/operator/Library/Logs/SSE ExEd Studio Control/studio-control.log",
+        "dbPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/studio-control.sqlite3",
+        "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
+        "updateRepositoryPath": "/Users/operator/Downloads/SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"
+      }
+    }
+  },
+  "lighting-populated": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "lighting",
+        "lighting": {
+          "currentSectionId": null,
+          "selectedCueId": "cue-opening"
+        }
+      },
+      "summary": "Lighting workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Lighting bridge online."
+    },
+    "lightingSnapshot": {
+      "status": "ready",
+      "summary": "Lighting snapshot active.",
+      "adapterMode": "simulated-dmx",
+      "bridgeIp": "192.168.1.80",
+      "universe": 1,
+      "enabled": true,
+      "grandMaster": 100,
+      "connected": true,
+      "reachable": true,
+      "lastActionStatus": "ok",
+      "selectedFixtureId": "fixture-key",
+      "selectedSceneId": "scene-warm-wash",
+      "activeCueId": "cue-opening",
+      "cameraMarker": { "x": 0.16, "y": 0.84, "rotation": 12 },
+      "subjectMarker": { "x": 0.5, "y": 0.54, "rotation": 180 },
+      "fixtures": [
+        {
+          "id": "fixture-key",
+          "name": "Key",
+          "type": "Astra",
+          "dmxStartAddress": 1,
+          "kind": "area",
+          "groupId": "group-front",
+          "spatialX": 0.24,
+          "spatialY": 0.26,
+          "spatialRotation": 0,
+          "rigZ": 4.2,
+          "beamAngleDegrees": 38,
+          "on": true,
+          "intensity": 76,
+          "cct": 3200
+        },
+        {
+          "id": "fixture-fill",
+          "name": "Fill",
+          "type": "Astra",
+          "dmxStartAddress": 21,
+          "kind": "area",
+          "groupId": "group-front",
+          "spatialX": 0.74,
+          "spatialY": 0.28,
+          "spatialRotation": 0,
+          "rigZ": null,
+          "beamAngleDegrees": null,
+          "on": true,
+          "intensity": 58,
+          "cct": 4300
+        },
+        {
+          "id": "fixture-back",
+          "name": "Back",
+          "type": "Infinibar",
+          "dmxStartAddress": 41,
+          "kind": "beam",
+          "groupId": "group-back",
+          "spatialX": 0.5,
+          "spatialY": 0.62,
+          "spatialRotation": 180,
+          "rigZ": null,
+          "beamAngleDegrees": null,
+          "on": false,
+          "intensity": 0,
+          "cct": 5600
+        },
+        {
+          "id": "fixture-kicker",
+          "name": "Warm wash",
+          "type": "Apollo Bridge",
+          "dmxStartAddress": 61,
+          "kind": "wash",
+          "groupId": "group-back",
+          "spatialX": 0.82,
+          "spatialY": 0.62,
+          "spatialRotation": 215,
+          "rigZ": null,
+          "beamAngleDegrees": null,
+          "on": true,
+          "intensity": 64,
+          "cct": 3000
+        }
+      ],
+      "groups": [
+        { "id": "group-front", "name": "Front", "fixtureCount": 2 },
+        { "id": "group-back", "name": "Back", "fixtureCount": 2 }
+      ],
+      "scenes": [
+        {
+          "id": "scene-warm-wash",
+          "name": "Warm wash",
+          "fixtureCount": 4,
+          "fixtureStates": [
+            { "fixtureId": "fixture-key", "intensity": 76, "cct": 3200, "on": true },
+            { "fixtureId": "fixture-fill", "intensity": 58, "cct": 4300, "on": true },
+            { "fixtureId": "fixture-back", "intensity": 0, "cct": 5600, "on": false },
+            { "fixtureId": "fixture-kicker", "intensity": 64, "cct": 3000, "on": true }
+          ],
+          "lastRecalled": true,
+          "lastRecalledAt": "2026-04-22T11:42:00.000Z"
+        },
+        {
+          "id": "scene-interview",
+          "name": "Interview",
+          "fixtureCount": 4,
+          "fixtureStates": [
+            { "fixtureId": "fixture-key", "intensity": 92, "cct": 4400, "on": true },
+            { "fixtureId": "fixture-fill", "intensity": 46, "cct": 4300, "on": true },
+            { "fixtureId": "fixture-back", "intensity": 18, "cct": 5600, "on": true },
+            { "fixtureId": "fixture-kicker", "intensity": 52, "cct": 3200, "on": true }
+          ],
+          "lastRecalled": false,
+          "lastRecalledAt": null
+        }
+      ],
+      "cues": [
+        {
+          "id": "cue-opening",
+          "ordinal": 1,
+          "label": "Opening look",
+          "sceneId": "scene-warm-wash",
+          "fadeInMs": 1200,
+          "fadeOutMs": 600,
+          "followSeconds": null,
+          "notes": "Hold for mic check.",
+          "state": "active"
+        },
+        {
+          "id": "cue-interview",
+          "ordinal": 2,
+          "label": "Interview look",
+          "sceneId": "scene-interview",
+          "fadeInMs": 1500,
+          "fadeOutMs": 800,
+          "followSeconds": null,
+          "notes": null,
+          "state": "pending"
+        }
+      ]
+    }
+  },
+  "lighting-patch-overlap": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "lighting",
+        "lighting": {
+          "currentSectionId": null,
+          "selectedCueId": "cue-opening"
+        }
+      },
+      "summary": "Lighting workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Lighting bridge online."
+    },
+    "lightingSnapshot": {
+      "status": "ready",
+      "summary": "Lighting snapshot active with patch overlap.",
+      "adapterMode": "simulated-dmx",
+      "bridgeIp": "192.168.1.80",
+      "universe": 1,
+      "enabled": true,
+      "grandMaster": 100,
+      "connected": true,
+      "reachable": true,
+      "lastActionStatus": "warning",
+      "selectedFixtureId": "fixture-back",
+      "selectedSceneId": "scene-warm-wash",
+      "activeCueId": "cue-opening",
+      "fixtures": [
+        {
+          "id": "fixture-key",
+          "name": "Key",
+          "type": "Astra",
+          "dmxStartAddress": 1,
+          "kind": "area",
+          "groupId": "group-front",
+          "spatialX": 0.24,
+          "spatialY": 0.26,
+          "spatialRotation": 0,
+          "on": true,
+          "intensity": 76,
+          "cct": 3200
+        },
+        {
+          "id": "fixture-fill",
+          "name": "Fill",
+          "type": "Astra",
+          "dmxStartAddress": 21,
+          "kind": "area",
+          "groupId": "group-front",
+          "spatialX": 0.74,
+          "spatialY": 0.28,
+          "spatialRotation": 0,
+          "on": true,
+          "intensity": 58,
+          "cct": 4300
+        },
+        {
+          "id": "fixture-back",
+          "name": "Back",
+          "type": "Infinibar",
+          "dmxStartAddress": 2,
+          "kind": "beam",
+          "groupId": "group-back",
+          "spatialX": 0.5,
+          "spatialY": 0.62,
+          "spatialRotation": 180,
+          "on": false,
+          "intensity": 0,
+          "cct": 5600
+        },
+        {
+          "id": "fixture-kicker",
+          "name": "Warm wash",
+          "type": "Apollo Bridge",
+          "dmxStartAddress": 61,
+          "kind": "wash",
+          "groupId": "group-back",
+          "spatialX": 0.82,
+          "spatialY": 0.62,
+          "spatialRotation": 215,
+          "on": true,
+          "intensity": 64,
+          "cct": 3000
+        }
+      ],
+      "groups": [
+        { "id": "group-front", "name": "Front", "fixtureCount": 2 },
+        { "id": "group-back", "name": "Back", "fixtureCount": 2 }
+      ],
+      "scenes": [
+        {
+          "id": "scene-warm-wash",
+          "name": "Warm wash",
+          "fixtureCount": 4,
+          "fixtureStates": [
+            { "fixtureId": "fixture-key", "intensity": 76, "cct": 3200, "on": true },
+            { "fixtureId": "fixture-fill", "intensity": 58, "cct": 4300, "on": true },
+            { "fixtureId": "fixture-back", "intensity": 0, "cct": 5600, "on": false },
+            { "fixtureId": "fixture-kicker", "intensity": 64, "cct": 3000, "on": true }
+          ],
+          "lastRecalled": true,
+          "lastRecalledAt": "2026-04-22T11:42:00.000Z"
+        },
+        {
+          "id": "scene-interview",
+          "name": "Interview",
+          "fixtureCount": 4,
+          "fixtureStates": [
+            { "fixtureId": "fixture-key", "intensity": 92, "cct": 4400, "on": true },
+            { "fixtureId": "fixture-fill", "intensity": 46, "cct": 4300, "on": true },
+            { "fixtureId": "fixture-back", "intensity": 18, "cct": 5600, "on": true },
+            { "fixtureId": "fixture-kicker", "intensity": 52, "cct": 3200, "on": true }
+          ],
+          "lastRecalled": false,
+          "lastRecalledAt": null
+        }
+      ],
+      "cues": [
+        {
+          "id": "cue-opening",
+          "ordinal": 1,
+          "label": "Opening look",
+          "sceneId": "scene-warm-wash",
+          "fadeInMs": 1200,
+          "fadeOutMs": 600,
+          "followSeconds": null,
+          "notes": "Hold for mic check.",
+          "state": "active"
+        },
+        {
+          "id": "cue-interview",
+          "ordinal": 2,
+          "label": "Interview look",
+          "sceneId": "scene-interview",
+          "fadeInMs": 1500,
+          "fadeOutMs": 800,
+          "followSeconds": null,
+          "notes": null,
+          "state": "pending"
+        }
+      ]
+    }
+  },
+  "lighting-loading": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "lighting",
+        "lighting": {
+          "currentSectionId": null,
+          "selectedCueId": null
+        }
+      },
+      "summary": "Lighting workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Lighting bridge online."
+    },
+    "lightingSnapshot": {
+      "lightingSnapshotLoaded": false,
+      "status": "loading",
+      "summary": "Loading lighting snapshot.",
+      "adapterMode": "simulated-dmx",
+      "bridgeIp": "192.168.1.80",
+      "universe": 1,
+      "enabled": true,
+      "connected": true,
+      "reachable": true,
+      "fixtures": [],
+      "groups": [],
+      "scenes": [],
+      "cues": []
+    }
+  },
+  "lighting-empty": {
+    "appSnapshot": {
+      "shell": { "workspace": "lighting" },
+      "summary": "Lighting workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Lighting bridge online."
+    },
+    "lightingSnapshot": {
+      "status": "ready",
+      "summary": "No fixtures are patched yet.",
+      "adapterMode": "simulated-dmx",
+      "bridgeIp": "192.168.1.80",
+      "universe": 1,
+      "enabled": true,
+      "grandMaster": 100,
+      "connected": true,
+      "reachable": true,
+      "lastActionStatus": "ok",
+      "selectedFixtureId": null,
+      "selectedSceneId": null,
+      "activeCueId": null,
+      "fixtures": [],
+      "groups": [],
+      "scenes": [],
+      "cues": []
+    }
+  },
+  "lighting-dmx-unreachable": {
+    "appSnapshot": {
+      "shell": { "workspace": "lighting" },
+      "summary": "Lighting workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "attention",
+      "summary": "DMX link lost."
+    },
+    "lightingSnapshot": {
+      "status": "ready",
+      "summary": "Lighting transport lost.",
+      "adapterMode": "simulated-dmx",
+      "bridgeIp": "192.168.1.80",
+      "universe": 1,
+      "enabled": true,
+      "grandMaster": 100,
+      "connected": true,
+      "reachable": false,
+      "lastActionStatus": "error",
+      "selectedFixtureId": "fixture-key",
+      "selectedSceneId": "scene-warm-wash",
+      "activeCueId": "cue-opening",
+      "fixtures": [
+        {
+          "id": "fixture-key",
+          "name": "Key",
+          "type": "Astra",
+          "dmxStartAddress": 1,
+          "kind": "area",
+          "groupId": "group-front",
+          "spatialX": 0.24,
+          "spatialY": 0.26,
+          "spatialRotation": 0,
+          "on": true,
+          "intensity": 76,
+          "cct": 3200
+        },
+        {
+          "id": "fixture-fill",
+          "name": "Fill",
+          "type": "Astra",
+          "dmxStartAddress": 21,
+          "kind": "area",
+          "groupId": "group-front",
+          "spatialX": 0.74,
+          "spatialY": 0.28,
+          "spatialRotation": 0,
+          "on": true,
+          "intensity": 58,
+          "cct": 4300
+        },
+        {
+          "id": "fixture-back",
+          "name": "Back",
+          "type": "Infinibar",
+          "dmxStartAddress": 41,
+          "kind": "beam",
+          "groupId": "group-back",
+          "spatialX": 0.5,
+          "spatialY": 0.62,
+          "spatialRotation": 180,
+          "on": false,
+          "intensity": 0,
+          "cct": 5600
+        },
+        {
+          "id": "fixture-kicker",
+          "name": "Warm wash",
+          "type": "Apollo Bridge",
+          "dmxStartAddress": 61,
+          "kind": "wash",
+          "groupId": "group-back",
+          "spatialX": 0.82,
+          "spatialY": 0.62,
+          "spatialRotation": 215,
+          "on": true,
+          "intensity": 64,
+          "cct": 3000
+        }
+      ],
+      "groups": [
+        { "id": "group-front", "name": "Front", "fixtureCount": 2 },
+        { "id": "group-back", "name": "Back", "fixtureCount": 2 }
+      ],
+      "scenes": [
+        {
+          "id": "scene-warm-wash",
+          "name": "Warm wash",
+          "fixtureCount": 4,
+          "fixtureStates": [
+            { "fixtureId": "fixture-key", "intensity": 76, "cct": 3200, "on": true },
+            { "fixtureId": "fixture-fill", "intensity": 58, "cct": 4300, "on": true },
+            { "fixtureId": "fixture-back", "intensity": 0, "cct": 5600, "on": false },
+            { "fixtureId": "fixture-kicker", "intensity": 64, "cct": 3000, "on": true }
+          ],
+          "lastRecalled": true,
+          "lastRecalledAt": "2026-04-22T11:42:00.000Z"
+        },
+        {
+          "id": "scene-interview",
+          "name": "Interview",
+          "fixtureCount": 4,
+          "fixtureStates": [
+            { "fixtureId": "fixture-key", "intensity": 92, "cct": 4400, "on": true },
+            { "fixtureId": "fixture-fill", "intensity": 46, "cct": 4300, "on": true },
+            { "fixtureId": "fixture-back", "intensity": 18, "cct": 5600, "on": true },
+            { "fixtureId": "fixture-kicker", "intensity": 52, "cct": 3200, "on": true }
+          ],
+          "lastRecalled": false,
+          "lastRecalledAt": null
+        }
+      ],
+      "cues": [
+        {
+          "id": "cue-opening",
+          "ordinal": 1,
+          "label": "Opening look",
+          "sceneId": "scene-warm-wash",
+          "fadeInMs": 1200,
+          "fadeOutMs": 600,
+          "followSeconds": null,
+          "notes": "Hold for mic check.",
+          "state": "active"
+        },
+        {
+          "id": "cue-interview",
+          "ordinal": 2,
+          "label": "Interview look",
+          "sceneId": "scene-interview",
+          "fadeInMs": 1500,
+          "fadeOutMs": 800,
+          "followSeconds": null,
+          "notes": null,
+          "state": "pending"
+        }
+      ]
+    }
+  },
+  "audio-populated": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded"
+    }
+  },
+  "audio-ready-overview": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded"
+    }
+  },
+  "audio-state-assumed": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "assumed",
+      "lastActionMessage": "Recalled Show open",
+      "lastActionStatus": "succeeded"
+    }
+  },
+  "audio-not-verified": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "idle",
+          "message": "Not run yet."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "unknown",
+      "lastConsoleSyncAt": null,
+      "lastConsoleSyncReason": null,
+      "lastActionMessage": null,
+      "lastActionStatus": "idle"
+    }
+  },
+  "audio-osc-disabled": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "unknown",
+      "lastConsoleSyncAt": null,
+      "lastConsoleSyncReason": null,
+      "lastActionMessage": null,
+      "lastActionStatus": "idle",
+      "oscEnabled": false
+    }
+  },
+  "audio-offline": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "failed",
+          "message": "Console did not answer OSC ping."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "assumed",
+      "lastActionCode": "AUDIO_SYNC_FAILED",
+      "lastActionMessage": "Console did not answer OSC ping.",
+      "lastActionStatus": "failed"
+    }
+  },
+  "audio-action-failed": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionCode": "AUDIO_SNAPSHOT_RECALL_FAILED",
+      "lastActionMessage": "Snapshot slot 3 did not match the current console layout.",
+      "lastActionStatus": "failed"
+    }
+  },
+  "audio-selected-channel": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded",
+      "selectedChannelId": "audio-playback-3-4"
+    }
+  },
+  "audio-loading": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": null
+  },
+  "audio-1920-fallback": {
+    "appSnapshot": {
+      "shell": { "workspace": "audio" },
+      "summary": "Audio workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded"
+    }
+  },
+  "planning-populated": {
+    "appSnapshot": {
+      "shell": { "workspace": "planning" },
+      "summary": "Planning timeline active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Planning state synchronized."
+    },
+    "planningSnapshot": {
+      "projects": [
+        {
+          "id": "proj-evening-service",
+          "title": "evening_service",
+          "description": "Tuesday evening run-of-show.",
+          "status": "todo",
+          "priority": "p1",
+          "createdAt": "2026-04-23T08:00:00+02:00",
+          "lastUpdated": "2026-04-23T19:12:00+02:00",
+          "order": 1
+        },
+        {
+          "id": "proj-booth-2",
+          "title": "booth_2",
+          "description": "Secondary booth deck commissioning.",
+          "status": "in-progress",
+          "priority": "p1",
+          "createdAt": "2026-04-23T08:10:00+02:00",
+          "lastUpdated": "2026-04-23T19:24:00+02:00",
+          "order": 2
+        },
+        {
+          "id": "proj-audio",
+          "title": "audio",
+          "description": "Audio desk prep and tuning.",
+          "status": "in-progress",
+          "priority": "p1",
+          "createdAt": "2026-04-23T08:20:00+02:00",
+          "lastUpdated": "2026-04-23T19:18:00+02:00",
+          "order": 3
+        },
+        {
+          "id": "proj-lighting",
+          "title": "lighting",
+          "description": "Lighting fixes waiting on ops.",
+          "status": "blocked",
+          "priority": "p0",
+          "createdAt": "2026-04-23T08:30:00+02:00",
+          "lastUpdated": "2026-04-23T18:52:00+02:00",
+          "order": 4
+        },
+        {
+          "id": "proj-ops",
+          "title": "ops",
+          "description": "Shared operator maintenance.",
+          "status": "todo",
+          "priority": "p2",
+          "createdAt": "2026-04-23T08:40:00+02:00",
+          "lastUpdated": "2026-04-23T16:06:00+02:00",
+          "order": 5
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task-import-profile",
+          "projectId": "proj-evening-service",
+          "title": "Import companion profile",
+          "description": "",
+          "priority": "p2",
+          "dueDate": null,
+          "labels": ["setup"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 1200,
+          "lastStarted": null,
+          "completed": true,
+          "order": 1,
+          "createdAt": "2026-04-23T09:05:00+02:00",
+          "scheduledStart": "2026-04-23T09:30:00+02:00",
+          "scheduledDurationSeconds": 1200
+        },
+        {
+          "id": "task-probe-hardware",
+          "projectId": "proj-evening-service",
+          "title": "Probe hardware · DMX/OSC",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["setup"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 2100,
+          "lastStarted": null,
+          "completed": true,
+          "order": 2,
+          "createdAt": "2026-04-23T09:50:00+02:00",
+          "scheduledStart": "2026-04-23T10:15:00+02:00",
+          "scheduledDurationSeconds": 2100
+        },
+        {
+          "id": "task-house-light",
+          "projectId": "proj-evening-service",
+          "title": "House-light scene \"preshow\"",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["lighting"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 2100,
+          "lastStarted": null,
+          "completed": true,
+          "order": 3,
+          "createdAt": "2026-04-23T16:00:00+02:00",
+          "scheduledStart": "2026-04-23T16:35:00+02:00",
+          "scheduledDurationSeconds": 2100
+        },
+        {
+          "id": "task-draft-run-of-show",
+          "projectId": "proj-evening-service",
+          "title": "Draft run-of-show · Tue",
+          "description": "",
+          "priority": "p0",
+          "dueDate": null,
+          "labels": ["planning"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 0,
+          "lastStarted": null,
+          "completed": false,
+          "order": 4,
+          "createdAt": "2026-04-23T18:00:00+02:00",
+          "scheduledStart": "2026-04-23T20:30:00+02:00",
+          "scheduledDurationSeconds": 7200
+        },
+        {
+          "id": "task-verify-osc",
+          "projectId": "proj-booth-2",
+          "title": "Verify OSC bindings",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["audio"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 1080,
+          "lastStarted": null,
+          "completed": true,
+          "order": 1,
+          "createdAt": "2026-04-23T16:00:00+02:00",
+          "scheduledStart": "2026-04-23T16:24:00+02:00",
+          "scheduledDurationSeconds": 1080
+        },
+        {
+          "id": "task-commission-streamdeck",
+          "projectId": "proj-booth-2",
+          "title": "Commission Stream Deck+ · Booth 2",
+          "description": "",
+          "priority": "p0",
+          "dueDate": null,
+          "labels": ["control-surface"],
+          "checklist": [
+            { "id": "chk-streamdeck-page", "text": "Pair Booth 2 page", "done": true },
+            { "id": "chk-streamdeck-handoff", "text": "Verify companion trigger handoff", "done": false }
+          ],
+          "isRunning": true,
+          "totalSeconds": 4680,
+          "lastStarted": "2026-04-23T18:24:00+02:00",
+          "completed": false,
+          "order": 2,
+          "createdAt": "2026-04-23T18:10:00+02:00",
+          "scheduledStart": "2026-04-23T18:24:00+02:00",
+          "scheduledDurationSeconds": 5100
+        },
+        {
+          "id": "task-level-match",
+          "projectId": "proj-audio",
+          "title": "Level-match overflow",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["audio"],
+          "checklist": [],
+          "isRunning": true,
+          "totalSeconds": 2520,
+          "lastStarted": "2026-04-23T19:00:00+02:00",
+          "completed": false,
+          "order": 1,
+          "createdAt": "2026-04-23T18:45:00+02:00",
+          "scheduledStart": "2026-04-23T19:00:00+02:00",
+          "scheduledDurationSeconds": 5400
+        },
+        {
+          "id": "task-dmx-splitter",
+          "projectId": "proj-lighting",
+          "title": "DMX splitter · stage right",
+          "description": "",
+          "priority": "p0",
+          "dueDate": null,
+          "labels": ["lighting"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 0,
+          "lastStarted": null,
+          "completed": false,
+          "order": 1,
+          "createdAt": "2026-04-23T16:45:00+02:00",
+          "scheduledStart": "2026-04-23T17:00:00+02:00",
+          "scheduledDurationSeconds": 10800
+        },
+        {
+          "id": "task-save-backup",
+          "projectId": "proj-ops",
+          "title": "Save backup · pre-service",
+          "description": "",
+          "priority": "p2",
+          "dueDate": null,
+          "labels": ["support"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 240,
+          "lastStarted": null,
+          "completed": true,
+          "order": 1,
+          "createdAt": "2026-04-23T15:50:00+02:00",
+          "scheduledStart": "2026-04-23T16:02:00+02:00",
+          "scheduledDurationSeconds": 240
+        },
+        {
+          "id": "task-archive-cues",
+          "projectId": "proj-ops",
+          "title": "Archive Q3 cue library",
+          "description": "",
+          "priority": "p3",
+          "dueDate": null,
+          "labels": ["support"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 0,
+          "lastStarted": null,
+          "completed": false,
+          "order": 2,
+          "createdAt": "2026-04-23T10:30:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        }
+      ],
+      "activityLog": [
+        {
+          "id": "planning-activity-1",
+          "timestamp": "2026-04-23T18:24:00+02:00",
+          "entityType": "task",
+          "entityId": "task-commission-streamdeck",
+          "action": "timer-started",
+          "detail": "Stream Deck+ booth commissioning resumed."
+        },
+        {
+          "id": "planning-activity-2",
+          "timestamp": "2026-04-23T19:00:00+02:00",
+          "entityType": "task",
+          "entityId": "task-level-match",
+          "action": "timer-started",
+          "detail": "Audio level-matching is in progress."
+        }
+      ],
+      "settings": {
+        "viewFilter": "all",
+        "sortBy": "manual",
+        "dashboardView": "kanban",
+        "deckMode": "project",
+        "modeSection": "timeline",
+        "timelineStartHour": 9,
+        "timelineEndHour": 22,
+        "selectedProjectId": "proj-booth-2",
+        "selectedTaskId": "task-commission-streamdeck"
+      }
+    }
+  },
+  "planning-all-unscheduled": {
+    "appSnapshot": {
+      "shell": { "workspace": "planning" },
+      "summary": "Planning timeline active. All tasks start unscheduled."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Planning state synchronized."
+    },
+    "planningSnapshot": {
+      "projects": [
+        {
+          "id": "proj-evening-service",
+          "title": "evening_service",
+          "description": "Tuesday evening run-of-show.",
+          "status": "todo",
+          "priority": "p1",
+          "createdAt": "2026-04-23T08:00:00+02:00",
+          "lastUpdated": "2026-04-23T19:12:00+02:00",
+          "order": 1
+        },
+        {
+          "id": "proj-booth-2",
+          "title": "booth_2",
+          "description": "Secondary booth deck commissioning.",
+          "status": "in-progress",
+          "priority": "p1",
+          "createdAt": "2026-04-23T08:10:00+02:00",
+          "lastUpdated": "2026-04-23T19:24:00+02:00",
+          "order": 2
+        },
+        {
+          "id": "proj-audio",
+          "title": "audio",
+          "description": "Audio desk prep and tuning.",
+          "status": "in-progress",
+          "priority": "p1",
+          "createdAt": "2026-04-23T08:20:00+02:00",
+          "lastUpdated": "2026-04-23T19:18:00+02:00",
+          "order": 3
+        },
+        {
+          "id": "proj-lighting",
+          "title": "lighting",
+          "description": "Lighting fixes waiting on ops.",
+          "status": "blocked",
+          "priority": "p0",
+          "createdAt": "2026-04-23T08:30:00+02:00",
+          "lastUpdated": "2026-04-23T18:52:00+02:00",
+          "order": 4
+        },
+        {
+          "id": "proj-ops",
+          "title": "ops",
+          "description": "Shared operator maintenance.",
+          "status": "todo",
+          "priority": "p2",
+          "createdAt": "2026-04-23T08:40:00+02:00",
+          "lastUpdated": "2026-04-23T16:06:00+02:00",
+          "order": 5
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task-import-profile",
+          "projectId": "proj-evening-service",
+          "title": "Import companion profile",
+          "description": "",
+          "priority": "p2",
+          "dueDate": null,
+          "labels": ["setup"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 1200,
+          "lastStarted": null,
+          "completed": true,
+          "order": 1,
+          "createdAt": "2026-04-23T09:05:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-probe-hardware",
+          "projectId": "proj-evening-service",
+          "title": "Probe hardware · DMX/OSC",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["setup"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 2100,
+          "lastStarted": null,
+          "completed": true,
+          "order": 2,
+          "createdAt": "2026-04-23T09:50:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-house-light",
+          "projectId": "proj-evening-service",
+          "title": "House-light scene \"preshow\"",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["lighting"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 2100,
+          "lastStarted": null,
+          "completed": true,
+          "order": 3,
+          "createdAt": "2026-04-23T16:00:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-draft-run-of-show",
+          "projectId": "proj-evening-service",
+          "title": "Draft run-of-show · Tue",
+          "description": "",
+          "priority": "p0",
+          "dueDate": null,
+          "labels": ["planning"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 0,
+          "lastStarted": null,
+          "completed": false,
+          "order": 4,
+          "createdAt": "2026-04-23T18:00:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-verify-osc",
+          "projectId": "proj-booth-2",
+          "title": "Verify OSC bindings",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["audio"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 1080,
+          "lastStarted": null,
+          "completed": true,
+          "order": 1,
+          "createdAt": "2026-04-23T16:00:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-commission-streamdeck",
+          "projectId": "proj-booth-2",
+          "title": "Commission Stream Deck+ · Booth 2",
+          "description": "",
+          "priority": "p0",
+          "dueDate": null,
+          "labels": ["control-surface"],
+          "checklist": [
+            { "id": "chk-streamdeck-page", "text": "Pair Booth 2 page", "done": true },
+            { "id": "chk-streamdeck-handoff", "text": "Verify companion trigger handoff", "done": false }
+          ],
+          "isRunning": true,
+          "totalSeconds": 4680,
+          "lastStarted": "2026-04-23T18:24:00+02:00",
+          "completed": false,
+          "order": 2,
+          "createdAt": "2026-04-23T18:10:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-level-match",
+          "projectId": "proj-audio",
+          "title": "Level-match overflow",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["audio"],
+          "checklist": [],
+          "isRunning": true,
+          "totalSeconds": 2520,
+          "lastStarted": "2026-04-23T19:00:00+02:00",
+          "completed": false,
+          "order": 1,
+          "createdAt": "2026-04-23T18:45:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-dmx-splitter",
+          "projectId": "proj-lighting",
+          "title": "DMX splitter · stage right",
+          "description": "",
+          "priority": "p0",
+          "dueDate": null,
+          "labels": ["lighting"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 0,
+          "lastStarted": null,
+          "completed": false,
+          "order": 1,
+          "createdAt": "2026-04-23T16:45:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-save-backup",
+          "projectId": "proj-ops",
+          "title": "Save backup · pre-service",
+          "description": "",
+          "priority": "p2",
+          "dueDate": null,
+          "labels": ["support"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 240,
+          "lastStarted": null,
+          "completed": true,
+          "order": 1,
+          "createdAt": "2026-04-23T15:50:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        },
+        {
+          "id": "task-archive-cues",
+          "projectId": "proj-ops",
+          "title": "Archive Q3 cue library",
+          "description": "",
+          "priority": "p3",
+          "dueDate": null,
+          "labels": ["support"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 0,
+          "lastStarted": null,
+          "completed": false,
+          "order": 2,
+          "createdAt": "2026-04-23T10:30:00+02:00",
+          "scheduledStart": null,
+          "scheduledDurationSeconds": null
+        }
+      ],
+      "activityLog": [
+        {
+          "id": "planning-activity-1",
+          "timestamp": "2026-04-23T18:24:00+02:00",
+          "entityType": "task",
+          "entityId": "task-commission-streamdeck",
+          "action": "timer-started",
+          "detail": "Stream Deck+ booth commissioning resumed."
+        },
+        {
+          "id": "planning-activity-2",
+          "timestamp": "2026-04-23T19:00:00+02:00",
+          "entityType": "task",
+          "entityId": "task-level-match",
+          "action": "timer-started",
+          "detail": "Audio level-matching is in progress."
+        }
+      ],
+      "settings": {
+        "viewFilter": "all",
+        "sortBy": "manual",
+        "dashboardView": "kanban",
+        "deckMode": "project",
+        "modeSection": "timeline",
+        "timelineStartHour": 9,
+        "timelineEndHour": 22,
+        "selectedProjectId": null,
+        "selectedTaskId": null
+      }
+    }
+  },
+  "planning-empty": {
+    "appSnapshot": {
+      "shell": { "workspace": "planning" },
+      "summary": "Planning ready for new work."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "No planning items yet."
+    },
+    "planningSnapshot": {
+      "projects": [],
+      "tasks": [],
+      "activityLog": [],
+      "settings": {
+        "viewFilter": "all",
+        "sortBy": "manual",
+        "dashboardView": "kanban",
+        "deckMode": "project",
+        "modeSection": "timeline",
+        "timelineStartHour": 9,
+        "timelineEndHour": 22,
+        "selectedProjectId": null,
+        "selectedTaskId": null
+      }
+    }
+  },
+  "planning-loading-board": {
+    "appSnapshot": {
+      "shell": { "workspace": "planning" },
+      "planning": {
+        "modeSection": "board",
+        "timelineStartHour": 9,
+        "timelineEndHour": 22
+      },
+      "summary": "Planning board snapshot is still loading."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Waiting for planning snapshot."
+    },
+    "planningSnapshot": null
+  },
+  "planning-overlap": {
+    "appSnapshot": {
+      "shell": { "workspace": "planning" },
+      "summary": "Planning timeline ready for overlap verification."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Planning overlap verification active."
+    },
+    "planningSnapshot": {
+      "projects": [
+        {
+          "id": "proj-overlap",
+          "title": "control_room",
+          "description": "Overlap verification lane.",
+          "status": "in-progress",
+          "priority": "p1",
+          "createdAt": "2026-04-23T08:00:00+02:00",
+          "lastUpdated": "2026-04-23T19:12:00+02:00",
+          "order": 1
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task-overlap-primary",
+          "projectId": "proj-overlap",
+          "title": "Program note runthrough",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["planning"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 1800,
+          "lastStarted": null,
+          "completed": false,
+          "order": 1,
+          "createdAt": "2026-04-23T17:30:00+02:00",
+          "scheduledStart": "2026-04-23T17:40:00+02:00",
+          "scheduledDurationSeconds": 1800
+        },
+        {
+          "id": "task-overlap-secondary",
+          "projectId": "proj-overlap",
+          "title": "Projector handoff",
+          "description": "",
+          "priority": "p1",
+          "dueDate": null,
+          "labels": ["ops"],
+          "checklist": [],
+          "isRunning": false,
+          "totalSeconds": 1800,
+          "lastStarted": null,
+          "completed": false,
+          "order": 2,
+          "createdAt": "2026-04-23T17:45:00+02:00",
+          "scheduledStart": "2026-04-23T18:10:00+02:00",
+          "scheduledDurationSeconds": 1800
+        }
+      ],
+      "activityLog": [],
+      "settings": {
+        "viewFilter": "all",
+        "sortBy": "manual",
+        "dashboardView": "kanban",
+        "deckMode": "project",
+        "modeSection": "timeline",
+        "timelineStartHour": 17,
+        "timelineEndHour": 20,
+        "selectedProjectId": "proj-overlap",
+        "selectedTaskId": "task-overlap-primary"
+      }
+    }
+  }
+}

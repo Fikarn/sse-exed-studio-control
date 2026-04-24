@@ -1,0 +1,17 @@
+{
+  "name": "@sse/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/generated/tokens.css"
+  },
+  "scripts": {
+    "build": "style-dictionary build --config ./style-dictionary.config.mjs",
+    "typecheck": "node ./src/validate-generated.mjs"
+  },
+  "devDependencies": {
+    "style-dictionary": "^4.1.0"
+  }
+}

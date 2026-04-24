@@ -1,0 +1,66 @@
+@layer reset, tokens, primitives, components, utilities, overrides;
+
+@import "@sse/tokens/styles.css" layer(tokens);
+
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    margin: 0;
+    min-height: 100%;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer primitives {
+  :root {
+    color-scheme: dark;
+    font-family: var(--font-family-sans);
+    background: var(--color-background-950);
+    color: var(--color-text-strong);
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(153, 186, 146, 0.1), transparent 34%),
+      linear-gradient(180deg, var(--color-background-900), var(--color-background-950));
+    color: var(--color-text-strong);
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary-400);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

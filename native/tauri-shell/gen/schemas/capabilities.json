@@ -1,0 +1,9 @@
+{
+  "default": {
+    "identifier": "default",
+    "description": "Default capability for the frontend replatform shell window.",
+    "local": true,
+    "windows": ["main"],
+    "permissions": ["core:default"]
+  }
+}

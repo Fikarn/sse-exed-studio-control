@@ -1,0 +1,28 @@
+.console-eyebrow {
+  color: var(--color-studio-400);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.console-sectionTitle {
+  color: var(--color-studio-050);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+
+.console-quiet {
+  color: var(--color-studio-400);
+}
+
+.console-grid {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.console-chipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}

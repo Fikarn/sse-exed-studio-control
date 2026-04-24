@@ -8,7 +8,8 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 
 ## Current Operating Truth
 
-- The product is a native desktop application built on a `Qt/QML` shell and a separate `Rust` engine.
+- The product is a native desktop application with an authoritative `Rust` engine and a current shipping `Qt/QML` shell.
+- A parallel frontend replatform is in progress: `native/tauri-shell/` plus `frontend/` are the approved replacement track, while the Qt shell remains the shipping runtime until late cutover.
 - The legacy Electron/Next.js runtime was retired in `v2.1.0`. There is no browser-served or Electron-served path left in the repository.
 - Native packaging, installer, update-repository, and release automation lanes exist, produce signed/unsigned operator-ready artifacts, and are driven from tagged releases.
 - Native operator parity is engineering-complete. Acceptance is layered: deterministic offscreen `2560x1440` captures, real-GPU onscreen spot captures, and the install-time first-launch smoke test shipped in the QtIFW installer.
@@ -24,6 +25,8 @@ Read these in order:
 3. `docs/RELEASE.md`
 4. `docs/HARDWARE_PROFILE.md`
 5. `docs/ARCHITECTURE.md`
+6. `docs/adr/0001-frontend-replatform.md`
+7. `docs/FRONTEND_CUTOVER_PLAN.md`
 
 Use these for deeper context only after the above are clear:
 
@@ -44,6 +47,7 @@ Do not reopen these casually:
 - supported primary hardware assumptions in `docs/HARDWARE_PROFILE.md`
 - engine-owned persistence, safety rules, and device logic
 - the native runtime is the only product runtime; do not reintroduce an Electron or Next.js path
+- the replacement shell stack is `Tauri 2 + React 19.2 + TypeScript + Vite`, developed in parallel until cutover
 
 ## Current Blockers
 
@@ -53,6 +57,12 @@ The highest-value unresolved work is:
    Both macOS and Windows native lanes are blocking on `main`. If either goes red, diagnose via the per-run `native/build/Testing/Temporary/` and `qt-shell/qmltest-results.{tap,xml}` artifacts that the lanes upload on every run.
 2. Keep the backlog actionable.
    Do not let real execution work live only in prose documents; open execution issues or milestone items before starting the next major slice.
+3. Keep current-truth docs aligned with the replatform program.
+   The shipping Qt runtime and the parallel Tauri replacement track must both be described consistently in `README.md`, `docs/HANDOFF.md`, `docs/ARCHITECTURE.md`, and the ADR set.
+4. Preserve the current frontend replatform checkpoint.
+   `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is now tracked in `docs/FRONTEND_CUTOVER_PLAN.md`; do not treat Qt as replaceable until that gate is satisfied.
+5. Keep Tauri CI posture honest.
+   The current Tauri CI jobs are foundation/build smoke jobs and are intentionally non-blocking while Qt remains the shipping runtime. `npm run tauri:setup-support:qualify` and `npm run tauri:workspaces:qualify` are local/manual cutover-readiness gates until a stable CI display/webview lane exists. Do not treat the Tauri shell as shippable until the gates in `docs/FRONTEND_CUTOVER_PLAN.md` are promoted and passing.
 
 ## Execution Queue
 

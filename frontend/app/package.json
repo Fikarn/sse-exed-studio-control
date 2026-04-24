@@ -1,0 +1,40 @@
+{
+  "name": "@sse/frontend-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.app.json && vite build",
+    "dev": "vite",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "preview": "vite preview",
+    "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build",
+    "storybook:serve-static": "node ../../scripts/frontend/storybook-static-server.mjs --root storybook-static --port 6007",
+    "playwright:test": "playwright test --config playwright.config.ts",
+    "tauri:dev": "cd ../../native/tauri-shell && tauri dev",
+    "tauri:build": "cd ../../native/tauri-shell && tauri build"
+  },
+  "dependencies": {
+    "@sse/design-system": "file:../packages/design-system",
+    "@sse/engine-client": "file:../packages/engine-client",
+    "@sse/shared-graphics": "file:../packages/shared-graphics",
+    "@sse/test-fixtures": "file:../packages/test-fixtures",
+    "@sse/tokens": "file:../packages/tokens",
+    "@tauri-apps/api": "^2.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@storybook/react-vite": "^10.3.5",
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/node": "^24.8.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^6.0.1",
+    "storybook": "^10.3.5",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.9"
+  }
+}

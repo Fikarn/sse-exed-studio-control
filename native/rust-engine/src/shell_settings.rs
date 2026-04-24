@@ -4,12 +4,16 @@ use std::collections::HashMap;
 
 pub const SHELL_SETTINGS_PREFIX: &str = "shell.";
 pub const WORKSPACE_KEY: &str = "shell.workspace";
+pub const SETUP_ACTIVE_SECTION_KEY: &str = "shell.setup.activeSection";
+pub const LIGHTING_CURRENT_SECTION_ID_KEY: &str = "shell.lighting.currentSectionId";
+pub const LIGHTING_SELECTED_CUE_ID_KEY: &str = "shell.lighting.selectedCueId";
 pub const WINDOW_WIDTH_KEY: &str = "shell.window.width";
 pub const WINDOW_HEIGHT_KEY: &str = "shell.window.height";
 pub const WINDOW_MAXIMIZED_KEY: &str = "shell.window.maximized";
 pub const WINDOW_MODE_KEY: &str = "shell.window.mode";
 
 pub const DEFAULT_WORKSPACE: &str = "planning";
+pub const DEFAULT_SETUP_ACTIVE_SECTION: &str = "commissioning";
 pub const DEFAULT_WINDOW_WIDTH: i64 = 1280;
 pub const DEFAULT_WINDOW_HEIGHT: i64 = 800;
 pub const DEFAULT_WINDOW_MAXIMIZED: bool = false;
@@ -23,6 +27,9 @@ const MAX_WINDOW_HEIGHT: i64 = 4320;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ShellSettingsSnapshot {
     pub workspace: String,
+    pub setup_active_section: String,
+    pub lighting_current_section_id: Option<String>,
+    pub lighting_selected_cue_id: Option<String>,
     pub window_width: i64,
     pub window_height: i64,
     pub window_maximized: bool,
@@ -33,6 +40,9 @@ impl Default for ShellSettingsSnapshot {
     fn default() -> Self {
         Self {
             workspace: String::from(DEFAULT_WORKSPACE),
+            setup_active_section: String::from(DEFAULT_SETUP_ACTIVE_SECTION),
+            lighting_current_section_id: None,
+            lighting_selected_cue_id: None,
             window_width: DEFAULT_WINDOW_WIDTH,
             window_height: DEFAULT_WINDOW_HEIGHT,
             window_maximized: DEFAULT_WINDOW_MAXIMIZED,
@@ -50,6 +60,19 @@ impl ShellSettingsSnapshot {
                 snapshot.workspace = workspace.clone();
             }
         }
+
+        if let Some(section) = settings.get(SETUP_ACTIVE_SECTION_KEY) {
+            if is_valid_setup_active_section(section) {
+                snapshot.setup_active_section = section.clone();
+            }
+        }
+
+        snapshot.lighting_current_section_id = settings
+            .get(LIGHTING_CURRENT_SECTION_ID_KEY)
+            .and_then(|value| parse_optional_shell_state_value(value));
+        snapshot.lighting_selected_cue_id = settings
+            .get(LIGHTING_SELECTED_CUE_ID_KEY)
+            .and_then(|value| parse_optional_shell_state_value(value));
 
         if let Some(width) = settings
             .get(WINDOW_WIDTH_KEY)
@@ -93,6 +116,13 @@ impl ShellSettingsSnapshot {
             "settings": settings,
             "shell": {
                 "workspace": self.workspace,
+                "setup": {
+                    "activeSection": self.setup_active_section,
+                },
+                "lighting": {
+                    "currentSectionId": self.lighting_current_section_id,
+                    "selectedCueId": self.lighting_selected_cue_id,
+                },
                 "window": {
                     "width": self.window_width,
                     "height": self.window_height,
@@ -107,6 +137,9 @@ impl ShellSettingsSnapshot {
 pub fn default_settings_entries() -> Vec<(&'static str, &'static str)> {
     vec![
         (WORKSPACE_KEY, DEFAULT_WORKSPACE),
+        (SETUP_ACTIVE_SECTION_KEY, DEFAULT_SETUP_ACTIVE_SECTION),
+        (LIGHTING_CURRENT_SECTION_ID_KEY, ""),
+        (LIGHTING_SELECTED_CUE_ID_KEY, ""),
         (WINDOW_WIDTH_KEY, "1280"),
         (WINDOW_HEIGHT_KEY, "800"),
         (WINDOW_MAXIMIZED_KEY, "false"),
@@ -129,6 +162,54 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
         }
 
         updates.push((WORKSPACE_KEY, workspace.to_string()));
+    }
+
+    if let Some(setup_value) = params.get("setup") {
+        let setup = setup_value
+            .as_object()
+            .ok_or_else(|| String::from("setup must be an object"))?;
+
+        if let Some(active_section_value) = setup.get("activeSection") {
+            let active_section = active_section_value
+                .as_str()
+                .ok_or_else(|| String::from("setup.activeSection must be a string"))?;
+
+            if !is_valid_setup_active_section(active_section) {
+                return Err(String::from(
+                    "setup.activeSection must be one of: commissioning, support",
+                ));
+            }
+
+            updates.push((SETUP_ACTIVE_SECTION_KEY, active_section.to_string()));
+        }
+    }
+
+    if let Some(lighting_value) = params.get("lighting") {
+        let lighting = lighting_value
+            .as_object()
+            .ok_or_else(|| String::from("lighting must be an object"))?;
+
+        if let Some(current_section_id_value) = lighting.get("currentSectionId") {
+            let current_section_id = parse_optional_shell_state_update_value(
+                current_section_id_value,
+                "lighting.currentSectionId",
+            )?;
+            updates.push((
+                LIGHTING_CURRENT_SECTION_ID_KEY,
+                current_section_id.unwrap_or_default(),
+            ));
+        }
+
+        if let Some(selected_cue_id_value) = lighting.get("selectedCueId") {
+            let selected_cue_id = parse_optional_shell_state_update_value(
+                selected_cue_id_value,
+                "lighting.selectedCueId",
+            )?;
+            updates.push((
+                LIGHTING_SELECTED_CUE_ID_KEY,
+                selected_cue_id.unwrap_or_default(),
+            ));
+        }
     }
 
     if let Some(window_value) = params.get("window") {
@@ -193,6 +274,10 @@ pub fn is_valid_workspace(workspace: &str) -> bool {
     matches!(workspace, "planning" | "lighting" | "audio" | "setup")
 }
 
+pub fn is_valid_setup_active_section(active_section: &str) -> bool {
+    matches!(active_section, "commissioning" | "support")
+}
+
 pub fn is_valid_window_mode(window_mode: &str) -> bool {
     matches!(window_mode, "windowed" | "maximized" | "fullscreen")
 }
@@ -212,6 +297,34 @@ fn parse_bool(value: &str) -> Option<bool> {
         "false" => Some(false),
         _ => None,
     }
+}
+
+fn parse_optional_shell_state_value(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(String::from(trimmed))
+    }
+}
+
+fn parse_optional_shell_state_update_value(
+    value: &Value,
+    field: &str,
+) -> Result<Option<String>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    let parsed = value
+        .as_str()
+        .map(str::trim)
+        .ok_or_else(|| format!("{field} must be a string or null"))?;
+    if parsed.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(String::from(parsed)))
 }
 
 fn validate_window_dimension(
@@ -237,6 +350,9 @@ mod tests {
         let snapshot = ShellSettingsSnapshot::from_settings(&settings);
 
         assert_eq!(snapshot.workspace, DEFAULT_WORKSPACE);
+        assert_eq!(snapshot.setup_active_section, DEFAULT_SETUP_ACTIVE_SECTION);
+        assert_eq!(snapshot.lighting_current_section_id, None);
+        assert_eq!(snapshot.lighting_selected_cue_id, None);
         assert_eq!(snapshot.window_width, DEFAULT_WINDOW_WIDTH);
         assert_eq!(snapshot.window_height, DEFAULT_WINDOW_HEIGHT);
         assert_eq!(snapshot.window_maximized, DEFAULT_WINDOW_MAXIMIZED);
@@ -247,6 +363,18 @@ mod tests {
     fn snapshot_parses_valid_window_settings() {
         let settings = HashMap::from([
             (String::from(WORKSPACE_KEY), String::from("audio")),
+            (
+                String::from(SETUP_ACTIVE_SECTION_KEY),
+                String::from("support"),
+            ),
+            (
+                String::from(LIGHTING_CURRENT_SECTION_ID_KEY),
+                String::from("stage-left"),
+            ),
+            (
+                String::from(LIGHTING_SELECTED_CUE_ID_KEY),
+                String::from("cue-14"),
+            ),
             (String::from(WINDOW_WIDTH_KEY), String::from("1440")),
             (String::from(WINDOW_HEIGHT_KEY), String::from("900")),
             (String::from(WINDOW_MAXIMIZED_KEY), String::from("true")),
@@ -256,6 +384,9 @@ mod tests {
         let snapshot = ShellSettingsSnapshot::from_settings(&settings);
 
         assert_eq!(snapshot.workspace, "audio");
+        assert_eq!(snapshot.setup_active_section, "support");
+        assert_eq!(snapshot.lighting_current_section_id.as_deref(), Some("stage-left"));
+        assert_eq!(snapshot.lighting_selected_cue_id.as_deref(), Some("cue-14"));
         assert_eq!(snapshot.window_width, 1440);
         assert_eq!(snapshot.window_height, 900);
         assert!(snapshot.window_maximized);
@@ -266,6 +397,13 @@ mod tests {
     fn settings_update_accepts_workspace_and_window_state() {
         let params = json!({
             "workspace": "lighting",
+            "setup": {
+                "activeSection": "support"
+            },
+            "lighting": {
+                "currentSectionId": "stage-left",
+                "selectedCueId": "cue-14"
+            },
             "window": {
                 "width": 1600,
                 "height": 900,
@@ -279,6 +417,9 @@ mod tests {
             updates,
             vec![
                 (WORKSPACE_KEY, String::from("lighting")),
+                (SETUP_ACTIVE_SECTION_KEY, String::from("support")),
+                (LIGHTING_CURRENT_SECTION_ID_KEY, String::from("stage-left")),
+                (LIGHTING_SELECTED_CUE_ID_KEY, String::from("cue-14")),
                 (WINDOW_WIDTH_KEY, String::from("1600")),
                 (WINDOW_HEIGHT_KEY, String::from("900")),
                 (WINDOW_MODE_KEY, String::from("fullscreen")),
@@ -317,5 +458,52 @@ mod tests {
 
         let error = parse_settings_update(&params).expect_err("width should be rejected");
         assert_eq!(error, "window.width must be between 800 and 8192");
+    }
+
+    #[test]
+    fn settings_update_rejects_invalid_setup_active_section() {
+        let params = json!({
+            "setup": {
+                "activeSection": "runner"
+            }
+        });
+
+        let error = parse_settings_update(&params).expect_err("section should be rejected");
+        assert_eq!(
+            error,
+            "setup.activeSection must be one of: commissioning, support"
+        );
+    }
+
+    #[test]
+    fn settings_update_accepts_null_lighting_shell_state_values() {
+        let params = json!({
+            "lighting": {
+                "currentSectionId": null,
+                "selectedCueId": null
+            }
+        });
+
+        let updates = parse_settings_update(&params).expect("lighting state should parse");
+
+        assert_eq!(
+            updates,
+            vec![
+                (LIGHTING_CURRENT_SECTION_ID_KEY, String::new()),
+                (LIGHTING_SELECTED_CUE_ID_KEY, String::new()),
+            ]
+        );
+    }
+
+    #[test]
+    fn settings_update_rejects_invalid_lighting_shell_state_values() {
+        let params = json!({
+            "lighting": {
+                "currentSectionId": 14
+            }
+        });
+
+        let error = parse_settings_update(&params).expect_err("lighting state should be rejected");
+        assert_eq!(error, "lighting.currentSectionId must be a string or null");
     }
 }

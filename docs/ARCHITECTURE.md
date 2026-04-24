@@ -13,11 +13,18 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 
 ## Runtime Layers
 
-### Qt shell
+### Qt shell (shipping runtime during migration)
 
-- owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome
+- owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome in the current production runtime
 - supervises the Rust engine as a child process
-- keeps shell view models thin and derived from engine snapshots
+- remains maintenance-only while the replacement shell is developed in parallel
+
+### Tauri shell (parallel replacement track)
+
+- owns the replacement native webview shell under `native/tauri-shell/` and `frontend/`
+- preserves the same authoritative engine boundary and IPC contract as the Qt shell
+- is developed story-first and verified in parallel until it is safer to ship than the Qt shell
+- cannot replace the shipping runtime until the gate in [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) is satisfied
 
 ### Rust engine
 
@@ -56,7 +63,8 @@ Any native studio domain should follow the same shape:
 
 - request snapshots through the engine controller
 - render operator-visible state without owning business logic
-- avoid recreating server-style fetch layers inside QML
+- avoid recreating server-style fetch layers inside shell code
+- keep both QML and React shells derived from engine snapshots and explicit commands
 
 ### 4. Operational status
 
@@ -77,8 +85,9 @@ Any native studio domain should follow the same shape:
 - `native/rust-engine/src/audio.rs`: audio snapshot, sync, recall, and simulated backend boundary
 - `native/rust-engine/src/support.rs`: backup, restore, and diagnostics support flows
 - `native/rust-engine/src/control_surface.rs`: Stream Deck bridge and Companion export generation
-- `native/qt-shell/qml/Main.qml`: operator shell surface derived from engine state
+- `native/qt-shell/qml/Main.qml`: current shipping operator shell surface derived from engine state
+- `frontend/app/src/app/OperatorShell.tsx`: replacement shell surface derived from engine state
 
 ## Refactor Rule
 
-When adding a feature, define or extend the engine contract first. Only then wire the shell and adapter layers. If a change would move product state or device policy into QML, it is probably going in the wrong direction.
+When adding a feature, define or extend the engine contract first. Only then wire the shell and adapter layers. If a change would move product state or device policy into QML or React, it is probably going in the wrong direction.

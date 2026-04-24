@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sse.exed/protocol/v1.schema.json",
+  "title": "SSE ExEd Studio Control Protocol v1",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": "1"
+    },
+    "transport": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "const": "jsonl-over-stdin-stdout"
+        },
+        "requestKind": {
+          "const": "request"
+        },
+        "responseKind": {
+          "const": "response"
+        },
+        "eventKind": {
+          "const": "event"
+        }
+      },
+      "required": ["mode", "requestKind", "responseKind", "eventKind"],
+      "additionalProperties": false
+    },
+    "startupLifecycleStates": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "idle",
+          "launching-process",
+          "waiting-for-ready-event",
+          "waiting-for-health-snapshot",
+          "waiting-for-app-snapshot",
+          "ready",
+          "failed"
+        ]
+      }
+    },
+    "devParityFixtures": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "planning-empty",
+          "planning-populated",
+          "lighting-populated",
+          "audio-populated",
+          "setup-required",
+          "setup-ready"
+        ]
+      }
+    },
+    "methods": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "app.snapshot",
+          "audio.channel.update",
+          "audio.mixTarget.update",
+          "audio.settings.update",
+          "audio.snapshot",
+          "audio.snapshot.create",
+          "audio.snapshot.delete",
+          "audio.snapshot.recall",
+          "audio.snapshot.update",
+          "audio.sync",
+          "commissioning.check.run",
+          "commissioning.seedPlanningDemo",
+          "commissioning.snapshot",
+          "commissioning.update",
+          "controlSurface.snapshot",
+          "dev.parityFixture.load",
+          "engine.ping",
+          "exports.companion.export",
+          "health.snapshot",
+          "lighting.cue.create",
+          "lighting.cue.delete",
+          "lighting.cue.fire",
+          "lighting.cue.update",
+          "lighting.dmxMonitor.snapshot",
+          "lighting.fixture.create",
+          "lighting.fixture.delete",
+          "lighting.fixture.update",
+          "lighting.group.create",
+          "lighting.group.delete",
+          "lighting.group.power",
+          "lighting.group.update",
+          "lighting.power.all",
+          "lighting.scene.create",
+          "lighting.scene.delete",
+          "lighting.scene.recall",
+          "lighting.scene.update",
+          "lighting.settings.update",
+          "lighting.snapshot",
+          "planning.context",
+          "planning.project.create",
+          "planning.project.delete",
+          "planning.project.reorder",
+          "planning.project.update",
+          "planning.report.time",
+          "planning.select",
+          "planning.settings.update",
+          "planning.snapshot",
+          "planning.task.checklist.add",
+          "planning.task.checklist.delete",
+          "planning.task.checklist.update",
+          "planning.task.create",
+          "planning.task.delete",
+          "planning.task.reschedule",
+          "planning.task.timer",
+          "planning.task.toggleComplete",
+          "planning.task.update",
+          "settings.get",
+          "settings.update",
+          "storage.importLegacyDb",
+          "support.backup.export",
+          "support.backup.restore",
+          "support.snapshot"
+        ]
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "app.changed",
+          "audio.changed",
+          "commissioning.changed",
+          "engine.ready",
+          "engine.startupFailed",
+          "lighting.changed",
+          "planning.changed",
+          "settings.changed",
+          "support.changed"
+        ]
+      }
+    }
+  },
+  "required": ["version", "transport", "startupLifecycleStates", "devParityFixtures", "methods", "events"],
+  "additionalProperties": false
+}

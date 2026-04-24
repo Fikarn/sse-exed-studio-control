@@ -90,6 +90,29 @@ npm run native:acceptance
 
 `npm run native:build` compiles the Rust engine and the Qt shell. On macOS, it auto-detects common Homebrew Qt prefixes. On Windows or custom Qt installs, set `CMAKE_PREFIX_PATH`, `QT_ROOT_DIR`, `QTDIR`, `QT_DIR`, or `Qt6_DIR` if Qt is not discovered automatically.
 
+For the parallel frontend replatform foundation:
+
+```bash
+npm run protocol:generate
+npm run frontend:tokens:build
+npm run frontend:storybook
+npm run frontend:foundation
+npm run tauri:foundation
+npm run tauri:setup-support:qualify
+npm run tauri:workspaces:qualify
+npm run tauri:cutover:candidate
+```
+
+During the migration, treat the Qt shell as maintenance-only unless the task is a release blocker, CI/release fix, or critical operator defect.
+
+`npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot, persisted restart, and degraded startup/recovery posture. `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence.
+
+Both Tauri qualification lanes and Playwright preview use the fixed local port `127.0.0.1:4173` with strict port binding. Do not run them concurrently with each other, `npm run preview`, or `npm run dev`; a stale or competing server makes the result invalid.
+
+The promotion gate for replacing the shipping Qt runtime lives in [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md). Do not switch shipping behavior, installer paths, or CI blocking status by inference; use that checklist as the cutover authority.
+
+`npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, and workspace qualification serially.
+
 ### 2b. Required parity workflow
 
 When the task changes any operator-visible native surface, do not stop at code or deterministic captures.
@@ -163,6 +186,37 @@ That command:
 
 The live interaction helper targets the native app window directly. Do not rely on current mouse position as the authority for the second-monitor operator surface.
 
+#### Built-in display review on Retina Macs
+
+Retina MacBook panels can have enough physical pixels for the target operator surface while still exposing a much smaller logical desktop. Treat the built-in panel as a review surface only when it is explicitly configured for that purpose.
+
+Check the current machine state with the direct Swift probe:
+
+```bash
+swift -e 'import AppKit; import CoreGraphics; for screen in NSScreen.screens { if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber { let id = CGDirectDisplayID(truncating: number); if let mode = CGDisplayCopyDisplayMode(id) { print("id=\(id) frame=\(Int(screen.frame.width))x\(Int(screen.frame.height)) points=\(mode.width)x\(mode.height) pixels=\(mode.pixelWidth)x\(mode.pixelHeight) backing=\(Double(screen.backingScaleFactor)) builtin=\(CGDisplayIsBuiltin(id) != 0)") } } }'
+```
+
+On the current 14-inch M5 workstation, this reports the built-in panel as `1512x982` points at `2.0` backing (`3024x1964` pixels), which is why the app looks compressed without a dedicated review workflow.
+
+Recommended built-in-display workflow:
+
+1. **Preferred:** use `BetterDisplay` flexible scaling on the built-in display. The current vendor docs explicitly support built-in Apple Silicon panels and flexible scaling on internal displays.
+2. Configure the built-in panel for an exact `2560x1440` review mode if the flexible-scaling list exposes it.
+3. If flexible scaling does not produce a stable exact target, use `BetterDisplay` virtual-screen mirroring instead:
+   - create a virtual screen associated with the built-in display,
+   - enable HiDPI for that virtual screen,
+   - include `2560x1440` in the virtual resolution list,
+   - mirror the virtual screen to the built-in panel,
+   - set the mirrored set as main.
+4. If the virtual mirror reverses direction or loses main-display status, stop mirroring and reattach it. `BetterDisplay` documents this as a macOS display-management quirk rather than an app-specific bug.
+5. Use the built-in panel only for human visual inspection. The acceptance gate remains the deterministic `2560x1440` capture set plus the checked-in live verification loop above.
+
+Reference docs:
+
+- Apple display resolution settings: <https://support.apple.com/en-afri/guide/mac-help/change-your-displays-resolution-mchl86d72b76/26/mac/26>
+- Apple high-resolution rendering model: <https://developer.apple.com/library/archive/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Explained/Explained.html>
+- BetterDisplay flexible scaling and virtual-screen workflow: <https://github.com/waydabber/BetterDisplay/wiki/Fully-scalable-HiDPI-desktop>
+
 For native startup, lifecycle, and failure coverage:
 
 ```bash
@@ -231,6 +285,8 @@ Keep changes in the correct layer:
 - `native/qt-shell/src/...` for shell lifecycle and QML adapters
 - `native/rust-engine/src/...` for domain state, persistence, and device logic
 - `native/protocol/...` for IPC contract changes
+- `frontend/...` for the replacement React/Storybook/Playwright frontend
+- `native/tauri-shell/...` for the replacement native shell
 - `docs/...` for process and operator documentation
 
 ### 3. Validate write paths carefully

@@ -240,6 +240,15 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "studio-control-protocol",
+]
+
+[[package]]
+name = "studio-control-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

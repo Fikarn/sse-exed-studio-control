@@ -1,5 +1,6 @@
 use crate::app_state::{
-    default_app_settings_entries, COMMISSIONING_COMPLETED_KEY, COMMISSIONING_STAGE_KEY,
+    default_app_settings_entries, COMMISSIONING_COMPLETED_KEY, COMMISSIONING_RUNNER_STAGE_KEY,
+    COMMISSIONING_STAGE_KEY,
 };
 use crate::commissioning::default_settings_entries as default_commissioning_settings_entries;
 use crate::legacy_import::{
@@ -491,6 +492,7 @@ fn write_imported_settings(
             SELECTED_TASK_ID_KEY,
             WORKSPACE_KEY,
             COMMISSIONING_COMPLETED_KEY,
+            COMMISSIONING_RUNNER_STAGE_KEY,
             COMMISSIONING_STAGE_KEY,
         ],
     )?;
@@ -504,6 +506,10 @@ fn write_imported_settings(
         (
             COMMISSIONING_COMPLETED_KEY,
             payload.settings.commissioning_completed.to_string(),
+        ),
+        (
+            COMMISSIONING_RUNNER_STAGE_KEY,
+            payload.settings.commissioning_runner_stage.clone(),
         ),
         (
             COMMISSIONING_STAGE_KEY,

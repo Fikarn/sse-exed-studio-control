@@ -62,6 +62,8 @@ pub struct CommissioningSnapshotPayload {
     #[serde(rename = "hasCompletedSetup")]
     pub has_completed_setup: bool,
     pub stage: String,
+    #[serde(rename = "runnerStage")]
+    pub runner_stage: String,
     #[serde(rename = "hardwareProfile")]
     pub hardware_profile: String,
     pub summary: String,
@@ -268,7 +270,7 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
     };
     let summary = format!(
         "Stage '{}', {} projects, {} tasks, {} probe records.",
-        commissioning.stage,
+        commissioning.runner_stage,
         planning_counts.0,
         planning_counts.1,
         checks.len()
@@ -307,34 +309,42 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             checks.len()
         )
     };
+    let current_stage = commissioning.runner_stage.as_str();
+    let stage_index = match current_stage {
+        "probe" => 1,
+        "map" => 2,
+        "verify" => 3,
+        "publish" => 4,
+        _ => 0,
+    };
+    let all_checks_completed = completed_checks == checks.len() && failed_checks == 0;
 
     let steps = vec![
         CommissioningStepSnapshot {
-            id: String::from("hardware-profile"),
-            label: String::from("Hardware Profile"),
-            status: if commissioning.hardware_profile.trim().is_empty() {
-                String::from("pending")
-            } else {
+            id: String::from("import"),
+            label: String::from("Import profile"),
+            status: if stage_index > 0 {
                 String::from("completed")
-            },
-            summary: if commissioning.hardware_profile.trim().is_empty() {
-                String::from("Choose the fixed workstation profile before validating adapters.")
             } else {
-                format!(
-                    "Using engine-owned profile '{}'.",
-                    commissioning.hardware_profile
-                )
+                String::from("current")
+            },
+            summary: if planning_counts.0 > 0 {
+                String::from("Profile export and sample planning data are ready for commissioning.")
+            } else {
+                String::from("Export the Companion profile and seed sample planning data before probing hardware.")
             },
         },
         CommissioningStepSnapshot {
-            id: String::from("connection-probes"),
-            label: String::from("Connection Probes"),
+            id: String::from("probe"),
+            label: String::from("Probe hardware"),
             status: if failed_checks > 0 {
                 String::from("attention")
-            } else if completed_checks == checks.len() {
+            } else if stage_index > 1 {
                 String::from("completed")
+            } else if current_stage == "probe" {
+                String::from("current")
             } else if completed_checks > 0 {
-                String::from("in-progress")
+                String::from("ready")
             } else {
                 String::from("pending")
             },
@@ -346,36 +356,62 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             ),
         },
         CommissioningStepSnapshot {
-            id: String::from("planning-data"),
-            label: String::from("Planning Seed"),
-            status: if planning_counts.0 > 0 {
+            id: String::from("map"),
+            label: String::from("Map bindings"),
+            status: if stage_index > 2 {
                 String::from("completed")
+            } else if current_stage == "map" {
+                String::from("current")
+            } else if all_checks_completed {
+                String::from("ready")
             } else {
                 String::from("pending")
             },
             summary: if planning_counts.0 > 0 {
                 format!(
-                    "Native planning store contains {} projects and {} tasks.",
+                    "Review {} projects and {} tasks across the mapped control-surface pages.",
                     planning_counts.0, planning_counts.1
                 )
             } else {
-                String::from("Sample planning data has not been loaded yet.")
+                String::from("Review the engine-owned control-surface pages before moving to live verification.")
             },
         },
         CommissioningStepSnapshot {
-            id: String::from("dashboard-routing"),
-            label: String::from("Dashboard Routing"),
+            id: String::from("verify"),
+            label: String::from("Verify live echo"),
+            status: if stage_index > 3 {
+                String::from("completed")
+            } else if current_stage == "verify" {
+                String::from("current")
+            } else if all_checks_completed {
+                String::from("ready")
+            } else {
+                String::from("pending")
+            },
+            summary: if current_stage == "verify" || stage_index > 3 {
+                String::from(
+                    "Press the physical Stream Deck+ controls and watch the matching cell pulse.",
+                )
+            } else {
+                String::from("Physical-button echo verification remains locked until probes and mapping are complete.")
+            },
+        },
+        CommissioningStepSnapshot {
+            id: String::from("publish"),
+            label: String::from("Publish"),
             status: if commissioning.has_completed_setup {
                 String::from("completed")
-            } else if completed_checks > 0 || planning_counts.0 > 0 {
+            } else if current_stage == "publish" {
+                String::from("current")
+            } else if all_checks_completed {
                 String::from("ready")
             } else {
                 String::from("pending")
             },
             summary: if commissioning.has_completed_setup {
-                String::from("Startup is routed directly into the dashboard surface.")
+                String::from("Startup is routed directly into the dashboard surface and the publish backup can be restored.")
             } else {
-                String::from("Mark commissioning ready after the required probes and data seed are complete.")
+                String::from("Commit setup, export a support backup, and return to Planning.")
             },
         },
     ];
@@ -383,6 +419,7 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
     Ok(CommissioningSnapshotPayload {
         has_completed_setup: commissioning.has_completed_setup,
         stage: commissioning.stage,
+        runner_stage: commissioning.runner_stage,
         hardware_profile: commissioning.hardware_profile,
         summary,
         config_summary,
@@ -729,7 +766,9 @@ fn is_valid_port(port: i64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app_state::{COMMISSIONING_COMPLETED_KEY, COMMISSIONING_STAGE_KEY};
+    use crate::app_state::{
+        COMMISSIONING_COMPLETED_KEY, COMMISSIONING_RUNNER_STAGE_KEY, COMMISSIONING_STAGE_KEY,
+    };
     use crate::control_surface::ControlSurfaceBridgeInfo;
     use crate::storage::{initialize_database, set_settings};
     use std::fs;
@@ -774,6 +813,7 @@ mod tests {
             logs_dir: test_dir.path().join("logs"),
             log_file_path: test_dir.path().join("logs").join("engine.log"),
             db_path: test_dir.path().join("native.sqlite3"),
+            update_repository_path: None,
             storage_ready: true,
             storage_bootstrap: crate::storage::StorageBootstrap {
                 schema_version: 2,
@@ -811,7 +851,7 @@ mod tests {
             snapshot
                 .steps
                 .iter()
-                .find(|step| step.id == "planning-data")
+                .find(|step| step.id == "import")
                 .map(|step| step.status.as_str()),
             Some("completed")
         );
@@ -897,6 +937,7 @@ mod tests {
             &runtime.db_path,
             &[
                 (COMMISSIONING_STAGE_KEY, String::from("in-progress")),
+                (COMMISSIONING_RUNNER_STAGE_KEY, String::from("probe")),
                 (COMMISSIONING_COMPLETED_KEY, String::from("false")),
                 (WORKSPACE_KEY, String::from("audio")),
             ],
@@ -921,6 +962,12 @@ mod tests {
                 .get(COMMISSIONING_STAGE_KEY)
                 .map(String::as_str),
             Some("in-progress")
+        );
+        assert_eq!(
+            app_settings
+                .get(COMMISSIONING_RUNNER_STAGE_KEY)
+                .map(String::as_str),
+            Some("probe")
         );
         assert_eq!(
             shell_settings.get(WORKSPACE_KEY).map(String::as_str),

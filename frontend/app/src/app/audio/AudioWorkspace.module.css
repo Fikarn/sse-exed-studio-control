@@ -1,0 +1,659 @@
+.audioShell {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.audioCard,
+.audioLoadingCard {
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface-800) 94%, transparent),
+      color-mix(in srgb, var(--color-surface-900) 96%, black 4%)
+    ),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary-500) 10%, transparent), transparent 58%);
+  box-shadow: 0 18px 48px color-mix(in srgb, black 28%, transparent);
+}
+
+.audioToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto auto auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+}
+
+.audioToolbarIdentity {
+  min-width: 0;
+}
+
+.audioToolbarEyebrow,
+.audioRailEyebrow,
+.audioInspectorEyebrow,
+.audioWarningLabel,
+.audioControlRoomLabel,
+.audioInspectorFieldLabel,
+.audioDeskSubtitle,
+.audioDeskHint,
+.audioLoadingBridgeTitle,
+.audioToolbarMeta,
+.audioSnapshotMeta,
+.audioMixTargetMeta,
+.audioInspectorMeta {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.audioToolbarTitle,
+.audioRailTitle,
+.audioInspectorTitle,
+.audioControlRoomValue,
+.audioStripName,
+.audioMixTargetName,
+.audioSnapshotName {
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) var(--font-size-lg) / 1.2 var(--font-family-sans);
+}
+
+.audioToolbarSubtitle,
+.audioNoSelectionCopy,
+.audioWarningBody,
+.audioControlRoomMeta,
+.audioStripMeta {
+  color: var(--color-text-muted);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+}
+
+.audioToolbarCluster {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.audioToolbarPill,
+.audioChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-700) 88%, transparent);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.audioChip[data-tone="selected"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-primary-500) 14%, var(--color-surface-800));
+  color: var(--color-text-strong);
+}
+
+.audioDensityToggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
+}
+
+.audioDensityButton {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.audioDensityButton[data-active="true"] {
+  background: color-mix(in srgb, var(--color-primary-500) 16%, var(--color-surface-700));
+  color: var(--color-text-strong);
+}
+
+.audioToolbarSnapshot {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  justify-items: end;
+}
+
+.audioToolbarSnapshotRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.audioToolbarSnapshotName {
+  color: var(--color-text-strong);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1.4 var(--font-family-sans);
+}
+
+.audioWarningBand,
+.audioFeedbackBanner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-warning-500) 30%, var(--color-border-default));
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-warning-500) 10%, transparent),
+      color-mix(in srgb, var(--color-surface-900) 94%, black 6%)
+    ),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-warning-500) 14%, transparent), transparent);
+}
+
+.audioWarningBand:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.audioWarningHint {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.audioFeedbackBanner {
+  grid-template-columns: 1fr;
+}
+
+.audioFeedbackBanner[data-tone="error"] {
+  border-color: color-mix(in srgb, var(--color-danger-500) 36%, var(--color-border-default));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-danger-500) 10%, transparent),
+      color-mix(in srgb, var(--color-surface-900) 94%, black 6%)
+    ),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-danger-500) 14%, transparent), transparent);
+}
+
+.audioMeterBridge {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  min-height: 136px;
+}
+
+.audioMeterTile {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-width: 0;
+  padding: 10px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 78%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.audioMeterTile[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-primary-500) 12%, var(--color-surface-800));
+}
+
+.audioMeterTile[data-clip="true"] {
+  border-color: color-mix(in srgb, var(--color-danger-500) 38%, var(--color-border-default));
+}
+
+.audioMeterName {
+  overflow: hidden;
+  color: var(--color-text-strong);
+  font: var(--font-weight-medium) 12px / 1.2 var(--font-family-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audioMeterShort,
+.audioMeterMeta {
+  display: inline-flex;
+  gap: 6px;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.audioMeterBars {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  align-items: end;
+  height: 44px;
+}
+
+.audioMeterBar {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+  overflow: hidden;
+}
+
+.audioMeterBar::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: var(--audio-meter-left);
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #ffe5ab 84%, white 16%),
+    color-mix(in srgb, var(--color-primary-500) 72%, #ffe5ab 28%)
+  );
+}
+
+.audioMeterBar[data-side="right"]::after {
+  height: var(--audio-meter-right);
+}
+
+.audioMeterPeak {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--audio-meter-peak);
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #fff4c9 88%, transparent);
+  pointer-events: none;
+}
+
+.audioMainGrid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 460px;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.audioRail,
+.audioDesk,
+.audioInspectorColumn {
+  min-height: 0;
+}
+
+.audioRail {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.audioRailSection {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.audioRailHeader,
+.audioDeskHeader,
+.audioInspectorHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.audioMixTargetList,
+.audioSnapshotList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.audioMixTargetRow,
+.audioSnapshotRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-800) 88%, transparent);
+  color: inherit;
+  text-align: left;
+}
+
+.audioMixTargetRow {
+  cursor: pointer;
+}
+
+.audioMixTargetRow[data-selected="true"],
+.audioSnapshotRow[data-current="true"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-primary-500) 11%, var(--color-surface-800));
+}
+
+.audioSnapshotRow[data-flash="true"] {
+  animation: audioSnapshotFlash 900ms ease-out;
+}
+
+.audioMixTargetChips,
+.audioChipRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.audioDesk {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.audioStripGrid {
+  display: grid;
+  grid-template-columns: repeat(var(--audio-strip-count), minmax(0, 1fr));
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+.audioStrip {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-3);
+  min-height: 540px;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 78%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-800) 88%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.audioStrip[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 40%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-primary-500) 8%, var(--color-surface-800));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
+}
+
+.audioStripHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.audioStripBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 22px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+}
+
+.audioStripMeterWell {
+  display: grid;
+  align-content: end;
+  gap: var(--space-3);
+}
+
+.audioStripMeterPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+  min-height: 320px;
+}
+
+.audioStripMeterTrack {
+  position: relative;
+  display: block;
+  height: 100%;
+  border-radius: 14px 14px 10px 10px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-surface-700) 86%, transparent),
+    color-mix(in srgb, var(--color-surface-900) 94%, black 6%)
+  );
+  overflow: hidden;
+}
+
+.audioStripMeterFill {
+  position: absolute;
+  inset: auto 0 0 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, #ffd487 88%, white 12%),
+      color-mix(in srgb, var(--color-primary-500) 72%, #ffd487 28%)
+    ),
+    linear-gradient(180deg, color-mix(in srgb, white 12%, transparent), transparent);
+}
+
+.audioStripMeterPeak {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #fff4c9 92%, transparent);
+}
+
+.audioStripFaderValue {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  text-align: center;
+}
+
+.audioStripFader,
+.audioInspectorRange {
+  width: 100%;
+  accent-color: var(--color-primary-500);
+}
+
+.audioStripActions,
+.audioInspectorButtonGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.audioStripToggle,
+.audioInspectorToggle {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-900) 90%, transparent);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.audioStripToggle[data-active="true"],
+.audioInspectorToggle[data-active="true"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 40%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-primary-500) 14%, var(--color-surface-800));
+  color: var(--color-text-strong);
+}
+
+.audioStripFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.audioInspectorColumn {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.audioInspectorCard {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.audioControlRoomGrid,
+.audioInspectorFieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.audioControlRoomCell {
+  display: grid;
+  gap: 6px;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-800) 88%, transparent);
+}
+
+.audioControlRoomSection {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.audioInspectorField {
+  display: grid;
+  gap: 10px;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-800) 88%, transparent);
+}
+
+.audioInspectorFieldValue {
+  color: var(--color-text-strong);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+}
+
+.audioLoadingBar,
+.audioLoadingChip,
+.audioLoadingRailSection,
+.audioLoadingInspectorCard,
+.audioLoadingStrip,
+.audioLoadingMeter {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-700) 90%, transparent);
+}
+
+.audioLoadingBar::after,
+.audioLoadingChip::after,
+.audioLoadingRailSection::after,
+.audioLoadingInspectorCard::after,
+.audioLoadingStrip::after,
+.audioLoadingMeter::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, white 12%, transparent), transparent);
+  animation: audioLoadingSweep 1.6s ease-in-out infinite;
+}
+
+.audioLoadingBar {
+  height: 32px;
+}
+
+.audioLoadingChipRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.audioLoadingChip {
+  width: 88px;
+  height: 28px;
+}
+
+.audioLoadingBridgeGrid,
+.audioLoadingStripGrid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.audioLoadingBridgeGrid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.audioLoadingMeter {
+  min-height: 86px;
+}
+
+.audioLoadingRailSection,
+.audioLoadingInspectorCard {
+  min-height: 180px;
+}
+
+.audioLoadingStripGrid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.audioLoadingStrip {
+  min-height: 520px;
+}
+
+@media (max-width: 2100px) {
+  .audioMainGrid {
+    grid-template-columns: 280px minmax(0, 1fr) 380px;
+  }
+
+  .audioMeterBridge {
+    min-height: 104px;
+  }
+}
+
+@keyframes audioLoadingSweep {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes audioSnapshotFlash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-500) 42%, transparent);
+  }
+
+  35% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 34%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-500) 0%, transparent);
+  }
+}

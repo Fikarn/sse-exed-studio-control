@@ -2,9 +2,9 @@ use crate::planning_settings::{
     is_valid_dashboard_view, is_valid_deck_mode, is_valid_mode_section, is_valid_sort_by,
     is_valid_timeline_hour, is_valid_view_filter, DASHBOARD_VIEW_KEY, DECK_MODE_KEY,
     DEFAULT_DASHBOARD_VIEW, DEFAULT_DECK_MODE, DEFAULT_MODE_SECTION, DEFAULT_SORT_BY,
-    DEFAULT_TIMELINE_END_HOUR, DEFAULT_TIMELINE_START_HOUR, DEFAULT_VIEW_FILTER,
-    MODE_SECTION_KEY, PLANNING_SETTINGS_PREFIX, SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY,
-    SORT_BY_KEY, TIMELINE_END_HOUR_KEY, TIMELINE_START_HOUR_KEY, VIEW_FILTER_KEY,
+    DEFAULT_TIMELINE_END_HOUR, DEFAULT_TIMELINE_START_HOUR, DEFAULT_VIEW_FILTER, MODE_SECTION_KEY,
+    PLANNING_SETTINGS_PREFIX, SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY, SORT_BY_KEY,
+    TIMELINE_END_HOUR_KEY, TIMELINE_START_HOUR_KEY, VIEW_FILTER_KEY,
 };
 use crate::storage::{apply_settings, list_settings_by_prefix, open_connection, EngineResult};
 use serde::{Deserialize, Serialize};
@@ -344,6 +344,7 @@ pub struct PlanningTaskDeleteRequest {
 #[derive(Debug)]
 pub struct PlanningTaskRescheduleRequest {
     task_id: String,
+    project_id: Option<String>,
     scheduled_start: Option<Option<String>>,
     scheduled_duration_seconds: Option<Option<i64>>,
 }
@@ -1570,9 +1571,13 @@ pub fn parse_planning_task_reschedule_request(
     params: &Value,
 ) -> Result<PlanningTaskRescheduleRequest, String> {
     let task_id = parse_required_string_field(params, "taskId")?;
+    let project_id = parse_optional_string_field(params, "projectId")?;
 
     let scheduled_start = if params.get("scheduledStart").is_some() {
-        Some(parse_optional_nullable_string_field(params, "scheduledStart")?)
+        Some(parse_optional_nullable_string_field(
+            params,
+            "scheduledStart",
+        )?)
     } else {
         None
     };
@@ -1593,14 +1598,15 @@ pub fn parse_planning_task_reschedule_request(
         }
     }
 
-    if scheduled_start.is_none() && scheduled_duration_seconds.is_none() {
+    if project_id.is_none() && scheduled_start.is_none() && scheduled_duration_seconds.is_none() {
         return Err(String::from(
-            "planning.task.reschedule requires scheduledStart or scheduledDurationSeconds",
+            "planning.task.reschedule requires projectId, scheduledStart, or scheduledDurationSeconds",
         ));
     }
 
     Ok(PlanningTaskRescheduleRequest {
         task_id,
+        project_id,
         scheduled_start,
         scheduled_duration_seconds,
     })
@@ -1617,6 +1623,15 @@ pub fn apply_planning_task_reschedule(
         .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
     let task = load_task_row(&transaction, &request.task_id)?;
     let now = current_timestamp(&transaction)?;
+    let next_project_id = request
+        .project_id
+        .clone()
+        .unwrap_or_else(|| task.project_id.clone());
+    let moved_across_projects = next_project_id != task.project_id;
+
+    if moved_across_projects {
+        assert_project_exists_in_transaction(&transaction, &next_project_id)?;
+    }
 
     let next_scheduled_start = match &request.scheduled_start {
         Some(value) => value.clone(),
@@ -1626,18 +1641,47 @@ pub fn apply_planning_task_reschedule(
         Some(value) => value,
         None => task.scheduled_duration_seconds,
     };
+    let next_order = if moved_across_projects {
+        next_task_sort_order_for_project(&transaction, &next_project_id)?
+    } else {
+        task.order
+    };
 
     transaction
         .execute(
             "UPDATE tasks
-             SET scheduled_start = ?2,
-                 scheduled_duration_seconds = ?3
+             SET project_id = ?2,
+                 scheduled_start = ?3,
+                 scheduled_duration_seconds = ?4,
+                 sort_order = ?5
              WHERE id = ?1",
-            rusqlite::params![request.task_id, next_scheduled_start, next_scheduled_duration],
+            rusqlite::params![
+                request.task_id,
+                next_project_id,
+                next_scheduled_start,
+                next_scheduled_duration,
+                next_order,
+            ],
         )
         .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
 
+    if moved_across_projects {
+        let source_task_ids =
+            ordered_task_ids_for_project_in_transaction(&transaction, &task.project_id, Some(&request.task_id))?;
+        for (order, ordered_task_id) in source_task_ids.iter().enumerate() {
+            transaction
+                .execute(
+                    "UPDATE tasks SET sort_order = ?2 WHERE id = ?1",
+                    rusqlite::params![ordered_task_id, order as i64],
+                )
+                .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
+        }
+    }
+
     let mut changes: Vec<&'static str> = Vec::new();
+    if request.project_id.is_some() {
+        changes.push("projectId");
+    }
     if request.scheduled_start.is_some() {
         changes.push("scheduledStart");
     }
@@ -1659,7 +1703,16 @@ pub fn apply_planning_task_reschedule(
         .commit()
         .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
 
-    let (task, context) = read_task_and_context(db_path, &request.task_id)?;
+    let context = if moved_across_projects {
+        update_selection_after_mutation(
+            db_path,
+            Some(Some(next_project_id.clone())),
+            Some(Some(request.task_id.clone())),
+        )?
+    } else {
+        read_planning_context_with_current_settings(db_path)?
+    };
+    let task = read_task_by_id(db_path, &request.task_id)?;
     Ok(PlanningTaskMutationResult { task, context })
 }
 
@@ -2841,10 +2894,7 @@ fn parse_optional_i64_field(params: &Value, name: &str) -> Result<Option<i64>, S
         .transpose()
 }
 
-fn parse_optional_nullable_i64_field(
-    params: &Value,
-    name: &str,
-) -> Result<Option<i64>, String> {
+fn parse_optional_nullable_i64_field(params: &Value, name: &str) -> Result<Option<i64>, String> {
     match params.get(name) {
         Some(value) if value.is_null() => Ok(None),
         Some(value) => value
@@ -3746,8 +3796,8 @@ mod tests {
             "scheduledDurationSeconds": 1800
         }))
         .expect("reschedule should parse");
-        let result = apply_planning_task_reschedule(&db_path, &request)
-            .expect("reschedule should apply");
+        let result =
+            apply_planning_task_reschedule(&db_path, &request).expect("reschedule should apply");
 
         assert_eq!(
             result.task.scheduled_start.as_deref(),
@@ -3783,8 +3833,7 @@ mod tests {
             "scheduledDurationSeconds": Value::Null
         }))
         .expect("clear should parse");
-        let cleared = apply_planning_task_reschedule(&db_path, &clear)
-            .expect("clear should apply");
+        let cleared = apply_planning_task_reschedule(&db_path, &clear).expect("clear should apply");
 
         assert!(cleared.task.scheduled_start.is_none());
         assert!(cleared.task.scheduled_duration_seconds.is_none());

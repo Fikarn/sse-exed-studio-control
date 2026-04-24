@@ -1,0 +1,12 @@
+{
+  "name": "@sse/shared-graphics",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "react": "^19.2.0"
+  }
+}

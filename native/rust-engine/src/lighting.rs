@@ -784,10 +784,7 @@ pub fn parse_lighting_fixture_update_request(
         .get("spatialRotation")
         .map(|value| parse_spatial_rotation_value(value, "spatialRotation"))
         .transpose()?;
-    let rig_z = params
-        .get("rigZ")
-        .map(parse_optional_rig_z)
-        .transpose()?;
+    let rig_z = params.get("rigZ").map(parse_optional_rig_z).transpose()?;
     let beam_angle_degrees = params
         .get("beamAngleDegrees")
         .map(parse_optional_beam_angle_degrees)
@@ -1224,9 +1221,7 @@ pub fn parse_lighting_cue_delete_request(
     })
 }
 
-pub fn parse_lighting_cue_fire_request(
-    params: &Value,
-) -> Result<LightingCueFireRequest, String> {
+pub fn parse_lighting_cue_fire_request(params: &Value) -> Result<LightingCueFireRequest, String> {
     let cue_id = params
         .get("cueId")
         .and_then(Value::as_str)
@@ -1467,7 +1462,15 @@ pub fn import_legacy_lighting_fixture(
                     .and_then(|effect| validate_effect_type(effect.effect_type.as_str()))
                     .map(|effect_type| LightingEffect {
                         effect_type,
-                        speed: clamp_i64(fixture.effect.as_ref().map(|effect| effect.speed).unwrap_or(1), 1, 10),
+                        speed: clamp_i64(
+                            fixture
+                                .effect
+                                .as_ref()
+                                .map(|effect| effect.speed)
+                                .unwrap_or(1),
+                            1,
+                            10,
+                        ),
                     }),
             }
         })
@@ -1544,11 +1547,17 @@ pub fn import_legacy_lighting_fixture(
     let selected_fixture_id = wire
         .lighting_settings
         .selected_light_id
-        .filter(|fixture_id| fixture_states.iter().any(|fixture| fixture.id == *fixture_id));
-    let selected_scene_id = wire
-        .lighting_settings
-        .selected_scene_id
-        .filter(|scene_id| editor_state.scenes.iter().any(|scene| scene.id == *scene_id));
+        .filter(|fixture_id| {
+            fixture_states
+                .iter()
+                .any(|fixture| fixture.id == *fixture_id)
+        });
+    let selected_scene_id = wire.lighting_settings.selected_scene_id.filter(|scene_id| {
+        editor_state
+            .scenes
+            .iter()
+            .any(|scene| scene.id == *scene_id)
+    });
 
     let mut updates = lighting_editor_state_updates(&editor_state)?;
     updates.extend_from_slice(&[
@@ -1589,7 +1598,10 @@ pub fn import_legacy_lighting_fixture(
             String::from("idle"),
         ),
         (String::from(LIGHTING_LAST_ACTION_CODE_KEY), String::new()),
-        (String::from(LIGHTING_LAST_ACTION_MESSAGE_KEY), String::new()),
+        (
+            String::from(LIGHTING_LAST_ACTION_MESSAGE_KEY),
+            String::new(),
+        ),
     ]);
 
     persist_lighting_state(db_path, &updates)
@@ -2636,12 +2648,14 @@ pub fn create_lighting_cue(
     let app_settings = load_lighting_settings(db_path)?;
     let editor_state = load_lighting_editor_state(&app_settings);
     if let Some(scene_id) = &request.scene_id {
-        if !editor_state.scenes.iter().any(|scene| &scene.id == scene_id) {
+        if !editor_state
+            .scenes
+            .iter()
+            .any(|scene| &scene.id == scene_id)
+        {
             return Err(LightingCommandError::Rejected(
                 "LIGHTING_SCENE_NOT_FOUND",
-                format!(
-                    "Lighting cue references scene '{scene_id}' but no matching scene exists."
-                ),
+                format!("Lighting cue references scene '{scene_id}' but no matching scene exists."),
             ));
         }
     }
@@ -2711,12 +2725,14 @@ pub fn update_lighting_cue(
     let app_settings = load_lighting_settings(db_path)?;
     let editor_state = load_lighting_editor_state(&app_settings);
     if let Some(Some(scene_id)) = &request.scene_id {
-        if !editor_state.scenes.iter().any(|scene| &scene.id == scene_id) {
+        if !editor_state
+            .scenes
+            .iter()
+            .any(|scene| &scene.id == scene_id)
+        {
             return Err(LightingCommandError::Rejected(
                 "LIGHTING_SCENE_NOT_FOUND",
-                format!(
-                    "Lighting cue references scene '{scene_id}' but no matching scene exists."
-                ),
+                format!("Lighting cue references scene '{scene_id}' but no matching scene exists."),
             ));
         }
     }
@@ -2728,7 +2744,10 @@ pub fn update_lighting_cue(
         .ok_or_else(|| {
             LightingCommandError::Rejected(
                 "LIGHTING_CUE_NOT_FOUND",
-                format!("Lighting cue '{}' is not present in the cue stack.", request.cue_id),
+                format!(
+                    "Lighting cue '{}' is not present in the cue stack.",
+                    request.cue_id
+                ),
             )
         })?;
 
@@ -2806,7 +2825,10 @@ pub fn delete_lighting_cue(
         .ok_or_else(|| {
             LightingCommandError::Rejected(
                 "LIGHTING_CUE_NOT_FOUND",
-                format!("Lighting cue '{}' is not present in the cue stack.", request.cue_id),
+                format!(
+                    "Lighting cue '{}' is not present in the cue stack.",
+                    request.cue_id
+                ),
             )
         })?;
     let removed = cues.remove(index);
@@ -2856,7 +2878,10 @@ pub fn fire_lighting_cue(
         .ok_or_else(|| {
             LightingCommandError::Rejected(
                 "LIGHTING_CUE_NOT_FOUND",
-                format!("Lighting cue '{}' is not present in the cue stack.", request.cue_id),
+                format!(
+                    "Lighting cue '{}' is not present in the cue stack.",
+                    request.cue_id
+                ),
             )
         })?;
 
@@ -2874,10 +2899,7 @@ pub fn fire_lighting_cue(
 
     let summary = format!("Lighting cue '{}' fired.", target.label);
     let updates = vec![
-        (
-            String::from(LIGHTING_ACTIVE_CUE_ID_KEY),
-            target.id.clone(),
-        ),
+        (String::from(LIGHTING_ACTIVE_CUE_ID_KEY), target.id.clone()),
         (
             String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
             String::from("succeeded"),
@@ -4016,7 +4038,9 @@ fn parse_optional_beam_angle_degrees(value: &Value) -> Result<Option<f64>, Strin
         .as_f64()
         .ok_or_else(|| String::from("beamAngleDegrees must be a finite number or null"))?;
     if !degrees.is_finite() {
-        return Err(String::from("beamAngleDegrees must be a finite number or null"));
+        return Err(String::from(
+            "beamAngleDegrees must be a finite number or null",
+        ));
     }
     Ok(Some(clamp_f64(degrees, 1.0, 180.0)))
 }
@@ -5058,7 +5082,10 @@ mod tests {
                 .expect("settings should load"),
         );
         assert_eq!(snapshot.cues.len(), 2);
-        assert_eq!(snapshot.active_cue_id.as_deref(), Some(relabeled.cue.id.as_str()));
+        assert_eq!(
+            snapshot.active_cue_id.as_deref(),
+            Some(relabeled.cue.id.as_str())
+        );
         let active_cue = snapshot
             .cues
             .iter()

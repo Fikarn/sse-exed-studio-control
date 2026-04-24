@@ -120,6 +120,7 @@ pub struct ImportedSettings {
     pub selected_project_id: Option<String>,
     pub selected_task_id: Option<String>,
     pub commissioning_completed: bool,
+    pub commissioning_runner_stage: String,
     pub commissioning_stage: String,
     pub shell_workspace: String,
 }
@@ -509,6 +510,11 @@ fn normalize_settings(
         selected_project_id,
         selected_task_id,
         commissioning_completed,
+        commissioning_runner_stage: if commissioning_completed {
+            String::from("publish")
+        } else {
+            String::from("import")
+        },
         commissioning_stage: if commissioning_completed {
             String::from("ready")
         } else {
@@ -624,6 +630,7 @@ mod tests {
         assert_eq!(normalized.selected_project_id.as_deref(), Some("proj-1"));
         assert_eq!(normalized.selected_task_id.as_deref(), Some("task-1"));
         assert_eq!(normalized.shell_workspace, "planning");
+        assert_eq!(normalized.commissioning_runner_stage, "import");
         assert_eq!(normalized.commissioning_stage, "setup-required");
     }
 }

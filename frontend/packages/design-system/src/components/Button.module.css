@@ -1,0 +1,66 @@
+@layer components {
+  .button {
+    align-items: center;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+    border: 1px solid var(--color-surface-border);
+    border-radius: var(--radius-pill);
+    color: var(--color-studio-050);
+    cursor: pointer;
+    display: inline-flex;
+    gap: var(--space-4);
+    justify-content: center;
+    letter-spacing: 0.01em;
+    padding: 0 var(--space-7);
+    transition:
+      transform var(--motion-duration-fast) ease,
+      border-color var(--motion-duration-fast) ease,
+      background-color var(--motion-duration-fast) ease;
+    white-space: nowrap;
+  }
+
+  .button:hover {
+    border-color: var(--color-surface-borderStrong);
+    transform: translateY(-1px);
+  }
+
+  .button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    transform: none;
+  }
+
+  .leading {
+    color: var(--color-studio-300);
+    font-size: 0.95em;
+  }
+
+  .default {
+    min-height: var(--size-controlHeight);
+  }
+
+  .compact {
+    min-height: var(--size-compactControlHeight);
+    padding-inline: var(--space-6);
+  }
+
+  .primary {
+    background:
+      linear-gradient(180deg, rgba(153, 186, 146, 0.25), rgba(153, 186, 146, 0.08)), var(--color-surface-raised);
+    border-color: rgba(153, 186, 146, 0.42);
+  }
+
+  .secondary {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+  }
+
+  .ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-studio-300);
+  }
+
+  .danger {
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0.06)), var(--color-surface-raised);
+    border-color: rgba(239, 68, 68, 0.32);
+  }
+}

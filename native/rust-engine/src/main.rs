@@ -53,7 +53,11 @@ fn main() -> io::Result<()> {
                     "logsDir": planned_paths.logs_dir.display().to_string(),
                     "logFilePath": planned_paths.log_file_path.display().to_string(),
                     "dbPath": planned_paths.db_path.display().to_string(),
-                    "backupDir": planned_paths.backups_dir.display().to_string()
+                    "backupDir": planned_paths.backups_dir.display().to_string(),
+                    "updateRepositoryPath": planned_paths
+                        .update_repository_path
+                        .as_ref()
+                        .map(|path| path.display().to_string())
                 }
             }),
         );
@@ -76,7 +80,11 @@ fn main() -> io::Result<()> {
                         "logsDir": planned_paths.logs_dir.display().to_string(),
                         "logFilePath": planned_paths.log_file_path.display().to_string(),
                         "dbPath": planned_paths.db_path.display().to_string(),
-                        "backupDir": planned_paths.backups_dir.display().to_string()
+                        "backupDir": planned_paths.backups_dir.display().to_string(),
+                        "updateRepositoryPath": planned_paths
+                            .update_repository_path
+                            .as_ref()
+                            .map(|path| path.display().to_string())
                     }
                 }),
             );

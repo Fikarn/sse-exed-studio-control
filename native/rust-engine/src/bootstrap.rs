@@ -19,6 +19,7 @@ pub struct RuntimePaths {
     pub logs_dir: PathBuf,
     pub log_file_path: PathBuf,
     pub db_path: PathBuf,
+    pub update_repository_path: Option<PathBuf>,
 }
 
 pub struct RuntimeContext {
@@ -28,6 +29,7 @@ pub struct RuntimeContext {
     pub logs_dir: PathBuf,
     pub log_file_path: PathBuf,
     pub db_path: PathBuf,
+    pub update_repository_path: Option<PathBuf>,
     pub storage_ready: bool,
     pub storage_bootstrap: StorageBootstrap,
     pub control_surface_bridge: ControlSurfaceBridgeInfo,
@@ -45,6 +47,11 @@ pub fn resolve_runtime_paths() -> RuntimePaths {
     let backups_dir = app_data_dir.join("backups");
     let log_file_path = logs_dir.join("engine.log");
     let db_path = app_data_dir.join("studio-control.sqlite3");
+    let update_repository_path = env::var("SSE_UPDATE_REPOSITORY_PATH")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from);
 
     RuntimePaths {
         protocol_version: String::from(SUPPORTED_PROTOCOL_VERSION),
@@ -54,6 +61,7 @@ pub fn resolve_runtime_paths() -> RuntimePaths {
         logs_dir,
         log_file_path,
         db_path,
+        update_repository_path,
     }
 }
 
@@ -157,6 +165,7 @@ pub fn bootstrap_runtime() -> EngineResult<RuntimeContext> {
         logs_dir: runtime_paths.logs_dir,
         log_file_path: runtime_paths.log_file_path,
         db_path: runtime_paths.db_path,
+        update_repository_path: runtime_paths.update_repository_path,
         storage_ready: true,
         storage_bootstrap,
         control_surface_bridge,

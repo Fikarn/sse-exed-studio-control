@@ -3,10 +3,15 @@
 This directory contains the product runtime:
 
 - `qt-shell/`: Qt/QML desktop shell
+- `tauri-shell/`: replacement native webview shell track
 - `rust-engine/`: Rust control engine
 - `protocol/`: transport and message contract
 
 The native runtime is the only product runtime. The legacy Electron/Next.js path was retired in `v2.1.0`.
+
+During the replatform, `qt-shell/` remains the shipping runtime and `tauri-shell/` remains the parallel replacement track.
+
+The promotion gate for replacing `qt-shell/` with `tauri-shell/` lives in [`docs/FRONTEND_CUTOVER_PLAN.md`](../docs/FRONTEND_CUTOVER_PLAN.md). Do not infer cutover readiness from local Tauri success alone.
 
 ## Repo Commands
 
@@ -40,7 +45,15 @@ npm run native:smoke:restart:clean-start
 npm run native:smoke:lifecycle
 npm run native:smoke:failures
 npm run native:acceptance
+npm run tauri:foundation
+npm run tauri:setup-support:qualify
+npm run tauri:workspaces:qualify
+npm run tauri:cutover:candidate
 ```
+
+The two Tauri qualification commands launch the replacement shell against the Rust engine and bind `127.0.0.1:4173`. Run them serially and stop other Vite preview/dev servers first.
+
+`npm run tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell. It keeps the existing Tauri checks serial and does not imply cutover readiness by itself.
 
 ## Local Build
 
