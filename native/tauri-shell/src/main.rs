@@ -532,20 +532,16 @@ fn route_window_to_preferred_monitor(window: &WebviewWindow) {
         return;
     };
 
-    let Ok(window_size) = window.outer_size() else {
-        return;
-    };
-
-    let work_area = monitor.work_area();
-    let target_width = window_size.width.min(work_area.size.width);
-    let target_height = window_size.height.min(work_area.size.height);
-    let target_x =
-        work_area.position.x + ((work_area.size.width as i32 - target_width as i32) / 2).max(0);
-    let target_y =
-        work_area.position.y + ((work_area.size.height as i32 - target_height as i32) / 2).max(0);
-
-    let _ = window.set_size(PhysicalSize::new(target_width, target_height));
-    let _ = window.set_position(PhysicalPosition::new(target_x, target_y));
+    let _ = window.set_fullscreen(false);
+    let _ = window.set_position(PhysicalPosition::new(
+        monitor.position().x,
+        monitor.position().y,
+    ));
+    let _ = window.set_size(PhysicalSize::new(
+        monitor.size().width,
+        monitor.size().height,
+    ));
+    let _ = window.set_fullscreen(true);
 }
 
 fn main() {
