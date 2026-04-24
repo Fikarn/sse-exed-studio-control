@@ -7,10 +7,12 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { createQualificationEvidence } from "./tauri-qualification-evidence.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const devServerPort = 4173;
+const evidence = createQualificationEvidence({ lane: "workspaces", rootDir });
 
 function assert(condition, message) {
   if (!condition) {
@@ -328,6 +330,10 @@ async function runWorkspaceQualification() {
     await dispatchCommand(firstSession, firstRun, "seedPlanningDemo", {
       replaceExistingData: true,
     });
+    evidence.recordCheck("commissioning-probes-and-publish-complete", {
+      audioReceivePort,
+      lightingUniverse: 1,
+    });
 
     const lightingWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
       workspaceId: "lighting",
@@ -384,6 +390,10 @@ async function runWorkspaceQualification() {
       cueFire.status.shellState.lightingSnapshot?.activeCueId === lightingCueId,
       "Expected live lighting cue fire to update activeCueId."
     );
+    evidence.recordCheck("lighting-live-mutations-round-trip", {
+      activeCueId: cueFire.status.shellState.lightingSnapshot?.activeCueId,
+      fixtureId: lightingFixtureId,
+    });
 
     const audioWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
       workspaceId: "audio",
@@ -454,6 +464,11 @@ async function runWorkspaceQualification() {
       audioRecall.status.shellState.audioSnapshot?.lastRecalledSnapshotId === audioSnapshotId,
       "Expected live audio snapshot recall to update lastRecalledSnapshotId."
     );
+    evidence.recordCheck("audio-live-mutations-round-trip", {
+      channelId: audioChannelId,
+      mixTargetId: audioMixTargetId,
+      snapshotId: audioSnapshotId,
+    });
 
     const planningWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
       workspaceId: "planning",
@@ -522,6 +537,10 @@ async function runWorkspaceQualification() {
       timeReport.result && typeof timeReport.result === "object",
       "Expected live planning time report to return an object."
     );
+    evidence.recordCheck("planning-live-mutations-round-trip", {
+      projectTitle: planningProjectTitle,
+      taskTitle: "Live shell acceptance task",
+    });
   } finally {
     await closeTauriShell(firstRun);
     firstSession.cleanup();
@@ -569,6 +588,11 @@ async function runWorkspaceQualification() {
       ),
       "Expected restarted Tauri runtime to preserve the created planning project."
     );
+    evidence.recordCheck("restart-preserves-migrated-workspace-state", {
+      activeCueId: restartStatus.shellState.lightingSnapshot?.activeCueId,
+      activeWorkspace: restartStatus.shellState.activeWorkspace,
+      selectedAudioChannelId: restartStatus.shellState.audioSnapshot?.selectedChannelId,
+    });
   } finally {
     if (restartSession) {
       await closeTauriShell(restartSession.child);
@@ -578,5 +602,13 @@ async function runWorkspaceQualification() {
   }
 }
 
-await runWorkspaceQualification();
-console.log("Tauri workspace qualification passed.");
+try {
+  await runWorkspaceQualification();
+  console.log(`Tauri workspace qualification evidence: ${evidence.write("passed")}`);
+  console.log("Tauri workspace qualification passed.");
+} catch (error) {
+  evidence.write("failed", {
+    error: error instanceof Error ? error.message : String(error),
+  });
+  throw error;
+}

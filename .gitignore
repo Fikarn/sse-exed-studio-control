@@ -25,6 +25,7 @@ native/tauri-shell/target/
 native/qt-shell/CMakeUserPresets.json
 native/qt-shell/assets/fonts/latin-*-normal.ttf
 artifacts/parity/live/
+artifacts/tauri-qualification/
 frontend/**/dist/
 frontend/**/storybook-static/
 frontend/**/playwright-report/

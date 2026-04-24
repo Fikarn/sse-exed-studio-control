@@ -6,10 +6,12 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { createQualificationEvidence } from "./tauri-qualification-evidence.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const devServerPort = 4173;
+const evidence = createQualificationEvidence({ lane: "setup-support", rootDir });
 
 function assert(condition, message) {
   if (!condition) {
@@ -251,6 +253,10 @@ async function runSetupSupportQualification() {
       initialStatus.shellState.commissioningSnapshot?.runnerStage === "import",
       `Expected clean commissioning runnerStage 'import', got '${initialStatus.shellState.commissioningSnapshot?.runnerStage}'.`
     );
+    evidence.recordCheck("clean-startup-routes-to-commissioning", {
+      activeWorkspace: initialStatus.shellState.activeWorkspace,
+      targetSurface: initialStatus.shellState.appSnapshot?.startup?.targetSurface,
+    });
 
     const supportStatus = await dispatchCommand(firstSession, firstRun, "setSetupSection", {
       section: "support",
@@ -259,6 +265,9 @@ async function runSetupSupportQualification() {
       supportStatus.status.shellState.appSnapshot?.shell?.setup?.activeSection === "support",
       "Expected support section toggle to persist through the live Tauri shell."
     );
+    evidence.recordCheck("support-section-toggle-persists", {
+      activeSection: supportStatus.status.shellState.appSnapshot?.shell?.setup?.activeSection,
+    });
 
     await dispatchCommand(firstSession, firstRun, "setSetupSection", {
       section: "commissioning",
@@ -274,6 +283,9 @@ async function runSetupSupportQualification() {
       publishStatus.status.shellState.appSnapshot?.startup?.targetSurface === "dashboard",
       "Expected commissioning publish to unlock dashboard startup through the live Tauri shell."
     );
+    evidence.recordCheck("commissioning-publish-unlocks-dashboard", {
+      targetSurface: publishStatus.status.shellState.appSnapshot?.startup?.targetSurface,
+    });
 
     const backupExport = await dispatchCommand(firstSession, firstRun, "exportSupportBackup");
     const backupPath = backupExport.result?.path;
@@ -285,6 +297,9 @@ async function runSetupSupportQualification() {
       backupExport.status.shellState.supportSnapshot?.backupCount >= 1,
       "Expected support snapshot to reflect at least one backup after export."
     );
+    evidence.recordCheck("backup-export-creates-archive", {
+      backupCount: backupExport.status.shellState.supportSnapshot?.backupCount,
+    });
 
     const diagnosticsExport = await dispatchCommand(firstSession, firstRun, "exportShellDiagnostics", {
       directory: runtime.diagnosticsDir,
@@ -293,6 +308,7 @@ async function runSetupSupportQualification() {
       typeof diagnosticsExport.result === "string" && existsSync(diagnosticsExport.result),
       "Expected diagnostics export to write a report through the live Tauri shell."
     );
+    evidence.recordCheck("diagnostics-export-writes-report");
 
     const seedStatus = await dispatchCommand(firstSession, firstRun, "seedPlanningDemo", {
       replaceExistingData: true,
@@ -326,6 +342,9 @@ async function runSetupSupportQualification() {
       restoreStatus.status.shellState.commissioningSnapshot?.planningTaskCount === 0,
       "Expected restore to return planning task count to the exported baseline."
     );
+    evidence.recordCheck("backup-restore-round-trips-native-support-backup", {
+      sourceFormat: restoreStatus.result?.sourceFormat,
+    });
 
     const planningStatus = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
       workspaceId: "planning",
@@ -373,6 +392,10 @@ async function runSetupSupportQualification() {
       restartStatus.shellState.supportSnapshot?.backupCount >= 2,
       "Expected restarted Tauri runtime to preserve support backup history."
     );
+    evidence.recordCheck("persisted-restart-restores-dashboard-state", {
+      activeWorkspace: restartStatus.shellState.activeWorkspace,
+      targetSurface: restartStatus.shellState.appSnapshot?.startup?.targetSurface,
+    });
   } finally {
     await closeTauriShell(secondRun);
     secondSession.cleanup();
@@ -409,6 +432,10 @@ async function runSetupSupportQualification() {
       recoveryStatus.shellState.startupFailure?.stage === "bootstrap",
       `Expected bootstrap recovery stage 'bootstrap', got '${recoveryStatus.shellState.startupFailure?.stage}'.`
     );
+    evidence.recordCheck("bootstrap-failure-remains-operator-visible", {
+      code: recoveryStatus.shellState.startupFailure?.code,
+      stage: recoveryStatus.shellState.startupFailure?.stage,
+    });
   } finally {
     await closeTauriShell(recoveryRun);
     recoverySession.cleanup();
@@ -416,5 +443,13 @@ async function runSetupSupportQualification() {
   }
 }
 
-await runSetupSupportQualification();
-console.log("Tauri Setup/Support qualification passed.");
+try {
+  await runSetupSupportQualification();
+  console.log(`Tauri Setup/Support qualification evidence: ${evidence.write("passed")}`);
+  console.log("Tauri Setup/Support qualification passed.");
+} catch (error) {
+  evidence.write("failed", {
+    error: error instanceof Error ? error.message : String(error),
+  });
+  throw error;
+}
