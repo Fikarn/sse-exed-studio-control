@@ -25,7 +25,8 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `Setup/Support`, `Lighting`, `Audio`, and `Planning` have replacement-shell coverage in fixture, Playwright, and live Tauri qualification lanes.
 - `npm run tauri:setup-support:qualify` covers clean startup, setup/support flows, persisted restart, and bootstrap-failure recovery posture.
 - `npm run tauri:workspaces:qualify` covers commissioned startup plus live Lighting, Audio, and Planning mutations across restart persistence.
-- The Tauri CI jobs are non-blocking foundation smoke jobs while Qt remains shipping.
+- `frontend-foundation`, `tauri-foundation-macos`, and `tauri-foundation-windows` are blocking CI jobs on `main`.
+- The live Tauri qualification commands remain local/manual cutover-readiness gates until stable CI display/webview lanes or documented target-host evidence exist.
 
 ## Non-Negotiables
 
@@ -139,8 +140,6 @@ Stop cutover work and re-anchor if any of these are true:
 The next implementation slice after this document should be the smallest gate-hardening task that moves a Checkpoint A or Checkpoint B item from manual to repeatable. Candidate slices are:
 
 - keep `npm run tauri:cutover:candidate` green as the local Checkpoint A gate
-- promote `frontend-foundation` from non-blocking to blocking once it is stable
-- promote `tauri-foundation` from non-blocking to blocking once macOS and Windows are stable
 - add stable CI or scripted evidence capture for `tauri:setup-support:qualify`
 - add stable CI or scripted evidence capture for `tauri:workspaces:qualify`
 - define the packaged Tauri release path before any shipping-runtime switch
