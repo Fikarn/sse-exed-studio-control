@@ -116,7 +116,7 @@ Before calling the productization pass complete, confirm:
 ## Current Implementation Slice
 
 - keep the native packaging and release lanes healthy as the only product path
-- verify native release bundles on a safe SQLite build before any operator rollout
+- verify the published `v2.2.0` installer on the intended operator workstation through [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4)
 
 ## Final Mile
 

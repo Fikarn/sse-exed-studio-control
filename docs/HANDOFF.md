@@ -68,7 +68,8 @@ The highest-value unresolved work is:
 
 The current GitHub execution queue is:
 
-- [Issue #3: Tauri replacement shell parallel acceptance and packaging evidence](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
+- [Issue #3: Cutover: Tauri shipping switch evidence and fallback window](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
+- [Issue #4: Rollout: verify v2.2.0 published installer on operator workstation](https://github.com/Fikarn/sse-exed-studio-control/issues/4)
 - release-artwork polish and public-distribution signing posture remain tracked in `docs/PRODUCTIZATION_PLAN.md` §3 rather than as separate execution items
 
 ## Validation Baseline
