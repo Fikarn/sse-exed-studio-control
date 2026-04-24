@@ -27,6 +27,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `npm run tauri:workspaces:qualify` covers commissioned startup plus live Lighting, Audio, and Planning mutations across restart persistence.
 - `npm run tauri:visual:review` captures repeatable replacement-shell fixture screenshots at `2560x1440` and `1920x1080` for Setup/Support recovery, Lighting, Audio, and Planning, and fails on app-level scroll.
 - `frontend-foundation`, `tauri-foundation-macos`, and `tauri-foundation-windows` are blocking CI jobs on `main`.
+- Current GitHub Actions runs for the new repository are failing before runner execution with empty job steps / no runner assignment; this blocks Checkpoint B until the account-level Actions runner/billing issue is resolved and the blocking jobs are rerun successfully.
 - The live Tauri qualification commands remain local/manual cutover-readiness gates until stable CI display/webview lanes or documented target-host evidence exist.
 - `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` stage Tauri candidate payloads through the QtIFW installer/update layout without touching the shipping Qt `release/native*` roots.
 - [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue. It declares the bounded acceptance window and packaging path, but does not authorize cutover by itself.
