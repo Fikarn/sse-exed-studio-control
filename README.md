@@ -104,6 +104,7 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): day-to-day engineering workflow
 - [docs/OPERATIONS.md](docs/OPERATIONS.md): local operations and operator support
 - [docs/RELEASE.md](docs/RELEASE.md): versioning, tagging, installers, and release flow
+- [docs/OPERATOR_WORKSTATION_ROLLOUT.md](docs/OPERATOR_WORKSTATION_ROLLOUT.md): final published-installer verification on the intended studio workstation
 - [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
 - [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
 - [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch

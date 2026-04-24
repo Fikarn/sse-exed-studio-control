@@ -275,6 +275,7 @@ On non-target hosts, `npm run release:verify` skips the installer and update-rep
 13. Smoke-test the generated macOS and Windows installers from GitHub Releases, including the expected unsigned trust flow.
 14. Verify the release includes both platform update-repository archives.
 15. Capture install and update notes for anything that would surprise the next operator or maintainer.
+16. For the production workstation rollout, follow [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md) and record the result on the linked rollout issue before closing any fallback window.
 
 ## Final Mile
 
@@ -295,6 +296,8 @@ Test on a clean machine or VM when possible:
 5. Trigger a manual support backup export.
 6. Download the Companion profile and import it.
 7. Apply a newer tagged release through the maintenance-tool repository or a newer offline installer and verify user data is preserved.
+
+For the actual studio operator workstation, use [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md). That runbook is stricter than a generic clean-machine smoke test because it records the real display, audio, lighting, and Companion state used for rollout.
 
 ## Rollback
 

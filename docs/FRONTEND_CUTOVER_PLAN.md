@@ -156,6 +156,6 @@ Stop cutover work and re-anchor if any of these are true:
 
 The next implementation slice after the `v2.2.0` release should preserve the fallback window and avoid Checkpoint D drift. Candidate slices are:
 
-- perform operator rollout/install verification from the published `v2.2.0` release assets on the intended workstation through [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4)
+- perform operator rollout/install verification from the published `v2.2.0` release assets on the intended workstation through [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) and [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md)
 - keep [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) aligned through the bounded fallback window
 - open a separate Checkpoint D / Qt retirement issue only after the fallback window completes, and before removing Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets

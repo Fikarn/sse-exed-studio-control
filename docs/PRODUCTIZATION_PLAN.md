@@ -116,7 +116,7 @@ Before calling the productization pass complete, confirm:
 ## Current Implementation Slice
 
 - keep the native packaging and release lanes healthy as the only product path
-- verify the published `v2.2.0` installer on the intended operator workstation through [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4)
+- verify the published `v2.2.0` installer on the intended operator workstation through [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) and [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md)
 
 ## Final Mile
 
