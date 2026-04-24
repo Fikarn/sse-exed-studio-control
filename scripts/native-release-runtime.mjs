@@ -3,14 +3,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const defaultRootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const supportedRuntimes = new Set(["qt", "tauri"]);
+const supportedRuntimes = new Set(["tauri"]);
 
 function normalizeRuntime(value, source) {
   if (supportedRuntimes.has(value)) {
     return value;
   }
 
-  throw new Error(`${source} must be one of: ${Array.from(supportedRuntimes).join(", ")}.`);
+  if (value === "qt") {
+    throw new Error(
+      `${source}=qt is retired for native release packaging. Use npm run native:qt:foundation for Checkpoint D fallback validation before source removal.`
+    );
+  }
+
+  throw new Error(`${source} must be: tauri.`);
 }
 
 export function resolveNativeReleaseRuntime(rootDir = defaultRootDir) {
@@ -20,37 +26,31 @@ export function resolveNativeReleaseRuntime(rootDir = defaultRootDir) {
 
   const configPath = path.join(rootDir, "scripts", "native-release-runtime.json");
   if (!existsSync(configPath)) {
-    return "qt";
+    return "tauri";
   }
 
   const config = JSON.parse(readFileSync(configPath, "utf8"));
-  return normalizeRuntime(config.shippingRuntime ?? "qt", `${configPath} shippingRuntime`);
+  return normalizeRuntime(config.shippingRuntime ?? "tauri", `${configPath} shippingRuntime`);
 }
 
 export function nativeReleaseRuntimeLabel(runtime) {
-  return runtime === "tauri" ? "Tauri" : "Qt";
+  normalizeRuntime(runtime, "native release runtime");
+  return "Tauri";
 }
 
 export function nativeReleaseShellExecutableName(target, runtime) {
-  if (runtime === "tauri") {
-    return target === "windows" ? "sse-exed-tauri-shell.exe" : "sse-exed-tauri-shell";
-  }
-
-  return target === "windows" ? "sse_exed_native.exe" : "sse_exed_native";
+  normalizeRuntime(runtime, "native release runtime");
+  return target === "windows" ? "sse-exed-tauri-shell.exe" : "sse-exed-tauri-shell";
 }
 
 export function nativeReleaseSmokeArgs(target, runtime, statusPath) {
-  if (runtime === "tauri") {
-    return ["--smoke-test", `--smoke-status-path=${statusPath}`];
-  }
-
-  return target === "macos"
-    ? ["-platform", "offscreen", "--smoke-test", `--smoke-status-path=${statusPath}`]
-    : ["--smoke-test", `--smoke-status-path=${statusPath}`];
+  normalizeRuntime(runtime, "native release runtime");
+  return ["--smoke-test", `--smoke-status-path=${statusPath}`];
 }
 
 export function nativeReleaseRequiresOperatorUiReady(runtime) {
-  return runtime !== "tauri";
+  normalizeRuntime(runtime, "native release runtime");
+  return false;
 }
 
 export function nativeReleaseAppIdentifier() {

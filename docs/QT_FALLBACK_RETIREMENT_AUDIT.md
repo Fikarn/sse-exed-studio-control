@@ -78,10 +78,10 @@ Current selector files:
 Current behavior:
 
 - `scripts/native-release-runtime.json` selects `tauri` as `shippingRuntime`.
-- The same file still records `fallbackRuntime: "qt"`.
-- `SSE_NATIVE_RELEASE_RUNTIME=qt` can still force the old runtime before retirement lands.
-- `native-release-runtime.mjs` still supports both `qt` and `tauri`.
-- `native-release-build.mjs` runs `tauri:foundation` for Tauri and `native:build` for Qt.
+- The same file no longer records `fallbackRuntime: "qt"`.
+- `SSE_NATIVE_RELEASE_RUNTIME=qt` now fails with a retired-runtime message before release packaging starts.
+- `native-release-runtime.mjs` supports `tauri` only for the release path.
+- `native-release-build.mjs` runs `tauri:foundation` through the selected Tauri release runtime.
 
 Risk if removed first:
 
@@ -235,6 +235,8 @@ Required verification:
 
 ### Slice 2: Runtime Selector Lockdown
 
+Status: complete. The release runtime selector is Tauri-only, `fallbackRuntime` is removed from `scripts/native-release-runtime.json`, and `SSE_NATIVE_RELEASE_RUNTIME=qt` fails with a clear retired-runtime message.
+
 Goal: remove the ability to accidentally select Qt as a release runtime.
 
 Actions:
@@ -325,11 +327,12 @@ Required verification:
 
 ## Recommended Next Slice
 
-The next implementation slice should be Slice 2: Runtime Selector Lockdown.
+The next implementation slice should be Slice 3: Packaging And Signing Cleanup.
 
 Reason:
 
-- Slice 1 has already made active validation Tauri-first without deleting fallback code.
-- The release selector still permits `SSE_NATIVE_RELEASE_RUNTIME=qt`.
-- Removing or retiring that selector path before source deletion prevents an operator or release engineer from accidentally selecting a broken fallback later.
-- Packaging, signing, source deletion, and parity asset cleanup should wait until the selector is locked down.
+- Slice 1 made active validation Tauri-first without deleting fallback code.
+- Slice 2 removed the release-runtime footgun before source deletion.
+- Packaging scripts still contain unused Qt branches and deploy-tool resolution.
+- Windows signing still contains a deferred Qt executable-name assumption that must be fixed before any signed Windows release.
+- Source deletion and parity asset cleanup should wait until packaging and signing assumptions are Tauri-only.

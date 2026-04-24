@@ -11,7 +11,7 @@ Entry point for Claude-assisted work in this repo. Keep it short. Follow the poi
 Two processes, separated by an IPC protocol:
 
 - `native/tauri-shell/` + `frontend/` — selected shipping shell for the current published Tauri runtime, built on `Tauri 2 + React 19.2 + TypeScript + Vite`. **No device or DB logic in React.**
-- `native/qt-shell/` — Qt 6 / QML fallback shell retained until Checkpoint D issue #5 removes or archives it. Owns windowing, input, and layout when explicitly selected as fallback. **No device or DB logic in QML.**
+- `native/qt-shell/` — Qt 6 / QML fallback shell retained until Checkpoint D issue #5 removes or archives it. Owns windowing, input, and layout when tested directly through retained Qt fallback validation. **No device or DB logic in QML.**
 - `native/rust-engine/` — Rust. Owns state, persistence, device I/O, protocol dispatch.
 - `native/protocol/` — the IPC contract between them. Changes here are contract changes.
 

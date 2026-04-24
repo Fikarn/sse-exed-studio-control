@@ -7,7 +7,7 @@ import { nativeReleaseRuntimeLabel, resolveNativeReleaseRuntime } from "./native
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
-const buildScript = releaseRuntime === "tauri" ? "tauri:foundation" : "native:build";
+const buildScript = "tauri:foundation";
 
 console.log(`Building ${nativeReleaseRuntimeLabel(releaseRuntime)} shipping runtime via npm run ${buildScript}.`);
 

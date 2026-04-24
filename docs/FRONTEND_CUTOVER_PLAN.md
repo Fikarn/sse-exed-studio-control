@@ -21,7 +21,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 
 - `scripts/native-release-runtime.json` now selects `tauri` as the shipping release runtime.
 - `native/tauri-shell/` plus `frontend/` are the selected replacement shell track for the shipping release path.
-- `native/qt-shell/` remains available only until a Checkpoint D change removes or archives the fallback runtime; it can still be selected with `SSE_NATIVE_RELEASE_RUNTIME=qt` before that removal lands.
+- `native/qt-shell/` remains available only until a Checkpoint D change removes or archives the fallback runtime; it is no longer selectable as a native release runtime and can only be exercised through retained Qt fallback validation commands.
 - The Rust engine remains authoritative for state, persistence, device I/O, startup policy, recovery behavior, and support workflows.
 - `Setup/Support`, `Lighting`, `Audio`, and `Planning` have replacement-shell coverage in fixture, Playwright, and live Tauri qualification lanes.
 - `npm run tauri:setup-support:qualify` covers clean startup, setup/support flows, persisted restart, and bootstrap-failure recovery posture.
@@ -158,6 +158,6 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The next implementation slice after validation lane split is Checkpoint D Slice 2 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): runtime selector lockdown.
+The next implementation slice after runtime selector lockdown is Checkpoint D Slice 3 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): packaging and signing cleanup.
 
-Do this before deleting Qt fallback code, Qt-specific verification automation, or Qt parity assets. The goal is to remove the ability to accidentally select the Qt fallback as a release runtime before later packaging and source-removal slices.
+Do this before deleting Qt fallback code, Qt-specific verification automation, or Qt parity assets. The goal is to remove unused Qt packaging branches and fix remaining packaging/signing assumptions while preserving QtIFW as the installer/update wrapper.
