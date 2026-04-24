@@ -21,7 +21,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 
 - `scripts/native-release-runtime.json` now selects `tauri` as the shipping release runtime.
 - `native/tauri-shell/` plus `frontend/` are the selected replacement shell track for the shipping release path.
-- `native/qt-shell/` remains available as the fallback runtime during the bounded post-release fallback window and can be selected with `SSE_NATIVE_RELEASE_RUNTIME=qt`.
+- `native/qt-shell/` remains available only until a Checkpoint D change removes or archives the fallback runtime; it can still be selected with `SSE_NATIVE_RELEASE_RUNTIME=qt` before that removal lands.
 - The Rust engine remains authoritative for state, persistence, device I/O, startup policy, recovery behavior, and support workflows.
 - `Setup/Support`, `Lighting`, `Audio`, and `Planning` have replacement-shell coverage in fixture, Playwright, and live Tauri qualification lanes.
 - `npm run tauri:setup-support:qualify` covers clean startup, setup/support flows, persisted restart, and bootstrap-failure recovery posture.
@@ -32,8 +32,8 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` remain historical/pre-switch candidate evidence lanes under separate `release/tauri-candidate*` roots.
 - The shipping release path is now the `native:*` release lane, which packages the runtime selected by `scripts/native-release-runtime.json` into `release/native*`.
 - macOS Apple Silicon and Windows 11 `x64` post-switch release evidence exists for the switched `native:*` path.
-- Checkpoint C is satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; final operator-workstation rollout passed on published patch release `v2.2.1` at tag commit `951a2c4e1f236200f0f017121158bc9969427051`; Checkpoint D / Qt retirement remains out of scope until the bounded fallback window completes and a separate retirement issue is opened.
-- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) records the completed cutover acceptance, target-host evidence, publication digest, and retained fallback posture. It does not authorize Qt retirement by itself.
+- Checkpoint C is satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; final operator-workstation rollout passed on published patch release `v2.2.1` at tag commit `951a2c4e1f236200f0f017121158bc9969427051`; the bounded fallback window is closed in [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3).
+- Checkpoint D / Qt retirement is tracked separately in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). Do not remove Qt shell code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets outside that issue.
 
 ## Non-Negotiables
 
@@ -41,7 +41,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 - Protocol changes remain contract changes under `native/protocol/`.
 - The target operator surface remains fullscreen `2560x1440`, with `1920x1080` as the minimum fallback.
 - Normal operation must not require scrolling at either supported operator size.
-- Qt remains available as the internal fallback during the bounded parallel-acceptance window.
+- Qt remains available until a Checkpoint D change removes or archives it.
 - Any on-disk format change requires an explicit migration and rollback plan before cutover.
 
 ## Cutover Acceptance Gate
@@ -98,7 +98,7 @@ Do not tag a release until every item below is true for the intended release com
 
 - The release issue explicitly names the packaging path for the selected Tauri shell.
 - Installer identity, app identifier, app-data paths, logs paths, update-repository behavior, and rollback instructions are documented before promotion.
-- The old Qt shell remains available as the fallback runtime during the parallel-acceptance window.
+- The old Qt shell remains available until a Checkpoint D change removes or archives it.
 - Rollback to the previous shipping tag remains a reinstall-away and does not require manual database surgery.
 - If QtIFW remains the installer path for the candidate, the Tauri shell must be exercised through the shipping `native:*` packaged path before release.
 - If the release moves away from QtIFW, the new installer/update path must have equivalent package, update, continuity, rollback, and clean-machine acceptance evidence.
@@ -109,8 +109,8 @@ Current packaging direction:
 - The selected `tauri` release runtime stages the Tauri shell executable and `studio-control-engine` / `studio-control-engine.exe` side by side in the existing `release/native*` roots, or sets `SSE_ENGINE_BIN` explicitly.
 - The candidate installer/update repository must preserve the existing operator app-data, logs, update-repository, and rollback expectations before Checkpoint C can be claimed.
 - Real QtIFW `binarycreator` and `repogen` evidence is required on matching target hosts through `npm run native:release:mac:local` and `npm run native:release:win:local` for the switched release path.
-- The Qt shell must remain installable or launchable as the fallback runtime through the bounded parallel-acceptance window.
-- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the current release/cutover issue for this gate.
+- The Qt shell must remain installable or launchable until Checkpoint D explicitly changes that rollback posture.
+- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the completed release/cutover issue for this gate; [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) is the current Checkpoint D planning issue.
 
 ## Promotion Sequence
 
@@ -140,6 +140,8 @@ Operator rollout status: passed on published patch release `v2.2.1` at tag commi
 
 Entry condition: the Tauri runtime has shipped successfully through the bounded fallback window.
 
+Status: entered. The fallback window is closed in [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3), and Checkpoint D planning is tracked in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). The first Checkpoint D task is a read-only impact audit and removal-sequence proposal.
+
 Exit condition: Qt shell code, Qt-specific verification automation, QtIFW release dependencies, and Qt parity assets are removed only through an explicit retirement issue and only after rollback requirements no longer depend on them.
 
 ## Stop Conditions
@@ -151,12 +153,12 @@ Stop cutover work and re-anchor if any of these are true:
 - visual evidence is stale, not `2560x1440`, or taken from an invalid Retina logical desktop
 - any operator-critical state is owned by React instead of the Rust engine
 - packaging/update/rollback behavior is unspecified
-- the old Qt fallback cannot be launched during the parallel-acceptance window
+- the old Qt fallback cannot be launched before the Checkpoint D retirement path explicitly removes that requirement
 - the plan requires a hardware behavior that is not in [docs/HARDWARE_PROFILE.md](./HARDWARE_PROFILE.md)
 
 ## Next Implementation Work
 
-The next implementation slice after the `v2.2.1` operator rollout should preserve the fallback window and avoid Checkpoint D drift. Candidate slices are:
+The next implementation slice after the `v2.2.1` operator rollout is Checkpoint D planning. Candidate slices are:
 
-- keep [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) aligned through the bounded fallback window
-- open a separate Checkpoint D / Qt retirement issue only after the fallback window completes, and before removing Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets
+- perform the read-only impact audit requested by [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5)
+- propose the smallest safe removal sequence before deleting Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets

@@ -116,7 +116,7 @@ Before calling the productization pass complete, confirm:
 ## Current Implementation Slice
 
 - keep the native packaging and release lanes healthy as the only product path
-- keep the passed `v2.2.1` operator-workstation rollout recorded on [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) and [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md), with Qt fallback retained until the bounded fallback-window decision is explicit
+- perform the Checkpoint D read-only impact audit in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) before removing Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets
 
 ## Final Mile
 

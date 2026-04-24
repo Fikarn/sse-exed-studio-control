@@ -21,7 +21,7 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 - supervises the Rust engine as a child process through the Tauri bridge
 - shipped in `v2.2.0` and satisfied the [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) Checkpoint C shipping-switch gate for tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix
 
-### Qt shell (fallback runtime during the bounded post-release fallback window)
+### Qt shell (fallback runtime pending Checkpoint D retirement)
 
 - owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when selected as fallback
 - supervises the Rust engine as a child process

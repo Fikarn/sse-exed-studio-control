@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This runbook verifies the published `v2.2.1` installer on the intended operator workstation before the bounded Qt fallback window can be closed.
+This runbook records verification of the published `v2.2.1` installer on the intended operator workstation before the bounded Qt fallback window was closed.
 
-It is the execution procedure for [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4). It does not authorize Checkpoint D or Qt retirement. Qt fallback remains retained until issue #3 is explicitly updated and a separate retirement issue is opened.
+It is the execution procedure for [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4). It does not authorize Checkpoint D or Qt retirement. Checkpoint D planning is tracked separately in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5).
 
 ## Plan Anchor
 
@@ -156,7 +156,7 @@ Post a comment with:
 - Unsigned trust prompt notes.
 - Any stop condition or deviation.
 
-If the pass succeeds, update issue #3 with a short rollout-result comment. Do not close the fallback window unless that is an explicit follow-up decision.
+At execution time, a successful pass required a rollout-result comment on issue #3 before any separate fallback-window closure decision. The fallback-window closure is now recorded in issue #3, and Checkpoint D planning is tracked in issue #5.
 
 ## Stop Conditions
 
@@ -180,7 +180,7 @@ Plan anchor:
 
 - Issue #4 execution item.
 - Checkpoint C already complete.
-- Checkpoint D / Qt retirement not started.
+- Checkpoint D / Qt retirement tracked in issue #5.
 
 Workstation:
 
