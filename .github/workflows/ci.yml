@@ -43,7 +43,6 @@ jobs:
   frontend-foundation:
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    continue-on-error: true
     permissions:
       contents: read
 
@@ -270,7 +269,6 @@ jobs:
   tauri-foundation-macos:
     runs-on: macos-latest
     timeout-minutes: 35
-    continue-on-error: true
     permissions:
       contents: read
 
@@ -443,7 +441,6 @@ jobs:
   tauri-foundation-windows:
     runs-on: windows-latest
     timeout-minutes: 40
-    continue-on-error: true
     permissions:
       contents: read
 
