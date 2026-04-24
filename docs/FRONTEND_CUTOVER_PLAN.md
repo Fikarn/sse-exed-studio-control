@@ -32,7 +32,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` remain historical/pre-switch candidate evidence lanes under separate `release/tauri-candidate*` roots.
 - The shipping release path is now the `native:*` release lane, which packages the runtime selected by `scripts/native-release-runtime.json` into `release/native*`.
 - macOS Apple Silicon and Windows 11 `x64` post-switch release evidence exists for the switched `native:*` path.
-- Checkpoint C is satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; Checkpoint D / Qt retirement remains out of scope until the bounded fallback window completes and a separate retirement issue is opened.
+- Checkpoint C is satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; final operator-workstation rollout passed on published patch release `v2.2.1` at tag commit `951a2c4e1f236200f0f017121158bc9969427051`; Checkpoint D / Qt retirement remains out of scope until the bounded fallback window completes and a separate retirement issue is opened.
 - [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) records the completed cutover acceptance, target-host evidence, publication digest, and retained fallback posture. It does not authorize Qt retirement by itself.
 
 ## Non-Negotiables
@@ -134,6 +134,8 @@ Exit condition: the release candidate installs, launches, recovers, updates, and
 
 Status: satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`. Evidence includes macOS Apple Silicon `npm run native:release:mac:local` exit `0`, Windows 11 `x64` target-host evidence bundle `2026-04-24T20-52-02-256Z`, GitHub Release publication, and `npm run release:anchor:verify -- --tag v2.2.0` with authenticated API access.
 
+Operator rollout status: passed on published patch release `v2.2.1` at tag commit `951a2c4e1f236200f0f017121158bc9969427051`. `v2.2.1` keeps the selected Tauri shipping runtime, adds durable default app-data path resolution when no `SSE_APP_DATA_DIR` override is set, passed macOS `npm run native:release:mac:local`, passed Windows 11 `x64` target-host evidence bundle `2026-04-24T22-17-55-519Z`, and installed on the operator workstation with app data at `C:\Users\Stora Studion\AppData\Roaming\ExEd Studio Control Native`.
+
 ### Checkpoint D: Qt Retirement
 
 Entry condition: the Tauri runtime has shipped successfully through the bounded fallback window.
@@ -154,8 +156,7 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The next implementation slice after the `v2.2.0` release should preserve the fallback window and avoid Checkpoint D drift. Candidate slices are:
+The next implementation slice after the `v2.2.1` operator rollout should preserve the fallback window and avoid Checkpoint D drift. Candidate slices are:
 
-- perform operator rollout/install verification from the published `v2.2.0` release assets on the intended workstation through [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) and [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md)
 - keep [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) aligned through the bounded fallback window
 - open a separate Checkpoint D / Qt retirement issue only after the fallback window completes, and before removing Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets

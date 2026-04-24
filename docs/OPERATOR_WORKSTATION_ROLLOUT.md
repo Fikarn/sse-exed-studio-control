@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This runbook verifies the published `v2.2.0` installer on the intended operator workstation before the bounded Qt fallback window can be closed.
+This runbook verifies the published `v2.2.1` installer on the intended operator workstation before the bounded Qt fallback window can be closed.
 
 It is the execution procedure for [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4). It does not authorize Checkpoint D or Qt retirement. Qt fallback remains retained until issue #3 is explicitly updated and a separate retirement issue is opened.
 
@@ -13,8 +13,9 @@ It is the execution procedure for [GitHub issue #4](https://github.com/Fikarn/ss
 - Operator recovery: [OPERATIONS.md](./OPERATIONS.md)
 - Hardware target: [HARDWARE_PROFILE.md](./HARDWARE_PROFILE.md)
 - Rollout issue: [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4)
-- Release: [v2.2.0](https://github.com/Fikarn/sse-exed-studio-control/releases/tag/v2.2.0)
-- Release tag commit: `eb166092ad5483a00b6b59137062c86c3193ca53`
+- Release: [v2.2.1](https://github.com/Fikarn/sse-exed-studio-control/releases/tag/v2.2.1)
+- Release tag commit: `951a2c4e1f236200f0f017121158bc9969427051`
+- Superseded rollout target: `v2.2.0` reached Checkpoint C, but final operator rollout moved to `v2.2.1` after the installed Tauri shell was found to default operator app data to a temporary directory when no `SSE_APP_DATA_DIR` override was set.
 
 ## Scope
 
@@ -96,7 +97,7 @@ Stop if the hash does not match.
 4. Record any unsigned trust prompt and whether the operator would find it surprising.
 5. Launch the installed app from the installed application location, not from a development checkout.
 6. Confirm the visible product name is `SSE ExEd Studio Control`.
-7. Confirm the installed runtime is the Tauri shipping runtime for `v2.2.0`, not the Qt fallback.
+7. Confirm the installed runtime is the Tauri shipping runtime for `v2.2.1`, not the Qt fallback.
 
 Runtime confirmation:
 
@@ -142,7 +143,7 @@ Post a comment with:
 - Workstation name.
 - Display mode and resolution used for the check.
 - Installer asset name and SHA256 result.
-- Whether the installer came directly from the `v2.2.0` GitHub Release.
+- Whether the installer came directly from the `v2.2.1` GitHub Release.
 - Startup target observed on first launch.
 - Product name and visible release/version posture.
 - Runtime app-data path.
@@ -173,7 +174,7 @@ Stop and record details before changing code if any of these occur:
 ## Issue #4 Comment Template
 
 ```markdown
-Operator workstation rollout verification for `v2.2.0`.
+Operator workstation rollout verification for `v2.2.1`.
 
 Plan anchor:
 
