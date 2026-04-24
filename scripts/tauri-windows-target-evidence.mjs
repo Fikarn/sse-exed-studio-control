@@ -98,6 +98,17 @@ function firstOutputLine(result) {
   );
 }
 
+function gitStatusPath(line) {
+  const pathPart = line.slice(3);
+  const renameSeparator = " -> ";
+  return pathPart.includes(renameSeparator) ? pathPart.split(renameSeparator).pop() : pathPart;
+}
+
+function isAllowedPostFoundationDirtyLine(line) {
+  const statusPath = gitStatusPath(line);
+  return statusPath.startsWith("native/tauri-shell/gen/schemas/") && statusPath.endsWith(".json");
+}
+
 function resolvePathFromRoot(value) {
   if (!value) {
     return null;
@@ -399,10 +410,24 @@ async function main() {
     }
 
     const postFoundationStatus = safeCapture("git", ["status", "--porcelain"]);
-    summary.postFoundationGitStatus = postFoundationStatus.stdout.trim();
-    if (summary.postFoundationGitStatus && !allowDirty) {
+    const postFoundationStatusLines = postFoundationStatus.stdout.split(/\r?\n/).filter(Boolean);
+    const allowedPostFoundationStatusLines = postFoundationStatusLines.filter(isAllowedPostFoundationDirtyLine);
+    const unexpectedPostFoundationStatusLines = postFoundationStatusLines.filter(
+      (line) => !isAllowedPostFoundationDirtyLine(line)
+    );
+    summary.postFoundationAllowedGitStatus = allowedPostFoundationStatusLines.join("\n");
+    summary.postFoundationGitStatus = postFoundationStatusLines.join("\n");
+    summary.postFoundationUnexpectedGitStatus = unexpectedPostFoundationStatusLines.join("\n");
+
+    if (allowedPostFoundationStatusLines.length > 0) {
+      summary.notes.push(
+        "tauri:foundation generated platform-specific Tauri schema files; these were recorded and allowed."
+      );
+    }
+
+    if (unexpectedPostFoundationStatusLines.length > 0 && !allowDirty) {
       throw new Error(
-        `Working tree became dirty after tauri:foundation. Generated artifacts may be stale.\n${summary.postFoundationGitStatus}`
+        `Working tree became dirty outside allowed Tauri schema generation after tauri:foundation.\n${summary.postFoundationUnexpectedGitStatus}`
       );
     }
 

@@ -71,7 +71,7 @@ The collector records host, tool, and git context, then runs the target-host fou
 npm run tauri:foundation
 ```
 
-That gate performs protocol generation, Rust engine build, Tauri shell build, and Tauri smoke coverage. The collector fails if the foundation gate fails or if generated files make the checkout dirty.
+That gate performs protocol generation, Rust engine build, Tauri shell build, and Tauri smoke coverage. The collector fails if the foundation gate fails or if generated files make the checkout dirty outside Tauri's platform-specific schema output under `native/tauri-shell/gen/schemas/`.
 
 The collector then runs the real Windows package gate:
 
@@ -113,7 +113,7 @@ Do not claim Windows evidence if any of these are true:
 - the host is not `x64`
 - the checkout was dirty before the run, unless the issue explicitly records why `--allow-dirty` was used
 - `binarycreator.exe` or `repogen.exe` came from an unknown toolchain
-- `npm run tauri:foundation` failed, was skipped, or made generated files dirty
+- `npm run tauri:foundation` failed, was skipped, or made generated/source files dirty outside Tauri's platform-specific schema output
 - `npm run tauri:package:win:ifw-local` failed or was skipped
 - installer acceptance was not exercised through the generated QtIFW installer
 
