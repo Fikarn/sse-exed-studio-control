@@ -117,7 +117,11 @@ function isAllowedEvidenceDirtyLine(line, outputBase) {
   }
 
   const statusPath = normalizeGitPath(gitStatusPath(line));
-  return statusPath === outputRelativePath || statusPath.startsWith(`${outputRelativePath}/`);
+  return (
+    statusPath === outputRelativePath ||
+    statusPath.startsWith(`${outputRelativePath}/`) ||
+    outputRelativePath.startsWith(`${statusPath}/`)
+  );
 }
 
 function resolvePathFromRoot(value) {
