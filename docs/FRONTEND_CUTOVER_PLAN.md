@@ -33,7 +33,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 - The shipping release path is now the `native:*` release lane, which packages the runtime selected by `scripts/native-release-runtime.json` into `release/native*`.
 - macOS Apple Silicon and Windows 11 `x64` post-switch release evidence exists for the switched `native:*` path.
 - Checkpoint C is satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; final operator-workstation rollout passed on published patch release `v2.2.1` at tag commit `951a2c4e1f236200f0f017121158bc9969427051`; the bounded fallback window is closed in [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3).
-- Checkpoint D / Qt retirement is tracked separately in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). Do not remove Qt shell code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets outside that issue.
+- Checkpoint D / Qt retirement is tracked separately in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). The read-only impact audit is recorded in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md). Do not remove Qt shell code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets outside that issue and audit sequence.
 
 ## Non-Negotiables
 
@@ -140,9 +140,9 @@ Operator rollout status: passed on published patch release `v2.2.1` at tag commi
 
 Entry condition: the Tauri runtime has shipped successfully through the bounded fallback window.
 
-Status: entered. The fallback window is closed in [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3), and Checkpoint D planning is tracked in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). The first Checkpoint D task is a read-only impact audit and removal-sequence proposal.
+Status: entered. The fallback window is closed in [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3), and Checkpoint D planning is tracked in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). The read-only impact audit and removal-sequence proposal are recorded in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md).
 
-Exit condition: Qt shell code, Qt-specific verification automation, QtIFW release dependencies, and Qt parity assets are removed only through an explicit retirement issue and only after rollback requirements no longer depend on them.
+Exit condition: Qt shell code, Qt-specific verification automation, and Qt parity assets are removed only through an explicit retirement issue and only after rollback requirements no longer depend on them. QtIFW remains the installer/update wrapper unless a separate installer replacement plan provides equivalent package, update, continuity, rollback, and clean-machine acceptance evidence.
 
 ## Stop Conditions
 
@@ -158,7 +158,6 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The next implementation slice after the `v2.2.1` operator rollout is Checkpoint D planning. Candidate slices are:
+The next implementation slice after the `v2.2.1` operator rollout is Checkpoint D Slice 1 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): validation lane split.
 
-- perform the read-only impact audit requested by [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5)
-- propose the smallest safe removal sequence before deleting Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets
+Do this before deleting Qt fallback code, Qt-specific verification automation, or Qt parity assets. The goal is to make the active validation path Tauri-first while keeping rollback and target-host release evidence intact.

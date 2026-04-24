@@ -108,6 +108,7 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
 - [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
 - [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
+- [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md): Checkpoint D impact audit and safe Qt fallback retirement sequence
 - [docs/archive/](docs/archive/): historical planning and parity documents preserved for reference
 - [native/README.md](native/README.md): native workspace scaffold for the selected Tauri shell, Qt fallback shell, Rust engine, and IPC protocol
 - [docs/adr/0001-frontend-replatform.md](docs/adr/0001-frontend-replatform.md): locked frontend replatform decision
@@ -175,7 +176,7 @@ npm run ci
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
-The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement planning is tracked in issue #5.
+The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement planning is tracked in issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). The next planned slice is validation lane split, not immediate Qt deletion.
 
 `npm run clean` removes generated native build output and packaged release folders.
 

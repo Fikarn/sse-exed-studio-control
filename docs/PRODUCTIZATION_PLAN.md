@@ -116,7 +116,8 @@ Before calling the productization pass complete, confirm:
 ## Current Implementation Slice
 
 - keep the native packaging and release lanes healthy as the only product path
-- perform the Checkpoint D read-only impact audit in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) before removing Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets
+- follow the Checkpoint D read-only impact audit in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md) and [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) before removing Qt fallback code, Qt-specific verification automation, or Qt parity assets
+- implement the next Checkpoint D slice as validation lane split so active development and CI guidance are Tauri-first before any fallback source deletion
 
 ## Final Mile
 
