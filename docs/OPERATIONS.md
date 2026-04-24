@@ -6,7 +6,7 @@ This document describes runtime behavior and operator recovery for the native `S
 
 ### Startup
 
-- The selected native shell starts first. In `v2.2.0`, the selected shipping shell is Tauri; Qt starts only when explicitly selected as the fallback runtime.
+- The selected native shell starts first. In the current published operator-rollout build (`v2.2.1`), the selected shipping shell is Tauri; Qt starts only when explicitly selected as the fallback runtime.
 - The shell validates runtime paths and bundled assets, then launches the bundled Rust engine.
 - The shell waits for `engine.ready`, `health.snapshot`, `app.snapshot`, and the relevant domain snapshots before routing into commissioning or the dashboard.
 

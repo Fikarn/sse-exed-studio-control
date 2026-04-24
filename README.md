@@ -38,7 +38,7 @@ Productization work and release gates are tracked in [docs/PRODUCTIZATION_PLAN.m
 
 ## Screenshots
 
-All captures below are deterministic native renders at the target `2560x1440` operator-monitor resolution. The checked-in release screenshots remain Qt-shell parity captures until the Tauri visual baseline is promoted through the cutover gate.
+All captures below are deterministic native renders at the target `2560x1440` operator-monitor resolution. The checked-in release screenshots remain historical Qt-shell parity captures; current Tauri visual review is produced through the local cutover-readiness lanes described in [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md).
 
 | Planning                                                                                             | Lighting                                                                                                    |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -112,7 +112,7 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [native/README.md](native/README.md): native workspace scaffold for the selected Tauri shell, Qt fallback shell, Rust engine, and IPC protocol
 - [docs/adr/0001-frontend-replatform.md](docs/adr/0001-frontend-replatform.md): locked frontend replatform decision
 - `frontend/`: Tauri web frontend workspace and design-system packages
-- `native/tauri-shell/`: selected native shell track for the cutover candidate
+- `native/tauri-shell/`: selected native shell track for the current published Tauri runtime
 
 ## Local Development
 
@@ -175,7 +175,7 @@ npm run ci
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
-The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` shipped the Tauri runtime through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence. Qt remains the fallback runtime during the bounded post-release fallback window.
+The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. Qt remains the fallback runtime during the bounded post-release fallback window.
 
 `npm run clean` removes generated native build output and packaged release folders.
 

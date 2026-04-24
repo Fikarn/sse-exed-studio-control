@@ -4,13 +4,13 @@ Entry point for Codex-assisted work in this repo. Keep it short. Follow the poin
 
 ## What this product is
 
-`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. Planning, DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Bundle id `com.sse.exedstudiocontrol`. Current shipping version is `v2.1.0` (2026-04-21) — the legacy Electron/Next.js runtime was retired; there is no browser path.
+`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. Planning, DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`; there is no browser path.
 
 ## Architecture boundary (non-negotiable)
 
 Two processes, separated by an IPC protocol:
 
-- `native/tauri-shell/` + `frontend/` — selected shipping shell for the current cutover candidate, built on `Tauri 2 + React 19.2 + TypeScript + Vite`. **No device or DB logic in React.**
+- `native/tauri-shell/` + `frontend/` — selected shipping shell for the current published Tauri runtime, built on `Tauri 2 + React 19.2 + TypeScript + Vite`. **No device or DB logic in React.**
 - `native/qt-shell/` — Qt 6 / QML fallback shell retained through the bounded cutover window. Owns windowing, input, and layout when explicitly selected as fallback. **No device or DB logic in QML.**
 - `native/rust-engine/` — Rust. Owns state, persistence, device I/O, protocol dispatch.
 - `native/protocol/` — the IPC contract between them. Changes here are contract changes.
