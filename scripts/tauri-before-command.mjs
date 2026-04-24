@@ -41,6 +41,11 @@ if (!args) {
 const result = spawnSync(npm, args, {
   cwd: rootDirectory,
   stdio: "inherit",
+  shell: process.platform === "win32",
 });
+
+if (result.error) {
+  console.error(`Tauri before-command failed to start npm: ${result.error.message}`);
+}
 
 process.exit(result.status ?? 1);

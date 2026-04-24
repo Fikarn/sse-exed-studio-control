@@ -820,9 +820,10 @@ test("toggles the expanded DMX monitor from the keyboard", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
   await page.keyboard.press(modifierShortcut("m"));
-  await expect(page.getByText("DMX monitor")).toBeVisible();
+  const dmxMonitorDialog = page.getByRole("dialog", { name: "DMX monitor" });
+  await expect(dmxMonitorDialog).toBeVisible();
   await page.keyboard.press(modifierShortcut("m"));
-  await expect(page.getByText("DMX monitor")).toBeHidden();
+  await expect(dmxMonitorDialog).toBeHidden();
 });
 
 test("opens the DMX monitor overlay from a peek channel click", async ({ page }) => {

@@ -4161,6 +4161,10 @@ function LightingWorkspaceSurface({
         : String(cueEditorCue.followSeconds)
     );
     setCueNotesDraft(cueEditorCue.notes ?? "");
+    window.requestAnimationFrame(() => {
+      cueLabelInputRef.current?.focus();
+      cueLabelInputRef.current?.select();
+    });
   }, [cueEditorCue]);
 
   const fireCue = useEffectEvent(async (actionId: string, cueId: string, fadeOverrideMs?: number) => {
