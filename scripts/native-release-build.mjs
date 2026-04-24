@@ -13,7 +13,9 @@ console.log(`Building ${nativeReleaseRuntimeLabel(releaseRuntime)} shipping runt
 
 const result = spawnSync(npmCommand, ["run", buildScript], {
   cwd: rootDir,
+  shell: process.platform === "win32",
   stdio: "inherit",
+  windowsHide: true,
 });
 
 if (result.error) {
