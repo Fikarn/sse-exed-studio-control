@@ -1,491 +1,2040 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Audio · Direction Ar+ · Control-room confidence desk</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-:root{
-  --studio-950:#0a0a0f;
-  --studio-900:#111118;
-  --studio-850:#16161f;
-  --studio-800:#1c1c27;
-  --studio-750:#242430;
-  --studio-700:#2e2e3b;
-  --studio-650:#363644;
-  --studio-600:#3e3e4d;
-  --studio-500:#8d8da5;
-  --studio-400:#a0a0b8;
-  --studio-300:#b0b0c4;
-  --studio-200:#d0d0e0;
-  --studio-100:#eaeaf0;
-  --studio-050:#f5f5fa;
+  <head>
+    <meta charset="utf-8" />
+    <title>Audio · Direction Ar+ · Control-room confidence desk</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --studio-950: #0a0a0f;
+        --studio-900: #111118;
+        --studio-850: #16161f;
+        --studio-800: #1c1c27;
+        --studio-750: #242430;
+        --studio-700: #2e2e3b;
+        --studio-650: #363644;
+        --studio-600: #3e3e4d;
+        --studio-500: #8d8da5;
+        --studio-400: #a0a0b8;
+        --studio-300: #b0b0c4;
+        --studio-200: #d0d0e0;
+        --studio-100: #eaeaf0;
+        --studio-050: #f5f5fa;
 
-  --accent-primary:#99BA92;
-  --accent-green:#22c55e;
-  --accent-red:#ef4444;
-  --accent-amber:#f59e0b;
-  --accent-cyan:#06b6d4;
+        --accent-primary: #99ba92;
+        --accent-green: #22c55e;
+        --accent-red: #ef4444;
+        --accent-amber: #f59e0b;
+        --accent-cyan: #06b6d4;
 
-  --surface-default:#111219;
-  --surface-soft:#0e0f15;
-  --surface-raised:#171923;
-  --surface-panel:#0c0d13;
-  --surface-panel-2:#101119;
-  --surface-stroke:#242633;
-  --surface-border:#343746;
-  --surface-border-strong:#51604f;
+        --surface-default: #111219;
+        --surface-soft: #0e0f15;
+        --surface-raised: #171923;
+        --surface-panel: #0c0d13;
+        --surface-panel-2: #101119;
+        --surface-stroke: #242633;
+        --surface-border: #343746;
+        --surface-border-strong: #51604f;
 
-  --meter-base:#1b2029;
-  --meter-fill:#99BA92;
-  --meter-hot:#f59e0b;
-  --meter-clip:#ef4444;
+        --meter-base: #1b2029;
+        --meter-fill: #99ba92;
+        --meter-hot: #f59e0b;
+        --meter-clip: #ef4444;
 
-  --font-ui:"IBM Plex Sans", "Aptos", "Segoe UI", system-ui, sans-serif;
-  --font-mono:"IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
-}
+        --font-ui: "IBM Plex Sans", "Aptos", "Segoe UI", system-ui, sans-serif;
+        --font-mono: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+      }
 
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;background:#05060a;color:var(--studio-100);font-family:var(--font-ui);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-body{
-  background:
-    radial-gradient(1200px 640px at 12% 0%, rgba(153,186,146,.08), transparent 58%),
-    radial-gradient(860px 460px at 92% 8%, rgba(6,182,212,.05), transparent 60%),
-    #05060a;
-}
-.page{width:2560px;margin:0 auto;padding:56px 72px 112px}
-.head{display:grid;grid-template-columns:1fr 420px;gap:40px;margin-bottom:34px}
-.kicker{margin:0 0 14px;color:var(--accent-primary);font:500 11px/1 var(--font-mono);letter-spacing:.24em;text-transform:uppercase}
-.title{margin:0 0 14px;font-size:47px;line-height:1.04;font-weight:700;letter-spacing:-.02em}
-.title em{font-style:normal;color:var(--accent-primary)}
-.lede{max-width:1120px;margin:0;color:var(--studio-300);font-size:18px;line-height:1.62}
-.spec{display:grid;grid-template-columns:auto 1fr;column-gap:16px;row-gap:10px;padding:22px 24px;background:var(--surface-soft);border:1px solid var(--surface-stroke);border-radius:18px}
-.spec .k{color:var(--studio-500);font:500 10px/1.2 var(--font-mono);letter-spacing:.18em;text-transform:uppercase}
-.spec .v{color:var(--studio-050);font:500 13px/1.45 var(--font-ui)}
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #05060a;
+        color: var(--studio-100);
+        font-family: var(--font-ui);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      body {
+        background:
+          radial-gradient(1200px 640px at 12% 0%, rgba(153, 186, 146, 0.08), transparent 58%),
+          radial-gradient(860px 460px at 92% 8%, rgba(6, 182, 212, 0.05), transparent 60%), #05060a;
+      }
+      .page {
+        width: 2560px;
+        margin: 0 auto;
+        padding: 56px 72px 112px;
+      }
+      .head {
+        display: grid;
+        grid-template-columns: 1fr 420px;
+        gap: 40px;
+        margin-bottom: 34px;
+      }
+      .kicker {
+        margin: 0 0 14px;
+        color: var(--accent-primary);
+        font: 500 11px/1 var(--font-mono);
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+      }
+      .title {
+        margin: 0 0 14px;
+        font-size: 47px;
+        line-height: 1.04;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .title em {
+        font-style: normal;
+        color: var(--accent-primary);
+      }
+      .lede {
+        max-width: 1120px;
+        margin: 0;
+        color: var(--studio-300);
+        font-size: 18px;
+        line-height: 1.62;
+      }
+      .spec {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 16px;
+        row-gap: 10px;
+        padding: 22px 24px;
+        background: var(--surface-soft);
+        border: 1px solid var(--surface-stroke);
+        border-radius: 18px;
+      }
+      .spec .k {
+        color: var(--studio-500);
+        font: 500 10px/1.2 var(--font-mono);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .spec .v {
+        color: var(--studio-050);
+        font: 500 13px/1.45 var(--font-ui);
+      }
 
-.note{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:14px 16px;background:rgba(153,186,146,.07);border:1px solid rgba(153,186,146,.18);border-radius:12px;color:var(--studio-100);font-size:13px}
-.note .tag{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;background:rgba(153,186,146,.1);border:1px solid rgba(153,186,146,.2);color:var(--accent-primary);font:500 10px/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase}
+      .note {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0 0 18px;
+        padding: 14px 16px;
+        background: rgba(153, 186, 146, 0.07);
+        border: 1px solid rgba(153, 186, 146, 0.18);
+        border-radius: 12px;
+        color: var(--studio-100);
+        font-size: 13px;
+      }
+      .note .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 24px;
+        padding: 0 9px;
+        border-radius: 999px;
+        background: rgba(153, 186, 146, 0.1);
+        border: 1px solid rgba(153, 186, 146, 0.2);
+        color: var(--accent-primary);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
 
-.workspace{border:1px solid var(--surface-stroke);border-radius:28px;overflow:hidden;background:linear-gradient(180deg,#090b10,#05060a 36%);box-shadow:0 26px 80px rgba(0,0,0,.45)}
-.monitor{height:22px;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--surface-stroke);background:#08090e;color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase}
-.monitor .right{margin-left:auto;display:flex;gap:12px}
-.monitor-chip{display:inline-flex;align-items:center;gap:8px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--accent-primary);box-shadow:0 0 0 3px rgba(153,186,146,.14)}
-.dot.amber{background:var(--accent-amber);box-shadow:0 0 0 3px rgba(245,158,11,.12)}
-.dot.cyan{background:var(--accent-cyan);box-shadow:0 0 0 3px rgba(6,182,212,.12)}
+      .workspace {
+        border: 1px solid var(--surface-stroke);
+        border-radius: 28px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #090b10, #05060a 36%);
+        box-shadow: 0 26px 80px rgba(0, 0, 0, 0.45);
+      }
+      .monitor {
+        height: 22px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--surface-stroke);
+        background: #08090e;
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .monitor .right {
+        margin-left: auto;
+        display: flex;
+        gap: 12px;
+      }
+      .monitor-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent-primary);
+        box-shadow: 0 0 0 3px rgba(153, 186, 146, 0.14);
+      }
+      .dot.amber {
+        background: var(--accent-amber);
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+      }
+      .dot.cyan {
+        background: var(--accent-cyan);
+        box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.12);
+      }
 
-.shell{height:68px;display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:1px solid var(--surface-stroke);background:rgba(11,12,18,.88)}
-.brand{display:flex;align-items:center;gap:10px;padding-right:18px;border-right:1px solid var(--surface-stroke)}
-.brand-mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,rgba(153,186,146,.28),rgba(153,186,146,.08));border:1px solid rgba(153,186,146,.2)}
-.brand-meta{font:500 10px/1.35 var(--font-mono);color:var(--studio-500);letter-spacing:.14em;text-transform:uppercase}
-.tabs{display:flex;gap:4px}
-.tab{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:8px;color:var(--studio-400);font-size:13px}
-.tab-dot{width:6px;height:6px;border-radius:50%;background:var(--studio-650)}
-.tab.active{background:rgba(153,186,146,.1);color:var(--studio-050)}
-.tab.active .tab-dot{background:var(--accent-primary);box-shadow:0 0 10px rgba(153,186,146,.55)}
-.spacer{flex:1}
-.shell-badges{display:flex;gap:10px}
+      .shell {
+        height: 68px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--surface-stroke);
+        background: rgba(11, 12, 18, 0.88);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-right: 18px;
+        border-right: 1px solid var(--surface-stroke);
+      }
+      .brand-mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(153, 186, 146, 0.28), rgba(153, 186, 146, 0.08));
+        border: 1px solid rgba(153, 186, 146, 0.2);
+      }
+      .brand-meta {
+        font: 500 10px/1.35 var(--font-mono);
+        color: var(--studio-500);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+      }
+      .tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 34px;
+        padding: 0 14px;
+        border-radius: 8px;
+        color: var(--studio-400);
+        font-size: 13px;
+      }
+      .tab-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--studio-650);
+      }
+      .tab.active {
+        background: rgba(153, 186, 146, 0.1);
+        color: var(--studio-050);
+      }
+      .tab.active .tab-dot {
+        background: var(--accent-primary);
+        box-shadow: 0 0 10px rgba(153, 186, 146, 0.55);
+      }
+      .spacer {
+        flex: 1;
+      }
+      .shell-badges {
+        display: flex;
+        gap: 10px;
+      }
 
-.pill{height:30px;display:inline-flex;align-items:center;gap:8px;padding:0 11px;border-radius:999px;border:1px solid var(--surface-border);background:var(--surface-default);color:var(--studio-200);font:500 11px/1 var(--font-mono);letter-spacing:.05em;text-transform:uppercase}
-.pill.ok{background:rgba(153,186,146,.08);border-color:rgba(153,186,146,.22);color:var(--accent-primary)}
-.pill.warn{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.22);color:#f8cf7a}
-.pill.ghost{background:rgba(255,255,255,.03)}
+      .pill {
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 11px;
+        border-radius: 999px;
+        border: 1px solid var(--surface-border);
+        background: var(--surface-default);
+        color: var(--studio-200);
+        font: 500 11px/1 var(--font-mono);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .pill.ok {
+        background: rgba(153, 186, 146, 0.08);
+        border-color: rgba(153, 186, 146, 0.22);
+        color: var(--accent-primary);
+      }
+      .pill.warn {
+        background: rgba(245, 158, 11, 0.08);
+        border-color: rgba(245, 158, 11, 0.22);
+        color: #f8cf7a;
+      }
+      .pill.ghost {
+        background: rgba(255, 255, 255, 0.03);
+      }
 
-.toolbar{height:44px;display:grid;grid-template-columns:380px 450px 460px 1fr;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--surface-stroke);background:rgba(12,13,19,.94)}
-.toolbar-group{display:flex;align-items:center;gap:10px;min-width:0}
-.toolbar-title .eyebrow{color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.18em;text-transform:uppercase}
-.toolbar-title .value{margin-top:2px;color:var(--studio-050);font-size:17px;font-weight:650;letter-spacing:-.015em}
-.status{height:30px;display:inline-flex;align-items:center;gap:8px;padding:0 10px;border-radius:8px;background:var(--surface-default);border:1px solid var(--surface-border);color:var(--studio-100)}
-.status .k{color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase}
-.status .v{font:600 11px/1 var(--font-mono);letter-spacing:.04em}
-.status.ok{background:rgba(153,186,146,.08);border-color:rgba(153,186,146,.2)}
-.status.ok .v{color:var(--accent-primary)}
-.status.warn{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.2)}
-.status.warn .v{color:#f8cf7a}
-.btn{height:30px;display:inline-flex;align-items:center;gap:8px;padding:0 12px;border-radius:8px;border:1px solid var(--surface-border);background:var(--surface-default);color:var(--studio-100);font-size:12px;font-weight:500}
-.btn.primary{background:var(--accent-primary);border-color:var(--accent-primary);color:#0a1009}
-.btn.nav{padding:0 10px}
-.density{display:inline-flex;align-items:center;gap:4px;padding:3px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--surface-border)}
-.density .mode{height:24px;display:inline-flex;align-items:center;padding:0 10px;border-radius:7px;color:var(--studio-400);font:500 10px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
-.density .mode.active{background:rgba(153,186,146,.12);color:var(--accent-primary)}
-.snapshot-readout{margin-left:auto;height:30px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--surface-border)}
-.snapshot-readout .k{color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase}
-.snapshot-readout .v{color:var(--studio-050);font-size:12px;font-weight:600}
+      .toolbar {
+        height: 44px;
+        display: grid;
+        grid-template-columns: 380px 450px 460px 1fr;
+        align-items: center;
+        gap: 14px;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--surface-stroke);
+        background: rgba(12, 13, 19, 0.94);
+      }
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .toolbar-title .eyebrow {
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .toolbar-title .value {
+        margin-top: 2px;
+        color: var(--studio-050);
+        font-size: 17px;
+        font-weight: 650;
+        letter-spacing: -0.015em;
+      }
+      .status {
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 10px;
+        border-radius: 8px;
+        background: var(--surface-default);
+        border: 1px solid var(--surface-border);
+        color: var(--studio-100);
+      }
+      .status .k {
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .status .v {
+        font: 600 11px/1 var(--font-mono);
+        letter-spacing: 0.04em;
+      }
+      .status.ok {
+        background: rgba(153, 186, 146, 0.08);
+        border-color: rgba(153, 186, 146, 0.2);
+      }
+      .status.ok .v {
+        color: var(--accent-primary);
+      }
+      .status.warn {
+        background: rgba(245, 158, 11, 0.07);
+        border-color: rgba(245, 158, 11, 0.2);
+      }
+      .status.warn .v {
+        color: #f8cf7a;
+      }
+      .btn {
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid var(--surface-border);
+        background: var(--surface-default);
+        color: var(--studio-100);
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .btn.primary {
+        background: var(--accent-primary);
+        border-color: var(--accent-primary);
+        color: #0a1009;
+      }
+      .btn.nav {
+        padding: 0 10px;
+      }
+      .density {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--surface-border);
+      }
+      .density .mode {
+        height: 24px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 10px;
+        border-radius: 7px;
+        color: var(--studio-400);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .density .mode.active {
+        background: rgba(153, 186, 146, 0.12);
+        color: var(--accent-primary);
+      }
+      .snapshot-readout {
+        margin-left: auto;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 10px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--surface-border);
+      }
+      .snapshot-readout .k {
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .snapshot-readout .v {
+        color: var(--studio-050);
+        font-size: 12px;
+        font-weight: 600;
+      }
 
-.warning{height:40px;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid rgba(245,158,11,.18);background:linear-gradient(90deg,rgba(245,158,11,.14),rgba(245,158,11,.05));color:var(--studio-100)}
-.warning .copy{font-size:13px}
-.warning .copy strong{color:#ffd38b}
-.warning .tiny{margin-left:auto;color:var(--studio-400);font:500 10px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase}
+      .warning {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 18px;
+        border-bottom: 1px solid rgba(245, 158, 11, 0.18);
+        background: linear-gradient(90deg, rgba(245, 158, 11, 0.14), rgba(245, 158, 11, 0.05));
+        color: var(--studio-100);
+      }
+      .warning .copy {
+        font-size: 13px;
+      }
+      .warning .copy strong {
+        color: #ffd38b;
+      }
+      .warning .tiny {
+        margin-left: auto;
+        color: var(--studio-400);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
 
-.bridge{height:136px;display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:8px;padding:12px 16px;border-bottom:1px solid var(--surface-stroke);background:linear-gradient(180deg,rgba(12,13,19,.98),rgba(8,9,13,.96))}
-.meter{display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:10px 8px;border-radius:12px;background:var(--surface-panel);border:1px solid transparent;overflow:hidden}
-.meter.selected{background:rgba(153,186,146,.13);border-color:rgba(153,186,146,.24)}
-.meter .name{color:var(--studio-400);font-size:11px;font-weight:600;letter-spacing:.01em}
-.meter .short{color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
-.meter-bars{height:56px;display:grid;grid-template-columns:1fr 1fr;gap:4px;align-items:end}
-.meter-track{position:relative;height:100%;border-radius:5px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01)),var(--meter-base);overflow:hidden}
-.meter-fill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,#d7e3d1,var(--meter-fill))}
-.meter-fill.hot{background:linear-gradient(180deg,#ffe2b4,var(--meter-hot))}
-.meter-fill.clip{background:linear-gradient(180deg,#fecaca,var(--meter-clip))}
-.meter-peak{position:absolute;left:0;right:0;height:2px;background:#fff3d4;opacity:.88}
-.tags{display:flex;gap:4px;flex-wrap:wrap}
-.tag{height:18px;display:inline-flex;align-items:center;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.04);color:var(--studio-500);font:500 9px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
-.tag.live{background:rgba(153,186,146,.12);color:var(--accent-primary)}
-.tag.warn{background:rgba(245,158,11,.12);color:#f8cf7a}
+      .bridge {
+        height: 136px;
+        display: grid;
+        grid-template-columns: repeat(16, minmax(0, 1fr));
+        gap: 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--surface-stroke);
+        background: linear-gradient(180deg, rgba(12, 13, 19, 0.98), rgba(8, 9, 13, 0.96));
+      }
+      .meter {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 10px 8px;
+        border-radius: 12px;
+        background: var(--surface-panel);
+        border: 1px solid transparent;
+        overflow: hidden;
+      }
+      .meter.selected {
+        background: rgba(153, 186, 146, 0.13);
+        border-color: rgba(153, 186, 146, 0.24);
+      }
+      .meter .name {
+        color: var(--studio-400);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      .meter .short {
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .meter-bars {
+        height: 56px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        align-items: end;
+      }
+      .meter-track {
+        position: relative;
+        height: 100%;
+        border-radius: 5px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)), var(--meter-base);
+        overflow: hidden;
+      }
+      .meter-fill {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(180deg, #d7e3d1, var(--meter-fill));
+      }
+      .meter-fill.hot {
+        background: linear-gradient(180deg, #ffe2b4, var(--meter-hot));
+      }
+      .meter-fill.clip {
+        background: linear-gradient(180deg, #fecaca, var(--meter-clip));
+      }
+      .meter-peak {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #fff3d4;
+        opacity: 0.88;
+      }
+      .tags {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .tag {
+        height: 18px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--studio-500);
+        font: 500 9px/1 var(--font-mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .tag.live {
+        background: rgba(153, 186, 146, 0.12);
+        color: var(--accent-primary);
+      }
+      .tag.warn {
+        background: rgba(245, 158, 11, 0.12);
+        color: #f8cf7a;
+      }
 
-.body{display:grid;grid-template-columns:300px minmax(0,1fr) 460px;min-height:824px}
-.rail{display:flex;flex-direction:column;gap:14px;padding:16px;background:var(--surface-panel-2);border-right:1px solid var(--surface-stroke)}
-.panel{border:1px solid var(--surface-stroke);border-radius:18px;background:rgba(17,18,25,.78);overflow:hidden}
-.panel-head{height:40px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px;border-bottom:1px solid var(--surface-stroke);background:rgba(255,255,255,.02)}
-.panel-head .h{color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.18em;text-transform:uppercase}
-.panel-head .v{color:var(--studio-400);font:500 10px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
-.mix-list,.snap-list{display:flex;flex-direction:column}
-.mix-row,.snap-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;min-height:56px;padding:0 14px;border-bottom:1px solid rgba(255,255,255,.04)}
-.mix-row:last-child,.snap-row:last-child{border-bottom:0}
-.mix-row.active,.snap-row.active{background:linear-gradient(90deg,rgba(153,186,146,.12),rgba(153,186,146,.03))}
-.mix-row .title,.snap-row .title{color:var(--studio-050);font-size:14px;font-weight:600}
-.mix-row .meta,.snap-row .meta{color:var(--studio-500);font:500 10px/1.35 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+      .body {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr) 460px;
+        min-height: 824px;
+      }
+      .rail {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 16px;
+        background: var(--surface-panel-2);
+        border-right: 1px solid var(--surface-stroke);
+      }
+      .panel {
+        border: 1px solid var(--surface-stroke);
+        border-radius: 18px;
+        background: rgba(17, 18, 25, 0.78);
+        overflow: hidden;
+      }
+      .panel-head {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--surface-stroke);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .panel-head .h {
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .panel-head .v {
+        color: var(--studio-400);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .mix-list,
+      .snap-list {
+        display: flex;
+        flex-direction: column;
+      }
+      .mix-row,
+      .snap-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 56px;
+        padding: 0 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .mix-row:last-child,
+      .snap-row:last-child {
+        border-bottom: 0;
+      }
+      .mix-row.active,
+      .snap-row.active {
+        background: linear-gradient(90deg, rgba(153, 186, 146, 0.12), rgba(153, 186, 146, 0.03));
+      }
+      .mix-row .title,
+      .snap-row .title {
+        color: var(--studio-050);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .mix-row .meta,
+      .snap-row .meta {
+        color: var(--studio-500);
+        font: 500 10px/1.35 var(--font-mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
 
-.desk{display:flex;flex-direction:column;background:var(--surface-panel)}
-.desk-head{height:44px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 16px;border-bottom:1px solid var(--surface-stroke)}
-.desk-title{color:var(--studio-100);font-size:13px;font-weight:600}
-.desk-right{display:flex;align-items:center;gap:8px}
-.strips{flex:1;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;padding:16px}
-.strip{display:flex;flex-direction:column;min-height:0;padding:10px 10px 12px;border-radius:18px;border:1px solid var(--surface-stroke);background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01))}
-.strip.selected{border-color:rgba(153,186,146,.35);box-shadow:inset 0 0 0 1px rgba(153,186,146,.08)}
-.strip-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px}
-.strip-name{color:var(--studio-050);font-size:13px;font-weight:650;line-height:1.15}
-.strip-meta{margin-top:4px;color:var(--studio-500);font:500 9px/1.3 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
-.stereo{height:18px;padding:0 6px;display:inline-flex;align-items:center;border-radius:999px;background:rgba(255,255,255,.04);color:var(--studio-400);font:500 9px/1 var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
-.strip-meters{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end;margin-bottom:10px}
-.strip-track{position:relative;min-height:270px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012)),#171a21;overflow:hidden}
-.strip-fill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,#dcead8,#99BA92)}
-.strip-fill.hot{background:linear-gradient(180deg,#ffe2b4,#f59e0b)}
-.strip-fill.clip{background:linear-gradient(180deg,#fecaca,#ef4444)}
-.strip-peak{position:absolute;left:0;right:0;height:2px;background:#fff0d1}
-.fader{width:100%;display:flex;align-items:center;gap:8px;margin:0 auto 8px}
-.fader .rail{height:6px;flex:1;padding:0;border-radius:999px;background:#1b212a;border:none}
-.fader .level{height:100%;width:72%;border-radius:999px;background:linear-gradient(90deg,#7ea778,var(--accent-primary))}
-.fader .thumb{position:relative;top:-4px;left:72%;width:14px;height:14px;border-radius:50%;background:var(--studio-050);border:2px solid var(--accent-primary);transform:translateX(-50%)}
-.fader .db{min-width:34px;text-align:right;color:var(--accent-primary);font:600 10px/1 var(--font-mono)}
-.switches{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
-.switch{height:26px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid var(--surface-border);color:var(--studio-300);font:500 10px/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase}
-.switch.on{background:rgba(153,186,146,.12);border-color:rgba(153,186,146,.22);color:var(--accent-primary)}
-.switch.warn{background:rgba(245,158,11,.11);border-color:rgba(245,158,11,.22);color:#f8cf7a}
+      .desk {
+        display: flex;
+        flex-direction: column;
+        background: var(--surface-panel);
+      }
+      .desk-head {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--surface-stroke);
+      }
+      .desk-title {
+        color: var(--studio-100);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .desk-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .strips {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 10px;
+        padding: 16px;
+      }
+      .strip {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 10px 10px 12px;
+        border-radius: 18px;
+        border: 1px solid var(--surface-stroke);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+      }
+      .strip.selected {
+        border-color: rgba(153, 186, 146, 0.35);
+        box-shadow: inset 0 0 0 1px rgba(153, 186, 146, 0.08);
+      }
+      .strip-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .strip-name {
+        color: var(--studio-050);
+        font-size: 13px;
+        font-weight: 650;
+        line-height: 1.15;
+      }
+      .strip-meta {
+        margin-top: 4px;
+        color: var(--studio-500);
+        font: 500 9px/1.3 var(--font-mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .stereo {
+        height: 18px;
+        padding: 0 6px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--studio-400);
+        font: 500 9px/1 var(--font-mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .strip-meters {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        align-items: end;
+        margin-bottom: 10px;
+      }
+      .strip-track {
+        position: relative;
+        min-height: 270px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)), #171a21;
+        overflow: hidden;
+      }
+      .strip-fill {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(180deg, #dcead8, #99ba92);
+      }
+      .strip-fill.hot {
+        background: linear-gradient(180deg, #ffe2b4, #f59e0b);
+      }
+      .strip-fill.clip {
+        background: linear-gradient(180deg, #fecaca, #ef4444);
+      }
+      .strip-peak {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #fff0d1;
+      }
+      .fader {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 auto 8px;
+      }
+      .fader .rail {
+        height: 6px;
+        flex: 1;
+        padding: 0;
+        border-radius: 999px;
+        background: #1b212a;
+        border: none;
+      }
+      .fader .level {
+        height: 100%;
+        width: 72%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #7ea778, var(--accent-primary));
+      }
+      .fader .thumb {
+        position: relative;
+        top: -4px;
+        left: 72%;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--studio-050);
+        border: 2px solid var(--accent-primary);
+        transform: translateX(-50%);
+      }
+      .fader .db {
+        min-width: 34px;
+        text-align: right;
+        color: var(--accent-primary);
+        font: 600 10px/1 var(--font-mono);
+      }
+      .switches {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .switch {
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--surface-border);
+        color: var(--studio-300);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .switch.on {
+        background: rgba(153, 186, 146, 0.12);
+        border-color: rgba(153, 186, 146, 0.22);
+        color: var(--accent-primary);
+      }
+      .switch.warn {
+        background: rgba(245, 158, 11, 0.11);
+        border-color: rgba(245, 158, 11, 0.22);
+        color: #f8cf7a;
+      }
 
-.right-col{display:flex;flex-direction:column;gap:14px;padding:16px;background:#0f1016;border-left:1px solid var(--surface-stroke)}
-.card{border:1px solid var(--surface-stroke);border-radius:18px;background:rgba(255,255,255,.02);overflow:hidden}
-.card-head{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 16px;border-bottom:1px solid var(--surface-stroke)}
-.eyebrow{color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.18em;text-transform:uppercase}
-.card-title{color:var(--studio-050);font-size:14px;font-weight:650}
-.card-body{padding:16px}
-.room-grid,.session-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.stat{min-height:64px;padding:12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.04)}
-.stat .k{color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
-.stat .v{color:var(--studio-050);font-size:14px;font-weight:600}
-.stat .sub{margin-top:6px;color:var(--studio-400);font-size:12px}
-.room-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
-.room-action{height:34px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--surface-border);color:var(--studio-300);font:500 10px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase}
-.room-action.on{background:rgba(153,186,146,.12);border-color:rgba(153,186,146,.22);color:var(--accent-primary)}
-.channel-hero{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
-.channel-name{color:var(--studio-050);font-size:22px;font-weight:700;letter-spacing:-.02em}
-.channel-sub{margin-top:6px;color:var(--studio-500);font:500 10px/1.35 var(--font-mono);letter-spacing:.14em;text-transform:uppercase}
-.kv-list{display:flex;flex-direction:column;gap:10px}
-.kv{display:grid;grid-template-columns:110px 1fr auto;gap:12px;align-items:center}
-.kv .k{color:var(--studio-500);font:500 10px/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase}
-.control{height:34px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--surface-border)}
-.control .bar{height:6px;flex:1;border-radius:999px;background:#1d2430;position:relative}
-.control .fill{position:absolute;left:0;top:0;bottom:0;width:68%;border-radius:999px;background:linear-gradient(90deg,#7ea778,var(--accent-primary))}
-.control .thumb{position:absolute;left:68%;top:50%;width:13px;height:13px;border-radius:50%;background:var(--studio-050);border:2px solid var(--accent-primary);transform:translate(-50%,-50%)}
-.mono{color:var(--studio-050);font:500 11px/1 var(--font-mono)}
-.toggle-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
-.hint{color:var(--studio-300);font-size:13px;line-height:1.55}
-.keys{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-.kbd{height:22px;display:inline-flex;align-items:center;padding:0 7px;border-radius:6px;border:1px solid var(--surface-border);background:#0a0c11;color:var(--studio-300);font:500 10px/1 var(--font-mono);letter-spacing:.08em}
+      .right-col {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 16px;
+        background: #0f1016;
+        border-left: 1px solid var(--surface-stroke);
+      }
+      .card {
+        border: 1px solid var(--surface-stroke);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.02);
+        overflow: hidden;
+      }
+      .card-head {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--surface-stroke);
+      }
+      .eyebrow {
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .card-title {
+        color: var(--studio-050);
+        font-size: 14px;
+        font-weight: 650;
+      }
+      .card-body {
+        padding: 16px;
+      }
+      .room-grid,
+      .session-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .stat {
+        min-height: 64px;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .stat .k {
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+      .stat .v {
+        color: var(--studio-050);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .stat .sub {
+        margin-top: 6px;
+        color: var(--studio-400);
+        font-size: 12px;
+      }
+      .room-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .room-action {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--surface-border);
+        color: var(--studio-300);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .room-action.on {
+        background: rgba(153, 186, 146, 0.12);
+        border-color: rgba(153, 186, 146, 0.22);
+        color: var(--accent-primary);
+      }
+      .channel-hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .channel-name {
+        color: var(--studio-050);
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .channel-sub {
+        margin-top: 6px;
+        color: var(--studio-500);
+        font: 500 10px/1.35 var(--font-mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .kv-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 110px 1fr auto;
+        gap: 12px;
+        align-items: center;
+      }
+      .kv .k {
+        color: var(--studio-500);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+      .control {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 12px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--surface-border);
+      }
+      .control .bar {
+        height: 6px;
+        flex: 1;
+        border-radius: 999px;
+        background: #1d2430;
+        position: relative;
+      }
+      .control .fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 68%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #7ea778, var(--accent-primary));
+      }
+      .control .thumb {
+        position: absolute;
+        left: 68%;
+        top: 50%;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: var(--studio-050);
+        border: 2px solid var(--accent-primary);
+        transform: translate(-50%, -50%);
+      }
+      .mono {
+        color: var(--studio-050);
+        font: 500 11px/1 var(--font-mono);
+      }
+      .toggle-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .hint {
+        color: var(--studio-300);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .keys {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      .kbd {
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 7px;
+        border-radius: 6px;
+        border: 1px solid var(--surface-border);
+        background: #0a0c11;
+        color: var(--studio-300);
+        font: 500 10px/1 var(--font-mono);
+        letter-spacing: 0.08em;
+      }
 
-.callouts{margin-top:28px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.callout{min-height:126px;padding:18px 18px 16px;border-radius:16px;border:1px solid var(--surface-stroke);background:rgba(14,15,22,.84)}
-.callout .n{color:var(--accent-primary);font:600 11px/1 var(--font-mono);letter-spacing:.16em;text-transform:uppercase;margin-bottom:10px}
-.callout .h{color:var(--studio-050);font-size:16px;font-weight:650;margin-bottom:8px;letter-spacing:-.01em}
-.callout p{margin:0;color:var(--studio-400);font-size:13px;line-height:1.5}
-</style>
-</head>
-<body>
-  <div class="page">
-    <div class="head">
-      <div>
-        <p class="kicker">Locked direction preview · Audio</p>
-        <h1 class="title">Direction <em>Ar+</em> — Control-room confidence desk</h1>
-        <p class="lede">A studio-specific Audio desk for one operator: submix-first, meter-first, and control-room-led. The goal is not to mimic a giant live console. The goal is to make one premium workstation feel trustworthy, fast, calm, and production-ready during recording and show operation.</p>
-      </div>
-      <div class="spec">
-        <div class="k">Target</div><div class="v">2560x1440 operator surface</div>
-        <div class="k">Fallback</div><div class="v">1920x1080 with the same structure</div>
-        <div class="k">Direction</div><div class="v">Submix-first desk with dedicated control room and persistent selected-channel focus</div>
-        <div class="k">Visual bar</div><div class="v">Quiet, expensive, signal-first, screenshot-ready</div>
-      </div>
-    </div>
-
-    <div class="note">
-      <span class="tag">Review artifact</span>
-      This mock shows the <strong>state assumed</strong> posture: OSC transport is connected, but the desk is still asking the operator to re-sync before trusting recall. The page stays fully usable, but the warning is precise and narrow rather than alarmist.
-    </div>
-
-    <div class="workspace">
-      <div class="monitor">
-        <span class="monitor-chip">Engine 2.2.0</span>
-        <span class="monitor-chip">Proto v1</span>
-        <span class="monitor-chip">Uptime 00:18:42</span>
-        <div class="right">
-          <span class="monitor-chip"><span class="dot amber"></span>Audio assumed</span>
-          <span class="monitor-chip"><span class="dot cyan"></span>Planning stable</span>
-          <span class="monitor-chip"><span class="dot"></span>Lighting ready</span>
+      .callouts {
+        margin-top: 28px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      .callout {
+        min-height: 126px;
+        padding: 18px 18px 16px;
+        border-radius: 16px;
+        border: 1px solid var(--surface-stroke);
+        background: rgba(14, 15, 22, 0.84);
+      }
+      .callout .n {
+        color: var(--accent-primary);
+        font: 600 11px/1 var(--font-mono);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+      .callout .h {
+        color: var(--studio-050);
+        font-size: 16px;
+        font-weight: 650;
+        margin-bottom: 8px;
+        letter-spacing: -0.01em;
+      }
+      .callout p {
+        margin: 0;
+        color: var(--studio-400);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="head">
+        <div>
+          <p class="kicker">Locked direction preview · Audio</p>
+          <h1 class="title">Direction <em>Ar+</em> — Control-room confidence desk</h1>
+          <p class="lede">
+            A studio-specific Audio desk for one operator: submix-first, meter-first, and control-room-led. The goal is
+            not to mimic a giant live console. The goal is to make one premium workstation feel trustworthy, fast, calm,
+            and production-ready during recording and show operation.
+          </p>
+        </div>
+        <div class="spec">
+          <div class="k">Target</div>
+          <div class="v">2560x1440 operator surface</div>
+          <div class="k">Fallback</div>
+          <div class="v">1920x1080 with the same structure</div>
+          <div class="k">Direction</div>
+          <div class="v">Submix-first desk with dedicated control room and persistent selected-channel focus</div>
+          <div class="k">Visual bar</div>
+          <div class="v">Quiet, expensive, signal-first, screenshot-ready</div>
         </div>
       </div>
 
-      <div class="shell">
-        <div class="brand">
-          <div class="brand-mark"></div>
-          <div class="brand-meta">SSE ExEd Studio Control<br>Operator desk</div>
-        </div>
-        <div class="tabs">
-          <div class="tab"><span class="tab-dot"></span>Setup</div>
-          <div class="tab"><span class="tab-dot"></span>Lighting</div>
-          <div class="tab active"><span class="tab-dot"></span>Audio</div>
-          <div class="tab"><span class="tab-dot"></span>Planning</div>
-        </div>
-        <div class="spacer"></div>
-        <div class="shell-badges">
-          <div class="pill warn">Audio assumed</div>
-          <div class="pill ok">Operator healthy</div>
-        </div>
+      <div class="note">
+        <span class="tag">Review artifact</span>
+        This mock shows the <strong>state assumed</strong> posture: OSC transport is connected, but the desk is still
+        asking the operator to re-sync before trusting recall. The page stays fully usable, but the warning is precise
+        and narrow rather than alarmist.
       </div>
 
-      <div class="toolbar">
-        <div class="toolbar-group toolbar-title">
-          <div>
-            <div class="eyebrow">Editing mix target</div>
-            <div class="value">Control Room A</div>
+      <div class="workspace">
+        <div class="monitor">
+          <span class="monitor-chip">Engine 2.2.0</span>
+          <span class="monitor-chip">Proto v1</span>
+          <span class="monitor-chip">Uptime 00:18:42</span>
+          <div class="right">
+            <span class="monitor-chip"><span class="dot amber"></span>Audio assumed</span>
+            <span class="monitor-chip"><span class="dot cyan"></span>Planning stable</span>
+            <span class="monitor-chip"><span class="dot"></span>Lighting ready</span>
           </div>
         </div>
-        <div class="toolbar-group">
-          <div class="status warn"><span class="k">OSC</span><span class="v">STATE ASSUMED</span></div>
-          <div class="status"><span class="k">Last sync</span><span class="v">18:24:12</span></div>
-          <div class="btn">Sync</div>
-        </div>
-        <div class="toolbar-group">
-          <div class="btn nav">[</div>
-          <div class="status"><span class="k">Bank</span><span class="v">1 / 2</span></div>
-          <div class="density">
-            <div class="mode active">Overview</div>
-            <div class="mode">Precision</div>
+
+        <div class="shell">
+          <div class="brand">
+            <div class="brand-mark"></div>
+            <div class="brand-meta">SSE ExEd Studio Control<br />Operator desk</div>
           </div>
-          <div class="btn nav">]</div>
+          <div class="tabs">
+            <div class="tab"><span class="tab-dot"></span>Setup</div>
+            <div class="tab"><span class="tab-dot"></span>Lighting</div>
+            <div class="tab active"><span class="tab-dot"></span>Audio</div>
+            <div class="tab"><span class="tab-dot"></span>Planning</div>
+          </div>
+          <div class="spacer"></div>
+          <div class="shell-badges">
+            <div class="pill warn">Audio assumed</div>
+            <div class="pill ok">Operator healthy</div>
+          </div>
         </div>
-        <div class="toolbar-group">
-          <div class="snapshot-readout"><span class="k">Current snapshot</span><span class="v">Show open</span></div>
-          <div class="btn primary">Recall</div>
-        </div>
-      </div>
 
-      <div class="warning">
-        <div class="status warn"><span class="k">State</span><span class="v">ASSUMED</span></div>
-        <div class="copy"><strong>STATE ASSUMED</strong> - using last synced console state. Run Sync before trusting recall or current fader state.</div>
-        <div class="tiny">Enter to sync · V toggles density · Esc clears selection</div>
-      </div>
-
-      <div class="bridge">
-        <div class="meter"><div class="name">Host</div><div class="short">VOX 1</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:72%"></div><div class="meter-peak" style="bottom:78%"></div></div><div class="meter-track"><div class="meter-fill" style="height:64%"></div><div class="meter-peak" style="bottom:70%"></div></div></div><div class="tags"><span class="tag live">live</span></div></div>
-        <div class="meter"><div class="name">Guest</div><div class="short">VOX 2</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:56%"></div><div class="meter-peak" style="bottom:60%"></div></div><div class="meter-track"><div class="meter-fill" style="height:48%"></div><div class="meter-peak" style="bottom:54%"></div></div></div><div class="tags"><span class="tag">pad</span></div></div>
-        <div class="meter"><div class="name">Boom</div><div class="short">VOX 3</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:34%"></div><div class="meter-peak" style="bottom:40%"></div></div><div class="meter-track"><div class="meter-fill" style="height:31%"></div><div class="meter-peak" style="bottom:36%"></div></div></div><div class="tags"><span class="tag">phase</span></div></div>
-        <div class="meter"><div class="name">Music L</div><div class="short">PLAY 1</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill hot" style="height:88%"></div><div class="meter-peak" style="bottom:92%"></div></div><div class="meter-track"><div class="meter-fill hot" style="height:84%"></div><div class="meter-peak" style="bottom:89%"></div></div></div><div class="tags"><span class="tag warn">hot</span></div></div>
-        <div class="meter"><div class="name">Music R</div><div class="short">PLAY 2</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill hot" style="height:83%"></div><div class="meter-peak" style="bottom:86%"></div></div><div class="meter-track"><div class="meter-fill hot" style="height:81%"></div><div class="meter-peak" style="bottom:85%"></div></div></div><div class="tags"><span class="tag warn">hot</span></div></div>
-        <div class="meter selected"><div class="name">VT</div><div class="short">PLAY 3</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:61%"></div><div class="meter-peak" style="bottom:67%"></div></div><div class="meter-track"><div class="meter-fill" style="height:58%"></div><div class="meter-peak" style="bottom:63%"></div></div></div><div class="tags"><span class="tag live">sel</span><span class="tag">st</span></div></div>
-        <div class="meter"><div class="name">FX</div><div class="short">PLAY 4</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:18%"></div><div class="meter-peak" style="bottom:26%"></div></div><div class="meter-track"><div class="meter-fill" style="height:15%"></div><div class="meter-peak" style="bottom:21%"></div></div></div><div class="tags"><span class="tag">mute</span></div></div>
-        <div class="meter"><div class="name">USB 1</div><div class="short">USB 1</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:42%"></div><div class="meter-peak" style="bottom:47%"></div></div><div class="meter-track"><div class="meter-fill" style="height:37%"></div><div class="meter-peak" style="bottom:42%"></div></div></div><div class="tags"><span class="tag">usb</span></div></div>
-        <div class="meter"><div class="name">USB 2</div><div class="short">USB 2</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:28%"></div><div class="meter-peak" style="bottom:34%"></div></div><div class="meter-track"><div class="meter-fill" style="height:30%"></div><div class="meter-peak" style="bottom:36%"></div></div></div><div class="tags"><span class="tag">usb</span></div></div>
-        <div class="meter"><div class="name">IFB 1</div><div class="short">AUX 1</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:46%"></div><div class="meter-peak" style="bottom:51%"></div></div><div class="meter-track"><div class="meter-fill" style="height:44%"></div><div class="meter-peak" style="bottom:49%"></div></div></div><div class="tags"><span class="tag">ifb</span></div></div>
-        <div class="meter"><div class="name">IFB 2</div><div class="short">AUX 2</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:39%"></div><div class="meter-peak" style="bottom:44%"></div></div><div class="meter-track"><div class="meter-fill" style="height:36%"></div><div class="meter-peak" style="bottom:40%"></div></div></div><div class="tags"><span class="tag">ifb</span></div></div>
-        <div class="meter"><div class="name">Control A</div><div class="short">OUT A</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill clip" style="height:92%"></div><div class="meter-peak" style="bottom:96%"></div></div><div class="meter-track"><div class="meter-fill clip" style="height:94%"></div><div class="meter-peak" style="bottom:97%"></div></div></div><div class="tags"><span class="tag warn">clip</span></div></div>
-        <div class="meter"><div class="name">Control B</div><div class="short">OUT B</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:52%"></div><div class="meter-peak" style="bottom:57%"></div></div><div class="meter-track"><div class="meter-fill" style="height:54%"></div><div class="meter-peak" style="bottom:58%"></div></div></div><div class="tags"><span class="tag">dim</span></div></div>
-        <div class="meter"><div class="name">Phones A</div><div class="short">PH A</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:66%"></div><div class="meter-peak" style="bottom:72%"></div></div><div class="meter-track"><div class="meter-fill" style="height:69%"></div><div class="meter-peak" style="bottom:74%"></div></div></div><div class="tags"><span class="tag live">talk</span></div></div>
-        <div class="meter"><div class="name">Phones B</div><div class="short">PH B</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:48%"></div><div class="meter-peak" style="bottom:53%"></div></div><div class="meter-track"><div class="meter-fill" style="height:45%"></div><div class="meter-peak" style="bottom:50%"></div></div></div><div class="tags"><span class="tag">mono</span></div></div>
-        <div class="meter"><div class="name">Record</div><div class="short">REC</div><div class="meter-bars"><div class="meter-track"><div class="meter-fill" style="height:58%"></div><div class="meter-peak" style="bottom:64%"></div></div><div class="meter-track"><div class="meter-fill" style="height:56%"></div><div class="meter-peak" style="bottom:61%"></div></div></div><div class="tags"><span class="tag">bus</span></div></div>
-      </div>
-
-      <div class="body">
-        <div class="rail">
-          <div class="panel">
-            <div class="panel-head">
-              <div class="h">Mix targets</div>
-              <div class="v">Submix first</div>
+        <div class="toolbar">
+          <div class="toolbar-group toolbar-title">
+            <div>
+              <div class="eyebrow">Editing mix target</div>
+              <div class="value">Control Room A</div>
             </div>
-            <div class="mix-list">
-              <div class="mix-row active"><div><div class="title">Control Room A</div><div class="meta">main monitor · selected · dim ready</div></div><div class="tag live">live</div></div>
-              <div class="mix-row"><div><div class="title">Control Room B</div><div class="meta">alt monitor · mono available</div></div><div class="tag">mono</div></div>
-              <div class="mix-row"><div><div class="title">Phones A</div><div class="meta">talent cue · talkback armed</div></div><div class="tag live">talk</div></div>
-              <div class="mix-row"><div><div class="title">Phones B</div><div class="meta">guest return</div></div><div class="tag">mono</div></div>
-              <div class="mix-row"><div><div class="title">Record bus</div><div class="meta">clean record feed</div></div><div class="tag">safe</div></div>
-            </div>
           </div>
-
-          <div class="panel">
-            <div class="panel-head">
-              <div class="h">Snapshots</div>
-              <div class="v">Shift 1-8</div>
+          <div class="toolbar-group">
+            <div class="status warn"><span class="k">OSC</span><span class="v">STATE ASSUMED</span></div>
+            <div class="status"><span class="k">Last sync</span><span class="v">18:24:12</span></div>
+            <div class="btn">Sync</div>
+          </div>
+          <div class="toolbar-group">
+            <div class="btn nav">[</div>
+            <div class="status"><span class="k">Bank</span><span class="v">1 / 2</span></div>
+            <div class="density">
+              <div class="mode active">Overview</div>
+              <div class="mode">Precision</div>
             </div>
-            <div class="snap-list">
-              <div class="snap-row"><div><div class="title">Open rehearsal</div><div class="meta">slot 1 · last recalled 16:02</div></div><div class="btn">Recall</div></div>
-              <div class="snap-row active"><div><div class="title">Show open</div><div class="meta">slot 2 · current desk state</div></div><div class="btn primary">Recall</div></div>
-              <div class="snap-row"><div><div class="title">Interview block</div><div class="meta">slot 3 · phones dim</div></div><div class="btn">Recall</div></div>
-              <div class="snap-row"><div><div class="title">Break bumper</div><div class="meta">slot 4 · music push</div></div><div class="btn">Recall</div></div>
-              <div class="snap-row"><div><div class="title">Credits</div><div class="meta">slot 5 · playback lead</div></div><div class="btn">Recall</div></div>
-            </div>
+            <div class="btn nav">]</div>
+          </div>
+          <div class="toolbar-group">
+            <div class="snapshot-readout"><span class="k">Current snapshot</span><span class="v">Show open</span></div>
+            <div class="btn primary">Recall</div>
           </div>
         </div>
 
-        <div class="desk">
-          <div class="desk-head">
-            <div class="desk-title">Overview density · bank 1 · strips 1-12</div>
-            <div class="desk-right">
-              <div class="tag live">1-8 select</div>
-              <div class="tag">M mute</div>
-              <div class="tag">S solo</div>
-              <div class="tag">V density</div>
-            </div>
+        <div class="warning">
+          <div class="status warn"><span class="k">State</span><span class="v">ASSUMED</span></div>
+          <div class="copy">
+            <strong>STATE ASSUMED</strong> - using last synced console state. Run Sync before trusting recall or current
+            fader state.
           </div>
-          <div class="strips">
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">Host</div><div class="strip-meta">Vox 1 · mic pre</div></div><div class="stereo">mono</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:70%"></div><div class="strip-peak" style="bottom:76%"></div></div><div class="strip-track"><div class="strip-fill" style="height:62%"></div><div class="strip-peak" style="bottom:68%"></div></div></div><div class="fader"><div class="rail"><div class="level"></div><div class="thumb"></div></div><div class="db">-4.0</div></div><div class="switches"><div class="switch">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag live">48v</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">Guest</div><div class="strip-meta">Vox 2 · mic pre</div></div><div class="stereo">mono</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:54%"></div><div class="strip-peak" style="bottom:60%"></div></div><div class="strip-track"><div class="strip-fill" style="height:47%"></div><div class="strip-peak" style="bottom:53%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:64%"></div><div class="thumb" style="left:64%"></div></div><div class="db">-6.5</div></div><div class="switches"><div class="switch">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag">pad</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">Boom</div><div class="strip-meta">Vox 3 · utility</div></div><div class="stereo">mono</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:35%"></div><div class="strip-peak" style="bottom:41%"></div></div><div class="strip-track"><div class="strip-fill" style="height:31%"></div><div class="strip-peak" style="bottom:36%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:58%"></div><div class="thumb" style="left:58%"></div></div><div class="db">-9.0</div></div><div class="switches"><div class="switch">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag">auto</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">Music L</div><div class="strip-meta">Playback 1 · stereo</div></div><div class="stereo">L</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill hot" style="height:88%"></div><div class="strip-peak" style="bottom:92%"></div></div><div class="strip-track"><div class="strip-fill hot" style="height:85%"></div><div class="strip-peak" style="bottom:89%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:78%"></div><div class="thumb" style="left:78%"></div></div><div class="db">+1.5</div></div><div class="switches"><div class="switch">Mute</div><div class="switch warn">Solo</div></div><div class="tags"><span class="tag warn">hot</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">Music R</div><div class="strip-meta">Playback 2 · stereo</div></div><div class="stereo">R</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill hot" style="height:85%"></div><div class="strip-peak" style="bottom:88%"></div></div><div class="strip-track"><div class="strip-fill hot" style="height:82%"></div><div class="strip-peak" style="bottom:86%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:76%"></div><div class="thumb" style="left:76%"></div></div><div class="db">+1.0</div></div><div class="switches"><div class="switch">Mute</div><div class="switch warn">Solo</div></div><div class="tags"><span class="tag warn">hot</span></div></div>
-            <div class="strip selected"><div class="strip-top"><div><div class="strip-name">VT</div><div class="strip-meta">Playback 3 · selected</div></div><div class="stereo">st</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:61%"></div><div class="strip-peak" style="bottom:67%"></div></div><div class="strip-track"><div class="strip-fill" style="height:58%"></div><div class="strip-peak" style="bottom:63%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:68%"></div><div class="thumb" style="left:68%"></div></div><div class="db">-3.5</div></div><div class="switches"><div class="switch">Mute</div><div class="switch on">Solo</div></div><div class="tags"><span class="tag live">selected</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">FX</div><div class="strip-meta">Playback 4 · return</div></div><div class="stereo">st</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:18%"></div><div class="strip-peak" style="bottom:25%"></div></div><div class="strip-track"><div class="strip-fill" style="height:15%"></div><div class="strip-peak" style="bottom:22%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:42%"></div><div class="thumb" style="left:42%"></div></div><div class="db">-16</div></div><div class="switches"><div class="switch on">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag">return</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">USB 1</div><div class="strip-meta">USB return</div></div><div class="stereo">mono</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:42%"></div><div class="strip-peak" style="bottom:48%"></div></div><div class="strip-track"><div class="strip-fill" style="height:37%"></div><div class="strip-peak" style="bottom:42%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:53%"></div><div class="thumb" style="left:53%"></div></div><div class="db">-11</div></div><div class="switches"><div class="switch">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag">usb</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">USB 2</div><div class="strip-meta">USB return</div></div><div class="stereo">mono</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:28%"></div><div class="strip-peak" style="bottom:34%"></div></div><div class="strip-track"><div class="strip-fill" style="height:30%"></div><div class="strip-peak" style="bottom:36%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:49%"></div><div class="thumb" style="left:49%"></div></div><div class="db">-13</div></div><div class="switches"><div class="switch">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag">usb</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">IFB 1</div><div class="strip-meta">Cue send</div></div><div class="stereo">aux</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:46%"></div><div class="strip-peak" style="bottom:51%"></div></div><div class="strip-track"><div class="strip-fill" style="height:44%"></div><div class="strip-peak" style="bottom:49%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:56%"></div><div class="thumb" style="left:56%"></div></div><div class="db">-8.5</div></div><div class="switches"><div class="switch">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag">ifb</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">IFB 2</div><div class="strip-meta">Cue send</div></div><div class="stereo">aux</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:39%"></div><div class="strip-peak" style="bottom:44%"></div></div><div class="strip-track"><div class="strip-fill" style="height:36%"></div><div class="strip-peak" style="bottom:40%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:51%"></div><div class="thumb" style="left:51%"></div></div><div class="db">-11.5</div></div><div class="switches"><div class="switch">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag">ifb</span></div></div>
-            <div class="strip"><div class="strip-top"><div><div class="strip-name">Record</div><div class="strip-meta">Clean program</div></div><div class="stereo">bus</div></div><div class="strip-meters"><div class="strip-track"><div class="strip-fill" style="height:58%"></div><div class="strip-peak" style="bottom:64%"></div></div><div class="strip-track"><div class="strip-fill" style="height:56%"></div><div class="strip-peak" style="bottom:61%"></div></div></div><div class="fader"><div class="rail"><div class="level" style="width:66%"></div><div class="thumb" style="left:66%"></div></div><div class="db">-5.0</div></div><div class="switches"><div class="switch">Mute</div><div class="switch">Solo</div></div><div class="tags"><span class="tag">safe</span></div></div>
-          </div>
+          <div class="tiny">Enter to sync · V toggles density · Esc clears selection</div>
         </div>
 
-        <div class="right-col">
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <div class="eyebrow">Control room</div>
-                <div class="card-title">Monitor confidence</div>
+        <div class="bridge">
+          <div class="meter">
+            <div class="name">Host</div>
+            <div class="short">VOX 1</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 72%"></div>
+                <div class="meter-peak" style="bottom: 78%"></div>
               </div>
-              <div class="tag live">live</div>
-            </div>
-            <div class="card-body">
-              <div class="room-grid">
-                <div class="stat"><div class="k">Monitor target</div><div class="v">Control Room A</div><div class="sub">speaker A · calibrated</div></div>
-                <div class="stat"><div class="k">Phones</div><div class="v">Phones A</div><div class="sub">talent cue active</div></div>
-                <div class="stat"><div class="k">Talkback</div><div class="v">Armed</div><div class="sub">routes to phones</div></div>
-                <div class="stat"><div class="k">Monitor level</div><div class="v">-14 dB</div><div class="sub">dim ready · mono off</div></div>
-              </div>
-              <div class="room-actions">
-                <div class="room-action on">Speaker A</div>
-                <div class="room-action">Speaker B</div>
-                <div class="room-action">Phones</div>
-                <div class="room-action">Dim</div>
-                <div class="room-action">Mono</div>
-                <div class="room-action on">Talkback</div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 64%"></div>
+                <div class="meter-peak" style="bottom: 70%"></div>
               </div>
             </div>
+            <div class="tags"><span class="tag live">live</span></div>
           </div>
-
-          <div class="card">
-            <div class="card-head">
-              <div class="eyebrow">Desk state</div>
-              <div class="tag warn">assumed</div>
-            </div>
-            <div class="card-body">
-              <div class="session-grid">
-                <div class="stat"><div class="k">Console state</div><div class="v">Assumed</div><div class="sub">last sync 18:24:12</div></div>
-                <div class="stat"><div class="k">Last action</div><div class="v">Sync succeeded</div><div class="sub">audio.sync</div></div>
-                <div class="stat"><div class="k">Snapshot</div><div class="v">Show open</div><div class="sub">recalled 18:05:43</div></div>
-                <div class="stat"><div class="k">Next move</div><div class="v">Run Sync</div><div class="sub">before trusting recall</div></div>
+          <div class="meter">
+            <div class="name">Guest</div>
+            <div class="short">VOX 2</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 56%"></div>
+                <div class="meter-peak" style="bottom: 60%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 48%"></div>
+                <div class="meter-peak" style="bottom: 54%"></div>
               </div>
             </div>
+            <div class="tags"><span class="tag">pad</span></div>
           </div>
-
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <div class="eyebrow">Selected channel</div>
-                <div class="card-title">VT playback</div>
+          <div class="meter">
+            <div class="name">Boom</div>
+            <div class="short">VOX 3</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 34%"></div>
+                <div class="meter-peak" style="bottom: 40%"></div>
               </div>
-              <div class="tag live">strip 6</div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 31%"></div>
+                <div class="meter-peak" style="bottom: 36%"></div>
+              </div>
             </div>
-            <div class="card-body">
-              <div class="channel-hero">
-                <div>
-                  <div class="channel-name">VT</div>
-                  <div class="channel-sub">Playback 3 · stereo return · selected from meter bridge</div>
+            <div class="tags"><span class="tag">phase</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">Music L</div>
+            <div class="short">PLAY 1</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill hot" style="height: 88%"></div>
+                <div class="meter-peak" style="bottom: 92%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill hot" style="height: 84%"></div>
+                <div class="meter-peak" style="bottom: 89%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag warn">hot</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">Music R</div>
+            <div class="short">PLAY 2</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill hot" style="height: 83%"></div>
+                <div class="meter-peak" style="bottom: 86%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill hot" style="height: 81%"></div>
+                <div class="meter-peak" style="bottom: 85%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag warn">hot</span></div>
+          </div>
+          <div class="meter selected">
+            <div class="name">VT</div>
+            <div class="short">PLAY 3</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 61%"></div>
+                <div class="meter-peak" style="bottom: 67%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 58%"></div>
+                <div class="meter-peak" style="bottom: 63%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag live">sel</span><span class="tag">st</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">FX</div>
+            <div class="short">PLAY 4</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 18%"></div>
+                <div class="meter-peak" style="bottom: 26%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 15%"></div>
+                <div class="meter-peak" style="bottom: 21%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag">mute</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">USB 1</div>
+            <div class="short">USB 1</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 42%"></div>
+                <div class="meter-peak" style="bottom: 47%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 37%"></div>
+                <div class="meter-peak" style="bottom: 42%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag">usb</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">USB 2</div>
+            <div class="short">USB 2</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 28%"></div>
+                <div class="meter-peak" style="bottom: 34%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 30%"></div>
+                <div class="meter-peak" style="bottom: 36%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag">usb</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">IFB 1</div>
+            <div class="short">AUX 1</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 46%"></div>
+                <div class="meter-peak" style="bottom: 51%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 44%"></div>
+                <div class="meter-peak" style="bottom: 49%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag">ifb</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">IFB 2</div>
+            <div class="short">AUX 2</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 39%"></div>
+                <div class="meter-peak" style="bottom: 44%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 36%"></div>
+                <div class="meter-peak" style="bottom: 40%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag">ifb</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">Control A</div>
+            <div class="short">OUT A</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill clip" style="height: 92%"></div>
+                <div class="meter-peak" style="bottom: 96%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill clip" style="height: 94%"></div>
+                <div class="meter-peak" style="bottom: 97%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag warn">clip</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">Control B</div>
+            <div class="short">OUT B</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 52%"></div>
+                <div class="meter-peak" style="bottom: 57%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 54%"></div>
+                <div class="meter-peak" style="bottom: 58%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag">dim</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">Phones A</div>
+            <div class="short">PH A</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 66%"></div>
+                <div class="meter-peak" style="bottom: 72%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 69%"></div>
+                <div class="meter-peak" style="bottom: 74%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag live">talk</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">Phones B</div>
+            <div class="short">PH B</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 48%"></div>
+                <div class="meter-peak" style="bottom: 53%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 45%"></div>
+                <div class="meter-peak" style="bottom: 50%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag">mono</span></div>
+          </div>
+          <div class="meter">
+            <div class="name">Record</div>
+            <div class="short">REC</div>
+            <div class="meter-bars">
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 58%"></div>
+                <div class="meter-peak" style="bottom: 64%"></div>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill" style="height: 56%"></div>
+                <div class="meter-peak" style="bottom: 61%"></div>
+              </div>
+            </div>
+            <div class="tags"><span class="tag">bus</span></div>
+          </div>
+        </div>
+
+        <div class="body">
+          <div class="rail">
+            <div class="panel">
+              <div class="panel-head">
+                <div class="h">Mix targets</div>
+                <div class="v">Submix first</div>
+              </div>
+              <div class="mix-list">
+                <div class="mix-row active">
+                  <div>
+                    <div class="title">Control Room A</div>
+                    <div class="meta">main monitor · selected · dim ready</div>
+                  </div>
+                  <div class="tag live">live</div>
                 </div>
-                <div class="stereo">stereo</div>
+                <div class="mix-row">
+                  <div>
+                    <div class="title">Control Room B</div>
+                    <div class="meta">alt monitor · mono available</div>
+                  </div>
+                  <div class="tag">mono</div>
+                </div>
+                <div class="mix-row">
+                  <div>
+                    <div class="title">Phones A</div>
+                    <div class="meta">talent cue · talkback armed</div>
+                  </div>
+                  <div class="tag live">talk</div>
+                </div>
+                <div class="mix-row">
+                  <div>
+                    <div class="title">Phones B</div>
+                    <div class="meta">guest return</div>
+                  </div>
+                  <div class="tag">mono</div>
+                </div>
+                <div class="mix-row">
+                  <div>
+                    <div class="title">Record bus</div>
+                    <div class="meta">clean record feed</div>
+                  </div>
+                  <div class="tag">safe</div>
+                </div>
               </div>
-              <div class="kv-list">
-                <div class="kv"><div class="k">Fader</div><div class="control"><div class="bar"><div class="fill"></div><div class="thumb"></div></div></div><div class="mono">-3.5 dB</div></div>
-                <div class="kv"><div class="k">Gain</div><div class="control"><div class="bar"><div class="fill" style="width:0%"></div><div class="thumb" style="left:0%"></div></div></div><div class="mono">n/a</div></div>
-                <div class="kv"><div class="k">Mix send</div><div class="control"><div class="bar"><div class="fill" style="width:74%"></div><div class="thumb" style="left:74%"></div></div></div><div class="mono">CR A</div></div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <div class="h">Snapshots</div>
+                <div class="v">Shift 1-8</div>
               </div>
-              <div class="toggle-grid">
-                <div class="switch">Mute</div>
-                <div class="switch on">Solo</div>
-                <div class="switch">Mono</div>
-                <div class="switch">Dim</div>
-                <div class="switch">Talkback</div>
-                <div class="switch">Phase</div>
+              <div class="snap-list">
+                <div class="snap-row">
+                  <div>
+                    <div class="title">Open rehearsal</div>
+                    <div class="meta">slot 1 · last recalled 16:02</div>
+                  </div>
+                  <div class="btn">Recall</div>
+                </div>
+                <div class="snap-row active">
+                  <div>
+                    <div class="title">Show open</div>
+                    <div class="meta">slot 2 · current desk state</div>
+                  </div>
+                  <div class="btn primary">Recall</div>
+                </div>
+                <div class="snap-row">
+                  <div>
+                    <div class="title">Interview block</div>
+                    <div class="meta">slot 3 · phones dim</div>
+                  </div>
+                  <div class="btn">Recall</div>
+                </div>
+                <div class="snap-row">
+                  <div>
+                    <div class="title">Break bumper</div>
+                    <div class="meta">slot 4 · music push</div>
+                  </div>
+                  <div class="btn">Recall</div>
+                </div>
+                <div class="snap-row">
+                  <div>
+                    <div class="title">Credits</div>
+                    <div class="meta">slot 5 · playback lead</div>
+                  </div>
+                  <div class="btn">Recall</div>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="card">
-            <div class="card-head">
-              <div class="eyebrow">No-selection posture</div>
-              <div class="tag">Esc</div>
+          <div class="desk">
+            <div class="desk-head">
+              <div class="desk-title">Overview density · bank 1 · strips 1-12</div>
+              <div class="desk-right">
+                <div class="tag live">1-8 select</div>
+                <div class="tag">M mute</div>
+                <div class="tag">S solo</div>
+                <div class="tag">V density</div>
+              </div>
             </div>
-            <div class="card-body hint">
-              If no channel is selected, the lower right panel falls back to a contextual help card with active mix target, last recall, sync status, and a small keyboard cheat sheet. That keeps the desk useful before the operator drills into a strip.
-              <div class="keys">
-                <span class="kbd">1-8 select</span>
-                <span class="kbd">[ ] bank</span>
-                <span class="kbd">V density</span>
-                <span class="kbd">M mute</span>
-                <span class="kbd">S solo</span>
+            <div class="strips">
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">Host</div>
+                    <div class="strip-meta">Vox 1 · mic pre</div>
+                  </div>
+                  <div class="stereo">mono</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 70%"></div>
+                    <div class="strip-peak" style="bottom: 76%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 62%"></div>
+                    <div class="strip-peak" style="bottom: 68%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level"></div>
+                    <div class="thumb"></div>
+                  </div>
+                  <div class="db">-4.0</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag live">48v</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">Guest</div>
+                    <div class="strip-meta">Vox 2 · mic pre</div>
+                  </div>
+                  <div class="stereo">mono</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 54%"></div>
+                    <div class="strip-peak" style="bottom: 60%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 47%"></div>
+                    <div class="strip-peak" style="bottom: 53%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 64%"></div>
+                    <div class="thumb" style="left: 64%"></div>
+                  </div>
+                  <div class="db">-6.5</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag">pad</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">Boom</div>
+                    <div class="strip-meta">Vox 3 · utility</div>
+                  </div>
+                  <div class="stereo">mono</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 35%"></div>
+                    <div class="strip-peak" style="bottom: 41%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 31%"></div>
+                    <div class="strip-peak" style="bottom: 36%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 58%"></div>
+                    <div class="thumb" style="left: 58%"></div>
+                  </div>
+                  <div class="db">-9.0</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag">auto</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">Music L</div>
+                    <div class="strip-meta">Playback 1 · stereo</div>
+                  </div>
+                  <div class="stereo">L</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill hot" style="height: 88%"></div>
+                    <div class="strip-peak" style="bottom: 92%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill hot" style="height: 85%"></div>
+                    <div class="strip-peak" style="bottom: 89%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 78%"></div>
+                    <div class="thumb" style="left: 78%"></div>
+                  </div>
+                  <div class="db">+1.5</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch warn">Solo</div>
+                </div>
+                <div class="tags"><span class="tag warn">hot</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">Music R</div>
+                    <div class="strip-meta">Playback 2 · stereo</div>
+                  </div>
+                  <div class="stereo">R</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill hot" style="height: 85%"></div>
+                    <div class="strip-peak" style="bottom: 88%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill hot" style="height: 82%"></div>
+                    <div class="strip-peak" style="bottom: 86%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 76%"></div>
+                    <div class="thumb" style="left: 76%"></div>
+                  </div>
+                  <div class="db">+1.0</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch warn">Solo</div>
+                </div>
+                <div class="tags"><span class="tag warn">hot</span></div>
+              </div>
+              <div class="strip selected">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">VT</div>
+                    <div class="strip-meta">Playback 3 · selected</div>
+                  </div>
+                  <div class="stereo">st</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 61%"></div>
+                    <div class="strip-peak" style="bottom: 67%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 58%"></div>
+                    <div class="strip-peak" style="bottom: 63%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 68%"></div>
+                    <div class="thumb" style="left: 68%"></div>
+                  </div>
+                  <div class="db">-3.5</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch on">Solo</div>
+                </div>
+                <div class="tags"><span class="tag live">selected</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">FX</div>
+                    <div class="strip-meta">Playback 4 · return</div>
+                  </div>
+                  <div class="stereo">st</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 18%"></div>
+                    <div class="strip-peak" style="bottom: 25%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 15%"></div>
+                    <div class="strip-peak" style="bottom: 22%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 42%"></div>
+                    <div class="thumb" style="left: 42%"></div>
+                  </div>
+                  <div class="db">-16</div>
+                </div>
+                <div class="switches">
+                  <div class="switch on">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag">return</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">USB 1</div>
+                    <div class="strip-meta">USB return</div>
+                  </div>
+                  <div class="stereo">mono</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 42%"></div>
+                    <div class="strip-peak" style="bottom: 48%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 37%"></div>
+                    <div class="strip-peak" style="bottom: 42%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 53%"></div>
+                    <div class="thumb" style="left: 53%"></div>
+                  </div>
+                  <div class="db">-11</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag">usb</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">USB 2</div>
+                    <div class="strip-meta">USB return</div>
+                  </div>
+                  <div class="stereo">mono</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 28%"></div>
+                    <div class="strip-peak" style="bottom: 34%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 30%"></div>
+                    <div class="strip-peak" style="bottom: 36%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 49%"></div>
+                    <div class="thumb" style="left: 49%"></div>
+                  </div>
+                  <div class="db">-13</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag">usb</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">IFB 1</div>
+                    <div class="strip-meta">Cue send</div>
+                  </div>
+                  <div class="stereo">aux</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 46%"></div>
+                    <div class="strip-peak" style="bottom: 51%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 44%"></div>
+                    <div class="strip-peak" style="bottom: 49%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 56%"></div>
+                    <div class="thumb" style="left: 56%"></div>
+                  </div>
+                  <div class="db">-8.5</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag">ifb</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">IFB 2</div>
+                    <div class="strip-meta">Cue send</div>
+                  </div>
+                  <div class="stereo">aux</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 39%"></div>
+                    <div class="strip-peak" style="bottom: 44%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 36%"></div>
+                    <div class="strip-peak" style="bottom: 40%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 51%"></div>
+                    <div class="thumb" style="left: 51%"></div>
+                  </div>
+                  <div class="db">-11.5</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag">ifb</span></div>
+              </div>
+              <div class="strip">
+                <div class="strip-top">
+                  <div>
+                    <div class="strip-name">Record</div>
+                    <div class="strip-meta">Clean program</div>
+                  </div>
+                  <div class="stereo">bus</div>
+                </div>
+                <div class="strip-meters">
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 58%"></div>
+                    <div class="strip-peak" style="bottom: 64%"></div>
+                  </div>
+                  <div class="strip-track">
+                    <div class="strip-fill" style="height: 56%"></div>
+                    <div class="strip-peak" style="bottom: 61%"></div>
+                  </div>
+                </div>
+                <div class="fader">
+                  <div class="rail">
+                    <div class="level" style="width: 66%"></div>
+                    <div class="thumb" style="left: 66%"></div>
+                  </div>
+                  <div class="db">-5.0</div>
+                </div>
+                <div class="switches">
+                  <div class="switch">Mute</div>
+                  <div class="switch">Solo</div>
+                </div>
+                <div class="tags"><span class="tag">safe</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="right-col">
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <div class="eyebrow">Control room</div>
+                  <div class="card-title">Monitor confidence</div>
+                </div>
+                <div class="tag live">live</div>
+              </div>
+              <div class="card-body">
+                <div class="room-grid">
+                  <div class="stat">
+                    <div class="k">Monitor target</div>
+                    <div class="v">Control Room A</div>
+                    <div class="sub">speaker A · calibrated</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Phones</div>
+                    <div class="v">Phones A</div>
+                    <div class="sub">talent cue active</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Talkback</div>
+                    <div class="v">Armed</div>
+                    <div class="sub">routes to phones</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Monitor level</div>
+                    <div class="v">-14 dB</div>
+                    <div class="sub">dim ready · mono off</div>
+                  </div>
+                </div>
+                <div class="room-actions">
+                  <div class="room-action on">Speaker A</div>
+                  <div class="room-action">Speaker B</div>
+                  <div class="room-action">Phones</div>
+                  <div class="room-action">Dim</div>
+                  <div class="room-action">Mono</div>
+                  <div class="room-action on">Talkback</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <div class="eyebrow">Desk state</div>
+                <div class="tag warn">assumed</div>
+              </div>
+              <div class="card-body">
+                <div class="session-grid">
+                  <div class="stat">
+                    <div class="k">Console state</div>
+                    <div class="v">Assumed</div>
+                    <div class="sub">last sync 18:24:12</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Last action</div>
+                    <div class="v">Sync succeeded</div>
+                    <div class="sub">audio.sync</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Snapshot</div>
+                    <div class="v">Show open</div>
+                    <div class="sub">recalled 18:05:43</div>
+                  </div>
+                  <div class="stat">
+                    <div class="k">Next move</div>
+                    <div class="v">Run Sync</div>
+                    <div class="sub">before trusting recall</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <div>
+                  <div class="eyebrow">Selected channel</div>
+                  <div class="card-title">VT playback</div>
+                </div>
+                <div class="tag live">strip 6</div>
+              </div>
+              <div class="card-body">
+                <div class="channel-hero">
+                  <div>
+                    <div class="channel-name">VT</div>
+                    <div class="channel-sub">Playback 3 · stereo return · selected from meter bridge</div>
+                  </div>
+                  <div class="stereo">stereo</div>
+                </div>
+                <div class="kv-list">
+                  <div class="kv">
+                    <div class="k">Fader</div>
+                    <div class="control">
+                      <div class="bar">
+                        <div class="fill"></div>
+                        <div class="thumb"></div>
+                      </div>
+                    </div>
+                    <div class="mono">-3.5 dB</div>
+                  </div>
+                  <div class="kv">
+                    <div class="k">Gain</div>
+                    <div class="control">
+                      <div class="bar">
+                        <div class="fill" style="width: 0%"></div>
+                        <div class="thumb" style="left: 0%"></div>
+                      </div>
+                    </div>
+                    <div class="mono">n/a</div>
+                  </div>
+                  <div class="kv">
+                    <div class="k">Mix send</div>
+                    <div class="control">
+                      <div class="bar">
+                        <div class="fill" style="width: 74%"></div>
+                        <div class="thumb" style="left: 74%"></div>
+                      </div>
+                    </div>
+                    <div class="mono">CR A</div>
+                  </div>
+                </div>
+                <div class="toggle-grid">
+                  <div class="switch">Mute</div>
+                  <div class="switch on">Solo</div>
+                  <div class="switch">Mono</div>
+                  <div class="switch">Dim</div>
+                  <div class="switch">Talkback</div>
+                  <div class="switch">Phase</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <div class="eyebrow">No-selection posture</div>
+                <div class="tag">Esc</div>
+              </div>
+              <div class="card-body hint">
+                If no channel is selected, the lower right panel falls back to a contextual help card with active mix
+                target, last recall, sync status, and a small keyboard cheat sheet. That keeps the desk useful before
+                the operator drills into a strip.
+                <div class="keys">
+                  <span class="kbd">1-8 select</span>
+                  <span class="kbd">[ ] bank</span>
+                  <span class="kbd">V density</span>
+                  <span class="kbd">M mute</span>
+                  <span class="kbd">S solo</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="callouts">
-      <div class="callout">
-        <div class="n">01</div>
-        <div class="h">Submix first</div>
-        <p>The active mix target becomes the desk identity, not a side option. That is the right mental model for one operator in one studio.</p>
-      </div>
-      <div class="callout">
-        <div class="n">02</div>
-        <div class="h">Control room is real UI</div>
-        <p>Monitor confidence, speaker switching, dim, mono, talkback, and phones state get their own premium surface instead of hiding inside generic metadata.</p>
-      </div>
-      <div class="callout">
-        <div class="n">03</div>
-        <div class="h">Signal first</div>
-        <p>The meter bridge stays the fastest read. The selected-channel inspector deepens one strip without making the whole page feel like a settings form.</p>
-      </div>
-      <div class="callout">
-        <div class="n">04</div>
-        <div class="h">Quiet but expensive</div>
-        <p>The visual language is denser and more premium than the first mock: fewer competing controls, stronger hierarchy, and surfaces that feel like flagship control software.</p>
+      <div class="callouts">
+        <div class="callout">
+          <div class="n">01</div>
+          <div class="h">Submix first</div>
+          <p>
+            The active mix target becomes the desk identity, not a side option. That is the right mental model for one
+            operator in one studio.
+          </p>
+        </div>
+        <div class="callout">
+          <div class="n">02</div>
+          <div class="h">Control room is real UI</div>
+          <p>
+            Monitor confidence, speaker switching, dim, mono, talkback, and phones state get their own premium surface
+            instead of hiding inside generic metadata.
+          </p>
+        </div>
+        <div class="callout">
+          <div class="n">03</div>
+          <div class="h">Signal first</div>
+          <p>
+            The meter bridge stays the fastest read. The selected-channel inspector deepens one strip without making the
+            whole page feel like a settings form.
+          </p>
+        </div>
+        <div class="callout">
+          <div class="n">04</div>
+          <div class="h">Quiet but expensive</div>
+          <p>
+            The visual language is denser and more premium than the first mock: fewer competing controls, stronger
+            hierarchy, and surfaces that feel like flagship control software.
+          </p>
+        </div>
       </div>
     </div>
-  </div>
-</body>
+  </body>
 </html>

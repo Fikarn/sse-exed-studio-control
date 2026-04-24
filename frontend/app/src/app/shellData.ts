@@ -185,15 +185,11 @@ export interface PlanningCountsEntry {
 }
 
 export function asRecord(value: unknown): SnapshotRecord | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as SnapshotRecord)
-    : null;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as SnapshotRecord) : null;
 }
 
 export function asStatusTone(value: unknown, fallback: StatusToneLike = "info"): StatusToneLike {
-  return value === "ok" || value === "attention" || value === "error" || value === "info"
-    ? value
-    : fallback;
+  return value === "ok" || value === "attention" || value === "error" || value === "info" ? value : fallback;
 }
 
 export function mapStatusBadgeTone(status: StatusToneLike): StatusTone {
@@ -263,7 +259,7 @@ export function getCommissioningChecks(snapshot: SnapshotRecord | null): Commiss
         label: String(record.label ?? "Status"),
         status: asStatusTone(
           record.status === "passed" ? "ok" : record.status === "failed" ? "attention" : record.status,
-          "attention",
+          "attention"
         ),
       },
     ];
@@ -282,9 +278,7 @@ export function getSupportBackups(snapshot: SnapshotRecord | null): SupportBacku
       return [
         {
           modifiedAt:
-            typeof record.modifiedAt === "number"
-              ? record.modifiedAt
-              : Date.parse(String(record.modifiedAt ?? "")),
+            typeof record.modifiedAt === "number" ? record.modifiedAt : Date.parse(String(record.modifiedAt ?? "")),
           name: String(record.name ?? "support-backup.json"),
           path: String(record.path ?? ""),
           sizeBytes: typeof record.sizeBytes === "number" ? record.sizeBytes : 0,
@@ -328,11 +322,9 @@ export function getLightingFixtures(snapshot: SnapshotRecord | null): LightingFi
 
     return [
       {
-        beamAngleDegrees:
-          typeof record.beamAngleDegrees === "number" ? record.beamAngleDegrees : undefined,
+        beamAngleDegrees: typeof record.beamAngleDegrees === "number" ? record.beamAngleDegrees : undefined,
         cct: typeof record.cct === "number" ? record.cct : 3200,
-        dmxStartAddress:
-          typeof record.dmxStartAddress === "number" ? record.dmxStartAddress : 1,
+        dmxStartAddress: typeof record.dmxStartAddress === "number" ? record.dmxStartAddress : 1,
         groupId: typeof record.groupId === "string" ? record.groupId : undefined,
         id: String(record.id ?? "fixture"),
         intensity: typeof record.intensity === "number" ? record.intensity : 0,
@@ -340,8 +332,7 @@ export function getLightingFixtures(snapshot: SnapshotRecord | null): LightingFi
         name: String(record.name ?? record.id ?? "Fixture"),
         on: record.on === true,
         rigZ: typeof record.rigZ === "number" ? record.rigZ : undefined,
-        spatialRotation:
-          typeof record.spatialRotation === "number" ? record.spatialRotation : 0,
+        spatialRotation: typeof record.spatialRotation === "number" ? record.spatialRotation : 0,
         spatialX: typeof record.spatialX === "number" ? record.spatialX : undefined,
         spatialY: typeof record.spatialY === "number" ? record.spatialY : undefined,
         type: String(record.type ?? record.kind ?? "Fixture"),
@@ -373,8 +364,7 @@ export function getLightingScenes(snapshot: SnapshotRecord | null): LightingScen
             {
               cct: typeof fixtureRecord.cct === "number" ? fixtureRecord.cct : 3200,
               fixtureId: String(fixtureRecord.fixtureId ?? "fixture"),
-              intensity:
-                typeof fixtureRecord.intensity === "number" ? fixtureRecord.intensity : 0,
+              intensity: typeof fixtureRecord.intensity === "number" ? fixtureRecord.intensity : 0,
               on: fixtureRecord.on === true,
             },
           ];
@@ -383,15 +373,11 @@ export function getLightingScenes(snapshot: SnapshotRecord | null): LightingScen
 
     return [
       {
-        fixtureCount:
-          typeof record.fixtureCount === "number"
-            ? record.fixtureCount
-            : fixtureStates.length,
+        fixtureCount: typeof record.fixtureCount === "number" ? record.fixtureCount : fixtureStates.length,
         fixtureStates,
         id: String(record.id ?? "scene"),
         lastRecalled: record.lastRecalled === true,
-        lastRecalledAt:
-          typeof record.lastRecalledAt === "string" ? record.lastRecalledAt : undefined,
+        lastRecalledAt: typeof record.lastRecalledAt === "string" ? record.lastRecalledAt : undefined,
         name: String(record.name ?? record.id ?? "Scene"),
       },
     ];
@@ -412,8 +398,7 @@ export function getLightingGroups(snapshot: SnapshotRecord | null): LightingGrou
 
     return [
       {
-        fixtureCount:
-          typeof record.fixtureCount === "number" ? record.fixtureCount : 0,
+        fixtureCount: typeof record.fixtureCount === "number" ? record.fixtureCount : 0,
         id: String(record.id ?? "group"),
         name: String(record.name ?? record.id ?? "Group"),
       },
@@ -438,8 +423,7 @@ export function getLightingCues(snapshot: SnapshotRecord | null): LightingCueEnt
         {
           fadeInMs: typeof record.fadeInMs === "number" ? record.fadeInMs : 0,
           fadeOutMs: typeof record.fadeOutMs === "number" ? record.fadeOutMs : 0,
-          followSeconds:
-            typeof record.followSeconds === "number" ? record.followSeconds : undefined,
+          followSeconds: typeof record.followSeconds === "number" ? record.followSeconds : undefined,
           id: String(record.id ?? "cue"),
           label: String(record.label ?? record.id ?? "Cue"),
           notes: typeof record.notes === "string" ? record.notes : undefined,
@@ -455,11 +439,7 @@ export function getLightingCues(snapshot: SnapshotRecord | null): LightingCueEnt
 export function getActiveLightingCue(snapshot: SnapshotRecord | null) {
   const cues = getLightingCues(snapshot);
   const activeCueId = typeof snapshot?.activeCueId === "string" ? snapshot.activeCueId : null;
-  return (
-    cues.find((cue) => cue.id === activeCueId) ??
-    cues.find((cue) => cue.state === "active") ??
-    null
-  );
+  return cues.find((cue) => cue.id === activeCueId) ?? cues.find((cue) => cue.state === "active") ?? null;
 }
 
 export function getNextLightingCue(snapshot: SnapshotRecord | null) {
@@ -529,8 +509,8 @@ export function getAudioChannels(snapshot: SnapshotRecord | null): AudioChannelE
         mixLevels: mixLevelsRecord
           ? Object.fromEntries(
               Object.entries(mixLevelsRecord).flatMap(([key, value]) =>
-                typeof value === "number" ? [[key, value]] : [],
-              ),
+                typeof value === "number" ? [[key, value]] : []
+              )
             )
           : {},
         mute: record.mute === true,
@@ -593,8 +573,7 @@ export function getAudioSnapshots(snapshot: SnapshotRecord | null): AudioSnapsho
         {
           id: String(record.id ?? "audio-snapshot"),
           lastRecalled: record.lastRecalled === true,
-          lastRecalledAt:
-            typeof record.lastRecalledAt === "string" ? record.lastRecalledAt : undefined,
+          lastRecalledAt: typeof record.lastRecalledAt === "string" ? record.lastRecalledAt : undefined,
           name: String(record.name ?? record.id ?? "Snapshot"),
           order: typeof record.order === "number" ? record.order : 0,
           oscIndex: typeof record.oscIndex === "number" ? record.oscIndex : 0,
@@ -677,11 +656,8 @@ export function getPlanningTasks(snapshot: SnapshotRecord | null): PlanningTaskE
           priority: String(record.priority ?? "p2"),
           projectId: String(record.projectId ?? "project"),
           scheduledDurationSeconds:
-            typeof record.scheduledDurationSeconds === "number"
-              ? record.scheduledDurationSeconds
-              : undefined,
-          scheduledStart:
-            typeof record.scheduledStart === "string" ? record.scheduledStart : undefined,
+            typeof record.scheduledDurationSeconds === "number" ? record.scheduledDurationSeconds : undefined,
+          scheduledStart: typeof record.scheduledStart === "string" ? record.scheduledStart : undefined,
           title: String(record.title ?? record.id ?? "Task"),
           totalSeconds: typeof record.totalSeconds === "number" ? record.totalSeconds : 0,
         },
@@ -727,15 +703,11 @@ export function getPlanningSettings(snapshot: SnapshotRecord | null): PlanningSe
     dashboardView: String(settings?.dashboardView ?? "kanban"),
     deckMode: String(settings?.deckMode ?? "project"),
     modeSection: settings?.modeSection === "board" ? "board" : "timeline",
-    selectedProjectId:
-      typeof settings?.selectedProjectId === "string" ? settings.selectedProjectId : undefined,
-    selectedTaskId:
-      typeof settings?.selectedTaskId === "string" ? settings.selectedTaskId : undefined,
+    selectedProjectId: typeof settings?.selectedProjectId === "string" ? settings.selectedProjectId : undefined,
+    selectedTaskId: typeof settings?.selectedTaskId === "string" ? settings.selectedTaskId : undefined,
     sortBy: String(settings?.sortBy ?? "manual"),
-    timelineEndHour:
-      typeof settings?.timelineEndHour === "number" ? settings.timelineEndHour : 22,
-    timelineStartHour:
-      typeof settings?.timelineStartHour === "number" ? settings.timelineStartHour : 9,
+    timelineEndHour: typeof settings?.timelineEndHour === "number" ? settings.timelineEndHour : 22,
+    timelineStartHour: typeof settings?.timelineStartHour === "number" ? settings.timelineStartHour : 9,
     viewFilter: String(settings?.viewFilter ?? "all"),
   };
 }
@@ -743,11 +715,9 @@ export function getPlanningSettings(snapshot: SnapshotRecord | null): PlanningSe
 export function getPlanningCounts(snapshot: SnapshotRecord | null): PlanningCountsEntry {
   const counts = asRecord(snapshot?.counts);
   return {
-    completedTaskCount:
-      typeof counts?.completedTaskCount === "number" ? counts.completedTaskCount : 0,
+    completedTaskCount: typeof counts?.completedTaskCount === "number" ? counts.completedTaskCount : 0,
     projectCount: typeof counts?.projectCount === "number" ? counts.projectCount : 0,
-    runningTaskCount:
-      typeof counts?.runningTaskCount === "number" ? counts.runningTaskCount : 0,
+    runningTaskCount: typeof counts?.runningTaskCount === "number" ? counts.runningTaskCount : 0,
     taskCount: typeof counts?.taskCount === "number" ? counts.taskCount : 0,
   };
 }
@@ -778,7 +748,7 @@ export function buildContextSections(
   activeWorkspace: ShellState["activeWorkspace"],
   commissioningSnapshot: SnapshotRecord | null,
   supportSnapshot: SnapshotRecord | null,
-  lightingSnapshot: SnapshotRecord | null,
+  lightingSnapshot: SnapshotRecord | null
 ) {
   if (activeWorkspace === "lighting") {
     const fixtures = getLightingFixtures(lightingSnapshot);
@@ -786,9 +756,7 @@ export function buildContextSections(
     const scenes = getLightingScenes(lightingSnapshot);
     const activeCue = getActiveLightingCue(lightingSnapshot);
     const selectedFixtureId =
-      typeof lightingSnapshot?.selectedFixtureId === "string"
-        ? lightingSnapshot.selectedFixtureId
-        : null;
+      typeof lightingSnapshot?.selectedFixtureId === "string" ? lightingSnapshot.selectedFixtureId : null;
     const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
     const onCount = fixtures.filter((fixture) => fixture.on === true).length;
 

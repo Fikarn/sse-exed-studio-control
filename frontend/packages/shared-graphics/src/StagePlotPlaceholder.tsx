@@ -12,7 +12,15 @@ export function StagePlotPlaceholder({ title, subtitle }: StagePlotPlaceholderPr
           <stop offset="100%" stopColor="rgba(105, 169, 209, 0.18)" />
         </linearGradient>
       </defs>
-      <rect x="32" y="32" width="656" height="356" rx="28" fill="rgba(17, 25, 20, 0.92)" stroke="rgba(64, 96, 80, 0.88)" />
+      <rect
+        x="32"
+        y="32"
+        width="656"
+        height="356"
+        rx="28"
+        fill="rgba(17, 25, 20, 0.92)"
+        stroke="rgba(64, 96, 80, 0.88)"
+      />
       <path
         d="M92 332C144 244 208 202 278 202C354 202 394 270 460 270C532 270 580 220 628 132"
         fill="none"

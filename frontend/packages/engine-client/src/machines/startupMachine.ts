@@ -8,10 +8,7 @@ export type StartupEvent =
   | { type: "app-loaded" }
   | { type: "failed" };
 
-export function transitionStartupState(
-  current: StartupLifecycleState,
-  event: StartupEvent,
-): StartupLifecycleState {
+export function transitionStartupState(current: StartupLifecycleState, event: StartupEvent): StartupLifecycleState {
   if (event.type === "failed") {
     return "failed";
   }

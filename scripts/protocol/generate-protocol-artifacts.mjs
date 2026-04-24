@@ -1,12 +1,20 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { format } from "prettier";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const contractPath = path.join(rootDir, "native", "protocol", "v1.contract.json");
 const schemaPath = path.join(rootDir, "native", "protocol", "generated", "v1.schema.json");
 const tsOutputPath = path.join(rootDir, "frontend", "packages", "engine-client", "src", "generated", "protocol.ts");
 const checkOnly = process.argv.includes("--check");
+const prettierOptions = {
+  semi: true,
+  singleQuote: false,
+  tabWidth: 2,
+  trailingComma: "es5",
+  printWidth: 120,
+};
 
 const contract = JSON.parse(readFileSync(contractPath, "utf8"));
 
@@ -124,5 +132,5 @@ export interface EventEnvelope<TEvent extends string = EventName> {
 }
 `;
 
-writeGenerated(schemaPath, stableJson(schema));
-writeGenerated(tsOutputPath, generatedTs);
+writeGenerated(schemaPath, await format(stableJson(schema), { ...prettierOptions, parser: "json" }));
+writeGenerated(tsOutputPath, await format(generatedTs, { ...prettierOptions, parser: "typescript" }));

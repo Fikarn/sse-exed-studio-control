@@ -16,6 +16,9 @@ permissions:
 jobs:
   analyze:
     name: Analyze (javascript-typescript)
+    # Private repositories require GitHub Advanced Security for CodeQL upload.
+    # Set CODEQL_PRIVATE_ENABLED=true after enabling that repo feature.
+    if: ${{ github.event.repository.private == false || vars.CODEQL_PRIVATE_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

@@ -19,10 +19,7 @@ export async function openShellPath(path: string) {
   return normalizedPath;
 }
 
-export async function exportShellDiagnostics(
-  report: Record<string, JsonValue>,
-  directory?: string,
-) {
+export async function exportShellDiagnostics(report: Record<string, JsonValue>, directory?: string) {
   const normalizedDirectory = directory?.trim();
   if (tauriAvailable()) {
     return invoke<string>("shell_export_diagnostics", {

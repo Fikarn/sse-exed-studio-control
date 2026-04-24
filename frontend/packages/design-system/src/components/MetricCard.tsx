@@ -7,11 +7,7 @@ export interface MetricCardProps {
   value: string;
 }
 
-export const MetricCard = ({
-  caption,
-  tone = "idle",
-  value
-}: MetricCardProps) => {
+export const MetricCard = ({ caption, tone = "idle", value }: MetricCardProps) => {
   return (
     <div className={styles.card}>
       <span className={styles.caption}>{caption}</span>

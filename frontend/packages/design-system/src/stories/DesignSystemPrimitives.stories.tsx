@@ -7,7 +7,7 @@ import { Surface } from "../components/Surface";
 const meta = {
   title: "Design System/Primitives",
   parameters: {
-    layout: "fullscreen"
+    layout: "fullscreen",
   },
   render: () => (
     <div
@@ -15,7 +15,7 @@ const meta = {
         display: "grid",
         gap: "16px",
         gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-        padding: "24px"
+        padding: "24px",
       }}
     >
       <Surface>
@@ -46,7 +46,7 @@ const meta = {
         <MetricCard caption="Target Surface" tone="connected" value="Operator UI" />
       </Surface>
     </div>
-  )
+  ),
 } satisfies Meta;
 
 export default meta;

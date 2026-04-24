@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.sse.exedstudiocontrol.replatform",
   "build": {
-    "beforeDevCommand": "node -e \"const {spawnSync}=require('node:child_process'); const fs=require('node:fs'); const path=require('node:path'); let dir=process.cwd(); while (true) { const pkgPath=path.join(dir,'package.json'); if (fs.existsSync(pkgPath)) { const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8')); if (pkg.workspaces) break; } const parent=path.dirname(dir); if (parent===dir) throw new Error('Workspace root not found'); dir=parent; } const npm=process.platform==='win32'?'npm.cmd':'npm'; const result=spawnSync(npm,['--workspace','frontend/app','run','dev','--','--host','127.0.0.1','--port','4173','--strictPort'],{cwd:dir,stdio:'inherit'}); process.exit(result.status ?? 1);\"",
-    "beforeBuildCommand": "node -e \"const {spawnSync}=require('node:child_process'); const fs=require('node:fs'); const path=require('node:path'); let dir=process.cwd(); while (true) { const pkgPath=path.join(dir,'package.json'); if (fs.existsSync(pkgPath)) { const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8')); if (pkg.workspaces) break; } const parent=path.dirname(dir); if (parent===dir) throw new Error('Workspace root not found'); dir=parent; } const npm=process.platform==='win32'?'npm.cmd':'npm'; const result=spawnSync(npm,['--workspace','frontend/app','run','build'],{cwd:dir,stdio:'inherit'}); process.exit(result.status ?? 1);\"",
+    "beforeDevCommand": "node ../scripts/tauri-before-command.mjs dev",
+    "beforeBuildCommand": "node ../scripts/tauri-before-command.mjs build",
     "devUrl": "http://127.0.0.1:4173",
     "frontendDist": "../../frontend/app/dist"
   },

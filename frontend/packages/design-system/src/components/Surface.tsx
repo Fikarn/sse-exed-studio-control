@@ -8,20 +8,12 @@ export interface SurfaceProps extends HTMLAttributes<HTMLElement> {
 }
 
 export const Surface = forwardRef<HTMLElement, SurfaceProps>(function Surface(
-  {
-    children,
-    className,
-    padding = "md",
-    tone = "default",
-    ...props
-  },
-  ref,
+  { children, className, padding = "md", tone = "default", ...props },
+  ref
 ) {
   return (
     <section
-      className={[styles.surface, styles[padding], styles[tone], className]
-        .filter(Boolean)
-        .join(" ")}
+      className={[styles.surface, styles[padding], styles[tone], className].filter(Boolean).join(" ")}
       ref={ref}
       {...props}
     >

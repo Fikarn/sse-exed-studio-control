@@ -65,7 +65,7 @@ export const REQUEST_METHODS = [
   "storage.importLegacyDb",
   "support.backup.export",
   "support.backup.restore",
-  "support.snapshot"
+  "support.snapshot",
 ] as const;
 export type RequestMethod = (typeof REQUEST_METHODS)[number];
 
@@ -78,7 +78,7 @@ export const EVENT_NAMES = [
   "lighting.changed",
   "planning.changed",
   "settings.changed",
-  "support.changed"
+  "support.changed",
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
@@ -89,7 +89,7 @@ export const STARTUP_LIFECYCLE_STATES = [
   "waiting-for-health-snapshot",
   "waiting-for-app-snapshot",
   "ready",
-  "failed"
+  "failed",
 ] as const;
 export type StartupLifecycleState = (typeof STARTUP_LIFECYCLE_STATES)[number];
 
@@ -99,7 +99,7 @@ export const DEV_PARITY_FIXTURES = [
   "lighting-populated",
   "audio-populated",
   "setup-required",
-  "setup-ready"
+  "setup-ready",
 ] as const;
 export type DevParityFixtureId = (typeof DEV_PARITY_FIXTURES)[number];
 

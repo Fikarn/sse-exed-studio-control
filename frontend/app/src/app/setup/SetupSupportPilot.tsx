@@ -1,11 +1,4 @@
-import {
-  startTransition,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { Button, MetricCard, StatusBadge, StatusPill, Surface } from "@sse/design-system";
 import type { JsonValue, ShellStore } from "@sse/engine-client";
@@ -93,8 +86,7 @@ function parseControlSurfacePages(snapshot: SnapshotRecord | null): ControlSurfa
             description: String(controlRecord.description ?? "Bridge-mapped control."),
             id: String(controlRecord.id ?? controlRecord.label ?? "control"),
             label: String(controlRecord.label ?? "Control"),
-            position:
-              typeof controlRecord.position === "number" ? controlRecord.position : 0,
+            position: typeof controlRecord.position === "number" ? controlRecord.position : 0,
             type: String(controlRecord.type ?? "button"),
           },
         ];
@@ -144,10 +136,7 @@ function normalizeRunnerStage(snapshot: SnapshotRecord | null): RunnerStepId | n
   return null;
 }
 
-function deriveRecommendedStepId(
-  snapshot: SnapshotRecord | null,
-  pages: ControlSurfacePage[],
-): RunnerStepId {
+function deriveRecommendedStepId(snapshot: SnapshotRecord | null, pages: ControlSurfacePage[]): RunnerStepId {
   const persistedStage = normalizeRunnerStage(snapshot);
   if (persistedStage) {
     return persistedStage;
@@ -204,18 +193,14 @@ function createControlSignatureMap(snapshot: SnapshotRecord | null) {
           pageId: page.id,
           position: control.position,
           type: control.type,
-        }),
+        })
       );
     }
   }
   return signatures;
 }
 
-function nextControlId(
-  controls: ControlSurfaceControl[],
-  selectedControlId: string | null,
-  direction: -1 | 1,
-) {
+function nextControlId(controls: ControlSurfaceControl[], selectedControlId: string | null, direction: -1 | 1) {
   if (controls.length === 0) {
     return null;
   }
@@ -244,22 +229,13 @@ export function SetupSupportPilot({
   store,
   supportSnapshot,
 }: SetupSupportPilotProps) {
-  const pages = useMemo(
-    () => parseControlSurfacePages(controlSurfaceSnapshot),
-    [controlSurfaceSnapshot],
-  );
-  const checks = useMemo(
-    () => getCommissioningChecks(commissioningSnapshot),
-    [commissioningSnapshot],
-  );
-  const backups = useMemo(
-    () => getSupportBackups(supportSnapshot),
-    [supportSnapshot],
-  );
+  const pages = useMemo(() => parseControlSurfacePages(controlSurfaceSnapshot), [controlSurfaceSnapshot]);
+  const checks = useMemo(() => getCommissioningChecks(commissioningSnapshot), [commissioningSnapshot]);
+  const backups = useMemo(() => getSupportBackups(supportSnapshot), [supportSnapshot]);
   const persistedMode = useMemo(() => normalizeSetupMode(appSnapshot), [appSnapshot]);
   const recommendedStepId = useMemo(
     () => deriveRecommendedStepId(commissioningSnapshot, pages),
-    [commissioningSnapshot, pages],
+    [commissioningSnapshot, pages]
   );
 
   const [mode, setMode] = useState<SetupMode>(persistedMode);
@@ -290,13 +266,9 @@ export function SetupSupportPilot({
     setExportBaseUrl(String(controlSurface?.baseUrl ?? ""));
     setLightingBridgeIp(String(asRecord(commissioningSnapshot?.lighting)?.bridgeIp ?? ""));
     setLightingUniverse(String(asRecord(commissioningSnapshot?.lighting)?.universe ?? 1));
-    setAudioSendHost(
-      String(asRecord(commissioningSnapshot?.audio)?.sendHost ?? "127.0.0.1"),
-    );
+    setAudioSendHost(String(asRecord(commissioningSnapshot?.audio)?.sendHost ?? "127.0.0.1"));
     setAudioSendPort(String(asRecord(commissioningSnapshot?.audio)?.sendPort ?? 7001));
-    setAudioReceivePort(
-      String(asRecord(commissioningSnapshot?.audio)?.receivePort ?? 9001),
-    );
+    setAudioReceivePort(String(asRecord(commissioningSnapshot?.audio)?.receivePort ?? 9001));
   }, [appSnapshot, commissioningSnapshot]);
 
   useEffect(() => {
@@ -353,9 +325,7 @@ export function SetupSupportPilot({
     selectedPage?.buttons.find((control) => control.id === selectedControlId) ??
     selectedPage?.dials.find((control) => control.id === selectedControlId) ??
     null;
-  const selectedPageControls = selectedPage
-    ? [...selectedPage.buttons, ...selectedPage.dials]
-    : [];
+  const selectedPageControls = selectedPage ? [...selectedPage.buttons, ...selectedPage.dials] : [];
 
   const runtime = asRecord(appSnapshot?.runtime);
   const runtimePaths = asRecord(runtime?.paths);
@@ -370,10 +340,7 @@ export function SetupSupportPilot({
   const isReady = commissioningSnapshot?.hasCompletedSetup === true;
   const lastBackup = backups[0];
   const stepIndex = runnerStepOrder.indexOf(activeStepId);
-  const totalControlCount = pages.reduce(
-    (count, page) => count + page.buttons.length + page.dials.length,
-    0,
-  );
+  const totalControlCount = pages.reduce((count, page) => count + page.buttons.length + page.dials.length, 0);
   const canReturnToConsole = String(startup?.targetSurface ?? "commissioning") === "dashboard";
   const probeHasError = checks.some((check) => check.status === "error");
 
@@ -412,35 +379,27 @@ export function SetupSupportPilot({
           tone,
         };
       }),
-    [activeStepId, isReady, probeHasError, stepIndex],
+    [activeStepId, isReady, probeHasError, stepIndex]
   );
 
-  const performAction = useEffectEvent(
-    async (
-      actionId: string,
-      onRun: () => Promise<ActionFeedback | null | void>,
-    ) => {
-      setBusyAction(actionId);
-      setFeedback(null);
+  const performAction = useEffectEvent(async (actionId: string, onRun: () => Promise<ActionFeedback | null | void>) => {
+    setBusyAction(actionId);
+    setFeedback(null);
 
-      try {
-        const result = await onRun();
-        if (result) {
-          setFeedback(result);
-        }
-      } catch (error) {
-        setFeedback({
-          message:
-            error instanceof Error
-              ? error.message
-              : "The setup workflow action failed.",
-          tone: "error",
-        });
-      } finally {
-        setBusyAction(null);
+    try {
+      const result = await onRun();
+      if (result) {
+        setFeedback(result);
       }
-    },
-  );
+    } catch (error) {
+      setFeedback({
+        message: error instanceof Error ? error.message : "The setup workflow action failed.",
+        tone: "error",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  });
 
   const activateStep = useEffectEvent(async (stepId: RunnerStepId) => {
     startTransition(() => setActiveStepId(stepId));
@@ -453,17 +412,13 @@ export function SetupSupportPilot({
   });
 
   const saveImportProfile = async (advance = false) => {
-    const result = asRecord(
-      await store.exportCompanionConfig(exportBaseUrl.trim() || undefined),
-    );
+    const result = asRecord(await store.exportCompanionConfig(exportBaseUrl.trim() || undefined));
     if (advance) {
       await activateStep("probe");
     }
 
     return {
-      message: `Exported Companion profile to ${String(
-        result?.path ?? "the native exports directory",
-      )}.`,
+      message: `Exported Companion profile to ${String(result?.path ?? "the native exports directory")}.`,
       tone: "ok" as const,
     };
   };
@@ -535,9 +490,7 @@ export function SetupSupportPilot({
     await store.setWorkspace("planning");
 
     return {
-      message: `Setup published and support backup written to ${String(
-        backup?.path ?? "the backup directory",
-      )}.`,
+      message: `Setup published and support backup written to ${String(backup?.path ?? "the backup directory")}.`,
       tone: "ok" as const,
     };
   };
@@ -545,9 +498,7 @@ export function SetupSupportPilot({
   const exportSupportBackup = async () => {
     const result = asRecord(await store.exportSupportBackup());
     return {
-      message: `Exported support backup to ${String(
-        result?.path ?? "the backup directory",
-      )}.`,
+      message: `Exported support backup to ${String(result?.path ?? "the backup directory")}.`,
       tone: "ok" as const,
     };
   };
@@ -555,18 +506,12 @@ export function SetupSupportPilot({
   const restoreBackup = async (path: string) => {
     const result = asRecord(await store.restoreSupportBackup(path));
     return {
-      message: `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(
-        result?.sourcePath ?? path,
-      )}.`,
+      message: `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(result?.sourcePath ?? path)}.`,
       tone: "ok" as const,
     };
   };
 
-  const openReferencePath = async (
-    label: string,
-    path: string,
-    tone: FeedbackTone = "info",
-  ) => {
+  const openReferencePath = async (label: string, path: string, tone: FeedbackTone = "info") => {
     const openedPath = await openShellPath(path);
     return {
       message: `${label} opened at ${openedPath}.`,
@@ -586,7 +531,7 @@ export function SetupSupportPilot({
     };
     const path = await exportShellDiagnostics(
       report,
-      typeof runtimePaths?.logsDir === "string" ? runtimePaths.logsDir : undefined,
+      typeof runtimePaths?.logsDir === "string" ? runtimePaths.logsDir : undefined
     );
     return {
       message: `Shell diagnostics exported to ${path}.`,
@@ -653,10 +598,7 @@ export function SetupSupportPilot({
   });
 
   const moveStepSelection = useEffectEvent((direction: -1 | 1) => {
-    const nextIndex = Math.min(
-      Math.max(stepIndex + direction, 0),
-      runnerStepOrder.length - 1,
-    );
+    const nextIndex = Math.min(Math.max(stepIndex + direction, 0), runnerStepOrder.length - 1);
     void activateStep(runnerStepOrder[nextIndex]!);
   });
 
@@ -678,13 +620,7 @@ export function SetupSupportPilot({
       }
 
       const editableTarget = isEditableTarget(event.target);
-      if (
-        event.shiftKey &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.altKey &&
-        event.key.toLowerCase() === "s"
-      ) {
+      if (event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "s") {
         persistMode(mode === "runner" ? "support" : "runner");
         event.preventDefault();
         return;
@@ -763,13 +699,7 @@ export function SetupSupportPilot({
       {feedback ? (
         <div className={styles.feedbackBanner} role="status">
           <StatusPill
-            label={
-              feedback.tone === "ok"
-                ? "Updated"
-                : feedback.tone === "error"
-                  ? "Attention"
-                  : "Info"
-            }
+            label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
             status={feedbackStatus(feedback) ?? "info"}
           />
           <span>{feedback.message}</span>
@@ -790,9 +720,7 @@ export function SetupSupportPilot({
         </div>
         <div className={styles.utilityMeta}>
           <div className={styles.modeEyebrow}>Setup / Support</div>
-          <div className={styles.modeHeadline}>
-            {mode === "runner" ? "Commissioning runner" : "Support dashboard"}
-          </div>
+          <div className={styles.modeHeadline}>{mode === "runner" ? "Commissioning runner" : "Support dashboard"}</div>
         </div>
         <div className={styles.utilityActions}>
           <Button
@@ -856,9 +784,8 @@ export function SetupSupportPilot({
                       <div className={styles.sectionEyebrow}>Step 1</div>
                       <h2 className={styles.sectionTitle}>Import the Companion profile</h2>
                       <p className={styles.sectionBody}>
-                        Export the ready-to-import control-surface profile before manual edits.
-                        The runner stays anchored to the engine-owned local bridge URL and current
-                        control-surface snapshot.
+                        Export the ready-to-import control-surface profile before manual edits. The runner stays
+                        anchored to the engine-owned local bridge URL and current control-surface snapshot.
                       </p>
                     </div>
                     <StatusBadge
@@ -905,9 +832,7 @@ export function SetupSupportPilot({
                   <div className={styles.inlineActions}>
                     <Button
                       onClick={() => {
-                        void performAction("export-companion-inline", () =>
-                          saveImportProfile(false),
-                        );
+                        void performAction("export-companion-inline", () => saveImportProfile(false));
                       }}
                       variant="secondary"
                     >
@@ -932,9 +857,8 @@ export function SetupSupportPilot({
                       <div className={styles.sectionEyebrow}>Step 2</div>
                       <h2 className={styles.sectionTitle}>Probe hardware</h2>
                       <p className={styles.sectionBody}>
-                        Run the control-surface, DMX, and OSC probes in one pass. Probe failures
-                        stay visible here and in Support so recovery does not fork into a second
-                        model.
+                        Run the control-surface, DMX, and OSC probes in one pass. Probe failures stay visible here and
+                        in Support so recovery does not fork into a second model.
                       </p>
                     </div>
                     <StatusBadge
@@ -993,18 +917,13 @@ export function SetupSupportPilot({
                             <div className={styles.checkTitle}>{check.label}</div>
                             <div className={styles.checkDetail}>{check.detail}</div>
                           </div>
-                          <StatusPill
-                            label={check.status === "ok" ? "ready" : check.status}
-                            status={check.status}
-                          />
+                          <StatusPill label={check.status === "ok" ? "ready" : check.status} status={check.status} />
                         </div>
                         <div className={styles.inlineActions}>
                           <Button
                             onClick={() => {
                               void performAction(`probe-${check.id}`, () =>
-                                runSingleProbe(
-                                  check.id as "control-surface" | "lighting" | "audio",
-                                ),
+                                runSingleProbe(check.id as "control-surface" | "lighting" | "audio")
                               );
                             }}
                             size="compact"
@@ -1013,9 +932,7 @@ export function SetupSupportPilot({
                             Run probe
                           </Button>
                           {check.checkedAt ? (
-                            <span className={styles.metaCopy}>
-                              Last run {formatBackupTimestamp(check.checkedAt)}
-                            </span>
+                            <span className={styles.metaCopy}>Last run {formatBackupTimestamp(check.checkedAt)}</span>
                           ) : null}
                         </div>
                       </div>
@@ -1028,9 +945,7 @@ export function SetupSupportPilot({
                 <Surface className={styles.heroSurface} padding="lg" tone="raised">
                   <div className={styles.cardHeader}>
                     <div>
-                      <div className={styles.sectionEyebrow}>
-                        Step {activeStepId === "map" ? "3" : "4"}
-                      </div>
+                      <div className={styles.sectionEyebrow}>Step {activeStepId === "map" ? "3" : "4"}</div>
                       <h2 className={styles.sectionTitle}>
                         {activeStepId === "map" ? "Map bindings" : "Verify live echo"}
                       </h2>
@@ -1080,16 +995,12 @@ export function SetupSupportPilot({
                         data-active={page.id === selectedPage?.id}
                         onClick={() => {
                           setSelectedPageId(page.id);
-                          setSelectedControlId(
-                            page.buttons[0]?.id ?? page.dials[0]?.id ?? null,
-                          );
+                          setSelectedControlId(page.buttons[0]?.id ?? page.dials[0]?.id ?? null);
                         }}
                         type="button"
                       >
                         {page.label}
-                        {activeStepId === "map" ? (
-                          <small>{index + 1}</small>
-                        ) : null}
+                        {activeStepId === "map" ? <small>{index + 1}</small> : null}
                       </button>
                     ))}
                   </div>
@@ -1128,9 +1039,7 @@ export function SetupSupportPilot({
                         <div className={styles.selectionLabel}>
                           {activeStepId === "map" ? "Binding detail" : "Echo detail"}
                         </div>
-                        <div className={styles.selectionTitle}>
-                          {selectedControl?.label ?? "Choose a control"}
-                        </div>
+                        <div className={styles.selectionTitle}>{selectedControl?.label ?? "Choose a control"}</div>
                         <div className={styles.checkDetail}>
                           {selectedControl?.description ??
                             "Review the current page and make sure the binding description matches the hardware label."}
@@ -1138,9 +1047,7 @@ export function SetupSupportPilot({
                       </div>
                     </div>
                   ) : (
-                    <div className={styles.emptyState}>
-                      Control-surface snapshot unavailable.
-                    </div>
+                    <div className={styles.emptyState}>Control-surface snapshot unavailable.</div>
                   )}
                 </Surface>
               ) : null}
@@ -1152,14 +1059,11 @@ export function SetupSupportPilot({
                       <div className={styles.sectionEyebrow}>Step 5</div>
                       <h2 className={styles.sectionTitle}>Publish</h2>
                       <p className={styles.sectionBody}>
-                        Publishing commits the commissioning gate, exports a fresh support backup,
-                        and returns routing to Planning.
+                        Publishing commits the commissioning gate, exports a fresh support backup, and returns routing
+                        to Planning.
                       </p>
                     </div>
-                    <StatusBadge
-                      label={isReady ? "ready" : "pending publish"}
-                      tone={isReady ? "healthy" : "warning"}
-                    />
+                    <StatusBadge label={isReady ? "ready" : "pending publish"} tone={isReady ? "healthy" : "warning"} />
                   </div>
                   <div className={styles.metricRow}>
                     <MetricCard
@@ -1179,16 +1083,9 @@ export function SetupSupportPilot({
                     />
                   </div>
                   <div className={styles.readinessList}>
-                    <div>
-                      Lighting, audio, and control-surface probes should all be green before
-                      publish.
-                    </div>
-                    <div>
-                      Support backup export is part of publish, not a post-commissioning chore.
-                    </div>
-                    <div>
-                      The shell asks for the routing change, then reloads from engine snapshots.
-                    </div>
+                    <div>Lighting, audio, and control-surface probes should all be green before publish.</div>
+                    <div>Support backup export is part of publish, not a post-commissioning chore.</div>
+                    <div>The shell asks for the routing change, then reloads from engine snapshots.</div>
                   </div>
                 </Surface>
               ) : null}
@@ -1218,9 +1115,7 @@ export function SetupSupportPilot({
                 <div className={styles.sideList}>
                   <div className={styles.sideRow}>
                     <span className={styles.sideLabel}>Workspace</span>
-                    <span className={styles.metaCopy}>
-                      {String(shell?.workspace ?? "setup")}
-                    </span>
+                    <span className={styles.metaCopy}>{String(shell?.workspace ?? "setup")}</span>
                   </div>
                   <div className={styles.sideRow}>
                     <span className={styles.sideLabel}>Hardware profile</span>
@@ -1231,9 +1126,7 @@ export function SetupSupportPilot({
                   <div className={styles.sideRow}>
                     <span className={styles.sideLabel}>Support archive</span>
                     <span className={styles.metaCopy}>
-                      {lastBackup
-                        ? formatBackupTimestamp(lastBackup.modifiedAt)
-                        : "No backups yet"}
+                      {lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No backups yet"}
                     </span>
                   </div>
                   <div className={styles.inlineActions}>
@@ -1246,11 +1139,7 @@ export function SetupSupportPilot({
                     >
                       Export backup
                     </Button>
-                    <Button
-                      onClick={() => persistMode("support")}
-                      size="compact"
-                      variant="ghost"
-                    >
+                    <Button onClick={() => persistMode("support")} size="compact" variant="ghost">
                       Support dashboard
                     </Button>
                   </div>
@@ -1260,11 +1149,7 @@ export function SetupSupportPilot({
           </div>
 
           <div className={styles.footerBar}>
-            <Button
-              disabled={stepIndex <= 0}
-              onClick={() => moveStepSelection(-1)}
-              variant="ghost"
-            >
+            <Button disabled={stepIndex <= 0} onClick={() => moveStepSelection(-1)} variant="ghost">
               Back
             </Button>
             <Button onClick={invokePrimaryAction} variant="primary" disabled={busyAction !== null}>
@@ -1281,8 +1166,8 @@ export function SetupSupportPilot({
                 <div className={styles.sectionEyebrow}>Restore</div>
                 <h2 className={styles.sectionTitle}>Backup and recovery</h2>
                 <p className={styles.sectionBody}>
-                  Restore from a native support archive or a legacy `db.json`, then re-probe the
-                  affected adapters before resuming operator work.
+                  Restore from a native support archive or a legacy `db.json`, then re-probe the affected adapters
+                  before resuming operator work.
                 </p>
               </div>
               <StatusBadge
@@ -1293,15 +1178,11 @@ export function SetupSupportPilot({
             <div className={styles.restoreSummary}>
               <div className={styles.restoreHighlight}>
                 <span className={styles.selectionLabel}>Latest backup</span>
-                <strong>
-                  {lastBackup
-                    ? formatBackupTimestamp(lastBackup.modifiedAt)
-                    : "No backup exported yet"}
-                </strong>
+                <strong>{lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No backup exported yet"}</strong>
                 <span className={styles.checkDetail}>
                   {String(
                     supportSnapshot?.restoreSummary ??
-                      "Restore from a native support archive or a legacy db.json export.",
+                      "Restore from a native support archive or a legacy db.json export."
                   )}
                 </span>
               </div>
@@ -1322,7 +1203,7 @@ export function SetupSupportPilot({
                 onClick={() => {
                   void performAction(
                     backups.length > 0 ? "support-export-main" : "support-export-first",
-                    exportSupportBackup,
+                    exportSupportBackup
                   );
                 }}
                 variant="primary"
@@ -1365,8 +1246,7 @@ export function SetupSupportPilot({
                       <small>{backup.path}</small>
                     </span>
                     <span className={styles.metaCopy}>
-                      {formatBackupTimestamp(backup.modifiedAt)} ·{" "}
-                      {formatFileSize(backup.sizeBytes)}
+                      {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)}
                     </span>
                   </button>
                 ))
@@ -1388,17 +1268,12 @@ export function SetupSupportPilot({
                       <div className={styles.checkTitle}>{check.label}</div>
                       <div className={styles.checkDetail}>{check.detail}</div>
                     </div>
-                    <StatusPill
-                      label={check.status === "ok" ? "ready" : check.status}
-                      status={check.status}
-                    />
+                    <StatusPill label={check.status === "ok" ? "ready" : check.status} status={check.status} />
                   </div>
                   <Button
                     onClick={() => {
                       void performAction(`support-probe-${check.id}`, () =>
-                        runSingleProbe(
-                          check.id as "control-surface" | "lighting" | "audio",
-                        ),
+                        runSingleProbe(check.id as "control-surface" | "lighting" | "audio")
                       );
                     }}
                     size="compact"
@@ -1423,7 +1298,7 @@ export function SetupSupportPilot({
                 disabled={!String(runtimePaths?.logFilePath ?? "").trim()}
                 onClick={() => {
                   void performAction("open-engine-log", () =>
-                    openReferencePath("Engine log", String(runtimePaths?.logFilePath ?? "")),
+                    openReferencePath("Engine log", String(runtimePaths?.logFilePath ?? ""))
                   );
                 }}
                 size="compact"
@@ -1443,21 +1318,19 @@ export function SetupSupportPilot({
               <div>
                 <strong>macOS</strong>
                 <span>
-                  If the app is blocked, right-click the app, choose Open, then confirm once to
-                  clear Gatekeeper for future launches.
+                  If the app is blocked, right-click the app, choose Open, then confirm once to clear Gatekeeper for
+                  future launches.
                 </span>
               </div>
               <div>
                 <strong>Windows</strong>
-                <span>
-                  If SmartScreen intervenes, choose More info, then Run anyway.
-                </span>
+                <span>If SmartScreen intervenes, choose More info, then Run anyway.</span>
               </div>
               <div>
                 <strong>Update posture</strong>
                 <span>
-                  Keep the workstation on the packaged installer/update-repository path rather than
-                  ad hoc local binaries.
+                  Keep the workstation on the packaged installer/update-repository path rather than ad hoc local
+                  binaries.
                 </span>
               </div>
             </div>
@@ -1470,10 +1343,7 @@ export function SetupSupportPilot({
                 className={styles.railButton}
                 onClick={() => {
                   void performAction("open-archive-path", () =>
-                    openReferencePath(
-                      "Archive",
-                      String(supportSnapshot?.backupDir ?? runtimePaths?.backupDir ?? ""),
-                    ),
+                    openReferencePath("Archive", String(supportSnapshot?.backupDir ?? runtimePaths?.backupDir ?? ""))
                   );
                 }}
                 type="button"
@@ -1485,10 +1355,7 @@ export function SetupSupportPilot({
                 disabled={!String(runtimePaths?.updateRepositoryPath ?? "").trim()}
                 onClick={() => {
                   void performAction("open-update-repo", () =>
-                    openReferencePath(
-                      "Update repo",
-                      String(runtimePaths?.updateRepositoryPath ?? ""),
-                    ),
+                    openReferencePath("Update repo", String(runtimePaths?.updateRepositoryPath ?? ""))
                   );
                 }}
                 type="button"
@@ -1500,7 +1367,7 @@ export function SetupSupportPilot({
                 disabled={!String(runtimePaths?.appDataDir ?? "").trim()}
                 onClick={() => {
                   void performAction("open-app-data", () =>
-                    openReferencePath("App data", String(runtimePaths?.appDataDir ?? "")),
+                    openReferencePath("App data", String(runtimePaths?.appDataDir ?? ""))
                   );
                 }}
                 type="button"
@@ -1512,10 +1379,7 @@ export function SetupSupportPilot({
                 disabled={!String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? "").trim()}
                 onClick={() => {
                   void performAction("open-diagnostics-dir", () =>
-                    openReferencePath(
-                      "Diagnostics",
-                      String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? ""),
-                    ),
+                    openReferencePath("Diagnostics", String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? ""))
                   );
                 }}
                 type="button"
@@ -1526,9 +1390,7 @@ export function SetupSupportPilot({
                 className={styles.railButton}
                 disabled={!String(runtimePaths?.logsDir ?? "").trim()}
                 onClick={() => {
-                  void performAction("open-logs", () =>
-                    openReferencePath("Logs", String(runtimePaths?.logsDir ?? "")),
-                  );
+                  void performAction("open-logs", () => openReferencePath("Logs", String(runtimePaths?.logsDir ?? "")));
                 }}
                 type="button"
               >
@@ -1553,8 +1415,7 @@ export function SetupSupportPilot({
               Skip ahead?
             </div>
             <p className={styles.dialogBody}>
-              Preceding steps haven&apos;t been confirmed. Skipping may leave the commissioning
-              incomplete.
+              Preceding steps haven&apos;t been confirmed. Skipping may leave the commissioning incomplete.
             </p>
             <div className={styles.dialogActions}>
               <Button variant="ghost" onClick={() => setPendingStepId(null)}>

@@ -16,10 +16,7 @@ export function createShellEnvironment() {
   const tauriAvailable = "__TAURI_INTERNALS__" in window;
   const useLiveTransport = !fixtureTransportRequested && (liveTransportRequested || tauriAvailable);
 
-  const transport =
-    useLiveTransport
-      ? createTauriTransport()
-      : createFixtureTransport(getFixtureScenario(fixtureId));
+  const transport = useLiveTransport ? createTauriTransport() : createFixtureTransport(getFixtureScenario(fixtureId));
 
   return {
     fixtureId,

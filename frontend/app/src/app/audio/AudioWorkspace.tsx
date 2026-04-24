@@ -1,17 +1,6 @@
-import {
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties } from "react";
 
-import {
-  Button,
-  StatusBadge,
-  Surface,
-} from "@sse/design-system";
+import { Button, StatusBadge, Surface } from "@sse/design-system";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioWorkspace.module.css";
@@ -45,7 +34,7 @@ function formatAudioDb(value: number) {
     return "-∞ dB";
   }
 
-  const db = (Math.max(0, Math.min(1, value)) * 18) - 18;
+  const db = Math.max(0, Math.min(1, value)) * 18 - 18;
   return `${db.toFixed(1)} dB`;
 }
 
@@ -122,8 +111,7 @@ function describeAudioStatus(snapshot: SnapshotRecord | null) {
   if (String(snapshot?.status ?? "not-verified") === "attention") {
     return {
       label: "OFFLINE",
-      warningBody:
-        "CONSOLE UNREACHABLE - audio may still be passing, but control state is not current.",
+      warningBody: "CONSOLE UNREACHABLE - audio may still be passing, but control state is not current.",
       warningTitle: "CONSOLE UNREACHABLE",
     };
   }
@@ -131,8 +119,7 @@ function describeAudioStatus(snapshot: SnapshotRecord | null) {
   if (String(snapshot?.status ?? "not-verified") !== "ready" || snapshot?.verified !== true) {
     return {
       label: "NOT VERIFIED",
-      warningBody:
-        "OSC NOT VERIFIED - run Sync before trusting recall or current fader state.",
+      warningBody: "OSC NOT VERIFIED - run Sync before trusting recall or current fader state.",
       warningTitle: "OSC NOT VERIFIED",
     };
   }
@@ -151,8 +138,7 @@ function describeAudioStatus(snapshot: SnapshotRecord | null) {
     return {
       label: "ACTION FAILED",
       warningBody:
-        String(snapshot?.lastActionMessage ?? "The last audio action failed.") ||
-        "The last audio action failed.",
+        String(snapshot?.lastActionMessage ?? "The last audio action failed.") || "The last audio action failed.",
       warningTitle,
     };
   }
@@ -169,9 +155,7 @@ function selectedChannelSendLevel(channel: AudioChannelEntry | null, mixTargetId
     return 0;
   }
 
-  return typeof channel.mixLevels[mixTargetId] === "number"
-    ? channel.mixLevels[mixTargetId]
-    : channel.fader;
+  return typeof channel.mixLevels[mixTargetId] === "number" ? channel.mixLevels[mixTargetId] : channel.fader;
 }
 
 function meterBridgeLevelStyle(channel: AudioChannelEntry, selected: boolean): CSSProperties {
@@ -196,21 +180,17 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const recallPulseTimerRef = useRef<number | null>(null);
 
   const status = describeAudioStatus(audioSnapshot);
-  const selectedMixTargetId = typeof audioSnapshot?.selectedMixTargetId === "string"
-    ? audioSnapshot.selectedMixTargetId
-    : mixTargets[0]?.id ?? null;
-  const selectedMixTarget =
-    mixTargets.find((entry) => entry.id === selectedMixTargetId) ?? mixTargets[0] ?? null;
-  const selectedChannelId = typeof audioSnapshot?.selectedChannelId === "string"
-    ? audioSnapshot.selectedChannelId
-    : null;
+  const selectedMixTargetId =
+    typeof audioSnapshot?.selectedMixTargetId === "string"
+      ? audioSnapshot.selectedMixTargetId
+      : (mixTargets[0]?.id ?? null);
+  const selectedMixTarget = mixTargets.find((entry) => entry.id === selectedMixTargetId) ?? mixTargets[0] ?? null;
+  const selectedChannelId =
+    typeof audioSnapshot?.selectedChannelId === "string" ? audioSnapshot.selectedChannelId : null;
   const selectedChannel = channels.find((entry) => entry.id === selectedChannelId) ?? null;
   const fadersPerBank = Math.max(
     1,
-    Math.min(
-      24,
-      typeof audioSnapshot?.fadersPerBank === "number" ? audioSnapshot.fadersPerBank : 12,
-    ),
+    Math.min(24, typeof audioSnapshot?.fadersPerBank === "number" ? audioSnapshot.fadersPerBank : 12)
   );
   const visibleStripCount = Math.min(density === "overview" ? 12 : 8, fadersPerBank);
   const totalBanks = Math.max(1, Math.ceil(channels.length / visibleStripCount));
@@ -248,9 +228,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
   useEffect(() => {
     const recalledSnapshotId =
-      typeof audioSnapshot?.lastRecalledSnapshotId === "string"
-        ? audioSnapshot.lastRecalledSnapshotId
-        : null;
+      typeof audioSnapshot?.lastRecalledSnapshotId === "string" ? audioSnapshot.lastRecalledSnapshotId : null;
 
     if (!recalledSnapshotId || !audioSnapshot?.lastSnapshotRecallAt) {
       return;
@@ -274,23 +252,20 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     };
   }, []);
 
-  const performAction = useEffectEvent(
-    async (actionId: string, runner: () => Promise<void>) => {
-      setBusyAction(actionId);
-      setFeedback(null);
-      try {
-        await runner();
-      } catch (error) {
-        setFeedback({
-          message:
-            error instanceof Error ? error.message : "The audio action could not be completed.",
-          tone: "error",
-        });
-      } finally {
-        setBusyAction(null);
-      }
-    },
-  );
+  const performAction = useEffectEvent(async (actionId: string, runner: () => Promise<void>) => {
+    setBusyAction(actionId);
+    setFeedback(null);
+    try {
+      await runner();
+    } catch (error) {
+      setFeedback({
+        message: error instanceof Error ? error.message : "The audio action could not be completed.",
+        tone: "error",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  });
 
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (event.defaultPrevented || isEditableTarget(event.target)) {
@@ -376,8 +351,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "ArrowDown") {
       if (visibleChannels.length > 0) {
         const selectedIndex = visibleChannels.findIndex((entry) => entry.id === selectedChannelId);
-        const nextIndex =
-          selectedIndex < 0 ? 0 : Math.min(visibleChannels.length - 1, selectedIndex + 1);
+        const nextIndex = selectedIndex < 0 ? 0 : Math.min(visibleChannels.length - 1, selectedIndex + 1);
         void store.updateAudioSettings({ selectedChannelId: visibleChannels[nextIndex]?.id ?? null });
         event.preventDefault();
       }
@@ -409,11 +383,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     }
 
     if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Enter") {
-      if (
-        warningBandRef.current &&
-        document.activeElement === warningBandRef.current &&
-        audioActionsAllowed
-      ) {
+      if (warningBandRef.current && document.activeElement === warningBandRef.current && audioActionsAllowed) {
         void performAction("audio-sync-warning", async () => {
           await store.syncAudio();
         });
@@ -484,9 +454,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       <section className={`${styles.audioToolbar} ${styles.audioCard}`}>
         <div className={styles.audioToolbarIdentity}>
           <div className={styles.audioToolbarEyebrow}>Editing mix target</div>
-          <div className={styles.audioToolbarTitle}>
-            {selectedMixTarget ? selectedMixTarget.name : "Audio"}
-          </div>
+          <div className={styles.audioToolbarTitle}>{selectedMixTarget ? selectedMixTarget.name : "Audio"}</div>
           <div className={styles.audioToolbarSubtitle}>
             {String(appSnapshot?.summary ?? audioSnapshot.summary ?? "Audio desk active.")}
           </div>
@@ -501,7 +469,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
                   ? "attention"
                   : status.label === "OFFLINE"
                     ? "error"
-                    : "attention",
+                    : "attention"
             )}
           />
           <span className={styles.audioToolbarMeta}>
@@ -565,10 +533,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         <div className={styles.audioToolbarSnapshot}>
           <div className={styles.audioToolbarEyebrow}>Current snapshot</div>
           <div className={styles.audioToolbarSnapshotRow}>
-            <span
-              className={styles.audioToolbarSnapshotName}
-              data-testid="audio-toolbar-current-snapshot"
-            >
+            <span className={styles.audioToolbarSnapshotName} data-testid="audio-toolbar-current-snapshot">
               {selectedSnapshot ? `Recalled ${selectedSnapshot.name}` : "No recall yet"}
             </span>
             <Button
@@ -600,9 +565,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         >
           <div className={styles.audioWarningLabel}>{status.warningTitle}</div>
           <div className={styles.audioWarningBody}>{status.warningBody}</div>
-          <div className={styles.audioWarningHint}>
-            Enter to sync · V toggles density · Esc clears selection
-          </div>
+          <div className={styles.audioWarningHint}>Enter to sync · V toggles density · Esc clears selection</div>
         </div>
       ) : null}
 
@@ -671,7 +634,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
                   </div>
                   <div className={styles.audioMixTargetChips}>
                     {mixTarget.id === selectedMixTargetId ? (
-                      <span className={styles.audioChip} data-tone="selected">Selected</span>
+                      <span className={styles.audioChip} data-tone="selected">
+                        Selected
+                      </span>
                     ) : null}
                     {mixTarget.mute ? <span className={styles.audioChip}>Mute</span> : null}
                     {mixTarget.dim ? <span className={styles.audioChip}>Dim</span> : null}
@@ -771,7 +736,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
                       <span className={styles.audioStripMeterTrack}>
                         <span
                           className={styles.audioStripMeterFill}
-                          style={{ height: `${Math.round(channel.stereo ? channel.meterRight : channel.meterLevel * 0.8)}%` }}
+                          style={{
+                            height: `${Math.round(channel.stereo ? channel.meterRight : channel.meterLevel * 0.8)}%`,
+                          }}
                         />
                         <span
                           className={styles.audioStripMeterPeak}
@@ -848,7 +815,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
               <div className={styles.audioControlRoomCell}>
                 <div className={styles.audioControlRoomLabel}>Monitor target</div>
                 <div className={styles.audioControlRoomValue}>{selectedMixTarget?.name ?? "Main Out"}</div>
-                <div className={styles.audioControlRoomMeta}>{formatAudioRole(selectedMixTarget?.role ?? "main-out")}</div>
+                <div className={styles.audioControlRoomMeta}>
+                  {formatAudioRole(selectedMixTarget?.role ?? "main-out")}
+                </div>
               </div>
               <div className={styles.audioControlRoomCell}>
                 <div className={styles.audioControlRoomLabel}>Console state</div>
@@ -863,9 +832,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
               </div>
               <div className={styles.audioControlRoomCell}>
                 <div className={styles.audioControlRoomLabel}>Snapshot</div>
-                <div className={styles.audioControlRoomValue}>
-                  {selectedSnapshot?.name ?? "No recall yet"}
-                </div>
+                <div className={styles.audioControlRoomValue}>{selectedSnapshot?.name ?? "No recall yet"}</div>
                 <div className={styles.audioControlRoomMeta}>
                   {audioSnapshot.lastSnapshotRecallAt
                     ? `Recalled ${formatBackupTimestamp(String(audioSnapshot.lastSnapshotRecallAt))}`
@@ -874,15 +841,13 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
               </div>
               <div className={styles.audioControlRoomCell}>
                 <div className={styles.audioControlRoomLabel}>Last action</div>
-              <div className={styles.audioControlRoomValue}>
-                {String(audioSnapshot.lastActionStatus ?? "idle")}
-              </div>
-              <div className={styles.audioControlRoomMeta}>
+                <div className={styles.audioControlRoomValue}>{String(audioSnapshot.lastActionStatus ?? "idle")}</div>
+                <div className={styles.audioControlRoomMeta}>
                   {audioSnapshot.lastActionCode
                     ? `${String(audioSnapshot.lastActionCode)} · ${String(audioSnapshot.lastActionMessage ?? "No action recorded yet.")}`
                     : String(audioSnapshot.lastActionMessage ?? "No action recorded yet.")}
+                </div>
               </div>
-            </div>
             </div>
             <div className={styles.audioControlRoomSection}>
               <label className={styles.audioInspectorField}>
@@ -906,9 +871,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
                   type="range"
                   value={selectedMixTarget?.volume ?? 0}
                 />
-                <span className={styles.audioInspectorFieldValue}>
-                  {formatAudioDb(selectedMixTarget?.volume ?? 0)}
-                </span>
+                <span className={styles.audioInspectorFieldValue}>{formatAudioDb(selectedMixTarget?.volume ?? 0)}</span>
               </label>
               <div className={styles.audioInspectorButtonGrid}>
                 <button
@@ -1047,9 +1010,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
                       type="range"
                       value={selectedChannelSendLevel(selectedChannel, selectedMixTargetId)}
                     />
-                    <span className={styles.audioInspectorFieldValue}>
-                      {selectedMixTarget?.shortName ?? "MAIN"}
-                    </span>
+                    <span className={styles.audioInspectorFieldValue}>{selectedMixTarget?.shortName ?? "MAIN"}</span>
                   </label>
                 </div>
                 <div className={styles.audioInspectorButtonGrid}>
@@ -1173,9 +1134,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
                   <span className={styles.audioChip}>Esc</span>
                 </div>
                 <div className={styles.audioNoSelectionCopy}>
-                  If no channel is selected, the lower right panel falls back to mix context, last
-                  recall, sync status, and a small keyboard cheat sheet. That keeps the desk useful
-                  before the operator drills into a strip.
+                  If no channel is selected, the lower right panel falls back to mix context, last recall, sync status,
+                  and a small keyboard cheat sheet. That keeps the desk useful before the operator drills into a strip.
                 </div>
                 <div className={styles.audioChipRow}>
                   <span className={styles.audioChip}>1-8 select</span>

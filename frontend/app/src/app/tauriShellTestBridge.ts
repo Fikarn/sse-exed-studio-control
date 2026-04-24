@@ -51,13 +51,11 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
 
   switch (action) {
     case "exportCompanionConfig":
-      return store.exportCompanionConfig(
-        typeof command.baseUrl === "string" ? command.baseUrl : undefined,
-      );
+      return store.exportCompanionConfig(typeof command.baseUrl === "string" ? command.baseUrl : undefined);
     case "exportShellDiagnostics":
       return exportShellDiagnostics(
         buildDiagnosticsReport(shellState),
-        typeof command.directory === "string" ? command.directory : undefined,
+        typeof command.directory === "string" ? command.directory : undefined
       );
     case "exportSupportBackup":
       return store.exportSupportBackup();
@@ -98,12 +96,10 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
       }
       return store.fireLightingCue(
         command.cueId,
-        typeof command.fadeOverrideMs === "number" ? command.fadeOverrideMs : undefined,
+        typeof command.fadeOverrideMs === "number" ? command.fadeOverrideMs : undefined
       );
     case "readPlanningTimeReport":
-      return store.readPlanningTimeReport(
-        typeof command.projectId === "string" ? command.projectId : undefined,
-      );
+      return store.readPlanningTimeReport(typeof command.projectId === "string" ? command.projectId : undefined);
     case "recallAudioSnapshot":
       if (typeof command.snapshotId !== "string" || !command.snapshotId.trim()) {
         throw new Error("recallAudioSnapshot requires snapshotId.");
@@ -115,7 +111,7 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
       }
       return store.recallLightingScene(
         command.sceneId,
-        typeof command.fadeDurationSeconds === "number" ? command.fadeDurationSeconds : undefined,
+        typeof command.fadeDurationSeconds === "number" ? command.fadeDurationSeconds : undefined
       );
     case "reschedulePlanningTask":
       if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
@@ -231,7 +227,7 @@ export function useTauriShellTestBridge(shellState: ShellState, store: ShellStor
         statusPath: config?.statusPath ?? null,
       },
     }),
-    [config?.commandPath, config?.statusPath, lastCommand, shellState],
+    [config?.commandPath, config?.statusPath, lastCommand, shellState]
   );
 
   useEffect(() => {
@@ -259,7 +255,7 @@ export function useTauriShellTestBridge(shellState: ShellState, store: ShellStor
       }
 
       const command = await invoke<Record<string, JsonValue> | null>("shell_test_bridge_read_command").catch(
-        () => null,
+        () => null
       );
       if (!command || typeof command.id !== "string" || !command.id) {
         return;

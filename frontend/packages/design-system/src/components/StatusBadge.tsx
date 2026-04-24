@@ -1,13 +1,6 @@
 import styles from "./StatusBadge.module.css";
 
-export type StatusTone =
-  | "healthy"
-  | "ready"
-  | "connected"
-  | "degraded"
-  | "warning"
-  | "idle"
-  | "error";
+export type StatusTone = "healthy" | "ready" | "connected" | "degraded" | "warning" | "idle" | "error";
 
 export interface StatusBadgeProps {
   label: string;

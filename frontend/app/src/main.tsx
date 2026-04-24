@@ -13,12 +13,4 @@ if (!rootElement) {
 const app = <OperatorShell />;
 const tauriRuntime = "__TAURI_INTERNALS__" in window;
 
-createRoot(rootElement).render(
-  tauriRuntime
-    ? app
-    : (
-        <StrictMode>
-          {app}
-        </StrictMode>
-      ),
-);
+createRoot(rootElement).render(tauriRuntime ? app : <StrictMode>{app}</StrictMode>);

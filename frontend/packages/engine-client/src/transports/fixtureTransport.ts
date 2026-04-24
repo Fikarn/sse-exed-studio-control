@@ -1,10 +1,4 @@
-import type {
-  EventEnvelope,
-  EventName,
-  JsonObject,
-  JsonValue,
-  RequestMethod,
-} from "../generated/protocol";
+import type { EventEnvelope, EventName, JsonObject, JsonValue, RequestMethod } from "../generated/protocol";
 import type {
   CommissioningCheckTarget,
   CommissioningStage,
@@ -41,9 +35,7 @@ function cloneJson<T extends JsonValue>(value: T): T {
 }
 
 function asRecord(value: unknown): JsonObject | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonObject)
-    : null;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonObject) : null;
 }
 
 function asArray(value: unknown): JsonValue[] {
@@ -63,13 +55,7 @@ function asBoolean(value: unknown, fallback = false) {
 }
 
 function normalizeRunnerStage(stage: unknown, legacyStage: unknown): RunnerStage {
-  if (
-    stage === "import" ||
-    stage === "probe" ||
-    stage === "map" ||
-    stage === "verify" ||
-    stage === "publish"
-  ) {
+  if (stage === "import" || stage === "probe" || stage === "map" || stage === "verify" || stage === "publish") {
     return stage;
   }
 
@@ -84,10 +70,7 @@ function normalizeRunnerStage(stage: unknown, legacyStage: unknown): RunnerStage
   return "import";
 }
 
-function legacyStageFromRunnerStage(
-  runnerStage: RunnerStage,
-  hasCompletedSetup: boolean,
-): CommissioningStage {
+function legacyStageFromRunnerStage(runnerStage: RunnerStage, hasCompletedSetup: boolean): CommissioningStage {
   if (runnerStage === "publish") {
     if (hasCompletedSetup) {
       return "ready";
@@ -123,10 +106,7 @@ function ensurePaths(state: MutableFixtureState) {
       typeof paths.logFilePath === "string"
         ? paths.logFilePath
         : "/Users/operator/Library/Logs/SSE ExEd Studio Control/studio-control.log",
-    logsDir:
-      typeof paths.logsDir === "string"
-        ? paths.logsDir
-        : "/Users/operator/Library/Logs/SSE ExEd Studio Control",
+    logsDir: typeof paths.logsDir === "string" ? paths.logsDir : "/Users/operator/Library/Logs/SSE ExEd Studio Control",
     updateRepositoryPath:
       typeof paths.updateRepositoryPath === "string"
         ? paths.updateRepositoryPath
@@ -260,7 +240,7 @@ function buildAudioChannel(
   gain: number,
   mixLevels: Record<string, number>,
   meterLevel: number,
-  options: Partial<JsonObject> = {},
+  options: Partial<JsonObject> = {}
 ): JsonObject {
   const meterLeft = stereo ? Math.max(0, meterLevel - 0.04) : meterLevel;
   const meterRight = stereo ? meterLevel : Math.max(0, meterLevel - 0.03);
@@ -325,7 +305,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         34,
         buildAudioMixLevels(0.84, 0.78, 0.62),
-        0.82,
+        0.82
       ),
       buildAudioChannel(
         "audio-input-10",
@@ -335,7 +315,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         34,
         buildAudioMixLevels(0.72, 0.68, 0.54),
-        0.68,
+        0.68
       ),
       buildAudioChannel(
         "audio-input-11",
@@ -345,7 +325,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         32,
         buildAudioMixLevels(0.54, 0.42, 0.34),
-        0.54,
+        0.54
       ),
       buildAudioChannel(
         "audio-input-12",
@@ -356,7 +336,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         24,
         buildAudioMixLevels(0.22, 0.12, 0.1),
         0.2,
-        { instrument: true },
+        { instrument: true }
       ),
       buildAudioChannel(
         "audio-input-1",
@@ -366,7 +346,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         0,
         buildAudioMixLevels(0.18, 0.12, 0.1),
-        0.16,
+        0.16
       ),
       buildAudioChannel(
         "audio-input-2",
@@ -376,7 +356,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         0,
         buildAudioMixLevels(0.14, 0.1, 0.08),
-        0.12,
+        0.12
       ),
       buildAudioChannel(
         "audio-input-3",
@@ -387,7 +367,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         0,
         buildAudioMixLevels(0.38, 0.32, 0.26),
         0.3,
-        { mute: true },
+        { mute: true }
       ),
       buildAudioChannel(
         "audio-input-4",
@@ -398,7 +378,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         0,
         buildAudioMixLevels(0.32, 0.26, 0.22),
         0.26,
-        { mute: true },
+        { mute: true }
       ),
       buildAudioChannel(
         "audio-input-5",
@@ -408,7 +388,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         0,
         buildAudioMixLevels(0.1, 0.08, 0.06),
-        0.09,
+        0.09
       ),
       buildAudioChannel(
         "audio-input-6",
@@ -418,7 +398,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         0,
         buildAudioMixLevels(0.08, 0.06, 0.05),
-        0.07,
+        0.07
       ),
       buildAudioChannel(
         "audio-input-7",
@@ -428,7 +408,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         0,
         buildAudioMixLevels(0.06, 0.05, 0.04),
-        0.05,
+        0.05
       ),
       buildAudioChannel(
         "audio-input-8",
@@ -438,7 +418,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         false,
         0,
         buildAudioMixLevels(0.05, 0.04, 0.03),
-        0.04,
+        0.04
       ),
       buildAudioChannel(
         "audio-playback-1-2",
@@ -448,7 +428,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         true,
         0,
         buildAudioMixLevels(0.86, 0.68, 0.44),
-        0.84,
+        0.84
       ),
       buildAudioChannel(
         "audio-playback-3-4",
@@ -459,7 +439,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         0,
         buildAudioMixLevels(0.82, 0.72, 0.58),
         0.8,
-        { solo: true },
+        { solo: true }
       ),
       buildAudioChannel(
         "audio-playback-5-6",
@@ -469,7 +449,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         true,
         0,
         buildAudioMixLevels(0.4, 0.54, 0.38),
-        0.44,
+        0.44
       ),
       buildAudioChannel(
         "audio-playback-7-8",
@@ -479,7 +459,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         true,
         0,
         buildAudioMixLevels(0.62, 0.24, 0.2),
-        0.6,
+        0.6
       ),
       buildAudioChannel(
         "audio-playback-9-10",
@@ -489,7 +469,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         true,
         0,
         buildAudioMixLevels(0.14, 0.12, 0.12),
-        0.16,
+        0.16
       ),
       buildAudioChannel(
         "audio-playback-11-12",
@@ -499,7 +479,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         true,
         0,
         buildAudioMixLevels(0.12, 0.1, 0.1),
-        0.14,
+        0.14
       ),
     ],
     mixTargets: [
@@ -676,7 +656,7 @@ function buildSeededPlanningSnapshot(): JsonObject {
       {
         id: "task-house-light",
         projectId: "proj-evening-service",
-        title: "House-light scene \"preshow\"",
+        title: 'House-light scene "preshow"',
         description: "",
         priority: "p1",
         dueDate: null,
@@ -855,9 +835,7 @@ function normalizePlanningModeSection(value: unknown) {
 }
 
 function normalizePlanningViewFilter(value: unknown) {
-  return value === "todo" || value === "in-progress" || value === "blocked" || value === "done"
-    ? value
-    : "all";
+  return value === "todo" || value === "in-progress" || value === "blocked" || value === "done" ? value : "all";
 }
 
 function normalizePlanningProjectStatus(value: unknown) {
@@ -888,31 +866,27 @@ function buildPlanningTimeReport(state: MutableFixtureState, projectId?: string 
       continue;
     }
 
-    const project =
-      projects.find((entry) => asString(entry.id) === taskProjectId) ?? null;
-    const entry =
-      projectTotals.get(taskProjectId) ??
-      {
-        projectId: taskProjectId,
-        title: asString(project?.title, "Unknown"),
-        totalSeconds: 0,
-        taskCount: 0,
-      };
+    const project = projects.find((entry) => asString(entry.id) === taskProjectId) ?? null;
+    const entry = projectTotals.get(taskProjectId) ?? {
+      projectId: taskProjectId,
+      title: asString(project?.title, "Unknown"),
+      totalSeconds: 0,
+      taskCount: 0,
+    };
     entry.totalSeconds = asNumber(entry.totalSeconds) + Math.max(0, asNumber(task.totalSeconds));
     entry.taskCount = asNumber(entry.taskCount) + 1;
     projectTotals.set(taskProjectId, entry);
   }
 
   const byProject = Array.from(projectTotals.values()).sort(
-    (left, right) => asNumber(right.totalSeconds) - asNumber(left.totalSeconds),
+    (left, right) => asNumber(right.totalSeconds) - asNumber(left.totalSeconds)
   );
 
   const byTask = tasks
     .filter((task) => asNumber(task.totalSeconds) > 0)
     .map((task) => {
       const taskProjectId = asString(task.projectId);
-      const project =
-        projects.find((entry) => asString(entry.id) === taskProjectId) ?? null;
+      const project = projects.find((entry) => asString(entry.id) === taskProjectId) ?? null;
       return {
         taskId: asString(task.id),
         taskTitle: asString(task.title, "Task"),
@@ -928,7 +902,12 @@ function buildPlanningTimeReport(state: MutableFixtureState, projectId?: string 
   const timerEvents = activityLog
     .filter((entry) => {
       const action = asString(entry.action);
-      return action === "timer-started" || action === "timer-stopped" || action === "timer_started" || action === "timer_stopped";
+      return (
+        action === "timer-started" ||
+        action === "timer-stopped" ||
+        action === "timer_started" ||
+        action === "timer_stopped"
+      );
     })
     .slice(0, 100);
 
@@ -1078,12 +1057,8 @@ function buildLightingFixtureUpdateSummary(fixture: JsonObject) {
     typeof fixture.spatialX === "number" && typeof fixture.spatialY === "number"
       ? `manual layout at ${Math.round(fixture.spatialX * 100)}% / ${Math.round(fixture.spatialY * 100)}% / ${Math.round(spatialRotation)}deg`
       : `auto layout / ${Math.round(spatialRotation)}deg`;
-  const beamAngle = asNumber(
-    fixture.beamAngleDegrees,
-    defaultLightingBeamAngle(asString(fixture.type, "fixture")),
-  );
-  const rigZSummary =
-    typeof fixture.rigZ === "number" ? `${fixture.rigZ.toFixed(1)}m rig` : "auto rig height";
+  const beamAngle = asNumber(fixture.beamAngleDegrees, defaultLightingBeamAngle(asString(fixture.type, "fixture")));
+  const rigZSummary = typeof fixture.rigZ === "number" ? `${fixture.rigZ.toFixed(1)}m rig` : "auto rig height";
   const effect = asRecord(fixture.effect);
   const effectSummary =
     effect && typeof effect.effectType === "string"
@@ -1162,25 +1137,25 @@ function createMutableFixtureState(scenario: FixtureScenario): MutableFixtureSta
     appSnapshot: cloneJson((scenario.appSnapshot ?? {}) as JsonObject),
     healthSnapshot: cloneJson((scenario.healthSnapshot ?? {}) as JsonObject),
     commissioningSnapshot: cloneJson((scenario.commissioningSnapshot ?? {}) as JsonObject),
-    lightingSnapshot: cloneJson(
-      (scenario.lightingSnapshot ?? buildDefaultLightingSnapshot()) as JsonObject,
-    ),
-    audioSnapshot: "audioSnapshot" in scenario
-      ? scenario.audioSnapshot === null
-        ? null
-        : scenarioAudioSnapshot
-          ? cloneJson({
-              ...buildDefaultAudioSnapshot(),
-              ...scenarioAudioSnapshot,
-            } as JsonObject)
-          : cloneJson(buildDefaultAudioSnapshot())
-      : cloneJson(buildDefaultAudioSnapshot()),
-    planningSnapshot: "planningSnapshot" in scenario
-      ? cloneJson((scenario.planningSnapshot ?? null) as JsonObject | null)
-      : cloneJson(buildDefaultPlanningSnapshot()),
+    lightingSnapshot: cloneJson((scenario.lightingSnapshot ?? buildDefaultLightingSnapshot()) as JsonObject),
+    audioSnapshot:
+      "audioSnapshot" in scenario
+        ? scenario.audioSnapshot === null
+          ? null
+          : scenarioAudioSnapshot
+            ? cloneJson({
+                ...buildDefaultAudioSnapshot(),
+                ...scenarioAudioSnapshot,
+              } as JsonObject)
+            : cloneJson(buildDefaultAudioSnapshot())
+        : cloneJson(buildDefaultAudioSnapshot()),
+    planningSnapshot:
+      "planningSnapshot" in scenario
+        ? cloneJson((scenario.planningSnapshot ?? null) as JsonObject | null)
+        : cloneJson(buildDefaultPlanningSnapshot()),
     supportSnapshot: cloneJson((scenario.supportSnapshot ?? {}) as JsonObject),
     controlSurfaceSnapshot: cloneJson(
-      (scenario.controlSurfaceSnapshot ?? buildDefaultControlSurfaceSnapshot()) as JsonObject,
+      (scenario.controlSurfaceSnapshot ?? buildDefaultControlSurfaceSnapshot()) as JsonObject
     ),
   };
 }
@@ -1213,7 +1188,7 @@ function buildCommissioningSteps(
   failedChecks: number,
   planningProjectCount: number,
   planningTaskCount: number,
-  hasCompletedSetup: boolean,
+  hasCompletedSetup: boolean
 ) {
   const stageIndex =
     runnerStage === "probe"
@@ -1249,20 +1224,13 @@ function buildCommissioningSteps(
               ? "current"
               : passedChecks > 0
                 ? "ready"
-              : "pending",
+                : "pending",
       summary: `${passedChecks} of ${checkCount} commissioning probes passed. Failed: ${failedChecks}.`,
     },
     {
       id: "map",
       label: "Map bindings",
-      status:
-        stageIndex > 2
-          ? "completed"
-          : runnerStage === "map"
-            ? "current"
-            : allChecksPassed
-              ? "ready"
-              : "pending",
+      status: stageIndex > 2 ? "completed" : runnerStage === "map" ? "current" : allChecksPassed ? "ready" : "pending",
       summary:
         planningProjectCount > 0
           ? `Review ${planningProjectCount} projects and ${planningTaskCount} tasks across the mapped control-surface pages.`
@@ -1272,13 +1240,7 @@ function buildCommissioningSteps(
       id: "verify",
       label: "Verify live echo",
       status:
-        stageIndex > 3
-          ? "completed"
-          : runnerStage === "verify"
-            ? "current"
-            : allChecksPassed
-              ? "ready"
-              : "pending",
+        stageIndex > 3 ? "completed" : runnerStage === "verify" ? "current" : allChecksPassed ? "ready" : "pending",
       summary:
         runnerStage === "verify" || stageIndex > 3
           ? "Press the physical Stream Deck+ controls and watch the matching cell pulse."
@@ -1287,14 +1249,13 @@ function buildCommissioningSteps(
     {
       id: "publish",
       label: "Publish",
-      status:
-        hasCompletedSetup
-          ? "completed"
-          : runnerStage === "publish"
-            ? "current"
-            : allChecksPassed
-              ? "ready"
-              : "pending",
+      status: hasCompletedSetup
+        ? "completed"
+        : runnerStage === "publish"
+          ? "current"
+          : allChecksPassed
+            ? "ready"
+            : "pending",
       summary: hasCompletedSetup
         ? "Startup is routed directly into the dashboard surface and the publish backup can be restored."
         : "Commit setup, export a support backup, and return to Planning.",
@@ -1339,16 +1300,8 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   planningSettings.dashboardView = asString(planningSettings.dashboardView, "kanban");
   planningSettings.deckMode = asString(planningSettings.deckMode, "project");
   planningSettings.modeSection = normalizePlanningModeSection(planningSettings.modeSection);
-  planningSettings.timelineStartHour = clampNumber(
-    Math.round(asNumber(planningSettings.timelineStartHour, 9)),
-    0,
-    23,
-  );
-  planningSettings.timelineEndHour = clampNumber(
-    Math.round(asNumber(planningSettings.timelineEndHour, 22)),
-    1,
-    23,
-  );
+  planningSettings.timelineStartHour = clampNumber(Math.round(asNumber(planningSettings.timelineStartHour, 9)), 0, 23);
+  planningSettings.timelineEndHour = clampNumber(Math.round(asNumber(planningSettings.timelineEndHour, 22)), 1, 23);
   if (planningSettings.timelineEndHour <= planningSettings.timelineStartHour) {
     planningSettings.timelineEndHour = Math.min(23, planningSettings.timelineStartHour + 1);
   }
@@ -1374,18 +1327,15 @@ function synchronizeFixtureState(state: MutableFixtureState) {
 
   const hardwareProfile = asString(
     state.commissioningSnapshot.hardwareProfile ?? commissioning.hardwareProfile,
-    "sse-fixed-studio-v1",
+    "sse-fixed-studio-v1"
   );
   const runnerStage = normalizeRunnerStage(
     state.commissioningSnapshot.runnerStage ?? commissioning.runnerStage,
-    state.commissioningSnapshot.stage ?? commissioning.stage,
+    state.commissioningSnapshot.stage ?? commissioning.stage
   );
   const stage = asString(
-    legacyStageFromRunnerStage(
-      runnerStage,
-      asBoolean(state.commissioningSnapshot.hasCompletedSetup, false),
-    ),
-    "setup-required",
+    legacyStageFromRunnerStage(runnerStage, asBoolean(state.commissioningSnapshot.hasCompletedSetup, false)),
+    "setup-required"
   ) as CommissioningStage;
   const planningProjectCount = planningProjects.length;
   const planningTaskCount = planningTasks.length;
@@ -1397,10 +1347,8 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     const status = asString(check.status);
     return status === "attention" || status === "error" || status === "failed";
   }).length;
-  const hasCompletedSetup = asBoolean(
-    state.commissioningSnapshot.hasCompletedSetup,
-    stage === "ready",
-  ) || stage === "ready";
+  const hasCompletedSetup =
+    asBoolean(state.commissioningSnapshot.hasCompletedSetup, stage === "ready") || stage === "ready";
   const startupTargetSurface = hasCompletedSetup ? "dashboard" : "commissioning";
   const allChecksPassed = checks.length > 0 && passedChecks === checks.length && failedChecks === 0;
 
@@ -1436,16 +1384,14 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     failedChecks,
     planningProjectCount,
     planningTaskCount,
-    hasCompletedSetup,
+    hasCompletedSetup
   );
 
   controlSurface.available = asBoolean(controlSurface.available, true);
   controlSurface.status = controlSurface.available ? "ok" : "attention";
   controlSurface.summary = asString(
     controlSurface.summary,
-    controlSurface.available
-      ? "Companion bridge ready."
-      : "Companion bridge unavailable.",
+    controlSurface.available ? "Companion bridge ready." : "Companion bridge unavailable."
   );
   runtime.controlSurface = controlSurface;
   state.appSnapshot.runtime = runtime;
@@ -1475,8 +1421,7 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   shell.setup = shellSetup;
   shellLighting.currentSectionId =
     typeof shellLighting.currentSectionId === "string" ? shellLighting.currentSectionId : null;
-  shellLighting.selectedCueId =
-    typeof shellLighting.selectedCueId === "string" ? shellLighting.selectedCueId : null;
+  shellLighting.selectedCueId = typeof shellLighting.selectedCueId === "string" ? shellLighting.selectedCueId : null;
   shell.lighting = shellLighting;
   shell.summary = hasCompletedSetup ? "Operator surface ready." : "Commissioning required before operator mode.";
   state.appSnapshot.shell = shell;
@@ -1489,8 +1434,7 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   const lightingCheck = checks.find((check) => check.id === "lighting");
   const audioCheck = checks.find((check) => check.id === "audio");
   const controlSurfaceCheck = checks.find((check) => check.id === "control-surface");
-  const lightingReady =
-    asString(lightingCheck?.status) === "passed" || asString(lightingCheck?.status) === "ok";
+  const lightingReady = asString(lightingCheck?.status) === "passed" || asString(lightingCheck?.status) === "ok";
 
   state.healthSnapshot.status = hasCompletedSetup && allChecksPassed ? "ok" : "attention";
   state.healthSnapshot.startupPhase = hasCompletedSetup ? "ready" : "waiting-for-app-snapshot";
@@ -1500,16 +1444,11 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   state.healthSnapshot.checks = {
     lighting: {
       status:
-        asString(lightingCheck?.status) === "passed" || asString(lightingCheck?.status) === "ok"
-          ? "ok"
-          : "attention",
+        asString(lightingCheck?.status) === "passed" || asString(lightingCheck?.status) === "ok" ? "ok" : "attention",
       summary: asString(lightingCheck?.message, "Bridge not commissioned."),
     },
     audio: {
-      status:
-        asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok"
-          ? "ok"
-          : "attention",
+      status: asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok" ? "ok" : "attention",
       summary: asString(audioCheck?.message, "Console not commissioned."),
     },
     controlSurface: {
@@ -1524,16 +1463,16 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   state.supportSnapshot.backups = backups;
   state.supportSnapshot.backupDir = asString(
     state.supportSnapshot.backupDir,
-    asString(asRecord(runtime.paths)?.backupDir),
+    asString(asRecord(runtime.paths)?.backupDir)
   );
   state.supportSnapshot.backupCount = backups.length;
   state.supportSnapshot.latestBackupPath = backups[0]?.path ?? null;
   state.supportSnapshot.restoreSummary = asString(
     state.supportSnapshot.restoreSummary,
-    "Restore from a native support backup archive or a legacy db.json export.",
+    "Restore from a native support backup archive or a legacy db.json export."
   );
   state.supportSnapshot.recentBackups = backups.map((entry) =>
-    new Date(asNumber(entry.modifiedAt, Date.now())).toISOString(),
+    new Date(asNumber(entry.modifiedAt, Date.now())).toISOString()
   );
   state.supportSnapshot.summary =
     backups.length > 0
@@ -1549,29 +1488,22 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   lightingSnapshot.adapterMode = asString(lightingSnapshot.adapterMode, "fixture");
   lightingSnapshot.bridgeIp = asString(
     lightingSnapshot.bridgeIp,
-    asString(state.commissioningSnapshot.lighting.bridgeIp, ""),
+    asString(state.commissioningSnapshot.lighting.bridgeIp, "")
   );
   lightingSnapshot.universe = asNumber(
     lightingSnapshot.universe,
-    asNumber(state.commissioningSnapshot.lighting.universe, 1),
+    asNumber(state.commissioningSnapshot.lighting.universe, 1)
   );
   lightingSnapshot.enabled = asBoolean(lightingSnapshot.enabled, lightingSnapshot.bridgeIp !== "");
   lightingSnapshot.connected = asBoolean(lightingSnapshot.connected, lightingReady);
   lightingSnapshot.reachable = asBoolean(lightingSnapshot.reachable, lightingReady);
   lightingSnapshot.status = asString(
     lightingSnapshot.status,
-    lightingReady
-      ? "ready"
-      : lightingSnapshot.bridgeIp
-        ? "attention"
-        : "unconfigured",
+    lightingReady ? "ready" : lightingSnapshot.bridgeIp ? "attention" : "unconfigured"
   );
   lightingSnapshot.summary = asString(
     lightingSnapshot.summary,
-    asString(
-      asRecord(asRecord(state.healthSnapshot.checks)?.lighting)?.summary,
-      "Lighting snapshot pending.",
-    ),
+    asString(asRecord(asRecord(state.healthSnapshot.checks)?.lighting)?.summary, "Lighting snapshot pending.")
   );
   lightingSnapshot.lastActionStatus = asString(lightingSnapshot.lastActionStatus, "idle");
   lightingSnapshot.lastActionCode =
@@ -1582,8 +1514,7 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   lightingSnapshot.groups = asArray(lightingSnapshot.groups);
   lightingSnapshot.scenes = asArray(lightingSnapshot.scenes);
   lightingSnapshot.cues = asArray(lightingSnapshot.cues);
-  lightingSnapshot.activeCueId =
-    typeof lightingSnapshot.activeCueId === "string" ? lightingSnapshot.activeCueId : null;
+  lightingSnapshot.activeCueId = typeof lightingSnapshot.activeCueId === "string" ? lightingSnapshot.activeCueId : null;
   lightingSnapshot.selectedSceneId =
     typeof lightingSnapshot.selectedSceneId === "string" ? lightingSnapshot.selectedSceneId : null;
   lightingSnapshot.selectedFixtureId =
@@ -1596,23 +1527,21 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     return;
   }
 
-  const audioReady =
-    asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok";
-  const audioFailed =
-    asString(audioCheck?.status) === "failed" || asString(audioCheck?.status) === "error";
+  const audioReady = asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok";
+  const audioFailed = asString(audioCheck?.status) === "failed" || asString(audioCheck?.status) === "error";
 
   audioSnapshotRecord.adapterMode = asString(audioSnapshotRecord.adapterMode, "simulated");
   audioSnapshotRecord.sendHost = asString(
     audioSnapshotRecord.sendHost,
-    asString(state.commissioningSnapshot.audio.sendHost, "127.0.0.1"),
+    asString(state.commissioningSnapshot.audio.sendHost, "127.0.0.1")
   );
   audioSnapshotRecord.sendPort = asNumber(
     audioSnapshotRecord.sendPort,
-    asNumber(state.commissioningSnapshot.audio.sendPort, 7001),
+    asNumber(state.commissioningSnapshot.audio.sendPort, 7001)
   );
   audioSnapshotRecord.receivePort = asNumber(
     audioSnapshotRecord.receivePort,
-    asNumber(state.commissioningSnapshot.audio.receivePort, 9001),
+    asNumber(state.commissioningSnapshot.audio.receivePort, 9001)
   );
   audioSnapshotRecord.oscEnabled = asBoolean(audioSnapshotRecord.oscEnabled, true);
   audioSnapshotRecord.status = audioSnapshotRecord.oscEnabled
@@ -1633,15 +1562,8 @@ function synchronizeFixtureState(state: MutableFixtureState) {
         : "disabled";
   audioSnapshotRecord.expectedPeakData = asBoolean(audioSnapshotRecord.expectedPeakData, true);
   audioSnapshotRecord.expectedSubmixLock = asBoolean(audioSnapshotRecord.expectedSubmixLock, true);
-  audioSnapshotRecord.expectedCompatibilityMode = asBoolean(
-    audioSnapshotRecord.expectedCompatibilityMode,
-    false,
-  );
-  audioSnapshotRecord.fadersPerBank = clampNumber(
-    Math.round(asNumber(audioSnapshotRecord.fadersPerBank, 12)),
-    1,
-    24,
-  );
+  audioSnapshotRecord.expectedCompatibilityMode = asBoolean(audioSnapshotRecord.expectedCompatibilityMode, false);
+  audioSnapshotRecord.fadersPerBank = clampNumber(Math.round(asNumber(audioSnapshotRecord.fadersPerBank, 12)), 1, 24);
   audioSnapshotRecord.consoleStateConfidence = (() => {
     const confidence = asString(audioSnapshotRecord.consoleStateConfidence, "unknown");
     if (confidence === "aligned" || confidence === "assumed") {
@@ -1650,28 +1572,18 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     return "unknown";
   })();
   audioSnapshotRecord.lastConsoleSyncAt =
-    typeof audioSnapshotRecord.lastConsoleSyncAt === "string"
-      ? audioSnapshotRecord.lastConsoleSyncAt
-      : null;
+    typeof audioSnapshotRecord.lastConsoleSyncAt === "string" ? audioSnapshotRecord.lastConsoleSyncAt : null;
   audioSnapshotRecord.lastConsoleSyncReason =
-    typeof audioSnapshotRecord.lastConsoleSyncReason === "string"
-      ? audioSnapshotRecord.lastConsoleSyncReason
-      : null;
+    typeof audioSnapshotRecord.lastConsoleSyncReason === "string" ? audioSnapshotRecord.lastConsoleSyncReason : null;
   audioSnapshotRecord.lastRecalledSnapshotId =
-    typeof audioSnapshotRecord.lastRecalledSnapshotId === "string"
-      ? audioSnapshotRecord.lastRecalledSnapshotId
-      : null;
+    typeof audioSnapshotRecord.lastRecalledSnapshotId === "string" ? audioSnapshotRecord.lastRecalledSnapshotId : null;
   audioSnapshotRecord.lastSnapshotRecallAt =
-    typeof audioSnapshotRecord.lastSnapshotRecallAt === "string"
-      ? audioSnapshotRecord.lastSnapshotRecallAt
-      : null;
+    typeof audioSnapshotRecord.lastSnapshotRecallAt === "string" ? audioSnapshotRecord.lastSnapshotRecallAt : null;
   audioSnapshotRecord.lastActionStatus = asString(audioSnapshotRecord.lastActionStatus, "idle");
   audioSnapshotRecord.lastActionCode =
     typeof audioSnapshotRecord.lastActionCode === "string" ? audioSnapshotRecord.lastActionCode : null;
   audioSnapshotRecord.lastActionMessage =
-    typeof audioSnapshotRecord.lastActionMessage === "string"
-      ? audioSnapshotRecord.lastActionMessage
-      : null;
+    typeof audioSnapshotRecord.lastActionMessage === "string" ? audioSnapshotRecord.lastActionMessage : null;
   audioSnapshotRecord.channels = asArray(audioSnapshotRecord.channels);
   audioSnapshotRecord.mixTargets = asArray(audioSnapshotRecord.mixTargets);
   audioSnapshotRecord.snapshots = asArray(audioSnapshotRecord.snapshots)
@@ -1680,8 +1592,7 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     .sort((left, right) => asNumber(left.order) - asNumber(right.order))
     .map((entry) => ({
       ...entry,
-      lastRecalled:
-        asString(audioSnapshotRecord.lastRecalledSnapshotId) === asString(entry.id),
+      lastRecalled: asString(audioSnapshotRecord.lastRecalledSnapshotId) === asString(entry.id),
       lastRecalledAt:
         asString(audioSnapshotRecord.lastRecalledSnapshotId) === asString(entry.id)
           ? audioSnapshotRecord.lastSnapshotRecallAt
@@ -1717,7 +1628,7 @@ function updateFixtureCheck(
   state: MutableFixtureState,
   target: CommissioningCheckTarget,
   status: "passed" | "failed",
-  message: string,
+  message: string
 ) {
   const checks = ensureCommissioningChecks(state);
   const checkId = target;
@@ -1738,10 +1649,7 @@ function updateFixtureCheck(
 
   if (target === "control-surface") {
     state.commissioningSnapshot.runnerStage =
-      normalizeRunnerStage(
-        state.commissioningSnapshot.runnerStage,
-        state.commissioningSnapshot.stage,
-      ) === "publish"
+      normalizeRunnerStage(state.commissioningSnapshot.runnerStage, state.commissioningSnapshot.stage) === "publish"
         ? "publish"
         : "probe";
   }
@@ -1783,14 +1691,13 @@ function ensureAudioActionAllowed(state: MutableFixtureState) {
   const audioCheck = asRecord(
     asArray(state.commissioningSnapshot.checks)
       .map((entry) => asRecord(entry))
-      .find((entry) => asString(entry?.id) === "audio"),
+      .find((entry) => asString(entry?.id) === "audio")
   );
-  const audioReady =
-    asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok";
+  const audioReady = asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok";
 
   if (!audioReady) {
     throw new Error(
-      "Run the commissioning audio probe before syncing the console or recalling snapshots from the fixture transport.",
+      "Run the commissioning audio probe before syncing the console or recalling snapshots from the fixture transport."
     );
   }
 
@@ -1875,8 +1782,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
               typeof lighting.currentSectionId === "string" ? lighting.currentSectionId : null;
           }
           if ("selectedCueId" in lighting) {
-            shellLighting.selectedCueId =
-              typeof lighting.selectedCueId === "string" ? lighting.selectedCueId : null;
+            shellLighting.selectedCueId = typeof lighting.selectedCueId === "string" ? lighting.selectedCueId : null;
           }
           shell.lighting = shellLighting;
           state.appSnapshot.shell = shell;
@@ -1891,10 +1797,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           .map((entry) => asRecord(entry))
           .find((entry) => asString(entry?.id) === "audio");
         const transportChanged =
-          "oscEnabled" in params ||
-          "sendHost" in params ||
-          "sendPort" in params ||
-          "receivePort" in params;
+          "oscEnabled" in params || "sendHost" in params || "sendPort" in params || "receivePort" in params;
 
         if ("oscEnabled" in params) {
           audioSnapshot.oscEnabled = asBoolean(params.oscEnabled, true);
@@ -1940,10 +1843,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           audioSnapshot.expectedSubmixLock = asBoolean(params.expectedSubmixLock, true);
         }
         if ("expectedCompatibilityMode" in params) {
-          audioSnapshot.expectedCompatibilityMode = asBoolean(
-            params.expectedCompatibilityMode,
-            false,
-          );
+          audioSnapshot.expectedCompatibilityMode = asBoolean(params.expectedCompatibilityMode, false);
         }
         if (typeof params.fadersPerBank === "number") {
           audioSnapshot.fadersPerBank = clampNumber(Math.round(params.fadersPerBank), 1, 24);
@@ -2040,7 +1940,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         if (typeof params.fader === "number") {
           const mixTargetId = asString(
             params.mixTargetId,
-            asString(audioSnapshot.selectedMixTargetId, "audio-mix-main"),
+            asString(audioSnapshot.selectedMixTargetId, "audio-mix-main")
           );
           const mixLevels = asRecord(channel.mixLevels) ?? {};
           mixLevels[mixTargetId] = Math.max(0, Math.min(1, params.fader));
@@ -2075,17 +1975,13 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
         if ("instrument" in params) {
           if (role !== "front-preamp") {
-            throw new Error(
-              "AUDIO_CHANNEL_FIELD_UNSUPPORTED: instrument is only available on front preamps.",
-            );
+            throw new Error("AUDIO_CHANNEL_FIELD_UNSUPPORTED: instrument is only available on front preamps.");
           }
           channel.instrument = asBoolean(params.instrument, false);
         }
         if ("autoSet" in params) {
           if (role !== "front-preamp") {
-            throw new Error(
-              "AUDIO_CHANNEL_FIELD_UNSUPPORTED: auto-set is only available on front preamps.",
-            );
+            throw new Error("AUDIO_CHANNEL_FIELD_UNSUPPORTED: auto-set is only available on front preamps.");
           }
           channel.autoSet = asBoolean(params.autoSet, false);
         }
@@ -2138,24 +2034,20 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           state.commissioningSnapshot.stage = params.stage as CommissioningStage;
           state.commissioningSnapshot.runnerStage = normalizeRunnerStage(
             state.commissioningSnapshot.runnerStage,
-            params.stage,
+            params.stage
           );
           state.commissioningSnapshot.hasCompletedSetup = params.stage === "ready";
         }
         if (typeof params.runnerStage === "string") {
           state.commissioningSnapshot.runnerStage = normalizeRunnerStage(
             params.runnerStage,
-            state.commissioningSnapshot.stage,
+            state.commissioningSnapshot.stage
           );
           state.commissioningSnapshot.stage =
             typeof params.stage === "string"
               ? (params.stage as CommissioningStage)
-              : legacyStageFromRunnerStage(
-                  state.commissioningSnapshot.runnerStage as RunnerStage,
-                  false,
-                );
-          state.commissioningSnapshot.hasCompletedSetup =
-            state.commissioningSnapshot.stage === "ready";
+              : legacyStageFromRunnerStage(state.commissioningSnapshot.runnerStage as RunnerStage, false);
+          state.commissioningSnapshot.hasCompletedSetup = state.commissioningSnapshot.stage === "ready";
         }
         if (typeof params.hardwareProfile === "string" && params.hardwareProfile.trim()) {
           state.commissioningSnapshot.hardwareProfile = params.hardwareProfile.trim();
@@ -2169,8 +2061,14 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const target = asString(params.target) as CommissioningCheckTarget;
 
         if (target === "lighting") {
-          const bridgeIp = asString(params.bridgeIp, asString(asRecord(state.commissioningSnapshot.lighting)?.bridgeIp));
-          const universe = asNumber(params.universe, asNumber(asRecord(state.commissioningSnapshot.lighting)?.universe, 1));
+          const bridgeIp = asString(
+            params.bridgeIp,
+            asString(asRecord(state.commissioningSnapshot.lighting)?.bridgeIp)
+          );
+          const universe = asNumber(
+            params.universe,
+            asNumber(asRecord(state.commissioningSnapshot.lighting)?.universe, 1)
+          );
           if (!bridgeIp || !validateIpv4(bridgeIp)) {
             throw new Error("bridgeIp is required and must be a valid IPv4 address");
           }
@@ -2178,18 +2076,19 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             throw new Error("universe must be between 1 and 63999");
           }
           state.commissioningSnapshot.lighting = { bridgeIp, universe };
-          updateFixtureCheck(
-            state,
-            "lighting",
-            "passed",
-            `Bridge probe reached ${bridgeIp} on universe ${universe}.`,
-          );
+          updateFixtureCheck(state, "lighting", "passed", `Bridge probe reached ${bridgeIp} on universe ${universe}.`);
         } else if (target === "audio") {
-          const sendHost = asString(params.sendHost, asString(asRecord(state.commissioningSnapshot.audio)?.sendHost, "127.0.0.1"));
-          const sendPort = asNumber(params.sendPort, asNumber(asRecord(state.commissioningSnapshot.audio)?.sendPort, 7001));
+          const sendHost = asString(
+            params.sendHost,
+            asString(asRecord(state.commissioningSnapshot.audio)?.sendHost, "127.0.0.1")
+          );
+          const sendPort = asNumber(
+            params.sendPort,
+            asNumber(asRecord(state.commissioningSnapshot.audio)?.sendPort, 7001)
+          );
           const receivePort = asNumber(
             params.receivePort,
-            asNumber(asRecord(state.commissioningSnapshot.audio)?.receivePort, 9001),
+            asNumber(asRecord(state.commissioningSnapshot.audio)?.receivePort, 9001)
           );
           if (!sendHost || (!validateIpv4(sendHost) && sendHost !== "127.0.0.1" && sendHost !== "localhost")) {
             throw new Error("sendHost must be localhost or a valid IPv4 address");
@@ -2202,23 +2101,22 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             state,
             "audio",
             "passed",
-            `OSC transport config accepted for ${sendHost} (send ${sendPort}, receive ${receivePort}).`,
+            `OSC transport config accepted for ${sendHost} (send ${sendPort}, receive ${receivePort}).`
           );
         } else if (target === "control-surface") {
           updateFixtureCheck(
             state,
             "control-surface",
             "passed",
-            `Control surface bridge exposes ${countControls(state)} mapped controls across ${asArray(state.controlSurfaceSnapshot.pages).length} pages.`,
+            `Control surface bridge exposes ${countControls(state)} mapped controls across ${asArray(state.controlSurfaceSnapshot.pages).length} pages.`
           );
         } else {
           throw new Error("target must be one of: control-surface, lighting, audio");
         }
 
-        if (normalizeRunnerStage(
-          state.commissioningSnapshot.runnerStage,
-          state.commissioningSnapshot.stage,
-        ) !== "publish") {
+        if (
+          normalizeRunnerStage(state.commissioningSnapshot.runnerStage, state.commissioningSnapshot.stage) !== "publish"
+        ) {
           state.commissioningSnapshot.runnerStage = "probe";
         }
 
@@ -2257,10 +2155,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
 
         const insertIndex =
           afterCueId.length > 0
-            ? Math.max(
-                0,
-                cues.findIndex((cue) => asString(cue.id) === afterCueId) + 1,
-              )
+            ? Math.max(0, cues.findIndex((cue) => asString(cue.id) === afterCueId) + 1)
             : cues.length;
         const createdCue: JsonObject = {
           id: nextCustomCueId(cues),
@@ -2399,7 +2294,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         if (hasOrdinal) {
           const targetIndex = Math.max(
             0,
-            Math.min(nextCues.length - 1, Math.round(asNumber(params.ordinal, currentIndex + 1)) - 1),
+            Math.min(nextCues.length - 1, Math.round(asNumber(params.ordinal, currentIndex + 1)) - 1)
           );
           if (targetIndex !== currentIndex) {
             const [movedCue] = nextCues.splice(currentIndex, 1);
@@ -2468,7 +2363,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const nextActiveCueId = activeCueId === cueId ? "" : activeCueId;
         const activeCue =
           nextActiveCueId.length > 0
-            ? resequencedCues.find((cue) => asString(cue.id) === nextActiveCueId) ?? null
+            ? (resequencedCues.find((cue) => asString(cue.id) === nextActiveCueId) ?? null)
             : null;
         const activeOrdinal = activeCue ? asNumber(activeCue.ordinal, 0) : null;
 
@@ -2518,25 +2413,17 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error(`Lighting cue '${cueId}' is not present in the cue stack.`);
         }
 
-        const previousCueId =
-          typeof lightingSnapshot.activeCueId === "string" ? lightingSnapshot.activeCueId : null;
+        const previousCueId = typeof lightingSnapshot.activeCueId === "string" ? lightingSnapshot.activeCueId : null;
         const targetOrdinal = asNumber(targetCue.ordinal, 0);
         const appliedFadeMs =
-          typeof params.fadeOverrideMs === "number"
-            ? params.fadeOverrideMs
-            : asNumber(targetCue.fadeInMs, 0);
+          typeof params.fadeOverrideMs === "number" ? params.fadeOverrideMs : asNumber(targetCue.fadeInMs, 0);
         const firedAt = new Date().toISOString();
         const targetSceneId = asString(targetCue.sceneId).trim();
 
         lightingSnapshot.activeCueId = cueId;
         lightingSnapshot.cues = cues.map((cue) => ({
           ...cue,
-          state:
-            asString(cue.id) === cueId
-              ? "active"
-              : asNumber(cue.ordinal, 0) < targetOrdinal
-                ? "fired"
-                : "pending",
+          state: asString(cue.id) === cueId ? "active" : asNumber(cue.ordinal, 0) < targetOrdinal ? "fired" : "pending",
         }));
 
         if (targetSceneId) {
@@ -2550,7 +2437,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           lightingSnapshot.scenes = scenes.map((scene) => ({
             ...scene,
             lastRecalled: asString(scene.id) === targetSceneId,
-            lastRecalledAt: asString(scene.id) === targetSceneId ? firedAt : scene.lastRecalledAt ?? null,
+            lastRecalledAt: asString(scene.id) === targetSceneId ? firedAt : (scene.lastRecalledAt ?? null),
           }));
 
           const targetScene = scenes.find((scene) => asString(scene.id) === targetSceneId);
@@ -2564,7 +2451,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
               .filter((fixture): fixture is JsonObject => fixture !== null);
             lightingSnapshot.fixtures = fixtures.map((fixture) => {
               const nextState = fixtureStates.find(
-                (fixtureState) => asString(fixtureState.fixtureId) === asString(fixture.id),
+                (fixtureState) => asString(fixtureState.fixtureId) === asString(fixture.id)
               );
               if (!nextState) {
                 return fixture;
@@ -2615,8 +2502,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const recalledAt = new Date().toISOString();
-        const fadeDurationSeconds =
-          typeof params.fadeDurationSeconds === "number" ? params.fadeDurationSeconds : 0;
+        const fadeDurationSeconds = typeof params.fadeDurationSeconds === "number" ? params.fadeDurationSeconds : 0;
         const fixtureStates = asArray(targetScene.fixtureStates)
           .map((fixtureState) => asRecord(fixtureState))
           .filter((fixtureState): fixtureState is JsonObject => fixtureState !== null);
@@ -2630,11 +2516,11 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         lightingSnapshot.scenes = scenes.map((scene) => ({
           ...scene,
           lastRecalled: asString(scene.id) === sceneId,
-          lastRecalledAt: asString(scene.id) === sceneId ? recalledAt : scene.lastRecalledAt ?? null,
+          lastRecalledAt: asString(scene.id) === sceneId ? recalledAt : (scene.lastRecalledAt ?? null),
         }));
         lightingSnapshot.fixtures = fixtures.map((fixture) => {
           const nextState = fixtureStates.find(
-            (fixtureState) => asString(fixtureState.fixtureId) === asString(fixture.id),
+            (fixtureState) => asString(fixtureState.fixtureId) === asString(fixture.id)
           );
           if (!nextState) {
             return fixture;
@@ -2713,10 +2599,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       case "lighting.settings.update": {
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
         const hasSelectedSceneId = Object.prototype.hasOwnProperty.call(params, "selectedSceneId");
-        const hasSelectedFixtureId = Object.prototype.hasOwnProperty.call(
-          params,
-          "selectedFixtureId",
-        );
+        const hasSelectedFixtureId = Object.prototype.hasOwnProperty.call(params, "selectedFixtureId");
 
         if (!hasSelectedSceneId && !hasSelectedFixtureId) {
           throw new Error("lighting.settings.update requires one or more supported fields");
@@ -2822,28 +2705,23 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const maxDmxStartAddress = lightingFixtureMaxStartAddress(normalizedFixtureType);
         if (requestedStartAddress < 1 || requestedStartAddress > maxDmxStartAddress) {
           throw new Error(
-            `DMX start address must be between 1 and ${maxDmxStartAddress} for fixture type '${normalizedFixtureType}'.`,
+            `DMX start address must be between 1 and ${maxDmxStartAddress} for fixture type '${normalizedFixtureType}'.`
           );
         }
 
-        const requestedEndAddress =
-          requestedStartAddress + lightingFixtureChannelCount(normalizedFixtureType) - 1;
+        const requestedEndAddress = requestedStartAddress + lightingFixtureChannelCount(normalizedFixtureType) - 1;
         const overlapFixture = fixtures.find((fixture) => {
           const fixtureType = normalizeFixtureType(fixture.type);
           const existingStartAddress = asNumber(fixture.dmxStartAddress, 1);
-          const existingEndAddress =
-            existingStartAddress + lightingFixtureChannelCount(fixtureType) - 1;
-          return (
-            requestedStartAddress <= existingEndAddress &&
-            requestedEndAddress >= existingStartAddress
-          );
+          const existingEndAddress = existingStartAddress + lightingFixtureChannelCount(fixtureType) - 1;
+          return requestedStartAddress <= existingEndAddress && requestedEndAddress >= existingStartAddress;
         });
         if (overlapFixture) {
           throw new Error(
             `DMX address overlaps with '${asString(overlapFixture.name, "Fixture")}' at ${asNumber(
               overlapFixture.dmxStartAddress,
-              0,
-            )}.`,
+              0
+            )}.`
           );
         }
 
@@ -2939,21 +2817,15 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const defaultCct = defaultLightingFixtureCct(normalizedFixtureType);
         const maxDmxStartAddress = lightingFixtureMaxStartAddress(normalizedFixtureType);
         const nextDmxStartAddress = hasDmxStartAddress
-          ? Math.round(
-              asNumber(
-                params.dmxStartAddress,
-                asNumber(targetFixture.dmxStartAddress, 1),
-              ),
-            )
+          ? Math.round(asNumber(params.dmxStartAddress, asNumber(targetFixture.dmxStartAddress, 1)))
           : asNumber(targetFixture.dmxStartAddress, 1);
         if (nextDmxStartAddress < 1 || nextDmxStartAddress > maxDmxStartAddress) {
           throw new Error(
-            `DMX start address must be between 1 and ${maxDmxStartAddress} for fixture type '${normalizedFixtureType}'.`,
+            `DMX start address must be between 1 and ${maxDmxStartAddress} for fixture type '${normalizedFixtureType}'.`
           );
         }
 
-        const nextDmxEndAddress =
-          nextDmxStartAddress + lightingFixtureChannelCount(normalizedFixtureType) - 1;
+        const nextDmxEndAddress = nextDmxStartAddress + lightingFixtureChannelCount(normalizedFixtureType) - 1;
         const overlapFixture = fixtures.find((fixture) => {
           if (asString(fixture.id) === fixtureId) {
             return false;
@@ -2961,19 +2833,15 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
 
           const fixtureType = normalizeFixtureType(fixture.type);
           const existingStartAddress = asNumber(fixture.dmxStartAddress, 1);
-          const existingEndAddress =
-            existingStartAddress + lightingFixtureChannelCount(fixtureType) - 1;
-          return (
-            nextDmxStartAddress <= existingEndAddress &&
-            nextDmxEndAddress >= existingStartAddress
-          );
+          const existingEndAddress = existingStartAddress + lightingFixtureChannelCount(fixtureType) - 1;
+          return nextDmxStartAddress <= existingEndAddress && nextDmxEndAddress >= existingStartAddress;
         });
         if (overlapFixture) {
           throw new Error(
             `DMX address overlaps with '${asString(overlapFixture.name, "Fixture")}' at ${asNumber(
               overlapFixture.dmxStartAddress,
-              0,
-            )}.`,
+              0
+            )}.`
           );
         }
 
@@ -3017,12 +2885,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
                   params.beamAngleDegrees === null
                     ? null
                     : clampNumber(
-                        asNumber(
-                          params.beamAngleDegrees,
-                          defaultLightingBeamAngle(normalizedFixtureType),
-                        ),
+                        asNumber(params.beamAngleDegrees, defaultLightingBeamAngle(normalizedFixtureType)),
                         1,
-                        180,
+                        180
                       ),
               }
             : {}),
@@ -3030,7 +2895,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             ? {
                 intensity: Math.max(
                   0,
-                  Math.min(100, Math.round(asNumber(params.intensity, asNumber(targetFixture.intensity, 0)))),
+                  Math.min(100, Math.round(asNumber(params.intensity, asNumber(targetFixture.intensity, 0))))
                 ),
               }
             : {}),
@@ -3038,19 +2903,17 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             ? {
                 cct: clampNumber(
                   (() => {
-                    const requested = Math.round(
-                      asNumber(params.cct, asNumber(targetFixture.cct, defaultCct)),
-                    );
+                    const requested = Math.round(asNumber(params.cct, asNumber(targetFixture.cct, defaultCct)));
                     return requested === 0 ? defaultCct : requested;
                   })(),
                   cctRange.min,
-                  cctRange.max,
+                  cctRange.max
                 ),
               }
             : {}),
         };
         lightingSnapshot.fixtures = fixtures.map((fixture) =>
-          asString(fixture.id) === fixtureId ? updatedFixture : fixture,
+          asString(fixture.id) === fixtureId ? updatedFixture : fixture
         );
         synchronizeLightingGroupCounts(lightingSnapshot);
 
@@ -3094,15 +2957,15 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const fixtures = asArray(lightingSnapshot.fixtures)
           .map((fixture) => asRecord(fixture))
           .filter((fixture): fixture is JsonObject => fixture !== null);
-        const affectedFixtures = fixtures.filter(
-          (fixture) => asString(fixture.groupId) === groupId,
-        ).length;
+        const affectedFixtures = fixtures.filter((fixture) => asString(fixture.groupId) === groupId).length;
         if (affectedFixtures === 0) {
-          throw new Error(`Lighting group '${asString(targetGroup.name, groupId)}' does not currently contain fixtures.`);
+          throw new Error(
+            `Lighting group '${asString(targetGroup.name, groupId)}' does not currently contain fixtures.`
+          );
         }
 
         lightingSnapshot.fixtures = fixtures.map((fixture) =>
-          asString(fixture.groupId) === groupId ? { ...fixture, on } : fixture,
+          asString(fixture.groupId) === groupId ? { ...fixture, on } : fixture
         );
 
         const summary = `Lighting group '${asString(targetGroup.name, groupId)}' set ${on ? "on" : "off"} across ${affectedFixtures} fixtures.`;
@@ -3200,9 +3063,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       }
       case "planning.report.time": {
         const projectId =
-          typeof params.projectId === "string" && params.projectId.trim().length > 0
-            ? params.projectId.trim()
-            : null;
+          typeof params.projectId === "string" && params.projectId.trim().length > 0 ? params.projectId.trim() : null;
         return buildPlanningTimeReport(state, projectId);
       }
       case "planning.project.create": {
@@ -3274,10 +3135,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const currentStatus = normalizePlanningProjectStatus(targetProject.status);
-        const nextStatus =
-          "newStatus" in params ? normalizePlanningProjectStatus(params.newStatus) : currentStatus;
-        const requestedIndex =
-          "newIndex" in params ? Math.max(0, Math.round(asNumber(params.newIndex, 0))) : null;
+        const nextStatus = "newStatus" in params ? normalizePlanningProjectStatus(params.newStatus) : currentStatus;
+        const requestedIndex = "newIndex" in params ? Math.max(0, Math.round(asNumber(params.newIndex, 0))) : null;
         const nextProject: JsonObject = {
           ...targetProject,
           status: nextStatus,
@@ -3333,9 +3192,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         emit("planning.changed", { reason: "project-reordered" });
         return {
           context: cloneJson(asRecord(state.planningSnapshot)),
-          project: cloneJson(
-            nextProjects.find((project) => asString(project.id) === projectId) ?? nextProject,
-          ),
+          project: cloneJson(nextProjects.find((project) => asString(project.id) === projectId) ?? nextProject),
         };
       }
       case "planning.task.create": {
@@ -3497,10 +3354,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error(`Planning checklist item '${itemId}' was not found.`);
         }
 
-        const nextText =
-          "text" in params
-            ? asString(params.text).trim()
-            : asString(targetItem.text);
+        const nextText = "text" in params ? asString(params.text).trim() : asString(targetItem.text);
         if (!nextText) {
           throw new Error("text must not be empty");
         }
@@ -3525,9 +3379,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           entityType: "task",
           entityId: taskId,
           action: "checklist_updated",
-          detail: "done" in params
-            ? `Checklist item ${nextDone ? "checked" : "unchecked"}`
-            : "Checklist item updated",
+          detail: "done" in params ? `Checklist item ${nextDone ? "checked" : "unchecked"}` : "Checklist item updated",
         });
         planningSnapshot.activityLog = activityLog.slice(0, 40);
 
@@ -3561,7 +3413,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           settings.timelineStartHour = clampNumber(
             Math.round(asNumber(params.timelineStartHour, asNumber(settings.timelineStartHour, 9))),
             0,
-            23,
+            23
           );
         }
 
@@ -3569,7 +3421,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           settings.timelineEndHour = clampNumber(
             Math.round(asNumber(params.timelineEndHour, asNumber(settings.timelineEndHour, 22))),
             1,
-            23,
+            23
           );
         }
 
@@ -3580,17 +3432,14 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         if ("selectedTaskId" in params) {
           const requestedTaskId = typeof params.selectedTaskId === "string" ? params.selectedTaskId : null;
           const selectedTask =
-            requestedTaskId !== null
-              ? tasks.find((task) => asString(task.id) === requestedTaskId) ?? null
-              : null;
+            requestedTaskId !== null ? (tasks.find((task) => asString(task.id) === requestedTaskId) ?? null) : null;
           settings.selectedTaskId = selectedTask ? asString(selectedTask.id) : null;
           settings.selectedProjectId = selectedTask ? asString(selectedTask.projectId) : null;
         } else if ("selectedProjectId" in params) {
-          const requestedProjectId =
-            typeof params.selectedProjectId === "string" ? params.selectedProjectId : null;
+          const requestedProjectId = typeof params.selectedProjectId === "string" ? params.selectedProjectId : null;
           const selectedProject =
             requestedProjectId !== null
-              ? projects.find((project) => asString(project.id) === requestedProjectId) ?? null
+              ? (projects.find((project) => asString(project.id) === requestedProjectId) ?? null)
               : null;
           settings.selectedProjectId = selectedProject ? asString(selectedProject.id) : null;
           if (selectedProject) {
@@ -3627,9 +3476,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const requestedProjectId =
-          "projectId" in params
-            ? asString(params.projectId).trim()
-            : asString(targetTask.projectId);
+          "projectId" in params ? asString(params.projectId).trim() : asString(targetTask.projectId);
         if (!requestedProjectId) {
           throw new Error("projectId is required");
         }
@@ -3780,20 +3627,10 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           state,
           "control-surface",
           "passed",
-          "Control surface bridge is reachable and restored bindings are current.",
+          "Control surface bridge is reachable and restored bindings are current."
         );
-        updateFixtureCheck(
-          state,
-          "lighting",
-          "passed",
-          "Lighting bridge settings were restored from support backup.",
-        );
-        updateFixtureCheck(
-          state,
-          "audio",
-          "passed",
-          "Audio transport settings were restored from support backup.",
-        );
+        updateFixtureCheck(state, "lighting", "passed", "Lighting bridge settings were restored from support backup.");
+        updateFixtureCheck(state, "audio", "passed", "Audio transport settings were restored from support backup.");
         synchronizeFixtureState(state);
         emit("support.changed", { reason: "backup-restored" });
         emit("commissioning.changed", { reason: "backup-restored" });
@@ -3842,7 +3679,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           startupFailure ?? {
             protocol: "1",
             engineVersion: "fixture",
-          },
+          }
         );
       };
 

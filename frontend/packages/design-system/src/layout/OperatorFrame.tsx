@@ -8,12 +8,7 @@ export interface OperatorFrameProps {
   workspaceRail: ReactNode;
 }
 
-export const OperatorFrame = ({
-  children,
-  contextRail,
-  monitorRail,
-  workspaceRail
-}: OperatorFrameProps) => {
+export const OperatorFrame = ({ children, contextRail, monitorRail, workspaceRail }: OperatorFrameProps) => {
   return (
     <div className={styles.frame}>
       <header className={styles.monitorRail}>{monitorRail}</header>

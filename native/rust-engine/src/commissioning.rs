@@ -853,7 +853,7 @@ mod tests {
                 .iter()
                 .find(|step| step.id == "import")
                 .map(|step| step.status.as_str()),
-            Some("completed")
+            Some("current")
         );
         assert!(snapshot.summary.contains("2 projects"));
         assert!(snapshot.config_summary.contains("Lighting bridge"));

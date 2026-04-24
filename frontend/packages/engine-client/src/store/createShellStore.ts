@@ -54,18 +54,15 @@ interface PendingStartupGate {
 function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
   const startup = appSnapshot?.startup;
   const startupTargetSurface =
-    typeof startup === "object" && startup && "targetSurface" in startup
-      ? (startup.targetSurface as string)
-      : null;
+    typeof startup === "object" && startup && "targetSurface" in startup ? (startup.targetSurface as string) : null;
 
   if (startupTargetSurface === "commissioning") {
     return "setup";
   }
 
   const workspace = appSnapshot?.shell;
-  const value = typeof workspace === "object" && workspace && "workspace" in workspace
-    ? (workspace.workspace as string)
-    : "setup";
+  const value =
+    typeof workspace === "object" && workspace && "workspace" in workspace ? (workspace.workspace as string) : "setup";
 
   if (value === "lighting" || value === "audio" || value === "planning") {
     return value;
@@ -75,9 +72,7 @@ function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
 }
 
 function asRecord(value: unknown): JsonObject | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonObject)
-    : null;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonObject) : null;
 }
 
 function isStartupFailure(value: unknown): value is StartupFailure {
@@ -93,14 +88,12 @@ function normalizeStartupFailure(error: unknown): StartupFailure {
       message: String(error.message ?? "Engine startup failed."),
       paths: pathsRecord
         ? Object.fromEntries(
-            Object.entries(pathsRecord).flatMap(([key, value]) => (typeof value === "string" ? [[key, value]] : [])),
+            Object.entries(pathsRecord).flatMap(([key, value]) => (typeof value === "string" ? [[key, value]] : []))
           )
         : undefined,
-      requestedProtocol:
-        typeof error.requestedProtocol === "string" ? error.requestedProtocol : undefined,
+      requestedProtocol: typeof error.requestedProtocol === "string" ? error.requestedProtocol : undefined,
       stage: String(error.stage),
-      supportedProtocol:
-        typeof error.supportedProtocol === "string" ? error.supportedProtocol : undefined,
+      supportedProtocol: typeof error.supportedProtocol === "string" ? error.supportedProtocol : undefined,
     };
   }
 
@@ -116,10 +109,7 @@ function normalizeStartupFailure(error: unknown): StartupFailure {
   if (errorRecord) {
     return {
       code: typeof errorRecord.code === "string" ? errorRecord.code : "ENGINE_STARTUP_FAILED",
-      message:
-        typeof errorRecord.message === "string"
-          ? errorRecord.message
-          : JSON.stringify(errorRecord),
+      message: typeof errorRecord.message === "string" ? errorRecord.message : JSON.stringify(errorRecord),
       stage: typeof errorRecord.stage === "string" ? errorRecord.stage : "frontend-bootstrap",
     };
   }
@@ -179,7 +169,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
             code: "ENGINE_READY_TIMEOUT",
             message: "Timed out waiting for the engine ready event.",
             stage: "ready-event",
-          }),
+          })
         );
       }, 10_000);
 
@@ -307,8 +297,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       });
 
       const readyPayload = await waitForEngineHandshake();
-      const reportedProtocol =
-        typeof readyPayload.protocol === "string" ? readyPayload.protocol : "unknown";
+      const reportedProtocol = typeof readyPayload.protocol === "string" ? readyPayload.protocol : "unknown";
 
       if (reportedProtocol !== PROTOCOL_VERSION) {
         throw normalizeStartupFailure({
@@ -497,15 +486,12 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return performRequest("lighting.power.all", { on });
     },
     async fireLightingCue(cueId: string, fadeOverrideMs?: number) {
-      return performRequest(
-        "lighting.cue.fire",
-        fadeOverrideMs === undefined ? { cueId } : { cueId, fadeOverrideMs },
-      );
+      return performRequest("lighting.cue.fire", fadeOverrideMs === undefined ? { cueId } : { cueId, fadeOverrideMs });
     },
     async recallLightingScene(sceneId: string, fadeDurationSeconds?: number) {
       return performRequest(
         "lighting.scene.recall",
-        fadeDurationSeconds === undefined ? { sceneId } : { sceneId, fadeDurationSeconds },
+        fadeDurationSeconds === undefined ? { sceneId } : { sceneId, fadeDurationSeconds }
       );
     },
     async seedPlanningDemo(replaceExistingData = false) {
@@ -527,10 +513,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return performRequest("planning.task.checklist.update", { done, itemId, taskId });
     },
     async readPlanningTimeReport(projectId?: string) {
-      return performRequest(
-        "planning.report.time",
-        projectId ? ({ projectId } as JsonObject) : {},
-      );
+      return performRequest("planning.report.time", projectId ? ({ projectId } as JsonObject) : {});
     },
     async updatePlanningSettings(request: PlanningSettingsUpdateRequest) {
       return performRequest("planning.settings.update", request as unknown as JsonObject);
