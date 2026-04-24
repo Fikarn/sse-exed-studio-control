@@ -62,12 +62,13 @@ The highest-value unresolved work is:
 4. Preserve the current frontend replatform checkpoint.
    `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is now tracked in `docs/FRONTEND_CUTOVER_PLAN.md`; do not treat Qt as replaceable until that gate is satisfied.
 5. Keep Tauri CI posture honest.
-   `frontend-foundation`, `tauri-foundation-macos`, and `tauri-foundation-windows` are blocking on `main`. `npm run tauri:setup-support:qualify` and `npm run tauri:workspaces:qualify` are local/manual cutover-readiness gates until stable CI display/webview lanes or documented target-host evidence exists. Do not treat the Tauri shell as shippable until every gate in `docs/FRONTEND_CUTOVER_PLAN.md` is satisfied.
+   `frontend-foundation`, `tauri-foundation-macos`, and `tauri-foundation-windows` are blocking on `main`. `npm run tauri:setup-support:qualify` and `npm run tauri:workspaces:qualify` are local/manual cutover-readiness gates until stable CI display/webview lanes or documented target-host evidence exists. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue and declares the bounded acceptance window plus packaging path; do not treat the Tauri shell as shippable until every gate in `docs/FRONTEND_CUTOVER_PLAN.md` and that issue is satisfied.
 
 ## Execution Queue
 
 The current GitHub execution queue is:
 
+- [Issue #3: Tauri replacement shell parallel acceptance and packaging evidence](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - release-artwork polish and public-distribution signing posture remain tracked in `docs/PRODUCTIZATION_PLAN.md` §3 rather than as separate execution items
 
 ## Validation Baseline

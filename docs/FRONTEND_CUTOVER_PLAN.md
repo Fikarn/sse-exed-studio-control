@@ -27,6 +27,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `npm run tauri:workspaces:qualify` covers commissioned startup plus live Lighting, Audio, and Planning mutations across restart persistence.
 - `frontend-foundation`, `tauri-foundation-macos`, and `tauri-foundation-windows` are blocking CI jobs on `main`.
 - The live Tauri qualification commands remain local/manual cutover-readiness gates until stable CI display/webview lanes or documented target-host evidence exist.
+- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue. It declares the bounded acceptance window and packaging path, but does not authorize cutover by itself.
 
 ## Non-Negotiables
 
@@ -103,6 +104,7 @@ Current packaging direction:
 - A packaged Tauri candidate must stage the Tauri shell executable and `studio-control-engine` / `studio-control-engine.exe` side by side, or set `SSE_ENGINE_BIN` explicitly.
 - The candidate installer/update repository must preserve the existing operator app-data, logs, update-repository, and rollback expectations before Checkpoint C can be claimed.
 - The Qt shell must remain installable or launchable as the fallback runtime through the bounded parallel-acceptance window.
+- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the current release/cutover issue for this gate.
 
 ## Promotion Sequence
 
@@ -144,9 +146,9 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The next implementation slice after this document should be the smallest gate-hardening task that moves a Checkpoint A or Checkpoint B item from manual to repeatable. Candidate slices are:
+The next implementation slice after this document should be the smallest gate-hardening task that moves a Checkpoint A, B, or C item from manual to repeatable. Candidate slices are:
 
-- keep `npm run tauri:cutover:candidate` green as the local Checkpoint A gate
-- add stable CI or scripted evidence capture for `tauri:setup-support:qualify`
-- add stable CI or scripted evidence capture for `tauri:workspaces:qualify`
-- define the packaged Tauri release path before any shipping-runtime switch
+- run `npm run tauri:cutover:candidate` with `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` and attach target-host evidence to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
+- attach required `2560x1440` and `1920x1080` visual review notes or screenshots to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
+- script or verify the packaged Tauri candidate through the declared QtIFW package/update path before Checkpoint C
+- add stable CI display/webview qualification lanes only if they can replace, not weaken, the target-host evidence requirement
