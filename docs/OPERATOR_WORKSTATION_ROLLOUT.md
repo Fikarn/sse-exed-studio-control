@@ -123,6 +123,7 @@ Run these checks from the installed app:
 | ------------------------- | ------------------------------------------------------------------------------- | ---- |
 | Startup routing           | Commissioning or dashboard matches workstation state                            |      |
 | Version/product posture   | Product name and release posture are visible and correct                        |      |
+| App-data path             | Runtime app-data path is durable and not under `%TEMP%` / `/tmp`                |      |
 | Setup/Support backup      | Support backup export succeeds                                                  |      |
 | Setup/Support diagnostics | Diagnostics export succeeds                                                     |      |
 | Planning persistence      | Create or edit a harmless planning item, close, reopen, and confirm it persists |      |
@@ -144,6 +145,7 @@ Post a comment with:
 - Whether the installer came directly from the `v2.2.0` GitHub Release.
 - Startup target observed on first launch.
 - Product name and visible release/version posture.
+- Runtime app-data path.
 - Backup export result.
 - Diagnostics export result.
 - Planning persistence result.
@@ -162,6 +164,7 @@ Stop and record details before changing code if any of these occur:
 - The downloaded installer hash does not match the SHA256 manifest.
 - The installer fails.
 - The installed app launches anything other than the selected Tauri runtime.
+- The installed app defaults operator app data to a temporary directory.
 - Startup hides degraded engine, storage, device, or recovery state behind a normal dashboard.
 - Backup export or diagnostics export fails.
 - Planning data is lost or requires manual database surgery.
@@ -203,6 +206,7 @@ Install and launch:
 - Startup target observed:
 - Product name/version posture:
 - Runtime observed:
+- Runtime app-data path:
 
 Operator checks:
 

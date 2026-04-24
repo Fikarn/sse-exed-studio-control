@@ -1,6 +1,7 @@
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::fs::create_dir_all;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -13,6 +14,7 @@ use studio_control_protocol::{RequestEnvelope, ResponseEnvelope, PROTOCOL_VERSIO
 use tauri::{AppHandle, Emitter};
 
 const ENGINE_EVENT_CHANNEL: &str = "engine://event";
+const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
 
 #[derive(Default)]
 pub struct EngineBridge {
@@ -233,18 +235,74 @@ fn spawn_stderr_thread(stderr: ChildStderr) {
 }
 
 pub(crate) fn resolve_runtime_directories() -> Result<(PathBuf, PathBuf), String> {
-    let app_data_dir = std::env::var_os("SSE_APP_DATA_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir().join("sse-exed-tauri").join("app-data"));
-    let logs_dir = std::env::var_os("SSE_LOG_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| app_data_dir.join("logs"));
+    let app_data_dir = match env_path("SSE_APP_DATA_DIR") {
+        Some(path) => path,
+        None => default_app_data_dir()?,
+    };
+    let logs_dir = env_path("SSE_LOG_DIR").unwrap_or_else(|| app_data_dir.join("logs"));
 
     if !app_data_dir.is_absolute() || !logs_dir.is_absolute() {
         return Err("Runtime paths must resolve to absolute directories.".to_string());
     }
 
     Ok((app_data_dir, logs_dir))
+}
+
+fn env_path(name: &str) -> Option<PathBuf> {
+    std::env::var_os(name)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+#[derive(Clone, Copy)]
+enum RuntimePlatform {
+    Macos,
+    Unix,
+    Windows,
+}
+
+fn current_runtime_platform() -> RuntimePlatform {
+    if cfg!(target_os = "windows") {
+        RuntimePlatform::Windows
+    } else if cfg!(target_os = "macos") {
+        RuntimePlatform::Macos
+    } else {
+        RuntimePlatform::Unix
+    }
+}
+
+fn default_app_data_dir() -> Result<PathBuf, String> {
+    default_app_data_dir_for_platform(current_runtime_platform(), |name| std::env::var_os(name))
+}
+
+fn default_app_data_dir_for_platform<F>(
+    platform: RuntimePlatform,
+    mut get_env: F,
+) -> Result<PathBuf, String>
+where
+    F: FnMut(&str) -> Option<OsString>,
+{
+    let env_path = |name: &str, get_env: &mut F| -> Option<PathBuf> {
+        get_env(name)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    };
+
+    let base = match platform {
+        RuntimePlatform::Windows => {
+            env_path("APPDATA", &mut get_env).or_else(|| env_path("LOCALAPPDATA", &mut get_env))
+        }
+        RuntimePlatform::Macos => env_path("HOME", &mut get_env)
+            .map(|home| home.join("Library").join("Application Support")),
+        RuntimePlatform::Unix => env_path("XDG_DATA_HOME", &mut get_env).or_else(|| {
+            env_path("HOME", &mut get_env).map(|home| home.join(".local").join("share"))
+        }),
+    };
+
+    base.map(|path| path.join(DEFAULT_APP_DATA_DIR_NAME)).ok_or_else(|| {
+        "Unable to resolve a durable app-data directory. Set SSE_APP_DATA_DIR to an absolute path."
+            .to_string()
+    })
 }
 
 pub(crate) fn resolve_engine_binary() -> Result<PathBuf, String> {
@@ -353,6 +411,61 @@ mod tests {
         fs::create_dir_all(path.parent().expect("test path should have a parent"))
             .expect("test parent directory should be creatable");
         File::create(path).expect("test file should be creatable");
+    }
+
+    fn env_fixture<'a>(
+        entries: &'a [(&'a str, &'a str)],
+    ) -> impl FnMut(&str) -> Option<OsString> + 'a {
+        move |name| {
+            entries
+                .iter()
+                .find_map(|(key, value)| (*key == name).then(|| OsString::from(value)))
+        }
+    }
+
+    #[test]
+    fn windows_default_app_data_matches_durable_qt_style_location() {
+        let resolved = default_app_data_dir_for_platform(
+            RuntimePlatform::Windows,
+            env_fixture(&[("APPDATA", "C:/Users/operator/AppData/Roaming")]),
+        )
+        .expect("windows app data should resolve");
+
+        assert_eq!(
+            resolved,
+            PathBuf::from("C:/Users/operator/AppData/Roaming").join(DEFAULT_APP_DATA_DIR_NAME)
+        );
+    }
+
+    #[test]
+    fn macos_default_app_data_matches_application_support_location() {
+        let resolved = default_app_data_dir_for_platform(
+            RuntimePlatform::Macos,
+            env_fixture(&[("HOME", "/Users/operator")]),
+        )
+        .expect("macos app data should resolve");
+
+        assert_eq!(
+            resolved,
+            PathBuf::from("/Users/operator")
+                .join("Library")
+                .join("Application Support")
+                .join(DEFAULT_APP_DATA_DIR_NAME)
+        );
+    }
+
+    #[test]
+    fn unix_default_app_data_honors_xdg_data_home() {
+        let resolved = default_app_data_dir_for_platform(
+            RuntimePlatform::Unix,
+            env_fixture(&[("XDG_DATA_HOME", "/home/operator/.local/data")]),
+        )
+        .expect("unix app data should resolve");
+
+        assert_eq!(
+            resolved,
+            PathBuf::from("/home/operator/.local/data").join(DEFAULT_APP_DATA_DIR_NAME)
+        );
     }
 
     #[test]

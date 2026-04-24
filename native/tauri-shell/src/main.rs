@@ -299,32 +299,28 @@ fn optional_env_path(name: &str) -> Option<String> {
 }
 
 fn current_runtime_paths() -> BTreeMap<String, String> {
-    let app_data_dir = optional_env_path("SSE_APP_DATA_DIR").unwrap_or_else(|| {
-        std::env::temp_dir()
-            .join("sse-exed-tauri")
-            .join("app-data")
-            .display()
-            .to_string()
+    let (app_data_dir, logs_dir) = engine::resolve_runtime_directories().unwrap_or_else(|_| {
+        let app_data_dir = optional_env_path("SSE_APP_DATA_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("<unresolved app data directory>"));
+        let logs_dir = optional_env_path("SSE_LOG_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| app_data_dir.join("logs"));
+        (app_data_dir, logs_dir)
     });
-    let logs_dir = optional_env_path("SSE_LOG_DIR").unwrap_or_else(|| {
-        PathBuf::from(&app_data_dir)
-            .join("logs")
-            .display()
-            .to_string()
-    });
-    let backup_dir = PathBuf::from(&app_data_dir).join("backups");
-    let db_path = PathBuf::from(&app_data_dir).join("studio-control.sqlite3");
-    let log_file_path = PathBuf::from(&logs_dir).join("engine.log");
+    let backup_dir = app_data_dir.join("backups");
+    let db_path = app_data_dir.join("studio-control.sqlite3");
+    let log_file_path = logs_dir.join("engine.log");
 
     let mut paths = BTreeMap::from([
-        ("appDataDir".to_string(), app_data_dir),
+        ("appDataDir".to_string(), app_data_dir.display().to_string()),
         ("backupDir".to_string(), backup_dir.display().to_string()),
         ("dbPath".to_string(), db_path.display().to_string()),
         (
             "logFilePath".to_string(),
             log_file_path.display().to_string(),
         ),
-        ("logsDir".to_string(), logs_dir),
+        ("logsDir".to_string(), logs_dir.display().to_string()),
     ]);
 
     if let Some(update_repository_path) = optional_env_path("SSE_UPDATE_REPOSITORY_PATH") {
@@ -407,9 +403,13 @@ fn shell_open_path(path: String) -> Result<(), String> {
 #[tauri::command]
 fn shell_export_diagnostics(report: Value, directory: Option<String>) -> Result<String, String> {
     let output_dir = directory.map(PathBuf::from).unwrap_or_else(|| {
-        std::env::temp_dir()
-            .join("sse-exed-tauri")
-            .join("diagnostics")
+        engine::resolve_runtime_directories()
+            .map(|(_, logs_dir)| logs_dir)
+            .unwrap_or_else(|_| {
+                std::env::temp_dir()
+                    .join("sse-exed-tauri")
+                    .join("diagnostics")
+            })
     });
 
     if !output_dir.is_absolute() {
