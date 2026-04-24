@@ -18,6 +18,8 @@ The native runtime is the only release path:
 - The legacy Electron runtime was retired in `v2.1.0`; no browser/Electron path remains in the repo.
 - Release readiness depends on packaging, smoke, acceptance, bridge-qualification, and install-time smoke-test gates — plus any open blockers tracked in [docs/HANDOFF.md](./HANDOFF.md).
 
+During the frontend replatform, the Qt shell remains the shipping native runtime. The Tauri replacement shell may only enter a release candidate through the cutover gate in [docs/FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md). Unless that plan is changed by a delta spec, the replacement candidate must reuse the QtIFW installer/update posture and package the Tauri shell with the Rust engine binary staged beside the shell executable.
+
 ## Native Release Artifacts
 
 Each tagged release should publish:

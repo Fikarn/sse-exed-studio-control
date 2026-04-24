@@ -35,7 +35,10 @@ pub struct EngineBootstrapSummary {
 
 impl EngineBridge {
     pub fn start(&self, app: &AppHandle) -> Result<EngineBootstrapSummary, String> {
-        let mut process_guard = self.process.lock().map_err(|_| "Engine bridge poisoned".to_string())?;
+        let mut process_guard = self
+            .process
+            .lock()
+            .map_err(|_| "Engine bridge poisoned".to_string())?;
 
         if let Some(process) = process_guard.as_ref() {
             return Ok(EngineBootstrapSummary {
@@ -110,11 +113,15 @@ impl EngineBridge {
             .remove(&request_id);
 
         let raw_response = result?;
-        serde_json::from_value(raw_response).map_err(|error| format!("Invalid engine response: {error}"))
+        serde_json::from_value(raw_response)
+            .map_err(|error| format!("Invalid engine response: {error}"))
     }
 
     pub fn stop(&self) -> Result<(), String> {
-        let mut process_guard = self.process.lock().map_err(|_| "Engine bridge poisoned".to_string())?;
+        let mut process_guard = self
+            .process
+            .lock()
+            .map_err(|_| "Engine bridge poisoned".to_string())?;
 
         if let Some(mut process) = process_guard.take() {
             process
@@ -133,7 +140,10 @@ impl EngineBridge {
     }
 
     fn write_request(&self, request: &RequestEnvelope) -> Result<(), String> {
-        let process_guard = self.process.lock().map_err(|_| "Engine bridge poisoned".to_string())?;
+        let process_guard = self
+            .process
+            .lock()
+            .map_err(|_| "Engine bridge poisoned".to_string())?;
         let process = process_guard
             .as_ref()
             .ok_or_else(|| "Engine is not running".to_string())?;
@@ -155,7 +165,11 @@ impl EngineBridge {
     }
 }
 
-fn spawn_stdout_thread(app: AppHandle, stdout: ChildStdout, pending: Arc<Mutex<HashMap<String, Sender<Value>>>>) {
+fn spawn_stdout_thread(
+    app: AppHandle,
+    stdout: ChildStdout,
+    pending: Arc<Mutex<HashMap<String, Sender<Value>>>>,
+) {
     thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
@@ -219,8 +233,28 @@ fn resolve_runtime_directories() -> Result<(PathBuf, PathBuf), String> {
 }
 
 fn resolve_engine_binary() -> Result<PathBuf, String> {
-    if let Some(path) = std::env::var_os("SSE_ENGINE_BIN") {
-        let binary_path = PathBuf::from(path);
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let binary_name = if cfg!(target_os = "windows") {
+        "studio-control-engine.exe"
+    } else {
+        "studio-control-engine"
+    };
+
+    resolve_engine_binary_from(
+        std::env::var_os("SSE_ENGINE_BIN").map(PathBuf::from),
+        std::env::current_exe().ok(),
+        &manifest_dir,
+        binary_name,
+    )
+}
+
+fn resolve_engine_binary_from(
+    explicit_path: Option<PathBuf>,
+    current_exe: Option<PathBuf>,
+    manifest_dir: &Path,
+    binary_name: &str,
+) -> Result<PathBuf, String> {
+    if let Some(binary_path) = explicit_path {
         if binary_exists(&binary_path) {
             return Ok(binary_path);
         }
@@ -230,20 +264,23 @@ fn resolve_engine_binary() -> Result<PathBuf, String> {
         ));
     }
 
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let binary_name = if cfg!(target_os = "windows") {
-        "studio-control-engine.exe"
-    } else {
-        "studio-control-engine"
-    };
-
     let candidates = [
-        manifest_dir.join("../rust-engine/target/debug").join(binary_name),
-        manifest_dir.join("../rust-engine/target/release").join(binary_name),
+        current_exe.and_then(|path| path.parent().map(|parent| parent.join(binary_name))),
+        Some(
+            manifest_dir
+                .join("../rust-engine/target/debug")
+                .join(binary_name),
+        ),
+        Some(
+            manifest_dir
+                .join("../rust-engine/target/release")
+                .join(binary_name),
+        ),
     ];
 
     candidates
         .into_iter()
+        .flatten()
         .find(|candidate| binary_exists(candidate))
         .ok_or_else(|| {
             "Unable to locate the Rust engine binary. Set SSE_ENGINE_BIN or build native/rust-engine first."
@@ -259,5 +296,120 @@ fn value_key(value: &Value) -> String {
     match value {
         Value::String(string) => string.clone(),
         _ => value.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct TempTree {
+        root: PathBuf,
+    }
+
+    impl TempTree {
+        fn new(label: &str) -> Self {
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after epoch")
+                .as_nanos();
+            let root = std::env::temp_dir().join(format!(
+                "sse-tauri-engine-resolution-{label}-{}-{nanos}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&root).expect("test temp root should be creatable");
+            Self { root }
+        }
+
+        fn path(&self, path: &str) -> PathBuf {
+            self.root.join(path)
+        }
+    }
+
+    impl Drop for TempTree {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn touch(path: &Path) {
+        fs::create_dir_all(path.parent().expect("test path should have a parent"))
+            .expect("test parent directory should be creatable");
+        File::create(path).expect("test file should be creatable");
+    }
+
+    #[test]
+    fn engine_override_wins_before_packaged_and_dev_candidates() {
+        let tree = TempTree::new("override");
+        let binary_name = "studio-control-engine";
+        let override_engine = tree.path("override/studio-control-engine");
+        let shell_exe = tree.path("package/sse-exed-tauri-shell");
+        let packaged_engine = tree.path("package/studio-control-engine");
+        let manifest_dir = tree.path("repo/native/tauri-shell");
+        let dev_engine = manifest_dir
+            .join("../rust-engine/target/debug")
+            .join(binary_name);
+
+        touch(&override_engine);
+        touch(&shell_exe);
+        touch(&packaged_engine);
+        touch(&manifest_dir.join("Cargo.toml"));
+        touch(&dev_engine);
+
+        let resolved = resolve_engine_binary_from(
+            Some(override_engine.clone()),
+            Some(shell_exe),
+            &manifest_dir,
+            binary_name,
+        )
+        .expect("explicit engine override should resolve");
+
+        assert_eq!(resolved, override_engine);
+    }
+
+    #[test]
+    fn packaged_engine_next_to_shell_wins_before_dev_candidate() {
+        let tree = TempTree::new("packaged");
+        let binary_name = "studio-control-engine";
+        let shell_exe = tree.path("package/sse-exed-tauri-shell");
+        let packaged_engine = tree.path("package/studio-control-engine");
+        let manifest_dir = tree.path("repo/native/tauri-shell");
+        let dev_engine = manifest_dir
+            .join("../rust-engine/target/debug")
+            .join(binary_name);
+
+        touch(&shell_exe);
+        touch(&packaged_engine);
+        touch(&manifest_dir.join("Cargo.toml"));
+        touch(&dev_engine);
+
+        let resolved =
+            resolve_engine_binary_from(None, Some(shell_exe), &manifest_dir, binary_name)
+                .expect("packaged side-by-side engine should resolve");
+
+        assert_eq!(resolved, packaged_engine);
+    }
+
+    #[test]
+    fn dev_engine_resolves_when_packaged_candidate_is_missing() {
+        let tree = TempTree::new("dev");
+        let binary_name = "studio-control-engine";
+        let shell_exe = tree.path("package/sse-exed-tauri-shell");
+        let manifest_dir = tree.path("repo/native/tauri-shell");
+        let dev_engine = manifest_dir
+            .join("../rust-engine/target/debug")
+            .join(binary_name);
+
+        touch(&shell_exe);
+        touch(&manifest_dir.join("Cargo.toml"));
+        touch(&dev_engine);
+
+        let resolved =
+            resolve_engine_binary_from(None, Some(shell_exe), &manifest_dir, binary_name)
+                .expect("dev engine candidate should resolve");
+
+        assert_eq!(resolved, dev_engine);
     }
 }

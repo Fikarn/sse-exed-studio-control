@@ -8,6 +8,7 @@ Current posture:
 - Rust/Tauri backend
 - frontend served from `frontend/app`
 - existing Rust engine remains a separate process and is launched through bridge commands
+- packaged candidates expect `studio-control-engine` / `studio-control-engine.exe` beside the Tauri shell executable, with `SSE_ENGINE_BIN` still available as an explicit override
 - current scope is foundation work only; the Qt shell remains the shipping runtime
 
 Key files:

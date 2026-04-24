@@ -97,6 +97,13 @@ Do not switch the shipping runtime until every item below is true.
 - If QtIFW remains the installer path for the candidate, the Tauri shell must be exercised through that packaged path before release.
 - If the release moves away from QtIFW, the new installer/update path must have equivalent package, update, continuity, rollback, and clean-machine acceptance evidence.
 
+Current packaging direction:
+
+- QtIFW remains the candidate release wrapper unless a delta spec replaces it.
+- A packaged Tauri candidate must stage the Tauri shell executable and `studio-control-engine` / `studio-control-engine.exe` side by side, or set `SSE_ENGINE_BIN` explicitly.
+- The candidate installer/update repository must preserve the existing operator app-data, logs, update-repository, and rollback expectations before Checkpoint C can be claimed.
+- The Qt shell must remain installable or launchable as the fallback runtime through the bounded parallel-acceptance window.
+
 ## Promotion Sequence
 
 ### Checkpoint A: Replacement Candidate
