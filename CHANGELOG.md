@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.2.1] — 2026-04-24
+
+### Fixed
+
+- Tauri shipping runtime now defaults operator app data to a durable platform app-data directory instead of `%TEMP%` / `/tmp` when `SSE_APP_DATA_DIR` is unset, preserving workstation persistence for published installer rollout and keeping explicit runtime-directory overrides available for test and evidence lanes.
+
+### Changed
+
+- Operator workstation rollout runbook now rejects temporary app-data paths during final published-installer verification.
+
 ## [2.2.0] — 2026-04-24
 
 ### Added
