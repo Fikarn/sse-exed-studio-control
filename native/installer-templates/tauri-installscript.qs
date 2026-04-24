@@ -15,7 +15,7 @@ Component.prototype.installationFinished = function() {
         var platform = systemInfo.productType;
         var isWindows = (platform === "windows");
         var exePath = isWindows
-            ? targetDir + "/sse-exed-tauri-shell.exe"
+            ? targetDir + "/SSE ExEd Studio Control Native/sse-exed-tauri-shell.exe"
             : targetDir + "/SSE ExEd Studio Control Native.app/Contents/MacOS/sse-exed-tauri-shell";
         var statusPath = targetDir + "/install-tauri-smoke.json";
 

@@ -327,6 +327,25 @@ function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expecte
   );
 }
 
+function assertInstallTimeSmokePassed(installRoot, runtimeKind, phase) {
+  if (runtimeKind !== "tauri") {
+    return;
+  }
+
+  const smokeStatusPath = path.join(installRoot, "install-tauri-smoke.json");
+  const smokeStatus = readSmokeStatus(smokeStatusPath);
+  assert(smokeStatus, `Tauri install-time smoke for '${phase}' did not write ${smokeStatusPath}.`);
+  assert(smokeStatus.finished, `Tauri install-time smoke for '${phase}' did not finish cleanly.`);
+  assert(
+    smokeStatus.exitCode === 0,
+    `Tauri install-time smoke for '${phase}' recorded exit code ${smokeStatus.exitCode}.`
+  );
+  assert(
+    smokeStatus.startedEnginePath,
+    `Tauri install-time smoke for '${phase}' did not record the bundled engine path.`
+  );
+}
+
 function cleanupInstallRootAfterPurge(target, installRoot, acceptanceRoot) {
   if (!existsSync(installRoot)) {
     return;
@@ -409,6 +428,7 @@ async function main() {
     acceptanceRoot,
     "installer-install"
   );
+  assertInstallTimeSmokePassed(installRoot, runtimeKind, "install");
 
   let installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
   assert(existsSync(installed.payloadPath), `Installed payload missing at ${installed.payloadPath}.`);
@@ -513,6 +533,7 @@ async function main() {
     acceptanceRoot,
     "installer-reinstall"
   );
+  assertInstallTimeSmokePassed(installRoot, runtimeKind, "reinstall");
 
   installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
   assert(existsSync(installed.payloadPath), `Reinstalled payload missing at ${installed.payloadPath}.`);
