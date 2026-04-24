@@ -3,11 +3,8 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writ
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveNativeReleaseRuntime } from "./native-release-runtime.mjs";
-
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
-const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 
 function readFlag(name) {
   const prefix = `${name}=`;
@@ -194,12 +191,7 @@ writeFileSync(
 );
 copyFileSync(path.join(rootDir, "LICENSE"), path.join(metaDir, "LICENSE.txt"));
 copyFileSync(
-  path.join(
-    rootDir,
-    "native",
-    "installer-templates",
-    releaseRuntime === "tauri" ? "tauri-installscript.qs" : "installscript.qs"
-  ),
+  path.join(rootDir, "native", "installer-templates", "tauri-installscript.qs"),
   path.join(metaDir, "installscript.qs")
 );
 

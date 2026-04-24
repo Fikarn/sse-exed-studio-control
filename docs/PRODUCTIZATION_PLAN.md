@@ -117,7 +117,7 @@ Before calling the productization pass complete, confirm:
 
 - keep the native packaging and release lanes healthy as the only product path
 - follow the Checkpoint D read-only impact audit in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md) and [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) before removing Qt fallback code, Qt-specific verification automation, or Qt parity assets
-- continue Checkpoint D with packaging and signing cleanup now that active validation is Tauri-first and the release runtime selector is locked to Tauri
+- complete Windows target-host evidence for the Checkpoint D packaging/signing cleanup before moving to Qt source/test removal
 
 ## Final Mile
 

@@ -89,7 +89,7 @@ Risk if removed first:
 
 ### Packaging, Installer, Update, And Acceptance
 
-Current packaging files with Qt branches or Qt assumptions:
+Packaging and installer files audited by Slice 3:
 
 - `scripts/native-package.mjs`
 - `scripts/native-installer.mjs`
@@ -99,20 +99,19 @@ Current packaging files with Qt branches or Qt assumptions:
 - `scripts/verify-native-release-artifacts.mjs`
 - `scripts/verify-native-release-continuity.mjs`
 - `scripts/native-delivery-acceptance.mjs`
-- `native/installer-templates/installscript.qs`
 - `native/installer-templates/tauri-installscript.qs`
 
 Current behavior:
 
-- `native-package.mjs` has separate Qt and Tauri packaging branches.
-- The Tauri branch is the current shipping path and packages `sse-exed-tauri-shell` plus `studio-control-engine`.
-- The Qt branch still uses `macdeployqt`, `windeployqt`, `native/qt-shell/qml`, and `sse_exed_native`.
-- `native-installer.mjs` chooses `tauri-installscript.qs` for the selected Tauri runtime and `installscript.qs` for Qt.
+- `native-package.mjs` is Tauri-only for the shipping path and packages `sse-exed-tauri-shell` plus `studio-control-engine`.
+- Qt deploy-tool resolution, Qt plugin staging, Qt warning suppression, and `sse_exed_native` packaging branches are removed from the shipping package script.
+- `native-installer.mjs` always stages `native/installer-templates/tauri-installscript.qs` as the QtIFW package `installscript.qs`.
+- The old Qt installer template `native/installer-templates/installscript.qs` is removed.
 - `verify-native-release-continuity.mjs` preserves legacy release identity continuity and still contains a legacy Qt installer-description fallback for older tags.
 
-Risk if removed first:
+Remaining risk before source deletion:
 
-- The current Tauri release path should keep working, but stale Qt branches and fallback templates would remain and could fail only when manually selected. Retirement should remove the selector before removing these branches.
+- Windows target-host evidence must verify the Tauri-only packaging/signing path before removing `native/qt-shell/**` or Qt-specific verification automation.
 
 Important boundary:
 
@@ -128,12 +127,12 @@ Current signing files:
 Observed state:
 
 - macOS signing signs the packaged app path from release identity and is runtime-neutral.
-- Windows signing currently hardcodes `sse_exed_native.exe` for the packaged shell.
+- Windows signing now targets `sse-exed-tauri-shell.exe` for the packaged Tauri shell.
 
 Risk:
 
 - Windows signing is currently deferred because no signing certificate is configured, so this does not block unsigned controlled deployment.
-- Before any signed Windows release, `native-sign-windows.mjs` must be made runtime-aware and sign `sse-exed-tauri-shell.exe` for the Tauri path.
+- Before any signed Windows release, `native-sign-windows.mjs` must still be exercised on a Windows signing host with a real certificate configuration.
 
 ### Smoke, Parity, And Visual Evidence
 
@@ -255,6 +254,8 @@ Required verification:
 
 ### Slice 3: Packaging And Signing Cleanup
 
+Status: implemented and macOS-verified. The local macOS release path passes through package smoke, clean smoke, packaged acceptance, bridge verification, real QtIFW installer generation, update-repository generation, full checksum/artifact verification, continuity verification, delivery acceptance, and real installer acceptance. Slice 3 is not complete until Windows 11 `x64` target-host evidence passes for the same cleanup.
+
 Goal: remove unused Qt packaging branches while preserving QtIFW distribution.
 
 Actions:
@@ -271,6 +272,22 @@ Required verification:
 - `npm run native:release:win:evidence`
 - checksum verification from generated release assets
 - install-time smoke status confirms durable app-data path when no `SSE_APP_DATA_DIR` is set
+
+macOS verification recorded during implementation:
+
+- `npm run native:release:mac:local` with QtIFW env and normal host permissions for localhost binding/cache access
+- `npm run native:package:mac:smoke`
+- `npm run native:installer:mac:local`
+- `npm run native:update-repo:mac:local`
+- `npm run native:checksums:mac:write`
+- `npm run native:artifacts:mac:verify`
+- `npm run native:continuity:mac:verify`
+- `npm run native:delivery:mac:verify`
+- `npm run native:installer-acceptance:mac:verify` with normal host permissions for QtIFW cache access
+
+Remaining gate before Slice 4:
+
+- `npm run native:release:win:evidence` on Windows 11 `x64` with QtIFW tools
 
 ### Slice 4: Qt Shell Source And Test Removal
 
@@ -325,14 +342,14 @@ Required verification:
 - Windows `npm run native:release:win:evidence`
 - published or draft release assets still install, launch, preserve data, and expose support backup export
 
-## Recommended Next Slice
+## Recommended Next Step
 
-The next implementation slice should be Slice 3: Packaging And Signing Cleanup.
+The next implementation step should complete Slice 3 target-host verification on Windows 11 `x64`.
 
 Reason:
 
 - Slice 1 made active validation Tauri-first without deleting fallback code.
 - Slice 2 removed the release-runtime footgun before source deletion.
-- Packaging scripts still contain unused Qt branches and deploy-tool resolution.
-- Windows signing still contains a deferred Qt executable-name assumption that must be fixed before any signed Windows release.
-- Source deletion and parity asset cleanup should wait until packaging and signing assumptions are Tauri-only.
+- Slice 3 removed unused Qt packaging branches, deploy-tool resolution, the old Qt installer script, and the Windows signing executable-name assumption from the shipping path.
+- macOS verification passed locally after the cleanup.
+- Source deletion and parity asset cleanup should wait until Windows target-host evidence proves the same Tauri-only packaging path on the Windows release host.

@@ -157,7 +157,7 @@ const packagedArchivePath = path.join(
   "windows",
   "SSE-ExEd-Studio-Control-Native-windows.zip"
 );
-const packagedShellPath = path.join(packagedDirPath, "sse_exed_native.exe");
+const packagedShellPath = path.join(packagedDirPath, "sse-exed-tauri-shell.exe");
 const packagedEnginePath = path.join(packagedDirPath, "studio-control-engine.exe");
 const installerPath = path.join(
   rootDir,
