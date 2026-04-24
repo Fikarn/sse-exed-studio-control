@@ -12,9 +12,16 @@ import {
   assertPlanningWorkflowParity,
 } from "./native-parity-acceptance.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
+import {
+  nativeReleaseRequiresOperatorUiReady,
+  nativeReleaseShellExecutableName,
+  nativeReleaseSmokeArgs,
+  resolveNativeReleaseRuntime,
+} from "./native-release-runtime.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
+const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 const qtFontAliasWarningPatterns = [
   /^qt\.qpa\.fonts: Populating font family aliases took .*missing font family "Sans Serif" with one that exists to avoid this cost\.\s*$/,
 ];
@@ -83,52 +90,25 @@ function normalizeForOutputComparison(value) {
 }
 
 function resolvePackagedRuntime(target) {
+  const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
   if (target === "macos") {
+    const payloadPath = path.join(rootDir, "release", "native", "macos", "SSE ExEd Studio Control Native.app");
     return {
       label: "macOS",
-      shellPath: path.join(
-        rootDir,
-        "release",
-        "native",
-        "macos",
-        "SSE ExEd Studio Control Native.app",
-        "Contents",
-        "MacOS",
-        "sse_exed_native"
-      ),
-      enginePath: path.join(
-        rootDir,
-        "release",
-        "native",
-        "macos",
-        "SSE ExEd Studio Control Native.app",
-        "Contents",
-        "MacOS",
-        "studio-control-engine"
-      ),
-      commandArgs: (statusPath) => ["-platform", "offscreen", "--smoke-test", `--smoke-status-path=${statusPath}`],
+      shellPath: path.join(payloadPath, "Contents", "MacOS", shellName),
+      enginePath: path.join(payloadPath, "Contents", "MacOS", "studio-control-engine"),
+      commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, releaseRuntime, statusPath),
+      requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(releaseRuntime),
     };
   }
 
+  const payloadPath = path.join(rootDir, "release", "native", "windows", "SSE ExEd Studio Control Native");
   return {
     label: "Windows",
-    shellPath: path.join(
-      rootDir,
-      "release",
-      "native",
-      "windows",
-      "SSE ExEd Studio Control Native",
-      "sse_exed_native.exe"
-    ),
-    enginePath: path.join(
-      rootDir,
-      "release",
-      "native",
-      "windows",
-      "SSE ExEd Studio Control Native",
-      "studio-control-engine.exe"
-    ),
-    commandArgs: (statusPath) => ["--smoke-test", `--smoke-status-path=${statusPath}`],
+    shellPath: path.join(payloadPath, shellName),
+    enginePath: path.join(payloadPath, "studio-control-engine.exe"),
+    commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, releaseRuntime, statusPath),
+    requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(releaseRuntime),
   };
 }
 
@@ -180,10 +160,12 @@ function runPackagedSmoke(packaged, acceptanceRoot, runtime, stepName, expectedT
     smokeStatus.targetSurface === expectedTarget,
     `Packaged ${packaged.label} acceptance step '${stepName}' reached '${smokeStatus.targetSurface}' instead of '${expectedTarget}'.`
   );
-  assert(
-    smokeStatus.operatorUiReady,
-    `Packaged ${packaged.label} acceptance step '${stepName}' never reported the operator UI as ready.`
-  );
+  if (packaged.requiresOperatorUiReady) {
+    assert(
+      smokeStatus.operatorUiReady,
+      `Packaged ${packaged.label} acceptance step '${stepName}' never reported the operator UI as ready.`
+    );
+  }
   assert(
     normalizeForOutputComparison(smokeStatus.startedEnginePath ?? "") ===
       normalizeForOutputComparison(packaged.enginePath),

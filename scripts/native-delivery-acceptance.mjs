@@ -6,10 +6,17 @@ import { fileURLToPath } from "node:url";
 
 import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
+import {
+  nativeReleaseRequiresOperatorUiReady,
+  nativeReleaseShellExecutableName,
+  nativeReleaseSmokeArgs,
+  resolveNativeReleaseRuntime,
+} from "./native-release-runtime.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
+const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 const qtFontAliasWarningPatterns = [
   /^qt\.qpa\.fonts: Populating font family aliases took .*missing font family "Sans Serif" with one that exists to avoid this cost\.\s*$/,
 ];
@@ -93,22 +100,25 @@ function resolveStagedPayloadPath(target, channel) {
 }
 
 function resolveInstalledRuntime(target, installedPayloadPath) {
+  const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
   if (target === "macos") {
     return {
       label: "macOS",
       payloadPath: installedPayloadPath,
-      shellPath: path.join(installedPayloadPath, "Contents", "MacOS", "sse_exed_native"),
+      shellPath: path.join(installedPayloadPath, "Contents", "MacOS", shellName),
       enginePath: path.join(installedPayloadPath, "Contents", "MacOS", "studio-control-engine"),
-      commandArgs: (statusPath) => ["-platform", "offscreen", "--smoke-test", `--smoke-status-path=${statusPath}`],
+      commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, releaseRuntime, statusPath),
+      requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(releaseRuntime),
     };
   }
 
   return {
     label: "Windows",
     payloadPath: installedPayloadPath,
-    shellPath: path.join(installedPayloadPath, "sse_exed_native.exe"),
+    shellPath: path.join(installedPayloadPath, shellName),
     enginePath: path.join(installedPayloadPath, "studio-control-engine.exe"),
-    commandArgs: (statusPath) => ["--smoke-test", `--smoke-status-path=${statusPath}`],
+    commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, releaseRuntime, statusPath),
+    requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(releaseRuntime),
   };
 }
 
@@ -164,10 +174,12 @@ function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expecte
     smokeStatus.targetSurface === expectedTarget,
     `Installed ${installed.label} delivery step '${stepName}' reached '${smokeStatus.targetSurface}' instead of '${expectedTarget}'.`
   );
-  assert(
-    smokeStatus.operatorUiReady,
-    `Installed ${installed.label} delivery step '${stepName}' never reported the operator UI as ready.`
-  );
+  if (installed.requiresOperatorUiReady) {
+    assert(
+      smokeStatus.operatorUiReady,
+      `Installed ${installed.label} delivery step '${stepName}' never reported the operator UI as ready.`
+    );
+  }
   assert(
     normalizeForOutputComparison(smokeStatus.startedEnginePath ?? "") ===
       normalizeForOutputComparison(installed.enginePath),

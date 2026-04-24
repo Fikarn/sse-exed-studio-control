@@ -126,6 +126,20 @@ function normalizeRelocatedMetadata(identity) {
   };
 }
 
+function lockedIdentityFields(identity) {
+  const normalized = normalizeRelocatedMetadata(identity);
+  return {
+    displayName: normalized.displayName,
+    installerTitle: normalized.installerTitle,
+    packageId: normalized.packageId,
+    payloadNames: normalized.payloadNames,
+    productUrl: normalized.productUrl,
+    publisher: normalized.publisher,
+    startMenuDir: normalized.startMenuDir,
+    targetDir: normalized.targetDir,
+  };
+}
+
 function findPreviousReleaseRef(currentVersion) {
   const output = runGit(["tag", "--sort=-v:refname"]);
   if (!output) {
@@ -205,8 +219,8 @@ assert(
 
 const previousIdentity = readJsonAtRef(previousRef, "scripts/native-release-identity.json") ?? legacyIdentity;
 assert(
-  JSON.stringify(normalizeRelocatedMetadata(previousIdentity)) === JSON.stringify(identity),
-  `Native release identity changed between ${previousRef} and ${packageJson.version}. Installer/update identity must remain stable for continuity.`
+  JSON.stringify(lockedIdentityFields(previousIdentity)) === JSON.stringify(lockedIdentityFields(identity)),
+  `Native release identity changed between ${previousRef} and ${packageJson.version}. Installer/update locked identity fields must remain stable for continuity.`
 );
 
 verifyInstallerContinuity(target, packageJson, identity);

@@ -1,0 +1,5 @@
+{
+  "shippingRuntime": "tauri",
+  "fallbackRuntime": "qt",
+  "cutoverIssue": "https://github.com/Fikarn/sse-exed-studio-control/issues/3"
+}

@@ -11,8 +11,8 @@ This repository is intentionally optimized for a specific deployment profile rat
 
 ## Architecture
 
-- shipping native `Qt/QML` operator shell during the migration
-- parallel `Tauri + React + TypeScript` replacement shell under `native/tauri-shell/` and `frontend/`
+- selected native `Tauri + React + TypeScript` operator shell for the current cutover candidate
+- retained `Qt/QML` fallback shell during the bounded cutover window
 - separate `Rust` engine (persistence, safety, device logic)
 - offline Qt Installer Framework packages on Windows 11 `x64` and macOS Apple Silicon
 - one-way importer for legacy `db.json` data, invoked once on first native launch for migrating operators
@@ -38,7 +38,7 @@ Productization work and release gates are tracked in [docs/PRODUCTIZATION_PLAN.m
 
 ## Screenshots
 
-All captures below are deterministic native renders at the target `2560x1440` operator-monitor resolution. They are produced by the real Qt shell driving the Rust engine through the production IPC path.
+All captures below are deterministic native renders at the target `2560x1440` operator-monitor resolution. The checked-in release screenshots remain Qt-shell parity captures until the Tauri visual baseline is promoted through the cutover gate.
 
 | Planning                                                                                             | Lighting                                                                                                    |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -50,7 +50,7 @@ All captures below are deterministic native renders at the target `2560x1440` op
 
 ## Operator Lifecycle
 
-- First launch starts the native Qt shell, launches the bundled Rust engine, and waits for engine readiness before routing into commissioning or the dashboard
+- First launch starts the selected native shell, launches the bundled Rust engine, and waits for engine readiness before routing into commissioning or the dashboard
 - First-run commissioning is available from inside the app for planning, lighting, and Companion setup
 - Closing the main window shows a warning and then fully quits the app if confirmed
 - Restored workspace and shell state come from the engine snapshot, not shell-local browser state
@@ -106,12 +106,12 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/RELEASE.md](docs/RELEASE.md): versioning, tagging, installers, and release flow
 - [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
 - [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
-- [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md): acceptance gate for promoting the Tauri replacement shell
+- [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
 - [docs/archive/](docs/archive/): historical planning and parity documents preserved for reference
-- [native/README.md](native/README.md): native workspace scaffold for the Qt shell, Tauri replacement shell, Rust engine, and IPC protocol
+- [native/README.md](native/README.md): native workspace scaffold for the selected Tauri shell, Qt fallback shell, Rust engine, and IPC protocol
 - [docs/adr/0001-frontend-replatform.md](docs/adr/0001-frontend-replatform.md): locked frontend replatform decision
-- `frontend/`: replacement web frontend workspace and design-system packages
-- `native/tauri-shell/`: replacement native shell track for the replatform
+- `frontend/`: Tauri web frontend workspace and design-system packages
+- `native/tauri-shell/`: selected native shell track for the cutover candidate
 
 ## Local Development
 
@@ -172,9 +172,9 @@ npm run ci
 
 `tauri:setup-support:qualify` and `tauri:workspaces:qualify` launch the real Tauri dev shell on the fixed local port `4173`. Run them serially and do not run them alongside `npm run dev`, `npm run preview`, or Playwright preview.
 
-`tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell. It does not change shipping behavior.
+`tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
-The Tauri shell is not the shipping runtime until the gate in [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md) is satisfied. Qt remains the production runtime during the migration.
+The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. The current candidate selects Tauri, but the switch is not complete until the gate in [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md) and the issue #3 target-host evidence are satisfied. Qt remains the fallback runtime during the bounded cutover window.
 
 `npm run clean` removes generated native build output and packaged release folders.
 

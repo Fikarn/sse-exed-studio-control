@@ -6,8 +6,8 @@
   "startMenuDir": "SSE ExEd Studio Control Native",
   "packageId": "com.sse.exedstudiocontrol.native",
   "targetDir": "@ApplicationsDir@",
-  "installerDescription": "Offline native installer for the Qt shell and bundled Rust engine.",
-  "updateDescription": "Native workstation runtime distributed through the Qt Installer Framework maintenance-tool repository.",
+  "installerDescription": "Offline native installer for the shipping desktop shell and bundled Rust engine.",
+  "updateDescription": "Shipping workstation runtime distributed through the Qt Installer Framework maintenance-tool repository.",
   "payloadNames": {
     "macos": "SSE ExEd Studio Control Native.app",
     "windows": "SSE ExEd Studio Control Native"

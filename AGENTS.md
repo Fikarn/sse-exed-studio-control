@@ -10,14 +10,14 @@ Entry point for Codex-assisted work in this repo. Keep it short. Follow the poin
 
 Two processes, separated by an IPC protocol:
 
-- `native/qt-shell/` — current shipping Qt 6 / QML shell. Owns windowing, input, layout in production during the migration. **No device or DB logic in QML.**
-- `native/tauri-shell/` + `frontend/` — approved parallel replacement shell built on `Tauri 2 + React 19.2 + TypeScript + Vite`. **No device or DB logic in React.**
+- `native/tauri-shell/` + `frontend/` — selected shipping shell for the current cutover candidate, built on `Tauri 2 + React 19.2 + TypeScript + Vite`. **No device or DB logic in React.**
+- `native/qt-shell/` — Qt 6 / QML fallback shell retained through the bounded cutover window. Owns windowing, input, and layout when explicitly selected as fallback. **No device or DB logic in QML.**
 - `native/rust-engine/` — Rust. Owns state, persistence, device I/O, protocol dispatch.
 - `native/protocol/` — the IPC contract between them. Changes here are contract changes.
 
 Rule: if a change would move product state or device policy into QML or React, it is going in the wrong direction. Authoritative source: `docs/ARCHITECTURE.md`.
 
-`Q_PROPERTY` / `Q_INVOKABLE` / signals live in the C++ adapter under `native/qt-shell/src/` (e.g. `EngineProcess.*`), not in the Rust engine. Engine-side additions feed those properties.
+Qt fallback `Q_PROPERTY` / `Q_INVOKABLE` / signals live in the C++ adapter under `native/qt-shell/src/` (e.g. `EngineProcess.*`), not in the Rust engine. Engine-side additions feed those properties.
 
 ## Hardware target (binding)
 
@@ -63,7 +63,7 @@ For live visual verification at true `2560×1440`, use `npm run native:parity:li
 
 Baselines under `artifacts/parity/native/workstation/`.
 
-During the replatform, Qt parity remains the shipping gate. The Tauri replacement shell uses Storybook, Playwright, and fixture-driven smoke coverage until it reaches cutover readiness.
+During the cutover, Qt parity remains the fallback comparison gate. The Tauri shell uses Storybook, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` before the cutover can be declared complete.
 
 ## Testing posture
 

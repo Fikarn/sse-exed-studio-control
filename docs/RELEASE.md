@@ -18,16 +18,16 @@ The native runtime is the only release path:
 - The legacy Electron runtime was retired in `v2.1.0`; no browser/Electron path remains in the repo.
 - Release readiness depends on packaging, smoke, acceptance, bridge-qualification, and install-time smoke-test gates — plus any open blockers tracked in [docs/HANDOFF.md](./HANDOFF.md).
 
-During the frontend replatform, the Qt shell remains the shipping native runtime. The Tauri replacement shell may only enter a release candidate through the cutover gate in [docs/FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md). Unless that plan is changed by a delta spec, the replacement candidate must reuse the QtIFW installer/update posture and package the Tauri shell with the Rust engine binary staged beside the shell executable.
+The selected native release runtime is controlled by `scripts/native-release-runtime.json` and can be overridden locally with `SSE_NATIVE_RELEASE_RUNTIME=qt` or `SSE_NATIVE_RELEASE_RUNTIME=tauri` for explicit fallback testing. The current cutover candidate selects `tauri`, so the `native:*` release lanes package the Tauri shell with the Rust engine binary staged beside the shell executable while preserving the existing QtIFW installer/update posture.
 
-The replacement-shell candidate packaging path is intentionally separate from the shipping Qt release path:
+The historical replacement-shell candidate packaging path remains available for pre-switch evidence under separate roots:
 
 - `npm run tauri:package:mac:ifw-staged`
 - `npm run tauri:package:win:ifw-staged`
 - `npm run tauri:package:mac:ifw-local`
 - `npm run tauri:package:win:ifw-local`
 
-The staged commands package the Tauri shell with the side-by-side Rust engine, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository staging, and verify staged payload parity. The local commands additionally run real QtIFW `binarycreator` / `repogen`, verify the full installer/update artifacts, install through the generated candidate installer, verify maintenance-tool package/repository visibility, purge, reinstall, and verify operator data survives. They write to `release/tauri-candidate*` roots, not `release/native*`, so the current Qt fallback artifacts remain independent during parallel acceptance.
+Those commands write to `release/tauri-candidate*` roots and do not publish the shipping path. The shipping release path is the `native:*` lane, which writes to `release/native*`, `release/native-installer*`, and `release/native-updates*` for the runtime selected by `scripts/native-release-runtime.json`.
 
 ## Native Release Artifacts
 
@@ -84,8 +84,8 @@ Repo commands for the native release path:
 - `npm run native:sign:mac:release`
 - `npm run native:sign:win:release`
 
-The prepare commands stage QtIFW metadata and payload layout. The local commands run `binarycreator` or `repogen` when QtIFW is installed and the tools are available on `PATH` or via `SSE_QT_IFW_BINARYCREATOR` / `SSE_QT_IFW_REPOGEN`.
-The packaged acceptance commands verify that the packaged shell and bundled engine can import data, reopen against the same app-data directory, restore a support backup, and relaunch without losing operator state.
+The prepare commands stage QtIFW metadata and payload layout for the selected release runtime. The local commands run `binarycreator` or `repogen` when QtIFW is installed and the tools are available on `PATH` or via `SSE_QT_IFW_BINARYCREATOR` / `SSE_QT_IFW_REPOGEN`.
+The packaged acceptance commands verify that the packaged shell selected by `scripts/native-release-runtime.json` and the bundled engine can import data, reopen against the same app-data directory, restore a support backup, and relaunch without losing operator state.
 The control-surface bridge qualification commands run the packaged engine on a dedicated localhost port, fail if the bundled bridge cannot bind, and then verify real HTTP behavior for `/api/deck/context`, `/api/deck/lcd`, `/api/deck/action`, `/api/deck/light-action`, and `/api/deck/audio-action`.
 The checksum commands write per-platform SHA256 manifests for the native release artifacts. Full mode covers the packaged bundle, installer, and update-repository archive; staged mode covers the packaged bundle when QtIFW tools are not present locally.
 The artifact verification commands assert the expected package identity, staged payload names, final installer/update archive outputs, checksum-manifest integrity, and payload consistency across the packaged bundle plus installer/update staging after those builds complete.

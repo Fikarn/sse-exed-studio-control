@@ -13,18 +13,19 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 
 ## Runtime Layers
 
-### Qt shell (shipping runtime during migration)
+### Tauri shell (selected shipping runtime for the cutover candidate)
 
-- owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome in the current production runtime
-- supervises the Rust engine as a child process
-- remains maintenance-only while the replacement shell is developed in parallel
-
-### Tauri shell (parallel replacement track)
-
-- owns the replacement native webview shell under `native/tauri-shell/` and `frontend/`
+- owns the native webview shell under `native/tauri-shell/` and `frontend/`
+- owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when the release runtime selector points at `tauri`
 - preserves the same authoritative engine boundary and IPC contract as the Qt shell
-- is developed story-first and verified in parallel until it is safer to ship than the Qt shell
-- cannot replace the shipping runtime until the gate in [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) is satisfied
+- supervises the Rust engine as a child process through the Tauri bridge
+- remains gated by [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) until macOS and Windows post-switch evidence is complete
+
+### Qt shell (fallback runtime during the bounded cutover window)
+
+- owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when selected as fallback
+- supervises the Rust engine as a child process
+- remains maintenance-only unless the task is a fallback release blocker, release-verification fix, or critical operator defect
 
 ### Rust engine
 
@@ -85,8 +86,8 @@ Any native studio domain should follow the same shape:
 - `native/rust-engine/src/audio.rs`: audio snapshot, sync, recall, and simulated backend boundary
 - `native/rust-engine/src/support.rs`: backup, restore, and diagnostics support flows
 - `native/rust-engine/src/control_surface.rs`: Stream Deck bridge and Companion export generation
-- `native/qt-shell/qml/Main.qml`: current shipping operator shell surface derived from engine state
-- `frontend/app/src/app/OperatorShell.tsx`: replacement shell surface derived from engine state
+- `frontend/app/src/app/OperatorShell.tsx`: Tauri operator shell surface derived from engine state
+- `native/qt-shell/qml/Main.qml`: Qt fallback operator shell surface derived from engine state
 
 ## Refactor Rule
 

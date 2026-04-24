@@ -8,8 +8,8 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 
 ## Current Operating Truth
 
-- The product is a native desktop application with an authoritative `Rust` engine and a current shipping `Qt/QML` shell.
-- A parallel frontend replatform is in progress: `native/tauri-shell/` plus `frontend/` are the approved replacement track, while the Qt shell remains the shipping runtime until late cutover.
+- The product is a native desktop application with an authoritative `Rust` engine and a selected `Tauri 2 + React 19.2 + TypeScript + Vite` shell for the current cutover candidate.
+- `scripts/native-release-runtime.json` selects `tauri` for the shipping release path; `native/qt-shell/` remains the fallback runtime during the bounded cutover window.
 - The legacy Electron/Next.js runtime was retired in `v2.1.0`. There is no browser-served or Electron-served path left in the repository.
 - Native packaging, installer, update-repository, and release automation lanes exist, produce signed/unsigned operator-ready artifacts, and are driven from tagged releases.
 - Native operator parity is engineering-complete. Acceptance is layered: deterministic offscreen `2560x1440` captures, real-GPU onscreen spot captures, and the install-time first-launch smoke test shipped in the QtIFW installer.
@@ -47,7 +47,7 @@ Do not reopen these casually:
 - supported primary hardware assumptions in `docs/HARDWARE_PROFILE.md`
 - engine-owned persistence, safety rules, and device logic
 - the native runtime is the only product runtime; do not reintroduce an Electron or Next.js path
-- the replacement shell stack is `Tauri 2 + React 19.2 + TypeScript + Vite`, developed in parallel until cutover
+- the selected shell stack is `Tauri 2 + React 19.2 + TypeScript + Vite`; Qt remains fallback until the cutover window closes
 
 ## Current Blockers
 
@@ -58,11 +58,11 @@ The highest-value unresolved work is:
 2. Keep the backlog actionable.
    Do not let real execution work live only in prose documents; open execution issues or milestone items before starting the next major slice.
 3. Keep current-truth docs aligned with the replatform program.
-   The shipping Qt runtime and the parallel Tauri replacement track must both be described consistently in `README.md`, `docs/HANDOFF.md`, `docs/ARCHITECTURE.md`, and the ADR set.
+   The selected Tauri release runtime and retained Qt fallback must both be described consistently in `README.md`, `docs/HANDOFF.md`, `docs/ARCHITECTURE.md`, and the ADR set.
 4. Preserve the current frontend replatform checkpoint.
-   `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is now tracked in `docs/FRONTEND_CUTOVER_PLAN.md`; do not treat Qt as replaceable until that gate is satisfied.
+   `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is tracked in `docs/FRONTEND_CUTOVER_PLAN.md`; do not close Checkpoint C until both macOS and Windows post-switch target-host release evidence exist.
 5. Keep Tauri target-host posture honest.
-   GitHub Actions is not the acceptance mechanism for the replacement-shell cutover. `npm run tauri:setup-support:qualify`, `npm run tauri:workspaces:qualify`, and `npm run tauri:visual:review` are local/manual cutover-readiness gates until documented target-host evidence exists. `npm run tauri:package:mac:ifw-staged` / `npm run tauri:package:win:ifw-staged` stage the Tauri candidate through separate QtIFW installer/update payload roots without touching the shipping Qt `release/native*` artifacts. `npm run tauri:package:mac:ifw-local` / `npm run tauri:package:win:ifw-local` are the real QtIFW target-host gates: they build installer/update artifacts, verify full artifacts, install, check maintenance-tool package/repository visibility, purge, reinstall, and verify operator data survives. `npm run tauri:package:win:evidence` wraps the Windows gate and writes the evidence bundle described in `docs/WINDOWS_TARGET_HOST_EVIDENCE.md`. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue and declares the bounded acceptance window plus packaging path; do not treat the Tauri shell as shippable until every gate in `docs/FRONTEND_CUTOVER_PLAN.md` and that issue is satisfied.
+   GitHub Actions is not the acceptance mechanism for the replacement-shell cutover. `npm run tauri:setup-support:qualify`, `npm run tauri:workspaces:qualify`, and `npm run tauri:visual:review` are local/manual cutover-readiness gates until documented target-host evidence exists. The historical `tauri:package:*` lanes remain useful pre-switch evidence under `release/tauri-candidate*`. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`; `npm run native:release:mac:local` has macOS post-switch evidence, and `npm run native:release:win:evidence` still needs Windows 11 `x64` evidence. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue and declares the bounded acceptance window plus packaging path; do not close the Tauri shipping switch until every gate in `docs/FRONTEND_CUTOVER_PLAN.md` and that issue is satisfied.
 
 ## Execution Queue
 

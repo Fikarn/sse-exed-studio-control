@@ -3,7 +3,10 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveNativeReleaseRuntime } from "../native-release-runtime.mjs";
+
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 
 function run(command, args) {
   const result = spawnSync(command, args, {
@@ -51,6 +54,10 @@ function runNpmScript(name) {
   run(npmCommand, ["run", name]);
 }
 
+function runReleaseRuntimeBuild() {
+  runNpmScript(releaseRuntime === "tauri" ? "tauri:foundation" : "native:build");
+}
+
 if (process.platform === "darwin") {
   const binaryCreator = resolveExecutable("binarycreator", ["SSE_QT_IFW_BINARYCREATOR", "QT_IFW_BINARYCREATOR"]);
   const repoGen = resolveExecutable("repogen", ["SSE_QT_IFW_REPOGEN", "QT_IFW_REPOGEN"]);
@@ -60,7 +67,7 @@ if (process.platform === "darwin") {
     runNpmScript("native:checksums:mac:write");
   } else {
     console.log("QtIFW tools not found. Running macOS native release staging verification.");
-    runNpmScript("native:build");
+    runReleaseRuntimeBuild();
     runNpmScript("native:package:mac:smoke");
     runNpmScript("native:package:mac:clean-smoke");
     runNpmScript("native:package:mac:acceptance");
@@ -83,7 +90,7 @@ if (process.platform === "win32") {
     runNpmScript("native:checksums:win:write");
   } else {
     console.log("QtIFW tools not found. Running Windows native release staging verification.");
-    runNpmScript("native:build");
+    runReleaseRuntimeBuild();
     runNpmScript("native:package:win:smoke");
     runNpmScript("native:package:win:clean-smoke");
     runNpmScript("native:package:win:acceptance");

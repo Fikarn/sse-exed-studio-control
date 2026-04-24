@@ -2,13 +2,13 @@
 
 ## Purpose
 
-This runbook collects the Windows 11 `x64` evidence required by [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) before Checkpoint C can be claimed for the Tauri replacement shell.
+This runbook collects the Windows 11 `x64` post-switch evidence required by [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) before Checkpoint C can be claimed for the Tauri release runtime.
 
 It does not authorize cutover by itself. It only proves the Windows side of the real QtIFW package, update, purge, reinstall, and operator-data preservation gate.
 
 ## Required Host
 
-Use a Windows 11 `x64` machine that can build and run the Tauri shell locally.
+Use a Windows 11 `x64` machine that can build and run the selected native release runtime locally.
 
 Required tools:
 
@@ -45,47 +45,45 @@ Confirm the working tree is clean:
 git status --short
 ```
 
-Run the evidence collector:
+Run the switched native release evidence collector:
 
 ```powershell
-npm run tauri:package:win:evidence
+npm run native:release:win:evidence
 ```
 
 The collector writes evidence under:
 
 ```text
-artifacts/tauri-qualification/windows-target-host/
+artifacts/native-release/windows-target-host/
 ```
 
 The newest run is also copied to:
 
 ```text
-artifacts/tauri-qualification/windows-target-host/latest-summary.json
+artifacts/native-release/windows-target-host/latest-summary.json
 ```
 
 ## What The Collector Verifies
 
-The collector records host, tool, and git context, then runs the target-host foundation gate:
+The collector records host, tool, git context, and the selected native release runtime, then runs the switched shipping release gate:
 
 ```powershell
-npm run tauri:foundation
-```
-
-That gate performs protocol generation, Rust engine build, Tauri shell build, and Tauri smoke coverage. The collector fails if the foundation gate fails or if generated files make the checkout dirty outside Tauri's platform-specific schema output under `native/tauri-shell/gen/schemas/`.
-
-The collector then runs the real Windows package gate:
-
-```powershell
-npm run tauri:package:win:ifw-local
+npm run native:release:win:local
 ```
 
 That gate performs:
 
-- packaged Tauri candidate build and smoke test
+- selected runtime build through `npm run native:release:build`
+- packaged native Windows build and smoke tests
+- packaged acceptance with import, restart, restore, and relaunch persistence
+- packaged control-surface bridge qualification
 - real QtIFW offline installer build through `binarycreator`
 - real QtIFW update repository build through `repogen`
+- SHA256 manifest generation
 - full artifact verification
-- install through the generated candidate installer
+- installer identity continuity verification
+- staged install/update/reinstall delivery acceptance
+- install through the generated native release installer
 - installed shell launch against the bundled Rust engine
 - maintenance-tool package listing and repository search
 - purge through the maintenance tool
@@ -97,11 +95,10 @@ That gate performs:
 
 Attach or summarize these paths on issue #3:
 
-- `artifacts/tauri-qualification/windows-target-host/latest-summary.json`
+- `artifacts/native-release/windows-target-host/latest-summary.json`
 - the corresponding timestamped `summary.json`
-- `logs/tauri-foundation.combined.log`
-- `logs/tauri-package-win-ifw-local.combined.log`
-- `installer-acceptance/` if the run fails or if detailed installer logs are requested
+- `logs/native-release-win-local.combined.log`
+- `packaged-acceptance/`, `bridge-acceptance/`, `delivery-acceptance/`, and `installer-acceptance/` if the run fails or if detailed acceptance logs are requested
 
 The summary is enough for routine gate tracking when the run passes, but keep both combined logs and the full folder until the cutover issue is closed.
 
@@ -112,9 +109,9 @@ Do not claim Windows evidence if any of these are true:
 - the script was run on non-Windows hardware
 - the host is not `x64`
 - the checkout was dirty before the run, unless the issue explicitly records why `--allow-dirty` was used
+- `scripts/native-release-runtime.json` or `SSE_NATIVE_RELEASE_RUNTIME` did not select `tauri`
 - `binarycreator.exe` or `repogen.exe` came from an unknown toolchain
-- `npm run tauri:foundation` failed, was skipped, or made generated/source files dirty outside Tauri's platform-specific schema output
-- `npm run tauri:package:win:ifw-local` failed or was skipped
+- `npm run native:release:win:local` failed, was skipped, or made generated/source files dirty outside Tauri's platform-specific schema output
 - installer acceptance was not exercised through the generated QtIFW installer
 
 If the run fails, attach `latest-summary.json` and the combined log to issue #3 before changing code. The failure may be a real cutover blocker.

@@ -19,8 +19,9 @@ If this document conflicts with those files, fix the conflict before continuing.
 
 ## Current State
 
-- `native/qt-shell/` remains the shipping runtime.
-- `native/tauri-shell/` plus `frontend/` are the approved replacement track.
+- `scripts/native-release-runtime.json` now selects `tauri` as the shipping release runtime for the current cutover candidate.
+- `native/tauri-shell/` plus `frontend/` are the selected replacement shell track for the candidate release path.
+- `native/qt-shell/` remains available as the fallback runtime during the bounded cutover window and can be selected with `SSE_NATIVE_RELEASE_RUNTIME=qt`.
 - The Rust engine remains authoritative for state, persistence, device I/O, startup policy, recovery behavior, and support workflows.
 - `Setup/Support`, `Lighting`, `Audio`, and `Planning` have replacement-shell coverage in fixture, Playwright, and live Tauri qualification lanes.
 - `npm run tauri:setup-support:qualify` covers clean startup, setup/support flows, persisted restart, and bootstrap-failure recovery posture.
@@ -28,8 +29,9 @@ If this document conflicts with those files, fix the conflict before continuing.
 - `npm run tauri:visual:review` captures repeatable replacement-shell fixture screenshots at `2560x1440` and `1920x1080` for Setup/Support recovery, Lighting, Audio, and Planning, and fails on app-level scroll.
 - GitHub Actions is not the acceptance mechanism for this cutover. Replacement-shell promotion is gated by local/target-host evidence captured on the macOS Apple Silicon and Windows 11 `x64` release hosts.
 - The live Tauri qualification commands remain local/manual cutover-readiness gates until documented target-host evidence exists for the candidate release.
-- `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` stage Tauri candidate payloads through the QtIFW installer/update layout without touching the shipping Qt `release/native*` roots.
-- `npm run tauri:package:mac:ifw-local` and `npm run tauri:package:win:ifw-local` build real QtIFW installer/update artifacts and run installer acceptance on matching target hosts.
+- `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` remain historical/pre-switch candidate evidence lanes under separate `release/tauri-candidate*` roots.
+- The shipping release path is now the `native:*` release lane, which packages the runtime selected by `scripts/native-release-runtime.json` into `release/native*`.
+- macOS Apple Silicon post-switch release evidence exists for the switched `native:*` path; Windows 11 `x64` post-switch evidence is still required before Checkpoint C can be closed.
 - [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue. It declares the bounded acceptance window and packaging path, but does not authorize cutover by itself.
 
 ## Non-Negotiables
@@ -43,7 +45,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 
 ## Cutover Acceptance Gate
 
-Do not switch the shipping runtime until every item below is true.
+Do not tag a release or claim the shipping switch complete until every item below is true.
 
 ### 1. Contract And Boundary Gate
 
@@ -93,19 +95,19 @@ Do not switch the shipping runtime until every item below is true.
 
 ### 7. Packaging And Rollback Gate
 
-- The release issue explicitly names the packaging path for the replacement shell.
+- The release issue explicitly names the packaging path for the selected Tauri shell.
 - Installer identity, app identifier, app-data paths, logs paths, update-repository behavior, and rollback instructions are documented before promotion.
 - The old Qt shell remains available as the fallback runtime during the parallel-acceptance window.
 - Rollback to the previous shipping tag remains a reinstall-away and does not require manual database surgery.
-- If QtIFW remains the installer path for the candidate, the Tauri shell must be exercised through that packaged path before release.
+- If QtIFW remains the installer path for the candidate, the Tauri shell must be exercised through the shipping `native:*` packaged path before release.
 - If the release moves away from QtIFW, the new installer/update path must have equivalent package, update, continuity, rollback, and clean-machine acceptance evidence.
 
 Current packaging direction:
 
-- QtIFW remains the candidate release wrapper unless a delta spec replaces it.
-- A packaged Tauri candidate must stage the Tauri shell executable and `studio-control-engine` / `studio-control-engine.exe` side by side, or set `SSE_ENGINE_BIN` explicitly.
+- QtIFW remains the release wrapper unless a delta spec replaces it.
+- The selected `tauri` release runtime stages the Tauri shell executable and `studio-control-engine` / `studio-control-engine.exe` side by side in the existing `release/native*` roots, or sets `SSE_ENGINE_BIN` explicitly.
 - The candidate installer/update repository must preserve the existing operator app-data, logs, update-repository, and rollback expectations before Checkpoint C can be claimed.
-- Real QtIFW `binarycreator` and `repogen` evidence is required on matching target hosts through `npm run tauri:package:mac:ifw-local` and `npm run tauri:package:win:ifw-local`.
+- Real QtIFW `binarycreator` and `repogen` evidence is required on matching target hosts through `npm run native:release:mac:local` and `npm run native:release:win:local` for the switched release path.
 - The Qt shell must remain installable or launchable as the fallback runtime through the bounded parallel-acceptance window.
 - [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the current release/cutover issue for this gate.
 
@@ -153,5 +155,5 @@ The next implementation slice after this document should be the smallest gate-ha
 
 - run `npm run tauri:cutover:candidate` with `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` and attach target-host evidence to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - run `npm run tauri:visual:review` and attach required `2560x1440` and `1920x1080` visual review notes or screenshots to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
-- run `npm run tauri:package:mac:ifw-local` and `npm run tauri:package:win:ifw-local` with real QtIFW tools on matching target hosts before Checkpoint C
-- use `npm run tauri:package:win:evidence` and [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md) to collect the Windows 11 `x64` package-gate evidence bundle when a host becomes available
+- run `npm run native:release:win:evidence` with real QtIFW tools on the Windows 11 `x64` host for the switched shipping path before Checkpoint C
+- update [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) with macOS and Windows post-switch `native:*` release evidence before claiming the shipping-switch exit condition

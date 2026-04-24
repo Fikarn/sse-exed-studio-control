@@ -6,10 +6,17 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
+import {
+  nativeReleaseRequiresOperatorUiReady,
+  nativeReleaseShellExecutableName,
+  nativeReleaseSmokeArgs,
+  resolveNativeReleaseRuntime,
+} from "./native-release-runtime.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
+const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 const sentinelProjectTitle = "Installer Continuity Sentinel";
 const qtFontAliasWarningPatterns = [
   /^qt\.qpa\.fonts: Populating font family aliases took .*missing font family "Sans Serif" with one that exists to avoid this cost\.\s*$/,
@@ -30,11 +37,23 @@ function parseTarget(value) {
 }
 
 function parseRuntime(value) {
-  if (!value || value === "native" || value === "tauri") {
+  if (!value || value === "native" || value === "tauri" || value === "qt") {
     return value ?? "native";
   }
 
-  throw new Error(`Unsupported installer acceptance runtime '${value}'. Use --runtime=native or --runtime=tauri.`);
+  throw new Error(
+    `Unsupported installer acceptance runtime '${value}'. Use --runtime=native, --runtime=tauri, or --runtime=qt.`
+  );
+}
+
+function effectiveInstalledRuntime(runtimeKind) {
+  if (runtimeKind === "tauri") {
+    return "tauri";
+  }
+  if (runtimeKind === "qt") {
+    return "qt";
+  }
+  return releaseRuntime;
 }
 
 function countSuppressedLines(text, patterns, writer) {
@@ -138,31 +157,28 @@ function resolveRepositoryPath(target, runtimeKind) {
 }
 
 function resolveInstalledRuntime(target, installRoot, runtimeKind) {
+  const installedRuntime = effectiveInstalledRuntime(runtimeKind);
+  const shellName = nativeReleaseShellExecutableName(target, installedRuntime);
   if (target === "macos") {
     const payloadPath = path.join(installRoot, releaseIdentity.payloadNames[target]);
-    const shellName = runtimeKind === "tauri" ? "sse-exed-tauri-shell" : "sse_exed_native";
     return {
       label: "macOS",
       payloadPath,
       shellPath: path.join(payloadPath, "Contents", "MacOS", shellName),
       enginePath: path.join(payloadPath, "Contents", "MacOS", "studio-control-engine"),
-      commandArgs: (statusPath) =>
-        runtimeKind === "tauri"
-          ? ["--smoke-test", `--smoke-status-path=${statusPath}`]
-          : ["-platform", "offscreen", "--smoke-test", `--smoke-status-path=${statusPath}`],
-      requiresOperatorUiReady: runtimeKind !== "tauri",
+      commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, installedRuntime, statusPath),
+      requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(installedRuntime),
     };
   }
 
   const payloadPath = path.join(installRoot, releaseIdentity.payloadNames[target]);
-  const shellName = runtimeKind === "tauri" ? "sse-exed-tauri-shell.exe" : "sse_exed_native.exe";
   return {
     label: "Windows",
     payloadPath,
     shellPath: path.join(payloadPath, shellName),
     enginePath: path.join(payloadPath, "studio-control-engine.exe"),
-    commandArgs: (statusPath) => ["--smoke-test", `--smoke-status-path=${statusPath}`],
-    requiresOperatorUiReady: runtimeKind !== "tauri",
+    commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, installedRuntime, statusPath),
+    requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(installedRuntime),
   };
 }
 
@@ -328,7 +344,7 @@ function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expecte
 }
 
 function assertInstallTimeSmokePassed(installRoot, runtimeKind, phase) {
-  if (runtimeKind !== "tauri") {
+  if (effectiveInstalledRuntime(runtimeKind) !== "tauri") {
     return;
   }
 

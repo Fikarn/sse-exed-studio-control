@@ -3,8 +3,11 @@ import { createReadStream, existsSync, lstatSync, readdirSync, readFileSync, rea
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { nativeReleaseShellExecutableName, resolveNativeReleaseRuntime } from "./native-release-runtime.mjs";
+
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
+const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 
 function readFlag(name) {
   const prefix = `${name}=`;
@@ -320,10 +323,9 @@ function verifyInstallerArtifacts(target, packageJson, mode) {
   const configXmlPath = path.join(installerRoot, "ifw", "config", "config.xml");
   const packageXmlPath = path.join(installerRoot, "ifw", "packages", releaseIdentity.packageId, "meta", "package.xml");
   const payloadDir = installerPayloadPath(target);
+  const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
   const shellPath =
-    target === "macos"
-      ? path.join(payloadDir, "Contents", "MacOS", "sse_exed_native")
-      : path.join(payloadDir, "sse_exed_native.exe");
+    target === "macos" ? path.join(payloadDir, "Contents", "MacOS", shellName) : path.join(payloadDir, shellName);
   const enginePath =
     target === "macos"
       ? path.join(payloadDir, "Contents", "MacOS", "studio-control-engine")
@@ -360,10 +362,9 @@ function verifyUpdateArtifacts(target, packageJson, mode) {
   const updateRoot = path.join(rootDir, "release", "native-updates", target);
   const packageXmlPath = path.join(updateRoot, "ifw", "packages", releaseIdentity.packageId, "meta", "package.xml");
   const payloadDir = updatePayloadPath(target);
+  const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
   const shellPath =
-    target === "macos"
-      ? path.join(payloadDir, "Contents", "MacOS", "sse_exed_native")
-      : path.join(payloadDir, "sse_exed_native.exe");
+    target === "macos" ? path.join(payloadDir, "Contents", "MacOS", shellName) : path.join(payloadDir, shellName);
   const enginePath =
     target === "macos"
       ? path.join(payloadDir, "Contents", "MacOS", "studio-control-engine")
@@ -394,10 +395,9 @@ function verifyUpdateArtifacts(target, packageJson, mode) {
 function verifyPackagedArtifacts(target, mode) {
   const packagedRoot = path.join(rootDir, "release", "native", target);
   const payloadPath = packagedPayloadPath(target);
+  const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
   const shellPath =
-    target === "macos"
-      ? path.join(payloadPath, "Contents", "MacOS", "sse_exed_native")
-      : path.join(payloadPath, "sse_exed_native.exe");
+    target === "macos" ? path.join(payloadPath, "Contents", "MacOS", shellName) : path.join(payloadPath, shellName);
   const enginePath =
     target === "macos"
       ? path.join(payloadPath, "Contents", "MacOS", "studio-control-engine")
