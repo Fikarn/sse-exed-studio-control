@@ -254,7 +254,7 @@ Required verification:
 
 ### Slice 3: Packaging And Signing Cleanup
 
-Status: implemented and macOS-verified. The local macOS release path passes through package smoke, clean smoke, packaged acceptance, bridge verification, real QtIFW installer generation, update-repository generation, full checksum/artifact verification, continuity verification, delivery acceptance, and real installer acceptance. Slice 3 is not complete until Windows 11 `x64` target-host evidence passes for the same cleanup.
+Status: complete. The local macOS release path passes through package smoke, clean smoke, packaged acceptance, bridge verification, real QtIFW installer generation, update-repository generation, full checksum/artifact verification, continuity verification, delivery acceptance, and real installer acceptance. Windows 11 `x64` target-host evidence passed for commit `437272a4db189a4bbb38f61cf2eb05c6b86e8d0c` with summary `artifacts/native-release/windows-target-host/2026-04-24T23-42-23-439Z/summary.json`.
 
 Goal: remove unused Qt packaging branches while preserving QtIFW distribution.
 
@@ -285,9 +285,13 @@ macOS verification recorded during implementation:
 - `npm run native:delivery:mac:verify`
 - `npm run native:installer-acceptance:mac:verify` with normal host permissions for QtIFW cache access
 
-Remaining gate before Slice 4:
+Windows verification recorded during implementation:
 
 - `npm run native:release:win:evidence` on Windows 11 `x64` with QtIFW tools
+- SHA256 manifest:
+  - `803c7602653da45a996d7ce49267dd89cdff8505adc9be1de82ca4961182d613  SSE-ExEd-Studio-Control-Native-windows.zip`
+  - `a48e6d79c255be9e95f570bc30e85465de7de02aae90cc4b9fce3be1638b1fa0  SSE-ExEd-Studio-Control-Native-windows-Installer.exe`
+  - `43fc01c8d5609a98566955cb5ed7d2b84612786cfe879c191e420de23375376b  SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip`
 
 ### Slice 4: Qt Shell Source And Test Removal
 
@@ -344,7 +348,7 @@ Required verification:
 
 ## Recommended Next Step
 
-The next implementation step should complete Slice 3 target-host verification on Windows 11 `x64`.
+The next implementation step should begin Slice 4: Qt Shell Source And Test Removal.
 
 Reason:
 
@@ -352,4 +356,5 @@ Reason:
 - Slice 2 removed the release-runtime footgun before source deletion.
 - Slice 3 removed unused Qt packaging branches, deploy-tool resolution, the old Qt installer script, and the Windows signing executable-name assumption from the shipping path.
 - macOS verification passed locally after the cleanup.
-- Source deletion and parity asset cleanup should wait until Windows target-host evidence proves the same Tauri-only packaging path on the Windows release host.
+- Windows target-host evidence proved the same Tauri-only packaging path on the Windows release host.
+- Source/test removal should now proceed before parity asset retirement and the final Checkpoint D gate.

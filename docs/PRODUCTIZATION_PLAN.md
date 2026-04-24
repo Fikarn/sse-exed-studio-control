@@ -117,7 +117,7 @@ Before calling the productization pass complete, confirm:
 
 - keep the native packaging and release lanes healthy as the only product path
 - follow the Checkpoint D read-only impact audit in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md) and [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) before removing Qt fallback code, Qt-specific verification automation, or Qt parity assets
-- complete Windows target-host evidence for the Checkpoint D packaging/signing cleanup before moving to Qt source/test removal
+- continue Checkpoint D with Qt source/test removal now that packaging/signing cleanup has macOS and Windows target-host evidence
 
 ## Final Mile
 

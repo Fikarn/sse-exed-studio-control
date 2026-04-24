@@ -158,6 +158,6 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The current implementation slice is Checkpoint D Slice 3 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): packaging and signing cleanup.
+The next implementation slice is Checkpoint D Slice 4 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): Qt shell source and test removal.
 
-The Tauri-only packaging/signing cleanup is implemented and macOS-verified. Do not delete Qt fallback code, Qt-specific verification automation, or Qt parity assets until Windows 11 `x64` `npm run native:release:win:evidence` passes for this Slice 3 cleanup. QtIFW remains the installer/update wrapper.
+Slice 3 packaging/signing cleanup is complete: macOS local release verification passed, and Windows 11 `x64` `npm run native:release:win:evidence` passed for commit `437272a4db189a4bbb38f61cf2eb05c6b86e8d0c`. QtIFW remains the installer/update wrapper. Remove Qt source/test paths only through Slice 4 and keep parity asset retirement for Slice 5.
