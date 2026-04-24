@@ -48,12 +48,17 @@ function commandName(name) {
   return process.platform === "win32" ? `${name}.cmd` : name;
 }
 
+function needsCommandShell(command) {
+  return process.platform === "win32" && /\.(bat|cmd)$/i.test(command);
+}
+
 function runCapture(command, commandArgs, options = {}) {
   const result = spawnSync(command, commandArgs, {
     cwd: rootDir,
     encoding: "utf8",
     env: options.env ? { ...process.env, ...options.env } : process.env,
-    shell: false,
+    shell: needsCommandShell(command),
+    windowsHide: true,
   });
 
   return {
@@ -271,7 +276,8 @@ function runLogged(command, commandArgs, options) {
         ...process.env,
         ...options.env,
       },
-      shell: false,
+      shell: needsCommandShell(command),
+      windowsHide: true,
     });
 
     child.stdout.on("data", (chunk) => {
