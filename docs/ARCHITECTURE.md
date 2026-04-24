@@ -19,7 +19,7 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 - owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when the release runtime selector points at `tauri`
 - preserves the same authoritative engine boundary and IPC contract as the Qt shell
 - supervises the Rust engine as a child process through the Tauri bridge
-- remains gated by [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) until macOS and Windows post-switch evidence is complete
+- has satisfied the [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) Checkpoint C shipping-switch evidence gate for baseline `57c482b386a3af007faf76ec3291584fe5479594`
 
 ### Qt shell (fallback runtime during the bounded cutover window)
 

@@ -31,7 +31,8 @@ If this document conflicts with those files, fix the conflict before continuing.
 - The live Tauri qualification commands remain local/manual cutover-readiness gates until documented target-host evidence exists for the candidate release.
 - `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` remain historical/pre-switch candidate evidence lanes under separate `release/tauri-candidate*` roots.
 - The shipping release path is now the `native:*` release lane, which packages the runtime selected by `scripts/native-release-runtime.json` into `release/native*`.
-- macOS Apple Silicon post-switch release evidence exists for the switched `native:*` path; Windows 11 `x64` post-switch evidence is still required before Checkpoint C can be closed.
+- macOS Apple Silicon and Windows 11 `x64` post-switch release evidence exists for the switched `native:*` path.
+- Checkpoint C is satisfied for the current Tauri shipping-switch candidate baseline `57c482b386a3af007faf76ec3291584fe5479594`; Checkpoint D / Qt retirement remains out of scope until a separate retirement issue is opened.
 - [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the active cutover acceptance issue. It declares the bounded acceptance window and packaging path, but does not authorize cutover by itself.
 
 ## Non-Negotiables
@@ -45,7 +46,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 
 ## Cutover Acceptance Gate
 
-Do not tag a release or claim the shipping switch complete until every item below is true.
+Do not tag a release until every item below is true for the intended release commit.
 
 ### 1. Contract And Boundary Gate
 
@@ -131,6 +132,8 @@ Entry condition: packaging, update, rollback, and clean-machine evidence exists 
 
 Exit condition: the release candidate installs, launches, recovers, updates, and rolls back using the documented release path on macOS Apple Silicon and Windows 11 `x64`.
 
+Status: satisfied for baseline `57c482b386a3af007faf76ec3291584fe5479594` using macOS Apple Silicon post-switch `native:*` release evidence and Windows 11 `x64` target-host evidence bundle `2026-04-24T20-33-41-244Z`.
+
 ### Checkpoint D: Qt Retirement
 
 Entry condition: the Tauri runtime has shipped successfully through the bounded fallback window.
@@ -153,7 +156,6 @@ Stop cutover work and re-anchor if any of these are true:
 
 The next implementation slice after this document should be the smallest gate-hardening task that moves a Checkpoint A, B, or C item from manual to repeatable. Candidate slices are:
 
-- run `npm run tauri:cutover:candidate` with `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` and attach target-host evidence to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
-- run `npm run tauri:visual:review` and attach required `2560x1440` and `1920x1080` visual review notes or screenshots to [issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
-- run `npm run native:release:win:evidence` with real QtIFW tools on the Windows 11 `x64` host for the switched shipping path before Checkpoint C
-- update [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) with macOS and Windows post-switch `native:*` release evidence before claiming the shipping-switch exit condition
+- keep [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) aligned with the final Checkpoint C evidence digest before any release tag
+- run the normal release verification/tagging process from [RELEASE.md](./RELEASE.md) when the operator release decision is made
+- open a separate Checkpoint D / Qt retirement issue before removing Qt fallback code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets
