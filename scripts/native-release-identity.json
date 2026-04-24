@@ -2,7 +2,7 @@
   "displayName": "SSE ExEd Studio Control Native",
   "installerTitle": "SSE ExEd Studio Control Native Installer",
   "publisher": "SSE",
-  "productUrl": "https://github.com/Fikarn/project-management-dashboard",
+  "productUrl": "https://github.com/Fikarn/sse-exed-studio-control",
   "startMenuDir": "SSE ExEd Studio Control Native",
   "packageId": "com.sse.exedstudiocontrol.native",
   "targetDir": "@ApplicationsDir@",

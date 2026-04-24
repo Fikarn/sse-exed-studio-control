@@ -14,12 +14,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Fikarn/project-management-dashboard.git"
+    "url": "git+https://github.com/Fikarn/sse-exed-studio-control.git"
   },
   "bugs": {
-    "url": "https://github.com/Fikarn/project-management-dashboard/issues"
+    "url": "https://github.com/Fikarn/sse-exed-studio-control/issues"
   },
-  "homepage": "https://github.com/Fikarn/project-management-dashboard#readme",
+  "homepage": "https://github.com/Fikarn/sse-exed-studio-control#readme",
   "engines": {
     "node": ">=20"
   },

@@ -4,6 +4,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const relocatedProductUrls = new Map([
+  ["https://github.com/Fikarn/project-management-dashboard", "https://github.com/Fikarn/sse-exed-studio-control"],
+]);
 
 const legacyIdentity = {
   displayName: "SSE ExEd Studio Control Native",
@@ -116,6 +119,13 @@ function readJsonAtRef(ref, repoPath) {
   return JSON.parse(output);
 }
 
+function normalizeRelocatedMetadata(identity) {
+  return {
+    ...identity,
+    productUrl: relocatedProductUrls.get(identity.productUrl) ?? identity.productUrl,
+  };
+}
+
 function findPreviousReleaseRef(currentVersion) {
   const output = runGit(["tag", "--sort=-v:refname"]);
   if (!output) {
@@ -195,7 +205,7 @@ assert(
 
 const previousIdentity = readJsonAtRef(previousRef, "scripts/native-release-identity.json") ?? legacyIdentity;
 assert(
-  JSON.stringify(previousIdentity) === JSON.stringify(identity),
+  JSON.stringify(normalizeRelocatedMetadata(previousIdentity)) === JSON.stringify(identity),
   `Native release identity changed between ${previousRef} and ${packageJson.version}. Installer/update identity must remain stable for continuity.`
 );
 

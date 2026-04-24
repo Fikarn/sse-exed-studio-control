@@ -158,8 +158,11 @@ The product identity is locked for operator rollout:
 - visible product name: `SSE ExEd Studio Control`
 - packaged app identifier: `com.sse.exedstudiocontrol`
 - QtIFW package identifier: `com.sse.exedstudiocontrol.native`
+- QtIFW product URL: `https://github.com/Fikarn/sse-exed-studio-control`
 
 Do not change these identifiers casually once installed operator builds exist. Any future change is an installer or update-migration task.
+
+The QtIFW product URL moved from the retired `Fikarn/project-management-dashboard` repository to `Fikarn/sse-exed-studio-control` with the 2026 repository relocation. The continuity verifier allows only that repository-url metadata relocation; package identity, bundle identity, target directories, payload names, and update package identifiers remain locked.
 
 ## Unsigned Controlled Deployment
 

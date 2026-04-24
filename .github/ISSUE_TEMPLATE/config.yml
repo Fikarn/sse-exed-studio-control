@@ -1,14 +1,14 @@
 blank_issues_enabled: false
 contact_links:
   - name: Engineering Handoff
-    url: https://github.com/Fikarn/project-management-dashboard/blob/main/docs/HANDOFF.md
+    url: https://github.com/Fikarn/sse-exed-studio-control/blob/main/docs/HANDOFF.md
     about: Review the current repository state, blockers, and execution queue before opening handoff issues.
   - name: Development Guide
-    url: https://github.com/Fikarn/project-management-dashboard/blob/main/docs/DEVELOPMENT.md
+    url: https://github.com/Fikarn/sse-exed-studio-control/blob/main/docs/DEVELOPMENT.md
     about: Read the development and validation workflow before opening engineering issues.
   - name: Hardware Profile
-    url: https://github.com/Fikarn/project-management-dashboard/blob/main/docs/HARDWARE_PROFILE.md
+    url: https://github.com/Fikarn/sse-exed-studio-control/blob/main/docs/HARDWARE_PROFILE.md
     about: Review the supported studio hardware and deployment assumptions.
   - name: Security Policy
-    url: https://github.com/Fikarn/project-management-dashboard/blob/main/SECURITY.md
+    url: https://github.com/Fikarn/sse-exed-studio-control/blob/main/SECURITY.md
     about: Report security issues privately. Do not open public vulnerability reports.

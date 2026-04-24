@@ -31,7 +31,7 @@ Suggested future flow:
 Example on macOS with Homebrew Qt:
 
 ```bash
-cd /path/to/project-management-dashboard
+cd /path/to/sse-exed-studio-control
 cmake -S native -B native/build -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt
 cmake --build native/build --parallel 4
 ```
@@ -39,7 +39,7 @@ cmake --build native/build --parallel 4
 Shell test example:
 
 ```bash
-cd /path/to/project-management-dashboard
+cd /path/to/sse-exed-studio-control
 npm run native:shell:test
 ```
 

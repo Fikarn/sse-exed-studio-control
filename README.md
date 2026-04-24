@@ -1,6 +1,6 @@
-[![CI](https://github.com/Fikarn/project-management-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Fikarn/project-management-dashboard/actions/workflows/ci.yml)
-[![Release](https://github.com/Fikarn/project-management-dashboard/actions/workflows/release.yml/badge.svg)](https://github.com/Fikarn/project-management-dashboard/actions/workflows/release.yml)
-[![CodeQL](https://github.com/Fikarn/project-management-dashboard/actions/workflows/codeql.yml/badge.svg)](https://github.com/Fikarn/project-management-dashboard/actions/workflows/codeql.yml)
+[![CI](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/ci.yml/badge.svg)](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/ci.yml)
+[![Release](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/release.yml/badge.svg)](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/release.yml)
+[![CodeQL](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/codeql.yml/badge.svg)](https://github.com/Fikarn/sse-exed-studio-control/actions/workflows/codeql.yml)
 
 # SSE ExEd Studio Control
 
@@ -30,7 +30,7 @@ This repository is intentionally optimized for a specific deployment profile rat
 
 ## Download
 
-Release artifacts are published through [GitHub Releases](https://github.com/Fikarn/project-management-dashboard/releases/latest).
+Release artifacts are published through [GitHub Releases](https://github.com/Fikarn/sse-exed-studio-control/releases/latest).
 
 - Windows: install the generated native `.exe` offline installer
 - macOS: install from the generated native offline installer archive
