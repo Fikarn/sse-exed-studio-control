@@ -43,19 +43,15 @@ Extend tokens and shared components additively. Do not bypass the frontend desig
 
 Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:foundation`, `native:check`, `native:test`, `native:acceptance`, `frontend:foundation`, `tauri:foundation`, packaging and installer lanes, etc.). Use them; don't invent new ones.
 
-## Parity discipline
+## Visual Review Discipline
 
-Every operator-visible change to a native surface must:
+Every operator-visible change to the selected Tauri surface must:
 
-1. regenerate the deterministic offscreen `2560×1440` capture for the affected workspace,
-2. produce two consecutive bit-identical runs on the same target-host verification lane before the baseline is accepted,
-3. land a baseline commit with `parity: ...` in the subject so reviewers can filter.
+1. run the relevant frontend, Tauri, or native validation lane for the changed surface,
+2. run `npm run tauri:visual:review` when layout or operator presentation changes,
+3. inspect the result on the BetterDisplay-backed `2560×1440` review surface or the fixed studio monitor when human fit judgment matters.
 
-Cross-platform pixel equivalence across lanes is not required — macOS and Windows diverge by driver. Per-lane determinism is the gate where deterministic capture baselines are used.
-
-Baselines under `artifacts/parity/native/workstation/`.
-
-After the shipping switch, Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Qt parity assets remain historical until Checkpoint D Slice 5 explicitly retires them.
+Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Historical Qt parity screenshots were retired in Checkpoint D Slice 5.
 
 ## Testing posture
 

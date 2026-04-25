@@ -332,11 +332,13 @@ Verification recorded during implementation:
 
 ### Slice 5: Parity Asset Retirement
 
+Status: complete. Historical Qt parity screenshots under `artifacts/parity/native/**` and `artifacts/parity/native-onscreen/**` were removed instead of moved to another tracked archive path. The active replacement is `npm run tauri:visual:review` plus BetterDisplay/fixed-monitor human review; historical context remains in frozen docs and git history.
+
 Goal: archive or remove Qt parity assets after the active Tauri visual lane is documented as the replacement.
 
 Actions:
 
-- Decide whether `artifacts/parity/native/**` should be removed or moved under an archive path.
+- Remove `artifacts/parity/native/**` instead of moving it under another tracked archive path.
 - Keep historical legacy oracle material only if it remains useful and is clearly marked as historical.
 - Update `docs/DEVELOPMENT.md` to point active visual review to `npm run tauri:visual:review` plus BetterDisplay/fixed-monitor human review.
 
@@ -344,6 +346,11 @@ Required verification:
 
 - `npm run tauri:visual:review`
 - active docs contain no instruction to regenerate Qt parity baselines for new work
+
+Verification recorded during implementation:
+
+- `npm run tauri:visual:review` passed with 10 screenshots and summary `artifacts/visual/tauri-cutover/fixture-viewport-summary.json`
+- active current-truth grep found no instructions to regenerate Qt parity baselines or run removed Qt parity commands
 
 ### Slice 6: Final Retirement Gate
 
@@ -364,13 +371,13 @@ Required verification:
 
 ## Recommended Next Step
 
-The next implementation step should begin Slice 4: Qt Shell Source And Test Removal.
+The next implementation step should begin Slice 6: Final Retirement Gate.
 
 Reason:
 
-- Slice 1 made active validation Tauri-first without deleting fallback code.
-- Slice 2 removed the release-runtime footgun before source deletion.
-- Slice 3 removed unused Qt packaging branches, deploy-tool resolution, the old Qt installer script, and the Windows signing executable-name assumption from the shipping path.
-- macOS verification passed locally after the cleanup.
-- Windows target-host evidence proved the same Tauri-only packaging path on the Windows release host.
-- Source/test removal should now proceed before parity asset retirement and the final Checkpoint D gate.
+- Slice 1 made active validation Tauri-first.
+- Slice 2 removed the release-runtime footgun.
+- Slice 3 removed unused Qt packaging/signing branches while preserving QtIFW.
+- Slice 4 removed Qt fallback source, tests, and launch automation.
+- Slice 5 removed obsolete Qt parity assets and left active visual review on the Tauri lane.
+- The remaining proof point is full macOS local shipping validation plus Windows target-host release evidence before marking Checkpoint D complete.

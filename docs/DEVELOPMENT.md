@@ -155,9 +155,7 @@ Required selected-runtime workflow:
 
 Treat raw window width alone as an invalid authority for operator layout. The primary target is fullscreen `2560x1440` on the permanent second monitor.
 
-Do not accept stale live evidence. If the current native screenshot does not clearly correspond to the deterministic capture being compared, regenerate it before continuing.
-
-Historical Qt parity assets remain until Checkpoint D Slice 5 decides whether to archive or remove them. Do not create new Qt parity baselines for current Tauri work.
+Do not accept stale live evidence. If the current Tauri visual review output or live screenshot does not clearly correspond to the operator state being checked, regenerate it before continuing.
 
 #### Built-in display review on Retina Macs
 

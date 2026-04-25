@@ -143,7 +143,7 @@ Status: entered. The fallback window is closed in [GitHub issue #3](https://gith
 
 Exit condition: Qt shell code, Qt-specific verification automation, and Qt parity assets are removed only through an explicit retirement issue and only after rollback requirements no longer depend on them. QtIFW remains the installer/update wrapper unless a separate installer replacement plan provides equivalent package, update, continuity, rollback, and clean-machine acceptance evidence.
 
-Status: in progress. Slices 1-4 are complete with macOS and Windows target-host evidence for the packaging/signing slice and local source/test removal validation for Slice 4. Slice 5 will retire or archive historical parity assets.
+Status: in progress. Slices 1-5 are complete with macOS and Windows target-host evidence for the packaging/signing slice, local source/test removal validation for Slice 4, and Tauri visual review validation for Slice 5. Slice 6 is the final retirement gate.
 
 ## Stop Conditions
 
@@ -158,6 +158,6 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The next implementation slice is Checkpoint D Slice 5 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): parity asset retirement.
+The next implementation slice is Checkpoint D Slice 6 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): final retirement gate.
 
-Slice 4 source/test removal is complete: `native/qt-shell/**`, root Qt CMake wiring, Qt shell build/test/smoke/parity commands, and active current-truth references were removed. Local validation passed through `format:check`, `release:check`, `frontend:foundation`, `tauri:foundation`, and the stricter `native:foundation` lane. QtIFW remains the installer/update wrapper. Keep parity asset retirement for Slice 5.
+Slice 5 parity asset retirement is complete: tracked historical Qt parity PNGs under `artifacts/parity/native/**` and `artifacts/parity/native-onscreen/**` were removed, and active visual-review docs point to `npm run tauri:visual:review` plus BetterDisplay/fixed-monitor inspection. QtIFW remains the installer/update wrapper.
