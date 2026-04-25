@@ -8,9 +8,9 @@ This directory contains the product runtime:
 
 The native runtime is the only product runtime. The legacy Electron/Next.js path was retired in `v2.1.0`.
 
-`scripts/native-release-runtime.json` selects the shipping release runtime. `v2.2.0` shipped with `tauri` selected, and `v2.2.1` is the current published operator-rollout build. The fallback window is closed, and the Qt shell source/test tree has been removed through Checkpoint D.
+`scripts/native-release-runtime.json` selects the shipping release runtime. `v2.2.0` shipped with `tauri` selected, and `v2.2.1` is the current published operator-rollout build. The fallback window is closed, and the Qt shell source/test tree has been removed through completed Checkpoint D.
 
-The completed Tauri shipping switch and retained fallback posture are tracked in [`docs/FRONTEND_CUTOVER_PLAN.md`](../docs/FRONTEND_CUTOVER_PLAN.md). Checkpoint D sequencing is recorded in [`docs/QT_FALLBACK_RETIREMENT_AUDIT.md`](../docs/QT_FALLBACK_RETIREMENT_AUDIT.md).
+The completed Tauri shipping switch and completed fallback retirement are tracked in [`docs/FRONTEND_CUTOVER_PLAN.md`](../docs/FRONTEND_CUTOVER_PLAN.md). Checkpoint D sequencing is recorded in [`docs/QT_FALLBACK_RETIREMENT_AUDIT.md`](../docs/QT_FALLBACK_RETIREMENT_AUDIT.md).
 
 ## Repo Commands
 

@@ -33,7 +33,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 - The shipping release path is now the `native:*` release lane, which packages the runtime selected by `scripts/native-release-runtime.json` into `release/native*`.
 - macOS Apple Silicon and Windows 11 `x64` post-switch release evidence exists for the switched `native:*` path.
 - Checkpoint C is satisfied for published release `v2.2.0` at tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; final operator-workstation rollout passed on published patch release `v2.2.1` at tag commit `951a2c4e1f236200f0f017121158bc9969427051`; the bounded fallback window is closed in [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3).
-- Checkpoint D / Qt retirement is tracked separately in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). The read-only impact audit is recorded in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md). Do not remove Qt shell code, Qt-specific verification automation, QtIFW dependencies, or Qt parity assets outside that issue and audit sequence.
+- Checkpoint D / Qt retirement is complete through [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). The impact audit, removal sequence, and evidence record are in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md). QtIFW remains the installer/update wrapper.
 
 ## Non-Negotiables
 
@@ -139,11 +139,11 @@ Operator rollout status: passed on published patch release `v2.2.1` at tag commi
 
 Entry condition: the Tauri runtime has shipped successfully through the bounded fallback window.
 
-Status: entered. The fallback window is closed in [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3), and Checkpoint D planning is tracked in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). The read-only impact audit and removal-sequence proposal are recorded in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md).
+Status: complete. The fallback window closed in [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3), and Checkpoint D retirement completed through [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5). The read-only impact audit and removal sequence are recorded in [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md).
 
 Exit condition: Qt shell code, Qt-specific verification automation, and Qt parity assets are removed only through an explicit retirement issue and only after rollback requirements no longer depend on them. QtIFW remains the installer/update wrapper unless a separate installer replacement plan provides equivalent package, update, continuity, rollback, and clean-machine acceptance evidence.
 
-Status: in progress. Slices 1-5 are complete with macOS and Windows target-host evidence for the packaging/signing slice, local source/test removal validation for Slice 4, and Tauri visual review validation for Slice 5. Slice 6 is the final retirement gate.
+Status: satisfied on commit `d0205baf52ce02d7d4d24699facd202f3bbba217`. Slices 1-6 are complete with macOS and Windows target-host evidence for the packaging/signing slice, local source/test removal validation for Slice 4, Tauri visual review validation for Slice 5, macOS `npm run native:release:mac:local` for Slice 6, and Windows 11 `x64` `npm run native:release:win:evidence` bundle `2026-04-25T07-32-31-463Z` for Slice 6. The repo is now Tauri-only at the shell-source level while preserving QtIFW as the installer/update wrapper.
 
 ## Stop Conditions
 
@@ -158,6 +158,6 @@ Stop cutover work and re-anchor if any of these are true:
 
 ## Next Implementation Work
 
-The next implementation slice is Checkpoint D Slice 6 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): final retirement gate.
+Checkpoint D is complete. The next implementation item should be opened as a new execution issue before work starts; do not reuse the closed fallback-retirement track for unrelated product, release, or signing work.
 
 Slice 5 parity asset retirement is complete: tracked historical Qt parity PNGs under `artifacts/parity/native/**` and `artifacts/parity/native-onscreen/**` were removed, and active visual-review docs point to `npm run tauri:visual:review` plus BetterDisplay/fixed-monitor inspection. QtIFW remains the installer/update wrapper.

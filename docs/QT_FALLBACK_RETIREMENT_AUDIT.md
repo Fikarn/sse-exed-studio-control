@@ -369,9 +369,19 @@ Required verification:
 - Windows `npm run native:release:win:evidence`
 - published or draft release assets still install, launch, preserve data, and expose support backup export
 
-## Recommended Next Step
+Verification recorded during implementation:
 
-The next implementation step should begin Slice 6: Final Retirement Gate.
+- macOS `npm run native:release:mac:local` passed on commit `d0205baf52ce02d7d4d24699facd202f3bbba217`
+- Windows 11 `x64` `npm run native:release:win:evidence` passed on commit `d0205baf52ce02d7d4d24699facd202f3bbba217`
+- Windows evidence summary: `artifacts/native-release/windows-target-host/2026-04-25T07-32-31-463Z/summary.json`
+- Windows SHA256 manifest:
+  - `5ed99250f93045d9321027e48a38bff7a57b7d7313b026f4dd0d6ef1623d2392  SSE-ExEd-Studio-Control-Native-windows.zip`
+  - `bc472ec40a687b39bb01dc8689c684c1e1a50578a7328a7efdc3d6fbf9d7689b  SSE-ExEd-Studio-Control-Native-windows-Installer.exe`
+  - `441d84c88bc9b5139f033f16a5e52b4b3cf9b36864d9b1460da12be435693237  SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip`
+
+## Completion Record
+
+Checkpoint D is complete as of commit `d0205baf52ce02d7d4d24699facd202f3bbba217`.
 
 Reason:
 
@@ -380,4 +390,4 @@ Reason:
 - Slice 3 removed unused Qt packaging/signing branches while preserving QtIFW.
 - Slice 4 removed Qt fallback source, tests, and launch automation.
 - Slice 5 removed obsolete Qt parity assets and left active visual review on the Tauri lane.
-- The remaining proof point is full macOS local shipping validation plus Windows target-host release evidence before marking Checkpoint D complete.
+- Slice 6 proved full macOS local shipping validation plus Windows target-host release evidence before marking Checkpoint D complete.

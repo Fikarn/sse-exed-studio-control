@@ -6,6 +6,8 @@ Entry point for Codex-assisted work in this repo. Keep it short. Follow the poin
 
 `SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. Planning, DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`; there is no browser path.
 
+Checkpoint D is complete: the Qt/QML fallback shell, Qt-specific shell automation, and historical Qt parity assets are retired. Do not reintroduce a Qt shell path without a new architecture decision and replacement release plan.
+
 ## Architecture boundary (non-negotiable)
 
 Two processes, separated by an IPC protocol:
@@ -51,7 +53,7 @@ Every operator-visible change to the selected Tauri surface must:
 2. run `npm run tauri:visual:review` when layout or operator presentation changes,
 3. inspect the result on the BetterDisplay-backed `2560×1440` review surface or the fixed studio monitor when human fit judgment matters.
 
-Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Historical Qt parity screenshots were retired in Checkpoint D Slice 5.
+Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Historical Qt parity screenshots were retired in Checkpoint D.
 
 ## Testing posture
 

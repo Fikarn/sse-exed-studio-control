@@ -116,8 +116,8 @@ Before calling the productization pass complete, confirm:
 ## Current Implementation Slice
 
 - keep the native packaging and release lanes healthy as the only product path
-- continue Checkpoint D through [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md) and [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5)
-- validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, and parity asset retirement are complete; the next planned slice is the final retirement gate
+- Checkpoint D is complete through [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md) and [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5)
+- validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete
 
 ## Final Mile
 

@@ -6,7 +6,7 @@ Date: 2026-04-22
 
 Accepted
 
-Post-acceptance update, 2026-04-25: `v2.2.0` shipped the `Tauri 2 + React 19.2 + TypeScript + Vite` shell as the selected release runtime through the `native:*` release lane, and `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix. The bounded fallback window is closed; Checkpoint D issue #5 has removed the Qt/QML source and test tree through the checked-in retirement sequence. Checkpoint D / Qt retirement is tracked by [QT_FALLBACK_RETIREMENT_AUDIT.md](../QT_FALLBACK_RETIREMENT_AUDIT.md), not by this ADR.
+Post-acceptance update, 2026-04-25: `v2.2.0` shipped the `Tauri 2 + React 19.2 + TypeScript + Vite` shell as the selected release runtime through the `native:*` release lane, and `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix. The bounded fallback window is closed; Checkpoint D issue #5 completed Qt/QML fallback retirement through the checked-in sequence, including source/test removal, Qt parity asset retirement, macOS shipping validation, and Windows target-host release evidence. Checkpoint D / Qt retirement is recorded by [QT_FALLBACK_RETIREMENT_AUDIT.md](../QT_FALLBACK_RETIREMENT_AUDIT.md), not by this ADR.
 
 ## Context
 
@@ -36,4 +36,4 @@ The replacement frontend foundation is:
 - new frontend work should target `frontend/**` and `native/tauri-shell/**`
 - protocol changes are contract changes and must land through `native/protocol/**`
 - Storybook becomes the primary UI lab and Playwright becomes the primary flow/screenshot harness for the new shell
-- after `v2.2.0`, the Tauri `native:*` release lane is authoritative; `v2.2.1` is the current published operator-rollout build, and the Qt source/test tree has been removed through Checkpoint D issue #5
+- after `v2.2.0`, the Tauri `native:*` release lane is authoritative; `v2.2.1` is the current published operator-rollout build, and the Qt fallback shell has been retired through completed Checkpoint D issue #5

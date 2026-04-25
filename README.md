@@ -16,6 +16,8 @@ This repository is intentionally optimized for a specific deployment profile rat
 - offline Qt Installer Framework packages on Windows 11 `x64` and macOS Apple Silicon
 - one-way importer for legacy `db.json` data, invoked once on first native launch for migrating operators
 
+The Qt/QML fallback shell was retired through Checkpoint D after the Tauri shipping runtime passed macOS and Windows target-host evidence. QtIFW remains the installer and update-repository wrapper.
+
 ## Distribution Targets
 
 - Windows 11 `x64` packaged as a Qt Installer Framework offline installer
@@ -107,7 +109,7 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
 - [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
 - [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
-- [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md): Checkpoint D impact audit and safe Qt fallback retirement sequence
+- [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md): completed Checkpoint D impact audit and safe Qt fallback retirement sequence
 - [docs/archive/](docs/archive/): historical planning and parity documents preserved for reference
 - [native/README.md](native/README.md): native workspace scaffold for the selected Tauri shell, Rust engine, and IPC protocol
 - [docs/adr/0001-frontend-replatform.md](docs/adr/0001-frontend-replatform.md): locked frontend replatform decision
@@ -171,7 +173,7 @@ npm run ci
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
-The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is tracked in issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, and parity asset retirement are complete; the next planned slice is the final retirement gate.
+The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is complete through issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete.
 
 `npm run clean` removes generated native build output and packaged release folders.
 
