@@ -12,14 +12,19 @@
 
 ## Validation
 
+- [ ] `npm run doctor`
+- [ ] `npm run dev:check`
 - [ ] `npm run format:check`
 - [ ] `npm run native:check` and `npm run native:test` when engine logic changed
 - [ ] `npm run frontend:foundation` when selected Tauri frontend logic or layout changed
 - [ ] `npm run tauri:foundation` when selected Tauri shell integration changed
 - [ ] `npm run native:foundation` when selected shipping-runtime startup or shell integration changed
 - [ ] `npm run native:acceptance` when native persistence, recovery, or release-critical behavior changed
-- [ ] `npm run release:check` when preparing a tagged release
+- [ ] `npm run doctor:release` and `npm run release:verify` when preparing a tagged release
+- [ ] Target-host release evidence recorded when packaging/release behavior changed
 - [ ] Manual validation completed for affected hardware / live workflows
+
+GitHub Actions are intentionally not the acceptance gate for this repo. Record local and target-host evidence here.
 
 ## Product Areas
 

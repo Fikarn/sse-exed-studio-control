@@ -1,5 +1,7 @@
 # Frontend Strategy Reset
 
+> Historical Qt-era reference. This reset memo describes the pre-cutover QML architecture and still references removed `native/qt-shell` paths. The direction it selected has been executed; use current architecture and workflow docs for implementation truth.
+
 Date: 2026-04-21
 
 ## Executive summary

@@ -9,7 +9,7 @@ Ship `SSE ExEd Studio Control` as a production-grade native desktop product for:
 
 The full journey should feel production-ready for a controlled workstation deployment from the GitHub repo page through install, first launch, setup, normal use, update, and rollback.
 
-Native parity was signed off and the legacy runtime was retired in `v2.1.0`. The remaining workstream is release polish and public-distribution trust posture.
+Native parity was signed off and the legacy runtime was retired in `v2.1.0`. The remaining workstream is controlled-deployment release polish; public self-serve distribution and signing remain deferred unless the deployment model changes.
 
 ## Locked Decisions
 
@@ -24,7 +24,7 @@ Native parity was signed off and the legacy runtime was retired in `v2.1.0`. The
 
 These still need deliberate rollout ownership:
 
-1. Public-distribution trust
+1. Public-distribution trust, only if the deployment model changes
    If the project later needs frictionless public self-serve installs, decide who owns the Windows signing certificate and the Apple Developer account or team.
 
 ## Workstreams

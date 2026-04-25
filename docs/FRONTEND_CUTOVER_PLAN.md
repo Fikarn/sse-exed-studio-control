@@ -109,7 +109,7 @@ Current packaging direction:
 - The candidate installer/update repository must preserve the existing operator app-data, logs, update-repository, and rollback expectations before Checkpoint C can be claimed.
 - Real QtIFW `binarycreator` and `repogen` evidence is required on matching target hosts through `npm run native:release:mac:local` and `npm run native:release:win:local` for the switched release path.
 - Rollback is now the tagged Tauri native release path; the Qt shell is no longer installable or launchable after Checkpoint D Slice 4.
-- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the completed release/cutover issue for this gate; [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) is the current Checkpoint D planning issue.
+- [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the completed release/cutover issue for this gate; [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) is the completed Checkpoint D retirement issue.
 
 ## Promotion Sequence
 

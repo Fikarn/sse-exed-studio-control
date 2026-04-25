@@ -12,6 +12,8 @@ audit_refs:
 
 # Planning — delta spec
 
+> Historical Qt-era reference. This spec was written for the pre-cutover QML implementation and still references removed `native/qt-shell` paths. Use it for product/design rationale only; current implementation truth lives in the Tauri frontend and active engineering docs.
+
 Reference mockup: `docs/redesign/assets/planning/Planning-Redesign.html` (four directions A / B / C / D; **D is the chosen direction**). Claude Design proposed Direction D as a fourth option beyond the original three hypotheses and it was locked over A / B / C because it pins task #1 from `docs/OPERATIONS.md` ("scan run-of-show at a glance") to the literal UI layout in a way a kanban cannot.
 
 Direction **D — Run-of-show timeline** reframes Planning as a schedule, not a kanban: the x-axis is show time, each project is a horizontal lane, tasks are duration blocks, and a vertical "NOW" playhead tracks the clock. The kanban board is not removed — it moves behind a `⇧B` mode toggle for deep triage. The workspace-vs-sidecar posture question (audit Rec #10) is resolved by dropping both framings: Planning is a schedule.

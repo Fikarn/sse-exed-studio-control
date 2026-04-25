@@ -100,6 +100,7 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 
 ## Repo Map
 
+- [docs/DEVELOPER_QUICKSTART.md](docs/DEVELOPER_QUICKSTART.md): cold-start path for engineers joining the project
 - [docs/HANDOFF.md](docs/HANDOFF.md): authoritative engineering handoff and current operating truth
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): runtime and domain boundaries
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): day-to-day engineering workflow
@@ -118,15 +119,21 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 
 ## Local Development
 
+Start with the cold-start guide:
+
+- [docs/DEVELOPER_QUICKSTART.md](docs/DEVELOPER_QUICKSTART.md)
+
 Prerequisites:
 
 - Node.js 20
 - npm
 - Rust stable toolchain
-- Qt Installer Framework for local installer/update generation
+- Qt Installer Framework for local installer/update generation and release evidence
 
 ```bash
 npm install
+npm run doctor
+npm run dev:check
 npm run format:check
 npm run release:check
 npm run native:check
@@ -159,6 +166,10 @@ Common commands:
 
 ```bash
 npm run clean
+npm run clean:local
+npm run doctor
+npm run doctor:release
+npm run dev:check
 npm run format:check
 npm run native:foundation
 npm run frontend:foundation
@@ -175,7 +186,7 @@ npm run ci
 
 The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is complete through issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete.
 
-`npm run clean` removes generated native build output and packaged release folders.
+`npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated evidence folders, and release output; it does not remove `.tools/`.
 
 ## Release Model
 

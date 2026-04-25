@@ -8,6 +8,6 @@
   },
   "scripts": {
     "fixtures:check": "node ./src/check-fixtures.mjs",
-    "typecheck": "node ./src/check-fixtures.mjs"
+    "typecheck": "tsc -p tsconfig.json --noEmit && node ./src/check-fixtures.mjs"
   }
 }

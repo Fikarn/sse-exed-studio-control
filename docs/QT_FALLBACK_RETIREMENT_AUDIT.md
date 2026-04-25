@@ -149,7 +149,7 @@ Tracked parity assets:
 - `artifacts/parity/native/workstation/**`
 - `artifacts/parity/native/minimum/**`
 - `artifacts/parity/native-onscreen/workstation/**`
-- `artifacts/reference/legacy-oracle/**`
+- historical `artifacts/reference/legacy-oracle/**` captures, now retired from the working tree and available only through git history
 
 Current replacement-shell evidence:
 

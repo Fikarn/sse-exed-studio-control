@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This runbook collects the Windows 11 `x64` post-switch evidence required by [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) before Checkpoint C can be claimed for the Tauri release runtime.
+This runbook collects Windows 11 `x64` evidence for the selected native release runtime. It is the Windows side of the local/target-host release gate used after the Tauri shipping switch.
 
-It does not authorize cutover by itself. It only proves the Windows side of the real QtIFW package, update, purge, reinstall, and operator-data preservation gate.
+It does not authorize a release by itself. It proves the Windows side of the real QtIFW package, update, purge, reinstall, and operator-data preservation gate.
 
 ## Required Host
 
@@ -45,10 +45,10 @@ Confirm the working tree is clean:
 git status --short
 ```
 
-Run the switched native release evidence collector:
+Run the switched native release evidence collector. Pass the active tracking issue when the run is tied to a release or evidence task:
 
 ```powershell
-npm run native:release:win:evidence
+npm run native:release:win:evidence -- --issue-url https://github.com/Fikarn/sse-exed-studio-control/issues/6
 ```
 
 The collector writes evidence under:
@@ -93,14 +93,14 @@ That gate performs:
 
 ## Evidence To Attach
 
-Attach or summarize these paths on issue #3:
+Attach or summarize these paths on the active release/evidence issue:
 
 - `artifacts/native-release/windows-target-host/latest-summary.json`
 - the corresponding timestamped `summary.json`
 - `logs/native-release-win-local.combined.log`
 - `packaged-acceptance/`, `bridge-acceptance/`, `delivery-acceptance/`, and `installer-acceptance/` if the run fails or if detailed acceptance logs are requested
 
-The summary is enough for routine gate tracking when the run passes, but keep both combined logs and the full folder until the cutover issue is closed.
+The summary is enough for routine gate tracking when the run passes, but keep both combined logs and the full folder until the active release/evidence issue is closed.
 
 ## Failure Rules
 
@@ -114,4 +114,4 @@ Do not claim Windows evidence if any of these are true:
 - `npm run native:release:win:local` failed, was skipped, or made generated/source files dirty outside Tauri's platform-specific schema output
 - installer acceptance was not exercised through the generated QtIFW installer
 
-If the run fails, attach `latest-summary.json` and the combined log to issue #3 before changing code. The failure may be a real cutover blocker.
+If the run fails, attach `latest-summary.json` and the combined log to the active release/evidence issue before changing code. The failure may be a real release blocker.

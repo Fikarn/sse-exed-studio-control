@@ -1,5 +1,7 @@
 # UX Audit — SSE ExEd Studio Control
 
+> Historical Qt-era reference. This audit was written before the Tauri shipping switch and still references removed `native/qt-shell` paths. Use it for product/UX rationale only; current implementation truth lives in [ARCHITECTURE.md](./ARCHITECTURE.md), [HANDOFF.md](./HANDOFF.md), and [DEVELOPER_QUICKSTART.md](./DEVELOPER_QUICKSTART.md).
+
 Phase A deliverable of the `redesign/v2.2` effort. Written against the current native shell (`native/qt-shell/qml/` at the branch point from `main`). Purpose: ground the redesign in the actual code, not in generic UX intuition.
 
 Severity scale: **blocker** (operator can't do the job), **high** (slows or misleads the operator), **medium** (polish / consistency), **low** (nice-to-have).

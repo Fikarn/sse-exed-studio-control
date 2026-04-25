@@ -23,9 +23,7 @@ native/build/
 native/**/build/
 native/rust-engine/target/
 native/tauri-shell/target/
-artifacts/parity/live/
-artifacts/tauri-qualification/
-artifacts/visual/
+artifacts/
 frontend/**/dist/
 frontend/**/storybook-static/
 frontend/**/playwright-report/

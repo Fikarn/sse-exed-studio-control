@@ -30,17 +30,21 @@ function readFlag(name) {
 function printHelp() {
   console.log(`Usage:
   npm run tauri:package:win:evidence
-  node scripts/tauri-windows-target-evidence.mjs [--output-dir <path>] [--allow-dirty]
+  node scripts/tauri-windows-target-evidence.mjs [--output-dir <path>] [--issue-url <url>] [--allow-dirty]
 
 Purpose:
   Run the Windows 11 x64 Tauri QtIFW package gate and write a target-host
-  evidence bundle for the frontend cutover issue.
+  evidence bundle for the active release/evidence issue.
 
 Required host:
   Windows 11 x64 with Node 20, Rust stable, npm dependencies, and QtIFW
   binarycreator/repogen available on PATH or through:
     SSE_QT_IFW_BINARYCREATOR
     SSE_QT_IFW_REPOGEN
+
+Tracking:
+  Pass --issue-url or set SSE_EVIDENCE_ISSUE_URL to include the active
+  release/evidence issue in summary.json.
 `);
 }
 
@@ -351,6 +355,7 @@ async function main() {
   const summaryPath = path.join(evidenceRoot, "summary.json");
   const latestSummaryPath = path.join(outputBase, "latest-summary.json");
   const allowDirty = hasFlag("--allow-dirty");
+  const issueUrl = readFlag("--issue-url") ?? process.env.SSE_EVIDENCE_ISSUE_URL ?? null;
 
   rmSync(evidenceRoot, { force: true, recursive: true });
   mkdirSync(logsDir, { recursive: true });
@@ -363,7 +368,7 @@ async function main() {
     completedAt: null,
     evidenceRoot,
     host: collectHostContext(),
-    issue: "https://github.com/Fikarn/sse-exed-studio-control/issues/3",
+    issue: issueUrl,
     notes: [],
     startedAt: startedAt.toISOString(),
     status: "running",
@@ -457,7 +462,9 @@ async function main() {
 
     summary.status = "passed";
     summary.notes.push(
-      "Attach this summary and the logs directory to issue #3 before claiming Windows target-host evidence."
+      issueUrl
+        ? `Attach this summary and the logs directory to ${issueUrl} before claiming Windows target-host evidence.`
+        : "Attach this summary and the logs directory to the active release/evidence issue before claiming Windows target-host evidence."
     );
   } catch (error) {
     summary.status = "failed";

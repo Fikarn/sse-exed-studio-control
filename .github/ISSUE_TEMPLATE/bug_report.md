@@ -30,7 +30,7 @@ What you expected to happen.
 **Platform**
 
 - OS: [macOS / Windows]
-- App version: [e.g., 2.1.0]
+- App version: [e.g., 2.2.1]
 
 **Hardware context**
 

@@ -11,6 +11,8 @@ audit_refs:
 
 # Lighting — delta spec
 
+> Historical Qt-era reference. This spec was written for the pre-cutover QML implementation and still references removed `native/qt-shell` paths. Use it for product/design rationale only; current implementation truth lives in the Tauri frontend and active engineering docs.
+
 Reference mockups: `docs/redesign/assets/lighting/Lighting-Redesign.html` (three-direction hypothesis — A / B / C) and `docs/redesign/assets/lighting/Lighting-C-Refined.html` (**the locked direction**). Direction C was chosen over A / B, then refined: the original C's stage plot was oversized and starved the other functions (cue list, params, DMX peek). The refinement — **direction Cr — Spatial desk** — shrinks the plot to ~2.1 M px² (−29 %), widens the cue rail to 380 px, replaces floating popovers with a persistent 440 px inspector, and adds a 140 px bottom control strip for groups / scenes / DMX peek.
 
 Direction **Cr — Spatial desk** reframes Lighting around the physical plot: the stage is the workspace. The cue list sits as a run-of-show rail on the left, the plot occupies the center, and a persistent inspector on the right answers "what am I editing?". A 140 px bottom strip carries groups + scenes + a live DMX peek. The three-panel `SplitView` (sidebar / content / spatial) is retired; the 1130-LOC `LightingSidebarPanel.qml` monolith and the 741-LOC `LightingContentPanel.qml` ScrollView wrapper are both deleted.

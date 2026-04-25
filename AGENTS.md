@@ -84,6 +84,7 @@ Only one piece of pre-v2.0.0 code is intentionally retained:
 | Runtime boundaries, shell/engine rules  | `docs/ARCHITECTURE.md`                           |
 | Workstation dimensions, device list     | `docs/HARDWARE_PROFILE.md`                       |
 | Operator task flows, keyboard shortcuts | `docs/OPERATIONS.md`                             |
+| Cold-start developer onboarding         | `docs/DEVELOPER_QUICKSTART.md`                   |
 | Daily build/test/package commands       | `docs/DEVELOPMENT.md`                            |
 | Release steps, acceptance checklist     | `docs/RELEASE.md`, `docs/PRODUCTIZATION_PLAN.md` |
 | Current engineering truth / open items  | `docs/HANDOFF.md`                                |

@@ -3,6 +3,4 @@ release/
 package-lock.json
 native/build/
 native/rust-engine/target/
-native/qt-shell/qml/OperatorParityHelpers.js
-native/qt-shell/qml/LightingParityHelpers.js
 artifacts/

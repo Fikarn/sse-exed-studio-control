@@ -21,13 +21,14 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 Read these in order:
 
 1. `README.md`
-2. `docs/HANDOFF.md`
-3. `docs/RELEASE.md`
-4. `docs/HARDWARE_PROFILE.md`
-5. `docs/ARCHITECTURE.md`
-6. `docs/adr/0001-frontend-replatform.md`
-7. `docs/FRONTEND_CUTOVER_PLAN.md`
-8. `docs/QT_FALLBACK_RETIREMENT_AUDIT.md`
+2. `docs/DEVELOPER_QUICKSTART.md`
+3. `docs/HANDOFF.md`
+4. `docs/RELEASE.md`
+5. `docs/HARDWARE_PROFILE.md`
+6. `docs/ARCHITECTURE.md`
+7. `docs/adr/0001-frontend-replatform.md`
+8. `docs/FRONTEND_CUTOVER_PLAN.md`
+9. `docs/QT_FALLBACK_RETIREMENT_AUDIT.md`
 
 Use these for deeper context only after the above are clear:
 
@@ -68,8 +69,8 @@ The highest-value unresolved work is:
 
 The current GitHub execution queue is:
 
-- No active Checkpoint D execution item remains. Open a new issue before beginning the next major product, release, or signing slice.
-- release-artwork polish and public-distribution signing posture remain tracked in `docs/PRODUCTIZATION_PLAN.md` §3 rather than as separate execution items
+- [Issue #6: Developer readiness: onboarding, workflow, and repo hygiene](https://github.com/Fikarn/sse-exed-studio-control/issues/6) is the active execution item for repository readiness and future-development workflow polish.
+- release-artwork polish and optional future signing posture remain tracked in `docs/PRODUCTIZATION_PLAN.md` §3 rather than as separate execution items; public distribution is not part of the current deployment goal
 
 Completed rollout record:
 
@@ -85,6 +86,8 @@ Common baseline:
 
 ```bash
 npm install
+npm run doctor
+npm run dev:check
 npm run format:check
 npm run release:check
 ```
@@ -103,6 +106,7 @@ npm run native:acceptance
 Full release verification (before tagging):
 
 ```bash
+npm run doctor:release
 npm run release:verify
 ```
 

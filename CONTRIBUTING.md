@@ -22,11 +22,16 @@ Initial setup:
 
 ```bash
 npm install
+npm run doctor
 ```
+
+For a complete cold-start path, use [docs/DEVELOPER_QUICKSTART.md](docs/DEVELOPER_QUICKSTART.md).
 
 ## Development Entry Points
 
 ```bash
+npm run doctor
+npm run dev:check
 npm run format:check
 npm run release:check
 npm run native:check
@@ -38,6 +43,8 @@ npm run frontend:foundation
 ## Validation Expectations
 
 Choose validation based on change risk.
+
+There are intentionally no GitHub Actions acceptance gates. Validation is local and target-host based; record the commands you ran in the PR.
 
 ### Tauri shell, React frontend, or operator layout
 
@@ -70,8 +77,11 @@ npm run native:acceptance
 ### Release preparation
 
 ```bash
+npm run doctor:release
 npm run release:verify
 ```
+
+Release packaging and installer evidence must run on the relevant target host. macOS Apple Silicon and Windows 11 `x64` release hosts build and verify their own QtIFW installers, update repositories, checksums, and continuity evidence.
 
 ## Repo Conventions
 
@@ -85,6 +95,10 @@ npm run release:verify
 - Avoid accidental hardware writes on mount or view switch.
 - Update docs when supported workflows or hardware assumptions change.
 - Update `CHANGELOG.md` for user-facing changes.
+
+## Dependency Upgrade Policy
+
+The active development baseline is Node 20 LTS and TypeScript 5.9. Routine minor/patch dependency updates may be handled through Dependabot and the normal local gates. Major TypeScript and `@types/node` upgrades are intentionally not background maintenance; they need an engineering-task issue, a stated validation plan, and updated docs if the baseline changes.
 
 ## Pull Requests
 

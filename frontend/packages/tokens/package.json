@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "style-dictionary build --config ./style-dictionary.config.mjs",
-    "typecheck": "node ./src/validate-generated.mjs"
+    "typecheck": "tsc -p tsconfig.json --noEmit && node ./src/validate-generated.mjs"
   },
   "devDependencies": {
     "style-dictionary": "^4.1.0"

@@ -1,7 +1,7 @@
 {
   "name": "sse-exed-studio-control",
   "version": "2.2.1",
-  "description": "Local studio control console for lighting, audio, Stream Deck, and production planning",
+  "description": "Native Tauri/Rust studio control console for a fixed SSE ExEd operator workstation.",
   "author": "Fikarn",
   "license": "MIT",
   "keywords": [
@@ -30,6 +30,10 @@
   ],
   "scripts": {
     "clean": "node scripts/clean.mjs",
+    "clean:local": "node scripts/clean.mjs --local",
+    "doctor": "node scripts/dev-doctor.mjs",
+    "doctor:release": "node scripts/dev-doctor.mjs --release",
+    "dev:check": "npm run format:check && npm run protocol:check && npm run frontend:typecheck && npm run native:check && npm run native:test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "protocol:generate": "node scripts/protocol/generate-protocol-artifacts.mjs",

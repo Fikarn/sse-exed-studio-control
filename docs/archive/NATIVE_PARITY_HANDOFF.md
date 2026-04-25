@@ -55,7 +55,7 @@ This was the detailed parity appendix for the broader repository handoff in [../
 
 ### Legacy oracle
 
-Use `artifacts/reference/legacy-oracle/operator-2560x1440/` as the visual source of truth.
+The legacy oracle captures that previously lived under `artifacts/reference/legacy-oracle/operator-2560x1440/` were retired from the working tree during the developer-readiness cleanup. Use git history for those historical images if needed; current visual evidence is regenerated into ignored `artifacts/` folders.
 
 ### Curated native evidence
 
@@ -174,9 +174,9 @@ Do not accept stale evidence or state-mismatched comparisons.
 
 1. Read this document first.
 2. Compare:
-   - `artifacts/reference/legacy-oracle/operator-2560x1440/setup-required.png`
+   - historical `artifacts/reference/legacy-oracle/operator-2560x1440/setup-required.png` in git history
    - `artifacts/parity/native/workstation/setup-required.png`
-   - `artifacts/reference/legacy-oracle/operator-2560x1440/setup-control-selected.png`
+   - historical `artifacts/reference/legacy-oracle/operator-2560x1440/setup-control-selected.png` in git history
    - `artifacts/parity/native/workstation/setup-control-selected.png`
 3. Resume only the remaining concrete differences listed above.
 4. Do not reopen broad substrate work unless a fresh comparison proves the remaining mismatch is still global instead of slice-local.

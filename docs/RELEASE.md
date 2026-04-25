@@ -113,6 +113,7 @@ npm version --no-git-tag-version 2.0.0
 4. Run the local release gate:
 
 ```bash
+npm run doctor:release
 npm run release:verify
 ```
 
@@ -144,7 +145,7 @@ npm run native:release:mac:local
 On Windows 11 `x64`:
 
 ```bash
-npm run native:release:win:local
+npm run native:release:win:evidence -- --issue-url <active-release-issue-url>
 ```
 
 8. Collect the required release artifacts under `release/native-installer/`, `release/native-updates/`, and `release/checksums/` on the publishing workstation.
@@ -197,7 +198,7 @@ The current supported rollout model is one controlled studio workstation, not pu
 
 ## Optional Signing
 
-The repo still includes optional signing hooks for future public-distribution hardening.
+The repo still includes optional signing hooks for future controlled-deployment hardening if public self-serve distribution ever becomes a goal.
 
 The local macOS release commands have optional signing hooks wired in. Configure these environment variables or secure local secret values to activate them:
 
@@ -225,6 +226,7 @@ Before creating a release tag, confirm:
 ```bash
 npm run release:check
 npm run format:check
+npm run doctor:release
 npm run release:verify
 ```
 

@@ -34,6 +34,7 @@ Before doing any work:
 git switch main
 git pull origin main
 npm install
+npm run doctor
 ```
 
 If you are starting a real feature or fix:
@@ -91,6 +92,7 @@ For the parallel frontend replatform foundation:
 
 ```bash
 npm run protocol:generate
+npm run dev:check
 npm run frontend:tokens:build
 npm run frontend:storybook
 npm run frontend:foundation
@@ -104,7 +106,7 @@ npm run tauri:package:mac:ifw-local
 npm run tauri:package:win:ifw-staged
 npm run tauri:package:win:ifw-local
 npm run tauri:package:win:evidence
-npm run native:release:win:evidence
+npm run native:release:win:evidence -- --issue-url https://github.com/Fikarn/sse-exed-studio-control/issues/6
 ```
 
 `npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot, persisted restart, and degraded startup/recovery posture. `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence.
@@ -135,7 +137,7 @@ export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin
 npm run native:release:mac:local
 ```
 
-Use the matching Windows QtIFW tools on a Windows 11 `x64` host for `npm run native:release:win:evidence` when collecting post-switch shipping evidence; it wraps `npm run native:release:win:local`, records host/tool/git/runtime context, writes logs, and stores the summary under `artifacts/native-release/windows-target-host/`. `npm run tauri:package:win:evidence` remains useful for candidate evidence under `artifacts/tauri-qualification/windows-target-host/`. The runbook is [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md).
+Use the matching Windows QtIFW tools on a Windows 11 `x64` host for `npm run native:release:win:evidence -- --issue-url <active-issue-url>` when collecting post-switch shipping evidence; it wraps `npm run native:release:win:local`, records host/tool/git/runtime context, writes logs, and stores the summary under `artifacts/native-release/windows-target-host/`. `npm run tauri:package:win:evidence -- --issue-url <active-issue-url>` remains useful for candidate evidence under `artifacts/tauri-qualification/windows-target-host/`. The runbook is [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md).
 
 ### 2b. Visual review
 
@@ -228,8 +230,25 @@ npm run release:verify
 #### Release preparation
 
 ```bash
+npm run doctor:release
 npm run release:verify
 ```
+
+### 4a. Cleanup
+
+Use the normal cleanup command for generated build and release output:
+
+```bash
+npm run clean
+```
+
+Use the deeper local cleanup before handoff or evidence collection:
+
+```bash
+npm run clean:local
+```
+
+`clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, generated visual/evidence folders, and release output. It intentionally does not remove `.tools/`.
 
 ## Recommended Development Rules
 
