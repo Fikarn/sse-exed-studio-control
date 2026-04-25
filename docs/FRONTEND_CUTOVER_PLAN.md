@@ -21,7 +21,7 @@ If this document conflicts with those files, fix the conflict before continuing.
 
 - `scripts/native-release-runtime.json` now selects `tauri` as the shipping release runtime.
 - `native/tauri-shell/` plus `frontend/` are the selected replacement shell track for the shipping release path.
-- `native/qt-shell/` remains available only until a Checkpoint D change removes or archives the fallback runtime; it is no longer selectable as a native release runtime and can only be exercised through retained Qt fallback validation commands.
+- The Qt fallback source/test tree has been removed through Checkpoint D Slice 4; QtIFW remains the installer/update wrapper.
 - The Rust engine remains authoritative for state, persistence, device I/O, startup policy, recovery behavior, and support workflows.
 - `Setup/Support`, `Lighting`, `Audio`, and `Planning` have replacement-shell coverage in fixture, Playwright, and live Tauri qualification lanes.
 - `npm run tauri:setup-support:qualify` covers clean startup, setup/support flows, persisted restart, and bootstrap-failure recovery posture.
@@ -41,7 +41,6 @@ If this document conflicts with those files, fix the conflict before continuing.
 - Protocol changes remain contract changes under `native/protocol/`.
 - The target operator surface remains fullscreen `2560x1440`, with `1920x1080` as the minimum fallback.
 - Normal operation must not require scrolling at either supported operator size.
-- Qt remains available until a Checkpoint D change removes or archives it.
 - Any on-disk format change requires an explicit migration and rollback plan before cutover.
 
 ## Cutover Acceptance Gate
@@ -98,7 +97,7 @@ Do not tag a release until every item below is true for the intended release com
 
 - The release issue explicitly names the packaging path for the selected Tauri shell.
 - Installer identity, app identifier, app-data paths, logs paths, update-repository behavior, and rollback instructions are documented before promotion.
-- The old Qt shell remains available until a Checkpoint D change removes or archives it.
+- QtIFW remains available as the installer/update wrapper; the old Qt shell is no longer a rollback dependency after Checkpoint D source/test removal.
 - Rollback to the previous shipping tag remains a reinstall-away and does not require manual database surgery.
 - If QtIFW remains the installer path for the candidate, the Tauri shell must be exercised through the shipping `native:*` packaged path before release.
 - If the release moves away from QtIFW, the new installer/update path must have equivalent package, update, continuity, rollback, and clean-machine acceptance evidence.
@@ -109,7 +108,7 @@ Current packaging direction:
 - The selected `tauri` release runtime stages the Tauri shell executable and `studio-control-engine` / `studio-control-engine.exe` side by side in the existing `release/native*` roots, or sets `SSE_ENGINE_BIN` explicitly.
 - The candidate installer/update repository must preserve the existing operator app-data, logs, update-repository, and rollback expectations before Checkpoint C can be claimed.
 - Real QtIFW `binarycreator` and `repogen` evidence is required on matching target hosts through `npm run native:release:mac:local` and `npm run native:release:win:local` for the switched release path.
-- The Qt shell must remain installable or launchable until Checkpoint D explicitly changes that rollback posture.
+- Rollback is now the tagged Tauri native release path; the Qt shell is no longer installable or launchable after Checkpoint D Slice 4.
 - [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) is the completed release/cutover issue for this gate; [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) is the current Checkpoint D planning issue.
 
 ## Promotion Sequence
@@ -144,6 +143,8 @@ Status: entered. The fallback window is closed in [GitHub issue #3](https://gith
 
 Exit condition: Qt shell code, Qt-specific verification automation, and Qt parity assets are removed only through an explicit retirement issue and only after rollback requirements no longer depend on them. QtIFW remains the installer/update wrapper unless a separate installer replacement plan provides equivalent package, update, continuity, rollback, and clean-machine acceptance evidence.
 
+Status: in progress. Slices 1-4 are complete with macOS and Windows target-host evidence for the packaging/signing slice and local source/test removal validation for Slice 4. Slice 5 will retire or archive historical parity assets.
+
 ## Stop Conditions
 
 Stop cutover work and re-anchor if any of these are true:
@@ -153,11 +154,10 @@ Stop cutover work and re-anchor if any of these are true:
 - visual evidence is stale, not `2560x1440`, or taken from an invalid Retina logical desktop
 - any operator-critical state is owned by React instead of the Rust engine
 - packaging/update/rollback behavior is unspecified
-- the old Qt fallback cannot be launched before the Checkpoint D retirement path explicitly removes that requirement
 - the plan requires a hardware behavior that is not in [docs/HARDWARE_PROFILE.md](./HARDWARE_PROFILE.md)
 
 ## Next Implementation Work
 
-The next implementation slice is Checkpoint D Slice 4 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): Qt shell source and test removal.
+The next implementation slice is Checkpoint D Slice 5 from [QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md): parity asset retirement.
 
-Slice 3 packaging/signing cleanup is complete: macOS local release verification passed, and Windows 11 `x64` `npm run native:release:win:evidence` passed for commit `437272a4db189a4bbb38f61cf2eb05c6b86e8d0c`. QtIFW remains the installer/update wrapper. Remove Qt source/test paths only through Slice 4 and keep parity asset retirement for Slice 5.
+Slice 4 source/test removal is complete: `native/qt-shell/**`, root Qt CMake wiring, Qt shell build/test/smoke/parity commands, and active current-truth references were removed. Local validation passed through `format:check`, `release:check`, `frontend:foundation`, `tauri:foundation`, and the stricter `native:foundation` lane. QtIFW remains the installer/update wrapper. Keep parity asset retirement for Slice 5.

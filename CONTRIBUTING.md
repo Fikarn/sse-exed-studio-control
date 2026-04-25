@@ -17,7 +17,6 @@ If a change improves a secondary feature but increases risk to lighting, audio, 
 - npm
 - Rust stable toolchain
 - Qt Installer Framework for local release packaging
-- Qt 6 desktop SDK only when working on the retained Qt fallback during Checkpoint D
 
 Initial setup:
 
@@ -62,12 +61,6 @@ npm run native:engine:build
 npm run native:foundation
 ```
 
-### Qt fallback retirement work
-
-```bash
-npm run native:qt:foundation
-```
-
 ### Native persistence, release, or recovery behavior
 
 ```bash
@@ -85,7 +78,6 @@ npm run release:verify
 - Keep changes inside the correct layer:
   - `frontend/*` for selected Tauri-shell operator UI
   - `native/tauri-shell/*` for selected shell windowing and Tauri integration
-  - `native/qt-shell/*` only for retained fallback work during Checkpoint D
   - `native/rust-engine/*` for engine-owned state, persistence, and device logic
   - `native/protocol/*` for the transport contract
   - `docs/*` for durable product and engineering documentation

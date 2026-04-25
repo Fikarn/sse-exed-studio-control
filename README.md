@@ -12,7 +12,6 @@ This repository is intentionally optimized for a specific deployment profile rat
 ## Architecture
 
 - selected native `Tauri + React + TypeScript` operator shell for the shipping runtime
-- retained `Qt/QML` fallback shell pending Checkpoint D retirement planning
 - separate `Rust` engine (persistence, safety, device logic)
 - offline Qt Installer Framework packages on Windows 11 `x64` and macOS Apple Silicon
 - one-way importer for legacy `db.json` data, invoked once on first native launch for migrating operators
@@ -110,7 +109,7 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
 - [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md): Checkpoint D impact audit and safe Qt fallback retirement sequence
 - [docs/archive/](docs/archive/): historical planning and parity documents preserved for reference
-- [native/README.md](native/README.md): native workspace scaffold for the selected Tauri shell, Qt fallback shell, Rust engine, and IPC protocol
+- [native/README.md](native/README.md): native workspace scaffold for the selected Tauri shell, Rust engine, and IPC protocol
 - [docs/adr/0001-frontend-replatform.md](docs/adr/0001-frontend-replatform.md): locked frontend replatform decision
 - `frontend/`: Tauri web frontend workspace and design-system packages
 - `native/tauri-shell/`: selected native shell track for the current published Tauri runtime
@@ -122,7 +121,6 @@ Prerequisites:
 - Node.js 20
 - npm
 - Rust stable toolchain
-- Qt 6 desktop SDK only for retained Qt fallback checks during Checkpoint D
 - Qt Installer Framework for local installer/update generation
 
 ```bash
@@ -155,8 +153,6 @@ npm run native:release:win:local
 npm run native:acceptance
 ```
 
-For retained Qt fallback work during Checkpoint D, use `npm run native:qt:foundation`. On macOS, the Qt shell build auto-detects common Homebrew Qt prefixes. On Windows target-host Qt installs, `CMAKE_PREFIX_PATH`, `QT_ROOT_DIR`, `QTDIR`, `QT_DIR`, or `Qt6_DIR` may be used to resolve the Qt CMake package location.
-
 Common commands:
 
 ```bash
@@ -175,7 +171,7 @@ npm run ci
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
-The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement planning is tracked in issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, and packaging/signing cleanup are complete; the next planned slice is Qt source/test removal.
+The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is tracked in issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, and Qt source/test removal are complete; the next planned slice is Qt parity asset retirement.
 
 `npm run clean` removes generated native build output and packaged release folders.
 

@@ -55,7 +55,10 @@ function runNpmScript(name) {
 }
 
 function runReleaseRuntimeBuild() {
-  runNpmScript(releaseRuntime === "tauri" ? "tauri:foundation" : "native:build");
+  if (releaseRuntime !== "tauri") {
+    throw new Error(`Unsupported native release runtime: ${releaseRuntime}`);
+  }
+  runNpmScript("tauri:foundation");
 }
 
 if (process.platform === "darwin") {

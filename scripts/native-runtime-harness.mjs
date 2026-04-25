@@ -51,7 +51,9 @@ export class EngineHarness {
   async start() {
     const engineExecutable = this.engineExecutable ?? resolveDebugEngineExecutable(this.rootDir);
     if (!existsSync(engineExecutable)) {
-      throw new Error(`Native engine executable not found at ${engineExecutable}. Run \`npm run native:build\` first.`);
+      throw new Error(
+        `Native engine executable not found at ${engineExecutable}. Run \`npm run native:engine:build\` first.`
+      );
     }
 
     mkdirSync(this.appDataDir, { recursive: true });

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This runbook records verification of the published `v2.2.1` installer on the intended operator workstation before the bounded Qt fallback window was closed.
+This historical runbook records verification of the published `v2.2.1` installer on the intended operator workstation before the bounded fallback window was closed.
 
-It is the execution procedure for [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4). It does not authorize Checkpoint D or Qt retirement. Checkpoint D planning is tracked separately in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5).
+It was the execution procedure for [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4). It did not authorize Checkpoint D or Qt retirement. Checkpoint D retirement is tracked separately in [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5).
 
 ## Plan Anchor
 
@@ -97,7 +97,7 @@ Stop if the hash does not match.
 4. Record any unsigned trust prompt and whether the operator would find it surprising.
 5. Launch the installed app from the installed application location, not from a development checkout.
 6. Confirm the visible product name is `SSE ExEd Studio Control`.
-7. Confirm the installed runtime is the Tauri shipping runtime for `v2.2.1`, not the Qt fallback.
+7. Confirm the installed runtime is the Tauri shipping runtime for `v2.2.1`.
 
 Runtime confirmation:
 
@@ -169,7 +169,7 @@ Stop and record details before changing code if any of these occur:
 - Startup hides degraded engine, storage, device, or recovery state behind a normal dashboard.
 - Backup export or diagnostics export fails.
 - Planning data is lost or requires manual database surgery.
-- Qt fallback is needed during the verification.
+- A non-Tauri runtime is needed during the verification.
 
 ## Issue #4 Comment Template
 

@@ -11,13 +11,10 @@ Entry point for Claude-assisted work in this repo. Keep it short. Follow the poi
 Two processes, separated by an IPC protocol:
 
 - `native/tauri-shell/` + `frontend/` — selected shipping shell for the current published Tauri runtime, built on `Tauri 2 + React 19.2 + TypeScript + Vite`. **No device or DB logic in React.**
-- `native/qt-shell/` — Qt 6 / QML fallback shell retained until Checkpoint D issue #5 removes or archives it. Owns windowing, input, and layout when tested directly through retained Qt fallback validation. **No device or DB logic in QML.**
 - `native/rust-engine/` — Rust. Owns state, persistence, device I/O, protocol dispatch.
 - `native/protocol/` — the IPC contract between them. Changes here are contract changes.
 
-Rule: if a change would move product state or device policy into QML or React, it is going in the wrong direction. Authoritative source: `docs/ARCHITECTURE.md`.
-
-`Q_PROPERTY` / `Q_INVOKABLE` / signals live in the C++ adapter under `native/qt-shell/src/` (e.g. `EngineProcess.*`), not in the Rust engine. Engine-side additions feed those properties.
+Rule: if a change would move product state, persistence, or device policy into React, it is going in the wrong direction. Authoritative source: `docs/ARCHITECTURE.md`.
 
 ## Hardware target (binding)
 
@@ -30,22 +27,19 @@ Authoritative source: `docs/HARDWARE_PROFILE.md`.
 
 ## Design system
 
-One theme file, one `Console*` component library — extend additively, do not replace.
+Use the frontend token and component packages as the shared UI foundation:
 
-- `native/qt-shell/qml/ConsoleTheme.qml` — tokens: dark-only `studio950→050` grayscale, `#99BA92` primary green, accent reds/ambers/cyans, IBM Plex Sans / Plex Mono, spacing `4–20`, radii `6–24`, `controlHeight 36`, `toolbarHeight 44`.
-- `native/qt-shell/qml/Console*.qml` — Badge, Button, ComboBox, Modal, Slider, StatCard, StatusBadge, Surface, Switch, TabButton, TextArea, TextField (plus `SafetyHoldButton.qml`).
+- `frontend/packages/tokens/` — generated design tokens and docs
+- `frontend/packages/design-system/` — shared shell primitives and layout components
+- `frontend/app/src/` — selected operator surfaces
 
-No Quick Controls 2 style packs (Material / Fusion / Imagine). No third-party QML meta-frameworks (Kirigami / Felgo). No light mode. These choices are deliberate — don't re-open them without a delta spec.
-
-When a workspace needs something new, add a variant to the existing component or a new `Console*` — don't bypass the tokens with ad-hoc hex literals.
+Extend tokens and shared components additively. Do not bypass the frontend design system with one-off styling unless the change is explicitly scoped and documented.
 
 ## Runtime environment
 
-- Qt floor: `qt_standard_project_setup(REQUIRES 6.5)` — `QtQuick.Effects` and modern Shapes are already available.
-- C++20.
-- Rust engine compiled and started by the current shell runtime.
+- Rust engine compiled and started by the selected Tauri shell runtime.
 
-Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:foundation`, `native:check`, `native:test`, `native:acceptance`, `frontend:foundation`, `tauri:foundation`, packaging and installer lanes, etc.). Use them; don't invent new ones. Retained Qt fallback checks use `npm run native:qt:foundation` during Checkpoint D only.
+Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:foundation`, `native:check`, `native:test`, `native:acceptance`, `frontend:foundation`, `tauri:foundation`, packaging and installer lanes, etc.). Use them; don't invent new ones.
 
 ## Parity discipline
 
@@ -55,17 +49,14 @@ Every operator-visible change to a native surface must:
 2. produce two consecutive bit-identical runs on the same target-host verification lane before the baseline is accepted,
 3. land a baseline commit with `parity: ...` in the subject so reviewers can filter.
 
-Cross-platform pixel equivalence across lanes is not required — macOS and Windows diverge by driver. Per-lane determinism is the gate.
-
-For live visual verification at true `2560×1440`, use `npm run native:parity:live -- --action=<name>` from `docs/DEVELOPMENT.md §2b`. Retina dev machines cannot produce a 1:1 onscreen `2560×1440`; the fixed studio workstation is the pixel-authoritative gate.
+Cross-platform pixel equivalence across lanes is not required — macOS and Windows diverge by driver. Per-lane determinism is the gate where deterministic capture baselines are used.
 
 Baselines under `artifacts/parity/native/workstation/`.
 
-After the shipping switch, Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Qt parity remains only for Checkpoint D fallback-retirement work.
+After the shipping switch, Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Qt parity assets remain historical until Checkpoint D Slice 5 explicitly retires them.
 
 ## Testing posture
 
-- QML structural tests: `native/qt-shell/tests/qml/tst_*.qml` are retained fallback tests during Checkpoint D. They assert wiring and behavior, not pixels. They preserve a qsettings org-identifier fix (PR #25) — keep tests hermetic while they remain.
 - Engine tests: `cargo test` under `native/rust-engine/`.
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
 - Target-host lanes: macOS and Windows native verification are both blocking release gates. Treat a Windows target-host failure the same as a macOS failure.
@@ -88,13 +79,13 @@ Only one piece of pre-v2.0.0 code is intentionally retained:
 
 ## Where to look
 
-| For…                                    | Go to…                                                                |
-| --------------------------------------- | --------------------------------------------------------------------- |
-| Runtime boundaries, shell/engine rules  | `docs/ARCHITECTURE.md`                                                |
-| Workstation dimensions, device list     | `docs/HARDWARE_PROFILE.md`                                            |
-| Operator task flows, keyboard shortcuts | `docs/OPERATIONS.md`, `native/qt-shell/qml/OperatorShortcutLayer.qml` |
-| Daily build/test/package commands       | `docs/DEVELOPMENT.md`                                                 |
-| Release steps, acceptance checklist     | `docs/RELEASE.md`, `docs/PRODUCTIZATION_PLAN.md`                      |
-| Current engineering truth / open items  | `docs/HANDOFF.md`                                                     |
+| For…                                    | Go to…                                           |
+| --------------------------------------- | ------------------------------------------------ |
+| Runtime boundaries, shell/engine rules  | `docs/ARCHITECTURE.md`                           |
+| Workstation dimensions, device list     | `docs/HARDWARE_PROFILE.md`                       |
+| Operator task flows, keyboard shortcuts | `docs/OPERATIONS.md`                             |
+| Daily build/test/package commands       | `docs/DEVELOPMENT.md`                            |
+| Release steps, acceptance checklist     | `docs/RELEASE.md`, `docs/PRODUCTIZATION_PLAN.md` |
+| Current engineering truth / open items  | `docs/HANDOFF.md`                                |
 
 If this file disagrees with any of the above, those docs win — this file is a pointer, not a spec.

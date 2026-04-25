@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Checkpoint D of [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) requires a read-only impact audit and removal-sequence proposal before removing the retained Qt/QML fallback runtime.
+Checkpoint D of [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) required a read-only impact audit and removal-sequence proposal before removing the retained Qt/QML fallback runtime.
 
 This audit records the current dependency surface after the `v2.2.1` operator-workstation rollout passed and the bounded fallback window was closed in GitHub issue #3. It is scoped to planning the retirement work tracked in GitHub issue #5.
 
-No Qt source, automation, installer dependency, or parity asset is removed by this audit.
+This document now tracks the bounded removal sequence after the initial audit. QtIFW installer/update infrastructure is intentionally retained.
 
 ## Plan Anchor
 
@@ -15,7 +15,7 @@ Current plan state:
 - `Tauri 2 + React 19.2 + TypeScript + Vite` is the selected shipping runtime through the `native:*` release lane.
 - `v2.2.1` is the current published operator-rollout build.
 - The operator workstation verification passed with durable app data under `AppData\Roaming\ExEd Studio Control Native`.
-- `native/qt-shell/` remains present only until Checkpoint D explicitly removes or archives it.
+- The Qt fallback source/test tree is removed through Slice 4.
 - QtIFW remains the installer/update wrapper unless a separate delta spec replaces it.
 - Rust remains authoritative for state, persistence, device I/O, startup policy, recovery, support workflows, and protocol dispatch.
 
@@ -211,7 +211,7 @@ QtIFW can only be removed under a separate installer/update replacement plan wit
 
 ### Slice 1: Validation Lane Split
 
-Status: complete. `npm run native:foundation` now delegates to the Tauri-first shipping foundation lane, and the retained Qt fallback validation path is explicit as `npm run native:qt:foundation`.
+Status: complete. `npm run native:foundation` now delegates to the Tauri-first shipping foundation lane. The temporary retained Qt fallback validation path was removed in Slice 4.
 
 Goal: make active validation Tauri-first without deleting Qt yet.
 
@@ -220,7 +220,7 @@ Actions:
 - Introduce or rename an active Tauri/native foundation command that represents the shipping runtime.
 - Stop presenting Qt shell build/test/smoke commands as the normal development path.
 - Update `ci` or equivalent local validation docs so the primary path no longer depends on Qt.
-- Keep explicit Qt fallback commands available only as fallback-retirement inputs until later slices remove them.
+- Keep explicit Qt fallback commands available only as fallback-retirement inputs until later slices remove them. Slice 4 removed them.
 
 Required verification:
 
@@ -295,6 +295,8 @@ Windows verification recorded during implementation:
 
 ### Slice 4: Qt Shell Source And Test Removal
 
+Status: complete. The Qt source/test tree, root Qt CMake entrypoint, Qt-only helper scripts, package scripts, active docs references, and PR checklist entry were removed. QtIFW installer/update tooling was not removed.
+
 Goal: delete the fallback runtime after active lanes no longer depend on it.
 
 Actions:
@@ -313,6 +315,20 @@ Required verification:
 - `npm run release:check`
 - `npm run frontend:foundation`
 - `npm run tauri:foundation`
+
+Verification recorded during implementation:
+
+- `git diff --check`
+- `node --check scripts/native-installer-acceptance.mjs`
+- `node --check scripts/native-release-runtime.mjs`
+- `node --check scripts/native-runtime-harness.mjs`
+- `node --check scripts/release/verify-native-release.mjs`
+- `npm run format:check`
+- `npm run release:check`
+- `npm run frontend:storybook:build` after an initial stuck Storybook subprocess was killed and rerun cleanly
+- `npm run frontend:foundation`
+- `npm run tauri:foundation` after an initial stuck Vite subprocess was killed and rerun cleanly
+- `npm run native:foundation`
 
 ### Slice 5: Parity Asset Retirement
 

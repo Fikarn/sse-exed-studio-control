@@ -17,7 +17,6 @@
 - [ ] `npm run frontend:foundation` when selected Tauri frontend logic or layout changed
 - [ ] `npm run tauri:foundation` when selected Tauri shell integration changed
 - [ ] `npm run native:foundation` when selected shipping-runtime startup or shell integration changed
-- [ ] `npm run native:qt:foundation` only when retained Qt fallback behavior changed during Checkpoint D
 - [ ] `npm run native:acceptance` when native persistence, recovery, or release-critical behavior changed
 - [ ] `npm run release:check` when preparing a tagged release
 - [ ] Manual validation completed for affected hardware / live workflows

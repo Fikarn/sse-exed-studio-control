@@ -3,13 +3,12 @@
 This directory contains the product runtime:
 
 - `tauri-shell/`: selected native webview shell for the shipping runtime
-- `qt-shell/`: Qt/QML fallback desktop shell
 - `rust-engine/`: Rust control engine
 - `protocol/`: transport and message contract
 
 The native runtime is the only product runtime. The legacy Electron/Next.js path was retired in `v2.1.0`.
 
-`scripts/native-release-runtime.json` selects the shipping release runtime. `v2.2.0` shipped with `tauri` selected, and `v2.2.1` is the current published operator-rollout build. The fallback window is closed; `qt-shell/` remains present only until Checkpoint D removes or archives it.
+`scripts/native-release-runtime.json` selects the shipping release runtime. `v2.2.0` shipped with `tauri` selected, and `v2.2.1` is the current published operator-rollout build. The fallback window is closed, and the Qt shell source/test tree has been removed through Checkpoint D.
 
 The completed Tauri shipping switch and retained fallback posture are tracked in [`docs/FRONTEND_CUTOVER_PLAN.md`](../docs/FRONTEND_CUTOVER_PLAN.md). Checkpoint D sequencing is recorded in [`docs/QT_FALLBACK_RETIREMENT_AUDIT.md`](../docs/QT_FALLBACK_RETIREMENT_AUDIT.md).
 
@@ -58,28 +57,9 @@ cd native/rust-engine
 cargo check
 ```
 
-Qt fallback shell, for Checkpoint D fallback-retirement work only:
-
-```bash
-cmake -S native -B native/build -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt
-cmake --build native/build --parallel 4
-```
-
-Native startup smoke test:
-
-```bash
-SSE_APP_DATA_DIR=/tmp/sse-qt-shell-smoke \
-SSE_LOG_DIR=/tmp/sse-qt-shell-smoke/logs \
-native/build/qt-shell/sse_exed_native.app/Contents/MacOS/sse_exed_native -platform offscreen --smoke-test
-```
-
 Notes:
 
-- use `native/build`, not `/tmp`, for local macOS builds because `/tmp` resolves through `/private/tmp` and can break Qt-generated relative include paths
-- on macOS with Homebrew Qt, `CMAKE_PREFIX_PATH=/opt/homebrew/opt/qt` is required unless your environment already exports the Qt CMake package location
-- the Qt shell now auto-discovers a locally built development engine at `native/rust-engine/target/debug/` or `native/rust-engine/target/release/` before falling back to PATH lookup
 - `SSE_APP_DATA_DIR` and `SSE_LOG_DIR` are respected by the shell runtime, which makes sandboxed smoke tests and isolated local runs deterministic
 - shell settings now persist through the Rust engine, including workspace plus window size/maximized state
 - when native planning tables are empty, the engine will auto-import a legacy `db.json` from `SSE_LEGACY_DB_PATH` or, in repo-local development, from `data/db.json`
 - set `SSE_DISABLE_AUTO_IMPORT=1` to disable startup auto-import
-- `npm run native:qt:foundation` runs the retained Qt fallback build, QML tests, and smoke lane while Checkpoint D is open

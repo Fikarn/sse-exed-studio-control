@@ -17,15 +17,9 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 
 - owns the native webview shell under `native/tauri-shell/` and `frontend/`
 - owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when the release runtime selector points at `tauri`
-- preserves the same authoritative engine boundary and IPC contract as the Qt shell
+- preserves the authoritative engine boundary and IPC contract
 - supervises the Rust engine as a child process through the Tauri bridge
 - shipped in `v2.2.0` and satisfied the [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md) Checkpoint C shipping-switch gate for tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix
-
-### Qt shell (fallback runtime pending Checkpoint D retirement)
-
-- owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when selected as fallback
-- supervises the Rust engine as a child process
-- remains maintenance-only unless the task is a fallback release blocker, release-verification fix, or critical operator defect
 
 ### Rust engine
 
@@ -65,13 +59,13 @@ Any native studio domain should follow the same shape:
 - request snapshots through the engine controller
 - render operator-visible state without owning business logic
 - avoid recreating server-style fetch layers inside shell code
-- keep both QML and React shells derived from engine snapshots and explicit commands
+- keep React surfaces derived from engine snapshots and explicit commands
 
 ### 4. Operational status
 
 - expose readiness, failure, and recovery state through engine snapshots
 - keep hardware disconnect and recovery behavior visible to the operator
-- keep device I/O policy in the engine, not in QML
+- keep device I/O policy in the engine, not in React
 
 ### 5. Tests
 
@@ -87,8 +81,7 @@ Any native studio domain should follow the same shape:
 - `native/rust-engine/src/support.rs`: backup, restore, and diagnostics support flows
 - `native/rust-engine/src/control_surface.rs`: Stream Deck bridge and Companion export generation
 - `frontend/app/src/app/OperatorShell.tsx`: Tauri operator shell surface derived from engine state
-- `native/qt-shell/qml/Main.qml`: Qt fallback operator shell surface derived from engine state
 
 ## Refactor Rule
 
-When adding a feature, define or extend the engine contract first. Only then wire the shell and adapter layers. If a change would move product state or device policy into QML or React, it is probably going in the wrong direction.
+When adding a feature, define or extend the engine contract first. Only then wire the shell and adapter layers. If a change would move product state or device policy into React, it is probably going in the wrong direction.

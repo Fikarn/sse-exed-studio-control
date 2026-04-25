@@ -37,21 +37,16 @@ function parseTarget(value) {
 }
 
 function parseRuntime(value) {
-  if (!value || value === "native" || value === "tauri" || value === "qt") {
+  if (!value || value === "native" || value === "tauri") {
     return value ?? "native";
   }
 
-  throw new Error(
-    `Unsupported installer acceptance runtime '${value}'. Use --runtime=native, --runtime=tauri, or --runtime=qt.`
-  );
+  throw new Error(`Unsupported installer acceptance runtime '${value}'. Use --runtime=native or --runtime=tauri.`);
 }
 
 function effectiveInstalledRuntime(runtimeKind) {
   if (runtimeKind === "tauri") {
     return "tauri";
-  }
-  if (runtimeKind === "qt") {
-    return "qt";
   }
   return releaseRuntime;
 }

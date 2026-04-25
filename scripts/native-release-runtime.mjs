@@ -12,7 +12,7 @@ function normalizeRuntime(value, source) {
 
   if (value === "qt") {
     throw new Error(
-      `${source}=qt is retired for native release packaging. Use npm run native:qt:foundation for Checkpoint D fallback validation before source removal.`
+      `${source}=qt is retired for native release packaging. The Qt shell source and validation commands have been removed through Checkpoint D.`
     );
   }
 

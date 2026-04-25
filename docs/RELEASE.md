@@ -18,7 +18,7 @@ The native runtime is the only release path:
 - The legacy Electron runtime was retired in `v2.1.0`; no browser/Electron path remains in the repo.
 - Release readiness depends on packaging, smoke, acceptance, bridge-qualification, and install-time smoke-test gates — plus any open blockers tracked in [docs/HANDOFF.md](./HANDOFF.md).
 
-The selected native release runtime is controlled by `scripts/native-release-runtime.json` and is Tauri-only after Checkpoint D runtime selector lockdown. `v2.2.0` shipped with `tauri` selected, and `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix. The `native:*` release lanes package the Tauri shell with the Rust engine binary staged beside the shell executable while preserving the existing QtIFW installer/update posture. Retained Qt fallback checks use `npm run native:qt:foundation`; they are not a release-runtime override.
+The selected native release runtime is controlled by `scripts/native-release-runtime.json` and is Tauri-only after Checkpoint D runtime selector lockdown. `v2.2.0` shipped with `tauri` selected, and `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix. The `native:*` release lanes package the Tauri shell with the Rust engine binary staged beside the shell executable while preserving the existing QtIFW installer/update posture.
 
 The historical replacement-shell candidate packaging path remains available for pre-switch evidence under separate roots:
 
