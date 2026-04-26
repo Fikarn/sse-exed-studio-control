@@ -58,6 +58,8 @@ use crate::planning::{
 use crate::planning_settings::PLANNING_SETTINGS_PREFIX;
 use crate::protocol::{
     error_response, event_message, invalid_params, ok_response, RequestEnvelope, ResponseEnvelope,
+    EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_COMMISSIONING_CHANGED, EVENT_ENGINE_READY,
+    EVENT_LIGHTING_CHANGED, EVENT_PLANNING_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
 use crate::storage::{
@@ -100,7 +102,7 @@ impl EngineApp {
 
     pub fn ready_event(&self) -> serde_json::Value {
         event_message(
-            "engine.ready",
+            EVENT_ENGINE_READY,
             json!({
                 "protocol": self.runtime.protocol_version,
                 "engineVersion": env!("CARGO_PKG_VERSION"),
@@ -1177,7 +1179,7 @@ impl EngineApp {
         EngineReply {
             response,
             events: vec![event_message(
-                "planning.changed",
+                EVENT_PLANNING_CHANGED,
                 json!({
                     "reason": reason,
                     "projectId": project_id,
@@ -1191,7 +1193,7 @@ impl EngineApp {
         EngineReply {
             response,
             events: vec![event_message(
-                "commissioning.changed",
+                EVENT_COMMISSIONING_CHANGED,
                 json!({
                     "reason": reason,
                 }),
@@ -1207,13 +1209,13 @@ impl EngineApp {
             response,
             events: vec![
                 event_message(
-                    "app.changed",
+                    EVENT_APP_CHANGED,
                     json!({
                         "reason": reason,
                     }),
                 ),
                 event_message(
-                    "commissioning.changed",
+                    EVENT_COMMISSIONING_CHANGED,
                     json!({
                         "reason": reason,
                     }),
@@ -1230,13 +1232,13 @@ impl EngineApp {
             response,
             events: vec![
                 event_message(
-                    "commissioning.changed",
+                    EVENT_COMMISSIONING_CHANGED,
                     json!({
                         "reason": reason,
                     }),
                 ),
                 event_message(
-                    "planning.changed",
+                    EVENT_PLANNING_CHANGED,
                     json!({
                         "reason": reason,
                         "projectId": serde_json::Value::Null,
@@ -1255,19 +1257,19 @@ impl EngineApp {
             response,
             events: vec![
                 event_message(
-                    "app.changed",
+                    EVENT_APP_CHANGED,
                     json!({
                         "reason": reason,
                     }),
                 ),
                 event_message(
-                    "commissioning.changed",
+                    EVENT_COMMISSIONING_CHANGED,
                     json!({
                         "reason": reason,
                     }),
                 ),
                 event_message(
-                    "planning.changed",
+                    EVENT_PLANNING_CHANGED,
                     json!({
                         "reason": reason,
                         "projectId": serde_json::Value::Null,
@@ -1282,7 +1284,7 @@ impl EngineApp {
         EngineReply {
             response,
             events: vec![event_message(
-                "support.changed",
+                EVENT_SUPPORT_CHANGED,
                 json!({
                     "reason": reason,
                 }),
@@ -1295,31 +1297,31 @@ impl EngineApp {
             response,
             events: vec![
                 event_message(
-                    "support.changed",
+                    EVENT_SUPPORT_CHANGED,
                     json!({
                         "reason": reason,
                     }),
                 ),
                 event_message(
-                    "settings.changed",
+                    EVENT_SETTINGS_CHANGED,
                     json!({
                         "reason": reason,
                     }),
                 ),
                 event_message(
-                    "app.changed",
+                    EVENT_APP_CHANGED,
                     json!({
                         "reason": reason,
                     }),
                 ),
                 event_message(
-                    "commissioning.changed",
+                    EVENT_COMMISSIONING_CHANGED,
                     json!({
                         "reason": reason,
                     }),
                 ),
                 event_message(
-                    "planning.changed",
+                    EVENT_PLANNING_CHANGED,
                     json!({
                         "reason": reason,
                         "projectId": serde_json::Value::Null,
@@ -1334,7 +1336,7 @@ impl EngineApp {
         EngineReply {
             response,
             events: vec![event_message(
-                "audio.changed",
+                EVENT_AUDIO_CHANGED,
                 json!({
                     "reason": reason,
                 }),
@@ -1346,7 +1348,7 @@ impl EngineApp {
         EngineReply {
             response,
             events: vec![event_message(
-                "lighting.changed",
+                EVENT_LIGHTING_CHANGED,
                 json!({
                     "reason": reason,
                 }),

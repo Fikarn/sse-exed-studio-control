@@ -3,16 +3,26 @@ use serde_json::{json, Value};
 
 pub const PROTOCOL_VERSION: &str = "1";
 
+pub const EVENT_APP_CHANGED: &str = "app.changed";
+pub const EVENT_AUDIO_CHANGED: &str = "audio.changed";
+pub const EVENT_COMMISSIONING_CHANGED: &str = "commissioning.changed";
+pub const EVENT_ENGINE_READY: &str = "engine.ready";
+pub const EVENT_ENGINE_STARTUP_FAILED: &str = "engine.startupFailed";
+pub const EVENT_LIGHTING_CHANGED: &str = "lighting.changed";
+pub const EVENT_PLANNING_CHANGED: &str = "planning.changed";
+pub const EVENT_SETTINGS_CHANGED: &str = "settings.changed";
+pub const EVENT_SUPPORT_CHANGED: &str = "support.changed";
+
 pub const EVENT_NAMES: &[&str] = &[
-    "app.changed",
-    "audio.changed",
-    "commissioning.changed",
-    "engine.ready",
-    "engine.startupFailed",
-    "lighting.changed",
-    "planning.changed",
-    "settings.changed",
-    "support.changed",
+    EVENT_APP_CHANGED,
+    EVENT_AUDIO_CHANGED,
+    EVENT_COMMISSIONING_CHANGED,
+    EVENT_ENGINE_READY,
+    EVENT_ENGINE_STARTUP_FAILED,
+    EVENT_LIGHTING_CHANGED,
+    EVENT_PLANNING_CHANGED,
+    EVENT_SETTINGS_CHANGED,
+    EVENT_SUPPORT_CHANGED,
 ];
 
 fn empty_object() -> Value {

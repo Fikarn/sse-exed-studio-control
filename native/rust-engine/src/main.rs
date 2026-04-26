@@ -20,7 +20,7 @@ mod support;
 
 use crate::app::EngineApp;
 use crate::bootstrap::{resolve_runtime_paths, validate_protocol_version};
-use crate::protocol::{event_message, RequestEnvelope};
+use crate::protocol::{event_message, RequestEnvelope, EVENT_ENGINE_STARTUP_FAILED};
 use serde::Serialize;
 use serde_json::json;
 use std::io::{self, BufRead, BufReader, Write};
@@ -41,7 +41,7 @@ fn main() -> io::Result<()> {
 
     if let Err(message) = validate_protocol_version(&planned_paths.requested_protocol_version) {
         let startup_failure = event_message(
-            "engine.startupFailed",
+            EVENT_ENGINE_STARTUP_FAILED,
             json!({
                 "stage": "protocol-negotiation",
                 "code": "PROTOCOL_MISMATCH",
@@ -70,7 +70,7 @@ fn main() -> io::Result<()> {
         Ok(app) => app,
         Err(error) => {
             let startup_failure = event_message(
-                "engine.startupFailed",
+                EVENT_ENGINE_STARTUP_FAILED,
                 json!({
                     "stage": "bootstrap",
                     "code": "BOOTSTRAP_FAILED",
