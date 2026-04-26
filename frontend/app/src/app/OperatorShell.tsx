@@ -14,6 +14,9 @@ import { AppShellFrame, Button, MetricCard, StatusBadge, Surface, type StatusTon
 import {
   useShellSnapshot,
   type JsonValue,
+  type LightingDmxMonitorSnapshot,
+  type LightingSnapshot,
+  type PlanningSnapshot,
   type ShellState,
   type ShellStore,
   type StartupFailure,
@@ -1011,7 +1014,7 @@ function PlanningWorkspaceSurface({
   store,
 }: {
   appSnapshot: SnapshotRecord | null;
-  planningSnapshot: SnapshotRecord | null;
+  planningSnapshot: PlanningSnapshot | null;
   store: ShellStore;
 }) {
   const projects = useMemo(() => getPlanningProjects(planningSnapshot), [planningSnapshot]);
@@ -3589,16 +3592,24 @@ function LightingWorkspaceSurface({
   store,
 }: {
   appSnapshot: SnapshotRecord | null;
-  lightingDmxMonitorSnapshot: SnapshotRecord | null;
-  lightingSnapshot: SnapshotRecord | null;
+  lightingDmxMonitorSnapshot: LightingDmxMonitorSnapshot | null;
+  lightingSnapshot: LightingSnapshot | null;
   store: ShellStore;
 }) {
   const shellLighting = asRecord(asRecord(appSnapshot?.shell)?.lighting);
   const persistedSelectedCueId = typeof shellLighting?.selectedCueId === "string" ? shellLighting.selectedCueId : null;
   const persistedSectionId =
     typeof shellLighting?.currentSectionId === "string" ? shellLighting.currentSectionId : null;
+  // `lightingSnapshotLoaded` and `loaded` are fixture-only loading-state
+  // markers (see frontend/packages/test-fixtures/src/fixtures.json). They
+  // are not part of the engine's wire format, so they're absent from the
+  // generated LightingSnapshot type. Read them through an unknown cast.
+  const lightingFixtureFlags = lightingSnapshot as unknown as {
+    lightingSnapshotLoaded?: boolean;
+    loaded?: boolean;
+  } | null;
   const lightingSnapshotLoaded =
-    lightingSnapshot?.lightingSnapshotLoaded !== false && lightingSnapshot?.loaded !== false;
+    lightingFixtureFlags?.lightingSnapshotLoaded !== false && lightingFixtureFlags?.loaded !== false;
   const dmxChannels = useMemo(() => getLightingDmxChannels(lightingDmxMonitorSnapshot), [lightingDmxMonitorSnapshot]);
   const fixtures = useMemo(() => getLightingFixtures(lightingSnapshot), [lightingSnapshot]);
   const scenes = useMemo(() => getLightingScenes(lightingSnapshot), [lightingSnapshot]);
