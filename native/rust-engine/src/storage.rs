@@ -444,7 +444,7 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
         schema_version = 3;
     }
 
-    if schema_version < 4 {
+    if schema_version < STORAGE_SCHEMA_VERSION {
         let transaction = connection.transaction()?;
 
         // Record format_version metadata so future migrations can distinguish
@@ -482,9 +482,12 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
             [],
         )?;
 
-        transaction.execute("INSERT INTO schema_migrations(version) VALUES (4)", [])?;
+        transaction.execute(
+            "INSERT INTO schema_migrations(version) VALUES (?1)",
+            [STORAGE_SCHEMA_VERSION],
+        )?;
         transaction.commit()?;
-        schema_version = 4;
+        schema_version = STORAGE_SCHEMA_VERSION;
     }
 
     Ok(schema_version)

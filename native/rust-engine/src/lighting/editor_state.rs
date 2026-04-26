@@ -30,14 +30,12 @@ pub(super) fn load_lighting_editor_state_with_inventory(
 ) -> LightingEditorState {
     settings
         .get(LIGHTING_EDITOR_STATE_KEY)
-        .or_else(|| settings.get(LEGACY_LIGHTING_EDITOR_STATE_KEY))
         .and_then(|value| serde_json::from_str::<LightingEditorState>(value).ok())
-        .map(|state| normalize_lighting_editor_state(state, settings, config, inventory))
-        .unwrap_or_else(|| default_lighting_editor_state(settings, config, inventory))
+        .map(|state| normalize_lighting_editor_state(state, config, inventory))
+        .unwrap_or_else(|| default_lighting_editor_state(config, inventory))
 }
 
 pub(super) fn default_lighting_editor_state(
-    settings: &HashMap<String, String>,
     config: &LightingBackendConfig,
     inventory: &LightingBackendInventory,
 ) -> LightingEditorState {
@@ -63,9 +61,9 @@ pub(super) fn default_lighting_editor_state(
             spatial_rotation: normalize_rotation(fixture.spatial_rotation),
             rig_z: None,
             beam_angle_degrees: None,
-            intensity: read_fixture_intensity(settings, &fixture.id),
-            cct: read_fixture_cct(settings, &fixture.id),
-            on: read_fixture_on(settings, &fixture.id),
+            intensity: DEFAULT_FIXTURE_INTENSITY,
+            cct: DEFAULT_FIXTURE_CCT,
+            on: false,
             effect: None,
         })
         .collect::<Vec<_>>();
@@ -81,7 +79,6 @@ pub(super) fn default_lighting_editor_state(
 
 pub(super) fn normalize_lighting_editor_state(
     existing: LightingEditorState,
-    settings: &HashMap<String, String>,
     config: &LightingBackendConfig,
     inventory: &LightingBackendInventory,
 ) -> LightingEditorState {
@@ -140,7 +137,7 @@ pub(super) fn normalize_lighting_editor_state(
             }
         })
         .collect::<Vec<_>>();
-    append_missing_fixture_states(&mut fixtures, &removed_fixture_ids, settings, inventory);
+    append_missing_fixture_states(&mut fixtures, &removed_fixture_ids, inventory);
     let groups = normalize_lighting_group_states(&existing.groups, inventory, &fixtures);
     let scenes = if existing.scenes.is_empty() {
         default_lighting_scene_states(config, inventory, &fixtures)
@@ -249,7 +246,6 @@ pub(super) fn append_missing_group_states(
 pub(super) fn append_missing_fixture_states(
     fixtures: &mut Vec<LightingEditorFixtureState>,
     removed_fixture_ids: &[String],
-    settings: &HashMap<String, String>,
     inventory: &LightingBackendInventory,
 ) {
     let known_ids = fixtures
@@ -284,13 +280,13 @@ pub(super) fn append_missing_fixture_states(
             spatial_rotation: normalize_rotation(inventory_fixture.spatial_rotation),
             rig_z: None,
             beam_angle_degrees: None,
-            intensity: read_fixture_intensity(settings, &inventory_fixture.id),
+            intensity: DEFAULT_FIXTURE_INTENSITY,
             cct: clamp_cct_for_type(
-                read_fixture_cct(settings, &inventory_fixture.id),
+                DEFAULT_FIXTURE_CCT,
                 fixture_type.as_str(),
                 inventory_fixture.cct,
             ),
-            on: read_fixture_on(settings, &inventory_fixture.id),
+            on: false,
             effect: None,
         });
     }
@@ -352,18 +348,7 @@ pub(super) fn lighting_editor_state_updates(
 ) -> Result<Vec<(String, String)>, LightingCommandError> {
     let serialized = serde_json::to_string(state)
         .map_err(|error| LightingCommandError::Storage(error.to_string()))?;
-    let mut updates = vec![(String::from(LIGHTING_EDITOR_STATE_KEY), serialized)];
-    for fixture in &state.fixtures {
-        updates.extend_from_slice(&[
-            (fixture_on_key(&fixture.id), fixture.on.to_string()),
-            (
-                fixture_intensity_key(&fixture.id),
-                fixture.intensity.to_string(),
-            ),
-            (fixture_cct_key(&fixture.id), fixture.cct.to_string()),
-        ]);
-    }
-    Ok(updates)
+    Ok(vec![(String::from(LIGHTING_EDITOR_STATE_KEY), serialized)])
 }
 
 pub(super) fn lighting_group_snapshot_from_state(

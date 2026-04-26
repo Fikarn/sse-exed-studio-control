@@ -513,45 +513,6 @@ pub(super) fn serialize_optional_marker(
         .map(|value| value.unwrap_or_default())
 }
 
-pub(super) fn fixture_on_key(fixture_id: &str) -> String {
-    format!("{LIGHTING_FIXTURE_STATE_PREFIX}{fixture_id}.on")
-}
-
-pub(super) fn fixture_intensity_key(fixture_id: &str) -> String {
-    format!("{LIGHTING_FIXTURE_STATE_PREFIX}{fixture_id}.intensity")
-}
-
-pub(super) fn fixture_cct_key(fixture_id: &str) -> String {
-    format!("{LIGHTING_FIXTURE_STATE_PREFIX}{fixture_id}.cct")
-}
-
-pub(super) fn read_fixture_on(settings: &HashMap<String, String>, fixture_id: &str) -> bool {
-    settings
-        .get(&fixture_on_key(fixture_id))
-        .and_then(|value| match value.as_str() {
-            "true" => Some(true),
-            "false" => Some(false),
-            _ => None,
-        })
-        .unwrap_or(false)
-}
-
-pub(super) fn read_fixture_intensity(settings: &HashMap<String, String>, fixture_id: &str) -> i64 {
-    settings
-        .get(&fixture_intensity_key(fixture_id))
-        .and_then(|value| value.parse::<i64>().ok())
-        .filter(|value| (0..=100).contains(value))
-        .unwrap_or(DEFAULT_FIXTURE_INTENSITY)
-}
-
-pub(super) fn read_fixture_cct(settings: &HashMap<String, String>, fixture_id: &str) -> i64 {
-    settings
-        .get(&fixture_cct_key(fixture_id))
-        .and_then(|value| value.parse::<i64>().ok())
-        .filter(|value| (MIN_FIXTURE_CCT..=MAX_FIXTURE_CCT).contains(value))
-        .unwrap_or(DEFAULT_FIXTURE_CCT)
-}
-
 pub(super) fn normalize_optional_coordinate(value: Option<f64>) -> Option<f64> {
     value
         .filter(|coordinate| coordinate.is_finite())
