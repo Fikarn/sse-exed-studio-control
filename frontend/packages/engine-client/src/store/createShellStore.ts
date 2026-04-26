@@ -1,8 +1,35 @@
 import { useSyncExternalStore } from "react";
 
-import { PROTOCOL_VERSION, type EventEnvelope, type EventName, type JsonObject } from "../generated/protocol";
+import {
+  PROTOCOL_VERSION,
+  type EventEnvelope,
+  type EventName,
+  type JsonObject,
+  type JsonValue,
+} from "../generated/protocol";
+import type { AudioSnapshot } from "../generated/snapshots/AudioSnapshot";
+import type { LightingDmxMonitorSnapshot } from "../generated/snapshots/LightingDmxMonitorSnapshot";
+import type { LightingSnapshot } from "../generated/snapshots/LightingSnapshot";
+import type { PlanningSnapshot } from "../generated/snapshots/PlanningSnapshot";
 import { transitionStartupState } from "../machines/startupMachine";
 import { deriveRecoveryState } from "../machines/recoveryMachine";
+
+// Boundary cast for typed snapshots produced by ts-rs codegen. The
+// engine boundary is the contract; we don't run runtime validation here
+// (no Zod, no schema check) for two reasons:
+//
+//   1. The IPC envelope is already validated by the engine; the wire
+//      format is JSON of a known shape that matches the ts-rs binding
+//      one-to-one.
+//   2. Adding runtime validation in the hot path would cost shell
+//      startup time on every refresh.
+//
+// If a snapshot ever returns null or a non-object, we still return null
+// here — that lets the UI keep rendering its empty state rather than
+// throwing.
+function coerceSnapshot<T>(value: JsonValue): T | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as unknown as T) : null;
+}
 import type {
   AudioChannelUpdateRequest,
   AudioMixTargetUpdateRequest,
@@ -221,10 +248,12 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       transport.request("health.snapshot").then((value) => value as JsonObject),
       transport.request("app.snapshot").then((value) => value as JsonObject),
       transport.request("commissioning.snapshot").then((value) => value as JsonObject),
-      transport.request("lighting.snapshot").then((value) => value as JsonObject),
-      transport.request("lighting.dmxMonitor.snapshot").then((value) => value as JsonObject),
-      transport.request("audio.snapshot").then((value) => value as JsonObject),
-      transport.request("planning.snapshot").then((value) => value as JsonObject),
+      transport.request("lighting.snapshot").then((value) => coerceSnapshot<LightingSnapshot>(value)),
+      transport
+        .request("lighting.dmxMonitor.snapshot")
+        .then((value) => coerceSnapshot<LightingDmxMonitorSnapshot>(value)),
+      transport.request("audio.snapshot").then((value) => coerceSnapshot<AudioSnapshot>(value)),
+      transport.request("planning.snapshot").then((value) => coerceSnapshot<PlanningSnapshot>(value)),
       transport.request("support.snapshot").then((value) => value as JsonObject),
       transport.request("controlSurface.snapshot").then((value) => value as JsonObject),
     ]);
@@ -336,10 +365,12 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       ] = await Promise.all([
         transport.request("app.snapshot").then((value) => value as JsonObject),
         transport.request("commissioning.snapshot").then((value) => value as JsonObject),
-        transport.request("lighting.snapshot").then((value) => value as JsonObject),
-        transport.request("lighting.dmxMonitor.snapshot").then((value) => value as JsonObject),
-        transport.request("audio.snapshot").then((value) => value as JsonObject),
-        transport.request("planning.snapshot").then((value) => value as JsonObject),
+        transport.request("lighting.snapshot").then((value) => coerceSnapshot<LightingSnapshot>(value)),
+        transport
+          .request("lighting.dmxMonitor.snapshot")
+          .then((value) => coerceSnapshot<LightingDmxMonitorSnapshot>(value)),
+        transport.request("audio.snapshot").then((value) => coerceSnapshot<AudioSnapshot>(value)),
+        transport.request("planning.snapshot").then((value) => coerceSnapshot<PlanningSnapshot>(value)),
         transport.request("support.snapshot").then((value) => value as JsonObject),
         transport.request("controlSurface.snapshot").then((value) => value as JsonObject),
       ]);
