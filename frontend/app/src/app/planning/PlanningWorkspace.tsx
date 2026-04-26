@@ -24,7 +24,7 @@ import {
   type PlanningTaskEntry,
   type SnapshotRecord,
 } from "../shellData";
-import styles from "../OperatorShell.module.css";
+import planningStyles from "./PlanningWorkspace.module.css";
 import { type ActionFeedback } from "../startup/startupHelpers";
 import { PlanningClockIcon } from "./icons";
 import { PlanningProjectDetailOverlay } from "./PlanningProjectDetailOverlay";
@@ -901,42 +901,45 @@ export function PlanningWorkspaceSurface({
       <div
         aria-busy="true"
         aria-label="Planning workspace"
-        className={styles.planningWorkspace}
+        className={planningStyles.planningWorkspace}
         data-testid="planning-workspace"
         role="region"
       >
         {loadingModeSection === "board" ? (
-          <div className={styles.planningBoardShell}>
+          <div className={planningStyles.planningBoardShell}>
             {boardColumns.map((column) => (
               <section
                 key={`planning-loading-${column.id}`}
-                className={styles.planningBoardColumn}
+                className={planningStyles.planningBoardColumn}
                 data-testid={`planning-board-column-${column.id}`}
               >
-                <div className={styles.planningBoardColumnHead}>
+                <div className={planningStyles.planningBoardColumnHead}>
                   <span>{column.label}</span>
                   <span>…</span>
                 </div>
-                <div className={styles.planningLoadingBoardColumn}>
+                <div className={planningStyles.planningLoadingBoardColumn}>
                   {Array.from({ length: 2 }, (_, index) => (
-                    <div key={`planning-loading-${column.id}-${index}`} className={styles.planningLoadingBoardCard} />
+                    <div
+                      key={`planning-loading-${column.id}-${index}`}
+                      className={planningStyles.planningLoadingBoardCard}
+                    />
                   ))}
                 </div>
               </section>
             ))}
           </div>
         ) : (
-          <div className={styles.planningShell} style={planningTimelineVariables}>
-            <div className={styles.planningScale}>
-              <div className={styles.planningScaleHead}>
+          <div className={planningStyles.planningShell} style={planningTimelineVariables}>
+            <div className={planningStyles.planningScale}>
+              <div className={planningStyles.planningScaleHead}>
                 <span>Project</span>
                 <span>Run-of-show loading…</span>
               </div>
-              <div className={styles.planningScaleTicks}>
+              <div className={planningStyles.planningScaleTicks}>
                 {timelineMinorTicks.map((minute) => (
                   <div
                     key={`planning-loading-half-hour-${minute}`}
-                    className={styles.planningScaleMinorTick}
+                    className={planningStyles.planningScaleMinorTick}
                     style={{
                       left: planningPercentForMinute(minute, timelineStartMinute, timelineRangeMinutes),
                     }}
@@ -944,11 +947,11 @@ export function PlanningWorkspaceSurface({
                 ))}
               </div>
             </div>
-            <div className={styles.planningLoadingLanes}>
+            <div className={planningStyles.planningLoadingLanes}>
               {Array.from({ length: 5 }, (_, index) => (
-                <div key={`planning-loading-${index}`} className={styles.planningLoadingLane}>
-                  <div className={styles.planningLoadingHead} />
-                  <div className={styles.planningLoadingBody} />
+                <div key={`planning-loading-${index}`} className={planningStyles.planningLoadingLane}>
+                  <div className={planningStyles.planningLoadingHead} />
+                  <div className={planningStyles.planningLoadingBody} />
                 </div>
               ))}
             </div>
@@ -961,16 +964,16 @@ export function PlanningWorkspaceSurface({
   return (
     <div
       aria-label="Planning workspace"
-      className={styles.planningWorkspace}
+      className={planningStyles.planningWorkspace}
       data-testid="planning-workspace"
       role="region"
     >
-      <div className={styles.planningToolbar} data-testid="planning-toolbar">
-        <div className={styles.planningToolbarActions}>
-          <div className={styles.planningModeToggle} role="tablist" aria-label="Planning mode">
+      <div className={planningStyles.planningToolbar} data-testid="planning-toolbar">
+        <div className={planningStyles.planningToolbarActions}>
+          <div className={planningStyles.planningModeToggle} role="tablist" aria-label="Planning mode">
             <button
               aria-selected={settings.modeSection === "timeline"}
-              className={styles.planningModeButton}
+              className={planningStyles.planningModeButton}
               data-active={settings.modeSection === "timeline"}
               onClick={() => togglePlanningMode("timeline")}
               role="tab"
@@ -980,7 +983,7 @@ export function PlanningWorkspaceSurface({
             </button>
             <button
               aria-selected={settings.modeSection === "board"}
-              className={styles.planningModeButton}
+              className={planningStyles.planningModeButton}
               data-active={settings.modeSection === "board"}
               onClick={() => togglePlanningMode("board")}
               role="tab"
@@ -989,15 +992,15 @@ export function PlanningWorkspaceSurface({
               Board
             </button>
           </div>
-          <div className={styles.planningNowCard}>
-            <div className={styles.planningNowHeader}>
-              <span className={styles.planningNowLabel}>Now</span>
-              <span className={styles.planningNowValue}>{nowLabel}</span>
+          <div className={planningStyles.planningNowCard}>
+            <div className={planningStyles.planningNowHeader}>
+              <span className={planningStyles.planningNowLabel}>Now</span>
+              <span className={planningStyles.planningNowValue}>{nowLabel}</span>
             </div>
-            <div className={styles.planningNudgeRow}>
+            <div className={planningStyles.planningNudgeRow}>
               <button
                 aria-label="View one hour earlier"
-                className={styles.planningNudgeButton}
+                className={planningStyles.planningNudgeButton}
                 onClick={() => setTimelineOffsetMinutes((current) => current - 60)}
                 type="button"
               >
@@ -1005,7 +1008,7 @@ export function PlanningWorkspaceSurface({
               </button>
               <button
                 aria-label="Snap to now"
-                className={styles.planningNudgeButton}
+                className={planningStyles.planningNudgeButton}
                 onClick={() => snapTimelineToNow()}
                 type="button"
               >
@@ -1013,7 +1016,7 @@ export function PlanningWorkspaceSurface({
               </button>
               <button
                 aria-label="View one hour later"
-                className={styles.planningNudgeButton}
+                className={planningStyles.planningNudgeButton}
                 onClick={() => setTimelineOffsetMinutes((current) => current + 60)}
                 type="button"
               >
@@ -1021,34 +1024,34 @@ export function PlanningWorkspaceSurface({
               </button>
             </div>
           </div>
-          <div className={styles.planningDayCard}>
-            <span className={styles.planningNowLabel}>Day</span>
-            <span className={styles.planningNowValue}>{viewDayLabel}</span>
+          <div className={planningStyles.planningDayCard}>
+            <span className={planningStyles.planningNowLabel}>Day</span>
+            <span className={planningStyles.planningNowValue}>{viewDayLabel}</span>
             {!viewIsToday ? (
-              <button className={styles.planningTodayButton} onClick={() => snapTimelineToNow()} type="button">
+              <button className={planningStyles.planningTodayButton} onClick={() => snapTimelineToNow()} type="button">
                 Today
               </button>
             ) : null}
           </div>
-          <div className={styles.planningStatRow}>
-            <div className={styles.planningStatChip}>
-              <span className={styles.planningStatLabel}>Lanes</span>
-              <span className={styles.planningStatValue}>{counts.projectCount}</span>
+          <div className={planningStyles.planningStatRow}>
+            <div className={planningStyles.planningStatChip}>
+              <span className={planningStyles.planningStatLabel}>Lanes</span>
+              <span className={planningStyles.planningStatValue}>{counts.projectCount}</span>
             </div>
-            <div className={styles.planningStatChip}>
-              <span className={styles.planningStatLabel}>On-time</span>
-              <span className={styles.planningStatValue}>{onTimeCount}</span>
+            <div className={planningStyles.planningStatChip}>
+              <span className={planningStyles.planningStatLabel}>On-time</span>
+              <span className={planningStyles.planningStatValue}>{onTimeCount}</span>
             </div>
-            <div className={styles.planningStatChip}>
-              <span className={styles.planningStatLabel}>Slipped</span>
-              <span className={styles.planningStatValue}>{slippedCount}</span>
+            <div className={planningStyles.planningStatChip}>
+              <span className={planningStyles.planningStatLabel}>Slipped</span>
+              <span className={planningStyles.planningStatValue}>{slippedCount}</span>
             </div>
-            <div className={styles.planningStatChip}>
-              <span className={styles.planningStatLabel}>Blocked</span>
-              <span className={styles.planningStatValue}>{blockedCount}</span>
+            <div className={planningStyles.planningStatChip}>
+              <span className={planningStyles.planningStatLabel}>Blocked</span>
+              <span className={planningStyles.planningStatValue}>{blockedCount}</span>
             </div>
           </div>
-          <div className={styles.planningFilterRow} role="tablist" aria-label="Planning filter">
+          <div className={planningStyles.planningFilterRow} role="tablist" aria-label="Planning filter">
             {[
               { label: "All", value: "all" },
               { label: "Todo", value: "todo" },
@@ -1059,7 +1062,7 @@ export function PlanningWorkspaceSurface({
               <button
                 key={filter.value}
                 aria-selected={settings.viewFilter === filter.value}
-                className={styles.planningFilterButton}
+                className={planningStyles.planningFilterButton}
                 data-active={settings.viewFilter === filter.value}
                 onClick={() =>
                   updatePlanningViewFilter(filter.value as "all" | "todo" | "in-progress" | "blocked" | "done")
@@ -1072,11 +1075,11 @@ export function PlanningWorkspaceSurface({
             ))}
           </div>
           {settings.modeSection === "timeline" && allTasksUnscheduled ? (
-            <div className={styles.planningTipChip}>Drag into a lane to schedule.</div>
+            <div className={planningStyles.planningTipChip}>Drag into a lane to schedule.</div>
           ) : null}
           <input
             aria-label="Search planning tasks"
-            className={styles.planningSearchInput}
+            className={planningStyles.planningSearchInput}
             onChange={(event) => setPlanningSearchQuery(event.currentTarget.value)}
             placeholder="Search tasks..."
             ref={planningSearchInputRef}
@@ -1085,18 +1088,18 @@ export function PlanningWorkspaceSurface({
           />
           <button
             aria-pressed={planningTimeReportOpen}
-            className={styles.planningToolbarButton}
+            className={planningStyles.planningToolbarButton}
             data-active={planningTimeReportOpen}
             onClick={() => togglePlanningTimeReport()}
             type="button"
           >
-            <span className={styles.planningToolbarButtonContent}>
+            <span className={planningStyles.planningToolbarButtonContent}>
               <PlanningClockIcon />
               <span>Time report</span>
             </span>
           </button>
           <button
-            className={styles.planningToolbarButton}
+            className={planningStyles.planningToolbarButton}
             disabled={planningBusyAction !== null}
             onClick={() => void exportPlanningBackup()}
             type="button"
@@ -1104,10 +1107,10 @@ export function PlanningWorkspaceSurface({
             Backup
           </button>
           {projectComposerOpen ? (
-            <div className={styles.planningProjectComposer}>
+            <div className={planningStyles.planningProjectComposer}>
               <input
                 aria-label="New project title"
-                className={styles.planningProjectInput}
+                className={planningStyles.planningProjectInput}
                 disabled={planningBusyAction !== null}
                 onChange={(event) => setNewProjectTitle(event.currentTarget.value)}
                 onKeyDown={(event) => {
@@ -1126,7 +1129,7 @@ export function PlanningWorkspaceSurface({
                 value={newProjectTitle}
               />
               <button
-                className={styles.planningToolbarButton}
+                className={planningStyles.planningToolbarButton}
                 data-primary="true"
                 disabled={newProjectTitle.trim().length === 0 || planningBusyAction !== null}
                 onClick={() => void createPlanningProject()}
@@ -1135,7 +1138,7 @@ export function PlanningWorkspaceSurface({
                 Add project
               </button>
               <button
-                className={styles.planningToolbarButton}
+                className={planningStyles.planningToolbarButton}
                 disabled={planningBusyAction !== null}
                 onClick={() => closeProjectComposer()}
                 type="button"
@@ -1145,7 +1148,7 @@ export function PlanningWorkspaceSurface({
             </div>
           ) : (
             <button
-              className={styles.planningToolbarButton}
+              className={planningStyles.planningToolbarButton}
               data-primary="true"
               disabled={planningBusyAction !== null}
               onClick={() => openProjectComposer()}
@@ -1157,29 +1160,29 @@ export function PlanningWorkspaceSurface({
         </div>
       </div>
       {planningFeedback ? (
-        <div className={styles.planningToolbarNotice} data-tone={planningFeedback.tone} role="status">
+        <div className={planningStyles.planningToolbarNotice} data-tone={planningFeedback.tone} role="status">
           {planningFeedback.message}
         </div>
       ) : null}
 
       {settings.modeSection === "board" ? (
-        <div className={styles.planningBoardShell}>
+        <div className={planningStyles.planningBoardShell}>
           {boardColumns.map((column) => {
             const columnProjects = filteredProjects.filter((project) => project.status === column.id);
             const filteredOut = settings.viewFilter !== "all" && settings.viewFilter !== column.id;
             return (
               <section
                 key={column.id}
-                className={styles.planningBoardColumn}
+                className={planningStyles.planningBoardColumn}
                 data-filter-dimmed={filteredOut}
                 data-testid={`planning-board-column-${column.id}`}
               >
-                <div className={styles.planningBoardColumnHead}>
+                <div className={planningStyles.planningBoardColumnHead}>
                   <span>{column.label}</span>
                   <span>{columnProjects.length}</span>
                 </div>
                 <div
-                  className={styles.planningBoardColumnBody}
+                  className={planningStyles.planningBoardColumnBody}
                   data-drop-active={planningBoardDropTarget?.status === column.id}
                   data-testid={`planning-board-column-body-${column.id}`}
                   onDragOver={(event) => {
@@ -1220,7 +1223,7 @@ export function PlanningWorkspaceSurface({
                 >
                   {settings.viewFilter !== "all" && settings.viewFilter === column.id && columnProjects.length === 0 ? (
                     <div
-                      className={styles.planningBoardEmpty}
+                      className={planningStyles.planningBoardEmpty}
                       data-testid={`planning-board-empty-${column.id}`}
                       data-zero-filter="true"
                     >
@@ -1239,7 +1242,7 @@ export function PlanningWorkspaceSurface({
                       return (
                         <article
                           key={project.id}
-                          className={styles.planningBoardCard}
+                          className={planningStyles.planningBoardCard}
                           data-blocked={project.status === "blocked"}
                           data-dragging={draggingBoardProjectId === project.id}
                           data-drop-target={
@@ -1295,59 +1298,59 @@ export function PlanningWorkspaceSurface({
                             clearPlanningBoardDragState();
                           }}
                         >
-                          <div className={styles.planningBoardCardHeader}>
+                          <div className={planningStyles.planningBoardCardHeader}>
                             <button
                               aria-label={`Open project detail for ${project.title}`}
-                              className={styles.planningBoardDetailButton}
+                              className={planningStyles.planningBoardDetailButton}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 openPlanningProjectDetail(project.id, projectTasks[0]?.id ?? null);
                               }}
                               type="button"
                             >
-                              <span className={styles.planningBoardCardTitle}>{project.title}</span>
+                              <span className={planningStyles.planningBoardCardTitle}>{project.title}</span>
                             </button>
-                            <div className={styles.planningBoardPriority}>{project.priority.toUpperCase()}</div>
+                            <div className={planningStyles.planningBoardPriority}>{project.priority.toUpperCase()}</div>
                           </div>
-                          <div className={styles.planningBoardStatusRow}>
+                          <div className={planningStyles.planningBoardStatusRow}>
                             <StatusBadge
                               label={project.status.replace("-", " ")}
                               tone={planningStatusTone(project.status)}
                             />
                             {runningTask ? (
-                              <div className={styles.planningBoardRunning}>
-                                <span className={styles.planningBoardRunningDot} />
+                              <div className={planningStyles.planningBoardRunning}>
+                                <span className={planningStyles.planningBoardRunningDot} />
                                 <span>{runningTask.title} running</span>
                               </div>
                             ) : (
-                              <div className={styles.planningBoardCardMeta}>
+                              <div className={planningStyles.planningBoardCardMeta}>
                                 {completedTaskCount}/{projectTasks.length} tasks
                               </div>
                             )}
                           </div>
                           {project.description ? (
-                            <div className={styles.planningBoardDescription}>{project.description}</div>
+                            <div className={planningStyles.planningBoardDescription}>{project.description}</div>
                           ) : null}
-                          <div className={styles.planningBoardProgress}>
+                          <div className={planningStyles.planningBoardProgress}>
                             <div
-                              className={styles.planningBoardProgressFill}
+                              className={planningStyles.planningBoardProgressFill}
                               style={{
                                 width: `${projectTasks.length > 0 ? Math.round((completedTaskCount / projectTasks.length) * 100) : 0}%`,
                               }}
                             />
                           </div>
-                          <div className={styles.planningBoardCardMeta}>
+                          <div className={planningStyles.planningBoardCardMeta}>
                             {completedTaskCount}/{projectTasks.length} tasks · {project.priority.toUpperCase()}
                           </div>
                           {visibleLabels.length > 0 ? (
-                            <div className={styles.planningBoardTags}>
+                            <div className={planningStyles.planningBoardTags}>
                               {visibleLabels.map((label) => (
-                                <span key={label} className={styles.planningBoardTag}>
+                                <span key={label} className={planningStyles.planningBoardTag}>
                                   {label}
                                 </span>
                               ))}
                               {extraLabelCount > 0 ? (
-                                <span className={styles.planningBoardTag}>+{extraLabelCount}</span>
+                                <span className={planningStyles.planningBoardTag}>+{extraLabelCount}</span>
                               ) : null}
                             </div>
                           ) : null}
@@ -1355,36 +1358,36 @@ export function PlanningWorkspaceSurface({
                       );
                     })
                   ) : (
-                    <div className={styles.planningBoardEmpty}>No projects in this column.</div>
+                    <div className={planningStyles.planningBoardEmpty}>No projects in this column.</div>
                   )}
                 </div>
               </section>
             );
           })}
           {projects.length === 0 ? (
-            <div className={styles.planningBoardEmptyState}>
-              <div className={styles.planningEmptyTitle}>No projects yet. Press N to start one.</div>
-              <div className={styles.planningEmptyBody}>
+            <div className={planningStyles.planningBoardEmptyState}>
+              <div className={planningStyles.planningEmptyTitle}>No projects yet. Press N to start one.</div>
+              <div className={planningStyles.planningEmptyBody}>
                 The board stays visible, but there is no run-of-show data on the current day.
               </div>
             </div>
           ) : null}
         </div>
       ) : (
-        <div className={styles.planningShell} style={planningTimelineVariables}>
-          <div className={styles.planningScale}>
-            <div className={styles.planningScaleHead}>
+        <div className={planningStyles.planningShell} style={planningTimelineVariables}>
+          <div className={planningStyles.planningScale}>
+            <div className={planningStyles.planningScaleHead}>
               <span>Project</span>
               <span>
                 {formatPlanningHourLabel(Math.floor(timelineStartMinute / 60))} →{" "}
                 {formatPlanningHourLabel(Math.floor(timelineEndMinute / 60))}
               </span>
             </div>
-            <div className={styles.planningScaleTicks}>
+            <div className={planningStyles.planningScaleTicks}>
               {timelineMinorTicks.map((minute) => (
                 <div
                   key={`planning-half-hour-${minute}`}
-                  className={styles.planningScaleMinorTick}
+                  className={planningStyles.planningScaleMinorTick}
                   style={{
                     left: planningPercentForMinute(minute, timelineStartMinute, timelineRangeMinutes),
                   }}
@@ -1393,7 +1396,7 @@ export function PlanningWorkspaceSurface({
               {timelineTicks.map((hour) => (
                 <div
                   key={`planning-hour-${hour}`}
-                  className={styles.planningScaleTick}
+                  className={planningStyles.planningScaleTick}
                   style={{
                     left: planningPercentForMinute(hour * 60, timelineStartMinute, timelineRangeMinutes),
                   }}
@@ -1404,28 +1407,32 @@ export function PlanningWorkspaceSurface({
             </div>
           </div>
           {showFilterBanner || showSearchZeroResult ? (
-            <div className={styles.planningFilterBanner} role="status">
+            <div className={planningStyles.planningFilterBanner} role="status">
               <span>
                 {hasPlanningSearch ? `Search: "${planningSearchQuery.trim()}"` : `Filter: ${settings.viewFilter}`} ·{" "}
                 {filteredProjects.length} of {projects.length}
               </span>
-              <button className={styles.planningFilterClear} onClick={() => clearPlanningFilters()} type="button">
+              <button
+                className={planningStyles.planningFilterClear}
+                onClick={() => clearPlanningFilters()}
+                type="button"
+              >
                 Clear
               </button>
             </div>
           ) : null}
 
           {projects.length === 0 ? (
-            <div className={styles.planningEmptyState}>
-              <div className={styles.planningEmptyTitle}>No projects yet. Press N to start one.</div>
-              <div className={styles.planningEmptyBody}>
+            <div className={planningStyles.planningEmptyState}>
+              <div className={planningStyles.planningEmptyTitle}>No projects yet. Press N to start one.</div>
+              <div className={planningStyles.planningEmptyBody}>
                 The timeline stays visible, but there is no run-of-show data on the current day.
               </div>
             </div>
           ) : (
-            <div className={styles.planningTimeline} ref={planningTimelineRef}>
+            <div className={planningStyles.planningTimeline} ref={planningTimelineRef}>
               <div
-                className={styles.planningNowPlayhead}
+                className={planningStyles.planningNowPlayhead}
                 data-testid="planning-now-playhead"
                 style={{
                   left: `calc(280px + (100% - 280px) * ${planningFractionForMinute(
@@ -1446,13 +1453,13 @@ export function PlanningWorkspaceSurface({
                 return (
                   <div
                     key={project.id}
-                    className={styles.planningLane}
+                    className={planningStyles.planningLane}
                     data-filter-dimmed={laneFilteredOut}
                     data-testid={`planning-lane-${project.id}`}
                   >
-                    <div className={styles.planningLaneHead}>
-                      <div className={styles.planningLaneTitle}>{project.title}</div>
-                      <div className={styles.planningLaneMeta}>
+                    <div className={planningStyles.planningLaneHead}>
+                      <div className={planningStyles.planningLaneTitle}>{project.title}</div>
+                      <div className={planningStyles.planningLaneMeta}>
                         <StatusBadge
                           label={project.status.replace("-", " ")}
                           tone={planningStatusTone(project.status)}
@@ -1460,9 +1467,9 @@ export function PlanningWorkspaceSurface({
                         <span>{subtitle}</span>
                       </div>
                     </div>
-                    <div className={styles.planningLaneBody}>
+                    <div className={planningStyles.planningLaneBody}>
                       <div
-                        className={styles.planningLaneDropZone}
+                        className={planningStyles.planningLaneDropZone}
                         data-drop-active={planningDropTarget?.projectId === project.id}
                         data-drop-allowed={
                           draggingScheduledTask !== null || draggingUnscheduledTask?.projectId === project.id
@@ -1518,7 +1525,7 @@ export function PlanningWorkspaceSurface({
                       />
                       {planningDropTarget?.projectId === project.id ? (
                         <div
-                          className={styles.planningDropGhost}
+                          className={planningStyles.planningDropGhost}
                           style={{
                             left: planningPercentForMinute(
                               planningDropTarget.minute,
@@ -1546,7 +1553,7 @@ export function PlanningWorkspaceSurface({
                         return (
                           <button
                             key={task.id}
-                            className={styles.planningBlock}
+                            className={planningStyles.planningBlock}
                             data-dragging={draggingScheduledTaskId === task.id}
                             data-overlap={overlapTitle !== null}
                             data-overlap-pulse={planningOverlapPulseTaskId === task.id}
@@ -1583,8 +1590,8 @@ export function PlanningWorkspaceSurface({
                             }
                             type="button"
                           >
-                            <span className={styles.planningBlockTitle}>{task.title}</span>
-                            <span className={styles.planningBlockMeta}>
+                            <span className={planningStyles.planningBlockTitle}>{task.title}</span>
+                            <span className={planningStyles.planningBlockMeta}>
                               {taskDurationMinutes} min · {task.priority.toUpperCase()}
                             </span>
                           </button>
@@ -1599,7 +1606,7 @@ export function PlanningWorkspaceSurface({
 
           {visibleUnscheduledTasks.length > 0 ? (
             <div
-              className={styles.planningUnscheduledTray}
+              className={planningStyles.planningUnscheduledTray}
               data-all-unscheduled={allTasksUnscheduled}
               data-expanded={unscheduledTrayExpanded}
               data-testid="planning-unscheduled-tray"
@@ -1620,19 +1627,19 @@ export function PlanningWorkspaceSurface({
             >
               <button
                 aria-expanded={unscheduledTrayExpanded}
-                className={styles.planningUnscheduledHead}
+                className={planningStyles.planningUnscheduledHead}
                 onClick={() => setTrayExpanded((current) => !current)}
                 type="button"
               >
                 <span>Unscheduled ({visibleUnscheduledTasks.length})</span>
                 <span>{unscheduledTrayExpanded ? "Collapse" : "Expand"}</span>
               </button>
-              <div className={styles.planningUnscheduledBody}>
+              <div className={planningStyles.planningUnscheduledBody}>
                 {visibleUnscheduledTasks.map((task) => (
                   <button
                     key={task.id}
                     aria-label={`Unscheduled task ${task.title}`}
-                    className={styles.planningUnscheduledChip}
+                    className={planningStyles.planningUnscheduledChip}
                     draggable
                     onDragEnd={() => {
                       setDraggingUnscheduledTaskId(null);

@@ -26,7 +26,8 @@ import {
   mapStatusBadgeTone,
   type SnapshotRecord,
 } from "../shellData";
-import styles from "../OperatorShell.module.css";
+import shellStyles from "../OperatorShell.module.css";
+import lightingStyles from "./LightingWorkspace.module.css";
 import { ShellDialog } from "../shared/ShellDialog";
 import { type ActionFeedback, feedbackBadgeTone } from "../startup/startupHelpers";
 import {
@@ -1987,59 +1988,59 @@ export function LightingWorkspaceSurface({
 
   if (!lightingSnapshotLoaded) {
     return (
-      <div className={styles.lightingShell}>
-        <section className={`${styles.workspaceCard} ${styles.lightingToolbar}`}>
-          <div className={styles.lightingToolbarCluster}>
+      <div className={lightingStyles.lightingShell}>
+        <section className={`${shellStyles.workspaceCard} ${lightingStyles.lightingToolbar}`}>
+          <div className={lightingStyles.lightingToolbarCluster}>
             <div>
-              <div className={styles.metaLabel}>Lighting</div>
-              <h2 className={styles.cardTitle}>Lighting workspace</h2>
-              <p className={styles.cardSubtitle}>Loading the lighting snapshot from the engine.</p>
+              <div className={shellStyles.metaLabel}>Lighting</div>
+              <h2 className={shellStyles.cardTitle}>Lighting workspace</h2>
+              <p className={shellStyles.cardSubtitle}>Loading the lighting snapshot from the engine.</p>
             </div>
             <StatusBadge label="loading" tone="connected" />
           </div>
-          <div className={styles.lightingToolbarCluster}>
+          <div className={lightingStyles.lightingToolbarCluster}>
             <StatusBadge label={`u${universe} · ${bridgeIp}`} tone="idle" />
           </div>
         </section>
 
-        <div className={styles.lightingMain}>
-          <aside className={`${styles.workspaceCard} ${styles.lightingCueRail}`}>
-            <div className={styles.lightingCueRailHeader}>
-              <div className={styles.metaLabel}>Cue Rail</div>
-              <div className={styles.footerNote}>Awaiting snapshot</div>
+        <div className={lightingStyles.lightingMain}>
+          <aside className={`${shellStyles.workspaceCard} ${lightingStyles.lightingCueRail}`}>
+            <div className={lightingStyles.lightingCueRailHeader}>
+              <div className={shellStyles.metaLabel}>Cue Rail</div>
+              <div className={shellStyles.footerNote}>Awaiting snapshot</div>
             </div>
-            <div className={styles.lightingGoBar}>
-              <div className={styles.lightingGoMeta}>
-                <div className={styles.summaryValue}>Loading cue stack…</div>
-                <div className={styles.summaryDetail}>Run-of-show metadata is still hydrating.</div>
+            <div className={lightingStyles.lightingGoBar}>
+              <div className={lightingStyles.lightingGoMeta}>
+                <div className={shellStyles.summaryValue}>Loading cue stack…</div>
+                <div className={shellStyles.summaryDetail}>Run-of-show metadata is still hydrating.</div>
               </div>
             </div>
-            <div className={styles.lightingCueList} aria-hidden="true">
+            <div className={lightingStyles.lightingCueList} aria-hidden="true">
               {Array.from({ length: 4 }, (_, index) => (
-                <div key={index} className={styles.lightingLoadingCueRow} />
+                <div key={index} className={lightingStyles.lightingLoadingCueRow} />
               ))}
             </div>
           </aside>
 
-          <section className={`${styles.workspaceCard} ${styles.lightingStageSurface}`}>
-            <div className={styles.lightingPlotCard}>
-              <div className={styles.lightingPlotHeader}>
+          <section className={`${shellStyles.workspaceCard} ${lightingStyles.lightingStageSurface}`}>
+            <div className={lightingStyles.lightingPlotCard}>
+              <div className={lightingStyles.lightingPlotHeader}>
                 <div>
-                  <div className={styles.metaLabel}>Stage preview</div>
-                  <div className={styles.summaryDetail}>
+                  <div className={shellStyles.metaLabel}>Stage preview</div>
+                  <div className={shellStyles.summaryDetail}>
                     Outline and grid are available before the live fixture layer arrives.
                   </div>
                 </div>
               </div>
-              <div className={styles.lightingPlot} data-patch="false">
-                <div className={styles.lightingPlotFrame} />
-                <div className={styles.lightingStageLabel}>STAGE</div>
+              <div className={lightingStyles.lightingPlot} data-patch="false">
+                <div className={lightingStyles.lightingPlotFrame} />
+                <div className={lightingStyles.lightingStageLabel}>STAGE</div>
                 {Array.from({ length: 3 }, (_, index) => {
                   const fallback = fallbackFixturePosition(index);
                   return (
                     <div
                       key={index}
-                      className={styles.lightingLoadingFixture}
+                      className={lightingStyles.lightingLoadingFixture}
                       style={{
                         left: `${Math.max(6, Math.min(94, fallback.x * 100))}%`,
                         top: `${Math.max(10, Math.min(90, fallback.y * 100))}%`,
@@ -2051,36 +2052,39 @@ export function LightingWorkspaceSurface({
             </div>
           </section>
 
-          <aside className={`${styles.workspaceCard} ${styles.lightingInspector}`}>
-            <div className={styles.metaItem}>
-              <div className={styles.metaLabel}>Cue preview</div>
-              <div className={styles.metaValue}>Loading…</div>
-              <div className={styles.lightingLoadingInspector}>
+          <aside className={`${shellStyles.workspaceCard} ${lightingStyles.lightingInspector}`}>
+            <div className={shellStyles.metaItem}>
+              <div className={shellStyles.metaLabel}>Cue preview</div>
+              <div className={shellStyles.metaValue}>Loading…</div>
+              <div className={lightingStyles.lightingLoadingInspector}>
                 {Array.from({ length: 4 }, (_, index) => (
-                  <div key={index} className={styles.lightingLoadingInspectorBar} />
+                  <div key={index} className={lightingStyles.lightingLoadingInspectorBar} />
                 ))}
               </div>
             </div>
           </aside>
         </div>
 
-        <section className={`${styles.workspaceCard} ${styles.lightingControlStrip}`}>
-          <div className={styles.lightingStripColumn}>
-            <div className={styles.metaLabel}>Groups</div>
-            <div className={styles.footerNote}>Waiting for published group pads.</div>
+        <section className={`${shellStyles.workspaceCard} ${lightingStyles.lightingControlStrip}`}>
+          <div className={lightingStyles.lightingStripColumn}>
+            <div className={shellStyles.metaLabel}>Groups</div>
+            <div className={shellStyles.footerNote}>Waiting for published group pads.</div>
           </div>
-          <div className={styles.lightingStripColumn}>
-            <div className={styles.metaLabel}>Scenes</div>
-            <div className={styles.footerNote}>Waiting for published scene recall tiles.</div>
+          <div className={lightingStyles.lightingStripColumn}>
+            <div className={shellStyles.metaLabel}>Scenes</div>
+            <div className={shellStyles.footerNote}>Waiting for published scene recall tiles.</div>
           </div>
-          <div className={styles.lightingStripColumn}>
-            <div className={styles.lightingStripHeader}>
-              <div className={styles.metaLabel}>DMX peek</div>
-              <div className={styles.footerNote}>Blank ribbon until the DMX monitor snapshot arrives.</div>
+          <div className={lightingStyles.lightingStripColumn}>
+            <div className={lightingStyles.lightingStripHeader}>
+              <div className={shellStyles.metaLabel}>DMX peek</div>
+              <div className={shellStyles.footerNote}>Blank ribbon until the DMX monitor snapshot arrives.</div>
             </div>
-            <div className={styles.lightingDmxGrid} data-stale="false" aria-hidden="true">
+            <div className={lightingStyles.lightingDmxGrid} data-stale="false" aria-hidden="true">
               {Array.from({ length: 12 }, (_, index) => (
-                <div key={index} className={`${styles.lightingDmxCell} ${styles.lightingLoadingDmxCell}`} />
+                <div
+                  key={index}
+                  className={`${lightingStyles.lightingDmxCell} ${lightingStyles.lightingLoadingDmxCell}`}
+                />
               ))}
             </div>
           </div>
@@ -2091,13 +2095,13 @@ export function LightingWorkspaceSurface({
 
   return (
     <>
-      <div className={styles.lightingShell}>
-        <section className={`${styles.workspaceCard} ${styles.lightingToolbar}`}>
-          <div className={styles.lightingToolbarCluster}>
+      <div className={lightingStyles.lightingShell}>
+        <section className={`${shellStyles.workspaceCard} ${lightingStyles.lightingToolbar}`}>
+          <div className={lightingStyles.lightingToolbarCluster}>
             <div>
-              <div className={styles.metaLabel}>Lighting</div>
-              <h2 className={styles.cardTitle}>Lighting workspace</h2>
-              <p className={styles.cardSubtitle}>
+              <div className={shellStyles.metaLabel}>Lighting</div>
+              <h2 className={shellStyles.cardTitle}>Lighting workspace</h2>
+              <p className={shellStyles.cardSubtitle}>
                 {String(
                   lightingSnapshot?.summary ?? "Engine-driven lighting state is now routed into the replacement shell."
                 )}
@@ -2105,27 +2109,27 @@ export function LightingWorkspaceSurface({
             </div>
             <StatusBadge label={status} tone={mapStatusBadgeTone(lightingStatusTone(status))} />
           </div>
-          <div className={styles.lightingToolbarCluster}>
+          <div className={lightingStyles.lightingToolbarCluster}>
             <StatusBadge label={dmxStale ? "DMX unreachable" : "DMX linked"} tone={dmxStale ? "error" : "connected"} />
             <StatusBadge label={`u${universe} · ${bridgeIp}`} tone={dmxStale ? "warning" : "idle"} />
           </div>
-          <div className={styles.lightingToolbarStats}>
-            <span className={styles.lightingToolbarStatChip}>Fixtures {fixtures.length}</span>
-            <span className={styles.lightingToolbarStatChip}>On {onCount}</span>
-            <span className={styles.lightingToolbarStatChip}>Groups {groups.length}</span>
-            <span className={styles.lightingToolbarStatChip}>Cues {cues.length}</span>
+          <div className={lightingStyles.lightingToolbarStats}>
+            <span className={lightingStyles.lightingToolbarStatChip}>Fixtures {fixtures.length}</span>
+            <span className={lightingStyles.lightingToolbarStatChip}>On {onCount}</span>
+            <span className={lightingStyles.lightingToolbarStatChip}>Groups {groups.length}</span>
+            <span className={lightingStyles.lightingToolbarStatChip}>Cues {cues.length}</span>
           </div>
-          <label className={styles.lightingToolbarSearch}>
-            <span className={styles.lightingToolbarSearchLabel}>Search</span>
+          <label className={lightingStyles.lightingToolbarSearch}>
+            <span className={lightingStyles.lightingToolbarSearchLabel}>Search</span>
             <input
-              className={styles.lightingToolbarInput}
+              className={lightingStyles.lightingToolbarInput}
               onChange={(event) => setSearchQuery(event.currentTarget.value)}
               placeholder="Search fixtures"
               type="search"
               value={searchQuery}
             />
           </label>
-          <div className={styles.lightingToolbarActions}>
+          <div className={lightingStyles.lightingToolbarActions}>
             {searchActive ? (
               <Button onClick={() => setSearchQuery("")} size="compact" variant="ghost">
                 Clear
@@ -2140,7 +2144,7 @@ export function LightingWorkspaceSurface({
             </Button>
             <Button
               aria-pressed={blackoutHolding}
-              className={styles.lightingBlackoutButton}
+              className={lightingStyles.lightingBlackoutButton}
               onMouseDown={startBlackoutHold}
               onMouseLeave={cancelBlackoutHold}
               onMouseUp={cancelBlackoutHold}
@@ -2166,41 +2170,41 @@ export function LightingWorkspaceSurface({
         </section>
 
         {feedback ? (
-          <div className={styles.statusBanner} role="status">
+          <div className={shellStyles.statusBanner} role="status">
             <div>
-              <div className={styles.statusBannerTitle}>
+              <div className={shellStyles.statusBannerTitle}>
                 {feedback.tone === "error" ? "Lighting action failed" : "Lighting action applied"}
               </div>
-              <div className={styles.statusBannerBody}>{feedback.message}</div>
+              <div className={shellStyles.statusBannerBody}>{feedback.message}</div>
             </div>
             <StatusBadge label={feedback.tone} tone={feedbackBadgeTone(feedback.tone)} />
           </div>
         ) : null}
 
-        <div className={styles.lightingMain}>
-          <aside className={`${styles.workspaceCard} ${styles.lightingCueRail}`}>
-            <div className={styles.lightingCueRailHeader}>
-              <div className={styles.metaLabel}>Cue Rail</div>
-              <div className={styles.footerNote}>{cues.length} cues</div>
+        <div className={lightingStyles.lightingMain}>
+          <aside className={`${shellStyles.workspaceCard} ${lightingStyles.lightingCueRail}`}>
+            <div className={lightingStyles.lightingCueRailHeader}>
+              <div className={shellStyles.metaLabel}>Cue Rail</div>
+              <div className={shellStyles.footerNote}>{cues.length} cues</div>
             </div>
             <div
-              className={styles.lightingGoBar}
+              className={lightingStyles.lightingGoBar}
               data-testid="lighting-go-bar"
               data-transitioning={cueTransition !== null}
             >
               {cueTransition ? (
                 <div
                   aria-hidden="true"
-                  className={styles.lightingGoProgress}
+                  className={lightingStyles.lightingGoProgress}
                   data-testid="lighting-go-progress"
                   style={{ width: `${Math.max(0, Math.min(100, cueTransitionProgress * 100))}%` }}
                 />
               ) : null}
-              <div className={styles.lightingGoMeta}>
-                <div className={styles.summaryValue}>
+              <div className={lightingStyles.lightingGoMeta}>
+                <div className={shellStyles.summaryValue}>
                   {cueTransition ? `GOING → ${cueTransition.cueLabel}` : cueTarget ? cueTarget.label : "No cue ready"}
                 </div>
-                <div className={styles.summaryDetail}>
+                <div className={shellStyles.summaryDetail}>
                   {cueTransition
                     ? `${cueTransitionPreviousCue ? `From ${cueTransitionPreviousCue.label}` : "Cross-fade in progress."} · ${Math.round(
                         cueTransitionProgress * 100
@@ -2214,7 +2218,7 @@ export function LightingWorkspaceSurface({
                           }`}
                 </div>
               </div>
-              <div className={styles.lightingGoActions}>
+              <div className={lightingStyles.lightingGoActions}>
                 <Button
                   disabled={!previousCue || busyAction === "cue-back" || cueOutputMuted}
                   onClick={() => previousCue && void fireCue("cue-back", previousCue.id, previousCue.fadeInMs)}
@@ -2231,23 +2235,23 @@ export function LightingWorkspaceSurface({
                 </Button>
               </div>
             </div>
-            <div className={styles.lightingCueList}>
+            <div className={lightingStyles.lightingCueList}>
               {cues.length > 0 ? (
                 cues.map((cue) => (
                   <button
                     key={cue.id}
-                    className={styles.lightingCueItem}
+                    className={lightingStyles.lightingCueItem}
                     data-active={cue.id === activeCue?.id}
                     data-selected={cue.id === selectedCue?.id}
                     onClick={() => void selectCuePreview(cue.id, cue.sceneId)}
                     type="button"
                   >
-                    <div className={styles.lightingCueRow}>
+                    <div className={lightingStyles.lightingCueRow}>
                       <div>
-                        <div className={styles.lightingCueLabel}>
+                        <div className={lightingStyles.lightingCueLabel}>
                           {cue.ordinal}. {cue.label}
                         </div>
-                        <div className={styles.lightingCueDetail}>
+                        <div className={lightingStyles.lightingCueDetail}>
                           Fade in {cue.fadeInMs} ms
                           {cue.followSeconds !== undefined ? ` · Follow ${cue.followSeconds}s` : ""}
                         </div>
@@ -2257,10 +2261,10 @@ export function LightingWorkspaceSurface({
                   </button>
                 ))
               ) : (
-                <div className={styles.footerNote}>No lighting cues are published yet.</div>
+                <div className={shellStyles.footerNote}>No lighting cues are published yet.</div>
               )}
             </div>
-            <div className={styles.actionRow}>
+            <div className={shellStyles.actionRow}>
               <Button
                 disabled={busyAction === "cue-create"}
                 onClick={() => void createLightingCue()}
@@ -2286,18 +2290,18 @@ export function LightingWorkspaceSurface({
                 Delete cue
               </Button>
             </div>
-            <div className={styles.footerNote}>
+            <div className={shellStyles.footerNote}>
               Space GO · Backspace BACK · ↑/↓ cue · Enter fire · C add cue · E edit cue · ←/→ nudge fixture · Shift+drag
               lasso · G save group
             </div>
           </aside>
 
-          <section className={`${styles.workspaceCard} ${styles.lightingStageSurface}`}>
-            <div className={styles.lightingPlotCard}>
-              <div className={styles.lightingPlotHeader}>
+          <section className={`${shellStyles.workspaceCard} ${lightingStyles.lightingStageSurface}`}>
+            <div className={lightingStyles.lightingPlotCard}>
+              <div className={lightingStyles.lightingPlotHeader}>
                 <div>
-                  <div className={styles.metaLabel}>Stage preview</div>
-                  <div className={styles.summaryDetail}>
+                  <div className={shellStyles.metaLabel}>Stage preview</div>
+                  <div className={shellStyles.summaryDetail}>
                     {patchMode
                       ? "Patch mode is active. Select a fixture to edit addresses in-place."
                       : activeSection
@@ -2305,13 +2309,13 @@ export function LightingWorkspaceSurface({
                         : "Fixture positions come straight from `lighting.snapshot`."}
                   </div>
                 </div>
-                <div className={styles.footerNote}>
+                <div className={shellStyles.footerNote}>
                   Bridge {bridgeIp} · Universe {universe}
                 </div>
               </div>
               <div
                 ref={plotRef}
-                className={styles.lightingPlot}
+                className={lightingStyles.lightingPlot}
                 data-cue-pulse={cueTransitionPulseActive}
                 data-testid="lighting-stage-plot"
                 data-patch={patchMode}
@@ -2325,31 +2329,31 @@ export function LightingWorkspaceSurface({
                   }
                 }}
               >
-                <div className={styles.lightingPlotFrame} />
-                <div className={styles.lightingStageLabel}>STAGE</div>
+                <div className={lightingStyles.lightingPlotFrame} />
+                <div className={lightingStyles.lightingStageLabel}>STAGE</div>
                 {activeSection ? (
-                  <div className={styles.lightingSectionPill}>
+                  <div className={lightingStyles.lightingSectionPill}>
                     {activeSection.key}. {activeSection.label}
                   </div>
                 ) : null}
-                {patchMode ? <div className={styles.lightingPatchBanner}>Patch mode · output muted</div> : null}
+                {patchMode ? <div className={lightingStyles.lightingPatchBanner}>Patch mode · output muted</div> : null}
                 {patchMode ? (
-                  <div className={styles.lightingPatchOverlay}>
-                    <div className={styles.lightingPatchOverlayHeader}>
-                      <div className={styles.metaLabel}>Candidate DMX starts</div>
-                      <div className={styles.summaryDetail}>
+                  <div className={lightingStyles.lightingPatchOverlay}>
+                    <div className={lightingStyles.lightingPatchOverlayHeader}>
+                      <div className={shellStyles.metaLabel}>Candidate DMX starts</div>
+                      <div className={shellStyles.summaryDetail}>
                         {selectedFixture
                           ? `Selected fixture: ${selectedFixture.name}. Drag a safe start address onto any fixture, or click to apply it to the current target.`
                           : "Select a fixture, then drag a safe start address onto the stage target you want to re-patch."}
                       </div>
                     </div>
                     {patchCandidateStartAddresses.length > 0 ? (
-                      <div className={styles.lightingPatchCandidateGrid}>
+                      <div className={lightingStyles.lightingPatchCandidateGrid}>
                         {patchCandidateStartAddresses.map((startAddress) => (
                           <button
                             key={startAddress}
                             aria-label={`Patch candidate DMX ${startAddress}`}
-                            className={styles.lightingPatchCandidate}
+                            className={lightingStyles.lightingPatchCandidate}
                             data-dragging={dragPatchStartAddress === startAddress}
                             draggable
                             onClick={() => {
@@ -2367,15 +2371,15 @@ export function LightingWorkspaceSurface({
                             title={`Universe ${universe} · start ${String(startAddress).padStart(3, "0")}`}
                             type="button"
                           >
-                            <span className={styles.lightingPatchCandidateAddress}>
+                            <span className={lightingStyles.lightingPatchCandidateAddress}>
                               {String(startAddress).padStart(3, "0")}
                             </span>
-                            <span className={styles.lightingPatchCandidateMeta}>safe start</span>
+                            <span className={lightingStyles.lightingPatchCandidateMeta}>safe start</span>
                           </button>
                         ))}
                       </div>
                     ) : (
-                      <div className={styles.footerNote}>
+                      <div className={shellStyles.footerNote}>
                         No safe start addresses are currently available in Universe {universe}.
                       </div>
                     )}
@@ -2390,7 +2394,7 @@ export function LightingWorkspaceSurface({
                         return (
                           <div
                             aria-hidden="true"
-                            className={styles.lightingBeamCone}
+                            className={lightingStyles.lightingBeamCone}
                             data-testid={`lighting-beam-${fixture.id}`}
                             key={`${fixture.id}:beam`}
                             style={{
@@ -2413,7 +2417,7 @@ export function LightingWorkspaceSurface({
                   ? stageMarkers.map((marker) => (
                       <div
                         aria-label={`${marker.label} marker`}
-                        className={styles.lightingStageMarker}
+                        className={lightingStyles.lightingStageMarker}
                         data-testid={`lighting-stage-marker-${marker.id}`}
                         key={marker.id}
                         style={{
@@ -2437,7 +2441,7 @@ export function LightingWorkspaceSurface({
                         aria-label={`Select fixture ${fixture.name}`}
                         aria-pressed={selectedFixtureId === fixture.id}
                         key={fixture.id}
-                        className={styles.lightingFixture}
+                        className={lightingStyles.lightingFixture}
                         data-active={selectedFixtureId === fixture.id}
                         data-display-intensity={fixture.displayIntensity}
                         data-display-on={fixture.displayOn}
@@ -2504,13 +2508,13 @@ export function LightingWorkspaceSurface({
                         title={fixture.name}
                         type="button"
                       >
-                        <span className={styles.lightingFixtureLabel}>
+                        <span className={lightingStyles.lightingFixtureLabel}>
                           {patchMode
                             ? lightingFixturePatchSummary(fixture.dmxStartAddress, fixture.type)
                             : fixture.name}
                         </span>
                         {patchMode && patchOverlap !== null ? (
-                          <span className={styles.lightingFixtureWarning}>
+                          <span className={lightingStyles.lightingFixtureWarning}>
                             {formatLightingPatchOverlapStageLabel(patchOverlap.conflictingFixtureNames)}
                           </span>
                         ) : null}
@@ -2518,9 +2522,9 @@ export function LightingWorkspaceSurface({
                     );
                   })
                 ) : (
-                  <div className={styles.lightingEmptyState}>
+                  <div className={lightingStyles.lightingEmptyState}>
                     <div>No fixture positions are available yet. Add the first fixture to begin patching.</div>
-                    <div className={styles.actionRow}>
+                    <div className={shellStyles.actionRow}>
                       <Button
                         disabled={busyAction === "fixture-create"}
                         onClick={() => void createLightingFixture()}
@@ -2533,7 +2537,7 @@ export function LightingWorkspaceSurface({
                 )}
                 {lassoDraft ? (
                   <div
-                    className={styles.lightingLasso}
+                    className={lightingStyles.lightingLasso}
                     style={{
                       left: `${Math.min(lassoDraft.startX, lassoDraft.endX) * 100}%`,
                       top: `${Math.min(lassoDraft.startY, lassoDraft.endY) * 100}%`,
@@ -2543,7 +2547,7 @@ export function LightingWorkspaceSurface({
                   />
                 ) : null}
                 {searchActive && searchHitCount === 0 ? (
-                  <div className={styles.lightingSearchEmptyState}>
+                  <div className={lightingStyles.lightingSearchEmptyState}>
                     <span>
                       Search: "{searchQuery}" · 0 of {fixtures.length}
                     </span>
@@ -2556,10 +2560,10 @@ export function LightingWorkspaceSurface({
             </div>
           </section>
 
-          <aside className={`${styles.workspaceCard} ${styles.lightingInspector}`}>
-            <div className={styles.metaItem}>
-              <div className={styles.metaLabel}>Inspector</div>
-              <div className={styles.metaValue}>
+          <aside className={`${shellStyles.workspaceCard} ${lightingStyles.lightingInspector}`}>
+            <div className={shellStyles.metaItem}>
+              <div className={shellStyles.metaLabel}>Inspector</div>
+              <div className={shellStyles.metaValue}>
                 {patchMode && !selectedFixture
                   ? "Patch mode"
                   : selectedFixture
@@ -2570,7 +2574,7 @@ export function LightingWorkspaceSurface({
                         ? selectedScene.name
                         : "Nothing selected"}
               </div>
-              <div className={styles.footerNote}>
+              <div className={shellStyles.footerNote}>
                 {patchMode && !selectedFixture
                   ? "Select a fixture on the stage to edit DMX addresses."
                   : selectedFixture
@@ -2583,10 +2587,12 @@ export function LightingWorkspaceSurface({
               </div>
             </div>
             {patchMode ? (
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Patch</div>
-                <div className={styles.metaValue}>{selectedFixture ? selectedFixture.name : "Select a fixture"}</div>
-                <div className={styles.summaryDetail}>
+              <div className={shellStyles.metaItem}>
+                <div className={shellStyles.metaLabel}>Patch</div>
+                <div className={shellStyles.metaValue}>
+                  {selectedFixture ? selectedFixture.name : "Select a fixture"}
+                </div>
+                <div className={shellStyles.summaryDetail}>
                   {selectedFixture
                     ? `Type ${selectedFixture.type} · ${lightingFixturePatchSummary(
                         selectedFixture.dmxStartAddress,
@@ -2596,46 +2602,46 @@ export function LightingWorkspaceSurface({
                 </div>
                 {selectedFixture ? (
                   <>
-                    <div className={styles.lightingPatchFacts}>
-                      <div className={styles.lightingPatchFact}>
-                        <div className={styles.summaryValue}>Universe {universe}</div>
-                        <div className={styles.footerNote}>sACN target</div>
+                    <div className={lightingStyles.lightingPatchFacts}>
+                      <div className={lightingStyles.lightingPatchFact}>
+                        <div className={shellStyles.summaryValue}>Universe {universe}</div>
+                        <div className={shellStyles.footerNote}>sACN target</div>
                       </div>
-                      <div className={styles.lightingPatchFact}>
-                        <div className={styles.summaryValue}>
+                      <div className={lightingStyles.lightingPatchFact}>
+                        <div className={shellStyles.summaryValue}>
                           {String(selectedFixture.dmxStartAddress).padStart(3, "0")}-
                           {String(
                             selectedFixture.dmxStartAddress + lightingFixtureChannelCount(selectedFixture.type) - 1
                           ).padStart(3, "0")}
                         </div>
-                        <div className={styles.footerNote}>Start ch</div>
+                        <div className={shellStyles.footerNote}>Start ch</div>
                       </div>
-                      <div className={styles.lightingPatchFact}>
-                        <div className={styles.summaryValue}>{lightingFixtureModeLabel(selectedFixture.type)}</div>
-                        <div className={styles.footerNote}>Mode</div>
+                      <div className={lightingStyles.lightingPatchFact}>
+                        <div className={shellStyles.summaryValue}>{lightingFixtureModeLabel(selectedFixture.type)}</div>
+                        <div className={shellStyles.footerNote}>Mode</div>
                       </div>
-                      <div className={styles.lightingPatchFact}>
-                        <div className={styles.summaryValue}>{formatLightingRigHeight(selectedFixture.rigZ)}</div>
-                        <div className={styles.footerNote}>Rig height</div>
+                      <div className={lightingStyles.lightingPatchFact}>
+                        <div className={shellStyles.summaryValue}>{formatLightingRigHeight(selectedFixture.rigZ)}</div>
+                        <div className={shellStyles.footerNote}>Rig height</div>
                       </div>
-                      <div className={styles.lightingPatchFact}>
-                        <div className={styles.summaryValue}>
+                      <div className={lightingStyles.lightingPatchFact}>
+                        <div className={shellStyles.summaryValue}>
                           {formatLightingBeamAngleValue(selectedFixture.type, selectedFixture.beamAngleDegrees)}
                         </div>
-                        <div className={styles.footerNote}>Beam angle</div>
+                        <div className={shellStyles.footerNote}>Beam angle</div>
                       </div>
                     </div>
                     {selectedFixturePatchOverlap ? (
-                      <div className={styles.lightingPatchConflictCard}>
-                        <div className={styles.lightingPatchConflictLabel}>Patch collision</div>
-                        <div className={styles.summaryDetail}>
+                      <div className={lightingStyles.lightingPatchConflictCard}>
+                        <div className={lightingStyles.lightingPatchConflictLabel}>Patch collision</div>
+                        <div className={shellStyles.summaryDetail}>
                           {selectedFixture.name} overlaps{" "}
                           {selectedFixturePatchOverlap.conflictingFixtureNames.join(", ")} at{" "}
                           {lightingFixturePatchSummary(selectedFixture.dmxStartAddress, selectedFixture.type)}.
                         </div>
                         {selectedFixturePatchOverlap.suggestedStartAddress !== null &&
                         selectedFixturePatchOverlap.suggestedEndAddress !== null ? (
-                          <div className={styles.actionRow}>
+                          <div className={shellStyles.actionRow}>
                             <Button
                               disabled={busyAction === `fixture-patch:${selectedFixture.id}`}
                               onClick={() =>
@@ -2650,48 +2656,50 @@ export function LightingWorkspaceSurface({
                             >
                               Auto-fix to DMX {selectedFixturePatchOverlap.suggestedStartAddress}
                             </Button>
-                            <span className={styles.footerNote}>
+                            <span className={shellStyles.footerNote}>
                               Safe range {String(selectedFixturePatchOverlap.suggestedStartAddress).padStart(3, "0")}-
                               {String(selectedFixturePatchOverlap.suggestedEndAddress).padStart(3, "0")}
                             </span>
                           </div>
                         ) : (
-                          <div className={styles.footerNote}>
+                          <div className={shellStyles.footerNote}>
                             No conflict-free start channel is currently available in Universe {universe}.
                           </div>
                         )}
                       </div>
                     ) : null}
                     {selectedFixturePatchRows.length > 0 ? (
-                      <div className={styles.lightingPatchTable} role="list">
+                      <div className={lightingStyles.lightingPatchTable} role="list">
                         {selectedFixturePatchRows.map((row) => (
                           <div
                             key={`${selectedFixture.id}:${row.channel}`}
-                            className={styles.lightingPatchRow}
+                            className={lightingStyles.lightingPatchRow}
                             role="listitem"
                             title={`${row.label} · ${String(row.channel).padStart(3, "0")} · ${row.value}`}
                           >
-                            <span className={styles.lightingPatchAddress}>{String(row.channel).padStart(3, "0")}</span>
-                            <div className={styles.lightingPatchBar}>
+                            <span className={lightingStyles.lightingPatchAddress}>
+                              {String(row.channel).padStart(3, "0")}
+                            </span>
+                            <div className={lightingStyles.lightingPatchBar}>
                               {Array.from({ length: 8 }, (_, index) => (
                                 <span
                                   key={index}
-                                  className={styles.lightingPatchSegment}
+                                  className={lightingStyles.lightingPatchSegment}
                                   data-active={index < lightingPatchBarSegments(row.value)}
                                 />
                               ))}
                             </div>
-                            <span className={styles.lightingPatchValue}>{row.value}</span>
+                            <span className={lightingStyles.lightingPatchValue}>{row.value}</span>
                           </div>
                         ))}
                       </div>
                     ) : null}
-                    <div className={styles.lightingPatchEditor}>
-                      <label className={styles.lightingPatchField}>
-                        <span className={styles.lightingPatchFieldLabel}>Start channel</span>
+                    <div className={lightingStyles.lightingPatchEditor}>
+                      <label className={lightingStyles.lightingPatchField}>
+                        <span className={lightingStyles.lightingPatchFieldLabel}>Start channel</span>
                         <input
                           aria-label="Fixture patch start channel"
-                          className={styles.lightingPatchInput}
+                          className={lightingStyles.lightingPatchInput}
                           disabled={busyAction === `fixture-patch:${selectedFixture.id}`}
                           inputMode="numeric"
                           max={selectedFixtureMaxStartAddress}
@@ -2733,11 +2741,11 @@ export function LightingWorkspaceSurface({
                         Apply patch
                       </Button>
                     </div>
-                    <div className={styles.footerNote}>
+                    <div className={shellStyles.footerNote}>
                       Universe {universe} · max start {selectedFixtureMaxStartAddress} ·{" "}
                       {lightingFixtureChannelCount(selectedFixture.type)} channels
                     </div>
-                    <div className={styles.actionRow}>
+                    <div className={shellStyles.actionRow}>
                       <Button
                         disabled={identifyFixtureId === selectedFixture.id}
                         onClick={() => triggerIdentifyBurst(selectedFixture.id, selectedFixture.name)}
@@ -2745,16 +2753,16 @@ export function LightingWorkspaceSurface({
                       >
                         Identify burst
                       </Button>
-                      <span className={styles.footerNote}>
+                      <span className={shellStyles.footerNote}>
                         Preview the selected fixture on the stage before committing address edits.
                       </span>
                     </div>
-                    <div className={styles.lightingPatchEditor}>
-                      <label className={styles.lightingPatchField}>
-                        <span className={styles.lightingPatchFieldLabel}>Rig height (m)</span>
+                    <div className={lightingStyles.lightingPatchEditor}>
+                      <label className={lightingStyles.lightingPatchField}>
+                        <span className={lightingStyles.lightingPatchFieldLabel}>Rig height (m)</span>
                         <input
                           aria-label="Fixture rig height"
-                          className={styles.lightingPatchInput}
+                          className={lightingStyles.lightingPatchInput}
                           disabled={busyAction === `fixture-rig-z:${selectedFixture.id}`}
                           inputMode="decimal"
                           max={20}
@@ -2801,15 +2809,15 @@ export function LightingWorkspaceSurface({
                         Apply height
                       </Button>
                     </div>
-                    <div className={styles.footerNote}>
+                    <div className={shellStyles.footerNote}>
                       Blank resets to the fixture default. Native range 0.0-20.0 m.
                     </div>
-                    <div className={styles.lightingPatchEditor}>
-                      <label className={styles.lightingPatchField}>
-                        <span className={styles.lightingPatchFieldLabel}>Beam angle (deg)</span>
+                    <div className={lightingStyles.lightingPatchEditor}>
+                      <label className={lightingStyles.lightingPatchField}>
+                        <span className={lightingStyles.lightingPatchFieldLabel}>Beam angle (deg)</span>
                         <input
                           aria-label="Fixture beam angle"
-                          className={styles.lightingPatchInput}
+                          className={lightingStyles.lightingPatchInput}
                           disabled={busyAction === `fixture-beam-angle:${selectedFixture.id}`}
                           inputMode="decimal"
                           max={180}
@@ -2860,27 +2868,27 @@ export function LightingWorkspaceSurface({
                         Apply beam
                       </Button>
                     </div>
-                    <div className={styles.footerNote}>
+                    <div className={shellStyles.footerNote}>
                       Blank resets to the fixture default. Native range 1-180 degrees.
                     </div>
                   </>
                 ) : (
-                  <div className={styles.footerNote}>
+                  <div className={shellStyles.footerNote}>
                     Press `P` or click Patch again to leave commissioning overlay mode.
                   </div>
                 )}
               </div>
             ) : selectedFixture ? (
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Fixture controls</div>
-                <div className={styles.summaryDetail}>
+              <div className={shellStyles.metaItem}>
+                <div className={shellStyles.metaLabel}>Fixture controls</div>
+                <div className={shellStyles.summaryDetail}>
                   {selectedFixture.on ? "Live" : "Standby"} at {selectedFixture.intensity}% / {selectedFixture.cct}K
                 </div>
-                <div className={styles.footerNote}>
+                <div className={shellStyles.footerNote}>
                   {groups.find((group) => group.id === selectedFixture.groupId)?.name ?? "Ungrouped"} ·{" "}
                   {selectedFixture.kind}
                 </div>
-                <div className={styles.actionRow}>
+                <div className={shellStyles.actionRow}>
                   <Button
                     disabled={busyAction === `fixture-power:${selectedFixture.id}`}
                     onClick={() =>
@@ -2895,17 +2903,17 @@ export function LightingWorkspaceSurface({
                     {selectedFixture.on ? "Turn fixture off" : "Turn fixture on"}
                   </Button>
                 </div>
-                <div className={styles.lightingParam}>
-                  <div className={styles.lightingParamHeader}>
-                    <span className={styles.lightingParamLabel}>Intensity</span>
-                    <span className={styles.lightingParamValue}>
+                <div className={lightingStyles.lightingParam}>
+                  <div className={lightingStyles.lightingParamHeader}>
+                    <span className={lightingStyles.lightingParamLabel}>Intensity</span>
+                    <span className={lightingStyles.lightingParamValue}>
                       {Math.max(0, Math.min(100, Math.round(fixtureIntensityDraft ?? selectedFixture.intensity)))}%
                     </span>
                   </div>
-                  <div className={styles.lightingParamSlider}>
+                  <div className={lightingStyles.lightingParamSlider}>
                     <div
                       aria-hidden="true"
-                      className={styles.lightingParamFill}
+                      className={lightingStyles.lightingParamFill}
                       style={{
                         width: `${Math.max(
                           0,
@@ -2913,14 +2921,14 @@ export function LightingWorkspaceSurface({
                         )}%`,
                       }}
                     />
-                    <div aria-hidden="true" className={styles.lightingParamMarks}>
+                    <div aria-hidden="true" className={lightingStyles.lightingParamMarks}>
                       {Array.from({ length: 21 }, (_, index) => (
                         <span key={index} />
                       ))}
                     </div>
                     <input
                       aria-label="Fixture intensity"
-                      className={styles.lightingParamRange}
+                      className={lightingStyles.lightingParamRange}
                       disabled={busyAction === `fixture-intensity:${selectedFixture.id}`}
                       max={100}
                       min={0}
@@ -2957,10 +2965,10 @@ export function LightingWorkspaceSurface({
                     />
                   </div>
                 </div>
-                <div className={styles.lightingParam}>
-                  <div className={styles.lightingParamHeader}>
-                    <span className={styles.lightingParamLabel}>CCT</span>
-                    <span className={styles.lightingParamValue}>
+                <div className={lightingStyles.lightingParam}>
+                  <div className={lightingStyles.lightingParamHeader}>
+                    <span className={lightingStyles.lightingParamLabel}>CCT</span>
+                    <span className={lightingStyles.lightingParamValue}>
                       {Math.max(
                         selectedFixtureCctRange.min,
                         Math.min(selectedFixtureCctRange.max, Math.round(fixtureCctDraft ?? selectedFixture.cct))
@@ -2968,10 +2976,10 @@ export function LightingWorkspaceSurface({
                       K
                     </span>
                   </div>
-                  <div className={styles.lightingParamSlider}>
+                  <div className={lightingStyles.lightingParamSlider}>
                     <div
                       aria-hidden="true"
-                      className={`${styles.lightingParamFill} ${styles.lightingParamFillCct}`}
+                      className={`${lightingStyles.lightingParamFill} ${lightingStyles.lightingParamFillCct}`}
                       style={{
                         width: `${lightingFixtureCctPercent(
                           fixtureCctDraft ?? selectedFixture.cct,
@@ -2979,14 +2987,14 @@ export function LightingWorkspaceSurface({
                         )}%`,
                       }}
                     />
-                    <div aria-hidden="true" className={styles.lightingParamMarks}>
+                    <div aria-hidden="true" className={lightingStyles.lightingParamMarks}>
                       {Array.from({ length: 7 }, (_, index) => (
                         <span key={index} />
                       ))}
                     </div>
                     <input
                       aria-label="Fixture CCT"
-                      className={styles.lightingParamRange}
+                      className={lightingStyles.lightingParamRange}
                       disabled={busyAction === `fixture-cct:${selectedFixture.id}`}
                       max={selectedFixtureCctRange.max}
                       min={selectedFixtureCctRange.min}
@@ -3029,43 +3037,45 @@ export function LightingWorkspaceSurface({
                     />
                   </div>
                 </div>
-                <div className={styles.lightingParam}>
-                  <div className={styles.lightingParamHeader}>
-                    <span className={styles.lightingParamLabel}>DMX patch</span>
-                    <span className={styles.lightingParamValue}>
+                <div className={lightingStyles.lightingParam}>
+                  <div className={lightingStyles.lightingParamHeader}>
+                    <span className={lightingStyles.lightingParamLabel}>DMX patch</span>
+                    <span className={lightingStyles.lightingParamValue}>
                       {lightingFixturePatchSummary(selectedFixture.dmxStartAddress, selectedFixture.type)}
                     </span>
                   </div>
                   {selectedFixturePatchRows.length > 0 ? (
-                    <div className={styles.lightingPatchTable} role="list">
+                    <div className={lightingStyles.lightingPatchTable} role="list">
                       {selectedFixturePatchRows.map((row) => (
                         <div
                           key={`${selectedFixture.id}:${row.channel}`}
-                          className={styles.lightingPatchRow}
+                          className={lightingStyles.lightingPatchRow}
                           role="listitem"
                           title={`${row.label} · ${String(row.channel).padStart(3, "0")} · ${row.value}`}
                         >
-                          <span className={styles.lightingPatchAddress}>{String(row.channel).padStart(3, "0")}</span>
-                          <div className={styles.lightingPatchBar}>
+                          <span className={lightingStyles.lightingPatchAddress}>
+                            {String(row.channel).padStart(3, "0")}
+                          </span>
+                          <div className={lightingStyles.lightingPatchBar}>
                             {Array.from({ length: 8 }, (_, index) => (
                               <span
                                 key={index}
-                                className={styles.lightingPatchSegment}
+                                className={lightingStyles.lightingPatchSegment}
                                 data-active={index < lightingPatchBarSegments(row.value)}
                               />
                             ))}
                           </div>
-                          <span className={styles.lightingPatchValue}>{row.value}</span>
+                          <span className={lightingStyles.lightingPatchValue}>{row.value}</span>
                         </div>
                       ))}
                     </div>
                   ) : null}
-                  <div className={styles.lightingPatchEditor}>
-                    <label className={styles.lightingPatchField}>
-                      <span className={styles.lightingPatchFieldLabel}>Start channel</span>
+                  <div className={lightingStyles.lightingPatchEditor}>
+                    <label className={lightingStyles.lightingPatchField}>
+                      <span className={lightingStyles.lightingPatchFieldLabel}>Start channel</span>
                       <input
                         aria-label="Fixture patch start channel"
-                        className={styles.lightingPatchInput}
+                        className={lightingStyles.lightingPatchInput}
                         disabled={busyAction === `fixture-patch:${selectedFixture.id}`}
                         inputMode="numeric"
                         max={selectedFixtureMaxStartAddress}
@@ -3107,78 +3117,84 @@ export function LightingWorkspaceSurface({
                       Apply patch
                     </Button>
                   </div>
-                  <div className={styles.footerNote}>
+                  <div className={shellStyles.footerNote}>
                     Universe {universe} · max start {selectedFixtureMaxStartAddress} ·{" "}
                     {lightingFixtureChannelCount(selectedFixture.type)} channels
                   </div>
                 </div>
-                <div className={styles.lightingParam}>
-                  <div className={styles.lightingParamHeader}>
-                    <span className={styles.lightingParamLabel}>Groups</span>
-                    <span className={styles.lightingParamValue}>
+                <div className={lightingStyles.lightingParam}>
+                  <div className={lightingStyles.lightingParamHeader}>
+                    <span className={lightingStyles.lightingParamLabel}>Groups</span>
+                    <span className={lightingStyles.lightingParamValue}>
                       {selectedFixtureGroups.length} membership{selectedFixtureGroups.length === 1 ? "" : "s"}
                     </span>
                   </div>
-                  <div className={styles.lightingChipRow}>
+                  <div className={lightingStyles.lightingChipRow}>
                     {selectedFixtureGroups.length > 0 ? (
                       selectedFixtureGroups.map((group) => (
-                        <span key={group.id} className={styles.lightingChip}>
+                        <span key={group.id} className={lightingStyles.lightingChip}>
                           <span>{group.name}</span>
-                          <span className={styles.lightingChipMeta}>{group.fixtureCount}</span>
+                          <span className={lightingStyles.lightingChipMeta}>{group.fixtureCount}</span>
                         </span>
                       ))
                     ) : (
-                      <div className={styles.footerNote}>No lighting groups are assigned to this fixture.</div>
+                      <div className={shellStyles.footerNote}>No lighting groups are assigned to this fixture.</div>
                     )}
                   </div>
                 </div>
-                <div className={styles.lightingParam}>
-                  <div className={styles.lightingParamHeader}>
-                    <span className={styles.lightingParamLabel}>In cues</span>
-                    <span className={styles.lightingParamValue}>
+                <div className={lightingStyles.lightingParam}>
+                  <div className={lightingStyles.lightingParamHeader}>
+                    <span className={lightingStyles.lightingParamLabel}>In cues</span>
+                    <span className={lightingStyles.lightingParamValue}>
                       {selectedFixtureCueMemberships.length} cue{selectedFixtureCueMemberships.length === 1 ? "" : "s"}
                     </span>
                   </div>
-                  <div className={styles.lightingChipRow}>
+                  <div className={lightingStyles.lightingChipRow}>
                     {selectedFixtureCueMemberships.length > 0 ? (
                       selectedFixtureCueMemberships.map((cue) => (
-                        <span key={cue.id} className={styles.lightingChip} data-active={cue.id === activeCue?.id}>
+                        <span
+                          key={cue.id}
+                          className={lightingStyles.lightingChip}
+                          data-active={cue.id === activeCue?.id}
+                        >
                           <span>
                             {cue.ordinal}. {cue.label}
                           </span>
-                          <span className={styles.lightingChipMeta}>{cue.state}</span>
+                          <span className={lightingStyles.lightingChipMeta}>{cue.state}</span>
                         </span>
                       ))
                     ) : (
-                      <div className={styles.footerNote}>No cue memberships are published for this fixture.</div>
+                      <div className={shellStyles.footerNote}>No cue memberships are published for this fixture.</div>
                     )}
                   </div>
                 </div>
               </div>
             ) : null}
             {!selectedFixture && lassoGroupState ? (
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Group controls</div>
-                <div className={styles.metaValue}>{lassoGroupState.fixtureCount} fixtures selected</div>
-                <div className={styles.footerNote}>
+              <div className={shellStyles.metaItem}>
+                <div className={shellStyles.metaLabel}>Group controls</div>
+                <div className={shellStyles.metaValue}>{lassoGroupState.fixtureCount} fixtures selected</div>
+                <div className={shellStyles.footerNote}>
                   {lassoGroupState.onFixtureCount}/{lassoGroupState.fixtureCount} on · intensity{" "}
                   {formatLightingValueRange(lassoGroupState.intensityMin, lassoGroupState.intensityMax, "%")} · CCT{" "}
                   {formatLightingValueRange(lassoGroupState.cctMin, lassoGroupState.cctMax, "K")}
                 </div>
-                <div className={styles.lightingChipRow}>
+                <div className={lightingStyles.lightingChipRow}>
                   {lassoGroupState.fixtures.map((fixture) => (
-                    <span key={`lasso:${fixture.id}`} className={styles.lightingChip} data-active={fixture.on}>
+                    <span key={`lasso:${fixture.id}`} className={lightingStyles.lightingChip} data-active={fixture.on}>
                       <span>{fixture.name}</span>
-                      <span className={styles.lightingChipMeta}>{fixture.on ? `${fixture.intensity}%` : "OFF"}</span>
+                      <span className={lightingStyles.lightingChipMeta}>
+                        {fixture.on ? `${fixture.intensity}%` : "OFF"}
+                      </span>
                     </span>
                   ))}
                 </div>
-                <div className={styles.lightingPatchEditor}>
-                  <label className={styles.lightingPatchField}>
-                    <span className={styles.lightingPatchFieldLabel}>Group name</span>
+                <div className={lightingStyles.lightingPatchEditor}>
+                  <label className={lightingStyles.lightingPatchField}>
+                    <span className={lightingStyles.lightingPatchFieldLabel}>Group name</span>
                     <input
                       aria-label="Lasso group name"
-                      className={styles.lightingPatchInput}
+                      className={lightingStyles.lightingPatchInput}
                       disabled={busyAction === "group-create"}
                       onChange={(event) => setLassoGroupName(event.currentTarget.value)}
                       value={lassoGroupName}
@@ -3192,33 +3208,35 @@ export function LightingWorkspaceSurface({
                     Save as Group…
                   </Button>
                 </div>
-                <div className={styles.summaryDetail}>
+                <div className={shellStyles.summaryDetail}>
                   Average output {lassoGroupState.averageIntensity}% · {lassoGroupState.averageCct}K
                   {lassoGroupState.mixed ? " · Mixed values published" : ""}
                 </div>
               </div>
             ) : !selectedFixture && selectedGroup ? (
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Group controls</div>
-                <div className={styles.metaValue}>{selectedGroup.name}</div>
-                <div className={styles.footerNote}>
+              <div className={shellStyles.metaItem}>
+                <div className={shellStyles.metaLabel}>Group controls</div>
+                <div className={shellStyles.metaValue}>{selectedGroup.name}</div>
+                <div className={shellStyles.footerNote}>
                   {selectedGroup.onFixtureCount}/{selectedGroup.fixtureCount} on · intensity{" "}
                   {formatLightingValueRange(selectedGroup.intensityMin, selectedGroup.intensityMax, "%")} · CCT{" "}
                   {formatLightingValueRange(selectedGroup.cctMin, selectedGroup.cctMax, "K")}
                 </div>
-                <div className={styles.lightingChipRow}>
+                <div className={lightingStyles.lightingChipRow}>
                   {selectedGroup.fixtures.map((fixture) => (
                     <span
                       key={`${selectedGroup.id}:${fixture.id}`}
-                      className={styles.lightingChip}
+                      className={lightingStyles.lightingChip}
                       data-active={fixture.on}
                     >
                       <span>{fixture.name}</span>
-                      <span className={styles.lightingChipMeta}>{fixture.on ? `${fixture.intensity}%` : "OFF"}</span>
+                      <span className={lightingStyles.lightingChipMeta}>
+                        {fixture.on ? `${fixture.intensity}%` : "OFF"}
+                      </span>
                     </span>
                   ))}
                 </div>
-                <div className={styles.actionRow}>
+                <div className={shellStyles.actionRow}>
                   <Button
                     disabled={busyAction === `group:${selectedGroup.id}`}
                     onClick={() =>
@@ -3229,23 +3247,23 @@ export function LightingWorkspaceSurface({
                     {selectedGroup.allOn ? "Turn group off" : "Turn group on"}
                   </Button>
                 </div>
-                <div className={styles.summaryDetail}>
+                <div className={shellStyles.summaryDetail}>
                   Average output {selectedGroup.averageIntensity}% · {selectedGroup.averageCct}K
                   {selectedGroup.mixed ? " · Mixed values published" : ""}
                 </div>
               </div>
             ) : !selectedFixture && cueEditorCue && cueEditorCue.id === selectedCue?.id ? (
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Cue edit</div>
-                <div className={styles.metaValue}>
+              <div className={shellStyles.metaItem}>
+                <div className={shellStyles.metaLabel}>Cue edit</div>
+                <div className={shellStyles.metaValue}>
                   Cue {cueEditorCue.ordinal}. {cueEditorCue.label}
                 </div>
-                <div className={styles.lightingPatchEditor}>
-                  <label className={styles.lightingPatchField}>
-                    <span className={styles.lightingPatchFieldLabel}>Cue label</span>
+                <div className={lightingStyles.lightingPatchEditor}>
+                  <label className={lightingStyles.lightingPatchField}>
+                    <span className={lightingStyles.lightingPatchFieldLabel}>Cue label</span>
                     <input
                       aria-label="Cue label"
-                      className={styles.lightingPatchInput}
+                      className={lightingStyles.lightingPatchInput}
                       disabled={cueEditorBusy}
                       onChange={(event) => setCueLabelDraft(event.currentTarget.value)}
                       onKeyDown={(event) => {
@@ -3258,11 +3276,11 @@ export function LightingWorkspaceSurface({
                       value={cueLabelDraft}
                     />
                   </label>
-                  <label className={styles.lightingPatchField}>
-                    <span className={styles.lightingPatchFieldLabel}>Scene</span>
+                  <label className={lightingStyles.lightingPatchField}>
+                    <span className={lightingStyles.lightingPatchFieldLabel}>Scene</span>
                     <select
                       aria-label="Cue scene"
-                      className={styles.lightingPatchInput}
+                      className={lightingStyles.lightingPatchInput}
                       disabled={cueEditorBusy}
                       onChange={(event) => setCueSceneIdDraft(event.currentTarget.value)}
                       value={cueSceneIdDraft}
@@ -3276,12 +3294,12 @@ export function LightingWorkspaceSurface({
                     </select>
                   </label>
                 </div>
-                <div className={styles.lightingPatchEditor}>
-                  <label className={styles.lightingPatchField}>
-                    <span className={styles.lightingPatchFieldLabel}>Fade in (ms)</span>
+                <div className={lightingStyles.lightingPatchEditor}>
+                  <label className={lightingStyles.lightingPatchField}>
+                    <span className={lightingStyles.lightingPatchFieldLabel}>Fade in (ms)</span>
                     <input
                       aria-label="Cue fade in"
-                      className={styles.lightingPatchInput}
+                      className={lightingStyles.lightingPatchInput}
                       disabled={cueEditorBusy}
                       inputMode="numeric"
                       onChange={(event) => setCueFadeInDraft(event.currentTarget.value)}
@@ -3289,11 +3307,11 @@ export function LightingWorkspaceSurface({
                       value={cueFadeInDraft}
                     />
                   </label>
-                  <label className={styles.lightingPatchField}>
-                    <span className={styles.lightingPatchFieldLabel}>Fade out (ms)</span>
+                  <label className={lightingStyles.lightingPatchField}>
+                    <span className={lightingStyles.lightingPatchFieldLabel}>Fade out (ms)</span>
                     <input
                       aria-label="Cue fade out"
-                      className={styles.lightingPatchInput}
+                      className={lightingStyles.lightingPatchInput}
                       disabled={cueEditorBusy}
                       inputMode="numeric"
                       onChange={(event) => setCueFadeOutDraft(event.currentTarget.value)}
@@ -3302,12 +3320,12 @@ export function LightingWorkspaceSurface({
                     />
                   </label>
                 </div>
-                <div className={styles.lightingPatchEditor}>
-                  <label className={styles.lightingPatchField}>
-                    <span className={styles.lightingPatchFieldLabel}>Follow (s)</span>
+                <div className={lightingStyles.lightingPatchEditor}>
+                  <label className={lightingStyles.lightingPatchField}>
+                    <span className={lightingStyles.lightingPatchFieldLabel}>Follow (s)</span>
                     <input
                       aria-label="Cue follow seconds"
-                      className={styles.lightingPatchInput}
+                      className={lightingStyles.lightingPatchInput}
                       disabled={cueEditorBusy}
                       inputMode="decimal"
                       onChange={(event) => setCueFollowDraft(event.currentTarget.value)}
@@ -3316,57 +3334,57 @@ export function LightingWorkspaceSurface({
                       value={cueFollowDraft}
                     />
                   </label>
-                  <label className={styles.lightingPatchField}>
-                    <span className={styles.lightingPatchFieldLabel}>Notes</span>
+                  <label className={lightingStyles.lightingPatchField}>
+                    <span className={lightingStyles.lightingPatchFieldLabel}>Notes</span>
                     <input
                       aria-label="Cue notes"
-                      className={styles.lightingPatchInput}
+                      className={lightingStyles.lightingPatchInput}
                       disabled={cueEditorBusy}
                       onChange={(event) => setCueNotesDraft(event.currentTarget.value)}
                       value={cueNotesDraft}
                     />
                   </label>
                 </div>
-                <div className={styles.actionRow}>
+                <div className={shellStyles.actionRow}>
                   <Button disabled={cueEditorBusy} onClick={() => void saveLightingCueEdits()} variant="secondary">
                     Apply cue edits
                   </Button>
                 </div>
-                <div className={styles.footerNote}>Shortcut `E` focuses cue editing for the selected cue.</div>
+                <div className={shellStyles.footerNote}>Shortcut `E` focuses cue editing for the selected cue.</div>
               </div>
             ) : !selectedFixture && inspectorCue ? (
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Cue preview</div>
-                <div className={styles.metaValue}>
+              <div className={shellStyles.metaItem}>
+                <div className={shellStyles.metaLabel}>Cue preview</div>
+                <div className={shellStyles.metaValue}>
                   Cue {inspectorCue.ordinal}. {inspectorCue.label}
                 </div>
-                <div className={styles.footerNote}>
+                <div className={shellStyles.footerNote}>
                   fade {formatLightingCueFadeSeconds(inspectorCue.fadeInMs)} · {inspectorCueDeltaRows.length} fixture
                   change
                   {inspectorCueDeltaRows.length === 1 ? "" : "s"}
                 </div>
                 {inspectorCueDeltaRows.length > 0 ? (
-                  <div className={styles.lightingCueDeltaList}>
+                  <div className={lightingStyles.lightingCueDeltaList}>
                     {inspectorCueDeltaRows.map((row) => (
                       <div
                         key={`${inspectorCue.id}:${row.fixtureId}`}
-                        className={styles.lightingCueDeltaRow}
+                        className={lightingStyles.lightingCueDeltaRow}
                         data-direction={row.direction}
                         title={`${row.fixtureName} ${row.fromLabel} → ${row.toLabel}`}
                       >
-                        <span className={styles.lightingCueDeltaFixture}>{row.fixtureName}</span>
-                        <span className={styles.lightingCueDeltaValue}>{row.fromLabel}</span>
-                        <span className={styles.lightingCueDeltaArrow}>→</span>
-                        <span className={styles.lightingCueDeltaValue}>{row.toLabel}</span>
+                        <span className={lightingStyles.lightingCueDeltaFixture}>{row.fixtureName}</span>
+                        <span className={lightingStyles.lightingCueDeltaValue}>{row.fromLabel}</span>
+                        <span className={lightingStyles.lightingCueDeltaArrow}>→</span>
+                        <span className={lightingStyles.lightingCueDeltaValue}>{row.toLabel}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className={styles.summaryDetail}>
+                  <div className={shellStyles.summaryDetail}>
                     {inspectorCue.notes ?? "No fixture level changes are published for this cue preview."}
                   </div>
                 )}
-                <div className={styles.actionRow}>
+                <div className={shellStyles.actionRow}>
                   <Button
                     disabled={busyAction === "cue-selected" || cueOutputMuted}
                     onClick={() => focusLightingCueEditor()}
@@ -3384,12 +3402,12 @@ export function LightingWorkspaceSurface({
                 </div>
               </div>
             ) : (
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Cue action</div>
-                <div className={styles.summaryDetail}>
+              <div className={shellStyles.metaItem}>
+                <div className={shellStyles.metaLabel}>Cue action</div>
+                <div className={shellStyles.summaryDetail}>
                   {selectedCue?.notes ?? "Select a cue from the rail to inspect or fire it directly."}
                 </div>
-                <div className={styles.actionRow}>
+                <div className={shellStyles.actionRow}>
                   <Button
                     disabled={!selectedCue || busyAction === "cue-selected" || cueOutputMuted}
                     onClick={() => selectedCue && void fireCue("cue-selected", selectedCue.id, selectedCue.fadeInMs)}
@@ -3401,17 +3419,17 @@ export function LightingWorkspaceSurface({
               </div>
             )}
             {!patchMode && sceneCaptureAvailable ? (
-              <div className={styles.metaItem}>
-                <div className={styles.metaLabel}>Save scene</div>
-                <div className={styles.summaryDetail}>
+              <div className={shellStyles.metaItem}>
+                <div className={shellStyles.metaLabel}>Save scene</div>
+                <div className={shellStyles.summaryDetail}>
                   {sceneCaptureSelectionLabel} active. Save the current rig state as a reusable scene.
                 </div>
-                <div className={styles.lightingPatchEditor}>
-                  <label className={styles.lightingPatchField}>
-                    <span className={styles.lightingPatchFieldLabel}>Scene name</span>
+                <div className={lightingStyles.lightingPatchEditor}>
+                  <label className={lightingStyles.lightingPatchField}>
+                    <span className={lightingStyles.lightingPatchFieldLabel}>Scene name</span>
                     <input
                       aria-label="Lighting scene name"
-                      className={styles.lightingPatchInput}
+                      className={lightingStyles.lightingPatchInput}
                       disabled={busyAction === "scene-create"}
                       onChange={(event) => setSceneNameDraft(event.currentTarget.value)}
                       onKeyDown={(event) => {
@@ -3437,38 +3455,38 @@ export function LightingWorkspaceSurface({
                     Save scene
                   </Button>
                 </div>
-                <div className={styles.footerNote}>Shortcut `S` focuses the scene name prompt.</div>
+                <div className={shellStyles.footerNote}>Shortcut `S` focuses the scene name prompt.</div>
               </div>
             ) : null}
-            <div className={styles.metaItem}>
-              <div className={styles.metaLabel}>Scene and transport</div>
-              <div className={styles.metaGrid}>
+            <div className={shellStyles.metaItem}>
+              <div className={shellStyles.metaLabel}>Scene and transport</div>
+              <div className={shellStyles.metaGrid}>
                 <div>
-                  <div className={styles.summaryValue}>{inspectorScene?.name ?? "No linked scene"}</div>
-                  <div className={styles.footerNote}>Selected scene</div>
+                  <div className={shellStyles.summaryValue}>{inspectorScene?.name ?? "No linked scene"}</div>
+                  <div className={shellStyles.footerNote}>Selected scene</div>
                 </div>
                 <div>
-                  <div className={styles.summaryValue}>{String(lightingSnapshot?.adapterMode ?? "unknown")}</div>
-                  <div className={styles.footerNote}>Adapter mode</div>
+                  <div className={shellStyles.summaryValue}>{String(lightingSnapshot?.adapterMode ?? "unknown")}</div>
+                  <div className={shellStyles.footerNote}>Adapter mode</div>
                 </div>
                 <div>
-                  <div className={styles.summaryValue}>{scenes.length}</div>
-                  <div className={styles.footerNote}>Scenes</div>
+                  <div className={shellStyles.summaryValue}>{scenes.length}</div>
+                  <div className={shellStyles.footerNote}>Scenes</div>
                 </div>
               </div>
             </div>
           </aside>
         </div>
 
-        <section className={`${styles.workspaceCard} ${styles.lightingControlStrip}`}>
-          <div className={styles.lightingStripColumn}>
-            <div className={styles.metaLabel}>Groups</div>
-            <div className={styles.lightingChipRow}>
+        <section className={`${shellStyles.workspaceCard} ${lightingStyles.lightingControlStrip}`}>
+          <div className={lightingStyles.lightingStripColumn}>
+            <div className={shellStyles.metaLabel}>Groups</div>
+            <div className={lightingStyles.lightingChipRow}>
               {groupStates.length > 0 ? (
                 groupStates.map((group) => (
                   <button
                     key={group.id}
-                    className={styles.lightingGroupChip}
+                    className={lightingStyles.lightingGroupChip}
                     data-active={group.id === selectedGroup?.id}
                     data-power={group.allOn ? "on" : group.mixed ? "mixed" : "off"}
                     disabled={group.fixtureCount === 0}
@@ -3476,91 +3494,95 @@ export function LightingWorkspaceSurface({
                     type="button"
                   >
                     <span>{group.name}</span>
-                    <span className={styles.lightingChipMeta}>
+                    <span className={lightingStyles.lightingChipMeta}>
                       {group.onFixtureCount}/{group.fixtureCount} on
                     </span>
                   </button>
                 ))
               ) : (
-                <div className={styles.footerNote}>No lighting groups are published yet.</div>
+                <div className={shellStyles.footerNote}>No lighting groups are published yet.</div>
               )}
             </div>
           </div>
 
-          <div className={styles.lightingStripColumn}>
-            <div className={styles.lightingStripHeader}>
-              <div className={styles.metaLabel}>Scenes</div>
-              <div className={styles.footerNote}>{selectedScene?.name ?? "Select a scene or cue"}</div>
+          <div className={lightingStyles.lightingStripColumn}>
+            <div className={lightingStyles.lightingStripHeader}>
+              <div className={shellStyles.metaLabel}>Scenes</div>
+              <div className={shellStyles.footerNote}>{selectedScene?.name ?? "Select a scene or cue"}</div>
             </div>
-            <div className={styles.lightingChipRow}>
+            <div className={lightingStyles.lightingChipRow}>
               {scenes.length > 0 ? (
                 scenes.map((scene) => (
                   <button
                     key={scene.id}
-                    className={styles.lightingSceneChip}
+                    className={lightingStyles.lightingSceneChip}
                     data-active={scene.lastRecalled || scene.id === selectedScene?.id}
                     disabled={busyAction === `scene:${scene.id}` || cueOutputMuted}
                     onClick={() => void recallScene(`scene:${scene.id}`, scene.id, 0)}
                     type="button"
                   >
                     <span>{scene.name}</span>
-                    <span className={styles.lightingChipMeta}>{scene.fixtureCount}</span>
+                    <span className={lightingStyles.lightingChipMeta}>{scene.fixtureCount}</span>
                   </button>
                 ))
               ) : (
-                <div className={styles.footerNote}>No scenes are available for recall yet.</div>
+                <div className={shellStyles.footerNote}>No scenes are available for recall yet.</div>
               )}
             </div>
           </div>
 
-          <div className={styles.lightingStripColumn}>
-            <div className={styles.lightingStripHeader}>
-              <div className={styles.metaLabel}>DMX peek</div>
-              <div className={styles.lightingStripActions}>
-                <div className={styles.footerNote}>{dmxStale ? `Stale · ${dmxPreviewLabel}` : dmxPreviewLabel}</div>
+          <div className={lightingStyles.lightingStripColumn}>
+            <div className={lightingStyles.lightingStripHeader}>
+              <div className={shellStyles.metaLabel}>DMX peek</div>
+              <div className={lightingStyles.lightingStripActions}>
+                <div className={shellStyles.footerNote}>
+                  {dmxStale ? `Stale · ${dmxPreviewLabel}` : dmxPreviewLabel}
+                </div>
                 <Button onClick={() => openLightingDmxMonitor()} size="compact" variant="ghost">
                   Expand
                 </Button>
               </div>
             </div>
             {dmxPreviewChannels.length > 0 ? (
-              <div className={styles.lightingDmxGrid} data-stale={dmxStale}>
+              <div className={lightingStyles.lightingDmxGrid} data-stale={dmxStale}>
                 {dmxPreviewChannels.map((channel) => (
                   <button
                     aria-label={`Open DMX channel ${channel.channel}`}
                     key={`${channel.channel}:${channel.label}`}
-                    className={styles.lightingDmxCell}
+                    className={lightingStyles.lightingDmxCell}
                     onClick={() => openLightingDmxMonitor(channel.channel)}
                     title={`${channel.lightName} · ${channel.label}`}
                     type="button"
                   >
-                    <span className={styles.lightingDmxChannel}>{String(channel.channel).padStart(3, "0")}</span>
-                    <span className={styles.lightingDmxValue}>{formatDmxValue(channel.value)}</span>
+                    <span className={lightingStyles.lightingDmxChannel}>
+                      {String(channel.channel).padStart(3, "0")}
+                    </span>
+                    <span className={lightingStyles.lightingDmxValue}>{formatDmxValue(channel.value)}</span>
                   </button>
                 ))}
               </div>
             ) : (
-              <div className={styles.footerNote}>No DMX monitor channels are published yet.</div>
+              <div className={shellStyles.footerNote}>No DMX monitor channels are published yet.</div>
             )}
           </div>
         </section>
 
         {dmxDrawerOpen ? (
-          <div className={styles.overlay} role="presentation">
+          <div className={shellStyles.overlay} role="presentation">
             <Surface
               aria-labelledby="lighting-dmx-monitor-title"
               aria-modal="true"
-              className={styles.dmxOverlayCard}
+              className={shellStyles.dmxOverlayCard}
               padding="lg"
               role="dialog"
               tone="raised"
             >
-              <div className={styles.dmxOverlayHeader}>
+              <div className={shellStyles.dmxOverlayHeader}>
                 <div>
-                  <div className={styles.metaLabel} id="lighting-dmx-monitor-title">
+                  <div className={shellStyles.metaLabel} id="lighting-dmx-monitor-title">
                     DMX monitor
                   </div>
-                  <div className={styles.footerNote}>
+                  <div className={shellStyles.footerNote}>
                     Full-universe overlay · first 88 channels · Ctrl+M opens, Esc closes
                   </div>
                 </div>
@@ -3569,39 +3591,43 @@ export function LightingWorkspaceSurface({
                 </Button>
               </div>
               {selectedDmxOverlayChannel ? (
-                <div className={styles.metaGrid}>
-                  <div className={styles.metaItem}>
-                    <div className={styles.metaLabel}>Channel</div>
-                    <div className={styles.metaValue}>{String(selectedDmxOverlayChannel.channel).padStart(3, "0")}</div>
+                <div className={shellStyles.metaGrid}>
+                  <div className={shellStyles.metaItem}>
+                    <div className={shellStyles.metaLabel}>Channel</div>
+                    <div className={shellStyles.metaValue}>
+                      {String(selectedDmxOverlayChannel.channel).padStart(3, "0")}
+                    </div>
                   </div>
-                  <div className={styles.metaItem}>
-                    <div className={styles.metaLabel}>Label</div>
-                    <div className={styles.metaValue}>{selectedDmxOverlayChannel.label}</div>
+                  <div className={shellStyles.metaItem}>
+                    <div className={shellStyles.metaLabel}>Label</div>
+                    <div className={shellStyles.metaValue}>{selectedDmxOverlayChannel.label}</div>
                   </div>
-                  <div className={styles.metaItem}>
-                    <div className={styles.metaLabel}>Fixture</div>
-                    <div className={styles.metaValue}>{selectedDmxOverlayChannel.lightName}</div>
+                  <div className={shellStyles.metaItem}>
+                    <div className={shellStyles.metaLabel}>Fixture</div>
+                    <div className={shellStyles.metaValue}>{selectedDmxOverlayChannel.lightName}</div>
                   </div>
-                  <div className={styles.metaItem}>
-                    <div className={styles.metaLabel}>Value</div>
-                    <div className={styles.metaValue}>{formatDmxValue(selectedDmxOverlayChannel.value)}</div>
+                  <div className={shellStyles.metaItem}>
+                    <div className={shellStyles.metaLabel}>Value</div>
+                    <div className={shellStyles.metaValue}>{formatDmxValue(selectedDmxOverlayChannel.value)}</div>
                   </div>
                 </div>
               ) : null}
-              <div className={styles.lightingDmxDrawerGrid}>
+              <div className={lightingStyles.lightingDmxDrawerGrid}>
                 {expandedDmxChannels.map((channel) => (
                   <button
                     aria-label={`Inspect DMX channel ${channel.channel}`}
                     key={`drawer:${channel.channel}`}
-                    className={styles.lightingDmxDrawerCell}
+                    className={lightingStyles.lightingDmxDrawerCell}
                     data-active={selectedDmxOverlayChannel?.channel === channel.channel}
                     onClick={() => setDmxOverlayChannel(channel.channel)}
                     title={`${channel.lightName} · ${channel.label}`}
                     type="button"
                   >
-                    <span className={styles.lightingDmxChannel}>{String(channel.channel).padStart(3, "0")}</span>
-                    <span className={styles.lightingDmxValue}>{formatDmxValue(channel.value)}</span>
-                    <span className={styles.lightingDmxDrawerLabel}>{channel.label}</span>
+                    <span className={lightingStyles.lightingDmxChannel}>
+                      {String(channel.channel).padStart(3, "0")}
+                    </span>
+                    <span className={lightingStyles.lightingDmxValue}>{formatDmxValue(channel.value)}</span>
+                    <span className={lightingStyles.lightingDmxDrawerLabel}>{channel.label}</span>
                   </button>
                 ))}
               </div>

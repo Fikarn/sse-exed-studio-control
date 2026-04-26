@@ -1,6 +1,7 @@
 import { Button, Surface } from "@sse/design-system";
 
-import styles from "../OperatorShell.module.css";
+import shellStyles from "../OperatorShell.module.css";
+import planningStyles from "./PlanningWorkspace.module.css";
 import { formatPlanningDuration, type PlanningTimeReportData } from "./planningHelpers";
 
 export function PlanningTimeReportOverlay({
@@ -17,51 +18,53 @@ export function PlanningTimeReportOverlay({
   const largestProjectTotal = report?.byProject[0]?.totalSeconds ?? 1;
 
   return (
-    <div className={styles.overlay} role="presentation">
+    <div className={shellStyles.overlay} role="presentation">
       <Surface
         aria-labelledby="planning-time-report-title"
         aria-modal="true"
-        className={`${styles.dialog} ${styles.planningTimeReportDialog}`}
+        className={`${shellStyles.dialog} ${planningStyles.planningTimeReportDialog}`}
         padding="lg"
         role="dialog"
         tone="raised"
       >
-        <div className={styles.planningTimeReportHeader}>
-          <div className={styles.planningTimeReportTitleBlock}>
-            <div className={styles.planningEyebrow}>Planning report</div>
-            <div className={styles.dialogTitle} id="planning-time-report-title">
+        <div className={planningStyles.planningTimeReportHeader}>
+          <div className={planningStyles.planningTimeReportTitleBlock}>
+            <div className={planningStyles.planningEyebrow}>Planning report</div>
+            <div className={shellStyles.dialogTitle} id="planning-time-report-title">
               Time report
             </div>
-            <div className={styles.planningTimeReportTotal}>
+            <div className={planningStyles.planningTimeReportTotal}>
               {loading ? "Loading…" : formatPlanningDuration(report?.totalSeconds ?? 0)}
             </div>
-            <p className={styles.planningTimeReportSubtitle}>Total tracked time across the current planning dataset.</p>
+            <p className={planningStyles.planningTimeReportSubtitle}>
+              Total tracked time across the current planning dataset.
+            </p>
           </div>
           <Button variant="ghost" onClick={onClose}>
             Close
           </Button>
         </div>
 
-        <div className={styles.planningTimeReportSections}>
-          <section className={styles.planningTimeReportSection}>
-            <div className={styles.planningTimeReportSectionTitle}>By project</div>
+        <div className={planningStyles.planningTimeReportSections}>
+          <section className={planningStyles.planningTimeReportSection}>
+            <div className={planningStyles.planningTimeReportSectionTitle}>By project</div>
             {error ? (
-              <div className={styles.planningTimeReportEmpty}>{error}</div>
+              <div className={planningStyles.planningTimeReportEmpty}>{error}</div>
             ) : loading ? (
-              <div className={styles.planningTimeReportEmpty}>Loading…</div>
+              <div className={planningStyles.planningTimeReportEmpty}>Loading…</div>
             ) : report && report.byProject.length > 0 ? (
               report.byProject.map((entry) => (
-                <div key={entry.projectId || entry.title} className={styles.planningTimeReportProjectRow}>
-                  <div className={styles.planningTimeReportProjectMeta}>
+                <div key={entry.projectId || entry.title} className={planningStyles.planningTimeReportProjectRow}>
+                  <div className={planningStyles.planningTimeReportProjectMeta}>
                     <span>{entry.title}</span>
                     <span>
                       {entry.taskCount} {entry.taskCount === 1 ? "task" : "tasks"} ·{" "}
                       {formatPlanningDuration(entry.totalSeconds)}
                     </span>
                   </div>
-                  <div className={styles.planningTimeReportBar}>
+                  <div className={planningStyles.planningTimeReportBar}>
                     <div
-                      className={styles.planningTimeReportBarFill}
+                      className={planningStyles.planningTimeReportBarFill}
                       style={{
                         width: `${Math.max(
                           8,
@@ -73,34 +76,34 @@ export function PlanningTimeReportOverlay({
                 </div>
               ))
             ) : (
-              <div className={styles.planningTimeReportEmpty}>No time tracked yet.</div>
+              <div className={planningStyles.planningTimeReportEmpty}>No time tracked yet.</div>
             )}
           </section>
 
-          <section className={styles.planningTimeReportSection}>
-            <div className={styles.planningTimeReportSectionTitle}>By task</div>
+          <section className={planningStyles.planningTimeReportSection}>
+            <div className={planningStyles.planningTimeReportSectionTitle}>By task</div>
             {error ? (
-              <div className={styles.planningTimeReportEmpty}>{error}</div>
+              <div className={planningStyles.planningTimeReportEmpty}>{error}</div>
             ) : loading ? (
-              <div className={styles.planningTimeReportEmpty}>Loading…</div>
+              <div className={planningStyles.planningTimeReportEmpty}>Loading…</div>
             ) : report && report.byTask.length > 0 ? (
               report.byTask.slice(0, 10).map((entry) => (
                 <div
                   key={entry.taskId || `${entry.projectId}:${entry.taskTitle}`}
-                  className={styles.planningTimeReportTaskRow}
+                  className={planningStyles.planningTimeReportTaskRow}
                 >
-                  <div className={styles.planningTimeReportTaskMeta}>
+                  <div className={planningStyles.planningTimeReportTaskMeta}>
                     <span>{entry.taskTitle}</span>
                     <span>{entry.projectTitle}</span>
                   </div>
-                  <div className={styles.planningTimeReportTaskDuration}>
-                    {entry.isRunning ? <span className={styles.planningTimeReportRunningDot} /> : null}
+                  <div className={planningStyles.planningTimeReportTaskDuration}>
+                    {entry.isRunning ? <span className={planningStyles.planningTimeReportRunningDot} /> : null}
                     <span>{formatPlanningDuration(entry.totalSeconds)}</span>
                   </div>
                 </div>
               ))
             ) : (
-              <div className={styles.planningTimeReportEmpty}>No time tracked yet.</div>
+              <div className={planningStyles.planningTimeReportEmpty}>No time tracked yet.</div>
             )}
           </section>
         </div>

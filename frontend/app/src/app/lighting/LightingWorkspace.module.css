@@ -1,0 +1,1081 @@
+.lightingPlotCard {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.lightingPlotHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lightingPlot {
+  position: relative;
+  min-height: 420px;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 82%, var(--color-primary-500) 18%);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface-800) 92%, transparent),
+      color-mix(in srgb, var(--color-surface-900) 96%, black 4%)
+    ),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border-default) 28%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--color-border-default) 22%, transparent) 1px, transparent 1px);
+  background-size:
+    auto,
+    64px 64px,
+    64px 64px;
+}
+
+.lightingPlot[data-patch="true"] {
+  border-color: color-mix(in srgb, var(--color-warning-500) 32%, var(--color-border-default));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface-800) 88%, transparent),
+      color-mix(in srgb, var(--color-surface-900) 96%, black 4%)
+    ),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border-default) 22%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--color-border-default) 18%, transparent) 1px, transparent 1px);
+}
+
+.lightingPlot[data-lasso-active="true"] {
+  cursor: crosshair;
+}
+
+.lightingPlot[data-cue-pulse="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 4px solid color-mix(in srgb, var(--color-primary-500) 78%, transparent);
+  border-radius: inherit;
+  box-shadow: 0 0 28px color-mix(in srgb, var(--color-primary-500) 26%, transparent);
+  pointer-events: none;
+  animation: lightingCuePulse 500ms ease-out;
+}
+
+.lightingPlotFrame {
+  position: absolute;
+  inset: 12% 8%;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 70%, var(--color-primary-500) 30%);
+  border-radius: var(--radius-lg);
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--color-primary-500) 10%, transparent),
+    transparent 70%
+  );
+}
+
+.lightingStageLabel {
+  position: absolute;
+  inset: 14% auto auto 50%;
+  transform: translateX(-50%);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+  letter-spacing: 0.12em;
+}
+
+.lightingBeamCone {
+  position: absolute;
+  z-index: 0;
+  border-radius: 999px 999px 0 0;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  filter: blur(1px);
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+
+.lightingStageMarker {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 70%, var(--color-primary-500) 30%);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-950) 90%, var(--color-primary-500) 10%);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+  color: var(--color-text-strong);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.lightingStageMarker::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 18px;
+  height: 18px;
+  border: 1px solid color-mix(in srgb, var(--color-primary-500) 42%, transparent);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  opacity: 0.7;
+}
+
+.lightingLasso {
+  position: absolute;
+  border: 1.5px dashed color-mix(in srgb, var(--color-primary-500) 82%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-primary-500) 12%, transparent);
+  pointer-events: none;
+}
+
+.lightingFixture {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  color: inherit;
+  cursor: grab;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, white 35%, transparent),
+    0 0 18px color-mix(in srgb, currentColor 22%, transparent);
+}
+
+.lightingFixture[data-dragging="true"] {
+  cursor: grabbing;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-primary-500) 72%, transparent),
+    0 0 28px color-mix(in srgb, var(--color-primary-500) 32%, transparent);
+}
+
+.lightingFixture:focus-visible,
+.lightingFixture[data-active="true"] {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-primary-500) 72%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-primary-500) 28%, transparent);
+}
+
+.lightingFixture[data-dimmed="true"] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, white 20%, transparent);
+}
+
+.lightingFixture[data-lasso-selected="true"] {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-primary-500) 76%, transparent),
+    0 0 24px color-mix(in srgb, var(--color-primary-500) 24%, transparent);
+}
+
+.lightingFixture[data-patch-overlap="true"] {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-danger-500) 80%, transparent),
+    0 0 28px color-mix(in srgb, var(--color-danger-500) 24%, transparent);
+}
+
+.lightingFixture[data-patch-drop-target="true"] {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-warning-500) 88%, transparent),
+    0 0 28px color-mix(in srgb, var(--color-warning-500) 26%, transparent);
+}
+
+.lightingFixture[data-identify-active="true"] {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--color-primary-500) 88%, transparent),
+    0 0 34px color-mix(in srgb, var(--color-primary-500) 42%, transparent);
+  animation: lightingIdentifyBurst 220ms ease-out 5 alternate;
+}
+
+.lightingFixture[data-stale="true"] {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-danger-500) 72%, transparent),
+    0 0 18px color-mix(in srgb, var(--color-danger-500) 20%, transparent);
+}
+
+.lightingFixtureLabel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+}
+
+.lightingFixtureWarning {
+  position: absolute;
+  top: calc(100% + 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--color-danger-400) 88%, white 12%);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+}
+
+.lightingEmptyState {
+  position: absolute;
+  inset: auto 24px 24px 24px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+}
+
+.lightingSearchEmptyState,
+.lightingPatchBanner {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-900) 94%, transparent);
+  color: var(--color-text-strong);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+}
+
+.lightingPatchBanner {
+  top: 18px;
+  border-color: color-mix(in srgb, var(--color-warning-500) 38%, var(--color-border-default));
+}
+
+.lightingPatchOverlay {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 1;
+  display: grid;
+  gap: var(--space-3);
+  width: min(320px, calc(100% - 40px));
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-warning-500) 24%, var(--color-border-default));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-900) 88%, transparent);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+
+.lightingPatchOverlayHeader {
+  display: grid;
+  gap: 6px;
+}
+
+.lightingPatchCandidateGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  pointer-events: auto;
+}
+
+.lightingPatchCandidate {
+  display: grid;
+  gap: 4px;
+  min-width: 68px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
+  color: var(--color-text-strong);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.lightingPatchCandidate[data-dragging="true"] {
+  opacity: 0.5;
+  border-color: color-mix(in srgb, var(--color-primary-500) 48%, var(--color-border-default));
+}
+
+.lightingPatchCandidateAddress {
+  font: var(--font-weight-semibold) var(--font-size-sm) / 1 var(--font-family-mono);
+}
+
+.lightingPatchCandidateMeta {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+}
+
+.lightingSearchEmptyState {
+  top: 52px;
+}
+
+.lightingShell {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.lightingToolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.lightingToolbarCluster,
+.lightingToolbarActions,
+.lightingToolbarStats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lightingBlackoutButton {
+  min-width: 120px;
+}
+
+.lightingToolbarCluster:first-child {
+  margin-right: auto;
+}
+
+.lightingToolbarStats {
+  flex-wrap: wrap;
+}
+
+.lightingToolbarStatChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-700) 92%, transparent);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lightingToolbarSearch {
+  display: grid;
+  gap: 6px;
+  min-width: min(240px, 100%);
+}
+
+.lightingToolbarSearchLabel {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lightingToolbarInput {
+  min-width: 240px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
+  color: var(--color-text-strong);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.4 var(--font-family-sans);
+}
+
+.lightingToolbarInput:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.lightingMain {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 360px;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.lightingCueRail,
+.lightingInspector,
+.lightingStageSurface {
+  min-height: 0;
+}
+
+.lightingCueRail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.lightingCueRailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lightingGoBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 72%, var(--color-primary-500) 28%);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-surface-700) 92%, transparent),
+      color-mix(in srgb, var(--color-surface-800) 96%, black 4%)
+    ),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary-500) 16%, transparent), transparent 58%);
+  overflow: hidden;
+}
+
+.lightingGoBar[data-transitioning="true"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 52%, var(--color-border-default));
+}
+
+.lightingGoProgress {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-primary-500) 18%, transparent),
+      color-mix(in srgb, var(--color-primary-500) 34%, transparent)
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary-500) 18%, transparent), transparent);
+  pointer-events: none;
+}
+
+.lightingGoMeta {
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.lightingGoActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  position: relative;
+  z-index: 1;
+}
+
+.lightingCueList {
+  display: grid;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.lightingCueItem {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lightingCueItem[data-active="true"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 38%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-primary-500) 10%, var(--color-surface-700));
+}
+
+.lightingCueItem[data-selected="true"] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 34%, transparent);
+}
+
+.lightingCueRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lightingCueLabel {
+  font: var(--font-weight-semibold) var(--font-size-md) / 1.3 var(--font-family-sans);
+}
+
+.lightingCueDetail {
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.4 var(--font-family-sans);
+}
+
+@keyframes lightingLoadingPulse {
+  0% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 0.9;
+  }
+
+  100% {
+    opacity: 0.35;
+  }
+}
+
+.lightingLoadingCueRow,
+.lightingLoadingFixture,
+.lightingLoadingInspectorBar,
+.lightingLoadingDmxCell {
+  animation: lightingLoadingPulse 1.2s ease-in-out infinite;
+}
+
+.lightingLoadingCueRow {
+  min-height: 56px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-surface-700) 92%, transparent),
+    color-mix(in srgb, var(--color-surface-600) 86%, transparent),
+    color-mix(in srgb, var(--color-surface-700) 92%, transparent)
+  );
+}
+
+.lightingStageSurface {
+  overflow: hidden;
+}
+
+.lightingInspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.lightingControlStrip {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr) minmax(0, 420px);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.lightingStripColumn {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.lightingStripHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lightingStripActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lightingChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.lightingChip,
+.lightingGroupChip,
+.lightingSceneChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-700) 92%, transparent);
+  color: var(--color-text-strong);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-sans);
+}
+
+.lightingGroupChip,
+.lightingSceneChip {
+  cursor: pointer;
+}
+
+.lightingGroupChip[data-power="on"],
+.lightingGroupChip[data-active="true"],
+.lightingSceneChip[data-active="true"],
+.lightingChip[data-active="true"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 40%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-primary-500) 12%, var(--color-surface-700));
+}
+
+.lightingGroupChip[data-power="mixed"] {
+  border-color: color-mix(in srgb, var(--color-warning-500) 40%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-warning-500) 10%, var(--color-surface-700));
+}
+
+.lightingChipMeta {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+}
+
+.lightingDmxGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lightingDmxGrid[data-stale="true"] {
+  opacity: 0.72;
+}
+
+.lightingLoadingDmxCell {
+  min-height: 56px;
+}
+
+.lightingDmxCell {
+  display: grid;
+  gap: 4px;
+  min-height: 56px;
+  padding: 10px 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+  color: inherit;
+  text-align: left;
+}
+
+.lightingDmxChannel {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+}
+
+.lightingDmxValue {
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) var(--font-size-md) / 1 var(--font-family-mono);
+}
+
+.lightingLoadingInspector {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.lightingLoadingInspectorBar {
+  min-height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-surface-700) 92%, transparent),
+    color-mix(in srgb, var(--color-surface-600) 86%, transparent),
+    color-mix(in srgb, var(--color-surface-700) 92%, transparent)
+  );
+}
+
+.lightingDmxDrawer {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.lightingDmxDrawerGrid {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lightingDmxDrawerCell {
+  display: grid;
+  gap: 4px;
+  min-height: 64px;
+  padding: 10px 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+  color: inherit;
+  text-align: left;
+}
+
+.lightingDmxDrawerCell[data-active="true"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 40%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-primary-500) 12%, var(--color-surface-700));
+}
+
+.lightingDmxDrawerLabel {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1.2 var(--font-family-sans);
+}
+
+.lightingParam {
+  display: grid;
+  gap: 8px;
+  margin-top: var(--space-3);
+}
+
+.lightingParamHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.lightingParamLabel {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lightingParamValue {
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) var(--font-size-sm) / 1 var(--font-family-mono);
+}
+
+.lightingParamSlider {
+  position: relative;
+  height: 28px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-surface-700) 92%, transparent);
+}
+
+.lightingSectionPill {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-primary-500) 40%, var(--color-border-default));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-950) 88%, var(--color-primary-500) 12%);
+  color: var(--color-text-strong);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lightingParamFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-primary-500) 25%, transparent),
+    color-mix(in srgb, var(--color-primary-500) 45%, transparent)
+  );
+  border-right: 1.5px solid var(--color-primary-500);
+  pointer-events: none;
+}
+
+.lightingParamFillCct {
+  background: linear-gradient(90deg, #ffb35c 0%, #ffd38b 48%, #eaf0ff 100%);
+}
+
+.lightingParamMarks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 1px;
+  pointer-events: none;
+}
+
+.lightingParamMarks span {
+  width: 1px;
+  height: 6px;
+  background: var(--color-border-default);
+}
+
+.lightingParamMarks span:nth-child(5n + 1) {
+  height: 10px;
+  background: var(--color-text-subtle);
+}
+
+.lightingParamRange {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lightingParamRange::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.lightingParamRange::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 28px;
+  border: 2px solid var(--color-primary-500);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-surface-950) 88%, black);
+}
+
+.lightingParamRange::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.lightingParamRange::-moz-range-thumb {
+  width: 14px;
+  height: 28px;
+  border: 2px solid var(--color-primary-500);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--color-surface-950) 88%, black);
+}
+
+.lightingParamRange:focus-visible {
+  outline: none;
+}
+
+.lightingPatchEditor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.lightingPatchFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.lightingPatchFact {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-800) 86%, transparent);
+}
+
+.lightingPatchTable {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-surface-700) 92%, transparent);
+}
+
+.lightingPatchRow {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 44px;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border-top: 1px solid var(--color-border-default);
+}
+
+.lightingPatchRow:first-child {
+  border-top: 0;
+}
+
+.lightingPatchAddress {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+}
+
+.lightingPatchBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.lightingPatchSegment {
+  flex: 1;
+  height: 8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-surface-500) 82%, black);
+}
+
+.lightingPatchSegment[data-active="true"] {
+  background: var(--color-primary-500);
+}
+
+.lightingPatchValue {
+  color: var(--color-text-strong);
+  text-align: right;
+  font: var(--font-weight-semibold) var(--font-size-xs) / 1 var(--font-family-mono);
+}
+
+.lightingPatchField {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.lightingPatchFieldLabel {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lightingPatchInput {
+  width: 100%;
+  min-height: var(--size-controlHeight);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) var(--font-size-sm) / 1 var(--font-family-mono);
+}
+
+.lightingPatchInput:disabled {
+  opacity: 0.7;
+}
+
+.lightingPatchInput:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 65%, transparent);
+  outline-offset: 2px;
+}
+
+.lightingPatchConflictCard {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-danger-500) 30%, var(--color-border-default));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-danger-500) 8%, var(--color-surface-700));
+}
+
+.lightingPatchConflictLabel {
+  color: color-mix(in srgb, var(--color-danger-400) 92%, white 8%);
+  font: var(--font-weight-semibold) var(--font-size-xs) / 1 var(--font-family-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lightingLoadingFixture {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  margin-left: -14px;
+  margin-top: -14px;
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, var(--color-surface-500));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-600) 82%, transparent);
+}
+
+.lightingCueDeltaList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.lightingCueDeltaRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+}
+
+.lightingCueDeltaRow[data-direction="rising"] {
+  border-color: color-mix(in srgb, var(--color-primary-500) 35%, var(--color-border-default));
+}
+
+.lightingCueDeltaRow[data-direction="falling"] {
+  border-color: color-mix(in srgb, var(--color-warning-500) 35%, var(--color-border-default));
+}
+
+.lightingCueDeltaFixture,
+.lightingCueDeltaValue,
+.lightingCueDeltaArrow {
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+}
+
+.lightingCueDeltaFixture {
+  color: var(--color-text-strong);
+}
+
+.lightingCueDeltaValue {
+  color: var(--color-text-subtle);
+}
+
+.lightingCueDeltaArrow {
+  color: var(--color-text-muted);
+}
+
+@keyframes lightingCuePulse {
+  0% {
+    opacity: 0.92;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes lightingIdentifyBurst {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1.28);
+  }
+}
+
+@media (max-width: 1440px) {
+  .lightingMain {
+    grid-template-columns: 1fr;
+  }
+
+  .lightingControlStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .lightingDmxGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1920px) and (max-height: 1080px) {
+  .lightingShell {
+    gap: var(--space-3);
+  }
+
+  .lightingMain {
+    gap: var(--space-3);
+  }
+
+  .lightingControlStrip {
+    grid-template-columns: 320px minmax(0, 1fr) 360px;
+    gap: var(--space-3);
+  }
+
+  .lightingGoBar {
+    min-height: 56px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .lightingCueList {
+    gap: 6px;
+  }
+
+  .lightingCueItem {
+    min-height: 48px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .lightingCueLabel {
+    font-size: var(--font-size-sm);
+  }
+
+  .lightingCueDetail {
+    margin-top: 4px;
+    font-size: var(--font-size-xs);
+  }
+
+  .lightingPlot {
+    min-height: 360px;
+    background-size:
+      auto,
+      48px 48px,
+      48px 48px;
+  }
+}

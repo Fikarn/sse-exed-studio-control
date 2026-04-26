@@ -4,7 +4,8 @@ import { Button, StatusBadge, Surface } from "@sse/design-system";
 import type { JsonValue } from "@sse/engine-client";
 
 import type { PlanningActivityEntry, PlanningProjectEntry, PlanningTaskEntry } from "../shellData";
-import styles from "../OperatorShell.module.css";
+import shellStyles from "../OperatorShell.module.css";
+import planningStyles from "./PlanningWorkspace.module.css";
 import {
   formatPlanningDuration,
   formatPlanningEnumLabel,
@@ -119,11 +120,11 @@ export function PlanningProjectDetailOverlay({
   });
 
   return (
-    <div className={styles.overlay} onClick={() => onClose()} role="presentation">
+    <div className={shellStyles.overlay} onClick={() => onClose()} role="presentation">
       <Surface
         aria-labelledby="planning-project-detail-title"
         aria-modal="true"
-        className={`${styles.dialog} ${styles.planningProjectDetailDialog}`}
+        className={`${shellStyles.dialog} ${planningStyles.planningProjectDetailDialog}`}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
@@ -137,16 +138,16 @@ export function PlanningProjectDetailOverlay({
         tabIndex={-1}
         tone="raised"
       >
-        <div className={styles.planningProjectDetailHeader}>
-          <div className={styles.planningProjectDetailTitleBlock}>
-            <div className={styles.planningEyebrow}>Planning project</div>
-            <div className={styles.dialogTitle} id="planning-project-detail-title">
+        <div className={planningStyles.planningProjectDetailHeader}>
+          <div className={planningStyles.planningProjectDetailTitleBlock}>
+            <div className={planningStyles.planningEyebrow}>Planning project</div>
+            <div className={shellStyles.dialogTitle} id="planning-project-detail-title">
               {project.title}
             </div>
             {project.description ? (
-              <p className={styles.planningProjectDetailDescription}>{project.description}</p>
+              <p className={planningStyles.planningProjectDetailDescription}>{project.description}</p>
             ) : null}
-            <div className={styles.planningProjectDetailBadgeRow}>
+            <div className={planningStyles.planningProjectDetailBadgeRow}>
               <StatusBadge
                 label={project.priority.toUpperCase()}
                 tone={project.priority === "p0" ? "error" : project.priority === "p1" ? "warning" : "idle"}
@@ -159,16 +160,16 @@ export function PlanningProjectDetailOverlay({
           </Button>
         </div>
 
-        <div className={styles.planningProjectDetailSummaryRow}>
-          <div className={styles.planningProjectDetailSummaryChip}>
+        <div className={planningStyles.planningProjectDetailSummaryRow}>
+          <div className={planningStyles.planningProjectDetailSummaryChip}>
             <span>Tasks</span>
             <strong>{totalTaskCount > 0 ? `${completedTaskCount}/${totalTaskCount} complete` : "No tasks yet"}</strong>
           </div>
-          <div className={styles.planningProjectDetailSummaryChip}>
+          <div className={planningStyles.planningProjectDetailSummaryChip}>
             <span>Total time</span>
             <strong>{formatPlanningDuration(totalProjectSeconds)}</strong>
           </div>
-          <div className={styles.planningProjectDetailSummaryChip}>
+          <div className={planningStyles.planningProjectDetailSummaryChip}>
             <span>Checklist</span>
             <strong>
               {checklistTotals.total > 0
@@ -179,20 +180,20 @@ export function PlanningProjectDetailOverlay({
         </div>
 
         {tasks.length > 0 ? (
-          <div className={styles.planningProjectDetailProgress}>
+          <div className={planningStyles.planningProjectDetailProgress}>
             <div
-              className={styles.planningProjectDetailProgressFill}
+              className={planningStyles.planningProjectDetailProgressFill}
               style={{ width: `${Math.round(progressValue * 100)}%` }}
             />
           </div>
         ) : null}
 
-        <div className={styles.planningProjectDetailSections}>
-          <section className={styles.planningProjectDetailSection}>
-            <div className={styles.planningProjectDetailSectionHeader}>
-              <div className={styles.planningProjectDetailSectionTitle}>Tasks</div>
-              <div className={styles.planningProjectDetailSectionHeaderActions}>
-                <div className={styles.planningProjectDetailSectionMeta}>
+        <div className={planningStyles.planningProjectDetailSections}>
+          <section className={planningStyles.planningProjectDetailSection}>
+            <div className={planningStyles.planningProjectDetailSectionHeader}>
+              <div className={planningStyles.planningProjectDetailSectionTitle}>Tasks</div>
+              <div className={planningStyles.planningProjectDetailSectionHeaderActions}>
+                <div className={planningStyles.planningProjectDetailSectionMeta}>
                   {totalTaskCount} {totalTaskCount === 1 ? "task" : "tasks"}
                 </div>
                 <Button
@@ -212,7 +213,7 @@ export function PlanningProjectDetailOverlay({
             </div>
             {taskComposerOpen ? (
               <form
-                className={styles.planningProjectDetailTaskComposer}
+                className={planningStyles.planningProjectDetailTaskComposer}
                 onSubmit={(event) => {
                   event.preventDefault();
                   void submitNewTask();
@@ -220,7 +221,7 @@ export function PlanningProjectDetailOverlay({
               >
                 <input
                   aria-label={`New task for ${project.title}`}
-                  className={styles.planningProjectDetailTaskComposerInput}
+                  className={planningStyles.planningProjectDetailTaskComposerInput}
                   onChange={(event) => {
                     setNewTaskTitle(event.target.value);
                     if (taskCreateError) {
@@ -231,7 +232,7 @@ export function PlanningProjectDetailOverlay({
                   type="text"
                   value={newTaskTitle}
                 />
-                <div className={styles.planningProjectDetailTaskComposerActions}>
+                <div className={planningStyles.planningProjectDetailTaskComposerActions}>
                   <Button
                     onClick={() => {
                       setTaskComposerOpen(false);
@@ -254,31 +255,31 @@ export function PlanningProjectDetailOverlay({
                   </Button>
                 </div>
                 {taskCreateError ? (
-                  <div className={styles.planningProjectDetailTaskComposerError}>{taskCreateError}</div>
+                  <div className={planningStyles.planningProjectDetailTaskComposerError}>{taskCreateError}</div>
                 ) : null}
               </form>
             ) : null}
             {tasks.length > 0 ? (
-              <div className={styles.planningProjectDetailTaskList}>
+              <div className={planningStyles.planningProjectDetailTaskList}>
                 {tasks.map((task) => {
                   const checklistDoneCount = task.checklist.filter((item) => item.done).length;
                   const dueDateLabel = planningDueDateLabel(task.dueDate);
                   return (
                     <div
                       key={task.id}
-                      className={styles.planningProjectDetailTaskCard}
+                      className={planningStyles.planningProjectDetailTaskCard}
                       data-selected={selectedTaskId === task.id}
                     >
                       <button
-                        className={styles.planningProjectDetailTaskCardButton}
+                        className={planningStyles.planningProjectDetailTaskCardButton}
                         onClick={() => onSelectTask(task.id, task.projectId)}
                         type="button"
                       >
-                        <div className={styles.planningProjectDetailTaskHeader}>
-                          <div className={styles.planningProjectDetailTaskTitleRow}>
+                        <div className={planningStyles.planningProjectDetailTaskHeader}>
+                          <div className={planningStyles.planningProjectDetailTaskTitleRow}>
                             <button
                               aria-label={`Toggle completion for ${task.title}`}
-                              className={styles.planningProjectDetailTaskToggle}
+                              className={planningStyles.planningProjectDetailTaskToggle}
                               data-completed={task.completed}
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -288,12 +289,17 @@ export function PlanningProjectDetailOverlay({
                             >
                               {task.completed ? "✓" : ""}
                             </button>
-                            {task.isRunning ? <span className={styles.planningProjectDetailRunningDot} /> : null}
-                            <span className={styles.planningProjectDetailTaskTitle} data-completed={task.completed}>
+                            {task.isRunning ? (
+                              <span className={planningStyles.planningProjectDetailRunningDot} />
+                            ) : null}
+                            <span
+                              className={planningStyles.planningProjectDetailTaskTitle}
+                              data-completed={task.completed}
+                            >
                               {task.title}
                             </span>
                           </div>
-                          <div className={styles.planningProjectDetailTaskBadgeRow}>
+                          <div className={planningStyles.planningProjectDetailTaskBadgeRow}>
                             <StatusBadge
                               label={planningTaskStateLabel(task)}
                               tone={
@@ -312,7 +318,7 @@ export function PlanningProjectDetailOverlay({
                             />
                           </div>
                         </div>
-                        <div className={styles.planningProjectDetailTaskMeta}>
+                        <div className={planningStyles.planningProjectDetailTaskMeta}>
                           <span>{formatPlanningTaskTimer(task.totalSeconds)}</span>
                           {task.checklist.length > 0 ? (
                             <span>
@@ -324,16 +330,16 @@ export function PlanningProjectDetailOverlay({
                           ) : null}
                         </div>
                         {task.description ? (
-                          <div className={styles.planningProjectDetailTaskDescription}>{task.description}</div>
+                          <div className={planningStyles.planningProjectDetailTaskDescription}>{task.description}</div>
                         ) : null}
                       </button>
                       {task.checklist.length > 0 ? (
-                        <div className={styles.planningProjectDetailChecklistList}>
+                        <div className={planningStyles.planningProjectDetailChecklistList}>
                           {task.checklist.map((item) => (
                             <button
                               key={item.id}
                               aria-label={`Toggle checklist item ${item.text} for ${task.title}`}
-                              className={styles.planningProjectDetailChecklistItem}
+                              className={planningStyles.planningProjectDetailChecklistItem}
                               data-done={item.done}
                               onClick={(event) => {
                                 event.stopPropagation();
@@ -341,10 +347,10 @@ export function PlanningProjectDetailOverlay({
                               }}
                               type="button"
                             >
-                              <span className={styles.planningProjectDetailChecklistToggle}>
+                              <span className={planningStyles.planningProjectDetailChecklistToggle}>
                                 {item.done ? "✓" : ""}
                               </span>
-                              <span className={styles.planningProjectDetailChecklistText} data-done={item.done}>
+                              <span className={planningStyles.planningProjectDetailChecklistText} data-done={item.done}>
                                 {item.text}
                               </span>
                             </button>
@@ -352,7 +358,7 @@ export function PlanningProjectDetailOverlay({
                         </div>
                       ) : null}
                       <form
-                        className={styles.planningProjectDetailChecklistComposer}
+                        className={planningStyles.planningProjectDetailChecklistComposer}
                         onClick={(event) => event.stopPropagation()}
                         onSubmit={(event) => {
                           event.preventDefault();
@@ -361,7 +367,7 @@ export function PlanningProjectDetailOverlay({
                       >
                         <input
                           aria-label={`Checklist item text for ${task.title}`}
-                          className={styles.planningProjectDetailChecklistComposerInput}
+                          className={planningStyles.planningProjectDetailChecklistComposerInput}
                           onChange={(event) => {
                             const value = event.target.value;
                             setChecklistDrafts((current) => ({
@@ -393,12 +399,14 @@ export function PlanningProjectDetailOverlay({
                         </Button>
                       </form>
                       {checklistErrors[task.id] ? (
-                        <div className={styles.planningProjectDetailChecklistError}>{checklistErrors[task.id]}</div>
+                        <div className={planningStyles.planningProjectDetailChecklistError}>
+                          {checklistErrors[task.id]}
+                        </div>
                       ) : null}
                       {task.labels.length > 0 ? (
-                        <div className={styles.planningProjectDetailTaskLabels}>
+                        <div className={planningStyles.planningProjectDetailTaskLabels}>
                           {task.labels.map((label) => (
-                            <span key={`${task.id}:${label}`} className={styles.planningProjectDetailTaskLabel}>
+                            <span key={`${task.id}:${label}`} className={planningStyles.planningProjectDetailTaskLabel}>
                               {label}
                             </span>
                           ))}
@@ -409,33 +417,33 @@ export function PlanningProjectDetailOverlay({
                 })}
               </div>
             ) : (
-              <div className={styles.planningProjectDetailEmpty}>No tasks yet.</div>
+              <div className={planningStyles.planningProjectDetailEmpty}>No tasks yet.</div>
             )}
           </section>
 
-          <section className={styles.planningProjectDetailSection}>
-            <div className={styles.planningProjectDetailSectionHeader}>
-              <div className={styles.planningProjectDetailSectionTitle}>Recent activity</div>
-              <div className={styles.planningProjectDetailSectionMeta}>
+          <section className={planningStyles.planningProjectDetailSection}>
+            <div className={planningStyles.planningProjectDetailSectionHeader}>
+              <div className={planningStyles.planningProjectDetailSectionTitle}>Recent activity</div>
+              <div className={planningStyles.planningProjectDetailSectionMeta}>
                 {activity.length > 0 ? `${activity.length} events` : "No events"}
               </div>
             </div>
             {activity.length > 0 ? (
-              <div className={styles.planningProjectDetailActivityList}>
+              <div className={planningStyles.planningProjectDetailActivityList}>
                 {activity.map((entry) => (
-                  <div key={entry.id} className={styles.planningProjectDetailActivityItem}>
-                    <div className={styles.planningProjectDetailActivityHeader}>
+                  <div key={entry.id} className={planningStyles.planningProjectDetailActivityItem}>
+                    <div className={planningStyles.planningProjectDetailActivityHeader}>
                       <span>{formatPlanningEnumLabel(entry.action)}</span>
                       <span>{formatPlanningRelativeTimestamp(entry.timestamp)}</span>
                     </div>
-                    <div className={styles.planningProjectDetailActivityBody}>
+                    <div className={planningStyles.planningProjectDetailActivityBody}>
                       {entry.detail || formatPlanningEnumLabel(entry.entityType)}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className={styles.planningProjectDetailEmpty}>No project activity yet.</div>
+              <div className={planningStyles.planningProjectDetailEmpty}>No project activity yet.</div>
             )}
           </section>
         </div>
