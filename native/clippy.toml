@@ -1,0 +1,2 @@
+# Clippy thresholds and tunables live here. Empty for now — the lint
+# selection itself is in [workspace.lints.clippy] in native/Cargo.toml.

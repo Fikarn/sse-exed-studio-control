@@ -33,9 +33,13 @@
     "clean:local": "node scripts/clean.mjs --local",
     "doctor": "node scripts/dev-doctor.mjs",
     "doctor:release": "node scripts/dev-doctor.mjs --release",
-    "dev:check": "npm run format:check && npm run protocol:check && npm run frontend:typecheck && npm run native:check && npm run native:test",
+    "dev:check": "npm run format:check && npm run lint && npm run rust:fmt:check && npm run rust:clippy && npm run protocol:check && npm run frontend:typecheck && npm run native:check && npm run native:test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "rust:fmt:check": "cd native && cargo fmt --all -- --check",
+    "rust:clippy": "cd native && cargo clippy --workspace --all-targets -- -W warnings",
     "protocol:generate": "node scripts/protocol/generate-protocol-artifacts.mjs",
     "protocol:check": "node scripts/protocol/generate-protocol-artifacts.mjs --check",
     "frontend:tokens:build": "npm run build --workspace frontend/packages/tokens",
@@ -135,8 +139,12 @@
     ]
   },
   "devDependencies": {
+    "eslint": "^9.39.4",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^6.1.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "typescript-eslint": "^8.59.0"
   }
 }

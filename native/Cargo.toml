@@ -13,3 +13,12 @@ rusqlite = { version = "0.39.0", features = ["bundled"] }
 studio-control-protocol = { path = "protocol/rust" }
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
+
+# Workspace-wide lints. Tightening from `warn` to `deny` is a follow-up item
+# once Phase 3 splits land and the existing 10 default-clippy warnings are
+# triaged.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = "warn"

@@ -1,2 +1,5 @@
 # Prettier formatting
 8bc7f4154d33ee703bf91cce5cc1cea6ab0a78ca
+
+# cargo fmt --all baseline
+e0d033230b358a0418a7db4319e2a32bca8c4fb4
