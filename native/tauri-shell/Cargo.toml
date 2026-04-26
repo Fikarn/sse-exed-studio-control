@@ -4,6 +4,13 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+# Enables the shell_test_bridge_* Tauri commands used by Playwright + smoke
+# harnesses to drive the shell over a file-backed status/command channel.
+# Production builds must NOT enable this feature.
+test-bridge = []
+
 [build-dependencies]
 tauri-build.workspace = true
 
