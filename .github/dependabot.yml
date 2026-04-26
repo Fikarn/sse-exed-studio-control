@@ -48,8 +48,12 @@ updates:
     commit-message:
       prefix: "chore(frontend-deps)"
 
+  # Single cargo entry covers the whole native/ workspace (introduced in
+  # `bb777ed`). Update-types for the runtime, protocol, and shell crates
+  # all flow through here; the patterns below group related dependencies
+  # so they ship as one PR rather than three.
   - package-ecosystem: cargo
-    directory: "/native/rust-engine"
+    directory: "/native"
     target-branch: "main"
     schedule:
       interval: monthly
@@ -68,31 +72,6 @@ updates:
           - "rusqlite"
           - "serde"
           - "serde_json"
-
-  - package-ecosystem: cargo
-    directory: "/native/protocol/rust"
-    target-branch: "main"
-    schedule:
-      interval: monthly
-      time: "09:00"
-      timezone: "Europe/Stockholm"
-    open-pull-requests-limit: 2
-    rebase-strategy: disabled
-    commit-message:
-      prefix: "chore(native-deps)"
-
-  - package-ecosystem: cargo
-    directory: "/native/tauri-shell"
-    target-branch: "main"
-    schedule:
-      interval: monthly
-      time: "09:00"
-      timezone: "Europe/Stockholm"
-    open-pull-requests-limit: 2
-    rebase-strategy: disabled
-    commit-message:
-      prefix: "chore(native-deps)"
-    groups:
       native-shell:
         update-types:
           - minor
@@ -100,3 +79,10 @@ updates:
         patterns:
           - "tauri"
           - "tauri-build"
+      native-tooling:
+        update-types:
+          - minor
+          - patch
+        patterns:
+          - "ts-rs"
+          - "ts-rs-macros"
