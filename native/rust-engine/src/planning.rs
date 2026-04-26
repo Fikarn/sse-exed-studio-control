@@ -1666,8 +1666,11 @@ pub fn apply_planning_task_reschedule(
         .map_err(|error| PlanningCommandError::Storage(error.to_string()))?;
 
     if moved_across_projects {
-        let source_task_ids =
-            ordered_task_ids_for_project_in_transaction(&transaction, &task.project_id, Some(&request.task_id))?;
+        let source_task_ids = ordered_task_ids_for_project_in_transaction(
+            &transaction,
+            &task.project_id,
+            Some(&request.task_id),
+        )?;
         for (order, ordered_task_id) in source_task_ids.iter().enumerate() {
             transaction
                 .execute(

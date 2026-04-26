@@ -385,7 +385,10 @@ mod tests {
 
         assert_eq!(snapshot.workspace, "audio");
         assert_eq!(snapshot.setup_active_section, "support");
-        assert_eq!(snapshot.lighting_current_section_id.as_deref(), Some("stage-left"));
+        assert_eq!(
+            snapshot.lighting_current_section_id.as_deref(),
+            Some("stage-left")
+        );
         assert_eq!(snapshot.lighting_selected_cue_id.as_deref(), Some("cue-14"));
         assert_eq!(snapshot.window_width, 1440);
         assert_eq!(snapshot.window_height, 900);
