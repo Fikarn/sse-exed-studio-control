@@ -89,14 +89,14 @@ function resolveGitSha() {
 
 function resolveTauriShellPath(target) {
   const executableName = target === "windows" ? "sse-exed-tauri-shell.exe" : "sse-exed-tauri-shell";
-  return path.join(rootDir, "native", "tauri-shell", "target", "release", executableName);
+  return path.join(rootDir, "native", "target", "release", executableName);
 }
 
 function resolveEnginePath(target) {
   const executableName = target === "windows" ? "studio-control-engine.exe" : "studio-control-engine";
   const candidates = [
-    path.join(rootDir, "native", "rust-engine", "target", "debug", executableName),
-    path.join(rootDir, "native", "rust-engine", "target", "release", executableName),
+    path.join(rootDir, "native", "target", "debug", executableName),
+    path.join(rootDir, "native", "target", "release", executableName),
   ];
 
   return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];

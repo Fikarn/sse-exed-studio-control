@@ -1,10 +1,11 @@
 [package]
 name = "studio-control-engine"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
-rusqlite = { version = "0.39.0", features = ["bundled"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-studio-control-protocol = { path = "../protocol/rust" }
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+studio-control-protocol.workspace = true

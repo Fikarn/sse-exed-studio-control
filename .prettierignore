@@ -2,5 +2,6 @@ node_modules/
 release/
 package-lock.json
 native/build/
-native/rust-engine/target/
+native/target/
+native/tauri-shell/gen/
 artifacts/
