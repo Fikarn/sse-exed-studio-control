@@ -95,8 +95,9 @@ pub fn bootstrap_runtime() -> EngineResult<RuntimeContext> {
         &runtime_paths.log_file_path,
         "INFO",
         &format!(
-            "Storage initialized: schema={}, journal_mode={}, integrity={}",
+            "Storage initialized: schema={}, format={}, journal_mode={}, integrity={}",
             storage_bootstrap.schema_version,
+            storage_bootstrap.format_version,
             storage_bootstrap.journal_mode,
             storage_bootstrap.integrity_check
         ),

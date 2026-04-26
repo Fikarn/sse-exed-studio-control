@@ -451,7 +451,8 @@ mod tests {
             protocol_version: String::from("1"),
             storage_ready: true,
             storage_bootstrap: StorageBootstrap {
-                schema_version: 3,
+                schema_version: 4,
+                format_version: String::from("1"),
                 journal_mode: String::from("wal"),
                 integrity_check: String::from("ok"),
             },

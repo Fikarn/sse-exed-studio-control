@@ -19,10 +19,13 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const STORAGE_SCHEMA_VERSION: i64 = 3;
+const STORAGE_SCHEMA_VERSION: i64 = 4;
+const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
+const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 
 pub struct StorageBootstrap {
     pub schema_version: i64,
+    pub format_version: String,
     pub journal_mode: String,
     pub integrity_check: String,
 }
@@ -108,12 +111,27 @@ pub fn initialize_database(db_path: &Path) -> EngineResult<StorageBootstrap> {
         connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
     let integrity_check: String =
         connection.pragma_query_value(None, "integrity_check", |row| row.get(0))?;
+    let format_version = read_format_version(&connection)?;
 
     Ok(StorageBootstrap {
         schema_version: resolved_schema_version,
+        format_version,
         journal_mode,
         integrity_check,
     })
+}
+
+fn read_format_version(connection: &Connection) -> Result<String, rusqlite::Error> {
+    connection
+        .query_row(
+            "SELECT value FROM app_metadata WHERE key = ?1",
+            [STORAGE_FORMAT_VERSION_KEY],
+            |row| row.get::<_, String>(0),
+        )
+        .or_else(|error| match error {
+            rusqlite::Error::QueryReturnedNoRows => Ok(String::from("0")),
+            other => Err(other),
+        })
 }
 
 pub fn import_legacy_db(
@@ -411,7 +429,7 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
         schema_version = 2;
     }
 
-    if schema_version < STORAGE_SCHEMA_VERSION {
+    if schema_version < 3 {
         let transaction = connection.transaction()?;
         transaction.execute_batch(
             r#"
@@ -421,12 +439,52 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
               ON tasks(scheduled_start) WHERE scheduled_start IS NOT NULL;
             "#,
         )?;
-        transaction.execute(
-            "INSERT INTO schema_migrations(version) VALUES (?1)",
-            [STORAGE_SCHEMA_VERSION],
-        )?;
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (3)", [])?;
         transaction.commit()?;
-        schema_version = STORAGE_SCHEMA_VERSION;
+        schema_version = 3;
+    }
+
+    if schema_version < 4 {
+        let transaction = connection.transaction()?;
+
+        // Record format_version metadata so future migrations can distinguish
+        // DDL shape (schema_migrations) from data shape (format_version).
+        transaction.execute(
+            "INSERT INTO app_metadata(key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO NOTHING",
+            params![STORAGE_FORMAT_VERSION_KEY, STORAGE_FORMAT_VERSION_INITIAL],
+        )?;
+
+        // Migrate the legacy lighting editor state key to the canonical key,
+        // preserving data for any database that still holds only the legacy
+        // value, then drop the legacy key unconditionally.
+        transaction.execute(
+            "INSERT INTO app_settings(key, value)
+             SELECT 'app.lighting.editor.state', value
+             FROM app_settings
+             WHERE key = 'app.control_surface.lighting.state'
+               AND NOT EXISTS (
+                 SELECT 1 FROM app_settings WHERE key = 'app.lighting.editor.state'
+               )",
+            [],
+        )?;
+        transaction.execute(
+            "DELETE FROM app_settings WHERE key = 'app.control_surface.lighting.state'",
+            [],
+        )?;
+
+        // Drop redundant per-fixture lighting keys. The editor state JSON has
+        // been the canonical source of truth for fixture intensity/cct/on
+        // since the lighting refactor; the per-fixture keys were a stale
+        // dual-write path.
+        transaction.execute(
+            "DELETE FROM app_settings WHERE key LIKE 'app.lighting.fixture.%'",
+            [],
+        )?;
+
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (4)", [])?;
+        transaction.commit()?;
+        schema_version = 4;
     }
 
     Ok(schema_version)
@@ -848,7 +906,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_schema_v3_is_idempotent() {
+    fn migrate_schema_is_idempotent() {
         let test_dir = TestDir::new("storage-migrate-idempotent");
         let db_path = test_dir.path().join("native.sqlite3");
 
@@ -856,16 +914,16 @@ mod tests {
 
         let mut connection = open_connection(&db_path).expect("connection should open");
         let resolved = migrate_schema(&mut connection).expect("second migration should succeed");
-        assert_eq!(resolved, 3);
+        assert_eq!(resolved, STORAGE_SCHEMA_VERSION);
 
-        let version_3_count: i64 = connection
+        let version_count: i64 = connection
             .query_row(
-                "SELECT COUNT(*) FROM schema_migrations WHERE version = 3",
-                [],
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = ?1",
+                [STORAGE_SCHEMA_VERSION],
                 |row| row.get(0),
             )
             .expect("count should query");
-        assert_eq!(version_3_count, 1);
+        assert_eq!(version_count, 1);
     }
 
     #[test]
@@ -918,7 +976,7 @@ mod tests {
                 .expect("v2 schema should seed");
         }
 
-        initialize_database(&db_path).expect("v3 migration should succeed");
+        initialize_database(&db_path).expect("migration to current schema should succeed");
 
         let connection = open_connection(&db_path).expect("connection should reopen");
         let (scheduled_start, scheduled_duration): (Option<String>, Option<i64>) = connection
@@ -939,5 +997,238 @@ mod tests {
             )
             .expect("count should query");
         assert_eq!(version_3_count, 1);
+        let version_4_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 4",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count should query");
+        assert_eq!(version_4_count, 1);
+    }
+
+    #[test]
+    fn initialize_database_records_format_version_metadata() {
+        let test_dir = TestDir::new("storage-format-version");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        let bootstrap = initialize_database(&db_path).expect("database should initialize");
+        assert_eq!(bootstrap.format_version, STORAGE_FORMAT_VERSION_INITIAL);
+
+        let connection = open_connection(&db_path).expect("connection should open");
+        let stored: String = connection
+            .query_row(
+                "SELECT value FROM app_metadata WHERE key = 'storage.format_version'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("format_version row should exist");
+        assert_eq!(stored, STORAGE_FORMAT_VERSION_INITIAL);
+    }
+
+    #[test]
+    fn migrate_schema_v3_to_v4_copies_legacy_lighting_key_when_canonical_missing() {
+        let test_dir = TestDir::new("storage-v4-legacy-only");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        seed_v3_database(&db_path);
+        set_settings_owned(
+            &db_path,
+            &[(
+                String::from("app.control_surface.lighting.state"),
+                String::from(r#"{"groups":[],"removed_fixture_ids":[],"fixtures":[],"scenes":[]}"#),
+            )],
+        )
+        .expect("legacy seed should write");
+
+        initialize_database(&db_path).expect("v4 migration should succeed");
+
+        let settings = list_settings_by_prefix(&db_path, "app.").expect("settings should load");
+        assert!(
+            settings.contains_key("app.lighting.editor.state"),
+            "canonical lighting key should be populated from legacy"
+        );
+        assert!(
+            !settings.contains_key("app.control_surface.lighting.state"),
+            "legacy lighting key should be removed"
+        );
+    }
+
+    #[test]
+    fn migrate_schema_v3_to_v4_canonical_lighting_key_wins_over_legacy() {
+        let test_dir = TestDir::new("storage-v4-canonical-wins");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        seed_v3_database(&db_path);
+        let canonical_value = String::from(
+            r#"{"groups":[{"id":"g1","name":"Stage"}],"removed_fixture_ids":[],"fixtures":[],"scenes":[]}"#,
+        );
+        set_settings_owned(
+            &db_path,
+            &[
+                (
+                    String::from("app.lighting.editor.state"),
+                    canonical_value.clone(),
+                ),
+                (
+                    String::from("app.control_surface.lighting.state"),
+                    String::from(
+                        r#"{"groups":[],"removed_fixture_ids":[],"fixtures":[],"scenes":[]}"#,
+                    ),
+                ),
+            ],
+        )
+        .expect("dual seed should write");
+
+        initialize_database(&db_path).expect("v4 migration should succeed");
+
+        let settings = list_settings_by_prefix(&db_path, "app.").expect("settings should load");
+        assert_eq!(
+            settings
+                .get("app.lighting.editor.state")
+                .map(String::as_str),
+            Some(canonical_value.as_str()),
+            "canonical lighting key should win over legacy"
+        );
+        assert!(
+            !settings.contains_key("app.control_surface.lighting.state"),
+            "legacy lighting key should be removed"
+        );
+    }
+
+    #[test]
+    fn migrate_schema_v3_to_v4_drops_per_fixture_state_keys() {
+        let test_dir = TestDir::new("storage-v4-per-fixture-cleanup");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        seed_v3_database(&db_path);
+        set_settings_owned(
+            &db_path,
+            &[
+                (
+                    String::from("app.lighting.fixture.fixture-key-left.intensity"),
+                    String::from("80"),
+                ),
+                (
+                    String::from("app.lighting.fixture.fixture-key-left.cct"),
+                    String::from("4500"),
+                ),
+                (
+                    String::from("app.lighting.fixture.fixture-key-left.on"),
+                    String::from("true"),
+                ),
+                (
+                    String::from("app.lighting.fixture.fixture-other.intensity"),
+                    String::from("42"),
+                ),
+            ],
+        )
+        .expect("per-fixture seed should write");
+
+        initialize_database(&db_path).expect("v4 migration should succeed");
+
+        let settings = list_settings_by_prefix(&db_path, "app.lighting.fixture.")
+            .expect("lighting fixture settings should load");
+        assert!(
+            settings.is_empty(),
+            "all per-fixture lighting keys should be deleted, got: {:?}",
+            settings.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn migrate_schema_v3_to_v4_handles_malformed_editor_state_json() {
+        let test_dir = TestDir::new("storage-v4-malformed-json");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        seed_v3_database(&db_path);
+        set_settings_owned(
+            &db_path,
+            &[(
+                String::from("app.lighting.editor.state"),
+                String::from("not valid json {{ broken"),
+            )],
+        )
+        .expect("malformed seed should write");
+
+        initialize_database(&db_path).expect("v4 migration should succeed despite bad json");
+
+        let connection = open_connection(&db_path).expect("connection should open");
+        let version_4_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 4",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count should query");
+        assert_eq!(version_4_count, 1);
+    }
+
+    fn seed_v3_database(db_path: &Path) {
+        let mut connection = open_connection(db_path).expect("connection should open");
+        connection
+            .execute_batch(
+                r#"
+                CREATE TABLE schema_migrations (
+                  version INTEGER PRIMARY KEY,
+                  applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE app_metadata (
+                  key TEXT PRIMARY KEY,
+                  value TEXT NOT NULL
+                );
+                CREATE TABLE app_settings (
+                  key TEXT PRIMARY KEY,
+                  value TEXT NOT NULL,
+                  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE projects (
+                  id TEXT PRIMARY KEY,
+                  title TEXT NOT NULL,
+                  description TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  priority TEXT NOT NULL,
+                  created_at TEXT NOT NULL,
+                  last_updated TEXT NOT NULL,
+                  sort_order INTEGER NOT NULL
+                );
+                CREATE TABLE tasks (
+                  id TEXT PRIMARY KEY,
+                  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                  title TEXT NOT NULL,
+                  description TEXT NOT NULL,
+                  priority TEXT NOT NULL,
+                  due_date TEXT,
+                  labels_json TEXT NOT NULL,
+                  is_running INTEGER NOT NULL DEFAULT 0,
+                  total_seconds INTEGER NOT NULL DEFAULT 0,
+                  last_started TEXT,
+                  completed INTEGER NOT NULL DEFAULT 0,
+                  sort_order INTEGER NOT NULL,
+                  created_at TEXT NOT NULL,
+                  scheduled_start TEXT,
+                  scheduled_duration_seconds INTEGER
+                );
+                CREATE TABLE task_checklist_items (
+                  id TEXT PRIMARY KEY,
+                  task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                  text TEXT NOT NULL,
+                  done INTEGER NOT NULL DEFAULT 0,
+                  sort_order INTEGER NOT NULL
+                );
+                CREATE TABLE activity_log (
+                  id TEXT PRIMARY KEY,
+                  timestamp TEXT NOT NULL,
+                  entity_type TEXT NOT NULL,
+                  entity_id TEXT NOT NULL,
+                  action TEXT NOT NULL,
+                  detail TEXT NOT NULL
+                );
+                INSERT INTO schema_migrations(version) VALUES (1);
+                INSERT INTO schema_migrations(version) VALUES (2);
+                INSERT INTO schema_migrations(version) VALUES (3);
+                "#,
+            )
+            .expect("v3 schema should seed");
     }
 }
