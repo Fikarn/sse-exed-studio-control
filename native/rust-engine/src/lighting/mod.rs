@@ -47,6 +47,8 @@ const MAX_CUE_LABEL_LEN: usize = 120;
 const MAX_CUE_NOTES_LEN: usize = 500;
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingSnapshot {
     pub status: String,
     pub summary: String,
@@ -90,6 +92,8 @@ pub struct LightingSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingFixtureSnapshot {
     pub id: String,
     pub name: String,
@@ -117,6 +121,8 @@ pub struct LightingFixtureSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingGroupSnapshot {
     pub id: String,
     pub name: String,
@@ -125,6 +131,8 @@ pub struct LightingGroupSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingSceneSnapshot {
     pub id: String,
     pub name: String,
@@ -139,6 +147,8 @@ pub struct LightingSceneSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingSceneFixtureSnapshot {
     #[serde(rename = "fixtureId")]
     pub fixture_id: String,
@@ -148,6 +158,8 @@ pub struct LightingSceneFixtureSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingCueSnapshot {
     pub id: String,
     pub ordinal: i64,
@@ -175,6 +187,8 @@ pub struct LightingEditorState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingSpatialMarker {
     pub x: f64,
     pub y: f64,
@@ -219,6 +233,8 @@ pub struct LightingEditorFixtureState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingEffect {
     #[serde(rename = "type")]
     pub effect_type: String,
@@ -271,11 +287,15 @@ pub struct LightingHealthCheck {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingDmxMonitorSnapshot {
     pub channels: Vec<LightingDmxChannelSnapshot>,
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingDmxChannelSnapshot {
     pub channel: i64,
     pub value: i64,

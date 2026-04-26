@@ -17,6 +17,8 @@ const VALID_PROJECT_STATUSES: &[&str] = &["todo", "in-progress", "blocked", "don
 const VALID_PRIORITIES: &[&str] = &["p0", "p1", "p2", "p3"];
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct PlanningSnapshot {
     pub projects: Vec<PlanningProject>,
     pub tasks: Vec<PlanningTask>,
@@ -27,6 +29,8 @@ pub struct PlanningSnapshot {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct PlanningProject {
     pub id: String,
     pub title: String,
@@ -41,6 +45,8 @@ pub struct PlanningProject {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct PlanningChecklistItem {
     pub id: String,
     pub text: String,
@@ -49,6 +55,8 @@ pub struct PlanningChecklistItem {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct PlanningTask {
     pub id: String,
     #[serde(rename = "projectId")]
@@ -77,6 +85,8 @@ pub struct PlanningTask {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct PlanningActivityEntry {
     pub id: String,
     pub timestamp: String,
@@ -89,8 +99,11 @@ pub struct PlanningActivityEntry {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct PlanningSettingsSnapshot {
     #[serde(rename = "settingsPrefix")]
+    #[cfg_attr(feature = "ts-rs", ts(type = "string"))]
     pub settings_prefix: &'static str,
     #[serde(rename = "viewFilter")]
     pub view_filter: String,
@@ -113,6 +126,8 @@ pub struct PlanningSettingsSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct PlanningCounts {
     #[serde(rename = "projectCount")]
     pub project_count: usize,

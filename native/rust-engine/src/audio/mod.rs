@@ -43,6 +43,8 @@ const DEFAULT_AUDIO_EXPECTED_COMPATIBILITY_MODE: bool = false;
 const DEFAULT_AUDIO_FADERS_PER_BANK: i64 = 12;
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct AudioSnapshot {
     pub status: String,
     pub summary: String,
@@ -95,6 +97,8 @@ pub struct AudioSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct AudioChannelSnapshot {
     pub id: String,
     pub name: String,
@@ -126,6 +130,8 @@ pub struct AudioChannelSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct AudioMixTargetSnapshot {
     pub id: String,
     pub name: String,
@@ -140,6 +146,8 @@ pub struct AudioMixTargetSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct AudioSceneSnapshot {
     pub id: String,
     pub name: String,

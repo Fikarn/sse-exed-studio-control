@@ -4,11 +4,19 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+default = []
+# Enables ts-rs `#[derive(TS)]` on snapshot types and triggers TypeScript
+# binding export when `cargo test --features ts-rs` runs. Production
+# builds must NOT enable this feature; it adds a dev-only dependency.
+ts-rs = ["dep:ts-rs"]
+
 [dependencies]
 rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 studio-control-protocol.workspace = true
+ts-rs = { workspace = true, optional = true }
 
 [lints]
 workspace = true

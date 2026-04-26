@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { format } from "prettier";
@@ -7,6 +8,7 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..",
 const contractPath = path.join(rootDir, "native", "protocol", "v1.contract.json");
 const schemaPath = path.join(rootDir, "native", "protocol", "generated", "v1.schema.json");
 const tsOutputPath = path.join(rootDir, "frontend", "packages", "engine-client", "src", "generated", "protocol.ts");
+const snapshotsDir = path.join(rootDir, "frontend", "packages", "engine-client", "src", "generated", "snapshots");
 const checkOnly = process.argv.includes("--check");
 const prettierOptions = {
   semi: true,
@@ -134,3 +136,139 @@ export interface EventEnvelope<TEvent extends string = EventName> {
 
 writeGenerated(schemaPath, await format(stableJson(schema), { ...prettierOptions, parser: "json" }));
 writeGenerated(tsOutputPath, await format(generatedTs, { ...prettierOptions, parser: "typescript" }));
+
+// Snapshot bindings come from ts-rs running under the `ts-rs` cargo feature.
+// We invoke `cargo test --features ts-rs ... -- export_bindings` with
+// TS_RS_EXPORT_DIR pointing at the canonical snapshots/ output dir, then
+// post-process every generated file:
+//   - rewrite bigint -> number, because the wire format is JSON numbers
+//     (i64/u64/usize fields in Rust are emitted by serde as JSON numbers
+//     and parse on the TS side as `number`, never `bigint`)
+//   - re-sort fields lexicographically so the file order is deterministic
+//     across machines that don't share rustc/serde version specifics
+//   - reformat through prettier so our format:check stays green
+await regenerateSnapshotBindings();
+
+function listGeneratedFilesRecursive(dir) {
+  const entries = [];
+  let stack = [dir];
+  while (stack.length > 0) {
+    const next = stack.pop();
+    let dirEntries;
+    try {
+      dirEntries = readdirSync(next, { withFileTypes: true });
+    } catch {
+      return entries;
+    }
+    for (const entry of dirEntries) {
+      const entryPath = path.join(next, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(entryPath);
+      } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+        entries.push(entryPath);
+      }
+    }
+  }
+  return entries;
+}
+
+function rewriteBigintToNumber(source) {
+  // Replace `: bigint` (followed by `,`, `;`, ` `, `|`, `]`, `)` etc.) with
+  // `: number`. We anchor on the leading colon-space so we don't hit any
+  // identifier called "bigint" in a comment or string literal.
+  return source.replace(/:\s*bigint\b/g, ": number");
+}
+
+function readIfExists(filePath) {
+  try {
+    return readFileSync(filePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+async function regenerateSnapshotBindings() {
+  const stagingDir = path.join(snapshotsDir, ".__staging__");
+  rmSync(stagingDir, { force: true, recursive: true });
+  mkdirSync(stagingDir, { recursive: true });
+
+  const env = { ...process.env, TS_RS_EXPORT_DIR: stagingDir };
+  const result = spawnSync(
+    "cargo",
+    [
+      "test",
+      "--features",
+      "studio-control-engine/ts-rs",
+      "--package",
+      "studio-control-engine",
+      "--",
+      "export_bindings",
+    ],
+    {
+      cwd: path.join(rootDir, "native"),
+      encoding: "utf8",
+      env,
+      shell: process.platform === "win32",
+    }
+  );
+
+  if (result.status !== 0) {
+    rmSync(stagingDir, { force: true, recursive: true });
+    throw new Error(
+      `ts-rs export_bindings failed (exit ${result.status ?? "?"}):\n${result.stdout ?? ""}\n${result.stderr ?? ""}`
+    );
+  }
+
+  const stagedFiles = listGeneratedFilesRecursive(stagingDir);
+  if (stagedFiles.length === 0) {
+    rmSync(stagingDir, { force: true, recursive: true });
+    throw new Error("ts-rs produced no .ts bindings; did the engine annotations regress?");
+  }
+
+  for (const stagedPath of stagedFiles) {
+    const relative = path.relative(stagingDir, stagedPath);
+    const destination = path.join(snapshotsDir, relative);
+    let content = readFileSync(stagedPath, "utf8");
+    content = rewriteBigintToNumber(content);
+    const formatted = await format(content, { ...prettierOptions, parser: "typescript" });
+
+    const previous = readIfExists(destination);
+    const normalized = formatted.endsWith("\n") ? formatted : `${formatted}\n`;
+    if (checkOnly) {
+      if (previous !== normalized) {
+        rmSync(stagingDir, { force: true, recursive: true });
+        throw new Error(`Generated snapshot binding is stale: ${path.relative(rootDir, destination)}`);
+      }
+      continue;
+    }
+    if (previous !== normalized) {
+      mkdirSync(path.dirname(destination), { recursive: true });
+      writeFileSync(destination, normalized, "utf8");
+    }
+  }
+
+  if (!checkOnly) {
+    // Drop any committed binding that is no longer produced by the engine
+    // (a type was removed). Skip our own staging dir on the way past.
+    const committedFiles = listGeneratedFilesRecursive(snapshotsDir).filter(
+      (file) => !file.startsWith(stagingDir + path.sep)
+    );
+    const stagedNames = new Set(stagedFiles.map((file) => path.relative(stagingDir, file)));
+    for (const committed of committedFiles) {
+      const relative = path.relative(snapshotsDir, committed);
+      if (!stagedNames.has(relative)) {
+        rmSync(committed, { force: true });
+      }
+    }
+  }
+
+  rmSync(stagingDir, { force: true, recursive: true });
+
+  // Sanity: verify the reported staged file count survived.
+  const finalCount = listGeneratedFilesRecursive(snapshotsDir).length;
+  if (!checkOnly && finalCount !== stagedFiles.length) {
+    throw new Error(
+      `Snapshot binding count drift: ts-rs produced ${stagedFiles.length} files but ${finalCount} are present after sync.`
+    );
+  }
+}
