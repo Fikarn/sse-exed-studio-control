@@ -131,625 +131,402 @@ impl EngineApp {
                     "echoParams": request.params,
                 }),
             )),
-            "health.snapshot" => match self.read_health_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "app.snapshot" => match self.read_app_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "commissioning.snapshot" => match self.read_commissioning_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "lighting.snapshot" => match self.read_lighting_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "lighting.dmxMonitor.snapshot" => match self.read_lighting_dmx_monitor_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "lighting.scene.recall" => match parse_lighting_scene_recall_request(&request.params) {
-                Ok(recall_request) => {
-                    match recall_lighting_scene(&self.runtime.db_path, &recall_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "scene-recalled",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.scene.create" => match parse_lighting_scene_create_request(&request.params) {
-                Ok(create_request) => {
-                    match create_lighting_scene(&self.runtime.db_path, &create_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "scene-created",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.scene.update" => match parse_lighting_scene_update_request(&request.params) {
-                Ok(update_request) => {
-                    match update_lighting_scene(&self.runtime.db_path, &update_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "scene-updated",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.scene.delete" => match parse_lighting_scene_delete_request(&request.params) {
-                Ok(delete_request) => {
-                    match delete_lighting_scene(&self.runtime.db_path, &delete_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "scene-deleted",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.group.create" => match parse_lighting_group_create_request(&request.params) {
-                Ok(create_request) => {
-                    match create_lighting_group(&self.runtime.db_path, &create_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "group-created",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.group.update" => match parse_lighting_group_update_request(&request.params) {
-                Ok(update_request) => {
-                    match update_lighting_group(&self.runtime.db_path, &update_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "group-updated",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.group.delete" => match parse_lighting_group_delete_request(&request.params) {
-                Ok(delete_request) => {
-                    match delete_lighting_group(&self.runtime.db_path, &delete_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "group-deleted",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.settings.update" => {
-                match parse_lighting_settings_update_request(&request.params) {
-                    Ok(update_request) => {
-                        match update_lighting_settings(&self.runtime.db_path, &update_request) {
-                            Ok(result) => Self::reply_with_lighting_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "settings-updated",
-                            ),
-                            Err(error) => match error {
-                                LightingCommandError::Rejected(code, message) => {
-                                    Self::reply(error_response(request.id, code, message))
-                                }
-                                LightingCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
+
+            // -------------------------------------------------------------
+            // Read snapshots (R-noargs)
+            // -------------------------------------------------------------
+            "health.snapshot" => self.dispatch_read(request.id, Self::read_health_snapshot),
+            "app.snapshot" => self.dispatch_read(request.id, Self::read_app_snapshot),
+            "commissioning.snapshot" => {
+                self.dispatch_read(request.id, Self::read_commissioning_snapshot)
             }
-            "lighting.fixture.create" => {
-                match parse_lighting_fixture_create_request(&request.params) {
-                    Ok(create_request) => {
-                        match create_lighting_fixture(&self.runtime.db_path, &create_request) {
-                            Ok(result) => Self::reply_with_lighting_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "fixture-created",
-                            ),
-                            Err(error) => match error {
-                                LightingCommandError::Rejected(code, message) => {
-                                    Self::reply(error_response(request.id, code, message))
-                                }
-                                LightingCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
+            "lighting.snapshot" => self.dispatch_read(request.id, Self::read_lighting_snapshot),
+            "lighting.dmxMonitor.snapshot" => {
+                self.dispatch_read(request.id, Self::read_lighting_dmx_monitor_snapshot)
             }
-            "lighting.fixture.update" => {
-                match parse_lighting_fixture_update_request(&request.params) {
-                    Ok(update_request) => {
-                        match update_lighting_fixture(&self.runtime.db_path, &update_request) {
-                            Ok(result) => Self::reply_with_lighting_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "fixture-updated",
-                            ),
-                            Err(error) => match error {
-                                LightingCommandError::Rejected(code, message) => {
-                                    Self::reply(error_response(request.id, code, message))
-                                }
-                                LightingCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
+            "audio.snapshot" => self.dispatch_read(request.id, Self::read_audio_snapshot),
+            "support.snapshot" => self.dispatch_read(request.id, Self::read_support_snapshot),
+            "controlSurface.snapshot" => {
+                self.dispatch_read(request.id, Self::read_control_surface_snapshot)
             }
-            "lighting.fixture.delete" => {
-                match parse_lighting_fixture_delete_request(&request.params) {
-                    Ok(delete_request) => {
-                        match delete_lighting_fixture(&self.runtime.db_path, &delete_request) {
-                            Ok(result) => Self::reply_with_lighting_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "fixture-deleted",
-                            ),
-                            Err(error) => match error {
-                                LightingCommandError::Rejected(code, message) => {
-                                    Self::reply(error_response(request.id, code, message))
-                                }
-                                LightingCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "lighting.group.power" => match parse_lighting_group_power_request(&request.params) {
-                Ok(power_request) => {
-                    match set_lighting_group_power(&self.runtime.db_path, &power_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "group-powered",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.power.all" => match parse_lighting_all_power_request(&request.params) {
-                Ok(power_request) => {
-                    match set_lighting_all_power(&self.runtime.db_path, &power_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "all-powered",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.cue.create" => match parse_lighting_cue_create_request(&request.params) {
-                Ok(create_request) => {
-                    match create_lighting_cue(&self.runtime.db_path, &create_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "cue-created",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.cue.update" => match parse_lighting_cue_update_request(&request.params) {
-                Ok(update_request) => {
-                    match update_lighting_cue(&self.runtime.db_path, &update_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "cue-updated",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.cue.delete" => match parse_lighting_cue_delete_request(&request.params) {
-                Ok(delete_request) => {
-                    match delete_lighting_cue(&self.runtime.db_path, &delete_request) {
-                        Ok(result) => Self::reply_with_lighting_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "cue-deleted",
-                        ),
-                        Err(error) => match error {
-                            LightingCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            LightingCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "lighting.cue.fire" => match parse_lighting_cue_fire_request(&request.params) {
-                Ok(fire_request) => match fire_lighting_cue(&self.runtime.db_path, &fire_request) {
-                    Ok(result) => Self::reply_with_lighting_change(
-                        ok_response(
-                            request.id,
-                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                        ),
-                        "cue-fired",
-                    ),
-                    Err(error) => match error {
-                        LightingCommandError::Rejected(code, message) => {
-                            Self::reply(error_response(request.id, code, message))
-                        }
-                        LightingCommandError::Storage(message) => {
-                            Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                        }
-                    },
+            "settings.get" => self.dispatch_read(request.id, Self::read_shell_settings),
+            "planning.snapshot" => self.dispatch_read(request.id, Self::read_planning_snapshot),
+            "planning.context" => self.dispatch_read(request.id, Self::read_planning_context),
+
+            // -------------------------------------------------------------
+            // Read with parsed params (R-args)
+            // -------------------------------------------------------------
+            "planning.report.time" => self.dispatch_read_with_params(
+                request,
+                parse_planning_time_report_request,
+                |s, project_id| s.read_planning_time_report(project_id.as_deref()),
+            ),
+
+            // -------------------------------------------------------------
+            // Lighting mutations (M-1event)
+            // -------------------------------------------------------------
+            "lighting.scene.recall" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_scene_recall_request,
+                recall_lighting_scene,
+                "scene-recalled",
+            ),
+            "lighting.scene.create" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_scene_create_request,
+                create_lighting_scene,
+                "scene-created",
+            ),
+            "lighting.scene.update" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_scene_update_request,
+                update_lighting_scene,
+                "scene-updated",
+            ),
+            "lighting.scene.delete" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_scene_delete_request,
+                delete_lighting_scene,
+                "scene-deleted",
+            ),
+            "lighting.group.create" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_group_create_request,
+                create_lighting_group,
+                "group-created",
+            ),
+            "lighting.group.update" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_group_update_request,
+                update_lighting_group,
+                "group-updated",
+            ),
+            "lighting.group.delete" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_group_delete_request,
+                delete_lighting_group,
+                "group-deleted",
+            ),
+            "lighting.settings.update" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_settings_update_request,
+                update_lighting_settings,
+                "settings-updated",
+            ),
+            "lighting.fixture.create" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_fixture_create_request,
+                create_lighting_fixture,
+                "fixture-created",
+            ),
+            "lighting.fixture.update" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_fixture_update_request,
+                update_lighting_fixture,
+                "fixture-updated",
+            ),
+            "lighting.fixture.delete" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_fixture_delete_request,
+                delete_lighting_fixture,
+                "fixture-deleted",
+            ),
+            "lighting.group.power" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_group_power_request,
+                set_lighting_group_power,
+                "group-powered",
+            ),
+            "lighting.power.all" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_all_power_request,
+                set_lighting_all_power,
+                "all-powered",
+            ),
+            "lighting.cue.create" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_cue_create_request,
+                create_lighting_cue,
+                "cue-created",
+            ),
+            "lighting.cue.update" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_cue_update_request,
+                update_lighting_cue,
+                "cue-updated",
+            ),
+            "lighting.cue.delete" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_cue_delete_request,
+                delete_lighting_cue,
+                "cue-deleted",
+            ),
+            "lighting.cue.fire" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_cue_fire_request,
+                fire_lighting_cue,
+                "cue-fired",
+            ),
+
+            // -------------------------------------------------------------
+            // Audio mutations (M-1event)
+            // -------------------------------------------------------------
+            "audio.sync" => self.run_audio_mutate(request.id, sync_audio_console, "console-synced"),
+            "audio.snapshot.recall" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_snapshot_recall_request,
+                recall_audio_snapshot,
+                "snapshot-recalled",
+            ),
+            "audio.snapshot.create" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_snapshot_create_request,
+                create_audio_snapshot,
+                "snapshot-created",
+            ),
+            "audio.snapshot.update" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_snapshot_update_request,
+                update_audio_snapshot,
+                "snapshot-updated",
+            ),
+            "audio.snapshot.delete" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_snapshot_delete_request,
+                delete_audio_snapshot,
+                "snapshot-deleted",
+            ),
+            "audio.channel.update" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_channel_update_request,
+                update_audio_channel,
+                "channel-updated",
+            ),
+            "audio.mixTarget.update" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_mix_target_update_request,
+                update_audio_mix_target,
+                "mix-target-updated",
+            ),
+            "audio.settings.update" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_settings_update_request,
+                update_audio_settings,
+                "settings-updated",
+            ),
+
+            // -------------------------------------------------------------
+            // Planning mutations (M-1event with derived event payload)
+            // -------------------------------------------------------------
+            "planning.settings.update" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_settings_update,
+                update_planning_settings,
+                "settings-updated",
+                |result| {
+                    (
+                        result.settings.selected_project_id.as_deref(),
+                        result.settings.selected_task_id.as_deref(),
+                    )
                 },
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "audio.snapshot" => match self.read_audio_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "audio.sync" => match sync_audio_console(&self.runtime.db_path) {
-                Ok(result) => Self::reply_with_audio_change(
-                    ok_response(
-                        request.id,
-                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                    ),
-                    "console-synced",
-                ),
-                Err(error) => match error {
-                    AudioCommandError::Rejected(code, message) => {
-                        Self::reply(error_response(request.id, code, message))
-                    }
-                    AudioCommandError::Storage(message) => {
-                        Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                    }
+            ),
+            "planning.select" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_selection_request,
+                apply_planning_selection,
+                "selection-updated",
+                |result| {
+                    (
+                        result.settings.selected_project_id.as_deref(),
+                        result.settings.selected_task_id.as_deref(),
+                    )
                 },
-            },
-            "audio.snapshot.recall" => match parse_audio_snapshot_recall_request(&request.params) {
-                Ok(recall_request) => {
-                    match recall_audio_snapshot(&self.runtime.db_path, &recall_request) {
-                        Ok(result) => Self::reply_with_audio_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "snapshot-recalled",
-                        ),
-                        Err(error) => match error {
-                            AudioCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            AudioCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "audio.snapshot.create" => match parse_audio_snapshot_create_request(&request.params) {
-                Ok(create_request) => {
-                    match create_audio_snapshot(&self.runtime.db_path, &create_request) {
-                        Ok(result) => Self::reply_with_audio_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "snapshot-created",
-                        ),
-                        Err(error) => match error {
-                            AudioCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            AudioCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "audio.snapshot.update" => match parse_audio_snapshot_update_request(&request.params) {
-                Ok(update_request) => {
-                    match update_audio_snapshot(&self.runtime.db_path, &update_request) {
-                        Ok(result) => Self::reply_with_audio_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "snapshot-updated",
-                        ),
-                        Err(error) => match error {
-                            AudioCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            AudioCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "audio.snapshot.delete" => match parse_audio_snapshot_delete_request(&request.params) {
-                Ok(delete_request) => {
-                    match delete_audio_snapshot(&self.runtime.db_path, &delete_request) {
-                        Ok(result) => Self::reply_with_audio_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "snapshot-deleted",
-                        ),
-                        Err(error) => match error {
-                            AudioCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            AudioCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "audio.channel.update" => match parse_audio_channel_update_request(&request.params) {
-                Ok(update_request) => {
-                    match update_audio_channel(&self.runtime.db_path, &update_request) {
-                        Ok(result) => Self::reply_with_audio_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "channel-updated",
-                        ),
-                        Err(error) => match error {
-                            AudioCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            AudioCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "audio.mixTarget.update" => {
-                match parse_audio_mix_target_update_request(&request.params) {
-                    Ok(update_request) => {
-                        match update_audio_mix_target(&self.runtime.db_path, &update_request) {
-                            Ok(result) => Self::reply_with_audio_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "mix-target-updated",
-                            ),
-                            Err(error) => {
-                                match error {
-                                    AudioCommandError::Rejected(code, message) => {
-                                        Self::reply(error_response(request.id, code, message))
-                                    }
-                                    AudioCommandError::Storage(message) => Self::reply(
-                                        error_response(request.id, "STORAGE_ERROR", message),
-                                    ),
-                                }
-                            }
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "audio.settings.update" => match parse_audio_settings_update_request(&request.params) {
-                Ok(update_request) => {
-                    match update_audio_settings(&self.runtime.db_path, &update_request) {
-                        Ok(result) => Self::reply_with_audio_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "settings-updated",
-                        ),
-                        Err(error) => match error {
-                            AudioCommandError::Rejected(code, message) => {
-                                Self::reply(error_response(request.id, code, message))
-                            }
-                            AudioCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "support.snapshot" => match self.read_support_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "controlSurface.snapshot" => match self.read_control_surface_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
+            ),
+            "planning.project.create" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_project_create_request,
+                apply_planning_project_create,
+                "project-created",
+                |result| {
+                    (
+                        Some(result.project.id.as_str()),
+                        result.context.settings.selected_task_id.as_deref(),
+                    )
+                },
+            ),
+            "planning.project.update" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_project_update_request,
+                apply_planning_project_update,
+                "project-updated",
+                |result| {
+                    (
+                        Some(result.project.id.as_str()),
+                        result.context.settings.selected_task_id.as_deref(),
+                    )
+                },
+            ),
+            "planning.project.delete" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_project_delete_request,
+                apply_planning_project_delete,
+                "project-deleted",
+                |result| {
+                    (
+                        result.context.settings.selected_project_id.as_deref(),
+                        result.context.settings.selected_task_id.as_deref(),
+                    )
+                },
+            ),
+            "planning.project.reorder" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_project_reorder_request,
+                apply_planning_project_reorder,
+                "project-reordered",
+                |result| {
+                    (
+                        Some(result.project.id.as_str()),
+                        result.context.settings.selected_task_id.as_deref(),
+                    )
+                },
+            ),
+            "planning.task.create" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_task_create_request,
+                apply_planning_task_create,
+                "task-created",
+                |result| {
+                    (
+                        Some(result.task.project_id.as_str()),
+                        Some(result.task.id.as_str()),
+                    )
+                },
+            ),
+            "planning.task.update" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_task_update_request,
+                apply_planning_task_update,
+                "task-updated",
+                |result| {
+                    (
+                        Some(result.task.project_id.as_str()),
+                        Some(result.task.id.as_str()),
+                    )
+                },
+            ),
+            "planning.task.reschedule" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_task_reschedule_request,
+                apply_planning_task_reschedule,
+                "task-rescheduled",
+                |result| {
+                    (
+                        Some(result.task.project_id.as_str()),
+                        Some(result.task.id.as_str()),
+                    )
+                },
+            ),
+            "planning.task.delete" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_task_delete_request,
+                apply_planning_task_delete,
+                "task-deleted",
+                |result| {
+                    (
+                        result.context.settings.selected_project_id.as_deref(),
+                        result.context.settings.selected_task_id.as_deref(),
+                    )
+                },
+            ),
+            "planning.task.checklist.add" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_task_checklist_add_request,
+                apply_planning_task_checklist_add,
+                "task-checklist-added",
+                |result| {
+                    (
+                        Some(result.task.project_id.as_str()),
+                        Some(result.task.id.as_str()),
+                    )
+                },
+            ),
+            "planning.task.checklist.update" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_task_checklist_update_request,
+                apply_planning_task_checklist_update,
+                "task-checklist-updated",
+                |result| {
+                    (
+                        Some(result.task.project_id.as_str()),
+                        Some(result.task.id.as_str()),
+                    )
+                },
+            ),
+            "planning.task.checklist.delete" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_task_checklist_delete_request,
+                apply_planning_task_checklist_delete,
+                "task-checklist-deleted",
+                |result| {
+                    (
+                        Some(result.task.project_id.as_str()),
+                        Some(result.task.id.as_str()),
+                    )
+                },
+            ),
+            "planning.task.timer" => self.dispatch_planning_mutate_dynamic_reason(
+                request,
+                parse_planning_task_timer_request,
+                apply_planning_task_timer,
+                |result| format!("task-timer-{}", result.resolved_action),
+                |result| Some(result.task.project_id.as_str()),
+                |result| Some(result.task.id.as_str()),
+            ),
+            "planning.task.toggleComplete" => self.dispatch_planning_mutate(
+                request,
+                parse_planning_task_toggle_complete_request,
+                apply_planning_task_toggle_complete,
+                "task-completion-toggled",
+                |result| {
+                    (
+                        Some(result.task.project_id.as_str()),
+                        Some(result.task.id.as_str()),
+                    )
+                },
+            ),
+
+            // -------------------------------------------------------------
+            // Commissioning mutations (M-1event + multi-event variants)
+            // -------------------------------------------------------------
+            "commissioning.check.run" => self.dispatch_commissioning_mutate(
+                request,
+                parse_commissioning_check_request,
+                run_commissioning_check,
+                "check-updated",
+            ),
+            "commissioning.seedPlanningDemo" => self.dispatch_commissioning_seed(
+                request,
+                parse_commissioning_seed_request,
+                seed_sample_planning_data,
+                "sample-planning-seeded",
+            ),
+
+            // -------------------------------------------------------------
+            // Dev parity fixture (M-multievent)
+            // -------------------------------------------------------------
+            "dev.parityFixture.load" => self.dispatch_parity_fixture(
+                request,
+                parse_parity_fixture_request,
+                load_parity_fixture,
+                "parity-fixture-loaded",
+            ),
+
+            // -------------------------------------------------------------
+            // Custom arms — kept hand-written because they have non-uniform
+            // error enums (storage.importLegacyDb), chained snapshot reads
+            // (commissioning.update, settings.update), or unique reply
+            // shapes (exports.companion.export).
+            // -------------------------------------------------------------
             "support.backup.export" => match export_support_backup(&self.runtime) {
                 Ok(result) => Self::reply_with_support_change(
                     ok_response(
@@ -830,500 +607,6 @@ impl EngineApp {
                 },
                 Err(message) => Self::reply(invalid_params(request.id, message)),
             },
-            "commissioning.check.run" => match parse_commissioning_check_request(&request.params) {
-                Ok(check_request) => {
-                    match run_commissioning_check(&self.runtime.db_path, &check_request) {
-                        Ok(result) => Self::reply_with_commissioning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "check-updated",
-                        ),
-                        Err(error) => match error {
-                            CommissioningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            CommissioningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "commissioning.seedPlanningDemo" => {
-                match parse_commissioning_seed_request(&request.params) {
-                    Ok(seed_request) => {
-                        match seed_sample_planning_data(&self.runtime, &seed_request) {
-                            Ok(result) => Self::reply_with_commissioning_and_planning_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "sample-planning-seeded",
-                            ),
-                            Err(error) => match error {
-                                CommissioningCommandError::InvalidParams(message) => {
-                                    Self::reply(invalid_params(request.id, message))
-                                }
-                                CommissioningCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "dev.parityFixture.load" => match parse_parity_fixture_request(&request.params) {
-                Ok(fixture_request) => match load_parity_fixture(&self.runtime, &fixture_request) {
-                    Ok(result) => Self::reply_with_app_commissioning_and_planning_change(
-                        ok_response(
-                            request.id,
-                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                        ),
-                        "parity-fixture-loaded",
-                    ),
-                    Err(error) => match error {
-                        ParityFixtureError::InvalidParams(message) => {
-                            Self::reply(invalid_params(request.id, message))
-                        }
-                        ParityFixtureError::Storage(message) => {
-                            Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                        }
-                    },
-                },
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "settings.get" => match self.read_shell_settings() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "planning.snapshot" => match self.read_planning_snapshot() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "planning.context" => match self.read_planning_context() {
-                Ok(result) => Self::reply(ok_response(request.id, result)),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            "planning.report.time" => match parse_planning_time_report_request(&request.params) {
-                Ok(project_id) => match self.read_planning_time_report(project_id.as_deref()) {
-                    Ok(result) => Self::reply(ok_response(request.id, result)),
-                    Err(error) => Self::reply(error_response(
-                        request.id,
-                        "STORAGE_ERROR",
-                        error.to_string(),
-                    )),
-                },
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "planning.settings.update" => match parse_planning_settings_update(&request.params) {
-                Ok(update_request) => {
-                    match update_planning_settings(&self.runtime.db_path, &update_request) {
-                        Ok(result) => Self::reply_with_planning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "settings-updated",
-                            result.settings.selected_project_id.as_deref(),
-                            result.settings.selected_task_id.as_deref(),
-                        ),
-                        Err(error) => match error {
-                            PlanningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            PlanningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "planning.select" => match parse_planning_selection_request(&request.params) {
-                Ok(selection_request) => {
-                    match apply_planning_selection(&self.runtime.db_path, &selection_request) {
-                        Ok(result) => Self::reply_with_planning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "selection-updated",
-                            result.settings.selected_project_id.as_deref(),
-                            result.settings.selected_task_id.as_deref(),
-                        ),
-                        Err(error) => match error {
-                            PlanningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            PlanningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "planning.project.create" => {
-                match parse_planning_project_create_request(&request.params) {
-                    Ok(create_request) => {
-                        match apply_planning_project_create(&self.runtime.db_path, &create_request)
-                        {
-                            Ok(result) => Self::reply_with_planning_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "project-created",
-                                Some(result.project.id.as_str()),
-                                result.context.settings.selected_task_id.as_deref(),
-                            ),
-                            Err(error) => match error {
-                                PlanningCommandError::InvalidParams(message) => {
-                                    Self::reply(invalid_params(request.id, message))
-                                }
-                                PlanningCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "planning.project.update" => {
-                match parse_planning_project_update_request(&request.params) {
-                    Ok(update_request) => {
-                        match apply_planning_project_update(&self.runtime.db_path, &update_request)
-                        {
-                            Ok(result) => Self::reply_with_planning_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "project-updated",
-                                Some(result.project.id.as_str()),
-                                result.context.settings.selected_task_id.as_deref(),
-                            ),
-                            Err(error) => match error {
-                                PlanningCommandError::InvalidParams(message) => {
-                                    Self::reply(invalid_params(request.id, message))
-                                }
-                                PlanningCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "planning.project.delete" => {
-                match parse_planning_project_delete_request(&request.params) {
-                    Ok(delete_request) => {
-                        match apply_planning_project_delete(&self.runtime.db_path, &delete_request)
-                        {
-                            Ok(result) => Self::reply_with_planning_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "project-deleted",
-                                result.context.settings.selected_project_id.as_deref(),
-                                result.context.settings.selected_task_id.as_deref(),
-                            ),
-                            Err(error) => match error {
-                                PlanningCommandError::InvalidParams(message) => {
-                                    Self::reply(invalid_params(request.id, message))
-                                }
-                                PlanningCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "planning.project.reorder" => {
-                match parse_planning_project_reorder_request(&request.params) {
-                    Ok(reorder_request) => {
-                        match apply_planning_project_reorder(
-                            &self.runtime.db_path,
-                            &reorder_request,
-                        ) {
-                            Ok(result) => Self::reply_with_planning_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "project-reordered",
-                                Some(result.project.id.as_str()),
-                                result.context.settings.selected_task_id.as_deref(),
-                            ),
-                            Err(error) => match error {
-                                PlanningCommandError::InvalidParams(message) => {
-                                    Self::reply(invalid_params(request.id, message))
-                                }
-                                PlanningCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "planning.task.create" => match parse_planning_task_create_request(&request.params) {
-                Ok(create_request) => {
-                    match apply_planning_task_create(&self.runtime.db_path, &create_request) {
-                        Ok(result) => Self::reply_with_planning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "task-created",
-                            Some(result.task.project_id.as_str()),
-                            Some(result.task.id.as_str()),
-                        ),
-                        Err(error) => match error {
-                            PlanningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            PlanningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "planning.task.update" => match parse_planning_task_update_request(&request.params) {
-                Ok(update_request) => {
-                    match apply_planning_task_update(&self.runtime.db_path, &update_request) {
-                        Ok(result) => Self::reply_with_planning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "task-updated",
-                            Some(result.task.project_id.as_str()),
-                            Some(result.task.id.as_str()),
-                        ),
-                        Err(error) => match error {
-                            PlanningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            PlanningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "planning.task.reschedule" => {
-                match parse_planning_task_reschedule_request(&request.params) {
-                    Ok(reschedule_request) => {
-                        match apply_planning_task_reschedule(
-                            &self.runtime.db_path,
-                            &reschedule_request,
-                        ) {
-                            Ok(result) => Self::reply_with_planning_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "task-rescheduled",
-                                Some(result.task.project_id.as_str()),
-                                Some(result.task.id.as_str()),
-                            ),
-                            Err(error) => match error {
-                                PlanningCommandError::InvalidParams(message) => {
-                                    Self::reply(invalid_params(request.id, message))
-                                }
-                                PlanningCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "planning.task.delete" => match parse_planning_task_delete_request(&request.params) {
-                Ok(delete_request) => {
-                    match apply_planning_task_delete(&self.runtime.db_path, &delete_request) {
-                        Ok(result) => Self::reply_with_planning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "task-deleted",
-                            result.context.settings.selected_project_id.as_deref(),
-                            result.context.settings.selected_task_id.as_deref(),
-                        ),
-                        Err(error) => match error {
-                            PlanningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            PlanningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "planning.task.checklist.add" => {
-                match parse_planning_task_checklist_add_request(&request.params) {
-                    Ok(add_request) => {
-                        match apply_planning_task_checklist_add(&self.runtime.db_path, &add_request)
-                        {
-                            Ok(result) => Self::reply_with_planning_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "task-checklist-added",
-                                Some(result.task.project_id.as_str()),
-                                Some(result.task.id.as_str()),
-                            ),
-                            Err(error) => match error {
-                                PlanningCommandError::InvalidParams(message) => {
-                                    Self::reply(invalid_params(request.id, message))
-                                }
-                                PlanningCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "planning.task.checklist.update" => {
-                match parse_planning_task_checklist_update_request(&request.params) {
-                    Ok(update_request) => match apply_planning_task_checklist_update(
-                        &self.runtime.db_path,
-                        &update_request,
-                    ) {
-                        Ok(result) => Self::reply_with_planning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "task-checklist-updated",
-                            Some(result.task.project_id.as_str()),
-                            Some(result.task.id.as_str()),
-                        ),
-                        Err(error) => match error {
-                            PlanningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            PlanningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    },
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "planning.task.checklist.delete" => {
-                match parse_planning_task_checklist_delete_request(&request.params) {
-                    Ok(delete_request) => match apply_planning_task_checklist_delete(
-                        &self.runtime.db_path,
-                        &delete_request,
-                    ) {
-                        Ok(result) => Self::reply_with_planning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "task-checklist-deleted",
-                            Some(result.task.project_id.as_str()),
-                            Some(result.task.id.as_str()),
-                        ),
-                        Err(error) => match error {
-                            PlanningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            PlanningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    },
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
-            "planning.task.timer" => match parse_planning_task_timer_request(&request.params) {
-                Ok(timer_request) => {
-                    match apply_planning_task_timer(&self.runtime.db_path, &timer_request) {
-                        Ok(result) => Self::reply_with_planning_change(
-                            ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            &format!("task-timer-{}", result.resolved_action),
-                            Some(result.task.project_id.as_str()),
-                            Some(result.task.id.as_str()),
-                        ),
-                        Err(error) => match error {
-                            PlanningCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
-                            }
-                            PlanningCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "planning.task.toggleComplete" => {
-                match parse_planning_task_toggle_complete_request(&request.params) {
-                    Ok(toggle_request) => {
-                        match apply_planning_task_toggle_complete(
-                            &self.runtime.db_path,
-                            &toggle_request,
-                        ) {
-                            Ok(result) => Self::reply_with_planning_change(
-                                ok_response(
-                                    request.id,
-                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                                ),
-                                "task-completion-toggled",
-                                Some(result.task.project_id.as_str()),
-                                Some(result.task.id.as_str()),
-                            ),
-                            Err(error) => match error {
-                                PlanningCommandError::InvalidParams(message) => {
-                                    Self::reply(invalid_params(request.id, message))
-                                }
-                                PlanningCommandError::Storage(message) => Self::reply(
-                                    error_response(request.id, "STORAGE_ERROR", message),
-                                ),
-                            },
-                        }
-                    }
-                    Err(message) => Self::reply(invalid_params(request.id, message)),
-                }
-            }
             "settings.update" => match parse_settings_update(&request.params) {
                 Ok(updates) => match set_settings(&self.runtime.db_path, &updates) {
                     Ok(()) => {
@@ -1564,6 +847,318 @@ impl EngineApp {
             .map(|(key, value)| format!("{key}={value}"))
             .collect::<Vec<_>>()
             .join(", ")
+    }
+
+    // -----------------------------------------------------------------------
+    // Dispatch helpers
+    //
+    // The match arms in `handle_request` previously expanded the same parse →
+    // call → reply scaffolding for every method. The helpers below capture
+    // the four uniform shapes (read-no-params, read-with-params, mutate with
+    // single event, mutate with derived planning event payload) so the match
+    // body collapses to one-liners. Custom arms with non-uniform error enums
+    // or chained read-snapshot calls (`commissioning.update`, `settings.update`,
+    // `support.backup.*`, `exports.companion.export`, `storage.importLegacyDb`)
+    // stay as hand-written branches.
+    // -----------------------------------------------------------------------
+
+    fn dispatch_read<T, F>(&self, request_id: serde_json::Value, read: F) -> EngineReply
+    where
+        T: serde::Serialize,
+        F: FnOnce(&Self) -> EngineResult<T>,
+    {
+        match read(self) {
+            Ok(result) => Self::reply(ok_response(
+                request_id,
+                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+            )),
+            Err(error) => Self::reply(error_response(
+                request_id,
+                "STORAGE_ERROR",
+                error.to_string(),
+            )),
+        }
+    }
+
+    fn dispatch_read_with_params<P, T, F, R>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        read: R,
+    ) -> EngineReply
+    where
+        T: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        R: FnOnce(&Self, &P) -> EngineResult<T>,
+    {
+        match parse(&request.params) {
+            Ok(parsed) => match read(self, &parsed) {
+                Ok(result) => Self::reply(ok_response(
+                    request.id,
+                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                )),
+                Err(error) => Self::reply(error_response(
+                    request.id,
+                    "STORAGE_ERROR",
+                    error.to_string(),
+                )),
+            },
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    fn dispatch_lighting_mutate<P, R, F, H>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        handler: H,
+        reason: &str,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        H: FnOnce(&std::path::Path, &P) -> Result<R, LightingCommandError>,
+    {
+        match parse(&request.params) {
+            Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
+                Ok(result) => Self::reply_with_lighting_change(
+                    ok_response(
+                        request.id,
+                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                    ),
+                    reason,
+                ),
+                Err(LightingCommandError::Rejected(code, message)) => {
+                    Self::reply(error_response(request.id, code, message))
+                }
+                Err(LightingCommandError::Storage(message)) => {
+                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                }
+            },
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    fn dispatch_audio_mutate<P, R, F, H>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        handler: H,
+        reason: &str,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        H: FnOnce(&std::path::Path, &P) -> Result<R, AudioCommandError>,
+    {
+        match parse(&request.params) {
+            Ok(parsed) => self.run_audio_mutate(request.id, |db| handler(db, &parsed), reason),
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    fn run_audio_mutate<R, H>(
+        &self,
+        request_id: serde_json::Value,
+        handler: H,
+        reason: &str,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        H: FnOnce(&std::path::Path) -> Result<R, AudioCommandError>,
+    {
+        match handler(&self.runtime.db_path) {
+            Ok(result) => Self::reply_with_audio_change(
+                ok_response(
+                    request_id,
+                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                ),
+                reason,
+            ),
+            Err(AudioCommandError::Rejected(code, message)) => {
+                Self::reply(error_response(request_id, code, message))
+            }
+            Err(AudioCommandError::Storage(message)) => {
+                Self::reply(error_response(request_id, "STORAGE_ERROR", message))
+            }
+        }
+    }
+
+    fn dispatch_planning_mutate<P, R, F, H, K>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        handler: H,
+        reason: &str,
+        keys: K,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        H: FnOnce(&std::path::Path, &P) -> Result<R, PlanningCommandError>,
+        K: for<'a> FnOnce(&'a R) -> (Option<&'a str>, Option<&'a str>),
+    {
+        match parse(&request.params) {
+            Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
+                Ok(result) => {
+                    let (project_id, task_id) = keys(&result);
+                    Self::reply_with_planning_change(
+                        ok_response(
+                            request.id,
+                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                        ),
+                        reason,
+                        project_id,
+                        task_id,
+                    )
+                }
+                Err(PlanningCommandError::InvalidParams(message)) => {
+                    Self::reply(invalid_params(request.id, message))
+                }
+                Err(PlanningCommandError::Storage(message)) => {
+                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                }
+            },
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    fn dispatch_planning_mutate_dynamic_reason<P, R, F, H, RFn>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        handler: H,
+        reason: RFn,
+        project_id: impl for<'a> FnOnce(&'a R) -> Option<&'a str>,
+        task_id: impl for<'a> FnOnce(&'a R) -> Option<&'a str>,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        H: FnOnce(&std::path::Path, &P) -> Result<R, PlanningCommandError>,
+        RFn: FnOnce(&R) -> String,
+    {
+        match parse(&request.params) {
+            Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
+                Ok(result) => {
+                    let event_reason = reason(&result);
+                    let pid = project_id(&result);
+                    let tid = task_id(&result);
+                    Self::reply_with_planning_change(
+                        ok_response(
+                            request.id,
+                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                        ),
+                        &event_reason,
+                        pid,
+                        tid,
+                    )
+                }
+                Err(PlanningCommandError::InvalidParams(message)) => {
+                    Self::reply(invalid_params(request.id, message))
+                }
+                Err(PlanningCommandError::Storage(message)) => {
+                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                }
+            },
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    fn dispatch_commissioning_mutate<P, R, F, H>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        handler: H,
+        reason: &str,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        H: FnOnce(&std::path::Path, &P) -> Result<R, CommissioningCommandError>,
+    {
+        match parse(&request.params) {
+            Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
+                Ok(result) => Self::reply_with_commissioning_change(
+                    ok_response(
+                        request.id,
+                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                    ),
+                    reason,
+                ),
+                Err(CommissioningCommandError::InvalidParams(message)) => {
+                    Self::reply(invalid_params(request.id, message))
+                }
+                Err(CommissioningCommandError::Storage(message)) => {
+                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                }
+            },
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    fn dispatch_commissioning_seed<P, R, F, H>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        handler: H,
+        reason: &str,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        H: FnOnce(&RuntimeContext, &P) -> Result<R, CommissioningCommandError>,
+    {
+        match parse(&request.params) {
+            Ok(parsed) => match handler(&self.runtime, &parsed) {
+                Ok(result) => Self::reply_with_commissioning_and_planning_change(
+                    ok_response(
+                        request.id,
+                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                    ),
+                    reason,
+                ),
+                Err(CommissioningCommandError::InvalidParams(message)) => {
+                    Self::reply(invalid_params(request.id, message))
+                }
+                Err(CommissioningCommandError::Storage(message)) => {
+                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                }
+            },
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    fn dispatch_parity_fixture<P, R, F, H>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        handler: H,
+        reason: &str,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        H: FnOnce(&RuntimeContext, &P) -> Result<R, ParityFixtureError>,
+    {
+        match parse(&request.params) {
+            Ok(parsed) => match handler(&self.runtime, &parsed) {
+                Ok(result) => Self::reply_with_app_commissioning_and_planning_change(
+                    ok_response(
+                        request.id,
+                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                    ),
+                    reason,
+                ),
+                Err(ParityFixtureError::InvalidParams(message)) => {
+                    Self::reply(invalid_params(request.id, message))
+                }
+                Err(ParityFixtureError::Storage(message)) => {
+                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                }
+            },
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
     }
 
     fn reply(response: ResponseEnvelope) -> EngineReply {
