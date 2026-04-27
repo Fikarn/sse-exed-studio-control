@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -177,6 +186,42 @@ function resolveInstalledRuntime(target, installRoot, runtimeKind) {
   };
 }
 
+function promoteWindowsMaintenanceToolNew(installRoot) {
+  if (process.platform !== "win32" || !existsSync(installRoot)) {
+    return null;
+  }
+
+  const candidates = [
+    [path.join(installRoot, "maintenancetool.exe.new"), path.join(installRoot, "maintenancetool.exe")],
+    [path.join(installRoot, "MaintenanceTool.exe.new"), path.join(installRoot, "MaintenanceTool.exe")],
+  ];
+
+  for (const [pendingPath, finalPath] of candidates) {
+    if (!existsSync(pendingPath)) {
+      continue;
+    }
+    if (existsSync(finalPath)) {
+      continue;
+    }
+    try {
+      renameSync(pendingPath, finalPath);
+      console.log(
+        `Installer acceptance: promoted ${path.basename(pendingPath)} -> ${path.basename(finalPath)} at ${installRoot}.`
+      );
+      return finalPath;
+    } catch (error) {
+      console.warn(
+        `Installer acceptance: failed to promote ${path.basename(pendingPath)} -> ${path.basename(finalPath)} at ${installRoot}: ${
+          error instanceof Error ? error.message : String(error)
+        }.`
+      );
+      return null;
+    }
+  }
+
+  return null;
+}
+
 function resolveMaintenanceToolPath(target, installRoot) {
   const candidates =
     target === "macos"
@@ -192,6 +237,16 @@ function resolveMaintenanceToolPath(target, installRoot) {
     if (existsSync(candidate)) {
       return candidate;
     }
+  }
+
+  // QtIFW writes the maintenance tool as `<name>.exe.new` on Windows during install
+  // and renames to `.exe` on the next maintenance-tool invocation or installer run.
+  // If the script reaches this resolver right after a reinstall (no intermediate
+  // invocation), the rename hasn't fired yet and `.exe` is absent. Promote it
+  // ourselves so subsequent purge/teardown can spawn the binary.
+  const promoted = promoteWindowsMaintenanceToolNew(installRoot);
+  if (promoted) {
+    return promoted;
   }
 
   if (existsSync(installRoot)) {
