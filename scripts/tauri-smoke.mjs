@@ -44,8 +44,8 @@ console.log("Tauri foundation smoke checks passed.");
 function resolveEngineBinary() {
   const binaryName = process.platform === "win32" ? "studio-control-engine.exe" : "studio-control-engine";
   const candidates = [
-    path.join(rootDir, "native", "rust-engine", "target", "debug", binaryName),
-    path.join(rootDir, "native", "rust-engine", "target", "release", binaryName),
+    path.join(rootDir, "native", "target", "debug", binaryName),
+    path.join(rootDir, "native", "target", "release", binaryName),
   ];
 
   const binaryPath = candidates.find((candidate) => existsSync(candidate));

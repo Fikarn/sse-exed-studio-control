@@ -15,7 +15,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const args = process.argv.slice(2);
 const smokeTest = args.includes("--smoke-test");
@@ -89,14 +89,14 @@ function resolveGitSha() {
 
 function resolveTauriShellPath(target) {
   const executableName = target === "windows" ? "sse-exed-tauri-shell.exe" : "sse-exed-tauri-shell";
-  return path.join(rootDir, "native", "tauri-shell", "target", "release", executableName);
+  return path.join(rootDir, "native", "target", "release", executableName);
 }
 
 function resolveEnginePath(target) {
   const executableName = target === "windows" ? "studio-control-engine.exe" : "studio-control-engine";
   const candidates = [
-    path.join(rootDir, "native", "rust-engine", "target", "debug", executableName),
-    path.join(rootDir, "native", "rust-engine", "target", "release", executableName),
+    path.join(rootDir, "native", "target", "debug", executableName),
+    path.join(rootDir, "native", "target", "release", executableName),
   ];
 
   return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];

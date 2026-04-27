@@ -1,10 +1,22 @@
 [package]
 name = "studio-control-engine"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+# Enables ts-rs `#[derive(TS)]` on snapshot types and triggers TypeScript
+# binding export when `cargo test --features ts-rs` runs. Production
+# builds must NOT enable this feature; it adds a dev-only dependency.
+ts-rs = ["dep:ts-rs"]
 
 [dependencies]
-rusqlite = { version = "0.39.0", features = ["bundled"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-studio-control-protocol = { path = "../protocol/rust" }
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+studio-control-protocol.workspace = true
+ts-rs = { workspace = true, optional = true }
+
+[lints]
+workspace = true

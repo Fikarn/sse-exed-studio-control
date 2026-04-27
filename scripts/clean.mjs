@@ -7,7 +7,7 @@ const localMode = process.argv.includes("--local");
 
 const targets = [
   "native/build",
-  "native/tauri-shell/target",
+  "native/target",
   "frontend/app/dist",
   "frontend/app/storybook-static",
   "frontend/app/playwright-report",
@@ -15,7 +15,7 @@ const targets = [
   "release",
 ];
 
-const localTargets = [".swift-module-cache", "artifacts", "native/rust-engine/target"];
+const localTargets = [".swift-module-cache", "artifacts"];
 
 const dsStoreSkipDirs = new Set([".git", ".tools", "node_modules", "release", "artifacts", "target"]);
 

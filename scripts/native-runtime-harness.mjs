@@ -12,8 +12,8 @@ export function resolvePathFromRoot(rootDir, value) {
 
 export function resolveDebugEngineExecutable(rootDir) {
   return process.platform === "win32"
-    ? path.join(rootDir, "native", "rust-engine", "target", "debug", "studio-control-engine.exe")
-    : path.join(rootDir, "native", "rust-engine", "target", "debug", "studio-control-engine");
+    ? path.join(rootDir, "native", "target", "debug", "studio-control-engine.exe")
+    : path.join(rootDir, "native", "target", "debug", "studio-control-engine");
 }
 
 export function wait(ms) {

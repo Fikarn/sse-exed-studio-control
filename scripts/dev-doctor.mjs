@@ -173,17 +173,18 @@ function resolveExecutable(names, envNames) {
 }
 
 function qtifwInstructions() {
+  // Any QtIFW 4.x is acceptable; substitute the installed minor version.
   if (process.platform === "win32") {
     return [
-      'Set $env:SSE_QT_IFW_BINARYCREATOR = "C:\\Qt\\Tools\\QtInstallerFramework\\4.7\\bin\\binarycreator.exe"',
-      'Set $env:SSE_QT_IFW_REPOGEN = "C:\\Qt\\Tools\\QtInstallerFramework\\4.7\\bin\\repogen.exe"',
+      'Set $env:SSE_QT_IFW_BINARYCREATOR = "C:\\Qt\\Tools\\QtInstallerFramework\\4.11\\bin\\binarycreator.exe"',
+      'Set $env:SSE_QT_IFW_REPOGEN = "C:\\Qt\\Tools\\QtInstallerFramework\\4.11\\bin\\repogen.exe"',
     ].join("\n");
   }
 
   return [
     "Install QtIFW into .tools/qt-ifw or another local path, then export:",
-    'export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"',
-    'export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"',
+    'export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.11/bin/binarycreator"',
+    'export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.11/bin/repogen"',
   ].join("\n");
 }
 

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const args = process.argv.slice(2);
 const defaultEvidenceBase = path.join(rootDir, "artifacts", "tauri-qualification", "windows-target-host");
 
@@ -30,7 +30,7 @@ function readFlag(name) {
 function printHelp() {
   console.log(`Usage:
   npm run tauri:package:win:evidence
-  node scripts/tauri-windows-target-evidence.mjs [--output-dir <path>] [--issue-url <url>] [--allow-dirty]
+  node scripts/legacy/tauri-windows-target-evidence.mjs [--output-dir <path>] [--issue-url <url>] [--allow-dirty]
 
 Purpose:
   Run the Windows 11 x64 Tauri QtIFW package gate and write a target-host

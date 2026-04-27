@@ -132,8 +132,8 @@ python3 -m venv .tools/aqtinstall-venv
 .tools/aqtinstall-venv/bin/python -m pip install --upgrade pip aqtinstall
 mkdir -p .tools/aqt-home
 HOME="$PWD/.tools/aqt-home" .tools/aqtinstall-venv/bin/aqt install-tool mac desktop tools_ifw qt.tools.ifw.47 -O .tools/qt-ifw
-export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"
-export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"
+export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.11/bin/binarycreator"
+export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.11/bin/repogen"
 npm run native:release:mac:local
 ```
 
@@ -233,6 +233,10 @@ npm run release:verify
 npm run doctor:release
 npm run release:verify
 ```
+
+#### Advisory CI
+
+Every pull request triggers a four-job advisory workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, and `rust` (which runs `rust:fmt:check`, `rust:clippy`, `native:check`, and `native:test`). The workflow is advisory only — it provides early signal on PRs but is not a required check, and target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
 
 ### 4a. Cleanup
 

@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { Button, StatusBadge, Surface } from "@sse/design-system";
-import type { ShellStore } from "@sse/engine-client";
+import type { AudioSnapshot, ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioWorkspace.module.css";
 import {
@@ -20,7 +20,7 @@ type FeedbackTone = "error" | "info" | "ok";
 
 interface AudioWorkspaceProps {
   appSnapshot: SnapshotRecord | null;
-  audioSnapshot: SnapshotRecord | null;
+  audioSnapshot: AudioSnapshot | null;
   store: ShellStore;
 }
 

@@ -6,6 +6,10 @@ import type {
   RequestMethod,
   StartupLifecycleState,
 } from "./generated/protocol";
+import type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
+import type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingDmxMonitorSnapshot";
+import type { LightingSnapshot } from "./generated/snapshots/LightingSnapshot";
+import type { PlanningSnapshot } from "./generated/snapshots/PlanningSnapshot";
 
 export type WorkspaceId = "setup" | "lighting" | "audio" | "planning";
 export type RecoveryState = "healthy" | "degraded" | "recovery";
@@ -186,15 +190,20 @@ export interface ShellState {
   lifecycle: StartupLifecycleState;
   recovery: RecoveryState;
   activeWorkspace: WorkspaceId;
+  // Snapshots that the engine assembles ad-hoc as serde_json::Value
+  // remain loose-typed; the engine boundary is the contract for these.
   appSnapshot: JsonObject | null;
   healthSnapshot: JsonObject | null;
   commissioningSnapshot: JsonObject | null;
-  lightingSnapshot: JsonObject | null;
-  lightingDmxMonitorSnapshot: JsonObject | null;
-  audioSnapshot: JsonObject | null;
-  planningSnapshot: JsonObject | null;
   supportSnapshot: JsonObject | null;
   controlSurfaceSnapshot: JsonObject | null;
+  // Snapshots backed by typed Rust structs (see ts-rs annotations in
+  // native/rust-engine/src/{lighting,audio,planning}). Regenerated via
+  // `npm run protocol:generate`.
+  lightingSnapshot: LightingSnapshot | null;
+  lightingDmxMonitorSnapshot: LightingDmxMonitorSnapshot | null;
+  audioSnapshot: AudioSnapshot | null;
+  planningSnapshot: PlanningSnapshot | null;
   startupFailure: StartupFailure | null;
   lastEvent: EventName | null;
   errorSummary: string | null;

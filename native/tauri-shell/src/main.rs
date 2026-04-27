@@ -4,7 +4,9 @@ use engine::{EngineBootstrapSummary, EngineBridge};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::env;
-use std::fs::{create_dir_all, read_to_string, write};
+#[cfg(feature = "test-bridge")]
+use std::fs::read_to_string;
+use std::fs::{create_dir_all, write};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -18,6 +20,7 @@ struct EngineState {
     bridge: EngineBridge,
 }
 
+#[cfg(feature = "test-bridge")]
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ShellTestBridgeConfig {
@@ -433,6 +436,7 @@ fn shell_export_diagnostics(report: Value, directory: Option<String>) -> Result<
     Ok(output_path.display().to_string())
 }
 
+#[cfg(feature = "test-bridge")]
 #[tauri::command]
 fn shell_test_bridge_config() -> Option<ShellTestBridgeConfig> {
     let status_path = optional_env_path("SSE_TAURI_TEST_STATUS_PATH");
@@ -448,6 +452,7 @@ fn shell_test_bridge_config() -> Option<ShellTestBridgeConfig> {
     })
 }
 
+#[cfg(feature = "test-bridge")]
 #[tauri::command]
 fn shell_test_bridge_write_status(status: Value) -> Result<(), String> {
     let status_path = optional_env_path("SSE_TAURI_TEST_STATUS_PATH")
@@ -472,6 +477,7 @@ fn shell_test_bridge_write_status(status: Value) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(feature = "test-bridge")]
 #[tauri::command]
 fn shell_test_bridge_read_command() -> Result<Option<Value>, String> {
     let Some(command_path) = optional_env_path("SSE_TAURI_TEST_COMMAND_PATH") else {
@@ -550,7 +556,7 @@ fn main() {
         std::process::exit(run_smoke_test(&args));
     }
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(EngineState {
             bridge: EngineBridge::default(),
         })
@@ -560,18 +566,32 @@ fn main() {
                 route_window_to_preferred_monitor(&window);
             }
             Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            engine_start,
-            engine_request,
-            engine_stop,
-            engine_summary,
-            shell_open_path,
-            shell_export_diagnostics,
-            shell_test_bridge_config,
-            shell_test_bridge_write_status,
-            shell_test_bridge_read_command
-        ])
+        });
+
+    #[cfg(feature = "test-bridge")]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        engine_start,
+        engine_request,
+        engine_stop,
+        engine_summary,
+        shell_open_path,
+        shell_export_diagnostics,
+        shell_test_bridge_config,
+        shell_test_bridge_write_status,
+        shell_test_bridge_read_command
+    ]);
+
+    #[cfg(not(feature = "test-bridge"))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        engine_start,
+        engine_request,
+        engine_stop,
+        engine_summary,
+        shell_open_path,
+        shell_export_diagnostics
+    ]);
+
+    builder
         .run(tauri::generate_context!())
         .expect("failed to run tauri shell");
 }

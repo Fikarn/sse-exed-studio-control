@@ -339,16 +339,8 @@ fn resolve_engine_binary_from(
 
     let candidates = [
         current_exe.and_then(|path| path.parent().map(|parent| parent.join(binary_name))),
-        Some(
-            manifest_dir
-                .join("../rust-engine/target/debug")
-                .join(binary_name),
-        ),
-        Some(
-            manifest_dir
-                .join("../rust-engine/target/release")
-                .join(binary_name),
-        ),
+        Some(manifest_dir.join("../target/debug").join(binary_name)),
+        Some(manifest_dir.join("../target/release").join(binary_name)),
     ];
 
     candidates
@@ -476,9 +468,7 @@ mod tests {
         let shell_exe = tree.path("package/sse-exed-tauri-shell");
         let packaged_engine = tree.path("package/studio-control-engine");
         let manifest_dir = tree.path("repo/native/tauri-shell");
-        let dev_engine = manifest_dir
-            .join("../rust-engine/target/debug")
-            .join(binary_name);
+        let dev_engine = manifest_dir.join("../target/debug").join(binary_name);
 
         touch(&override_engine);
         touch(&shell_exe);
@@ -504,9 +494,7 @@ mod tests {
         let shell_exe = tree.path("package/sse-exed-tauri-shell");
         let packaged_engine = tree.path("package/studio-control-engine");
         let manifest_dir = tree.path("repo/native/tauri-shell");
-        let dev_engine = manifest_dir
-            .join("../rust-engine/target/debug")
-            .join(binary_name);
+        let dev_engine = manifest_dir.join("../target/debug").join(binary_name);
 
         touch(&shell_exe);
         touch(&packaged_engine);
@@ -526,9 +514,7 @@ mod tests {
         let binary_name = "studio-control-engine";
         let shell_exe = tree.path("package/sse-exed-tauri-shell");
         let manifest_dir = tree.path("repo/native/tauri-shell");
-        let dev_engine = manifest_dir
-            .join("../rust-engine/target/debug")
-            .join(binary_name);
+        let dev_engine = manifest_dir.join("../target/debug").join(binary_name);
 
         touch(&shell_exe);
         touch(&manifest_dir.join("Cargo.toml"));

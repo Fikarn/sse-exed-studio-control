@@ -1,0 +1,824 @@
+use serde_json::Value;
+
+use super::helpers::*;
+use super::types::{
+    LightingAllPowerRequest, LightingCueCreateRequest, LightingCueDeleteRequest,
+    LightingCueFireRequest, LightingCueUpdateRequest, LightingEffect, LightingFixtureCreateRequest,
+    LightingFixtureDeleteRequest, LightingFixtureUpdateRequest, LightingGroupCreateRequest,
+    LightingGroupDeleteRequest, LightingGroupPowerRequest, LightingGroupUpdateRequest,
+    LightingSceneCreateRequest, LightingSceneDeleteRequest, LightingSceneRecallRequest,
+    LightingSceneUpdateRequest, LightingSettingsUpdateRequest, LightingSpatialMarker,
+};
+use super::{MAX_CUE_LABEL_LEN, MAX_CUE_NOTES_LEN, MAX_FADE_MS, MAX_FOLLOW_SECONDS};
+
+pub fn parse_lighting_scene_recall_request(
+    params: &Value,
+) -> Result<LightingSceneRecallRequest, String> {
+    let scene_id = params
+        .get("sceneId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("sceneId is required"))?;
+
+    let fade_duration_seconds = params
+        .get("fadeDurationSeconds")
+        .map(|value| {
+            value
+                .as_f64()
+                .ok_or_else(|| String::from("fadeDurationSeconds must be a number"))
+        })
+        .transpose()?
+        .unwrap_or(0.0);
+
+    if !(0.0..=10.0).contains(&fade_duration_seconds) {
+        return Err(String::from(
+            "fadeDurationSeconds must be between 0 and 10 seconds",
+        ));
+    }
+
+    Ok(LightingSceneRecallRequest {
+        scene_id: String::from(scene_id),
+        fade_duration_seconds,
+    })
+}
+
+pub fn parse_lighting_fixture_create_request(
+    params: &Value,
+) -> Result<LightingFixtureCreateRequest, String> {
+    let fixture_type = parse_required_fixture_type(params.get("type"))?;
+    let dmx_start_address =
+        parse_required_fixture_dmx_start_address(params.get("dmxStartAddress"), &fixture_type)?;
+    let group_id = params
+        .get("groupId")
+        .map(parse_optional_group_id)
+        .transpose()?
+        .unwrap_or(None);
+
+    Ok(LightingFixtureCreateRequest {
+        name: parse_required_fixture_name(params.get("name"))?,
+        fixture_type,
+        dmx_start_address,
+        group_id,
+    })
+}
+
+pub fn parse_lighting_fixture_update_request(
+    params: &Value,
+) -> Result<LightingFixtureUpdateRequest, String> {
+    let fixture_id = params
+        .get("fixtureId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("fixtureId is required"))?;
+    let name = params
+        .get("name")
+        .map(|value| parse_required_fixture_name(Some(value)))
+        .transpose()?;
+    let fixture_type = params
+        .get("type")
+        .map(|value| parse_required_fixture_type(Some(value)))
+        .transpose()?;
+    let dmx_start_address = params
+        .get("dmxStartAddress")
+        .map(parse_positive_i64_value)
+        .transpose()?;
+    let effect = params
+        .get("effect")
+        .map(|value| parse_optional_effect(value, "effect"))
+        .transpose()?;
+
+    let on = params
+        .get("on")
+        .map(|value| {
+            value
+                .as_bool()
+                .ok_or_else(|| String::from("on must be a boolean"))
+        })
+        .transpose()?;
+
+    let intensity = params
+        .get("intensity")
+        .map(parse_i64_value)
+        .transpose()?
+        .map(|value| clamp_i64(value, 0, 100));
+
+    let cct = params.get("cct").map(parse_i64_value).transpose()?;
+
+    let group_id = params
+        .get("groupId")
+        .map(parse_optional_group_id)
+        .transpose()?;
+    let spatial_x = params
+        .get("spatialX")
+        .map(|value| parse_optional_spatial_coordinate(value, "spatialX"))
+        .transpose()?;
+    let spatial_y = params
+        .get("spatialY")
+        .map(|value| parse_optional_spatial_coordinate(value, "spatialY"))
+        .transpose()?;
+    let spatial_rotation = params
+        .get("spatialRotation")
+        .map(|value| parse_spatial_rotation_value(value, "spatialRotation"))
+        .transpose()?;
+    let rig_z = params.get("rigZ").map(parse_optional_rig_z).transpose()?;
+    let beam_angle_degrees = params
+        .get("beamAngleDegrees")
+        .map(parse_optional_beam_angle_degrees)
+        .transpose()?;
+
+    if on.is_none()
+        && name.is_none()
+        && fixture_type.is_none()
+        && dmx_start_address.is_none()
+        && effect.is_none()
+        && intensity.is_none()
+        && cct.is_none()
+        && group_id.is_none()
+        && spatial_x.is_none()
+        && spatial_y.is_none()
+        && spatial_rotation.is_none()
+        && rig_z.is_none()
+        && beam_angle_degrees.is_none()
+    {
+        return Err(String::from(
+            "lighting.fixture.update requires one or more supported fields",
+        ));
+    }
+
+    Ok(LightingFixtureUpdateRequest {
+        fixture_id: String::from(fixture_id),
+        name,
+        fixture_type,
+        dmx_start_address,
+        effect,
+        on,
+        intensity,
+        cct,
+        group_id,
+        spatial_x,
+        spatial_y,
+        spatial_rotation,
+        rig_z,
+        beam_angle_degrees,
+    })
+}
+
+pub fn parse_lighting_fixture_delete_request(
+    params: &Value,
+) -> Result<LightingFixtureDeleteRequest, String> {
+    let fixture_id = params
+        .get("fixtureId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("fixtureId is required"))?;
+
+    Ok(LightingFixtureDeleteRequest {
+        fixture_id: String::from(fixture_id),
+    })
+}
+
+pub fn parse_lighting_group_power_request(
+    params: &Value,
+) -> Result<LightingGroupPowerRequest, String> {
+    let group_id = params
+        .get("groupId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("groupId is required"))?;
+
+    let on = params
+        .get("on")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| String::from("on must be a boolean"))?;
+
+    Ok(LightingGroupPowerRequest {
+        group_id: String::from(group_id),
+        on,
+    })
+}
+
+pub fn parse_lighting_all_power_request(params: &Value) -> Result<LightingAllPowerRequest, String> {
+    let on = params
+        .get("on")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| String::from("on must be a boolean"))?;
+
+    Ok(LightingAllPowerRequest { on })
+}
+
+pub fn parse_lighting_group_create_request(
+    params: &Value,
+) -> Result<LightingGroupCreateRequest, String> {
+    let name = parse_required_group_name(params.get("name"))?;
+    Ok(LightingGroupCreateRequest { name })
+}
+
+pub fn parse_lighting_group_update_request(
+    params: &Value,
+) -> Result<LightingGroupUpdateRequest, String> {
+    let group_id = params
+        .get("groupId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("groupId is required"))?;
+    let name = parse_required_group_name(params.get("name"))?;
+
+    Ok(LightingGroupUpdateRequest {
+        group_id: String::from(group_id),
+        name,
+    })
+}
+
+pub fn parse_lighting_group_delete_request(
+    params: &Value,
+) -> Result<LightingGroupDeleteRequest, String> {
+    let group_id = params
+        .get("groupId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("groupId is required"))?;
+
+    Ok(LightingGroupDeleteRequest {
+        group_id: String::from(group_id),
+    })
+}
+
+pub fn parse_lighting_settings_update_request(
+    params: &Value,
+) -> Result<LightingSettingsUpdateRequest, String> {
+    let enabled = params
+        .get("enabled")
+        .map(|value| {
+            value
+                .as_bool()
+                .ok_or_else(|| String::from("enabled must be a boolean"))
+        })
+        .transpose()?;
+    let bridge_ip = params
+        .get("bridgeIp")
+        .map(|value| {
+            value
+                .as_str()
+                .ok_or_else(|| String::from("bridgeIp must be a string"))
+                .map(|text| text.trim().to_string())
+        })
+        .transpose()?;
+    let universe = params
+        .get("universe")
+        .map(parse_i64_value)
+        .transpose()?
+        .map(|value| clamp_i64(value, 1, 63999));
+    let grand_master = params
+        .get("grandMaster")
+        .map(parse_i64_value)
+        .transpose()?
+        .map(|value| clamp_i64(value, 0, 100));
+    let selected_scene_id = params
+        .get("selectedSceneId")
+        .map(|value| parse_optional_trimmed_string_or_null(value, "selectedSceneId"))
+        .transpose()?;
+    let selected_fixture_id = params
+        .get("selectedFixtureId")
+        .map(|value| parse_optional_trimmed_string_or_null(value, "selectedFixtureId"))
+        .transpose()?;
+    let camera_marker = params
+        .get("cameraMarker")
+        .map(|value| parse_optional_spatial_marker(value, "cameraMarker"))
+        .transpose()?;
+    let subject_marker = params
+        .get("subjectMarker")
+        .map(|value| parse_optional_spatial_marker(value, "subjectMarker"))
+        .transpose()?;
+
+    if enabled.is_none()
+        && bridge_ip.is_none()
+        && universe.is_none()
+        && grand_master.is_none()
+        && selected_scene_id.is_none()
+        && selected_fixture_id.is_none()
+        && camera_marker.is_none()
+        && subject_marker.is_none()
+    {
+        return Err(String::from(
+            "lighting.settings.update requires one or more supported fields",
+        ));
+    }
+
+    Ok(LightingSettingsUpdateRequest {
+        enabled,
+        bridge_ip,
+        universe,
+        grand_master,
+        selected_scene_id,
+        selected_fixture_id,
+        camera_marker,
+        subject_marker,
+    })
+}
+
+pub fn parse_lighting_scene_create_request(
+    params: &Value,
+) -> Result<LightingSceneCreateRequest, String> {
+    let name = parse_required_scene_name(params.get("name"))?;
+    Ok(LightingSceneCreateRequest { name })
+}
+
+pub fn parse_lighting_scene_update_request(
+    params: &Value,
+) -> Result<LightingSceneUpdateRequest, String> {
+    let scene_id = params
+        .get("sceneId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("sceneId is required"))?;
+
+    let name = params
+        .get("name")
+        .map(|value| parse_required_scene_name(Some(value)))
+        .transpose()?;
+    let capture_current_state = params
+        .get("captureCurrentState")
+        .map(|value| {
+            value
+                .as_bool()
+                .ok_or_else(|| String::from("captureCurrentState must be a boolean"))
+        })
+        .transpose()?
+        .unwrap_or(false);
+
+    if name.is_none() && !capture_current_state {
+        return Err(String::from(
+            "lighting.scene.update requires a name and/or captureCurrentState",
+        ));
+    }
+
+    Ok(LightingSceneUpdateRequest {
+        scene_id: String::from(scene_id),
+        name,
+        capture_current_state,
+    })
+}
+
+pub fn parse_lighting_scene_delete_request(
+    params: &Value,
+) -> Result<LightingSceneDeleteRequest, String> {
+    let scene_id = params
+        .get("sceneId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("sceneId is required"))?;
+
+    Ok(LightingSceneDeleteRequest {
+        scene_id: String::from(scene_id),
+    })
+}
+
+pub(super) fn parse_required_cue_label(value: Option<&Value>) -> Result<String, String> {
+    let label = value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+        .ok_or_else(|| String::from("label is required"))?;
+    if label.chars().count() > MAX_CUE_LABEL_LEN {
+        return Err(format!(
+            "label must be {MAX_CUE_LABEL_LEN} characters or fewer"
+        ));
+    }
+    Ok(label)
+}
+
+pub(super) fn parse_optional_cue_notes(value: &Value) -> Result<Option<String>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let notes = value
+        .as_str()
+        .map(str::trim)
+        .ok_or_else(|| String::from("notes must be a string or null"))?;
+    if notes.is_empty() {
+        return Ok(None);
+    }
+    if notes.chars().count() > MAX_CUE_NOTES_LEN {
+        return Err(format!(
+            "notes must be {MAX_CUE_NOTES_LEN} characters or fewer"
+        ));
+    }
+    Ok(Some(String::from(notes)))
+}
+
+pub(super) fn parse_optional_follow_seconds(value: &Value) -> Result<Option<f64>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let seconds = value
+        .as_f64()
+        .ok_or_else(|| String::from("followSeconds must be a number or null"))?;
+    if !(0.0..=MAX_FOLLOW_SECONDS).contains(&seconds) {
+        return Err(format!(
+            "followSeconds must be between 0 and {MAX_FOLLOW_SECONDS}"
+        ));
+    }
+    Ok(Some(seconds))
+}
+
+pub(super) fn parse_fade_ms(value: &Value, field: &str) -> Result<i64, String> {
+    let ms = parse_i64_value(value)?;
+    if !(0..=MAX_FADE_MS).contains(&ms) {
+        return Err(format!("{field} must be between 0 and {MAX_FADE_MS} ms"));
+    }
+    Ok(ms)
+}
+
+pub fn parse_lighting_cue_create_request(
+    params: &Value,
+) -> Result<LightingCueCreateRequest, String> {
+    let label = parse_required_cue_label(params.get("label"))?;
+    let after_cue_id = params
+        .get("afterCueId")
+        .map(|value| parse_optional_trimmed_string_or_null(value, "afterCueId"))
+        .transpose()?
+        .unwrap_or(None);
+    let scene_id = params
+        .get("sceneId")
+        .map(|value| parse_optional_trimmed_string_or_null(value, "sceneId"))
+        .transpose()?
+        .unwrap_or(None);
+    let fade_in_ms = params
+        .get("fadeInMs")
+        .map(|value| parse_fade_ms(value, "fadeInMs"))
+        .transpose()?;
+    let fade_out_ms = params
+        .get("fadeOutMs")
+        .map(|value| parse_fade_ms(value, "fadeOutMs"))
+        .transpose()?;
+    let follow_seconds = params
+        .get("followSeconds")
+        .map(parse_optional_follow_seconds)
+        .transpose()?;
+    let notes = params
+        .get("notes")
+        .map(parse_optional_cue_notes)
+        .transpose()?;
+
+    Ok(LightingCueCreateRequest {
+        label,
+        after_cue_id,
+        scene_id,
+        fade_in_ms,
+        fade_out_ms,
+        follow_seconds,
+        notes,
+    })
+}
+
+pub fn parse_lighting_cue_update_request(
+    params: &Value,
+) -> Result<LightingCueUpdateRequest, String> {
+    let cue_id = params
+        .get("cueId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("cueId is required"))?;
+
+    let label = params
+        .get("label")
+        .map(|value| parse_required_cue_label(Some(value)))
+        .transpose()?;
+    let scene_id = params
+        .get("sceneId")
+        .map(|value| parse_optional_trimmed_string_or_null(value, "sceneId"))
+        .transpose()?;
+    let fade_in_ms = params
+        .get("fadeInMs")
+        .map(|value| parse_fade_ms(value, "fadeInMs"))
+        .transpose()?;
+    let fade_out_ms = params
+        .get("fadeOutMs")
+        .map(|value| parse_fade_ms(value, "fadeOutMs"))
+        .transpose()?;
+    let follow_seconds = params
+        .get("followSeconds")
+        .map(parse_optional_follow_seconds)
+        .transpose()?;
+    let notes = params
+        .get("notes")
+        .map(parse_optional_cue_notes)
+        .transpose()?;
+    let ordinal = params
+        .get("ordinal")
+        .map(parse_positive_i64_value)
+        .transpose()?;
+
+    if label.is_none()
+        && scene_id.is_none()
+        && fade_in_ms.is_none()
+        && fade_out_ms.is_none()
+        && follow_seconds.is_none()
+        && notes.is_none()
+        && ordinal.is_none()
+    {
+        return Err(String::from(
+            "lighting.cue.update requires one or more supported fields",
+        ));
+    }
+
+    Ok(LightingCueUpdateRequest {
+        cue_id: String::from(cue_id),
+        label,
+        scene_id,
+        fade_in_ms,
+        fade_out_ms,
+        follow_seconds,
+        notes,
+        ordinal,
+    })
+}
+
+pub fn parse_lighting_cue_delete_request(
+    params: &Value,
+) -> Result<LightingCueDeleteRequest, String> {
+    let cue_id = params
+        .get("cueId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("cueId is required"))?;
+
+    Ok(LightingCueDeleteRequest {
+        cue_id: String::from(cue_id),
+    })
+}
+
+pub fn parse_lighting_cue_fire_request(params: &Value) -> Result<LightingCueFireRequest, String> {
+    let cue_id = params
+        .get("cueId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("cueId is required"))?;
+    let fade_override_ms = params
+        .get("fadeOverrideMs")
+        .map(|value| {
+            if value.is_null() {
+                Ok(None)
+            } else {
+                parse_fade_ms(value, "fadeOverrideMs").map(Some)
+            }
+        })
+        .transpose()?
+        .flatten();
+
+    Ok(LightingCueFireRequest {
+        cue_id: String::from(cue_id),
+        fade_override_ms,
+    })
+}
+
+pub(super) fn parse_required_scene_name(value: Option<&Value>) -> Result<String, String> {
+    value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+        .ok_or_else(|| String::from("name is required"))
+}
+
+pub(super) fn parse_required_group_name(value: Option<&Value>) -> Result<String, String> {
+    value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+        .ok_or_else(|| String::from("name is required"))
+}
+
+pub(super) fn parse_required_fixture_name(value: Option<&Value>) -> Result<String, String> {
+    let name = value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+        .ok_or_else(|| String::from("name is required"))?;
+    if name.len() > 50 {
+        return Err(String::from("name must be 50 characters or fewer"));
+    }
+    Ok(name)
+}
+
+pub(super) fn parse_required_fixture_type(value: Option<&Value>) -> Result<String, String> {
+    let fixture_type = value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("type is required"))?;
+
+    validate_fixture_type(fixture_type).ok_or_else(|| {
+        String::from("type must be one of astra-bicolor, infinimat, or infinibar-pb12")
+    })
+}
+
+pub(super) fn parse_required_fixture_dmx_start_address(
+    value: Option<&Value>,
+    fixture_type: &str,
+) -> Result<i64, String> {
+    let dmx_start_address = value
+        .ok_or_else(|| String::from("dmxStartAddress is required"))
+        .and_then(parse_positive_i64_value)?;
+    let max_start = 512 - fixture_channel_count(fixture_type) + 1;
+    if !(1..=max_start).contains(&dmx_start_address) {
+        return Err(format!(
+            "dmxStartAddress must be between 1 and {} for type '{}'",
+            max_start, fixture_type
+        ));
+    }
+    Ok(dmx_start_address)
+}
+
+pub(super) fn parse_optional_trimmed_string_or_null(
+    value: &Value,
+    field: &str,
+) -> Result<Option<String>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+        .map(Some)
+        .ok_or_else(|| format!("{field} must be a string or null"))
+}
+
+pub(super) fn parse_optional_group_id(value: &Value) -> Result<Option<String>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|group_id| !group_id.is_empty())
+        .map(String::from)
+        .map(Some)
+        .ok_or_else(|| String::from("groupId must be a string or null"))
+}
+
+pub(super) fn parse_optional_effect(
+    value: &Value,
+    field: &str,
+) -> Result<Option<LightingEffect>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{field} must be an object or null"))?;
+    let effect_type = object
+        .get("type")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| format!("{field}.type is required"))?;
+    let normalized_type = validate_effect_type(effect_type)
+        .ok_or_else(|| format!("{field}.type must be one of pulse, strobe, or candle"))?;
+    let speed = object
+        .get("speed")
+        .map(parse_i64_value)
+        .transpose()?
+        .unwrap_or(5);
+
+    Ok(Some(LightingEffect {
+        effect_type: normalized_type,
+        speed: clamp_i64(speed, 1, 10),
+    }))
+}
+
+pub(super) fn parse_optional_spatial_coordinate(
+    value: &Value,
+    field: &str,
+) -> Result<Option<f64>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    let coordinate = value
+        .as_f64()
+        .ok_or_else(|| format!("{field} must be a finite number or null"))?;
+    if !coordinate.is_finite() {
+        return Err(format!("{field} must be a finite number or null"));
+    }
+
+    Ok(Some(clamp_f64(coordinate, 0.0, 1.0)))
+}
+
+pub(super) fn parse_spatial_rotation_value(value: &Value, field: &str) -> Result<f64, String> {
+    let rotation = value
+        .as_f64()
+        .ok_or_else(|| format!("{field} must be a finite number"))?;
+    if !rotation.is_finite() {
+        return Err(format!("{field} must be a finite number"));
+    }
+    Ok(normalize_rotation(rotation))
+}
+
+pub(super) fn parse_optional_rig_z(value: &Value) -> Result<Option<f64>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let meters = value
+        .as_f64()
+        .ok_or_else(|| String::from("rigZ must be a finite number or null"))?;
+    if !meters.is_finite() {
+        return Err(String::from("rigZ must be a finite number or null"));
+    }
+    Ok(Some(clamp_f64(meters, 0.0, 20.0)))
+}
+
+pub(super) fn parse_optional_beam_angle_degrees(value: &Value) -> Result<Option<f64>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let degrees = value
+        .as_f64()
+        .ok_or_else(|| String::from("beamAngleDegrees must be a finite number or null"))?;
+    if !degrees.is_finite() {
+        return Err(String::from(
+            "beamAngleDegrees must be a finite number or null",
+        ));
+    }
+    Ok(Some(clamp_f64(degrees, 1.0, 180.0)))
+}
+
+pub(super) fn parse_optional_spatial_marker(
+    value: &Value,
+    field: &str,
+) -> Result<Option<LightingSpatialMarker>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{field} must be an object or null"))?;
+    let x = parse_optional_spatial_coordinate(
+        object
+            .get("x")
+            .ok_or_else(|| format!("{field}.x is required"))?,
+        &format!("{field}.x"),
+    )?
+    .ok_or_else(|| format!("{field}.x is required"))?;
+    let y = parse_optional_spatial_coordinate(
+        object
+            .get("y")
+            .ok_or_else(|| format!("{field}.y is required"))?,
+        &format!("{field}.y"),
+    )?
+    .ok_or_else(|| format!("{field}.y is required"))?;
+    let rotation = parse_spatial_rotation_value(
+        object
+            .get("rotation")
+            .ok_or_else(|| format!("{field}.rotation is required"))?,
+        &format!("{field}.rotation"),
+    )?;
+
+    Ok(Some(LightingSpatialMarker {
+        x: clamp_f64(x, 0.0, 1.0),
+        y: clamp_f64(y, 0.0, 1.0),
+        rotation,
+    }))
+}
+
+pub(super) fn parse_i64_value(value: &Value) -> Result<i64, String> {
+    if let Some(number) = value.as_i64() {
+        Ok(number)
+    } else if let Some(number) = value.as_f64() {
+        if number.is_finite() {
+            Ok(number.round() as i64)
+        } else {
+            Err(String::from("value must be a finite number"))
+        }
+    } else {
+        Err(String::from("value must be a number"))
+    }
+}
+
+pub(super) fn parse_positive_i64_value(value: &Value) -> Result<i64, String> {
+    let number = parse_i64_value(value)?;
+    if number < 1 {
+        return Err(String::from("value must be a positive integer"));
+    }
+    Ok(number)
+}

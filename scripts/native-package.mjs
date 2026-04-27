@@ -95,13 +95,13 @@ function normalizeForOutputComparison(value) {
 
 function resolveEngineExecutablePath() {
   return process.platform === "win32"
-    ? path.join(rootDir, "native", "rust-engine", "target", "debug", "studio-control-engine.exe")
-    : path.join(rootDir, "native", "rust-engine", "target", "debug", "studio-control-engine");
+    ? path.join(rootDir, "native", "target", "debug", "studio-control-engine.exe")
+    : path.join(rootDir, "native", "target", "debug", "studio-control-engine");
 }
 
 function resolveTauriShellPath(target) {
   const executableName = nativeReleaseShellExecutableName(target, releaseRuntime);
-  return path.join(rootDir, "native", "tauri-shell", "target", "release", executableName);
+  return path.join(rootDir, "native", "target", "release", executableName);
 }
 
 function archiveWindowsDirectory(sourceDir, archivePath) {

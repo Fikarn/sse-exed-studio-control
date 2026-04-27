@@ -12,6 +12,8 @@
 
 ## Validation
 
+> Advisory CI runs format/lint/typecheck/cargo on every PR. **Target-host evidence below remains the acceptance gate** — CI does not gate releases.
+
 - [ ] `npm run doctor`
 - [ ] `npm run dev:check`
 - [ ] `npm run format:check`

@@ -12,7 +12,7 @@
     "storybook:build": "storybook build",
     "storybook:serve-static": "node ../../scripts/frontend/storybook-static-server.mjs --root storybook-static --port 6007",
     "playwright:test": "playwright test --config playwright.config.ts",
-    "tauri:dev": "cd ../../native/tauri-shell && tauri dev",
+    "tauri:dev": "cd ../../native/tauri-shell && tauri dev --features test-bridge",
     "tauri:build": "cd ../../native/tauri-shell && tauri build"
   },
   "dependencies": {

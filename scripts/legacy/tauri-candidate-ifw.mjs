@@ -3,7 +3,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writ
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
 const args = process.argv.slice(2);
@@ -93,7 +93,10 @@ function ensurePackagedPayload(target) {
   }
 
   if ((target === "macos" && process.platform === "darwin") || (target === "windows" && process.platform === "win32")) {
-    run(process.execPath, [path.join(rootDir, "scripts", "tauri-package-candidate.mjs"), `--target=${target}`]);
+    run(process.execPath, [
+      path.join(rootDir, "scripts", "legacy", "tauri-package-candidate.mjs"),
+      `--target=${target}`,
+    ]);
     return payloadPath;
   }
 

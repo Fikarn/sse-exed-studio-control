@@ -110,6 +110,8 @@ npm run doctor:release
 npm run release:verify
 ```
 
+GitHub Actions runs the four-job advisory workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request — `format-protocol`, `lint`, `frontend-typecheck`, and `rust` (rustfmt + clippy + cargo check + cargo test). It is **advisory only** and intentionally not a required status check; target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the acceptance mechanism for this repo. CI failures are early signal, never a release gate.
+
 ## Repo Hygiene Rules
 
 - Prefer one authoritative doc for current truth and link to detail docs instead of duplicating status prose everywhere.

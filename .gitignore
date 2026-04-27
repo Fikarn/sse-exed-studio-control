@@ -21,8 +21,7 @@ temp/
 *.orig
 native/build/
 native/**/build/
-native/rust-engine/target/
-native/tauri-shell/target/
+native/target/
 artifacts/
 frontend/**/dist/
 frontend/**/storybook-static/

@@ -29,7 +29,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const SUPPORT_BACKUP_FORMAT_VERSION: i64 = 2;
+const SUPPORT_BACKUP_FORMAT_VERSION: i64 = 3;
 const SUPPORT_BACKUP_ARCHIVE_TYPE: &str = "native-support-backup";
 const LIGHTING_SETTINGS_PREFIX: &str = "app.lighting.";
 const AUDIO_SETTINGS_PREFIX: &str = "app.audio.";
@@ -117,6 +117,8 @@ struct SupportBackupArchive {
     exported_at: String,
     #[serde(rename = "engineVersion")]
     engine_version: String,
+    #[serde(default, rename = "storageFormatVersion")]
+    storage_format_version: Option<String>,
     planning: SupportPlanningArchive,
     commissioning: SupportCommissioningArchive,
     shell: ShellSettingsSnapshot,
@@ -361,12 +363,14 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
         list_settings_by_prefix(&runtime.db_path, LIGHTING_SELECTED_FIXTURE_ID_KEY)?;
     let shell_snapshot = ShellSettingsSnapshot::from_settings(&shell_settings_map);
     let exported_at = current_timestamp(&runtime.db_path)?;
+    let storage_format_version = read_storage_format_version(&runtime.db_path)?;
 
     Ok(SupportBackupArchive {
         archive_type: String::from(SUPPORT_BACKUP_ARCHIVE_TYPE),
         format_version: SUPPORT_BACKUP_FORMAT_VERSION,
         exported_at,
         engine_version: String::from(env!("CARGO_PKG_VERSION")),
+        storage_format_version,
         planning: SupportPlanningArchive {
             projects: planning_snapshot.projects,
             tasks: planning_snapshot.tasks,
@@ -805,6 +809,18 @@ fn current_timestamp(db_path: &Path) -> EngineResult<String> {
             row.get::<_, String>(0)
         })?;
     Ok(timestamp)
+}
+
+fn read_storage_format_version(db_path: &Path) -> EngineResult<Option<String>> {
+    let connection = open_connection(db_path)?;
+    let value = connection
+        .query_row(
+            "SELECT value FROM app_metadata WHERE key = 'storage.format_version'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .ok();
+    Ok(value)
 }
 
 fn list_json_files(directory: &Path) -> EngineResult<Vec<SupportFileEntry>> {
@@ -1327,5 +1343,71 @@ mod tests {
         assert_eq!(summary.project_count, 1);
         assert_eq!(summary.task_count, 1);
         assert_eq!(summary.checklist_item_count, 2);
+    }
+
+    #[test]
+    fn export_support_backup_records_storage_format_version() {
+        let test_dir = TestDir::new("export-format-version");
+        let runtime = test_dir.runtime();
+        let legacy_path = test_dir.path().join("legacy-db.json");
+        seed_legacy_payload(&legacy_path);
+        import_legacy_db(
+            &runtime.db_path,
+            &LegacyImportRequest {
+                source_path: legacy_path,
+                force: true,
+            },
+        )
+        .expect("legacy import should seed database");
+
+        let export = export_support_backup(&runtime).expect("backup export should succeed");
+        let archive_bytes = fs::read(&export.path).expect("archive should read back");
+        let archive: SupportBackupArchive =
+            serde_json::from_slice(&archive_bytes).expect("archive should parse");
+
+        assert_eq!(archive.format_version, SUPPORT_BACKUP_FORMAT_VERSION);
+        assert_eq!(archive.storage_format_version, Some(String::from("1")));
+    }
+
+    #[test]
+    fn restore_support_backup_accepts_format_v2_archive_without_storage_version() {
+        let test_dir = TestDir::new("restore-format-v2");
+        let runtime = test_dir.runtime();
+        let legacy_path = test_dir.path().join("legacy-db.json");
+        seed_legacy_payload(&legacy_path);
+        import_legacy_db(
+            &runtime.db_path,
+            &LegacyImportRequest {
+                source_path: legacy_path,
+                force: true,
+            },
+        )
+        .expect("legacy import should seed database");
+
+        // Build a real archive then strip the v3-only field to forge a v2 shape.
+        let mut archive_value = serde_json::to_value(
+            build_support_backup_archive(&runtime).expect("archive should build"),
+        )
+        .expect("archive should serialize to value");
+        let archive_object = archive_value.as_object_mut().expect("archive is an object");
+        archive_object.insert(String::from("formatVersion"), json!(2));
+        archive_object.remove("storageFormatVersion");
+
+        let v2_archive_path = test_dir.path().join("legacy-format-v2-backup.json");
+        fs::write(
+            &v2_archive_path,
+            serde_json::to_vec_pretty(&archive_value).expect("v2 archive should serialize"),
+        )
+        .expect("v2 archive should write");
+
+        let summary = restore_support_backup(
+            &runtime,
+            &SupportRestoreRequest {
+                source_path: v2_archive_path,
+            },
+        )
+        .expect("v2 archive should restore on v3-aware reader");
+
+        assert_eq!(summary.source_format, "native-support-backup");
     }
 }

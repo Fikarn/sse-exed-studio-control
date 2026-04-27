@@ -16,16 +16,16 @@ Required tools:
 - Node.js 20 and npm
 - Rust stable toolchain
 - Windows build tools required by Tauri/Rust
-- Qt Installer Framework with `binarycreator.exe` and `repogen.exe`
+- Qt Installer Framework 4.x with `binarycreator.exe` and `repogen.exe` (any 4.x minor version; the `binarycreator`/`repogen` CLIs have been stable across the series and the release scripts are version-agnostic — they resolve the binaries via env var or `PATH` without checking the installed version)
 
-`binarycreator.exe` and `repogen.exe` must be on `PATH`, or exposed through:
+`binarycreator.exe` and `repogen.exe` must be on `PATH`, or exposed through (substitute the actual installed minor version, e.g., `4.7`, `4.11`):
 
 ```powershell
-$env:SSE_QT_IFW_BINARYCREATOR = "C:\Qt\Tools\QtInstallerFramework\4.7\bin\binarycreator.exe"
-$env:SSE_QT_IFW_REPOGEN = "C:\Qt\Tools\QtInstallerFramework\4.7\bin\repogen.exe"
+$env:SSE_QT_IFW_BINARYCREATOR = "C:\Qt\Tools\QtInstallerFramework\4.11\bin\binarycreator.exe"
+$env:SSE_QT_IFW_REPOGEN = "C:\Qt\Tools\QtInstallerFramework\4.11\bin\repogen.exe"
 ```
 
-Use the installed QtIFW version that matches the current macOS target-host gate unless a delta spec changes the packaging toolchain.
+Match the QtIFW major.minor across hosts (Windows + macOS) when feasible to keep installer/repository artifact bytes comparable in cross-host evidence reviews. A minor mismatch (e.g., 4.7 on macOS vs 4.11 on Windows) is acceptable for branch validation; revisit the version policy explicitly only if a release-blocking artifact difference shows up.
 
 ## Procedure
 

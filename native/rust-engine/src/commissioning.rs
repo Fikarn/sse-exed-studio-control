@@ -816,7 +816,8 @@ mod tests {
             update_repository_path: None,
             storage_ready: true,
             storage_bootstrap: crate::storage::StorageBootstrap {
-                schema_version: 2,
+                schema_version: 4,
+                format_version: String::from("1"),
                 journal_mode: String::from("wal"),
                 integrity_check: String::from("ok"),
             },
