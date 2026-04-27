@@ -10,12 +10,12 @@ It does not authorize cutover by itself. It records the conditions that must be 
 
 ## Sources Of Authority
 
-- [ADR 0001: Frontend Replatform Foundation](./adr/0001-frontend-replatform.md)
-- [Architecture](./ARCHITECTURE.md)
-- [Development](./DEVELOPMENT.md)
-- [Handoff](./HANDOFF.md)
-- [Hardware Profile](./HARDWARE_PROFILE.md)
-- [Protocol v1](../native/protocol/v1.md)
+- [ADR 0001: Frontend Replatform Foundation](../adr/0001-frontend-replatform.md)
+- [Architecture](../ARCHITECTURE.md)
+- [Development](../DEVELOPMENT.md)
+- [Handoff](../HANDOFF.md)
+- [Hardware Profile](../HARDWARE_PROFILE.md)
+- [Protocol v1](../../native/protocol/v1.md)
 
 If this document conflicts with those files, fix the conflict before continuing.
 
@@ -90,7 +90,7 @@ Do not tag a release until every item below is true for the intended release com
 ### 6. Hardware Workflow Gate
 
 - Lighting covers the current fixed rig and intentionally excludes pan/tilt unless the hardware profile changes.
-- Audio follows the locked `Ar+ - Control-room confidence desk` posture in [docs/redesign/audio.md](./redesign/audio.md).
+- Audio follows the locked `Ar+ - Control-room confidence desk` posture in [docs/redesign/audio.md](../redesign/audio.md).
 - Planning remains a secondary run-of-show / board workspace and does not displace live Lighting or Audio priority.
 - Setup/Support remains the service-mode entry point for commissioning, Companion/Stream Deck support, diagnostics, backup, and recovery.
 - Any real-hardware dry run must record the exact workstation, display mode, audio interface, lighting bridge, and Companion state used.
@@ -156,7 +156,7 @@ Stop cutover work and re-anchor if any of these are true:
 - visual evidence is stale, not `2560x1440`, or taken from an invalid Retina logical desktop
 - any operator-critical state is owned by React instead of the Rust engine
 - packaging/update/rollback behavior is unspecified
-- the plan requires a hardware behavior that is not in [docs/HARDWARE_PROFILE.md](./HARDWARE_PROFILE.md)
+- the plan requires a hardware behavior that is not in [docs/HARDWARE_PROFILE.md](../HARDWARE_PROFILE.md)
 
 ## Next Implementation Work
 
