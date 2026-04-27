@@ -186,6 +186,30 @@ function resolveInstalledRuntime(target, installRoot, runtimeKind) {
   };
 }
 
+function probeInstallRootAfterInstall(installRoot, phase) {
+  if (process.platform !== "win32" || !existsSync(installRoot)) {
+    return;
+  }
+  const entries = readdirSync(installRoot, { withFileTypes: true })
+    .map((entry) => `${entry.name} (${entry.isDirectory() ? "dir" : entry.isFile() ? "file" : "other"})`)
+    .join(", ");
+  console.log(`Installer acceptance: install-root state immediately after ${phase}: ${entries || "<empty>"}.`);
+  const promoted = promoteWindowsMaintenanceToolNew(installRoot);
+  if (!promoted) {
+    const exeCandidates = ["maintenancetool.exe", "MaintenanceTool.exe"];
+    const existingExe = exeCandidates.find((name) => existsSync(path.join(installRoot, name)));
+    if (existingExe) {
+      console.log(
+        `Installer acceptance: maintenance tool already promoted to ${existingExe} after ${phase} (no rename needed).`
+      );
+    } else {
+      console.warn(
+        `Installer acceptance: no maintenancetool.exe or maintenancetool.exe.new in install-root after ${phase}. Maintenance-tool purge will be skipped at teardown; reg-delete fallback will run.`
+      );
+    }
+  }
+}
+
 function promoteWindowsMaintenanceToolNew(installRoot) {
   if (process.platform !== "win32" || !existsSync(installRoot)) {
     return null;
@@ -735,6 +759,7 @@ async function main() {
       acceptanceRoot,
       "installer-install"
     );
+    probeInstallRootAfterInstall(installRoot, "Step 1 install");
     assertInstallTimeSmokePassed(installRoot, runtimeKind, "install");
 
     let installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
@@ -846,6 +871,7 @@ async function main() {
       acceptanceRoot,
       "installer-reinstall"
     );
+    probeInstallRootAfterInstall(installRoot, "Step 4 reinstall");
     assertInstallTimeSmokePassed(installRoot, runtimeKind, "reinstall");
 
     installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
