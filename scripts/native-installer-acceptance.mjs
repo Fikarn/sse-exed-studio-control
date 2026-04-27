@@ -195,11 +195,21 @@ function resolveMaintenanceToolPath(target, installRoot) {
   }
 
   if (existsSync(installRoot)) {
-    const matchingEntry = readdirSync(installRoot, { withFileTypes: true }).find((entry) =>
-      entry.name.toLowerCase().includes("maintenancetool")
-    );
-    if (matchingEntry) {
-      if (target === "macos" && matchingEntry.isDirectory()) {
+    const entries = readdirSync(installRoot, { withFileTypes: true });
+
+    if (target === "windows") {
+      const matchingExe = entries.find(
+        (entry) =>
+          entry.isFile() &&
+          entry.name.toLowerCase().includes("maintenancetool") &&
+          entry.name.toLowerCase().endsWith(".exe")
+      );
+      if (matchingExe) {
+        return path.join(installRoot, matchingExe.name);
+      }
+    } else {
+      const matchingEntry = entries.find((entry) => entry.name.toLowerCase().includes("maintenancetool"));
+      if (matchingEntry && target === "macos" && matchingEntry.isDirectory()) {
         const dynamicCandidate = path.join(
           installRoot,
           matchingEntry.name,
@@ -210,10 +220,6 @@ function resolveMaintenanceToolPath(target, installRoot) {
         if (existsSync(dynamicCandidate)) {
           return dynamicCandidate;
         }
-      }
-
-      if (target === "windows" && matchingEntry.isFile()) {
-        return path.join(installRoot, matchingEntry.name);
       }
     }
   }
@@ -538,6 +544,15 @@ function teardownAcceptanceInstall({ target, installRoot, acceptanceRoot, stepNa
     toolPath = resolveMaintenanceToolPath(target, installRoot);
   } catch (error) {
     summary.purge.error = error instanceof Error ? error.message : String(error);
+    summary.purge.installRootContents = readdirSync(installRoot, { withFileTypes: true }).map((entry) => ({
+      name: entry.name,
+      kind: entry.isDirectory() ? "dir" : entry.isFile() ? "file" : "other",
+    }));
+    console.warn(
+      `Installer acceptance teardown: maintenance tool not found at ${installRoot}. Install-root contents: ${
+        summary.purge.installRootContents.map((entry) => `${entry.name} (${entry.kind})`).join(", ") || "<empty>"
+      }. Falling back to direct registry cleanup.`
+    );
   }
 
   if (toolPath) {
