@@ -24,6 +24,7 @@ export default [
       "**/playwright-report/**",
       "**/test-results/**",
       "**/node_modules/**",
+      ".tools/**",
       "frontend/packages/engine-client/src/generated/**",
       "frontend/packages/tokens/src/generated/**",
       "native/target/**",
