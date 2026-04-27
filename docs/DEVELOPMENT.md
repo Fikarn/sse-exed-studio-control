@@ -115,7 +115,7 @@ Both Tauri qualification lanes and Playwright preview use the fixed local port `
 
 Both Tauri qualification commands write a `summary.json` evidence file. By default the summary is written to a temp directory and the path is printed. For target-host evidence capture, set `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` before running the commands; this directory is intentionally ignored by git.
 
-The promotion gate for the Tauri shipping switch lives in [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md). Do not change shipping behavior, installer paths, or target-host gate status by inference; use that checklist as the cutover authority.
+The promotion gate for the Tauri shipping switch lives in [FRONTEND_CUTOVER_PLAN.md](./archive/FRONTEND_CUTOVER_PLAN.md). Do not change shipping behavior, installer paths, or target-host gate status by inference; use that checklist as the cutover authority.
 
 `npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, workspace qualification, and visual review serially.
 

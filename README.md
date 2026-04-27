@@ -39,7 +39,7 @@ Productization work and release gates are tracked in [docs/PRODUCTIZATION_PLAN.m
 
 ## Screenshots
 
-All captures below are deterministic native renders at the target `2560x1440` operator-monitor resolution. The checked-in release screenshots remain historical Qt-shell parity captures; current Tauri visual review is produced through the local cutover-readiness lanes described in [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md).
+All captures below are deterministic native renders at the target `2560x1440` operator-monitor resolution. The checked-in release screenshots remain historical Qt-shell parity captures; current Tauri visual review is produced through the local cutover-readiness lanes described in [docs/archive/FRONTEND_CUTOVER_PLAN.md](docs/archive/FRONTEND_CUTOVER_PLAN.md).
 
 | Planning                                                                                             | Lighting                                                                                                    |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -109,8 +109,8 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/OPERATOR_WORKSTATION_ROLLOUT.md](docs/OPERATOR_WORKSTATION_ROLLOUT.md): final published-installer verification on the intended studio workstation
 - [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
 - [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
-- [docs/FRONTEND_CUTOVER_PLAN.md](docs/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
-- [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md): completed Checkpoint D impact audit and safe Qt fallback retirement sequence
+- [docs/archive/FRONTEND_CUTOVER_PLAN.md](docs/archive/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
+- [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md): completed Checkpoint D impact audit and safe Qt fallback retirement sequence
 - [docs/archive/](docs/archive/): historical planning and parity documents preserved for reference
 - [native/README.md](native/README.md): native workspace scaffold for the selected Tauri shell, Rust engine, and IPC protocol
 - [docs/adr/0001-frontend-replatform.md](docs/adr/0001-frontend-replatform.md): locked frontend replatform decision
@@ -184,7 +184,7 @@ npm run ci
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
-The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is complete through issue #5 plus [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete.
+The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is complete through issue #5 plus [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete.
 
 `npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated evidence folders, and release output; it does not remove `.tools/`.
 

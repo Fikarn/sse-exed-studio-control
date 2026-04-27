@@ -1,4 +1,6 @@
-# Qt Fallback Retirement Audit
+# Qt Fallback Retirement Audit (archived 2026-04-27)
+
+> Archived after Checkpoint D Qt fallback retirement completed and was recorded against tag `d0205ba`. The audit and removal sequence are preserved here for historical reference. Current architecture (Tauri-only) is documented in [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) and [`docs/HANDOFF.md`](../HANDOFF.md).
 
 ## Purpose
 

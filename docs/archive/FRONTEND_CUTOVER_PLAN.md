@@ -1,4 +1,6 @@
-# Frontend Cutover Plan
+# Frontend Cutover Plan (archived 2026-04-27)
+
+> Archived after `v2.2.x` operator-workstation rollout completed and Checkpoint D Qt fallback retirement closed. This document records the acceptance gate that authorized the Tauri shipping switch; that gate is satisfied. Current cutover truth lives in [`docs/HANDOFF.md`](../HANDOFF.md), and release work flows through [`docs/RELEASE.md`](../RELEASE.md).
 
 ## Purpose
 

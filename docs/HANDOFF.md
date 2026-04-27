@@ -27,8 +27,8 @@ Read these in order:
 5. `docs/HARDWARE_PROFILE.md`
 6. `docs/ARCHITECTURE.md`
 7. `docs/adr/0001-frontend-replatform.md`
-8. `docs/FRONTEND_CUTOVER_PLAN.md`
-9. `docs/QT_FALLBACK_RETIREMENT_AUDIT.md`
+8. `docs/archive/FRONTEND_CUTOVER_PLAN.md`
+9. `docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md`
 
 Use these for deeper context only after the above are clear:
 
@@ -48,7 +48,7 @@ Do not reopen these casually:
 - supported primary hardware assumptions in `docs/HARDWARE_PROFILE.md`
 - engine-owned persistence, safety rules, and device logic
 - the native runtime is the only product runtime; do not reintroduce an Electron or Next.js path
-- the selected shell stack is `Tauri 2 + React 19.2 + TypeScript + Vite`; Qt fallback retirement is complete and recorded in Checkpoint D issue #5 and `docs/QT_FALLBACK_RETIREMENT_AUDIT.md`
+- the selected shell stack is `Tauri 2 + React 19.2 + TypeScript + Vite`; Qt fallback retirement is complete and recorded in Checkpoint D issue #5 and `docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md`
 
 ## Current Blockers
 
@@ -61,7 +61,7 @@ The highest-value unresolved work is:
 3. Keep current-truth docs aligned with the replatform program.
    The selected Tauri release runtime, retired Qt source/test surface, retired parity assets, and completed Checkpoint D evidence must stay described consistently in `README.md`, `docs/HANDOFF.md`, `docs/ARCHITECTURE.md`, and the ADR set.
 4. Preserve the current frontend replatform checkpoint.
-   `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is tracked in `docs/FRONTEND_CUTOVER_PLAN.md`; Checkpoint C is satisfied for published tag `v2.2.0` (`eb166092ad5483a00b6b59137062c86c3193ca53`) with macOS and Windows post-switch target-host release evidence, the final operator-workstation rollout passed on published tag `v2.2.1` (`951a2c4e1f236200f0f017121158bc9969427051`), and Checkpoint D completed on commit `d0205baf52ce02d7d4d24699facd202f3bbba217` with macOS `native:release:mac:local` plus Windows evidence bundle `2026-04-25T07-32-31-463Z`. Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, and the final retirement gate are complete.
+   `Setup/Support` is the verified pilot. The `Lighting` pass is closed against the current checked-in plan for the fixed studio hardware profile, with `pan/tilt` intentionally out of scope; keep the patch inspector aligned to `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, and `Identify`. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is tracked in `docs/archive/FRONTEND_CUTOVER_PLAN.md`; Checkpoint C is satisfied for published tag `v2.2.0` (`eb166092ad5483a00b6b59137062c86c3193ca53`) with macOS and Windows post-switch target-host release evidence, the final operator-workstation rollout passed on published tag `v2.2.1` (`951a2c4e1f236200f0f017121158bc9969427051`), and Checkpoint D completed on commit `d0205baf52ce02d7d4d24699facd202f3bbba217` with macOS `native:release:mac:local` plus Windows evidence bundle `2026-04-25T07-32-31-463Z`. Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, and the final retirement gate are complete.
 5. Keep Tauri target-host posture honest.
    GitHub Actions is not the acceptance mechanism for the replacement-shell cutover. `npm run tauri:setup-support:qualify`, `npm run tauri:workspaces:qualify`, and `npm run tauri:visual:review` remain local/manual cutover-readiness gates for future shell changes. The historical `tauri:package:*` lanes remain useful pre-switch evidence under `release/tauri-candidate*`. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`; `npm run native:release:mac:local` passed for published `v2.2.1`, and `npm run native:release:win:evidence` passed on Windows 11 `x64` with evidence bundle `2026-04-24T22-17-55-519Z`. Checkpoint D also passed macOS `npm run native:release:mac:local` and Windows 11 `x64` evidence bundle `2026-04-25T07-32-31-463Z` on commit `d0205baf52ce02d7d4d24699facd202f3bbba217`. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) records the completed Checkpoint C evidence and closed fallback window; [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) records the passed `v2.2.1` operator rollout; [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) records the completed Checkpoint D / Qt retirement track.
 
@@ -76,7 +76,7 @@ Completed rollout record:
 
 - [Issue #3: Cutover: Tauri shipping switch evidence and fallback window](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - [Issue #4: Rollout: verify v2.2.1 published installer on operator workstation](https://github.com/Fikarn/sse-exed-studio-control/issues/4), executed through [docs/OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md)
-- [Issue #5: Checkpoint D: plan Qt fallback retirement](https://github.com/Fikarn/sse-exed-studio-control/issues/5), executed through [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](./QT_FALLBACK_RETIREMENT_AUDIT.md)
+- [Issue #5: Checkpoint D: plan Qt fallback retirement](https://github.com/Fikarn/sse-exed-studio-control/issues/5), executed through [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](./archive/QT_FALLBACK_RETIREMENT_AUDIT.md)
 
 ## Validation Baseline
 

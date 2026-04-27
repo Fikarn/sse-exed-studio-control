@@ -6,7 +6,7 @@ Date: 2026-04-22
 
 Accepted
 
-Post-acceptance update, 2026-04-25: `v2.2.0` shipped the `Tauri 2 + React 19.2 + TypeScript + Vite` shell as the selected release runtime through the `native:*` release lane, and `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix. The bounded fallback window is closed; Checkpoint D issue #5 completed Qt/QML fallback retirement through the checked-in sequence, including source/test removal, Qt parity asset retirement, macOS shipping validation, and Windows target-host release evidence. Checkpoint D / Qt retirement is recorded by [QT_FALLBACK_RETIREMENT_AUDIT.md](../QT_FALLBACK_RETIREMENT_AUDIT.md), not by this ADR.
+Post-acceptance update, 2026-04-25: `v2.2.0` shipped the `Tauri 2 + React 19.2 + TypeScript + Vite` shell as the selected release runtime through the `native:*` release lane, and `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix. The bounded fallback window is closed; Checkpoint D issue #5 completed Qt/QML fallback retirement through the checked-in sequence, including source/test removal, Qt parity asset retirement, macOS shipping validation, and Windows target-host release evidence. Checkpoint D / Qt retirement is recorded by [QT_FALLBACK_RETIREMENT_AUDIT.md](../archive/QT_FALLBACK_RETIREMENT_AUDIT.md), not by this ADR.
 
 ## Context
 

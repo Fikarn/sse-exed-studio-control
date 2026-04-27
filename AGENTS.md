@@ -53,7 +53,7 @@ Every operator-visible change to the selected Tauri surface must:
 2. run `npm run tauri:visual:review` when layout or operator presentation changes,
 3. inspect the result on the BetterDisplay-backed `2560×1440` review surface or the fixed studio monitor when human fit judgment matters.
 
-Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Historical Qt parity screenshots were retired in Checkpoint D.
+Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/archive/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Historical Qt parity screenshots were retired in Checkpoint D.
 
 ## Testing posture
 

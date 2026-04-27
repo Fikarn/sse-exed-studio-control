@@ -8,7 +8,7 @@ It was the execution procedure for [GitHub issue #4](https://github.com/Fikarn/s
 
 ## Plan Anchor
 
-- Cutover gate: [FRONTEND_CUTOVER_PLAN.md](./FRONTEND_CUTOVER_PLAN.md)
+- Cutover gate: [FRONTEND_CUTOVER_PLAN.md](./archive/FRONTEND_CUTOVER_PLAN.md)
 - Release procedure: [RELEASE.md](./RELEASE.md)
 - Operator recovery: [OPERATIONS.md](./OPERATIONS.md)
 - Hardware target: [HARDWARE_PROFILE.md](./HARDWARE_PROFILE.md)
