@@ -12,6 +12,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && node ./src/validate-generated.mjs"
   },
   "devDependencies": {
-    "style-dictionary": "^4.1.0"
+    "style-dictionary": "^5.4.0"
   }
 }
