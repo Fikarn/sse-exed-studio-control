@@ -1,4 +1,6 @@
-# Greenfield Frontend Recommendation
+# Greenfield Frontend Recommendation (archived 2026-04-27)
+
+> Archived after `v2.2.x` shipped the Tauri 2 + React 19.2 stack as the selected runtime. This memo was a "from scratch" design exercise; its conclusions informed the cutover plan but it is not current implementation guidance. Use [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) for current architecture truth.
 
 Date: 2026-04-22
 

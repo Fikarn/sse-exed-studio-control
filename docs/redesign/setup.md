@@ -4,10 +4,10 @@ phase: B (direction locked)
 status: ready-for-phase-c
 chosen_direction: B — runner (5-step wizard + Support dashboard toggle)
 audit_refs:
-  - docs/UX_AUDIT.md §Setup workspace
-  - docs/UX_AUDIT.md §C1 (modal mode — kept)
-  - docs/UX_AUDIT.md §C2 (Support restored — global prep, done in 91d6e6a)
-  - docs/UX_AUDIT.md §C4, §C5, §C6, §C7, §C8, §C10, §C11
+  - docs/archive/UX_AUDIT.md §Setup workspace
+  - docs/archive/UX_AUDIT.md §C1 (modal mode — kept)
+  - docs/archive/UX_AUDIT.md §C2 (Support restored — global prep, done in 91d6e6a)
+  - docs/archive/UX_AUDIT.md §C4, §C5, §C6, §C7, §C8, §C10, §C11
 ---
 
 # Setup — delta spec

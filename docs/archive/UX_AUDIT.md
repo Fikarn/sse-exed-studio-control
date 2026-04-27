@@ -1,6 +1,6 @@
-# UX Audit — SSE ExEd Studio Control
+# UX Audit — SSE ExEd Studio Control (archived 2026-04-27)
 
-> Historical Qt-era reference. This audit was written before the Tauri shipping switch and still references removed `native/qt-shell` paths. Use it for product/UX rationale only; current implementation truth lives in [ARCHITECTURE.md](./ARCHITECTURE.md), [HANDOFF.md](./HANDOFF.md), and [DEVELOPER_QUICKSTART.md](./DEVELOPER_QUICKSTART.md).
+> Historical Qt-era reference, archived after the Tauri shipping switch shipped in `v2.2.x`. This audit predates the cutover and still references removed `native/qt-shell` paths. Use it for product/UX rationale only; current implementation truth lives in [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md), [`docs/HANDOFF.md`](../HANDOFF.md), and [`docs/DEVELOPER_QUICKSTART.md`](../DEVELOPER_QUICKSTART.md). Active per-workspace UX direction lives in [`docs/redesign/`](../redesign/).
 
 Phase A deliverable of the `redesign/v2.2` effort. Written against the current native shell (`native/qt-shell/qml/` at the branch point from `main`). Purpose: ground the redesign in the actual code, not in generic UX intuition.
 

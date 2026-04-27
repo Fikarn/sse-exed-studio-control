@@ -4,9 +4,9 @@ phase: B (direction locked)
 status: ready-for-phase-c
 chosen_direction: Cr — Spatial desk (refined from Direction C)
 audit_refs:
-  - docs/UX_AUDIT.md §Lighting workspace
-  - docs/UX_AUDIT.md §C7 (scroll rule — closed on lighting content panel)
-  - docs/UX_AUDIT.md §Recommendations #11 (Use Add Light dead button — closed)
+  - docs/archive/UX_AUDIT.md §Lighting workspace
+  - docs/archive/UX_AUDIT.md §C7 (scroll rule — closed on lighting content panel)
+  - docs/archive/UX_AUDIT.md §Recommendations #11 (Use Add Light dead button — closed)
 ---
 
 # Lighting — delta spec

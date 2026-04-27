@@ -1,6 +1,6 @@
-# Frontend Strategy Reset
+# Frontend Strategy Reset (archived 2026-04-27)
 
-> Historical Qt-era reference. This reset memo describes the pre-cutover QML architecture and still references removed `native/qt-shell` paths. The direction it selected has been executed; use current architecture and workflow docs for implementation truth.
+> Historical Qt-era reference, archived after the Tauri shipping switch shipped in `v2.2.x` and Checkpoint D Qt fallback retirement closed. This reset memo describes the pre-cutover QML architecture and still references removed `native/qt-shell` paths. The direction it selected has been executed; use [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) and [`docs/HANDOFF.md`](../HANDOFF.md) for current architecture truth.
 
 Date: 2026-04-21
 

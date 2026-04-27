@@ -4,10 +4,10 @@ phase: B (direction locked)
 status: ready-for-phase-c
 chosen_direction: D — Run-of-show timeline (lanes × time, kanban behind ⇧B)
 audit_refs:
-  - docs/UX_AUDIT.md §Planning workspace
-  - docs/UX_AUDIT.md §C8 (identity/hero stack — closed)
-  - docs/UX_AUDIT.md §C11 (Planning vs Projects naming — closed)
-  - docs/UX_AUDIT.md §Recommendations #10 (workspace vs sidecar — resolved by reframing)
+  - docs/archive/UX_AUDIT.md §Planning workspace
+  - docs/archive/UX_AUDIT.md §C8 (identity/hero stack — closed)
+  - docs/archive/UX_AUDIT.md §C11 (Planning vs Projects naming — closed)
+  - docs/archive/UX_AUDIT.md §Recommendations #10 (workspace vs sidecar — resolved by reframing)
 ---
 
 # Planning — delta spec

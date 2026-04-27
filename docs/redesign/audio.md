@@ -4,15 +4,15 @@ phase: B (direction locked)
 status: ready-for-phase-c
 chosen_direction: Ar+ - Control-room confidence desk
 audit_refs:
-  - docs/UX_AUDIT.md §Audio workspace
-  - docs/UX_AUDIT.md §C4 (token discipline - closed on the migrated audio shell)
+  - docs/archive/UX_AUDIT.md §Audio workspace
+  - docs/archive/UX_AUDIT.md §C4 (token discipline - closed on the migrated audio shell)
 ---
 
 # Audio - delta spec
 
 There is no separate HTML direction deck for Audio. This document is the direction lock. It is intentionally **not** derived from the legacy QML Audio workspace. The design source is:
 
-- the operator tasks and failure modes called out in `docs/UX_AUDIT.md`
+- the operator tasks and failure modes called out in `docs/archive/UX_AUDIT.md`
 - the fixed-hardware constraints in `docs/HARDWARE_PROFILE.md`
 - the replatform shell patterns already proven in the Lighting and Planning migrations
 - the operator posture of this product: one person running a small but ultra-premium studio from one fixed workstation

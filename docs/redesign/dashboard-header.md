@@ -4,8 +4,8 @@ phase: B (direction locked)
 status: ready-for-phase-c
 chosen_direction: D — monitor rail + single-row tabs
 audit_refs:
-  - docs/UX_AUDIT.md §Dashboard Header Panel
-  - docs/UX_AUDIT.md §C1, §C4, §C5, §C6, §C8, §C9, §C10, §C11
+  - docs/archive/UX_AUDIT.md §Dashboard Header Panel
+  - docs/archive/UX_AUDIT.md §C1, §C4, §C5, §C6, §C8, §C9, §C10, §C11
 ---
 
 # Dashboard header — delta spec
