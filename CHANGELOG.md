@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Aligned the Tauri shell's bundle identifier from `com.sse.exedstudiocontrol.replatform` to `com.sse.exedstudiocontrol`, matching the locked product identity declared in `AGENTS.md` and `docs/RELEASE.md`. The `.replatform` suffix was a checkpoint marker added during the Qt → Tauri cutover and lost its meaning after Checkpoint D retired the Qt fallback shell. The QtIFW `packageId` (`com.sse.exedstudiocontrol.native`) is unchanged, so the maintenance-tool upgrade path from v2.2.1 to the next release continues to work and operator app-data persistence is preserved (app-data is anchored to a fixed directory name, not the bundle identifier). On macOS, operators may see a fresh Spotlight entry on first launch of the next release because `CFBundleIdentifier` changes; this is a one-time visual cue, not a data migration.
+
 ## [2.2.1] — 2026-04-24
 
 ### Fixed
