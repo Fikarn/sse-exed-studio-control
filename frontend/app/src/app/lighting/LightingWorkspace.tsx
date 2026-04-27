@@ -411,8 +411,8 @@ export function LightingWorkspaceSurface({
   }, [lightingSnapshot]);
   const selectedDmxOverlayChannel =
     (dmxOverlayChannel !== null
-      ? (expandedDmxChannels.find((channel) => channel.channel === dmxOverlayChannel) ?? null)
-      : null) ??
+      ? expandedDmxChannels.find((channel) => channel.channel === dmxOverlayChannel)
+      : undefined) ??
     expandedDmxChannels[0] ??
     null;
   const dmxStale = lightingSnapshot?.reachable === false;

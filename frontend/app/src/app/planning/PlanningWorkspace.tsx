@@ -218,7 +218,7 @@ export function PlanningWorkspaceSurface({
   const filteredTaskCount = tasks.filter((task) => filteredProjectIds.has(task.projectId)).length;
   const allTasksUnscheduled = filteredTaskCount > 0 && visibleScheduledTasks.length === 0;
   const draggingScheduledTask =
-    (draggingScheduledTaskId ? (tasks.find((task) => task.id === draggingScheduledTaskId) ?? null) : null) ?? null;
+    (draggingScheduledTaskId ? tasks.find((task) => task.id === draggingScheduledTaskId) : undefined) ?? null;
   const draggingUnscheduledTask =
     (draggingUnscheduledTaskId
       ? visibleUnscheduledTasks.find((task) => task.id === draggingUnscheduledTaskId)
