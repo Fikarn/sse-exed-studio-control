@@ -1,0 +1,54 @@
+@layer components {
+  .state {
+    align-items: center;
+    background: var(--color-surface-default);
+    border: 1px solid var(--color-surface-border);
+    border-radius: var(--radius-sm);
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 88px;
+    padding: var(--space-5);
+  }
+
+  .icon {
+    color: var(--color-studio-300);
+    height: 24px;
+    width: 24px;
+  }
+
+  .copy {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .title {
+    color: var(--color-studio-050);
+    font: var(--font-weight-semibold) var(--font-size-md) / 1.25 var(--font-family-sans);
+  }
+
+  .message {
+    color: var(--color-studio-400);
+    font: var(--font-weight-regular) var(--font-size-sm) / 1.4 var(--font-family-sans);
+  }
+
+  .actions {
+    align-items: center;
+    display: inline-flex;
+    gap: var(--space-2);
+  }
+
+  .empty {
+    border-style: dashed;
+  }
+
+  .degraded {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+
+  .degraded .icon {
+    color: var(--color-accent-amber);
+  }
+}

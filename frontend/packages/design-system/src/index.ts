@@ -2,11 +2,40 @@ export { AppShellFrame } from "./components/AppShellFrame";
 export type { AppShellFrameProps, ContextItem, MonitorItem, RailItem } from "./components/AppShellFrame";
 export { Button } from "./components/Button";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./components/Button";
+export { CueRail } from "./components/CueRail";
+export type { CueRailItem, CueRailProps, CueRailState } from "./components/CueRail";
+export { DenseList, DenseListRow, DenseTable } from "./components/DenseRows";
+export type {
+  DenseListProps,
+  DenseListRowProps,
+  DenseRowTone,
+  DenseTableColumn,
+  DenseTableProps,
+  DenseTableRow,
+} from "./components/DenseRows";
+export { Dialog } from "./components/Dialog";
+export type { DialogProps } from "./components/Dialog";
+export { EmptyState, DegradedState } from "./components/OperationalState";
+export type { DegradedStateProps, EmptyStateProps } from "./components/OperationalState";
+export { IconButton } from "./components/IconButton";
+export type { IconButtonProps, IconButtonSize, IconButtonTone } from "./components/IconButton";
+export { InspectorPanel, InspectorSection } from "./components/InspectorPanel";
+export type { InspectorPanelProps, InspectorSectionProps } from "./components/InspectorPanel";
+export { MeterBridge } from "./components/MeterBridge";
+export type { MeterBridgeChannel, MeterBridgeProps, MeterState } from "./components/MeterBridge";
 export { MetricCard } from "./components/MetricCard";
 export type { MetricCardProps } from "./components/MetricCard";
+export { SegmentedControl } from "./components/SegmentedControl";
+export type { SegmentedControlOption, SegmentedControlProps } from "./components/SegmentedControl";
 export { StatusBadge } from "./components/StatusBadge";
 export type { StatusBadgeProps, StatusTone } from "./components/StatusBadge";
+export { StatusBand } from "./components/StatusBand";
+export type { StatusBandProps, StatusBandTone } from "./components/StatusBand";
 export { StatusPill } from "./components/StatusPill";
 export type { StatusPillProps } from "./components/StatusPill";
 export { Surface } from "./components/Surface";
 export type { SurfaceProps } from "./components/Surface";
+export { ToggleButton } from "./components/ToggleButton";
+export type { ToggleButtonProps, ToggleButtonTone } from "./components/ToggleButton";
+export { Toolbar, ToolbarGroup } from "./components/Toolbar";
+export type { ToolbarDensity, ToolbarGroupProps, ToolbarProps } from "./components/Toolbar";
