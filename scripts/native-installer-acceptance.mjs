@@ -268,6 +268,62 @@ function runCliStep(command, args, acceptanceRoot, stepName, env = {}) {
   };
 }
 
+function safeRunCliStep(command, args, acceptanceRoot, stepName, env = {}) {
+  const stepRoot = path.join(acceptanceRoot, stepName);
+  const stdoutPath = path.join(stepRoot, "stdout.log");
+  const stderrPath = path.join(stepRoot, "stderr.log");
+  const homeDir = path.join(acceptanceRoot, "home");
+
+  rmSync(stepRoot, { force: true, recursive: true });
+  mkdirSync(stepRoot, { recursive: true });
+  mkdirSync(path.join(homeDir, ".cache"), { recursive: true });
+
+  let result;
+  try {
+    result = spawnSync(command, args, {
+      cwd: rootDir,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        HOME: homeDir,
+        XDG_CACHE_HOME: path.join(homeDir, ".cache"),
+        ...env,
+      },
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      exitCode: 1,
+      stdout: "",
+      stderr: "",
+      stepRoot,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  writeFileSync(stdoutPath, result.stdout ?? "", "utf8");
+  writeFileSync(stderrPath, result.stderr ?? "", "utf8");
+
+  emitCapturedOutput(result.stdout, result.stderr, {
+    patterns: qtFontAliasWarningPatterns,
+    summaryLabel: "Qt font alias warning",
+  });
+
+  const exitCode = result.error ? 1 : (result.status ?? 1);
+  return {
+    ok: !result.error && exitCode === 0,
+    exitCode,
+    stdout: result.stdout ?? "",
+    stderr: result.stderr ?? "",
+    stepRoot,
+    error: result.error
+      ? result.error.message
+      : exitCode === 0
+        ? null
+        : `Step '${stepName}' exited with code ${exitCode}`,
+  };
+}
+
 function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expectedTarget, env = {}) {
   const stepRoot = path.join(acceptanceRoot, stepName);
   const smokeStatusPath = path.join(stepRoot, "smoke-status.json");
@@ -382,6 +438,155 @@ function cleanupInstallRootAfterPurge(target, installRoot, acceptanceRoot) {
   rmSync(installRoot, { force: true, recursive: true });
 }
 
+function findUninstallKeysUnderInstallRoot(installRoot) {
+  if (process.platform !== "win32") {
+    return [];
+  }
+
+  const installRootNormalized = path
+    .resolve(installRoot)
+    .replace(/[\\/]+$/, "")
+    .toLowerCase();
+  const hives = [
+    "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKLM\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+  ];
+
+  const matches = [];
+
+  for (const hive of hives) {
+    const list = spawnSync("reg.exe", ["query", hive], { encoding: "utf8" });
+    if ((list.status ?? 1) !== 0 || !list.stdout) {
+      continue;
+    }
+
+    const subkeys = list.stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => /^HKEY_(?:LOCAL_MACHINE|CURRENT_USER)\\/i.test(line));
+
+    for (const subkey of subkeys) {
+      const valueResult = spawnSync("reg.exe", ["query", subkey, "/v", "InstallLocation"], { encoding: "utf8" });
+      if ((valueResult.status ?? 1) !== 0 || !valueResult.stdout) {
+        continue;
+      }
+
+      const valueLine = valueResult.stdout.split(/\r?\n/).find((line) => /\s+InstallLocation\s+REG_/i.test(line));
+      if (!valueLine) {
+        continue;
+      }
+
+      const valueMatch = valueLine.match(/REG_(?:SZ|EXPAND_SZ)\s+(.*\S)/);
+      if (!valueMatch) {
+        continue;
+      }
+
+      const installLocation = valueMatch[1].trim();
+      const installLocationNormalized = installLocation.replace(/[\\/]+$/, "").toLowerCase();
+
+      if (
+        installLocationNormalized === installRootNormalized ||
+        installLocationNormalized.startsWith(`${installRootNormalized}\\`)
+      ) {
+        matches.push({ subkey, installLocation });
+      }
+    }
+  }
+
+  return matches;
+}
+
+function deleteUninstallKeysUnderInstallRoot(installRoot) {
+  if (process.platform !== "win32") {
+    return [];
+  }
+
+  const matches = findUninstallKeysUnderInstallRoot(installRoot);
+  return matches.map(({ subkey, installLocation }) => {
+    const result = spawnSync("reg.exe", ["delete", subkey, "/f"], { encoding: "utf8" });
+    const exitCode = result.status ?? 1;
+    return {
+      subkey,
+      installLocation,
+      ok: exitCode === 0,
+      exitCode,
+      stderr: result.stderr ?? "",
+    };
+  });
+}
+
+function teardownAcceptanceInstall({ target, installRoot, acceptanceRoot, stepName }) {
+  const summary = {
+    installRoot,
+    purge: { attempted: false, ok: false, toolPath: null, error: null },
+    fallback: { attempted: false, removed: [] },
+    orphansBefore: [],
+    orphansAfter: [],
+    clean: true,
+    error: null,
+  };
+
+  if (!existsSync(installRoot)) {
+    return summary;
+  }
+
+  summary.orphansBefore = findUninstallKeysUnderInstallRoot(installRoot);
+
+  let toolPath = null;
+  try {
+    toolPath = resolveMaintenanceToolPath(target, installRoot);
+  } catch (error) {
+    summary.purge.error = error instanceof Error ? error.message : String(error);
+  }
+
+  if (toolPath) {
+    summary.purge.toolPath = toolPath;
+    summary.purge.attempted = true;
+    const purgeResult = safeRunCliStep(
+      toolPath,
+      ["--verbose", "--default-answer", "--confirm-command", "purge"],
+      acceptanceRoot,
+      stepName
+    );
+    summary.purge.ok = purgeResult.ok;
+    if (!purgeResult.ok) {
+      summary.purge.error = purgeResult.error;
+      console.warn(
+        `Installer acceptance teardown: maintenance-tool purge at ${toolPath} failed (${purgeResult.error}). Falling back to direct registry cleanup.`
+      );
+    }
+  }
+
+  const purgeLeftOrphans = process.platform === "win32" && findUninstallKeysUnderInstallRoot(installRoot).length > 0;
+
+  if (process.platform === "win32" && (!summary.purge.ok || purgeLeftOrphans)) {
+    summary.fallback.attempted = true;
+    summary.fallback.removed = deleteUninstallKeysUnderInstallRoot(installRoot);
+    if (summary.fallback.removed.length > 0) {
+      console.log(
+        `Installer acceptance teardown: removed ${summary.fallback.removed.length} orphaned Uninstall registry entr${
+          summary.fallback.removed.length === 1 ? "y" : "ies"
+        } via reg delete fallback.`
+      );
+    }
+  }
+
+  cleanupInstallRootAfterPurge(target, installRoot, acceptanceRoot);
+
+  summary.orphansAfter = findUninstallKeysUnderInstallRoot(installRoot);
+  summary.clean = summary.orphansAfter.length === 0;
+  if (!summary.clean) {
+    summary.error =
+      `${summary.orphansAfter.length} orphaned Uninstall registry entr${
+        summary.orphansAfter.length === 1 ? "y" : "ies"
+      } remain referencing ${installRoot} after teardown:\n` +
+      summary.orphansAfter.map((entry) => `  ${entry.subkey} (InstallLocation: ${entry.installLocation})`).join("\n");
+  }
+
+  return summary;
+}
+
 function resolveAcceptanceRoot(explicitRoot, target) {
   if (explicitRoot) {
     return explicitRoot;
@@ -419,6 +624,23 @@ async function main() {
 
   const explicitRoot = resolvePathFromRoot(rootDir, process.env.SSE_NATIVE_INSTALLER_ACCEPTANCE_DIR);
   const acceptanceRoot = resolveAcceptanceRoot(explicitRoot, target);
+  const stalePrePurgeRoot = path.join(acceptanceRoot, "install-root");
+  if (existsSync(stalePrePurgeRoot)) {
+    console.log(
+      `Installer acceptance pre-purge: detected stale install at ${stalePrePurgeRoot}; purging maintenance-tool registry before recreating acceptance root.`
+    );
+    const prePurge = teardownAcceptanceInstall({
+      target,
+      installRoot: stalePrePurgeRoot,
+      acceptanceRoot,
+      stepName: "maintenancetool-pre-purge",
+    });
+    if (!prePurge.clean) {
+      console.warn(
+        `Installer acceptance pre-purge: ${prePurge.error ?? "registry orphans persisted"}. The rmSync below will still remove the on-disk install root.`
+      );
+    }
+  }
   rmSync(acceptanceRoot, { force: true, recursive: true });
   mkdirSync(acceptanceRoot, { recursive: true });
 
@@ -431,180 +653,238 @@ async function main() {
   mkdirSync(runtime.logsDir, { recursive: true });
 
   console.log(`${runtimeKind === "tauri" ? "Tauri candidate" : "Native"} installer acceptance root: ${acceptanceRoot}`);
-  console.log("Step 1: install the actual offline installer into a clean target root.");
 
-  runCliStep(
-    installerExecutable,
-    ["--verbose", "--root", installRoot, "--accept-licenses", "--default-answer", "--confirm-command", "install"],
-    acceptanceRoot,
-    "installer-install"
-  );
-  assertInstallTimeSmokePassed(installRoot, runtimeKind, "install");
-
-  let installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
-  assert(existsSync(installed.payloadPath), `Installed payload missing at ${installed.payloadPath}.`);
-  assert(existsSync(installed.shellPath), `Installed shell missing at ${installed.shellPath}.`);
-  assert(existsSync(installed.enginePath), `Installed engine missing at ${installed.enginePath}.`);
-
-  console.log("Step 2: import workstation data through the installed shell and persist a continuity sentinel.");
-  runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-import", "commissioning", {
-    SSE_LEGACY_DB_PATH: fixturePath,
-  });
-
-  const firstRun = new EngineHarness({
-    rootDir,
-    appDataDir: runtime.appDataDir,
-    logsDir: runtime.logsDir,
-    engineExecutable: installed.enginePath,
-    env: {
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    },
-  });
-
+  let teardown = null;
+  let mainError = null;
   try {
-    await firstRun.start();
-    await assertSafeBundledSqlite(firstRun, "installer-installed", `Installed ${installed.label} engine`);
+    console.log("Step 1: install the actual offline installer into a clean target root.");
 
-    const initialAppSnapshot = await firstRun.request("installer-app-installed", "app.snapshot");
-    const initialPlanningSnapshot = await firstRun.request("installer-planning-installed", "planning.snapshot");
-
-    assert(
-      initialAppSnapshot.startup?.targetSurface === "commissioning",
-      `Expected installer acceptance import to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
+    runCliStep(
+      installerExecutable,
+      ["--verbose", "--root", installRoot, "--accept-licenses", "--default-answer", "--confirm-command", "install"],
+      acceptanceRoot,
+      "installer-install"
     );
-    assert(initialPlanningSnapshot.counts?.projectCount === 2, "Expected installer acceptance project count to be 2.");
-    assert(initialPlanningSnapshot.counts?.taskCount === 3, "Expected installer acceptance task count to be 3.");
+    assertInstallTimeSmokePassed(installRoot, runtimeKind, "install");
 
-    const commissioningUpdate = await firstRun.request("installer-commissioning-ready", "commissioning.update", {
-      stage: "ready",
-    });
-    assert(
-      commissioningUpdate.startup?.targetSurface === "dashboard",
-      `Expected installer acceptance to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
-    );
+    let installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
+    assert(existsSync(installed.payloadPath), `Installed payload missing at ${installed.payloadPath}.`);
+    assert(existsSync(installed.shellPath), `Installed shell missing at ${installed.shellPath}.`);
+    assert(existsSync(installed.enginePath), `Installed engine missing at ${installed.enginePath}.`);
 
-    await firstRun.request("installer-planning-project-create", "planning.project.create", {
-      title: sentinelProjectTitle,
-      description: "Temporary project used to verify actual installer reinstall continuity.",
-      status: "todo",
-      priority: "p2",
+    console.log("Step 2: import workstation data through the installed shell and persist a continuity sentinel.");
+    runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-import", "commissioning", {
+      SSE_LEGACY_DB_PATH: fixturePath,
     });
 
-    const mutatedPlanningSnapshot = await firstRun.request("installer-planning-mutated", "planning.snapshot");
-    assert(
-      mutatedPlanningSnapshot.counts?.projectCount === 3,
-      "Expected installer continuity sentinel mutation to increase project count to 3."
+    const firstRun = new EngineHarness({
+      rootDir,
+      appDataDir: runtime.appDataDir,
+      logsDir: runtime.logsDir,
+      engineExecutable: installed.enginePath,
+      env: {
+        SSE_DISABLE_AUTO_IMPORT: "1",
+      },
+    });
+
+    try {
+      await firstRun.start();
+      await assertSafeBundledSqlite(firstRun, "installer-installed", `Installed ${installed.label} engine`);
+
+      const initialAppSnapshot = await firstRun.request("installer-app-installed", "app.snapshot");
+      const initialPlanningSnapshot = await firstRun.request("installer-planning-installed", "planning.snapshot");
+
+      assert(
+        initialAppSnapshot.startup?.targetSurface === "commissioning",
+        `Expected installer acceptance import to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
+      );
+      assert(
+        initialPlanningSnapshot.counts?.projectCount === 2,
+        "Expected installer acceptance project count to be 2."
+      );
+      assert(initialPlanningSnapshot.counts?.taskCount === 3, "Expected installer acceptance task count to be 3.");
+
+      const commissioningUpdate = await firstRun.request("installer-commissioning-ready", "commissioning.update", {
+        stage: "ready",
+      });
+      assert(
+        commissioningUpdate.startup?.targetSurface === "dashboard",
+        `Expected installer acceptance to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
+      );
+
+      await firstRun.request("installer-planning-project-create", "planning.project.create", {
+        title: sentinelProjectTitle,
+        description: "Temporary project used to verify actual installer reinstall continuity.",
+        status: "todo",
+        priority: "p2",
+      });
+
+      const mutatedPlanningSnapshot = await firstRun.request("installer-planning-mutated", "planning.snapshot");
+      assert(
+        mutatedPlanningSnapshot.counts?.projectCount === 3,
+        "Expected installer continuity sentinel mutation to increase project count to 3."
+      );
+    } finally {
+      await firstRun.close().catch((error) => {
+        throw error;
+      });
+    }
+
+    console.log("Step 3: verify the installed maintenance tool can see the installed package and staged repository.");
+    const maintenanceToolPath = resolveMaintenanceToolPath(target, installRoot);
+    const repositoryUri = pathToFileURL(repositoryPath).href;
+
+    const installedPackages = runCliStep(
+      maintenanceToolPath,
+      ["--verbose", "list"],
+      acceptanceRoot,
+      "maintenancetool-list"
     );
+    assert(
+      installedPackages.stdout.includes(releaseIdentity.packageId),
+      `Expected maintenance tool list output to include ${releaseIdentity.packageId}.`
+    );
+
+    const repositorySearch = runCliStep(
+      maintenanceToolPath,
+      ["--verbose", "--set-temp-repository", repositoryUri, "--type", "package", "search", releaseIdentity.packageId],
+      acceptanceRoot,
+      "maintenancetool-search"
+    );
+    assert(
+      repositorySearch.stdout.includes(releaseIdentity.packageId),
+      `Expected maintenance tool search output to include ${releaseIdentity.packageId}.`
+    );
+
+    console.log("Step 4: purge the installed program directory through the maintenance tool and reinstall it.");
+    runCliStep(
+      maintenanceToolPath,
+      ["--verbose", "--default-answer", "--confirm-command", "purge"],
+      acceptanceRoot,
+      "maintenancetool-purge"
+    );
+
+    assert(
+      !existsSync(installed.payloadPath),
+      `Expected purge to remove ${installed.payloadPath}, but it still exists.`
+    );
+    cleanupInstallRootAfterPurge(target, installRoot, acceptanceRoot);
+
+    runCliStep(
+      installerExecutable,
+      ["--verbose", "--root", installRoot, "--accept-licenses", "--default-answer", "--confirm-command", "install"],
+      acceptanceRoot,
+      "installer-reinstall"
+    );
+    assertInstallTimeSmokePassed(installRoot, runtimeKind, "reinstall");
+
+    installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
+    assert(existsSync(installed.payloadPath), `Reinstalled payload missing at ${installed.payloadPath}.`);
+    assert(existsSync(installed.shellPath), `Reinstalled shell missing at ${installed.shellPath}.`);
+    assert(existsSync(installed.enginePath), `Reinstalled engine missing at ${installed.enginePath}.`);
+
+    console.log("Step 5: relaunch the reinstalled application and verify operator state survived the reinstall.");
+    runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-relaunch", "dashboard", {
+      SSE_DISABLE_AUTO_IMPORT: "1",
+    });
+
+    const secondRun = new EngineHarness({
+      rootDir,
+      appDataDir: runtime.appDataDir,
+      logsDir: runtime.logsDir,
+      engineExecutable: installed.enginePath,
+      env: {
+        SSE_DISABLE_AUTO_IMPORT: "1",
+      },
+    });
+
+    try {
+      await secondRun.start();
+      await assertSafeBundledSqlite(secondRun, "installer-reinstalled", `Reinstalled ${installed.label} engine`);
+
+      const reinstalledAppSnapshot = await secondRun.request("installer-app-reinstalled", "app.snapshot");
+      const reinstalledPlanningSnapshot = await secondRun.request(
+        "installer-planning-reinstalled",
+        "planning.snapshot"
+      );
+
+      assert(
+        reinstalledAppSnapshot.startup?.targetSurface === "dashboard",
+        `Expected reinstalled runtime to route to dashboard, got '${reinstalledAppSnapshot.startup?.targetSurface}'.`
+      );
+      assert(
+        reinstalledAppSnapshot.commissioning?.stage === "ready",
+        `Expected commissioning stage to remain ready after reinstall, got '${reinstalledAppSnapshot.commissioning?.stage}'.`
+      );
+      assert(
+        reinstalledPlanningSnapshot.counts?.projectCount === 3,
+        "Expected installer reinstall to preserve the continuity sentinel project."
+      );
+      assert(
+        Array.isArray(reinstalledPlanningSnapshot.projects) &&
+          reinstalledPlanningSnapshot.projects.some((project) => project?.title === sentinelProjectTitle),
+        `Expected reinstall to preserve project '${sentinelProjectTitle}'.`
+      );
+
+      const backupExport = await secondRun.request("installer-support-backup-export", "support.backup.export");
+      assert(
+        backupExport.path && existsSync(backupExport.path),
+        "Expected installer acceptance backup export to succeed."
+      );
+    } finally {
+      await secondRun.close().catch((error) => {
+        throw error;
+      });
+    }
+
+    console.log(
+      `${runtimeKind === "tauri" ? "Tauri candidate" : "Native"} installer acceptance passed: real installer install, purge, and reinstall preserve operator data.`
+    );
+  } catch (error) {
+    mainError = error;
   } finally {
-    await firstRun.close().catch((error) => {
-      throw error;
+    teardown = teardownAcceptanceInstall({
+      target,
+      installRoot,
+      acceptanceRoot,
+      stepName: "maintenancetool-final-purge",
     });
   }
 
-  console.log("Step 3: verify the installed maintenance tool can see the installed package and staged repository.");
-  const maintenanceToolPath = resolveMaintenanceToolPath(target, installRoot);
-  const repositoryUri = pathToFileURL(repositoryPath).href;
-
-  const installedPackages = runCliStep(
-    maintenanceToolPath,
-    ["--verbose", "list"],
-    acceptanceRoot,
-    "maintenancetool-list"
-  );
-  assert(
-    installedPackages.stdout.includes(releaseIdentity.packageId),
-    `Expected maintenance tool list output to include ${releaseIdentity.packageId}.`
-  );
-
-  const repositorySearch = runCliStep(
-    maintenanceToolPath,
-    ["--verbose", "--set-temp-repository", repositoryUri, "--type", "package", "search", releaseIdentity.packageId],
-    acceptanceRoot,
-    "maintenancetool-search"
-  );
-  assert(
-    repositorySearch.stdout.includes(releaseIdentity.packageId),
-    `Expected maintenance tool search output to include ${releaseIdentity.packageId}.`
-  );
-
-  console.log("Step 4: purge the installed program directory through the maintenance tool and reinstall it.");
-  runCliStep(
-    maintenanceToolPath,
-    ["--verbose", "--default-answer", "--confirm-command", "purge"],
-    acceptanceRoot,
-    "maintenancetool-purge"
-  );
-
-  assert(!existsSync(installed.payloadPath), `Expected purge to remove ${installed.payloadPath}, but it still exists.`);
-  cleanupInstallRootAfterPurge(target, installRoot, acceptanceRoot);
-
-  runCliStep(
-    installerExecutable,
-    ["--verbose", "--root", installRoot, "--accept-licenses", "--default-answer", "--confirm-command", "install"],
-    acceptanceRoot,
-    "installer-reinstall"
-  );
-  assertInstallTimeSmokePassed(installRoot, runtimeKind, "reinstall");
-
-  installed = resolveInstalledRuntime(target, installRoot, runtimeKind);
-  assert(existsSync(installed.payloadPath), `Reinstalled payload missing at ${installed.payloadPath}.`);
-  assert(existsSync(installed.shellPath), `Reinstalled shell missing at ${installed.shellPath}.`);
-  assert(existsSync(installed.enginePath), `Reinstalled engine missing at ${installed.enginePath}.`);
-
-  console.log("Step 5: relaunch the reinstalled application and verify operator state survived the reinstall.");
-  runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-relaunch", "dashboard", {
-    SSE_DISABLE_AUTO_IMPORT: "1",
-  });
-
-  const secondRun = new EngineHarness({
-    rootDir,
-    appDataDir: runtime.appDataDir,
-    logsDir: runtime.logsDir,
-    engineExecutable: installed.enginePath,
-    env: {
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    },
-  });
-
-  try {
-    await secondRun.start();
-    await assertSafeBundledSqlite(secondRun, "installer-reinstalled", `Reinstalled ${installed.label} engine`);
-
-    const reinstalledAppSnapshot = await secondRun.request("installer-app-reinstalled", "app.snapshot");
-    const reinstalledPlanningSnapshot = await secondRun.request("installer-planning-reinstalled", "planning.snapshot");
-
-    assert(
-      reinstalledAppSnapshot.startup?.targetSurface === "dashboard",
-      `Expected reinstalled runtime to route to dashboard, got '${reinstalledAppSnapshot.startup?.targetSurface}'.`
-    );
-    assert(
-      reinstalledAppSnapshot.commissioning?.stage === "ready",
-      `Expected commissioning stage to remain ready after reinstall, got '${reinstalledAppSnapshot.commissioning?.stage}'.`
-    );
-    assert(
-      reinstalledPlanningSnapshot.counts?.projectCount === 3,
-      "Expected installer reinstall to preserve the continuity sentinel project."
-    );
-    assert(
-      Array.isArray(reinstalledPlanningSnapshot.projects) &&
-        reinstalledPlanningSnapshot.projects.some((project) => project?.title === sentinelProjectTitle),
-      `Expected reinstall to preserve project '${sentinelProjectTitle}'.`
-    );
-
-    const backupExport = await secondRun.request("installer-support-backup-export", "support.backup.export");
-    assert(
-      backupExport.path && existsSync(backupExport.path),
-      "Expected installer acceptance backup export to succeed."
-    );
-  } finally {
-    await secondRun.close().catch((error) => {
-      throw error;
-    });
+  if (mainError) {
+    if (teardown && !teardown.clean) {
+      console.error(`Installer acceptance teardown also failed: ${teardown.error}`);
+    }
+    throw mainError;
   }
 
-  console.log(
-    `${runtimeKind === "tauri" ? "Tauri candidate" : "Native"} installer acceptance passed: real installer install, purge, and reinstall preserve operator data.`
-  );
+  if (!teardown.clean) {
+    throw new Error(teardown.error);
+  }
+
+  if (process.platform === "win32") {
+    console.log(
+      `Installer acceptance final teardown: maintenance-tool purge ${
+        teardown.purge.attempted
+          ? teardown.purge.ok
+            ? "succeeded"
+            : `failed (${teardown.purge.error})`
+          : "skipped (tool unavailable)"
+      }; ${teardown.orphansBefore.length} Uninstall registry entr${
+        teardown.orphansBefore.length === 1 ? "y" : "ies"
+      } cleaned, ${teardown.fallback.attempted ? `${teardown.fallback.removed.length} via reg-delete fallback, ` : ""}0 orphans remain.`
+    );
+  } else {
+    console.log(
+      `Installer acceptance final teardown: maintenance-tool purge ${
+        teardown.purge.attempted
+          ? teardown.purge.ok
+            ? "succeeded"
+            : `failed (${teardown.purge.error})`
+          : "skipped (tool unavailable)"
+      }; registry assertions skipped on non-Windows host.`
+    );
+  }
 }
 
 main().catch((error) => {
