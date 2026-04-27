@@ -1,0 +1,74 @@
+@layer components {
+  .bridge {
+    align-items: stretch;
+    background: var(--color-surface-default);
+    border: 1px solid var(--color-surface-border);
+    border-radius: var(--radius-sm);
+    display: grid;
+    gap: var(--space-3);
+    grid-auto-columns: minmax(34px, 1fr);
+    grid-auto-flow: column;
+    min-height: 172px;
+    overflow: hidden;
+    padding: var(--space-4);
+  }
+
+  .channel {
+    align-items: center;
+    display: grid;
+    gap: var(--space-2);
+    grid-template-rows: minmax(112px, 1fr) auto;
+    justify-items: center;
+    min-width: 0;
+  }
+
+  .meter {
+    background: var(--color-surface-soft);
+    border: 1px solid var(--color-surface-border);
+    border-radius: var(--radius-sm);
+    height: 100%;
+    min-height: 112px;
+    overflow: hidden;
+    position: relative;
+    width: 18px;
+  }
+
+  .fill {
+    background: var(--color-studio-500);
+    bottom: 0;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 0;
+    transform-origin: bottom;
+  }
+
+  .peak {
+    background: var(--color-studio-050);
+    height: 2px;
+    left: 2px;
+    position: absolute;
+    right: 2px;
+  }
+
+  .signal .fill {
+    background: linear-gradient(180deg, var(--color-accent-green), rgba(34, 197, 94, 0.52));
+  }
+
+  .hot .fill {
+    background: linear-gradient(180deg, var(--color-accent-amber), rgba(245, 158, 11, 0.52));
+  }
+
+  .clip .fill {
+    background: linear-gradient(180deg, var(--color-accent-red), rgba(239, 68, 68, 0.52));
+  }
+
+  .label {
+    color: var(--color-studio-400);
+    font: var(--font-weight-semibold) var(--font-size-xs) / 1.1 var(--font-family-sans);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
