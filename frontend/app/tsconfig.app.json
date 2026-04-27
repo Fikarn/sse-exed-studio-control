@@ -1,8 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["vite/client", "node"],
-    "baseUrl": "."
+    "types": ["vite/client", "node"]
   },
   "include": ["src", ".storybook", "vite.config.ts", "playwright.config.ts"]
 }
