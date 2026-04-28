@@ -10,6 +10,7 @@ export interface SceneRailProps {
   activeSceneId: string | null;
   modifiedSceneId: string | null;
   sceneThumbs: Record<string, string>;
+  searchQuery?: string;
   onRecall: (sceneId: string) => void;
   onAddScene?: () => void;
 }
@@ -36,18 +37,26 @@ export function SceneRail({
   activeSceneId,
   modifiedSceneId,
   sceneThumbs,
+  searchQuery = "",
   onRecall,
   onAddScene,
 }: SceneRailProps) {
+  const needle = searchQuery.trim().toLowerCase();
+  const filteredScenes = needle ? scenes.filter((scene) => scene.name.toLowerCase().includes(needle)) : scenes;
+
   if (scenes.length === 0 && !onAddScene) {
     return (
       <p className={styles.empty}>No scenes saved yet. Press S after editing fixtures to save the current state.</p>
     );
   }
 
+  if (needle && filteredScenes.length === 0) {
+    return <p className={styles.empty}>No scenes match “{searchQuery}”.</p>;
+  }
+
   return (
     <div className={styles.sceneGrid} role="list" aria-label="Saved scenes">
-      {scenes.map((scene) => {
+      {filteredScenes.map((scene) => {
         const stats = statsForScene(scene);
         return (
           <div key={scene.id} role="listitem">
@@ -64,7 +73,7 @@ export function SceneRail({
           </div>
         );
       })}
-      {onAddScene ? (
+      {onAddScene && !needle ? (
         <button
           type="button"
           className={styles.tileAdd}

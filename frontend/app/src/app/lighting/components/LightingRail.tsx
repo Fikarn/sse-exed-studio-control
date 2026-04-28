@@ -27,6 +27,7 @@ export interface LightingRailProps {
   groups: readonly GroupRailEntry[];
   onToggleGroupPower: (groupId: string, on: boolean) => void;
 
+  searchQuery?: string;
   patchMode?: boolean;
   isSceneModified?: boolean;
   onResaveScene?: () => void;
@@ -50,6 +51,7 @@ export function LightingRail({
   onSaveScene,
   groups,
   onToggleGroupPower,
+  searchQuery = "",
   patchMode = false,
   isSceneModified = false,
   onResaveScene,
@@ -91,6 +93,7 @@ export function LightingRail({
         activeSceneId={activeSceneId}
         modifiedSceneId={modifiedSceneId}
         sceneThumbs={sceneThumbs}
+        searchQuery={searchQuery}
         onRecall={onRecallScene}
         onAddScene={patchMode ? undefined : onSaveScene}
       />
@@ -107,39 +110,26 @@ export function LightingRail({
               : undefined
         }
       />
-      <GroupRail groups={groups} onTogglePower={onToggleGroupPower} />
+      <GroupRail groups={groups} onTogglePower={onToggleGroupPower} searchQuery={searchQuery} />
 
-      {!patchMode ? (
+      {!patchMode && isSceneModified ? (
         <div className={styles.actions}>
-          {isSceneModified ? (
-            <>
-              <button
-                type="button"
-                className={`${styles.action} ${styles.actionYellow}`}
-                onClick={onResaveScene}
-                disabled={!onResaveScene}
-              >
-                Save changes
-              </button>
-              <button
-                type="button"
-                className={`${styles.action} ${styles.actionYellow} ${styles.actionAlt}`}
-                onClick={onRevertScene}
-                disabled={!onRevertScene}
-              >
-                Revert
-              </button>
-            </>
-          ) : (
-            <>
-              <span className={`${styles.action} ${styles.actionDeferred}`} aria-disabled="true">
-                Reorder
-              </span>
-              <span className={`${styles.action} ${styles.actionDeferred}`} aria-disabled="true">
-                Manage
-              </span>
-            </>
-          )}
+          <button
+            type="button"
+            className={`${styles.action} ${styles.actionYellow}`}
+            onClick={onResaveScene}
+            disabled={!onResaveScene}
+          >
+            Save changes
+          </button>
+          <button
+            type="button"
+            className={`${styles.action} ${styles.actionYellow} ${styles.actionAlt}`}
+            onClick={onRevertScene}
+            disabled={!onRevertScene}
+          >
+            Revert
+          </button>
         </div>
       ) : null}
     </aside>

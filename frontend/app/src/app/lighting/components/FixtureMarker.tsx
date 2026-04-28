@@ -14,6 +14,7 @@ export interface FixtureMarkerProps {
   cct: number;
   on: boolean;
   selected: boolean;
+  dimmed?: boolean;
   onSelect: (id: string) => void;
 }
 
@@ -62,6 +63,7 @@ export function FixtureMarker({
   cct,
   on,
   selected,
+  dimmed = false,
   onSelect,
 }: FixtureMarkerProps) {
   const color = lightingFixtureColor(cct, on);
@@ -85,7 +87,7 @@ export function FixtureMarker({
         event.stopPropagation();
         onSelect(id);
       }}
-      style={{ cursor: "pointer" }}
+      style={{ cursor: "pointer", opacity: dimmed ? 0.35 : 1 }}
       data-fixture-id={id}
     >
       <g transform={`translate(${centerX}, ${centerY}) rotate(${rotationDegrees})`}>

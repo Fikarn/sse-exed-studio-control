@@ -36,6 +36,8 @@ export interface CommissioningUpdateRequest {
 export interface LightingSettingsUpdateRequest {
   selectedSceneId?: string | null;
   selectedFixtureId?: string | null;
+  /** 0–100 multiplier applied to every fixture's intensity in DMX output. */
+  grandMaster?: number;
 }
 
 export interface PlanningSettingsUpdateRequest {

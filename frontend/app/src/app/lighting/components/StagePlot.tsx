@@ -22,6 +22,7 @@ export interface StagePlotProps {
   patchMode: boolean;
   activeSceneName?: string;
   isSceneModified?: boolean;
+  searchQuery?: string;
   onSelectFixture: (id: string | null) => void;
 }
 
@@ -41,6 +42,7 @@ export function StagePlot({
   patchMode,
   activeSceneName,
   isSceneModified = false,
+  searchQuery = "",
   onSelectFixture,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
@@ -49,6 +51,10 @@ export function StagePlot({
   const viewport = useStagePlotViewport({
     onBackgroundClick: () => onSelectFixture(null),
   });
+
+  const needle = searchQuery.trim().toLowerCase();
+  const fixtureMatches = (fixture: LightingFixtureSnapshot) =>
+    !needle || fixture.name.toLowerCase().includes(needle) || fixture.type.toLowerCase().includes(needle);
 
   const selectedFixture = selectedFixtureId
     ? (fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null)
@@ -159,6 +165,7 @@ export function StagePlot({
                 cct={fixture.cct}
                 on={fixture.on}
                 selected={fixture.id === selectedFixtureId}
+                dimmed={!fixtureMatches(fixture)}
                 onSelect={onSelectFixture}
               />
             );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import type {
   LightingDmxMonitorSnapshot,
@@ -93,8 +93,27 @@ export function LightingWorkspaceSurface({
   const [searchQuery, setSearchQuery] = useState("");
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [grandMaster, setGrandMaster] = useState(100);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  const snapshotGrandMaster = lightingSnapshot?.grandMaster ?? 100;
+  const [grandMasterDraft, setGrandMasterDraft] = useState(snapshotGrandMaster);
+  const grandMasterCommitRef = useRef<number | null>(null);
+
+  // Sync the slider draft to the engine snapshot when no commit is pending.
+  // While the user is dragging (timer armed) the draft wins; once the trailing
+  // commit fires and the snapshot reflects the new value, this no-ops.
+  useEffect(() => {
+    if (grandMasterCommitRef.current !== null) return;
+    setGrandMasterDraft(snapshotGrandMaster);
+  }, [snapshotGrandMaster]);
+
+  useEffect(() => {
+    return () => {
+      if (grandMasterCommitRef.current !== null) {
+        window.clearTimeout(grandMasterCommitRef.current);
+      }
+    };
+  }, []);
 
   const columns = useResizableColumns();
 
@@ -245,9 +264,28 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleGrandMasterChange = useCallback((value: number) => {
-    setGrandMaster(Math.max(0, Math.min(100, Math.round(value))));
-  }, []);
+  const commitGrandMaster = useEffectEvent(async (value: number) => {
+    grandMasterCommitRef.current = null;
+    try {
+      await store.updateLightingSettings({ grandMaster: value });
+    } catch (error) {
+      reportError(error, "Grand master update failed.");
+    }
+  });
+
+  const handleGrandMasterChange = useCallback(
+    (value: number) => {
+      const clamped = Math.max(0, Math.min(100, Math.round(value)));
+      setGrandMasterDraft(clamped);
+      if (grandMasterCommitRef.current !== null) {
+        window.clearTimeout(grandMasterCommitRef.current);
+      }
+      grandMasterCommitRef.current = window.setTimeout(() => {
+        void commitGrandMaster(clamped);
+      }, 200);
+    },
+    [commitGrandMaster]
+  );
 
   const handleEmergencyCut = useEffectEvent(async () => {
     setBusyAction("lighting-blackout");
@@ -517,7 +555,7 @@ export function LightingWorkspaceSurface({
         }}
       >
         <LightingRail
-          grandMaster={grandMaster}
+          grandMaster={grandMasterDraft}
           masterEnabled={bridgeReachable}
           bridgeReachable={bridgeReachable}
           fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}
@@ -533,6 +571,7 @@ export function LightingWorkspaceSurface({
           onSaveScene={handleSaveScene}
           groups={railGroupEntries}
           onToggleGroupPower={handleToggleGroupPower}
+          searchQuery={searchQuery}
           patchMode={uiMode === "patch"}
           isSceneModified={isSceneModified}
           onResaveScene={handleResaveScene}
@@ -548,6 +587,7 @@ export function LightingWorkspaceSurface({
             patchMode={uiMode === "patch"}
             activeSceneName={activeScene?.name}
             isSceneModified={isSceneModified}
+            searchQuery={searchQuery}
             onSelectFixture={(id) => void handleSelectFixture(id)}
           />
         </main>
