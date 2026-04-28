@@ -45,6 +45,7 @@ export interface LightingInspectorProps {
   onRecallScene?: (sceneId: string) => void;
   onResaveScene?: () => void;
   onDeleteScene?: () => void;
+  onDeleteFixture?: (fixtureId: string) => void;
 
   busyAction: string | null;
 }
@@ -93,6 +94,7 @@ export function LightingInspector({
   onRecallScene,
   onResaveScene,
   onDeleteScene,
+  onDeleteFixture,
   busyAction,
 }: LightingInspectorProps) {
   const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
@@ -142,7 +144,9 @@ export function LightingInspector({
           onIntensityCommit={onIntensityCommit}
           onCctCommit={onCctCommit}
           onIdentifyBurst={onIdentifyBurst}
+          onDeleteFixture={onDeleteFixture}
           busy={busyAction?.startsWith(`fixture-`) ?? false}
+          deleteBusy={busyAction === `fixture-delete:${selectedFixture.id}`}
         />
       ) : null}
 

@@ -1,7 +1,7 @@
 import { type ChangeEvent, useEffect, useState } from "react";
-import { Power } from "lucide-react";
+import { Power, Trash2 } from "lucide-react";
 
-import { Button, InspectorSection, StatusDot } from "@sse/design-system";
+import { Button, ConfirmDialog, InspectorSection, StatusDot } from "@sse/design-system";
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { deriveMounting, type FixtureMounting } from "../fixtureMounting";
@@ -17,7 +17,9 @@ export interface InspectorFixtureProps {
   onIntensityCommit: (fixtureId: string, intensity: number) => void;
   onCctCommit: (fixtureId: string, cct: number) => void;
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
+  onDeleteFixture?: (fixtureId: string) => void;
   busy?: boolean;
+  deleteBusy?: boolean;
 }
 
 const MOUNTING_LABEL: Record<FixtureMounting, string> = {
@@ -34,11 +36,18 @@ export function InspectorFixture({
   onIntensityCommit,
   onCctCommit,
   onIdentifyBurst,
+  onDeleteFixture,
   busy = false,
+  deleteBusy = false,
 }: InspectorFixtureProps) {
   const cctRange = lightingFixtureCctRange(fixture.type);
   const [intensityDraft, setIntensityDraft] = useState(fixture.intensity);
   const [cctDraft, setCctDraft] = useState(fixture.cct);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  useEffect(() => {
+    setConfirmingDelete(false);
+  }, [fixture.id]);
 
   useEffect(() => {
     setIntensityDraft(fixture.intensity);
@@ -175,6 +184,45 @@ export function InspectorFixture({
           </span>
         </div>
       </InspectorSection>
+
+      {onDeleteFixture ? (
+        <InspectorSection title="Danger zone">
+          <div className={styles.actionRow}>
+            <Button
+              onClick={() => setConfirmingDelete(true)}
+              disabled={deleteBusy}
+              variant="danger"
+              size="compact"
+              leadingVisual={<Trash2 aria-hidden="true" size={13} strokeWidth={1.75} />}
+            >
+              Delete fixture
+            </Button>
+            <span className={styles.helpText}>
+              Removes the fixture from the rig. Saved scenes that referenced it lose this fixture's saved state.
+            </span>
+          </div>
+        </InspectorSection>
+      ) : null}
+
+      {confirmingDelete && onDeleteFixture ? (
+        <ConfirmDialog
+          title="Delete fixture?"
+          body={
+            <>
+              This permanently removes <strong>{fixture.name}</strong> from the rig and frees its DMX address (
+              {fixture.dmxStartAddress > 0 ? fixture.dmxStartAddress : "unpatched"}).
+            </>
+          }
+          confirmLabel="Delete fixture"
+          danger
+          busy={deleteBusy}
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            onDeleteFixture(fixture.id);
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      ) : null}
     </>
   );
 }

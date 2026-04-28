@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
+import { ConfirmDialog } from "@sse/design-system";
 import type {
   LightingDmxMonitorSnapshot,
   LightingSceneSnapshot,
@@ -26,6 +27,7 @@ import { LightingToolbar } from "./components/LightingToolbar";
 import { StagePlot } from "./components/StagePlot";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
 import { useResizableColumns } from "./useResizableColumns";
+import { useUnsavedChangesGuard } from "./useUnsavedScenePrompt";
 import styles from "./LightingWorkspace.module.css";
 
 interface LightingWorkspaceSurfaceProps {
@@ -155,6 +157,29 @@ export function LightingWorkspaceSurface({
   }, [activeScene, fixtureEntries]);
 
   const modifiedSceneId = isSceneModified && activeSceneId ? activeSceneId : null;
+
+  // Unsaved-changes guard. When the active scene is drifted, intercept any
+  // workspace switch (including ⌘1-4, A, ⇧S keyboard shortcuts) with a
+  // confirmation dialog. The guard fn returns a Promise resolved by the
+  // user's click on the dialog.
+  const pendingLeaveResolveRef = useRef<((allowed: boolean) => void) | null>(null);
+  const [showLeavePrompt, setShowLeavePrompt] = useState(false);
+  const promptForLeave = useCallback(() => {
+    return new Promise<boolean>((resolve) => {
+      pendingLeaveResolveRef.current = resolve;
+      setShowLeavePrompt(true);
+    });
+  }, []);
+  useUnsavedChangesGuard(isSceneModified ? promptForLeave : null);
+  // Belt-and-braces: if the workspace unmounts while a prompt is open (e.g.
+  // hot reload mid-prompt), resolve the awaiter so the navigation pipeline
+  // doesn't deadlock.
+  useEffect(() => {
+    return () => {
+      pendingLeaveResolveRef.current?.(false);
+      pendingLeaveResolveRef.current = null;
+    };
+  }, []);
 
   const selectedFixture = useMemo(
     () => fixtures.find((fixture) => fixture.id === persistedSelectedFixtureId) ?? null,
@@ -489,6 +514,27 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const handleDeleteFixture = useEffectEvent(async (fixtureId: string) => {
+    const target = fixtures.find((fixture) => fixture.id === fixtureId);
+    setBusyAction(`fixture-delete:${fixtureId}`);
+    try {
+      await store.deleteLightingFixture(fixtureId);
+      // Clear the selection if we just deleted the selected fixture so the
+      // inspector falls back to the scene tab.
+      if (persistedSelectedFixtureId === fixtureId) {
+        await store.updateLightingSettings({ selectedFixtureId: null });
+      }
+      setFeedback({
+        message: target ? `Fixture '${target.name}' deleted.` : "Fixture deleted.",
+        tone: "ok",
+      });
+    } catch (error) {
+      reportError(error, "Fixture delete failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
   // ---------------- keyboard shortcuts ----------------
 
   useEffect(() => {
@@ -621,6 +667,7 @@ export function LightingWorkspaceSurface({
           onRecallScene={handleRecallScene}
           onResaveScene={handleResaveScene}
           onDeleteScene={handleDeleteScene}
+          onDeleteFixture={(id) => void handleDeleteFixture(id)}
           busyAction={busyAction}
         />
       </div>
@@ -633,6 +680,36 @@ export function LightingWorkspaceSurface({
         driftDetected={isSceneModified}
         lastSavedLabel={lastSavedLabel}
       />
+
+      {showLeavePrompt ? (
+        <ConfirmDialog
+          title="Leave with unsaved changes?"
+          body={
+            activeScene ? (
+              <>
+                Scene <strong>{activeScene.name}</strong> has live changes that aren't saved. You can save them with{" "}
+                <strong>Save changes</strong> in the rail, or come back later — the live rig state stays as it is either
+                way.
+              </>
+            ) : (
+              <>The active scene has unsaved changes that won't be discarded — the live rig state stays as it is.</>
+            )
+          }
+          confirmLabel="Leave anyway"
+          cancelLabel="Stay"
+          danger
+          onConfirm={() => {
+            setShowLeavePrompt(false);
+            pendingLeaveResolveRef.current?.(true);
+            pendingLeaveResolveRef.current = null;
+          }}
+          onCancel={() => {
+            setShowLeavePrompt(false);
+            pendingLeaveResolveRef.current?.(false);
+            pendingLeaveResolveRef.current = null;
+          }}
+        />
+      ) : null}
     </div>
   );
 }

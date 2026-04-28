@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Pencil, Play, Save, Trash2 } from "lucide-react";
 
-import { Button } from "@sse/design-system";
+import { Button, ConfirmDialog } from "@sse/design-system";
 import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
 
 import { lightingFixtureColor } from "../lightingHelpers";
@@ -90,6 +91,8 @@ export function InspectorScene({
   resaveBusy = false,
   deleteBusy = false,
 }: InspectorSceneProps) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   if (!scene) {
     return (
       <div className={styles.scenePane}>
@@ -230,7 +233,7 @@ export function InspectorScene({
         ) : null}
         {onDeleteScene ? (
           <Button
-            onClick={onDeleteScene}
+            onClick={() => setConfirmingDelete(true)}
             disabled={deleteBusy}
             variant="danger"
             size="compact"
@@ -240,6 +243,26 @@ export function InspectorScene({
           </Button>
         ) : null}
       </div>
+
+      {confirmingDelete && onDeleteScene ? (
+        <ConfirmDialog
+          title="Delete scene?"
+          body={
+            <>
+              This permanently removes <strong>{scene.name}</strong>. Other scenes are unaffected and the live rig state
+              stays as it is.
+            </>
+          }
+          confirmLabel="Delete scene"
+          danger
+          busy={deleteBusy}
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            onDeleteScene();
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      ) : null}
     </div>
   );
 }
