@@ -1,0 +1,32 @@
+@layer components {
+  .meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 13px;
+    background: var(--color-glass-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-glass-border);
+    border-radius: var(--radius-tight-sm);
+    font-family: var(--font-family-mono);
+    font-size: 11px;
+    color: var(--color-brand-text-muted);
+    letter-spacing: 0.04em;
+    box-shadow: var(--shadow-glass);
+    font-feature-settings: "tnum", "zero";
+  }
+
+  .value {
+    color: var(--color-brand-text-primary);
+    font-weight: 500;
+  }
+
+  .blue {
+    border-color: var(--color-brand-blue-border);
+  }
+
+  .blue .value {
+    color: var(--color-brand-blue-hot);
+  }
+}
