@@ -6,7 +6,6 @@ pub const SHELL_SETTINGS_PREFIX: &str = "shell.";
 pub const WORKSPACE_KEY: &str = "shell.workspace";
 pub const SETUP_ACTIVE_SECTION_KEY: &str = "shell.setup.activeSection";
 pub const LIGHTING_CURRENT_SECTION_ID_KEY: &str = "shell.lighting.currentSectionId";
-pub const LIGHTING_SELECTED_CUE_ID_KEY: &str = "shell.lighting.selectedCueId";
 pub const LIGHTING_SCENE_THUMBS_KEY: &str = "shell.lighting.sceneThumbs";
 pub const WINDOW_WIDTH_KEY: &str = "shell.window.width";
 pub const WINDOW_HEIGHT_KEY: &str = "shell.window.height";
@@ -30,7 +29,6 @@ pub struct ShellSettingsSnapshot {
     pub workspace: String,
     pub setup_active_section: String,
     pub lighting_current_section_id: Option<String>,
-    pub lighting_selected_cue_id: Option<String>,
     pub lighting_scene_thumbs: HashMap<String, String>,
     pub window_width: i64,
     pub window_height: i64,
@@ -44,7 +42,6 @@ impl Default for ShellSettingsSnapshot {
             workspace: String::from(DEFAULT_WORKSPACE),
             setup_active_section: String::from(DEFAULT_SETUP_ACTIVE_SECTION),
             lighting_current_section_id: None,
-            lighting_selected_cue_id: None,
             lighting_scene_thumbs: HashMap::new(),
             window_width: DEFAULT_WINDOW_WIDTH,
             window_height: DEFAULT_WINDOW_HEIGHT,
@@ -72,9 +69,6 @@ impl ShellSettingsSnapshot {
 
         snapshot.lighting_current_section_id = settings
             .get(LIGHTING_CURRENT_SECTION_ID_KEY)
-            .and_then(|value| parse_optional_shell_state_value(value));
-        snapshot.lighting_selected_cue_id = settings
-            .get(LIGHTING_SELECTED_CUE_ID_KEY)
             .and_then(|value| parse_optional_shell_state_value(value));
         snapshot.lighting_scene_thumbs = settings
             .get(LIGHTING_SCENE_THUMBS_KEY)
@@ -128,7 +122,6 @@ impl ShellSettingsSnapshot {
                 },
                 "lighting": {
                     "currentSectionId": self.lighting_current_section_id,
-                    "selectedCueId": self.lighting_selected_cue_id,
                     "sceneThumbs": self.lighting_scene_thumbs,
                 },
                 "window": {
@@ -147,7 +140,6 @@ pub fn default_settings_entries() -> Vec<(&'static str, &'static str)> {
         (WORKSPACE_KEY, DEFAULT_WORKSPACE),
         (SETUP_ACTIVE_SECTION_KEY, DEFAULT_SETUP_ACTIVE_SECTION),
         (LIGHTING_CURRENT_SECTION_ID_KEY, ""),
-        (LIGHTING_SELECTED_CUE_ID_KEY, ""),
         (LIGHTING_SCENE_THUMBS_KEY, "{}"),
         (WINDOW_WIDTH_KEY, "1280"),
         (WINDOW_HEIGHT_KEY, "800"),
@@ -206,17 +198,6 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
             updates.push((
                 LIGHTING_CURRENT_SECTION_ID_KEY,
                 current_section_id.unwrap_or_default(),
-            ));
-        }
-
-        if let Some(selected_cue_id_value) = lighting.get("selectedCueId") {
-            let selected_cue_id = parse_optional_shell_state_update_value(
-                selected_cue_id_value,
-                "lighting.selectedCueId",
-            )?;
-            updates.push((
-                LIGHTING_SELECTED_CUE_ID_KEY,
-                selected_cue_id.unwrap_or_default(),
             ));
         }
 
@@ -379,7 +360,6 @@ mod tests {
         assert_eq!(snapshot.workspace, DEFAULT_WORKSPACE);
         assert_eq!(snapshot.setup_active_section, DEFAULT_SETUP_ACTIVE_SECTION);
         assert_eq!(snapshot.lighting_current_section_id, None);
-        assert_eq!(snapshot.lighting_selected_cue_id, None);
         assert_eq!(snapshot.window_width, DEFAULT_WINDOW_WIDTH);
         assert_eq!(snapshot.window_height, DEFAULT_WINDOW_HEIGHT);
         assert_eq!(snapshot.window_maximized, DEFAULT_WINDOW_MAXIMIZED);
@@ -398,10 +378,6 @@ mod tests {
                 String::from(LIGHTING_CURRENT_SECTION_ID_KEY),
                 String::from("stage-left"),
             ),
-            (
-                String::from(LIGHTING_SELECTED_CUE_ID_KEY),
-                String::from("cue-14"),
-            ),
             (String::from(WINDOW_WIDTH_KEY), String::from("1440")),
             (String::from(WINDOW_HEIGHT_KEY), String::from("900")),
             (String::from(WINDOW_MAXIMIZED_KEY), String::from("true")),
@@ -416,7 +392,6 @@ mod tests {
             snapshot.lighting_current_section_id.as_deref(),
             Some("stage-left")
         );
-        assert_eq!(snapshot.lighting_selected_cue_id.as_deref(), Some("cue-14"));
         assert_eq!(snapshot.window_width, 1440);
         assert_eq!(snapshot.window_height, 900);
         assert!(snapshot.window_maximized);
@@ -431,8 +406,7 @@ mod tests {
                 "activeSection": "support"
             },
             "lighting": {
-                "currentSectionId": "stage-left",
-                "selectedCueId": "cue-14"
+                "currentSectionId": "stage-left"
             },
             "window": {
                 "width": 1600,
@@ -449,7 +423,6 @@ mod tests {
                 (WORKSPACE_KEY, String::from("lighting")),
                 (SETUP_ACTIVE_SECTION_KEY, String::from("support")),
                 (LIGHTING_CURRENT_SECTION_ID_KEY, String::from("stage-left")),
-                (LIGHTING_SELECTED_CUE_ID_KEY, String::from("cue-14")),
                 (WINDOW_WIDTH_KEY, String::from("1600")),
                 (WINDOW_HEIGHT_KEY, String::from("900")),
                 (WINDOW_MODE_KEY, String::from("fullscreen")),
@@ -603,8 +576,7 @@ mod tests {
     fn settings_update_accepts_null_lighting_shell_state_values() {
         let params = json!({
             "lighting": {
-                "currentSectionId": null,
-                "selectedCueId": null
+                "currentSectionId": null
             }
         });
 
@@ -612,10 +584,7 @@ mod tests {
 
         assert_eq!(
             updates,
-            vec![
-                (LIGHTING_CURRENT_SECTION_ID_KEY, String::new()),
-                (LIGHTING_SELECTED_CUE_ID_KEY, String::new()),
-            ]
+            vec![(LIGHTING_CURRENT_SECTION_ID_KEY, String::new())]
         );
     }
 

@@ -19,7 +19,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const STORAGE_SCHEMA_VERSION: i64 = 4;
+const STORAGE_SCHEMA_VERSION: i64 = 5;
 const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
 const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 
@@ -444,7 +444,7 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
         schema_version = 3;
     }
 
-    if schema_version < STORAGE_SCHEMA_VERSION {
+    if schema_version < 4 {
         let transaction = connection.transaction()?;
 
         // Record format_version metadata so future migrations can distinguish
@@ -479,6 +479,31 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
         // dual-write path.
         transaction.execute(
             "DELETE FROM app_settings WHERE key LIKE 'app.lighting.fixture.%'",
+            [],
+        )?;
+
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (4)", [])?;
+        transaction.commit()?;
+        schema_version = 4;
+    }
+
+    if schema_version < STORAGE_SCHEMA_VERSION {
+        // v4 → v5 (PR 4 — Direction D cue cleanup).
+        //
+        // Direction D dropped the cue model entirely. The frontend has no
+        // cue call sites (verified post-PR-3 merge); the engine cue IPCs are
+        // gone in PR 4. This migration purges the now-orphaned storage keys
+        // so an upgraded operator workstation does not carry orphaned cue
+        // bytes forever. The shell.lighting.selectedCueId blob is dropped
+        // alongside the engine-side `app.lighting.cues` /
+        // `app.lighting.active_cue_id` keys.
+        let transaction = connection.transaction()?;
+
+        transaction.execute(
+            "DELETE FROM app_settings WHERE key IN
+                ('app.lighting.cues',
+                 'app.lighting.active_cue_id',
+                 'shell.lighting.selectedCueId')",
             [],
         )?;
 
@@ -1165,6 +1190,68 @@ mod tests {
             )
             .expect("count should query");
         assert_eq!(version_4_count, 1);
+    }
+
+    #[test]
+    fn migrate_schema_v4_to_v5_purges_cue_keys() {
+        let test_dir = TestDir::new("storage-v5-cue-purge");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        seed_v3_database(&db_path);
+        set_settings_owned(
+            &db_path,
+            &[
+                (
+                    String::from("app.lighting.cues"),
+                    String::from(r#"[{"id":"cue-custom-1","ordinal":1,"label":"Stale"}]"#),
+                ),
+                (
+                    String::from("app.lighting.active_cue_id"),
+                    String::from("cue-custom-1"),
+                ),
+                (
+                    String::from("shell.lighting.selectedCueId"),
+                    String::from("cue-custom-1"),
+                ),
+                (
+                    String::from("app.lighting.editor.state"),
+                    String::from(r#"{"fixtures":[],"groups":[],"scenes":[]}"#),
+                ),
+            ],
+        )
+        .expect("cue seed should write");
+
+        initialize_database(&db_path).expect("v5 migration should succeed");
+
+        let lighting = list_settings_by_prefix(&db_path, "app.lighting.")
+            .expect("lighting settings should load");
+        assert!(
+            !lighting.contains_key("app.lighting.cues"),
+            "app.lighting.cues should be purged",
+        );
+        assert!(
+            !lighting.contains_key("app.lighting.active_cue_id"),
+            "app.lighting.active_cue_id should be purged",
+        );
+        // Sanity: editor state survives — only cue keys are dropped.
+        assert!(lighting.contains_key("app.lighting.editor.state"));
+
+        let shell = list_settings_by_prefix(&db_path, "shell.lighting.")
+            .expect("shell lighting settings should load");
+        assert!(
+            !shell.contains_key("shell.lighting.selectedCueId"),
+            "shell.lighting.selectedCueId should be purged",
+        );
+
+        let connection = open_connection(&db_path).expect("connection should open");
+        let version_5_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 5",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count should query");
+        assert_eq!(version_5_count, 1);
     }
 
     fn seed_v3_database(db_path: &Path) {

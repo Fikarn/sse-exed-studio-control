@@ -55,13 +55,6 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         })
         .collect::<Vec<_>>();
     let selected_scene_id = read_selected_scene_id(settings, &scenes);
-    let cue_states = load_lighting_cues(settings);
-    let active_cue_id = read_optional_setting(settings, LIGHTING_ACTIVE_CUE_ID_KEY)
-        .filter(|id| cue_states.iter().any(|cue| cue.id == *id));
-    let cues = cue_states
-        .iter()
-        .map(|cue| lighting_cue_snapshot_from_state(cue, active_cue_id.as_deref()))
-        .collect::<Vec<_>>();
     let status = if !enabled && config.bridge_ip.trim().is_empty() {
         String::from("unconfigured")
     } else if !enabled {
@@ -108,8 +101,6 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         fixtures,
         groups,
         scenes,
-        cues,
-        active_cue_id,
     }
 }
 

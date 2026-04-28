@@ -3,7 +3,6 @@ import type {
   AudioMixTargetSnapshot,
   AudioSceneSnapshot,
   AudioSnapshot,
-  LightingCueSnapshot,
   LightingDmxChannelSnapshot,
   LightingDmxMonitorSnapshot,
   LightingFixtureSnapshot,
@@ -81,18 +80,6 @@ export interface LightingSceneEntry {
   lastRecalled: boolean;
   lastRecalledAt?: string;
   name: string;
-}
-
-export interface LightingCueEntry {
-  fadeInMs: number;
-  fadeOutMs: number;
-  followSeconds?: number;
-  id: string;
-  label: string;
-  notes?: string;
-  ordinal: number;
-  sceneId?: string;
-  state: string;
 }
 
 export interface LightingGroupEntry {
@@ -388,44 +375,6 @@ export function getLightingGroups(snapshot: LightingSnapshot | null): LightingGr
   }));
 }
 
-export function getLightingCues(snapshot: LightingSnapshot | null): LightingCueEntry[] {
-  return [...(snapshot?.cues ?? [])]
-    .map(
-      (c: LightingCueSnapshot): LightingCueEntry => ({
-        fadeInMs: c.fadeInMs,
-        fadeOutMs: c.fadeOutMs,
-        followSeconds: c.followSeconds ?? undefined,
-        id: c.id,
-        label: c.label,
-        notes: c.notes ?? undefined,
-        ordinal: c.ordinal,
-        sceneId: c.sceneId ?? undefined,
-        state: c.state,
-      })
-    )
-    .sort((left, right) => left.ordinal - right.ordinal);
-}
-
-export function getActiveLightingCue(snapshot: LightingSnapshot | null) {
-  const cues = getLightingCues(snapshot);
-  const activeCueId = snapshot?.activeCueId ?? null;
-  return cues.find((cue) => cue.id === activeCueId) ?? cues.find((cue) => cue.state === "active") ?? null;
-}
-
-export function getNextLightingCue(snapshot: LightingSnapshot | null) {
-  const cues = getLightingCues(snapshot);
-  if (cues.length === 0) {
-    return null;
-  }
-
-  const activeCue = getActiveLightingCue(snapshot);
-  if (!activeCue) {
-    return cues[0] ?? null;
-  }
-
-  return cues.find((cue) => cue.ordinal > activeCue.ordinal) ?? activeCue;
-}
-
 export function getLightingDmxChannels(snapshot: LightingDmxMonitorSnapshot | null): LightingDmxChannelEntry[] {
   return [...(snapshot?.channels ?? [])]
     .map(
@@ -642,9 +591,8 @@ export function buildContextSections(
 ) {
   if (activeWorkspace === "lighting") {
     const fixtures = getLightingFixtures(lightingSnapshot);
-    const cues = getLightingCues(lightingSnapshot);
     const scenes = getLightingScenes(lightingSnapshot);
-    const activeCue = getActiveLightingCue(lightingSnapshot);
+    const groups = getLightingGroups(lightingSnapshot);
     const selectedFixtureId = lightingSnapshot?.selectedFixtureId ?? null;
     const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
     const onCount = fixtures.filter((fixture) => fixture.on === true).length;
@@ -676,15 +624,11 @@ export function buildContextSections(
           },
           {
             id: "lighting:inventory",
-            label: `Scenes ${scenes.length} · Cues ${cues.length}`,
+            label: `Scenes ${scenes.length} · Groups ${groups.length}`,
           },
           {
             id: "lighting:selection",
-            label: selectedFixture
-              ? `Selected fixture ${selectedFixture.name}`
-              : activeCue
-                ? `Active cue ${activeCue.label}`
-                : "No fixture or cue selected.",
+            label: selectedFixture ? `Selected fixture ${selectedFixture.name}` : "No fixture selected.",
           },
         ],
       },

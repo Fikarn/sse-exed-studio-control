@@ -174,7 +174,6 @@ pub fn build_app_snapshot(
             },
             "lighting": {
                 "currentSectionId": shell.lighting_current_section_id,
-                "selectedCueId": shell.lighting_selected_cue_id,
                 "sceneThumbs": shell.lighting_scene_thumbs,
             },
             "window": {

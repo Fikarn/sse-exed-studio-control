@@ -19,17 +19,8 @@ const LIGHTING_SUBJECT_MARKER_KEY: &str = "app.lighting.subject_marker";
 const LIGHTING_CUSTOM_FIXTURE_ID_PREFIX: &str = "fixture-custom-";
 const LIGHTING_CUSTOM_GROUP_ID_PREFIX: &str = "group-custom-";
 const LIGHTING_CUSTOM_SCENE_ID_PREFIX: &str = "scene-custom-";
-const LIGHTING_CUSTOM_CUE_ID_PREFIX: &str = "cue-custom-";
 const DEFAULT_LIGHTING_FIXTURE_TYPE: &str = "astra-bicolor";
 
-const LIGHTING_CUES_KEY: &str = "app.lighting.cues";
-const LIGHTING_ACTIVE_CUE_ID_KEY: &str = "app.lighting.active_cue_id";
-const MAX_FADE_MS: i64 = 60_000;
-const MAX_FOLLOW_SECONDS: f64 = 3_600.0;
-const MAX_CUE_LABEL_LEN: usize = 120;
-const MAX_CUE_NOTES_LEN: usize = 500;
-
-mod cues;
 mod editor_state;
 mod fixtures;
 mod groups;
@@ -41,7 +32,6 @@ mod settings;
 mod snapshot;
 mod types;
 
-pub use cues::*;
 pub use editor_state::{load_lighting_editor_state, save_lighting_editor_state};
 pub use fixtures::*;
 pub use groups::*;

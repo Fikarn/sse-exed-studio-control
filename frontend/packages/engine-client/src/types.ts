@@ -136,27 +136,6 @@ export interface LightingSceneCreateRequest {
   name: string;
 }
 
-export interface LightingCueCreateRequest {
-  label: string;
-  afterCueId?: string | null;
-  sceneId?: string | null;
-  fadeInMs?: number;
-  fadeOutMs?: number;
-  followSeconds?: number | null;
-  notes?: string | null;
-}
-
-export interface LightingCueUpdateRequest {
-  cueId: string;
-  label?: string;
-  sceneId?: string | null;
-  fadeInMs?: number;
-  fadeOutMs?: number;
-  followSeconds?: number | null;
-  notes?: string | null;
-  ordinal?: number;
-}
-
 export interface StartupFailure {
   code: string;
   message: string;
@@ -217,7 +196,6 @@ export interface ShellStore {
   setWorkspace(workspaceId: WorkspaceId): Promise<JsonValue>;
   setSetupSection(section: SetupSection): Promise<JsonValue>;
   setLightingSection(sectionId: string | null): Promise<JsonValue>;
-  setLightingSelectedCue(cueId: string | null): Promise<JsonValue>;
   setLightingSceneThumbs(thumbs: Record<string, string>): Promise<JsonValue>;
   runCommissioningCheck(request: CommissioningCheckRequest): Promise<JsonValue>;
   updateCommissioning(request: CommissioningUpdateRequest): Promise<JsonValue>;
@@ -231,13 +209,9 @@ export interface ShellStore {
   createLightingFixture(request: LightingFixtureCreateRequest): Promise<JsonValue>;
   createLightingScene(request: LightingSceneCreateRequest): Promise<JsonValue>;
   deleteLightingScene(sceneId: string): Promise<JsonValue>;
-  createLightingCue(request: LightingCueCreateRequest): Promise<JsonValue>;
-  updateLightingCue(request: LightingCueUpdateRequest): Promise<JsonValue>;
-  deleteLightingCue(cueId: string): Promise<JsonValue>;
   updateLightingFixture(request: LightingFixtureUpdateRequest): Promise<JsonValue>;
   setLightingGroupPower(groupId: string, on: boolean): Promise<JsonValue>;
   setLightingAllPower(on: boolean): Promise<JsonValue>;
-  fireLightingCue(cueId: string, fadeOverrideMs?: number): Promise<JsonValue>;
   recallLightingScene(sceneId: string, fadeDurationSeconds?: number): Promise<JsonValue>;
   seedPlanningDemo(replaceExistingData?: boolean): Promise<JsonValue>;
   createPlanningProject(request: PlanningProjectCreateRequest): Promise<JsonValue>;

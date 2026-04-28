@@ -281,7 +281,7 @@ async function runWorkspaceQualification() {
   const audioSendPort = audioReceivePort === 65535 ? 65534 : audioReceivePort + 1;
 
   let lightingFixtureId = null;
-  let lightingCueId = null;
+  let lightingRecalledSceneId = null;
   let audioChannelId = null;
   let audioMixTargetId = null;
   let audioSnapshotId = null;
@@ -342,7 +342,6 @@ async function runWorkspaceQualification() {
     const lightingSnapshot = lightingWorkspace.status.shellState.lightingSnapshot;
     const fixture = asArray(lightingSnapshot?.fixtures)[0];
     const scene = asArray(lightingSnapshot?.scenes)[0];
-    let cue = asArray(lightingSnapshot?.cues)[0];
     assert(fixture?.id, "Expected live lighting snapshot to expose at least one fixture.");
     assert(scene?.id, "Expected live lighting snapshot to expose at least one scene.");
     assert(
@@ -350,24 +349,6 @@ async function runWorkspaceQualification() {
       "Expected live lighting DMX monitor snapshot to expose channels."
     );
     lightingFixtureId = fixture.id;
-
-    if (!cue?.id) {
-      const cueCreate = await dispatchCommand(firstSession, firstRun, "createLightingCue", {
-        request: {
-          fadeInMs: 0,
-          fadeOutMs: 0,
-          label: "Live qualification cue",
-          sceneId: scene.id,
-        },
-      });
-      cue =
-        asArray(cueCreate.status.shellState.lightingSnapshot?.cues).find(
-          (entry) => entry?.label === "Live qualification cue"
-        ) ?? null;
-    }
-
-    assert(cue?.id, "Expected live lighting cue create to expose a cue.");
-    lightingCueId = cue.id;
 
     const lightingUpdate = await dispatchCommand(firstSession, firstRun, "updateLightingFixture", {
       request: {
@@ -382,16 +363,19 @@ async function runWorkspaceQualification() {
     assert(updatedFixture?.intensity === 37, "Expected live lighting fixture intensity update to round-trip.");
     assert(updatedFixture?.cct === 5600, "Expected live lighting fixture CCT update to round-trip.");
 
-    const cueFire = await dispatchCommand(firstSession, firstRun, "fireLightingCue", {
-      cueId: lightingCueId,
-      fadeOverrideMs: 0,
+    // Direction D recall model: scene recall (no cue indirection) is the
+    // mutation that survives a Tauri restart for the lighting workspace.
+    const sceneRecall = await dispatchCommand(firstSession, firstRun, "recallLightingScene", {
+      sceneId: scene.id,
+      fadeDurationSeconds: 0,
     });
     assert(
-      cueFire.status.shellState.lightingSnapshot?.activeCueId === lightingCueId,
-      "Expected live lighting cue fire to update activeCueId."
+      sceneRecall.status.shellState.lightingSnapshot?.lastRecalledSceneId === scene.id,
+      "Expected live lighting scene recall to update lastRecalledSceneId."
     );
+    lightingRecalledSceneId = scene.id;
     evidence.recordCheck("lighting-live-mutations-round-trip", {
-      activeCueId: cueFire.status.shellState.lightingSnapshot?.activeCueId,
+      lastRecalledSceneId: sceneRecall.status.shellState.lightingSnapshot?.lastRecalledSceneId,
       fixtureId: lightingFixtureId,
     });
 
@@ -567,8 +551,8 @@ async function runWorkspaceQualification() {
       "Expected restarted Tauri runtime to preserve the lighting fixture inventory."
     );
     assert(
-      restartStatus.shellState.lightingSnapshot?.activeCueId === lightingCueId,
-      "Expected restarted Tauri runtime to preserve the fired lighting cue."
+      restartStatus.shellState.lightingSnapshot?.lastRecalledSceneId === lightingRecalledSceneId,
+      "Expected restarted Tauri runtime to preserve the recalled lighting scene."
     );
     assert(
       restartStatus.shellState.audioSnapshot?.selectedChannelId === audioChannelId,
@@ -589,7 +573,7 @@ async function runWorkspaceQualification() {
       "Expected restarted Tauri runtime to preserve the created planning project."
     );
     evidence.recordCheck("restart-preserves-migrated-workspace-state", {
-      activeCueId: restartStatus.shellState.lightingSnapshot?.activeCueId,
+      lastRecalledSceneId: restartStatus.shellState.lightingSnapshot?.lastRecalledSceneId,
       activeWorkspace: restartStatus.shellState.activeWorkspace,
       selectedAudioChannelId: restartStatus.shellState.audioSnapshot?.selectedChannelId,
     });

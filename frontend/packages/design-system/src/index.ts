@@ -4,8 +4,6 @@ export { Button } from "./components/Button";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./components/Button";
 export { Crest } from "./components/Crest";
 export type { CrestProps, CrestSize } from "./components/Crest";
-export { CueRail } from "./components/CueRail";
-export type { CueRailItem, CueRailProps, CueRailState } from "./components/CueRail";
 export { DenseList, DenseListRow, DenseTable } from "./components/DenseRows";
 export type {
   DenseListProps,
