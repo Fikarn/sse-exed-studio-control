@@ -105,6 +105,12 @@ export function LightingWorkspaceSurface({
   // together. Cleared on workspace switch / hot reload by being state.
   const [extraSelectedFixtureIds, setExtraSelectedFixtureIds] = useState<ReadonlySet<string>>(() => new Set());
   const [dmxMonitorOpen, setDmxMonitorOpen] = useState(false);
+  // Frontend-only "previewed" scene id. Set immediately when a scene tile is
+  // clicked so the inspector can show its details even if the engine recall
+  // IPC was rejected (e.g. bridge unreachable in dev / pre-probe states).
+  // Takes priority over snapshot-derived recalled / persisted selection so
+  // the inspector tracks the user's intent rather than the engine's truth.
+  const [previewSceneId, setPreviewSceneId] = useState<string | null>(null);
 
   const snapshotGrandMaster = lightingSnapshot?.grandMaster ?? 100;
   const [grandMasterDraft, setGrandMasterDraft] = useState(snapshotGrandMaster);
@@ -141,13 +147,16 @@ export function LightingWorkspaceSurface({
   // back to the persisted selectedSceneId. Kept lean — no persisted "active
   // cue" anywhere because the cue model is gone in Direction D.
   const activeSceneId = useMemo(() => {
+    if (previewSceneId && sceneEntries.some((scene) => scene.id === previewSceneId)) {
+      return previewSceneId;
+    }
     const recalled = sceneEntries.find((scene) => scene.lastRecalled);
     if (recalled) return recalled.id;
     if (persistedSelectedSceneId && sceneEntries.some((scene) => scene.id === persistedSelectedSceneId)) {
       return persistedSelectedSceneId;
     }
     return null;
-  }, [sceneEntries, persistedSelectedSceneId]);
+  }, [previewSceneId, sceneEntries, persistedSelectedSceneId]);
 
   const activeScene = useMemo(
     () => scenes.find((scene) => scene.id === activeSceneId) ?? null,
@@ -509,6 +518,10 @@ export function LightingWorkspaceSurface({
       });
       return;
     }
+    // Show the scene in the inspector immediately — even if the recall IPC
+    // is rejected by the engine (e.g. pre-probe state), the operator still
+    // sees what the scene contains. The recall IPC drives the actual rig.
+    setPreviewSceneId(sceneId);
     setBusyAction(`scene:${sceneId}`);
     try {
       await store.recallLightingScene(sceneId, 0);
