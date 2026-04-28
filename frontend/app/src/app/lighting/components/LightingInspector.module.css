@@ -87,67 +87,160 @@
   color: var(--color-brand-text-secondary);
 }
 
-/* Scene tab */
+/* Scene tab — rebuilt to match the v6 prototype */
 
-.scenePreview {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 12px;
-  align-items: start;
-}
-
-.scenePreviewImage {
-  width: 96px;
-  height: 66px;
-  border-radius: var(--radius-tight-sm);
-  background: var(--color-bg-deep);
-  border: 1px solid var(--color-bg-stroke);
-  object-fit: cover;
-}
-
-.scenePreviewPlaceholder {
-  width: 96px;
-  height: 66px;
-  border-radius: var(--radius-tight-sm);
-  background: var(--color-bg-deep);
-  border: 1px dashed var(--color-bg-border);
+.scenePane {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 2px;
+}
+
+.sceneEmpty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sceneEyebrow {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: var(--color-brand-text-muted);
 }
 
-.sceneMeta {
+.sceneTitle {
+  font-family: var(--font-family-display);
+  font-variation-settings: "opsz" 32;
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--color-brand-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.sceneSub {
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-brand-text-secondary);
+  margin: 0;
+}
+
+.sceneStatGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+}
+
+.sceneStat {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 0;
+  margin: 0;
 }
 
-.sceneName {
+.sceneStatLabel {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+}
+
+.sceneStatValue {
   font-family: var(--font-family-display);
   font-variation-settings: "opsz" 24;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--color-brand-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 0;
+  font-feature-settings: "tnum", "zero";
 }
 
-.sceneSubline {
+.sceneStatValue small {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-brand-text-muted);
+  margin-left: 2px;
+}
+
+.sceneSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sceneSectionHead {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+  margin: 0;
+  font-weight: 600;
+}
+
+.sceneFixtureChips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sceneFixtureChip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-family-mono);
+  padding: 4px 8px 4px 5px;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-family-ui);
   font-size: 11px;
-  color: var(--color-brand-text-secondary);
+  color: var(--color-brand-text-primary);
 }
 
-.sceneFooter {
+.sceneFixtureSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sceneFixtureName {
+  font-weight: 500;
+}
+
+.sceneFixtureLevel {
   font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
   font-size: 10px;
   color: var(--color-brand-text-muted);
+}
+
+.sceneProvenance {
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  color: var(--color-brand-text-secondary);
+  margin: 0;
+}
+
+.sceneActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 /* Fixture / Group / Patch tab — shared bits */

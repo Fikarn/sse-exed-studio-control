@@ -257,6 +257,18 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const handleToggleAllPower = useEffectEvent(async (on: boolean) => {
+    setBusyAction("lighting-master-toggle");
+    try {
+      await store.setLightingAllPower(on);
+      setFeedback({ message: on ? "Lighting resumed." : "Lighting paused.", tone: "ok" });
+    } catch (error) {
+      reportError(error, "Lighting master toggle failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
   const handleSaveScene = useEffectEvent(async () => {
     setBusyAction("scene-create");
     try {
@@ -498,8 +510,11 @@ export function LightingWorkspaceSurface({
           grandMaster={grandMaster}
           masterEnabled={bridgeReachable}
           bridgeReachable={bridgeReachable}
+          fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}
+          fixtureTotal={fixtures.length}
           onGrandMasterChange={handleGrandMasterChange}
           onEmergencyCut={handleEmergencyCut}
+          onToggleAllPower={handleToggleAllPower}
           scenes={scenes}
           activeSceneId={activeSceneId}
           modifiedSceneId={modifiedSceneId}
@@ -538,7 +553,6 @@ export function LightingWorkspaceSurface({
           selectedFixtureId={selectedFixture?.id ?? null}
           selectedGroupId={selectedGroupId}
           activeSceneId={activeSceneId}
-          sceneThumb={activeSceneId ? displayedSceneThumbs[activeSceneId] : undefined}
           isSceneModified={isSceneModified}
           bridgeReachable={bridgeReachable}
           onTogglePower={handleToggleFixturePower}
@@ -549,6 +563,7 @@ export function LightingWorkspaceSurface({
           onToggleGroupPower={handleToggleGroupPower}
           onSelectFixture={(id) => void handleSelectFixture(id)}
           onSaveScene={handleSaveScene}
+          onRecallScene={handleRecallScene}
           onResaveScene={handleResaveScene}
           onDeleteScene={handleDeleteScene}
           busyAction={busyAction}

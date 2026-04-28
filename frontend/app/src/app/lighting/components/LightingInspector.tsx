@@ -32,7 +32,6 @@ export interface LightingInspectorProps {
   selectedGroupId: string | null;
   activeSceneId: string | null;
 
-  sceneThumb?: string;
   isSceneModified: boolean;
   bridgeReachable: boolean;
 
@@ -44,6 +43,7 @@ export interface LightingInspectorProps {
   onToggleGroupPower: (groupId: string, on: boolean) => void;
   onSelectFixture: (fixtureId: string) => void;
   onSaveScene?: () => void;
+  onRecallScene?: (sceneId: string) => void;
   onResaveScene?: () => void;
   onDeleteScene?: () => void;
 
@@ -81,7 +81,6 @@ export function LightingInspector({
   selectedFixtureId,
   selectedGroupId,
   activeSceneId,
-  sceneThumb,
   isSceneModified,
   bridgeReachable,
   onTogglePower,
@@ -92,6 +91,7 @@ export function LightingInspector({
   onToggleGroupPower,
   onSelectFixture,
   onSaveScene,
+  onRecallScene,
   onResaveScene,
   onDeleteScene,
   busyAction,
@@ -120,14 +120,16 @@ export function LightingInspector({
       {activeTab === "scene" ? (
         <InspectorScene
           scene={activeScene}
-          thumbDataUri={sceneThumb}
+          fixtures={fixtures}
+          groups={groups}
           isModified={isSceneModified}
-          fixtureCount={fixtures.length}
           bridgeReachable={bridgeReachable}
           onSaveScene={onSaveScene}
+          onRecallScene={onRecallScene}
           onResaveScene={onResaveScene}
           onDeleteScene={onDeleteScene}
           saveBusy={busyAction === "scene-create"}
+          recallBusy={busyAction?.startsWith("scene:") ?? false}
           resaveBusy={busyAction === "scene-resave"}
           deleteBusy={busyAction === "scene-delete"}
         />

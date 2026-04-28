@@ -11,8 +11,11 @@ export interface LightingRailProps {
   grandMaster: number;
   masterEnabled: boolean;
   bridgeReachable: boolean;
+  fixtureOnCount: number;
+  fixtureTotal: number;
   onGrandMasterChange: (value: number) => void;
   onEmergencyCut: () => void;
+  onToggleAllPower?: (on: boolean) => void;
 
   scenes: readonly LightingSceneSnapshot[];
   activeSceneId: string | null;
@@ -20,7 +23,6 @@ export interface LightingRailProps {
   sceneThumbs: Record<string, string>;
   onRecallScene: (sceneId: string) => void;
   onSaveScene: () => void;
-  lastRecalledLabel?: (scene: LightingSceneSnapshot) => string | undefined;
 
   groups: readonly GroupRailEntry[];
   onToggleGroupPower: (groupId: string, on: boolean) => void;
@@ -35,15 +37,17 @@ export function LightingRail({
   grandMaster,
   masterEnabled,
   bridgeReachable,
+  fixtureOnCount,
+  fixtureTotal,
   onGrandMasterChange,
   onEmergencyCut,
+  onToggleAllPower,
   scenes,
   activeSceneId,
   modifiedSceneId,
   sceneThumbs,
   onRecallScene,
   onSaveScene,
-  lastRecalledLabel,
   groups,
   onToggleGroupPower,
   patchMode = false,
@@ -63,8 +67,11 @@ export function LightingRail({
         grandMaster={grandMaster}
         enabled={masterEnabled && !patchMode}
         bridgeReachable={bridgeReachable}
+        fixtureOnCount={fixtureOnCount}
+        fixtureTotal={fixtureTotal}
         onGrandMasterChange={onGrandMasterChange}
         onEmergencyCut={onEmergencyCut}
+        onToggleAllPower={patchMode ? undefined : onToggleAllPower}
         eyebrow={patchMode ? "Master · paused · patch mode" : undefined}
       />
 
@@ -84,9 +91,8 @@ export function LightingRail({
         activeSceneId={activeSceneId}
         modifiedSceneId={modifiedSceneId}
         sceneThumbs={sceneThumbs}
-        lastRecalledLabel={lastRecalledLabel}
         onRecall={onRecallScene}
-        onAddScene={onSaveScene}
+        onAddScene={patchMode ? undefined : onSaveScene}
       />
 
       <RailDivider />
