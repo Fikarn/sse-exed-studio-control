@@ -1,0 +1,103 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--font-family-mono);
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--color-brand-text-muted);
+}
+
+.legendKey {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-tight-xs);
+  border: 1px solid var(--color-bg-stroke);
+}
+
+.legendSwatchAssigned {
+  background: var(--color-brand-blue-soft);
+  border-color: var(--color-brand-blue-border);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  gap: 2px;
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  padding: 4px;
+  max-height: 540px;
+  overflow-y: auto;
+}
+
+.cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 5px 5px;
+  background: var(--color-bg-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius-tight-xs);
+  font-feature-settings: "tnum", "zero";
+  cursor: default;
+}
+
+.cellAssigned {
+  background: var(--color-brand-blue-soft);
+  border-color: var(--color-brand-blue-border);
+  color: var(--color-brand-blue-hot);
+}
+
+.cellHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--color-brand-text-muted);
+}
+
+.cellAssigned .cellHeader {
+  color: var(--color-brand-blue);
+}
+
+.cellValue {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-brand-text-primary);
+  text-align: center;
+}
+
+.cellAssigned .cellValue {
+  color: var(--color-brand-blue-hot);
+}
+
+.cellBar {
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-border);
+  overflow: hidden;
+}
+
+.cellBarFill {
+  display: block;
+  height: 100%;
+  background: var(--color-brand-text-secondary);
+}
+
+.cellAssigned .cellBarFill {
+  background: var(--color-brand-blue-hot);
+}

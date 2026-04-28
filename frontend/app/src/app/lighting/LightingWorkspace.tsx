@@ -19,6 +19,7 @@ import {
   type SnapshotRecord,
 } from "../shellData";
 import { ColumnResizer } from "./components/ColumnResizer";
+import { DMXMonitorDialog } from "./components/DMXMonitorDialog";
 import { LightingBridgeBanner } from "./components/LightingBridgeBanner";
 import { LightingHealthBar } from "./components/LightingHealthBar";
 import { LightingInspector, deriveInspectorTab, type LightingUiMode } from "./components/LightingInspector";
@@ -103,6 +104,7 @@ export function LightingWorkspaceSurface({
   // additional shift-click selections so the bulk inspector can edit them
   // together. Cleared on workspace switch / hot reload by being state.
   const [extraSelectedFixtureIds, setExtraSelectedFixtureIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [dmxMonitorOpen, setDmxMonitorOpen] = useState(false);
 
   const snapshotGrandMaster = lightingSnapshot?.grandMaster ?? 100;
   const [grandMasterDraft, setGrandMasterDraft] = useState(snapshotGrandMaster);
@@ -817,6 +819,15 @@ export function LightingWorkspaceSurface({
         return;
       }
 
+      // ⌘⇧M / Ctrl+Shift+M opens the full DMX monitor. Plain ⌘M is
+      // reserved by macOS / Tauri for window minimise so the modal uses the
+      // shifted variant.
+      if (modifier && event.shiftKey && !event.altKey && event.key.toLowerCase() === "m") {
+        setDmxMonitorOpen(true);
+        event.preventDefault();
+        return;
+      }
+
       // Arrow-key nudge: requires a selected fixture; default ±0.1 m, hold
       // Shift for ±0.5 m (matching the snap grid). Modifier-free arrows are
       // commonly used by browsers/forms — gating on a fixture being selected
@@ -987,6 +998,15 @@ export function LightingWorkspaceSurface({
         driftDetected={isSceneModified}
         lastSavedLabel={lastSavedLabel}
       />
+
+      {dmxMonitorOpen ? (
+        <DMXMonitorDialog
+          universe={bridgeUniverse}
+          snapshot={lightingDmxMonitorSnapshot}
+          reachable={bridgeReachable}
+          onClose={() => setDmxMonitorOpen(false)}
+        />
+      ) : null}
 
       {showLeavePrompt ? (
         <ConfirmDialog
