@@ -1,27 +1,29 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  min-height: var(--size-control-height);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border-default);
+  gap: 7px;
+  height: 26px;
+  padding: 0 11px;
+  border: 1px solid var(--color-bg-stroke);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--tone, var(--color-surface-700)) 28%, transparent);
-  color: var(--color-text-strong);
-  font: var(--font-weight-medium) var(--font-size-md) / 1 var(--font-family-sans);
+  background: color-mix(in srgb, var(--tone, var(--color-bg-raised)) 28%, var(--color-bg-raised));
+  color: var(--color-brand-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  font-feature-settings: "tnum", "zero";
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 220px;
   min-width: 0;
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
-  background: var(--tone, var(--color-primary-500));
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--tone, var(--color-primary-500)) 18%, transparent);
+  background: var(--tone, var(--color-brand-green));
+  box-shadow: 0 0 5px color-mix(in srgb, var(--tone, var(--color-brand-green)) 55%, transparent);
   flex-shrink: 0;
 }
 
