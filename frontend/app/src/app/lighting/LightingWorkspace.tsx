@@ -97,6 +97,11 @@ export function LightingWorkspaceSurface({
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  // Frontend-only multi-select. The persisted single id (read from snapshot)
+  // is the "primary" focus that's synced to the engine; the set tracks the
+  // additional shift-click selections so the bulk inspector can edit them
+  // together. Cleared on workspace switch / hot reload by being state.
+  const [extraSelectedFixtureIds, setExtraSelectedFixtureIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const snapshotGrandMaster = lightingSnapshot?.grandMaster ?? 100;
   const [grandMasterDraft, setGrandMasterDraft] = useState(snapshotGrandMaster);
@@ -260,8 +265,32 @@ export function LightingWorkspaceSurface({
     });
   });
 
-  const handleSelectFixture = useEffectEvent(async (fixtureId: string | null) => {
+  const handleSelectFixture = useEffectEvent(async (fixtureId: string | null, options: { additive?: boolean } = {}) => {
+    const { additive = false } = options;
     setSelectedGroupId(null);
+
+    if (fixtureId === null) {
+      setExtraSelectedFixtureIds(new Set());
+    } else if (additive) {
+      // Toggle the clicked id in the extras set. The persisted single id
+      // stays as-is so the engine still knows which fixture is "focused";
+      // the bulk inspector renders from persisted ∪ extras.
+      setExtraSelectedFixtureIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(fixtureId) && fixtureId !== persistedSelectedFixtureId) {
+          next.delete(fixtureId);
+        } else if (fixtureId !== persistedSelectedFixtureId) {
+          next.add(fixtureId);
+        }
+        return next;
+      });
+      // Skip the engine sync — additive clicks shouldn't change which
+      // fixture is "primary".
+      return;
+    } else {
+      setExtraSelectedFixtureIds(new Set());
+    }
+
     setBusyAction("fixture-select");
     try {
       await store.updateLightingSettings({ selectedFixtureId: fixtureId });
@@ -271,6 +300,17 @@ export function LightingWorkspaceSurface({
       setBusyAction(null);
     }
   });
+
+  const selectedFixtureIds = useMemo<ReadonlySet<string>>(() => {
+    const set = new Set(extraSelectedFixtureIds);
+    if (persistedSelectedFixtureId) set.add(persistedSelectedFixtureId);
+    return set;
+  }, [extraSelectedFixtureIds, persistedSelectedFixtureId]);
+
+  const selectedFixtureSnapshots = useMemo(
+    () => fixtures.filter((fixture) => selectedFixtureIds.has(fixture.id)),
+    [fixtures, selectedFixtureIds]
+  );
 
   const handleTogglePatch = useEffectEvent(() => {
     setUiMode((current) => (current === "patch" ? "recall" : "patch"));
@@ -612,6 +652,43 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const handleBulkTogglePower = useEffectEvent(async (fixtureIds: readonly string[], on: boolean) => {
+    setBusyAction("fixture-bulk-power");
+    try {
+      await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, on })));
+      setFeedback({
+        message: `Set ${fixtureIds.length} fixtures ${on ? "on" : "off"}.`,
+        tone: "ok",
+      });
+    } catch (error) {
+      reportError(error, "Bulk power update failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
+  const handleBulkIntensityCommit = useEffectEvent(async (fixtureIds: readonly string[], intensity: number) => {
+    setBusyAction("fixture-bulk-intensity");
+    try {
+      await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, intensity })));
+    } catch (error) {
+      reportError(error, "Bulk intensity update failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
+  const handleBulkCctCommit = useEffectEvent(async (fixtureIds: readonly string[], cct: number) => {
+    setBusyAction("fixture-bulk-cct");
+    try {
+      await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, cct })));
+    } catch (error) {
+      reportError(error, "Bulk CCT update failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
   const handleFixtureSpatialCommit = useEffectEvent(
     async (
       fixtureId: string,
@@ -821,11 +898,12 @@ export function LightingWorkspaceSurface({
           <StagePlot
             fixtures={fixtures}
             selectedFixtureId={selectedFixture?.id ?? null}
+            selectedFixtureIds={selectedFixtureIds}
             patchMode={uiMode === "patch"}
             activeSceneName={activeScene?.name}
             isSceneModified={isSceneModified}
             searchQuery={searchQuery}
-            onSelectFixture={(id) => void handleSelectFixture(id)}
+            onSelectFixture={(id, options) => void handleSelectFixture(id, options ?? {})}
             onPositionCommit={(id, xMeters, yMeters) =>
               void handleFixtureSpatialCommit(id, { spatialX: xMeters, spatialY: yMeters })
             }
@@ -862,6 +940,11 @@ export function LightingWorkspaceSurface({
           onDeleteScene={handleDeleteScene}
           onDeleteFixture={(id) => void handleDeleteFixture(id)}
           onSpatialCommit={(id, partial) => void handleFixtureSpatialCommit(id, partial)}
+          selectedFixtures={selectedFixtureSnapshots}
+          onClearSelection={() => void handleSelectFixture(null)}
+          onBulkTogglePower={(ids, on) => void handleBulkTogglePower(ids, on)}
+          onBulkIntensityCommit={(ids, intensity) => void handleBulkIntensityCommit(ids, intensity)}
+          onBulkCctCommit={(ids, cct) => void handleBulkCctCommit(ids, cct)}
           busyAction={busyAction}
         />
       </div>

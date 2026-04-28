@@ -20,7 +20,7 @@ export interface FixtureMarkerProps {
   on: boolean;
   selected: boolean;
   dimmed?: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, options: { additive: boolean }) => void;
   /**
    * Optional commit callback when the marker is dragged. xMeters / yMeters
    * are already snapped to the 0.5 m grid unless Alt was held on pointerup.
@@ -187,7 +187,7 @@ export function FixtureMarker({
       }
       onPositionCommit(id, xMeters, yMeters);
     } else {
-      onSelect(id);
+      onSelect(id, { additive: event.shiftKey });
     }
   };
 

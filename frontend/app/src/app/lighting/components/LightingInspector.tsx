@@ -6,6 +6,7 @@ import type { LightingDmxChannelEntry } from "../../shellData";
 import { buildLightingPatchOverlapMap } from "../lightingPatch";
 
 import { InspectorFixture } from "./InspectorFixture";
+import { InspectorFixtureBulk } from "./InspectorFixtureBulk";
 import { InspectorGroup } from "./InspectorGroup";
 import { InspectorPatch } from "./InspectorPatch";
 import { InspectorScene } from "./InspectorScene";
@@ -57,6 +58,13 @@ export interface LightingInspectorProps {
     }
   ) => void;
 
+  /** Multi-fixture selection (size > 1 surfaces the bulk inspector). */
+  selectedFixtures?: readonly LightingFixtureSnapshot[];
+  onClearSelection?: () => void;
+  onBulkTogglePower?: (fixtureIds: readonly string[], on: boolean) => void;
+  onBulkIntensityCommit?: (fixtureIds: readonly string[], intensity: number) => void;
+  onBulkCctCommit?: (fixtureIds: readonly string[], cct: number) => void;
+
   busyAction: string | null;
 }
 
@@ -106,6 +114,11 @@ export function LightingInspector({
   onDeleteScene,
   onDeleteFixture,
   onSpatialCommit,
+  selectedFixtures,
+  onClearSelection,
+  onBulkTogglePower,
+  onBulkIntensityCommit,
+  onBulkCctCommit,
   busyAction,
 }: LightingInspectorProps) {
   const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
@@ -147,7 +160,18 @@ export function LightingInspector({
         />
       ) : null}
 
-      {activeTab === "fixture" && selectedFixture ? (
+      {activeTab === "fixture" && selectedFixtures && selectedFixtures.length > 1 ? (
+        <InspectorFixtureBulk
+          fixtures={selectedFixtures}
+          busy={busyAction?.startsWith("fixture-bulk-") ?? false}
+          onClearSelection={onClearSelection ?? (() => undefined)}
+          onBulkTogglePower={onBulkTogglePower ?? (() => undefined)}
+          onBulkIntensityCommit={onBulkIntensityCommit ?? (() => undefined)}
+          onBulkCctCommit={onBulkCctCommit ?? (() => undefined)}
+        />
+      ) : null}
+
+      {activeTab === "fixture" && selectedFixture && (!selectedFixtures || selectedFixtures.length <= 1) ? (
         <InspectorFixture
           fixture={selectedFixture}
           groupName={fixtureGroup?.name}

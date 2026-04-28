@@ -19,11 +19,13 @@ export interface StagePlotProps {
   fixtures: readonly LightingFixtureSnapshot[];
   layout?: StudioLayout;
   selectedFixtureId: string | null;
+  /** Frontend-only multi-select. Includes selectedFixtureId when present. */
+  selectedFixtureIds?: ReadonlySet<string>;
   patchMode: boolean;
   activeSceneName?: string;
   isSceneModified?: boolean;
   searchQuery?: string;
-  onSelectFixture: (id: string | null) => void;
+  onSelectFixture: (id: string | null, options?: { additive?: boolean }) => void;
   onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
 }
 
@@ -40,6 +42,7 @@ export function StagePlot({
   fixtures,
   layout = STUDIO_LAYOUT,
   selectedFixtureId,
+  selectedFixtureIds,
   patchMode,
   activeSceneName,
   isSceneModified = false,
@@ -177,9 +180,9 @@ export function StagePlot({
                   intensity={fixture.intensity}
                   cct={fixture.cct}
                   on={fixture.on}
-                  selected={fixture.id === selectedFixtureId}
+                  selected={selectedFixtureIds ? selectedFixtureIds.has(fixture.id) : fixture.id === selectedFixtureId}
                   dimmed={!fixtureMatches(fixture)}
-                  onSelect={onSelectFixture}
+                  onSelect={(id, options) => onSelectFixture(id, options)}
                   onPositionCommit={onPositionCommit}
                 />
               );
