@@ -1,0 +1,96 @@
+@layer components {
+  .bar {
+    background: linear-gradient(180deg, var(--color-bg-canvas) 0%, var(--color-bg-deep) 100%);
+    border-top: 1px solid var(--color-bg-stroke);
+    display: flex;
+    align-items: stretch;
+    height: var(--size-health-bar-height);
+    position: relative;
+  }
+
+  .bar::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-brand-dark-green-soft) 25%,
+      var(--color-brand-dark-green-soft) 75%,
+      transparent
+    );
+    opacity: 0.5;
+  }
+
+  .item {
+    flex: 1;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    border-right: 1px solid var(--color-bg-stroke);
+    min-width: 0;
+  }
+
+  .lastItem {
+    border-right: none;
+  }
+
+  .label {
+    font-family: var(--font-family-mono);
+    font-size: 9px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--color-brand-text-muted);
+    font-weight: 600;
+  }
+
+  .value {
+    font-family: var(--font-family-mono);
+    font-size: 13px;
+    color: var(--color-brand-text-primary);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-feature-settings: "tnum", "zero";
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .valueText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .value small {
+    color: var(--color-brand-text-muted);
+    font-weight: 500;
+  }
+
+  .hint {
+    padding: 0 28px 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-family-mono);
+    font-size: 11px;
+    color: var(--color-brand-text-muted);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  .kbd {
+    font-family: var(--font-family-mono);
+    font-size: 11px;
+    background: var(--color-bg-soft);
+    border: 1px solid var(--color-bg-border);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-tight-xs);
+    padding: 2px 6px;
+    color: var(--color-brand-text-secondary);
+  }
+}

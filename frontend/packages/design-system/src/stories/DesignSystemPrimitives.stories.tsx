@@ -1,21 +1,73 @@
 import { useState } from "react";
-import { Bell, Check, Download, SlidersHorizontal, WandSparkles } from "lucide-react";
+import { Bell, Calendar, Check, Download, Mic, Sliders, SlidersHorizontal, Sun, WandSparkles } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Button } from "../components/Button";
+import { Crest } from "../components/Crest";
 import { CueRail } from "../components/CueRail";
 import { DenseList, DenseListRow, DenseTable } from "../components/DenseRows";
 import { EmptyState, DegradedState } from "../components/OperationalState";
+import { HealthBar } from "../components/HealthBar";
 import { IconButton } from "../components/IconButton";
 import { InspectorPanel, InspectorSection } from "../components/InspectorPanel";
 import { MeterBridge } from "../components/MeterBridge";
 import { MetricCard } from "../components/MetricCard";
+import { NavItem } from "../components/NavItem";
+import { PlotMeta } from "../components/PlotMeta";
+import { PlotPill } from "../components/PlotPill";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { StatusBadge } from "../components/StatusBadge";
 import { StatusBand } from "../components/StatusBand";
+import { StatusDot } from "../components/StatusDot";
 import { Surface } from "../components/Surface";
 import { ToggleButton } from "../components/ToggleButton";
 import { Toolbar, ToolbarGroup } from "../components/Toolbar";
+
+const dStage: React.CSSProperties = {
+  background: "var(--color-bg-deep)",
+  color: "var(--color-brand-text-primary)",
+  fontFamily: "var(--font-family-ui)",
+  padding: "32px",
+  minHeight: "100vh",
+};
+
+const dRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "16px",
+  flexWrap: "wrap",
+  marginBottom: "24px",
+};
+
+const dColumn: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "16px",
+};
+
+const dDisplayName: React.CSSProperties = {
+  fontFamily: "var(--font-family-display)",
+  fontWeight: 600,
+  fontSize: 16,
+};
+
+const dModBlue: React.CSSProperties = {
+  fontFamily: "var(--font-family-mono)",
+  fontSize: 10,
+  letterSpacing: "0.24em",
+  textTransform: "uppercase",
+  color: "var(--color-brand-blue-hot)",
+  fontWeight: 600,
+};
+
+const dModYellow: React.CSSProperties = {
+  fontFamily: "var(--font-family-mono)",
+  fontSize: 10,
+  letterSpacing: "0.24em",
+  textTransform: "uppercase",
+  color: "var(--color-brand-yellow)",
+  fontWeight: 600,
+};
 
 function PrimitiveConsoleBoard() {
   const [mode, setMode] = useState("program");
@@ -201,3 +253,143 @@ const meta = {
 export default meta;
 
 export const Overview: StoryObj<typeof meta> = {};
+
+export const DirectionDCrest: StoryObj<typeof meta> = {
+  name: "Direction D · Crest sizes",
+  render: () => (
+    <div style={dStage}>
+      <div style={dRow}>
+        <Crest size="sm" />
+        <Crest size="md" />
+        <Crest size="lg" />
+      </div>
+    </div>
+  ),
+};
+
+export const DirectionDNavItem: StoryObj<typeof meta> = {
+  name: "Direction D · NavItem rail",
+  render: () => (
+    <div style={dStage}>
+      <div style={{ ...dRow, gap: "4px" }}>
+        <NavItem id="setup" label="Setup" icon={<Sliders size={16} />} />
+        <NavItem id="planning" label="Planning" icon={<Calendar size={16} />} />
+        <NavItem id="lighting" label="Lighting" icon={<Sun size={16} />} active />
+        <NavItem id="audio" label="Audio" icon={<Mic size={16} />} />
+      </div>
+    </div>
+  ),
+};
+
+export const DirectionDStatusDot: StoryObj<typeof meta> = {
+  name: "Direction D · StatusDot matrix",
+  render: () => (
+    <div style={dStage}>
+      <div style={dColumn}>
+        <div style={dRow}>
+          <span style={{ width: "120px" }}>md, glow on</span>
+          <StatusDot state="ok" />
+          <StatusDot state="attn" />
+          <StatusDot state="err" />
+          <StatusDot state="info" />
+        </div>
+        <div style={dRow}>
+          <span style={{ width: "120px" }}>sm, glow on</span>
+          <StatusDot state="ok" size="sm" />
+          <StatusDot state="attn" size="sm" />
+          <StatusDot state="err" size="sm" />
+          <StatusDot state="info" size="sm" />
+        </div>
+        <div style={dRow}>
+          <span style={{ width: "120px" }}>md, glow off</span>
+          <StatusDot state="ok" glow={false} />
+          <StatusDot state="attn" glow={false} />
+          <StatusDot state="err" glow={false} />
+          <StatusDot state="info" glow={false} />
+        </div>
+      </div>
+    </div>
+  ),
+};
+
+export const DirectionDHealthBar: StoryObj<typeof meta> = {
+  name: "Direction D · HealthBar (clean)",
+  render: () => (
+    <div style={{ ...dStage, padding: 0 }}>
+      <div style={{ height: "320px" }} />
+      <HealthBar
+        items={[
+          { label: "Bridge", dot: "ok", value: "DMX U1 · reachable" },
+          { label: "Universe", dot: "ok", value: "12 / 512 ch" },
+          { label: "Fixtures", dot: "ok", value: "6 / 6 patched" },
+          { label: "Auto-save", dot: "ok", value: "Saved", suffix: "· last 19:38 UTC" },
+          { label: "Session", value: "2h 47m" },
+          { label: "App", value: "v2.2.2" },
+        ]}
+        hint={{ kbd: "?", label: "Shortcuts" }}
+      />
+    </div>
+  ),
+};
+
+export const DirectionDHealthBarDirty: StoryObj<typeof meta> = {
+  name: "Direction D · HealthBar (drift)",
+  render: () => (
+    <div style={{ ...dStage, padding: 0 }}>
+      <div style={{ height: "320px" }} />
+      <HealthBar
+        items={[
+          { label: "Bridge", dot: "ok", value: "DMX U1 · reachable" },
+          { label: "Universe", dot: "ok", value: "12 / 512 ch" },
+          { label: "Fixtures", dot: "ok", value: "6 / 6 patched" },
+          { label: "Auto-save", dot: "attn", value: "Unsaved changes" },
+          { label: "Session", value: "2h 47m" },
+          { label: "App", value: "v2.2.2" },
+        ]}
+        hint={{ kbd: "?", label: "Shortcuts" }}
+      />
+    </div>
+  ),
+};
+
+export const DirectionDPlotPill: StoryObj<typeof meta> = {
+  name: "Direction D · PlotPill states",
+  render: () => (
+    <div style={dStage}>
+      <div style={dColumn}>
+        <div style={dRow}>
+          <PlotPill state="default">
+            <span style={{ color: "var(--color-brand-text-muted)" }}>Recall:</span>
+            <span style={dDisplayName}>Standup</span>
+          </PlotPill>
+        </div>
+        <div style={dRow}>
+          <PlotPill state="modified">
+            <span style={{ color: "var(--color-brand-text-muted)" }}>Recall:</span>
+            <span style={dDisplayName}>Standup</span>
+            <span style={dModYellow}>· Modified</span>
+          </PlotPill>
+        </div>
+        <div style={dRow}>
+          <PlotPill state="patch">
+            <span style={{ color: "var(--color-brand-text-muted)" }}>Patch mode</span>
+            <span style={dModBlue}>· DMX overlay</span>
+          </PlotPill>
+        </div>
+      </div>
+    </div>
+  ),
+};
+
+export const DirectionDPlotMeta: StoryObj<typeof meta> = {
+  name: "Direction D · PlotMeta tones",
+  render: () => (
+    <div style={dStage}>
+      <div style={dRow}>
+        <PlotMeta label="Floor" value="12 m × 8 m" />
+        <PlotMeta label="Grid" value="0.5 / 1 / 5 m" />
+        <PlotMeta label="Universe" value="U1 · 512 ch" tone="blue" />
+      </div>
+    </div>
+  ),
+};

@@ -1,0 +1,49 @@
+@layer components {
+  .dot {
+    display: inline-block;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .sm {
+    width: 6px;
+    height: 6px;
+  }
+
+  .md {
+    width: 8px;
+    height: 8px;
+  }
+
+  .ok {
+    background: var(--color-brand-green);
+  }
+
+  .attn {
+    background: var(--color-brand-yellow);
+  }
+
+  .err {
+    background: var(--color-brand-coral);
+  }
+
+  .info {
+    background: var(--color-brand-blue-hot);
+  }
+
+  .glow.ok {
+    box-shadow: 0 0 8px var(--color-brand-green);
+  }
+
+  .glow.attn {
+    box-shadow: 0 0 8px var(--color-brand-yellow);
+  }
+
+  .glow.err {
+    box-shadow: 0 0 8px var(--color-brand-coral);
+  }
+
+  .glow.info {
+    box-shadow: 0 0 8px var(--color-brand-blue);
+  }
+}

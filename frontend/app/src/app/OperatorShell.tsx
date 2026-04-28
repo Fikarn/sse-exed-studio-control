@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useEffectEvent, useMemo, useState } from "react";
+import { Calendar, Mic, Sliders, Sun } from "lucide-react";
 
 import { AppShellFrame, Button } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
@@ -78,10 +79,10 @@ export function OperatorShell() {
   const workspaces = useMemo(
     () =>
       [
-        { id: "setup", label: "Setup / Support", meta: "pilot" },
-        { id: "lighting", label: "Lighting", meta: "primary" },
-        { id: "audio", label: "Audio", meta: "primary" },
-        { id: "planning", label: "Planning", meta: "secondary" },
+        { id: "setup", label: "Setup / Support", meta: "pilot", icon: <Sliders size={16} /> },
+        { id: "lighting", label: "Lighting", meta: "primary", icon: <Sun size={16} /> },
+        { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} /> },
+        { id: "planning", label: "Planning", meta: "secondary", icon: <Calendar size={16} /> },
       ] as const,
     []
   );

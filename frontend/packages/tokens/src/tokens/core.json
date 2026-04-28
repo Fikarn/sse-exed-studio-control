@@ -35,12 +35,69 @@
     "border": {
       "default": { "$value": "#2A3B31" },
       "strong": { "$value": "#406050" }
+    },
+    "brand": {
+      "green": { "$value": "{color.primary.500}" },
+      "greenHot": { "$value": "#B5D4AD" },
+      "greenSoft": { "$value": "rgba(153, 186, 146, 0.16)" },
+      "greenGlow": { "$value": "rgba(153, 186, 146, 0.10)" },
+      "greenBorder": { "$value": "rgba(153, 186, 146, 0.5)" },
+      "darkGreen": { "$value": "#1F4D38" },
+      "darkGreenMid": { "$value": "#2C6A4F" },
+      "darkGreenSoft": { "$value": "rgba(31, 77, 56, 0.5)" },
+      "yellow": { "$value": "#E8D561" },
+      "yellowSoft": { "$value": "rgba(232, 213, 97, 0.14)" },
+      "yellowBorder": { "$value": "rgba(232, 213, 97, 0.5)" },
+      "blue": { "$value": "#3F70C8" },
+      "blueHot": { "$value": "#6A93DC" },
+      "blueSoft": { "$value": "rgba(63, 112, 200, 0.16)" },
+      "blueBorder": { "$value": "rgba(63, 112, 200, 0.55)" },
+      "burgundy": { "$value": "#6B1F1F" },
+      "burgundySoft": { "$value": "rgba(107, 31, 31, 0.16)" },
+      "coral": { "$value": "#ED7C5E" },
+      "coralSoft": { "$value": "rgba(237, 124, 94, 0.16)" },
+      "sky": { "$value": "#C8D4DD" },
+      "text": {
+        "primary": { "$value": "#FAF6E6" },
+        "secondary": { "$value": "#D4CDB3" },
+        "muted": { "$value": "#8A8470" },
+        "faint": { "$value": "#5A5547" }
+      }
+    },
+    "bg": {
+      "deep": { "$value": "#08090A" },
+      "canvas": { "$value": "#0D0F0D" },
+      "default": { "$value": "#121412" },
+      "soft": { "$value": "#0F110F" },
+      "raised": { "$value": "#161916" },
+      "strong": { "$value": "#1C201C" },
+      "elevated": { "$value": "#20251F" },
+      "stroke": { "$value": "#21251F" },
+      "hairline": { "$value": "rgba(250, 246, 230, 0.04)" },
+      "border": { "$value": "#2A2F28" },
+      "borderStrong": { "$value": "#383F35" }
+    },
+    "cct": {
+      "2700": { "$value": "#EF8E5A" },
+      "3200": { "$value": "#F3A87A" },
+      "3800": { "$value": "#F6C39A" },
+      "4400": { "$value": "#F0DFB8" },
+      "5000": { "$value": "#EBE5D2" },
+      "5600": { "$value": "#D4DDE2" },
+      "6500": { "$value": "#C8D4DD" }
+    },
+    "glass": {
+      "bg": { "$value": "rgba(8, 10, 8, 0.78)" },
+      "bgBlue": { "$value": "rgba(7, 12, 22, 0.82)" },
+      "border": { "$value": "rgba(250, 246, 230, 0.08)" }
     }
   },
   "font": {
     "family": {
-      "sans": { "$value": "\"IBM Plex Sans\", system-ui, sans-serif" },
-      "mono": { "$value": "\"IBM Plex Mono\", ui-monospace, monospace" }
+      "sans": { "$value": "{font.family.ui}" },
+      "mono": { "$value": "\"JetBrains Mono Variable\", \"JetBrains Mono\", ui-monospace, monospace" },
+      "ui": { "$value": "\"Inter Variable\", \"Inter\", system-ui, sans-serif" },
+      "display": { "$value": "\"Fraunces Variable\", \"Fraunces\", \"Source Serif 4\", Georgia, serif" }
     },
     "size": {
       "sm": { "$value": "12px" },
@@ -65,17 +122,42 @@
   "radius": {
     "sm": { "$value": "8px" },
     "md": { "$value": "14px" },
-    "lg": { "$value": "20px" }
+    "lg": { "$value": "20px" },
+    "pill": { "$value": "999px" },
+    "tight": {
+      "xs": { "$value": "3px" },
+      "sm": { "$value": "4px" },
+      "md": { "$value": "6px" },
+      "lg": { "$value": "8px" },
+      "xl": { "$value": "12px" }
+    }
   },
   "size": {
     "controlHeight": { "$value": "36px" },
     "toolbarHeight": { "$value": "44px" },
     "monitorRailHeight": { "$value": "52px" },
     "contextRailWidth": { "$value": "344px" },
-    "workspaceRailWidth": { "$value": "248px" }
+    "workspaceRailWidth": { "$value": "248px" },
+    "shellHeight": { "$value": "92px" },
+    "healthBarHeight": { "$value": "64px" }
   },
   "shadow": {
-    "surface": { "$value": "0 14px 38px rgba(0, 0, 0, 0.28)" }
+    "surface": { "$value": "0 14px 38px rgba(0, 0, 0, 0.28)" },
+    "insetHi": { "$value": "inset 0 1px 0 rgba(250, 246, 230, 0.05)" },
+    "insetHiStrong": { "$value": "inset 0 1px 0 rgba(250, 246, 230, 0.08)" },
+    "sm": { "$value": "0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(250, 246, 230, 0.04)" },
+    "md": { "$value": "0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(250, 246, 230, 0.05)" },
+    "lg": { "$value": "0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(250, 246, 230, 0.06)" },
+    "glass": { "$value": "0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.10)" },
+    "glowGreen": {
+      "$value": "0 0 0 1px {color.brand.green}, 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
+    },
+    "glowYellow": {
+      "$value": "0 0 0 1px {color.brand.yellow}, 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
+    },
+    "glowBlue": {
+      "$value": "0 0 0 1px {color.brand.blue}, 0 12px 28px rgba(63, 112, 200, 0.20), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
+    }
   },
   "motion": {
     "duration": {

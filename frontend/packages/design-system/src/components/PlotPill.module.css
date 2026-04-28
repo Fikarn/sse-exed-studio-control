@@ -1,0 +1,57 @@
+@layer components {
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 20px;
+    background: var(--color-glass-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--color-glass-border);
+    border-radius: var(--radius-pill);
+    font-family: var(--font-family-ui);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-brand-text-primary);
+    box-shadow: var(--shadow-glass);
+  }
+
+  .body {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--color-brand-green);
+    box-shadow: 0 0 14px var(--color-brand-green);
+  }
+
+  .default .dot {
+    background: var(--color-brand-green);
+    box-shadow: 0 0 14px var(--color-brand-green);
+  }
+
+  .modified {
+    border-color: var(--color-brand-yellow-border);
+  }
+
+  .modified .dot {
+    background: var(--color-brand-yellow);
+    box-shadow: 0 0 14px var(--color-brand-yellow);
+  }
+
+  .patch {
+    border-color: var(--color-brand-blue-border);
+    background: var(--color-glass-bg-blue);
+  }
+
+  .patch .dot {
+    background: var(--color-brand-blue-hot);
+    box-shadow: 0 0 14px var(--color-brand-blue);
+  }
+}

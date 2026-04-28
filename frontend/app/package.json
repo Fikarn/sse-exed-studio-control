@@ -16,12 +16,16 @@
     "tauri:build": "cd ../../native/tauri-shell && tauri build"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "^5.2.9",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@sse/design-system": "file:../packages/design-system",
     "@sse/engine-client": "file:../packages/engine-client",
     "@sse/shared-graphics": "file:../packages/shared-graphics",
     "@sse/test-fixtures": "file:../packages/test-fixtures",
     "@sse/tokens": "file:../packages/tokens",
     "@tauri-apps/api": "^2.0.0",
+    "lucide-react": "^1.11.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
