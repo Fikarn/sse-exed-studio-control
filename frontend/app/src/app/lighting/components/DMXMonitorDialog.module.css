@@ -61,6 +61,11 @@
   color: var(--color-brand-blue-hot);
 }
 
+.cell:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 1px;
+}
+
 .cellHeader {
   display: flex;
   justify-content: space-between;

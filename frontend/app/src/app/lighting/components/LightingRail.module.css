@@ -77,6 +77,25 @@
   color: var(--color-brand-green);
 }
 
+.headButton:focus-visible,
+.tile:focus-visible,
+.tileAdd:focus-visible,
+.action:focus-visible,
+.emergencyCut:focus-visible,
+.masterToggle:focus-visible,
+.groupChip:focus-visible,
+.groupChipInspect:focus-visible,
+.groupChipAdd:focus-visible,
+.emptyAction:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+}
+
+.groupChipRow:focus-within {
+  border-color: var(--color-brand-green);
+  box-shadow: 0 0 0 1px var(--color-brand-green);
+}
+
 .headButtonKbd {
   font-family: var(--font-family-mono);
   font-size: 9px;

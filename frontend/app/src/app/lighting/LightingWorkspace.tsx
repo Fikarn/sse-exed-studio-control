@@ -357,49 +357,51 @@ export function LightingWorkspaceSurface({
     setCreateFixtureOpen(true);
   }, []);
 
-  const handleAddFixture = useEffectEvent(async (fixtureSpec: { name: string; type: string; dmxStartAddress: number }) => {
-    setBusyAction("fixture-create");
-    try {
-      const result = asRecord(await store.createLightingFixture(fixtureSpec));
-      const createdFixture = asRecord(result?.fixture);
-      const createdFixtureId = typeof createdFixture?.id === "string" ? createdFixture.id : null;
-      if (createdFixtureId) {
-        await store.updateLightingSettings({ selectedFixtureId: createdFixtureId });
+  const handleAddFixture = useEffectEvent(
+    async (fixtureSpec: { name: string; type: string; dmxStartAddress: number }) => {
+      setBusyAction("fixture-create");
+      try {
+        const result = asRecord(await store.createLightingFixture(fixtureSpec));
+        const createdFixture = asRecord(result?.fixture);
+        const createdFixtureId = typeof createdFixture?.id === "string" ? createdFixture.id : null;
+        if (createdFixtureId) {
+          await store.updateLightingSettings({ selectedFixtureId: createdFixtureId });
 
-        // Push undo: deleting the just-created fixture. Refuses if any
-        // scene saved AFTER this push references the fixture (the engine
-        // captures fixture id on save), since deletion would orphan that
-        // saved-state entry.
-        let currentId = createdFixtureId;
-        undoStack.push({
-          label: `Add fixture ${fixtureSpec.name}`,
-          undo: async () => {
-            const refs = scenesRef.current.reduce(
-              (sum, scene) => sum + scene.fixtureStates.filter((state) => state.fixtureId === currentId).length,
-              0
-            );
-            if (refs > 0) {
-              throw new UndoRefusedError(
-                `fixture is referenced by ${refs} scene${refs === 1 ? "" : "s"} saved after it was added`
+          // Push undo: deleting the just-created fixture. Refuses if any
+          // scene saved AFTER this push references the fixture (the engine
+          // captures fixture id on save), since deletion would orphan that
+          // saved-state entry.
+          let currentId = createdFixtureId;
+          undoStack.push({
+            label: `Add fixture ${fixtureSpec.name}`,
+            undo: async () => {
+              const refs = scenesRef.current.reduce(
+                (sum, scene) => sum + scene.fixtureStates.filter((state) => state.fixtureId === currentId).length,
+                0
               );
-            }
-            await store.deleteLightingFixture(currentId);
-          },
-          redo: async () => {
-            const redoResult = asRecord(await store.createLightingFixture(fixtureSpec));
-            const redoCreated = asRecord(redoResult?.fixture);
-            const newId = typeof redoCreated?.id === "string" ? redoCreated.id : null;
-            if (newId) currentId = newId;
-          },
-        });
+              if (refs > 0) {
+                throw new UndoRefusedError(
+                  `fixture is referenced by ${refs} scene${refs === 1 ? "" : "s"} saved after it was added`
+                );
+              }
+              await store.deleteLightingFixture(currentId);
+            },
+            redo: async () => {
+              const redoResult = asRecord(await store.createLightingFixture(fixtureSpec));
+              const redoCreated = asRecord(redoResult?.fixture);
+              const newId = typeof redoCreated?.id === "string" ? redoCreated.id : null;
+              if (newId) currentId = newId;
+            },
+          });
+        }
+        setFeedback({ message: String(result?.summary ?? "Fixture added."), tone: "ok" });
+      } catch (error) {
+        reportError(error, "Lighting fixture create failed.");
+      } finally {
+        setBusyAction(null);
       }
-      setFeedback({ message: String(result?.summary ?? "Fixture added."), tone: "ok" });
-    } catch (error) {
-      reportError(error, "Lighting fixture create failed.");
-    } finally {
-      setBusyAction(null);
     }
-  });
+  );
 
   const handleCreateGroup = useEffectEvent(async (name: string) => {
     setBusyAction("group-create");
@@ -846,13 +848,10 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleInspectGroup = useCallback(
-    (groupId: string) => {
-      setSelectedGroupId(groupId);
-      setActiveTabOverride("group");
-    },
-    []
-  );
+  const handleInspectGroup = useCallback((groupId: string) => {
+    setSelectedGroupId(groupId);
+    setActiveTabOverride("group");
+  }, []);
 
   const handleFixtureNudge = useEffectEvent(async (deltaXMeters: number, deltaYMeters: number) => {
     const fixture = persistedSelectedFixtureId
@@ -1129,15 +1128,9 @@ export function LightingWorkspaceSurface({
           onDeleteScene={handleDeleteScene}
           onDeleteFixture={(id) => void handleDeleteFixture(id)}
           onSpatialCommit={(id, partial) => void handleFixtureSpatialCommit(id, partial)}
-          onRenameScene={(sceneId, currentName) =>
-            setRenameTarget({ kind: "scene", sceneId, currentName })
-          }
-          onRenameFixture={(fixtureId, currentName) =>
-            setRenameTarget({ kind: "fixture", fixtureId, currentName })
-          }
-          onRenameGroup={(groupId, currentName) =>
-            setRenameTarget({ kind: "group", groupId, currentName })
-          }
+          onRenameScene={(sceneId, currentName) => setRenameTarget({ kind: "scene", sceneId, currentName })}
+          onRenameFixture={(fixtureId, currentName) => setRenameTarget({ kind: "fixture", fixtureId, currentName })}
+          onRenameGroup={(groupId, currentName) => setRenameTarget({ kind: "group", groupId, currentName })}
           onAssignFixtureGroup={(fixtureId, groupId) => void handleAssignFixtureGroup(fixtureId, groupId)}
           onCreateGroup={() => setCreateGroupOpen(true)}
           selectedFixtures={selectedFixtureSnapshots}

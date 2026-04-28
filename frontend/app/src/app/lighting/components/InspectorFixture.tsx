@@ -229,9 +229,7 @@ export function InspectorFixture({
                   {group.name}
                 </option>
               ))}
-              {onCreateGroup ? (
-                <option disabled>──────────</option>
-              ) : null}
+              {onCreateGroup ? <option disabled>──────────</option> : null}
               {onCreateGroup ? <option value={ASSIGN_NEW_GROUP_VALUE}>+ Create new group…</option> : null}
             </select>
           </label>

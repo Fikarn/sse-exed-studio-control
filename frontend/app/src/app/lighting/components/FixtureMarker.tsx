@@ -1,4 +1,10 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
+import {
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+} from "react";
 
 import type { FixtureMounting } from "../fixtureMounting";
 import { lightingFixtureColor } from "../lightingHelpers";
@@ -102,6 +108,9 @@ export function FixtureMarker({
   // visual follows the cursor; the original (centerX, centerY) gets a
   // dashed shadow to anchor the move.
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+  // Show a green focus ring around the marker when keyboard focus lands on
+  // it (and only on keyboard focus — pointer interactions don't trigger).
+  const [keyboardFocused, setKeyboardFocused] = useState(false);
 
   // Per the v6 prototype: name + meta lines sit above the marker, not rotated
   // with the fixture body. Label upper-cased to match the prototype's
@@ -191,13 +200,43 @@ export function FixtureMarker({
     }
   };
 
+  const intensityWord = on ? `${Math.round(intensity)} percent` : "off";
+  const ariaLabel = `Fixture ${name}, ${intensityWord}, ${Math.round(cct)} kelvin, ${MOUNTING_SHORT_LABEL[mounting]} mount`;
+
+  const handleKeyDown = (event: ReactKeyboardEvent<SVGGElement>) => {
+    if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+      event.preventDefault();
+      onSelect(id, { additive: event.shiftKey });
+    }
+  };
+
   return (
     <g
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={(event) => finishDrag(event, "up")}
       onPointerCancel={(event) => finishDrag(event, "cancel")}
-      style={{ cursor: cursorStyle, opacity: dimmed ? 0.35 : 1 }}
+      onKeyDown={handleKeyDown}
+      onFocus={(event) => {
+        // Only treat focus as keyboard-driven when :focus-visible matches —
+        // pointer-driven focus shouldn't surface the keyboard ring. Browsers
+        // without :focus-visible on SVG nodes fall back to always showing
+        // the ring on focus, which is still accessible if a touch noisier.
+        try {
+          if (typeof event.currentTarget.matches === "function" && !event.currentTarget.matches(":focus-visible")) {
+            return;
+          }
+        } catch {
+          // Ignore — show the ring anyway.
+        }
+        setKeyboardFocused(true);
+      }}
+      onBlur={() => setKeyboardFocused(false)}
+      tabIndex={0}
+      role="button"
+      aria-label={ariaLabel}
+      aria-pressed={selected}
+      style={{ cursor: cursorStyle, opacity: dimmed ? 0.35 : 1, outline: "none" }}
       data-fixture-id={id}
     >
       {ghost ? (
@@ -224,6 +263,19 @@ export function FixtureMarker({
           />
         ) : null}
       </g>
+      {/* Focus ring — only visible on keyboard focus, mirrors SELECTED_STROKE
+          in green so screen-magnifier users can spot the focused marker. */}
+      {keyboardFocused ? (
+        <circle
+          cx={renderX}
+          cy={renderY}
+          r={mounting === "wall-bar" ? 30 : 18}
+          fill="none"
+          stroke={SELECTED_STROKE}
+          strokeWidth={2}
+          pointerEvents="none"
+        />
+      ) : null}
       <text
         x={renderX}
         y={renderY + nameOffsetY}

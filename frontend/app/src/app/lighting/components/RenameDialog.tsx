@@ -65,7 +65,13 @@ export function RenameDialog({
           <Button onClick={onCancel} disabled={busy} variant="ghost" size="compact">
             {cancelLabel}
           </Button>
-          <Button onClick={() => onConfirm(trimmed)} disabled={!canSubmit} loading={busy} variant="primary" size="compact">
+          <Button
+            onClick={() => onConfirm(trimmed)}
+            disabled={!canSubmit}
+            loading={busy}
+            variant="primary"
+            size="compact"
+          >
             {confirmLabel}
           </Button>
         </>

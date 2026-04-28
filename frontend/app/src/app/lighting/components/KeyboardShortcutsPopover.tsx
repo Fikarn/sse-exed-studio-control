@@ -11,7 +11,10 @@ const SHORTCUTS: ReadonlyArray<{ heading: string; entries: ReadonlyArray<Shortcu
   {
     heading: "Scenes",
     entries: [
-      { keys: ["S"], description: "Smart save — save changes if active scene is drifted, otherwise create a new scene" },
+      {
+        keys: ["S"],
+        description: "Smart save — save changes if active scene is drifted, otherwise create a new scene",
+      },
       { keys: ["⌘", "S"], description: "Save changes to the active scene (no-op if no drift)" },
       { keys: ["⌘", "⇧", "S"], description: "Save as new scene (opens a name dialog)" },
     ],

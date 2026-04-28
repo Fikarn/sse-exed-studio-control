@@ -49,3 +49,13 @@
   opacity: 1;
   background: var(--color-brand-green);
 }
+
+.resizer:focus-visible::before {
+  background: var(--color-brand-green);
+  width: 3px;
+}
+
+.resizer:focus-visible .grip {
+  opacity: 1;
+  background: var(--color-brand-green);
+}

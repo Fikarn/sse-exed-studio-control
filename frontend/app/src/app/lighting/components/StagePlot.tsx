@@ -82,11 +82,7 @@ export function StagePlot({
       aria-label="Lighting stage plot"
     >
       {!patchMode && activeSceneName ? (
-        <div
-          className={`${styles.plotPill} ${
-            isSceneModified && bridgeReachable ? styles.plotPillModified : ""
-          }`}
-        >
+        <div className={`${styles.plotPill} ${isSceneModified && bridgeReachable ? styles.plotPillModified : ""}`}>
           <span className={styles.plotPillDot} aria-hidden="true" />
           <span className={styles.plotPillLabel}>Active scene</span>
           <span className={styles.plotPillName}>{activeSceneName}</span>

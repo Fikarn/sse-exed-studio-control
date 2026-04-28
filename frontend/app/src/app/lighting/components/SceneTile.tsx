@@ -45,6 +45,7 @@ export function SceneTile({
 
   const subLine = onCount > 0 ? `${onCount} on · ${Math.round(avgCct)} K` : `${onCount} on`;
   const badgeText = isActive ? (showAsModified ? "Modified" : isModified ? "Preview" : "Active") : null;
+  const ariaLabel = `Recall scene ${name}${badgeText ? ` (${badgeText.toLowerCase()})` : ""}`;
 
   return (
     <button
@@ -52,15 +53,16 @@ export function SceneTile({
       className={stateClass}
       onClick={() => onRecall(id)}
       aria-pressed={isActive}
-      aria-label={`Recall scene ${name}`}
+      aria-current={isActive ? "true" : undefined}
+      aria-label={ariaLabel}
     >
       <SceneThumbnail src={thumbDataUri} alt={`${name} preview`} />
       <span className={styles.tileBody}>
         <span className={styles.tileNameRow}>
           <span className={styles.tileName}>{name}</span>
           {badgeText ? (
-            <span className={styles.tileBadge} aria-hidden="true">
-              <span className={styles.tileBadgeDot} />
+            <span className={styles.tileBadge}>
+              <span className={styles.tileBadgeDot} aria-hidden="true" />
               {badgeText}
             </span>
           ) : null}
