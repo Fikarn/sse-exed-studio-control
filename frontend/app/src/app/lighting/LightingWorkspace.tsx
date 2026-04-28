@@ -612,6 +612,41 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const handleFixtureSpatialCommit = useEffectEvent(
+    async (
+      fixtureId: string,
+      partial: {
+        spatialX?: number | null;
+        spatialY?: number | null;
+        rigZ?: number | null;
+        beamAngleDegrees?: number | null;
+        spatialRotation?: number;
+      }
+    ) => {
+      setBusyAction(`fixture-spatial:${fixtureId}`);
+      try {
+        await store.updateLightingFixture({ fixtureId, ...partial });
+      } catch (error) {
+        reportError(error, "Fixture spatial update failed.");
+      } finally {
+        setBusyAction(null);
+      }
+    }
+  );
+
+  const handleFixtureNudge = useEffectEvent(async (deltaXMeters: number, deltaYMeters: number) => {
+    const fixture = persistedSelectedFixtureId
+      ? fixtures.find((candidate) => candidate.id === persistedSelectedFixtureId)
+      : null;
+    if (!fixture) return;
+    const baseX = fixture.spatialX ?? 0;
+    const baseY = fixture.spatialY ?? 0;
+    // Round to 0.05 m so float drift doesn't accumulate across many nudges.
+    const nextX = Math.round((baseX + deltaXMeters) * 20) / 20;
+    const nextY = Math.round((baseY + deltaYMeters) * 20) / 20;
+    void handleFixtureSpatialCommit(fixture.id, { spatialX: nextX, spatialY: nextY });
+  });
+
   const reportUndoOutcome = useEffectEvent((outcome: UndoOutcome, kind: "Undo" | "Redo") => {
     switch (outcome.kind) {
       case "ok":
@@ -674,6 +709,27 @@ export function LightingWorkspaceSurface({
         return;
       }
 
+      // Arrow-key nudge: requires a selected fixture; default ±0.1 m, hold
+      // Shift for ±0.5 m (matching the snap grid). Modifier-free arrows are
+      // commonly used by browsers/forms — gating on a fixture being selected
+      // keeps it scoped.
+      if (
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        persistedSelectedFixtureId &&
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+      ) {
+        const step = event.shiftKey ? 0.5 : 0.1;
+        const dx = event.key === "ArrowLeft" ? -step : event.key === "ArrowRight" ? step : 0;
+        const dy = event.key === "ArrowUp" ? -step : event.key === "ArrowDown" ? step : 0;
+        if (dx !== 0 || dy !== 0) {
+          void handleFixtureNudge(dx, dy);
+          event.preventDefault();
+        }
+        return;
+      }
+
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (event.key.toLowerCase() === "p") {
         setUiMode((current) => (current === "patch" ? "recall" : "patch"));
@@ -688,7 +744,7 @@ export function LightingWorkspaceSurface({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSaveScene, handleSelectFixture, triggerRedo, triggerUndo]);
+  }, [handleFixtureNudge, handleSaveScene, handleSelectFixture, persistedSelectedFixtureId, triggerRedo, triggerUndo]);
 
   const lastSavedLabel = lastSavedAt
     ? `${lastSavedAt.getUTCHours().toString().padStart(2, "0")}:${lastSavedAt
@@ -770,6 +826,9 @@ export function LightingWorkspaceSurface({
             isSceneModified={isSceneModified}
             searchQuery={searchQuery}
             onSelectFixture={(id) => void handleSelectFixture(id)}
+            onPositionCommit={(id, xMeters, yMeters) =>
+              void handleFixtureSpatialCommit(id, { spatialX: xMeters, spatialY: yMeters })
+            }
           />
         </main>
 
@@ -802,6 +861,7 @@ export function LightingWorkspaceSurface({
           onResaveScene={handleResaveScene}
           onDeleteScene={handleDeleteScene}
           onDeleteFixture={(id) => void handleDeleteFixture(id)}
+          onSpatialCommit={(id, partial) => void handleFixtureSpatialCommit(id, partial)}
           busyAction={busyAction}
         />
       </div>

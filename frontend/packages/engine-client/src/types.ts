@@ -123,6 +123,7 @@ export interface LightingFixtureUpdateRequest {
   groupId?: string | null;
   spatialX?: number | null;
   spatialY?: number | null;
+  spatialRotation?: number;
   rigZ?: number | null;
   beamAngleDegrees?: number | null;
 }

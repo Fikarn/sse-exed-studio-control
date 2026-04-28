@@ -46,6 +46,16 @@ export interface LightingInspectorProps {
   onResaveScene?: () => void;
   onDeleteScene?: () => void;
   onDeleteFixture?: (fixtureId: string) => void;
+  onSpatialCommit?: (
+    fixtureId: string,
+    partial: {
+      spatialX?: number | null;
+      spatialY?: number | null;
+      rigZ?: number | null;
+      beamAngleDegrees?: number | null;
+      spatialRotation?: number;
+    }
+  ) => void;
 
   busyAction: string | null;
 }
@@ -95,6 +105,7 @@ export function LightingInspector({
   onResaveScene,
   onDeleteScene,
   onDeleteFixture,
+  onSpatialCommit,
   busyAction,
 }: LightingInspectorProps) {
   const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
@@ -145,6 +156,7 @@ export function LightingInspector({
           onCctCommit={onCctCommit}
           onIdentifyBurst={onIdentifyBurst}
           onDeleteFixture={onDeleteFixture}
+          onSpatialCommit={onSpatialCommit}
           busy={busyAction?.startsWith(`fixture-`) ?? false}
           deleteBusy={busyAction === `fixture-delete:${selectedFixture.id}`}
         />

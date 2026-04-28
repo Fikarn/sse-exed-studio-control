@@ -18,6 +18,15 @@ export interface InspectorFixtureProps {
   onCctCommit: (fixtureId: string, cct: number) => void;
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   onDeleteFixture?: (fixtureId: string) => void;
+  onSpatialCommit?: (
+    fixtureId: string,
+    partial: {
+      spatialX?: number | null;
+      spatialY?: number | null;
+      rigZ?: number | null;
+      beamAngleDegrees?: number | null;
+    }
+  ) => void;
   busy?: boolean;
   deleteBusy?: boolean;
 }
@@ -29,6 +38,16 @@ const MOUNTING_LABEL: Record<FixtureMounting, string> = {
   "wall-bar": "Wall bar",
 };
 
+function formatMaybeMeters(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return Number.isInteger(value) ? value.toFixed(1) : String(value);
+}
+
+function formatMaybeNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
 export function InspectorFixture({
   fixture,
   groupName,
@@ -37,6 +56,7 @@ export function InspectorFixture({
   onCctCommit,
   onIdentifyBurst,
   onDeleteFixture,
+  onSpatialCommit,
   busy = false,
   deleteBusy = false,
 }: InspectorFixtureProps) {
@@ -45,9 +65,20 @@ export function InspectorFixture({
   const [cctDraft, setCctDraft] = useState(fixture.cct);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  // Position-field drafts. Strings (not numbers) so the user can type
+  // intermediate values like "5." without the input clobbering them.
+  const [spatialXDraft, setSpatialXDraft] = useState(() => formatMaybeMeters(fixture.spatialX));
+  const [spatialYDraft, setSpatialYDraft] = useState(() => formatMaybeMeters(fixture.spatialY));
+  const [rigZDraft, setRigZDraft] = useState(() => formatMaybeMeters(fixture.rigZ));
+  const [beamAngleDraft, setBeamAngleDraft] = useState(() => formatMaybeNumber(fixture.beamAngleDegrees));
+
   useEffect(() => {
     setConfirmingDelete(false);
-  }, [fixture.id]);
+    setSpatialXDraft(formatMaybeMeters(fixture.spatialX));
+    setSpatialYDraft(formatMaybeMeters(fixture.spatialY));
+    setRigZDraft(formatMaybeMeters(fixture.rigZ));
+    setBeamAngleDraft(formatMaybeNumber(fixture.beamAngleDegrees));
+  }, [fixture.id, fixture.spatialX, fixture.spatialY, fixture.rigZ, fixture.beamAngleDegrees]);
 
   useEffect(() => {
     setIntensityDraft(fixture.intensity);
@@ -81,6 +112,21 @@ export function InspectorFixture({
     if (cctDraft !== fixture.cct) {
       onCctCommit(fixture.id, cctDraft);
     }
+  };
+
+  const commitSpatial = (field: "spatialX" | "spatialY" | "rigZ" | "beamAngleDegrees", rawDraft: string) => {
+    if (!onSpatialCommit) return;
+    const trimmed = rawDraft.trim();
+    if (trimmed === "") {
+      // Clearing a field maps to null on nullable engine fields.
+      onSpatialCommit(fixture.id, { [field]: null });
+      return;
+    }
+    const parsed = Number.parseFloat(trimmed);
+    if (!Number.isFinite(parsed)) return;
+    const current = fixture[field] ?? null;
+    if (parsed === current) return;
+    onSpatialCommit(fixture.id, { [field]: parsed });
   };
 
   return (
@@ -184,6 +230,89 @@ export function InspectorFixture({
           </span>
         </div>
       </InspectorSection>
+
+      {onSpatialCommit ? (
+        <InspectorSection title="Position">
+          <div className={styles.positionGrid}>
+            <label className={styles.positionField}>
+              <span className={styles.positionLabel}>Stage X (m)</span>
+              <input
+                aria-label="Stage X position in metres"
+                className={styles.positionInput}
+                disabled={busy}
+                inputMode="decimal"
+                type="text"
+                value={spatialXDraft}
+                onChange={(event) => setSpatialXDraft(event.currentTarget.value)}
+                onBlur={() => commitSpatial("spatialX", spatialXDraft)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            </label>
+            <label className={styles.positionField}>
+              <span className={styles.positionLabel}>Stage Y (m)</span>
+              <input
+                aria-label="Stage Y position in metres"
+                className={styles.positionInput}
+                disabled={busy}
+                inputMode="decimal"
+                type="text"
+                value={spatialYDraft}
+                onChange={(event) => setSpatialYDraft(event.currentTarget.value)}
+                onBlur={() => commitSpatial("spatialY", spatialYDraft)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            </label>
+            <label className={styles.positionField}>
+              <span className={styles.positionLabel}>Rig height (m)</span>
+              <input
+                aria-label="Rig height in metres"
+                className={styles.positionInput}
+                disabled={busy}
+                inputMode="decimal"
+                type="text"
+                value={rigZDraft}
+                onChange={(event) => setRigZDraft(event.currentTarget.value)}
+                onBlur={() => commitSpatial("rigZ", rigZDraft)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            </label>
+            <label className={styles.positionField}>
+              <span className={styles.positionLabel}>Beam angle (°)</span>
+              <input
+                aria-label="Beam angle in degrees"
+                className={styles.positionInput}
+                disabled={busy}
+                inputMode="decimal"
+                type="text"
+                value={beamAngleDraft}
+                onChange={(event) => setBeamAngleDraft(event.currentTarget.value)}
+                onBlur={() => commitSpatial("beamAngleDegrees", beamAngleDraft)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            </label>
+          </div>
+          <span className={styles.helpText}>
+            Drag the marker on the plot, hold ⌥ to free-position, or use the arrow keys (Shift = 0.5 m steps) when the
+            fixture is selected.
+          </span>
+        </InspectorSection>
+      ) : null}
 
       {onDeleteFixture ? (
         <InspectorSection title="Danger zone">

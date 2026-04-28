@@ -24,6 +24,7 @@ export interface StagePlotProps {
   isSceneModified?: boolean;
   searchQuery?: string;
   onSelectFixture: (id: string | null) => void;
+  onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
 }
 
 const FALLBACK_X_STEP = 1.5;
@@ -44,6 +45,7 @@ export function StagePlot({
   isSceneModified = false,
   searchQuery = "",
   onSelectFixture,
+  onPositionCommit,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
@@ -149,27 +151,40 @@ export function StagePlot({
             );
           })}
 
-          {/* Fixture markers */}
-          {fixtures.map((fixture, index) => {
-            const { xMeters, yMeters } = meterPositionFor(fixture, index);
-            return (
-              <FixtureMarker
-                key={fixture.id}
-                id={fixture.id}
-                name={fixture.name}
-                centerX={xMeters * 100}
-                centerY={yMeters * 100}
-                rotationDegrees={fixture.spatialRotation}
-                mounting={deriveMounting(fixture.type)}
-                intensity={fixture.intensity}
-                cct={fixture.cct}
-                on={fixture.on}
-                selected={fixture.id === selectedFixtureId}
-                dimmed={!fixtureMatches(fixture)}
-                onSelect={onSelectFixture}
-              />
-            );
-          })}
+          {/* Fixture markers — reorder so the selected fixture paints last
+              (above its siblings), giving the in-flight drag a clear z-stack
+              without interfering with React reconciliation (key-stable). */}
+          {(() => {
+            const ordered =
+              selectedFixtureId && fixtures.some((fixture) => fixture.id === selectedFixtureId)
+                ? [
+                    ...fixtures.filter((fixture) => fixture.id !== selectedFixtureId),
+                    fixtures.find((fixture) => fixture.id === selectedFixtureId)!,
+                  ]
+                : fixtures;
+            return ordered.map((fixture) => {
+              const originalIndex = fixtures.indexOf(fixture);
+              const { xMeters, yMeters } = meterPositionFor(fixture, originalIndex);
+              return (
+                <FixtureMarker
+                  key={fixture.id}
+                  id={fixture.id}
+                  name={fixture.name}
+                  centerX={xMeters * 100}
+                  centerY={yMeters * 100}
+                  rotationDegrees={fixture.spatialRotation}
+                  mounting={deriveMounting(fixture.type)}
+                  intensity={fixture.intensity}
+                  cct={fixture.cct}
+                  on={fixture.on}
+                  selected={fixture.id === selectedFixtureId}
+                  dimmed={!fixtureMatches(fixture)}
+                  onSelect={onSelectFixture}
+                  onPositionCommit={onPositionCommit}
+                />
+              );
+            });
+          })()}
 
           {/* Patch overlay — DMX address tags above each fixture */}
           <PatchOverlay active={patchMode}>

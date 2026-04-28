@@ -286,6 +286,53 @@
   margin: 0;
 }
 
+.positionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.positionField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.positionLabel {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+}
+
+.positionInput {
+  appearance: none;
+  width: 100%;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  color: var(--color-brand-text-primary);
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+  font-size: 12px;
+  padding: 6px 8px;
+  transition:
+    border-color var(--motion-duration-fast) ease,
+    background var(--motion-duration-fast) ease;
+}
+
+.positionInput:focus-visible {
+  outline: none;
+  border-color: var(--color-brand-green-border);
+  background: var(--color-bg-default);
+}
+
+.positionInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .fact {
   display: flex;
   flex-direction: column;
