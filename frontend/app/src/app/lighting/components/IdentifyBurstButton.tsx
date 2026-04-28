@@ -51,7 +51,8 @@ export function IdentifyBurstButton({ fixtureId, fixtureName, onTrigger, disable
   return (
     <Button
       onClick={handleClick}
-      disabled={disabled || active}
+      disabled={disabled}
+      loading={active}
       variant={active ? "primary" : "secondary"}
       size="compact"
       leadingVisual={<Zap aria-hidden="true" size={13} strokeWidth={1.75} />}

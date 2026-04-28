@@ -93,4 +93,15 @@
   .danger:hover {
     border-color: rgba(213, 106, 101, 0.7);
   }
+
+  .spinner {
+    animation: spseSpin 0.85s linear infinite;
+    color: currentColor;
+  }
+}
+
+@keyframes spseSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }

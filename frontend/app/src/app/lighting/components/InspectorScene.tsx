@@ -201,7 +201,8 @@ export function InspectorScene({
         {onRecallScene ? (
           <Button
             onClick={() => onRecallScene(scene.id)}
-            disabled={recallBusy || !bridgeReachable}
+            loading={recallBusy}
+            disabled={!bridgeReachable}
             variant="primary"
             size="compact"
             leadingVisual={<Play aria-hidden="true" size={13} strokeWidth={1.75} />}
@@ -212,7 +213,8 @@ export function InspectorScene({
         {onResaveScene ? (
           <Button
             onClick={onResaveScene}
-            disabled={resaveBusy || !isModified || !bridgeReachable}
+            loading={resaveBusy}
+            disabled={!isModified || !bridgeReachable}
             variant="secondary"
             size="compact"
             leadingVisual={<Pencil aria-hidden="true" size={13} strokeWidth={1.75} />}
@@ -223,7 +225,8 @@ export function InspectorScene({
         {onSaveScene ? (
           <Button
             onClick={onSaveScene}
-            disabled={saveBusy || fixtures.length === 0}
+            loading={saveBusy}
+            disabled={fixtures.length === 0}
             variant="ghost"
             size="compact"
             leadingVisual={<Save aria-hidden="true" size={13} strokeWidth={1.75} />}
@@ -234,7 +237,7 @@ export function InspectorScene({
         {onDeleteScene ? (
           <Button
             onClick={() => setConfirmingDelete(true)}
-            disabled={deleteBusy}
+            loading={deleteBusy}
             variant="danger"
             size="compact"
             leadingVisual={<Trash2 aria-hidden="true" size={13} strokeWidth={1.75} />}

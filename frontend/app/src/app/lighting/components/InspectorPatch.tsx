@@ -157,7 +157,8 @@ export function InspectorPatch({
           </label>
           <Button
             onClick={() => commit(draft)}
-            disabled={busy || draft.trim() === String(fixture.dmxStartAddress)}
+            loading={busy}
+            disabled={draft.trim() === String(fixture.dmxStartAddress)}
             variant="secondary"
             size="compact"
           >

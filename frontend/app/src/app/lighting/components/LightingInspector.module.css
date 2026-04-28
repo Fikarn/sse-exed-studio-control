@@ -395,7 +395,19 @@
 }
 
 .sliderCct {
-  background: linear-gradient(90deg, #ffb35c 0%, #ffd38b 50%, #eaf0ff 100%);
+  background: linear-gradient(90deg, #f0dfb8 0%, #ebe5d2 50%, #d4dde2 100%);
+}
+
+.cctScale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+  margin-top: 4px;
 }
 
 .sliderValue {

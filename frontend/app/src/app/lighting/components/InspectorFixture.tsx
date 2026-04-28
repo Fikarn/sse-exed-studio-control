@@ -142,7 +142,7 @@ export function InspectorFixture({
           </div>
           <Button
             onClick={() => onTogglePower(fixture.id, !fixture.on)}
-            disabled={busy}
+            loading={busy}
             variant={fixture.on ? "secondary" : "primary"}
             size="compact"
             leadingVisual={<Power aria-hidden="true" size={13} strokeWidth={1.75} />}
@@ -212,8 +212,9 @@ export function InspectorFixture({
           />
           <span className={styles.sliderValue}>{cctDraft}K</span>
         </div>
-        <div className={styles.helpText}>
-          Range {cctRange.min}–{cctRange.max}K for {fixture.type}.
+        <div className={styles.cctScale} aria-hidden="true">
+          <span>{cctRange.min}K · warm</span>
+          <span>{cctRange.max}K · cool</span>
         </div>
       </InspectorSection>
 
@@ -319,7 +320,7 @@ export function InspectorFixture({
           <div className={styles.actionRow}>
             <Button
               onClick={() => setConfirmingDelete(true)}
-              disabled={deleteBusy}
+              loading={deleteBusy}
               variant="danger"
               size="compact"
               leadingVisual={<Trash2 aria-hidden="true" size={13} strokeWidth={1.75} />}
