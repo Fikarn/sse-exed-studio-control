@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { Crest } from "./Crest";
+import { NavItem } from "./NavItem";
 import { StatusPill } from "./StatusPill";
 import styles from "./AppShellFrame.module.css";
 
@@ -7,6 +9,7 @@ export interface RailItem {
   id: string;
   label: string;
   meta?: string;
+  icon?: ReactNode;
 }
 
 export interface MonitorItem {
@@ -28,6 +31,8 @@ export interface AppShellFrameProps {
   title: string;
   subtitle: string;
   eyebrow: string;
+  productName?: string;
+  clock?: ReactNode;
   monitorItems: readonly MonitorItem[];
   workspaces: readonly RailItem[];
   activeWorkspace: string;
@@ -41,43 +46,48 @@ export function AppShellFrame({
   title,
   subtitle,
   eyebrow,
+  productName = "Studio Control",
+  clock,
   monitorItems,
   workspaces,
   activeWorkspace,
   contextSections,
   children,
-  hideMainHeader = false,
+  hideMainHeader = true,
   onWorkspaceChange,
 }: AppShellFrameProps) {
   const showContextRail = contextSections.length > 0;
   return (
     <div className={styles.shell} data-context-visible={showContextRail}>
-      <header className={styles.monitorRail}>
-        <div className={styles.monitorGroup}>
-          <div className={styles.brand}>SSE ExEd Studio Control</div>
+      <header className={styles.shellHeader}>
+        <div className={styles.brand}>
+          <Crest size="md" />
+          <span className={styles.brandDivider} aria-hidden="true" />
+          <span className={styles.productName}>{productName}</span>
+          <nav className={styles.workspaceNav} aria-label="Workspace navigation">
+            {workspaces.map((workspace) => (
+              <NavItem
+                key={workspace.id}
+                id={workspace.id}
+                label={workspace.label}
+                icon={workspace.icon}
+                active={workspace.id === activeWorkspace}
+                onClick={() => onWorkspaceChange?.(workspace.id)}
+              />
+            ))}
+          </nav>
+        </div>
+        <div className={styles.shellMeta}>
           {monitorItems.map((item, index) => (
-            <StatusPill key={`${item.status}:${item.label}:${index}`} label={item.label} status={item.status} />
+            <StatusPill
+              key={`${item.status}:${item.label}:${index}`}
+              label={item.label}
+              status={item.status}
+            />
           ))}
+          {clock ? <span className={styles.clock}>{clock}</span> : null}
         </div>
-        <div className={styles.heroMetric}>Mission-critical operator shell</div>
       </header>
-
-      <aside className={styles.workspaceRail}>
-        <div className={styles.workspaceNav} aria-label="Workspace command rail">
-          {workspaces.map((workspace) => (
-            <button
-              key={workspace.id}
-              className={styles.workspaceButton}
-              data-active={workspace.id === activeWorkspace}
-              onClick={() => onWorkspaceChange?.(workspace.id)}
-              type="button"
-            >
-              <span>{workspace.label}</span>
-              {workspace.meta ? <span className={styles.workspaceMeta}>{workspace.meta}</span> : null}
-            </button>
-          ))}
-        </div>
-      </aside>
 
       <main className={styles.main}>
         <section className={styles.mainSurface}>
