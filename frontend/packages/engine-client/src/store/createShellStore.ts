@@ -39,7 +39,9 @@ import type {
   EngineTransport,
   LightingFixtureCreateRequest,
   LightingFixtureUpdateRequest,
+  LightingGroupUpdateRequest,
   LightingSceneCreateRequest,
+  LightingSceneUpdateRequest,
   PlanningProjectCreateRequest,
   PlanningProjectReorderRequest,
   LightingSettingsUpdateRequest,
@@ -490,11 +492,17 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async createLightingGroup(name: string) {
       return performRequest("lighting.group.create", { name });
     },
+    async updateLightingGroup(request: LightingGroupUpdateRequest) {
+      return performRequest("lighting.group.update", request as unknown as JsonObject);
+    },
     async createLightingFixture(request: LightingFixtureCreateRequest) {
       return performRequest("lighting.fixture.create", request as unknown as JsonObject);
     },
     async createLightingScene(request: LightingSceneCreateRequest) {
       return performRequest("lighting.scene.create", request as unknown as JsonObject);
+    },
+    async updateLightingScene(request: LightingSceneUpdateRequest) {
+      return performRequest("lighting.scene.update", request as unknown as JsonObject);
     },
     async deleteLightingScene(sceneId: string) {
       return performRequest("lighting.scene.delete", { sceneId });

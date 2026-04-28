@@ -116,6 +116,8 @@ export interface PlanningProjectReorderRequest {
 
 export interface LightingFixtureUpdateRequest {
   fixtureId: string;
+  name?: string;
+  type?: string;
   on?: boolean;
   intensity?: number;
   cct?: number;
@@ -136,6 +138,22 @@ export interface LightingFixtureCreateRequest {
 }
 
 export interface LightingSceneCreateRequest {
+  name: string;
+}
+
+export interface LightingSceneUpdateRequest {
+  sceneId: string;
+  /** New name. Optional — at least one of name / captureCurrentState is required. */
+  name?: string;
+  /**
+   * When true, the scene's saved fixtureStates are overwritten with the live
+   * rig state. Used for "Save changes" without delete+recreate.
+   */
+  captureCurrentState?: boolean;
+}
+
+export interface LightingGroupUpdateRequest {
+  groupId: string;
   name: string;
 }
 
@@ -209,8 +227,10 @@ export interface ShellStore {
   updateAudioSettings(request: AudioSettingsUpdateRequest): Promise<JsonValue>;
   updateLightingSettings(request: LightingSettingsUpdateRequest): Promise<JsonValue>;
   createLightingGroup(name: string): Promise<JsonValue>;
+  updateLightingGroup(request: LightingGroupUpdateRequest): Promise<JsonValue>;
   createLightingFixture(request: LightingFixtureCreateRequest): Promise<JsonValue>;
   createLightingScene(request: LightingSceneCreateRequest): Promise<JsonValue>;
+  updateLightingScene(request: LightingSceneUpdateRequest): Promise<JsonValue>;
   deleteLightingScene(sceneId: string): Promise<JsonValue>;
   updateLightingFixture(request: LightingFixtureUpdateRequest): Promise<JsonValue>;
   identifyLightingFixture(fixtureId: string, durationMs?: number): Promise<JsonValue>;

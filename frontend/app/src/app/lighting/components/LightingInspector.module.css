@@ -140,6 +140,13 @@
   overflow-wrap: anywhere;
 }
 
+.sceneTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .sceneSub {
   font-family: var(--font-family-ui);
   font-size: 12px;
@@ -287,12 +294,58 @@
   gap: 12px;
 }
 
+.fixtureNameStack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fixtureNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .fixtureName {
   font-family: var(--font-family-display);
   font-variation-settings: "opsz" 24;
   font-weight: 600;
   font-size: 16px;
   color: var(--color-brand-text-primary);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.groupAssignField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.groupAssignSelect {
+  appearance: none;
+  width: 100%;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  padding: 6px 10px;
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  color: var(--color-brand-text-primary);
+  cursor: pointer;
+}
+
+.groupAssignSelect:focus {
+  outline: none;
+  border-color: var(--color-brand-green-border);
+}
+
+.groupAssignSelect:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .fixtureSubline {

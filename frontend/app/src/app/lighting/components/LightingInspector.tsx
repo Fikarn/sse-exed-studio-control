@@ -48,10 +48,16 @@ export interface LightingInspectorProps {
   onToggleGroupPower: (groupId: string, on: boolean) => void;
   onSelectFixture: (fixtureId: string, options?: { additive?: boolean }) => void;
   onSaveScene?: () => void;
+  onSaveSceneAs?: () => void;
   onRecallScene?: (sceneId: string) => void;
   onResaveScene?: () => void;
   onDeleteScene?: () => void;
   onDeleteFixture?: (fixtureId: string) => void;
+  onRenameScene?: (sceneId: string, currentName: string) => void;
+  onRenameFixture?: (fixtureId: string, currentName: string) => void;
+  onRenameGroup?: (groupId: string, currentName: string) => void;
+  onAssignFixtureGroup?: (fixtureId: string, groupId: string | null) => void;
+  onCreateGroup?: () => void;
   onSpatialCommit?: (
     fixtureId: string,
     partial: {
@@ -84,6 +90,20 @@ export function deriveInspectorTab(opts: {
   return "scene";
 }
 
+function buildVisibleTabs(opts: {
+  uiMode: LightingUiMode;
+  selectedGroupId: string | null;
+  activeTab: InspectorTab;
+}): readonly InspectorTab[] {
+  if (opts.uiMode === "patch") return ["patch"];
+  // Group tab is only present when there's a group to inspect — the empty
+  // "Select a group from the rail" state is unreachable from any UI path
+  // (group chips toggle power, not select for inspection in this build),
+  // so hiding the tab when no group is selected avoids a dead-end.
+  const groupVisible = opts.selectedGroupId !== null || opts.activeTab === "group";
+  return groupVisible ? (["scene", "fixture", "group"] as const) : (["scene", "fixture"] as const);
+}
+
 const TAB_TITLE: Record<InspectorTab, string> = {
   scene: "Scene",
   fixture: "Fixture",
@@ -114,10 +134,16 @@ export function LightingInspector({
   onToggleGroupPower,
   onSelectFixture,
   onSaveScene,
+  onSaveSceneAs,
   onRecallScene,
   onResaveScene,
   onDeleteScene,
   onDeleteFixture,
+  onRenameScene,
+  onRenameFixture,
+  onRenameGroup,
+  onAssignFixtureGroup,
+  onCreateGroup,
   onSpatialCommit,
   selectedFixtures,
   onClearSelection,
@@ -138,8 +164,7 @@ export function LightingInspector({
   const patchOverlapMap = useMemo(() => buildLightingPatchOverlapMap([...fixtures]), [fixtures]);
   const patchOverlap = selectedFixture ? (patchOverlapMap.get(selectedFixture.id) ?? null) : null;
 
-  const visibleTabs: readonly InspectorTab[] =
-    uiMode === "patch" ? ["patch"] : (["scene", "fixture", "group"] as const);
+  const visibleTabs = buildVisibleTabs({ uiMode, selectedGroupId, activeTab });
 
   const fixtureGroup = selectedFixture ? (groups.find((group) => group.id === selectedFixture.groupId) ?? null) : null;
 
@@ -161,9 +186,11 @@ export function LightingInspector({
             isModified={isSceneModified}
             bridgeReachable={bridgeReachable}
             onSaveScene={onSaveScene}
+            onSaveSceneAs={onSaveSceneAs}
             onRecallScene={onRecallScene}
             onResaveScene={onResaveScene}
             onDeleteScene={onDeleteScene}
+            onRenameScene={onRenameScene}
             saveBusy={busyAction === "scene-create"}
             recallBusy={busyAction?.startsWith("scene:") ?? false}
             resaveBusy={busyAction === "scene-resave"}
@@ -187,6 +214,7 @@ export function LightingInspector({
           <InspectorFixture
             fixture={selectedFixture}
             groupName={fixtureGroup?.name}
+            groups={groups}
             bridgeReachable={bridgeReachable}
             onTogglePower={onTogglePower}
             onIntensityCommit={onIntensityCommit}
@@ -194,8 +222,13 @@ export function LightingInspector({
             onIdentifyBurst={onIdentifyBurst}
             onDeleteFixture={onDeleteFixture}
             onSpatialCommit={onSpatialCommit}
+            onRenameFixture={onRenameFixture}
+            onAssignFixtureGroup={onAssignFixtureGroup}
+            onCreateGroup={onCreateGroup}
             busy={busyAction?.startsWith(`fixture-`) ?? false}
             deleteBusy={busyAction === `fixture-delete:${selectedFixture.id}`}
+            renameBusy={busyAction === `fixture-rename:${selectedFixture.id}`}
+            assignGroupBusy={busyAction === `fixture-group:${selectedFixture.id}`}
           />
         ) : null}
 
@@ -210,12 +243,14 @@ export function LightingInspector({
             fixtures={groupFixtures}
             onTogglePower={onToggleGroupPower}
             onSelectFixture={onSelectFixture}
+            onRenameGroup={onRenameGroup}
             busy={busyAction === `group:${selectedGroup.id}`}
+            renameBusy={busyAction === `group-rename:${selectedGroup.id}`}
           />
         ) : null}
 
         {activeTab === "group" && !selectedGroup ? (
-          <p className={styles.empty}>Select a group from the rail to inspect its members.</p>
+          <p className={styles.empty}>Pick a group from the rail (chevron icon) to see its members.</p>
         ) : null}
 
         {activeTab === "patch" ? (

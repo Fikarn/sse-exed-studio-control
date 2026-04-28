@@ -33,6 +33,8 @@ export interface LightingRailProps {
   onResaveScene?: () => void;
   onRevertScene?: () => void;
   onClearSearch?: () => void;
+  onCreateGroup?: () => void;
+  onInspectGroup?: (groupId: string) => void;
 }
 
 export function LightingRail({
@@ -58,6 +60,8 @@ export function LightingRail({
   onResaveScene,
   onRevertScene,
   onClearSearch,
+  onCreateGroup,
+  onInspectGroup,
 }: LightingRailProps) {
   const railClass = patchMode ? `${styles.rail} ${styles.railPaused}` : styles.rail;
   return (
@@ -121,6 +125,8 @@ export function LightingRail({
         onTogglePower={onToggleGroupPower}
         searchQuery={searchQuery}
         onClearSearch={onClearSearch}
+        onInspectGroup={patchMode ? undefined : onInspectGroup}
+        onCreateGroup={patchMode ? undefined : onCreateGroup}
       />
 
       {!patchMode && isSceneModified ? (

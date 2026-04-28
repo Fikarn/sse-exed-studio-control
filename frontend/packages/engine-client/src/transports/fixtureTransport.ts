@@ -2226,6 +2226,67 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           summary,
         };
       }
+      case "lighting.scene.update": {
+        const sceneId = asString(params.sceneId).trim();
+        if (!sceneId) {
+          throw new Error("sceneId is required");
+        }
+        const hasName = typeof params.name === "string";
+        const hasCapture = params.captureCurrentState === true;
+        if (!hasName && !hasCapture) {
+          throw new Error("lighting.scene.update requires a name and/or captureCurrentState");
+        }
+
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+        const scenes = asArray(lightingSnapshot.scenes)
+          .map((scene) => asRecord(scene))
+          .filter((scene): scene is JsonObject => scene !== null);
+        const targetScene = scenes.find((scene) => asString(scene.id) === sceneId);
+        if (!targetScene) {
+          throw new Error(`Lighting scene '${sceneId}' is not present in the scene list.`);
+        }
+
+        const fixtures = asArray(lightingSnapshot.fixtures)
+          .map((fixture) => asRecord(fixture))
+          .filter((fixture): fixture is JsonObject => fixture !== null);
+
+        const nextName = hasName ? asString(params.name).trim() : asString(targetScene.name);
+        if (hasName && !nextName) {
+          throw new Error("name must not be empty");
+        }
+        const nextFixtureStates = hasCapture
+          ? fixtures.map((fixture) => ({
+              fixtureId: asString(fixture.id),
+              intensity: asNumber(fixture.intensity, 0),
+              cct: asNumber(fixture.cct, 3200),
+              on: asBoolean(fixture.on, false),
+            }))
+          : asArray(targetScene.fixtureStates);
+
+        const updatedScene: JsonObject = {
+          ...targetScene,
+          name: nextName,
+          fixtureStates: nextFixtureStates,
+          fixtureCount: hasCapture ? fixtures.length : asNumber(targetScene.fixtureCount, fixtures.length),
+        };
+
+        lightingSnapshot.scenes = scenes.map((scene) => (asString(scene.id) === sceneId ? updatedScene : scene));
+        const summaryParts: string[] = [];
+        if (hasName) summaryParts.push(`renamed to '${nextName}'`);
+        if (hasCapture) summaryParts.push("captured current rig state");
+        const summary = `Lighting scene '${nextName}' ${summaryParts.join(" + ")}.`;
+        lightingSnapshot.lastActionStatus = "succeeded";
+        lightingSnapshot.lastActionCode = null;
+        lightingSnapshot.lastActionMessage = summary;
+        lightingSnapshot.summary = summary;
+        state.lightingSnapshot = lightingSnapshot;
+        synchronizeFixtureState(state);
+        emit("lighting.changed", { reason: "scene-updated" });
+        return {
+          scene: cloneJson(updatedScene),
+          summary,
+        };
+      }
       case "lighting.settings.update": {
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
         const hasSelectedSceneId = Object.prototype.hasOwnProperty.call(params, "selectedSceneId");
@@ -2403,6 +2464,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error("fixtureId is required");
         }
 
+        const hasName = typeof params.name === "string";
+        const hasType = typeof params.type === "string";
         const hasOn = typeof params.on === "boolean";
         const hasIntensity = typeof params.intensity === "number";
         const hasCct = typeof params.cct === "number";
@@ -2413,6 +2476,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const hasRigZ = Object.prototype.hasOwnProperty.call(params, "rigZ");
         const hasBeamAngleDegrees = Object.prototype.hasOwnProperty.call(params, "beamAngleDegrees");
         if (
+          !hasName &&
+          !hasType &&
           !hasOn &&
           !hasIntensity &&
           !hasCct &&
@@ -2442,7 +2507,11 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error(`Lighting fixture '${fixtureId}' is not present in the fixture inventory.`);
         }
 
-        const normalizedFixtureType = normalizeFixtureType(targetFixture.type);
+        const requestedType = hasType ? normalizeFixtureType(params.type) : null;
+        if (hasType && !requestedType) {
+          throw new Error("type is required");
+        }
+        const normalizedFixtureType = requestedType ?? normalizeFixtureType(targetFixture.type);
         const cctRange = lightingFixtureCctRange(normalizedFixtureType);
         const defaultCct = defaultLightingFixtureCct(normalizedFixtureType);
         const maxDmxStartAddress = lightingFixtureMaxStartAddress(normalizedFixtureType);
@@ -2482,6 +2551,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
 
         const updatedFixture: JsonObject = {
           ...targetFixture,
+          ...(hasName ? { name: asString(params.name).trim() || asString(targetFixture.name) } : {}),
+          ...(hasType ? { type: normalizedFixtureType } : {}),
           ...(hasOn ? { on: params.on } : {}),
           ...(hasDmxStartAddress ? { dmxStartAddress: nextDmxStartAddress } : {}),
           ...(hasGroupId ? { groupId: nextGroupId || null } : {}),
@@ -2640,6 +2711,40 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         emit("lighting.changed", { reason: "group-created" });
         return {
           group: cloneJson(createdGroup),
+          summary,
+        };
+      }
+      case "lighting.group.update": {
+        const groupId = asString(params.groupId).trim();
+        if (!groupId) {
+          throw new Error("groupId is required");
+        }
+        const name = asString(params.name).trim();
+        if (!name) {
+          throw new Error("name is required");
+        }
+
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+        const groups = asArray(lightingSnapshot.groups)
+          .map((group) => asRecord(group))
+          .filter((group): group is JsonObject => group !== null);
+        const targetGroup = groups.find((group) => asString(group.id) === groupId);
+        if (!targetGroup) {
+          throw new Error(`Lighting group '${groupId}' is not present in the group list.`);
+        }
+
+        const updatedGroup: JsonObject = { ...targetGroup, name };
+        lightingSnapshot.groups = groups.map((group) => (asString(group.id) === groupId ? updatedGroup : group));
+        const summary = `Lighting group renamed to '${name}'.`;
+        lightingSnapshot.lastActionStatus = "succeeded";
+        lightingSnapshot.lastActionCode = null;
+        lightingSnapshot.lastActionMessage = summary;
+        lightingSnapshot.summary = summary;
+        state.lightingSnapshot = lightingSnapshot;
+        synchronizeFixtureState(state);
+        emit("lighting.changed", { reason: "group-updated" });
+        return {
+          group: cloneJson(updatedGroup),
           summary,
         };
       }

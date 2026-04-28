@@ -456,15 +456,33 @@
   gap: 6px;
 }
 
+.groupChipRow {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  overflow: hidden;
+  transition: border-color var(--motion-duration-fast) ease;
+}
+
+.groupChipRow:hover {
+  border-color: var(--color-bg-border);
+}
+
+.groupChipRow:has(.groupChipOn) {
+  border-color: var(--color-brand-green-border);
+  background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, rgba(153, 186, 146, 0.05) 100%);
+}
+
 .groupChip {
   appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-pill);
+  background: transparent;
+  border: none;
   color: var(--color-brand-text-secondary);
   font-family: var(--font-family-ui);
   font-size: 12px;
@@ -472,13 +490,53 @@
 }
 
 .groupChip:hover {
-  border-color: var(--color-bg-border);
   color: var(--color-brand-text-primary);
 }
 
 .groupChipOn {
-  border-color: var(--color-brand-green-border);
   color: var(--color-brand-text-primary);
+}
+
+.groupChipInspect {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--color-bg-stroke);
+  color: var(--color-brand-text-muted);
+  cursor: pointer;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.groupChipInspect:hover {
+  color: var(--color-brand-green);
+  background: var(--color-bg-raised);
+}
+
+.groupChipAdd {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--color-bg-soft);
+  border: 1px dashed var(--color-bg-stroke);
+  border-radius: var(--radius-pill);
+  color: var(--color-brand-text-secondary);
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
+    background var(--motion-duration-fast) ease;
+}
+
+.groupChipAdd:hover {
+  border-color: var(--color-brand-green-border);
+  color: var(--color-brand-green);
   background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, rgba(153, 186, 146, 0.05) 100%);
 }
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Pencil, Play, Save, Trash2 } from "lucide-react";
+import { Pencil, Play, Plus, Save, Trash2 } from "lucide-react";
 
-import { Button, ConfirmDialog } from "@sse/design-system";
+import { Button, ConfirmDialog, IconButton } from "@sse/design-system";
 import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
 
 import { formatLightingRelativeTime, lightingFixtureColor } from "../lightingHelpers";
@@ -15,9 +15,11 @@ export interface InspectorSceneProps {
   isModified: boolean;
   bridgeReachable: boolean;
   onSaveScene?: () => void;
+  onSaveSceneAs?: () => void;
   onRecallScene?: (sceneId: string) => void;
   onResaveScene?: () => void;
   onDeleteScene?: () => void;
+  onRenameScene?: (sceneId: string, currentName: string) => void;
   saveBusy?: boolean;
   recallBusy?: boolean;
   resaveBusy?: boolean;
@@ -70,9 +72,11 @@ export function InspectorScene({
   isModified,
   bridgeReachable,
   onSaveScene,
+  onSaveSceneAs,
   onRecallScene,
   onResaveScene,
   onDeleteScene,
+  onRenameScene,
   saveBusy = false,
   recallBusy = false,
   resaveBusy = false,
@@ -88,10 +92,10 @@ export function InspectorScene({
           <h2 className={styles.sceneTitle}>No scene</h2>
           <p className={styles.sceneSub}>
             No scene is active. Press <kbd className={styles.kbd}>S</kbd> after editing fixtures to save the current rig
-            state as a new scene.
+            state as a new scene, or use <strong>Save as new</strong> to name it explicitly.
           </p>
-          {onSaveScene ? (
-            <div className={styles.sceneActions}>
+          <div className={styles.sceneActions}>
+            {onSaveScene ? (
               <Button
                 onClick={onSaveScene}
                 disabled={saveBusy || fixtures.length === 0}
@@ -101,8 +105,19 @@ export function InspectorScene({
               >
                 Save scene
               </Button>
-            </div>
-          ) : null}
+            ) : null}
+            {onSaveSceneAs ? (
+              <Button
+                onClick={onSaveSceneAs}
+                disabled={saveBusy || fixtures.length === 0}
+                variant="ghost"
+                size="compact"
+                leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={1.75} />}
+              >
+                Save as new…
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     );
@@ -114,7 +129,18 @@ export function InspectorScene({
   return (
     <div className={styles.scenePane}>
       <span className={styles.sceneEyebrow}>{isModified ? "Active scene · modified" : "Active scene"}</span>
-      <h2 className={styles.sceneTitle}>{scene.name}</h2>
+      <div className={styles.sceneTitleRow}>
+        <h2 className={styles.sceneTitle}>{scene.name}</h2>
+        {onRenameScene ? (
+          <IconButton
+            tone="ghost"
+            size="sm"
+            icon={Pencil}
+            label={`Rename scene ${scene.name}`}
+            onClick={() => onRenameScene(scene.id, scene.name)}
+          />
+        ) : null}
+      </div>
       <p className={styles.sceneSub}>
         {stats.onCount > 0
           ? `${stats.onCount} of ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} on at ${stats.avgIntensity}% / ${stats.avgCct} K average.`
@@ -222,14 +248,14 @@ export function InspectorScene({
             Save changes
           </Button>
         ) : null}
-        {onSaveScene ? (
+        {onSaveSceneAs ? (
           <Button
-            onClick={onSaveScene}
+            onClick={onSaveSceneAs}
             loading={saveBusy}
             disabled={fixtures.length === 0}
             variant="ghost"
             size="compact"
-            leadingVisual={<Save aria-hidden="true" size={13} strokeWidth={1.75} />}
+            leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={1.75} />}
           >
             Save as new
           </Button>

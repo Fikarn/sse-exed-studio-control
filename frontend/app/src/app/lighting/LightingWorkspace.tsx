@@ -19,6 +19,7 @@ import {
   type SnapshotRecord,
 } from "../shellData";
 import { ColumnResizer } from "./components/ColumnResizer";
+import { CreateFixtureDialog } from "./components/CreateFixtureDialog";
 import { DMXMonitorDialog } from "./components/DMXMonitorDialog";
 import { LightingBridgeBanner } from "./components/LightingBridgeBanner";
 import { LightingHealthBar } from "./components/LightingHealthBar";
@@ -26,12 +27,18 @@ import { LightingInspector, deriveInspectorTab, type LightingUiMode } from "./co
 import type { InspectorTab } from "./components/LightingInspectorTabs";
 import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
+import { RenameDialog } from "./components/RenameDialog";
 import { StagePlot } from "./components/StagePlot";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
 import { useResizableColumns } from "./useResizableColumns";
 import { UndoRefusedError, useUndoStack, type UndoOutcome } from "./useUndoStack";
 import { useUnsavedChangesGuard } from "./useUnsavedScenePrompt";
 import styles from "./LightingWorkspace.module.css";
+
+type RenameTarget =
+  | { kind: "scene"; sceneId: string; currentName: string }
+  | { kind: "fixture"; fixtureId: string; currentName: string }
+  | { kind: "group"; groupId: string; currentName: string };
 
 interface LightingWorkspaceSurfaceProps {
   appSnapshot: SnapshotRecord | null;
@@ -106,6 +113,10 @@ export function LightingWorkspaceSurface({
   const [extraSelectedFixtureIds, setExtraSelectedFixtureIds] = useState<ReadonlySet<string>>(() => new Set());
   const [dmxMonitorOpen, setDmxMonitorOpen] = useState(false);
   const [confirmCutAllOpen, setConfirmCutAllOpen] = useState(false);
+  const [createFixtureOpen, setCreateFixtureOpen] = useState(false);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [saveSceneAsOpen, setSaveSceneAsOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   // Frontend-only "previewed" scene id. Set immediately when a scene tile is
   // clicked so the inspector can show its details even if the engine recall
   // IPC was rejected (e.g. bridge unreachable in dev / pre-probe states).
@@ -342,14 +353,13 @@ export function LightingWorkspaceSurface({
     setUiMode((current) => (current === "patch" ? "recall" : "patch"));
   });
 
-  const handleAddFixture = useEffectEvent(async () => {
+  const requestAddFixture = useCallback(() => {
+    setCreateFixtureOpen(true);
+  }, []);
+
+  const handleAddFixture = useEffectEvent(async (fixtureSpec: { name: string; type: string; dmxStartAddress: number }) => {
     setBusyAction("fixture-create");
     try {
-      const fixtureSpec = {
-        dmxStartAddress: 1,
-        name: `Fixture ${fixtures.length + 1}`,
-        type: "astra-bicolor",
-      };
       const result = asRecord(await store.createLightingFixture(fixtureSpec));
       const createdFixture = asRecord(result?.fixture);
       const createdFixtureId = typeof createdFixture?.id === "string" ? createdFixture.id : null;
@@ -386,6 +396,54 @@ export function LightingWorkspaceSurface({
       setFeedback({ message: String(result?.summary ?? "Fixture added."), tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting fixture create failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
+  const handleCreateGroup = useEffectEvent(async (name: string) => {
+    setBusyAction("group-create");
+    try {
+      const result = asRecord(await store.createLightingGroup(name));
+      setFeedback({ message: String(result?.summary ?? `Group '${name}' created.`), tone: "ok" });
+    } catch (error) {
+      reportError(error, "Lighting group create failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
+  const handleRenameScene = useEffectEvent(async (sceneId: string, name: string) => {
+    setBusyAction("scene-rename");
+    try {
+      await store.updateLightingScene({ sceneId, name });
+      setFeedback({ message: `Scene renamed to '${name}'.`, tone: "ok" });
+    } catch (error) {
+      reportError(error, "Scene rename failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
+  const handleRenameFixture = useEffectEvent(async (fixtureId: string, name: string) => {
+    setBusyAction(`fixture-rename:${fixtureId}`);
+    try {
+      await store.updateLightingFixture({ fixtureId, name });
+      setFeedback({ message: `Fixture renamed to '${name}'.`, tone: "ok" });
+    } catch (error) {
+      reportError(error, "Fixture rename failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
+  const handleRenameGroup = useEffectEvent(async (groupId: string, name: string) => {
+    setBusyAction(`group-rename:${groupId}`);
+    try {
+      await store.updateLightingGroup({ groupId, name });
+      setFeedback({ message: `Group renamed to '${name}'.`, tone: "ok" });
+    } catch (error) {
+      reportError(error, "Group rename failed.");
     } finally {
       setBusyAction(null);
     }
@@ -442,10 +500,10 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleSaveScene = useEffectEvent(async () => {
+  const handleSaveScene = useEffectEvent(async (overrideName?: string) => {
     setBusyAction("scene-create");
     try {
-      const name = `Scene ${scenes.length + 1}`;
+      const name = overrideName?.trim() || `Scene ${scenes.length + 1}`;
       const result = asRecord(await store.createLightingScene({ name }));
       const created = asRecord(result?.scene);
       const createdId = typeof created?.id === "string" ? created.id : null;
@@ -471,28 +529,29 @@ export function LightingWorkspaceSurface({
 
   const handleResaveScene = useEffectEvent(async () => {
     if (!activeScene) return;
-    // Engine has no direct "update scene fixture states" IPC — the existing
-    // create path is used: delete the old, recreate with the same name.
     setBusyAction("scene-resave");
     try {
-      const previousId = activeScene.id;
-      const previousName = activeScene.name;
-      await store.deleteLightingScene(previousId);
-      const result = asRecord(await store.createLightingScene({ name: previousName }));
-      const created = asRecord(result?.scene);
-      const createdId = typeof created?.id === "string" ? created.id : null;
-      let nextThumbs = withSceneThumbRemoved(sceneThumbs, previousId);
-      if (createdId) {
-        const fixtureStatesRecord = Array.isArray(created?.fixtureStates) ? created!.fixtureStates : [];
-        const dataUri = renderSceneThumbnailDataUri({
-          fixtures,
-          fixtureStates: fixtureStatesRecord as unknown as LightingSceneSnapshot["fixtureStates"],
-        });
-        nextThumbs = withSceneThumbUpserted(nextThumbs, createdId, dataUri);
-      }
+      const sceneId = activeScene.id;
+      const sceneName = activeScene.name;
+      // Use the new lighting.scene.update IPC with captureCurrentState — no
+      // more delete+recreate dance, scene id stays stable so any persisted
+      // references (sceneThumbs cache, lastRecalled flag) keep working.
+      await store.updateLightingScene({ sceneId, captureCurrentState: true });
+      // Refresh the cached thumbnail with the freshly captured state.
+      const liveStates = fixtures.map((fixture) => ({
+        fixtureId: fixture.id,
+        intensity: fixture.intensity,
+        cct: fixture.cct,
+        on: fixture.on,
+      })) as unknown as LightingSceneSnapshot["fixtureStates"];
+      const dataUri = renderSceneThumbnailDataUri({
+        fixtures,
+        fixtureStates: liveStates,
+      });
+      const nextThumbs = withSceneThumbUpserted(sceneThumbs, sceneId, dataUri);
       await store.setLightingSceneThumbs(nextThumbs);
       setLastSavedAt(new Date());
-      setFeedback({ message: `Scene '${previousName}' updated.`, tone: "ok" });
+      setFeedback({ message: `Scene '${sceneName}' updated.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Scene re-save failed.");
     } finally {
@@ -527,6 +586,16 @@ export function LightingWorkspaceSurface({
     // is rejected by the engine (e.g. pre-probe state), the operator still
     // sees what the scene contains. The recall IPC drives the actual rig.
     setPreviewSceneId(sceneId);
+    if (!bridgeReachable) {
+      // Skip the IPC entirely when the bridge is unreachable — the engine
+      // would just reject it. Surface a single non-error toast so the
+      // operator knows recall is preview-only and not a failed action.
+      setFeedback({
+        message: "Bridge unreachable — showing scene contents only.",
+        tone: "info",
+      });
+      return;
+    }
     setBusyAction(`scene:${sceneId}`);
     try {
       await store.recallLightingScene(sceneId, 0);
@@ -762,6 +831,29 @@ export function LightingWorkspaceSurface({
     }
   );
 
+  const handleAssignFixtureGroup = useEffectEvent(async (fixtureId: string, groupId: string | null) => {
+    setBusyAction(`fixture-group:${fixtureId}`);
+    try {
+      await store.updateLightingFixture({ fixtureId, groupId });
+      setFeedback({
+        message: groupId ? "Fixture moved to group." : "Fixture removed from group.",
+        tone: "ok",
+      });
+    } catch (error) {
+      reportError(error, "Fixture group assignment failed.");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
+  const handleInspectGroup = useCallback(
+    (groupId: string) => {
+      setSelectedGroupId(groupId);
+      setActiveTabOverride("group");
+    },
+    []
+  );
+
   const handleFixtureNudge = useEffectEvent(async (deltaXMeters: number, deltaYMeters: number) => {
     const fixture = persistedSelectedFixtureId
       ? fixtures.find((candidate) => candidate.id === persistedSelectedFixtureId)
@@ -867,12 +959,35 @@ export function LightingWorkspaceSurface({
         return;
       }
 
+      // ⌘S / Ctrl+S → save changes when drift exists, otherwise no-op with
+      // feedback. ⌘⇧S → always opens the "Save as new" dialog with rename.
+      if (modifier && !event.altKey && event.key.toLowerCase() === "s") {
+        if (event.shiftKey) {
+          setSaveSceneAsOpen(true);
+        } else if (isSceneModified && activeScene) {
+          void handleResaveScene();
+        } else {
+          setFeedback({
+            message: activeScene ? "Already saved." : "No active scene to save changes to.",
+            tone: "info",
+          });
+        }
+        event.preventDefault();
+        return;
+      }
+
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (event.key.toLowerCase() === "p") {
         setUiMode((current) => (current === "patch" ? "recall" : "patch"));
         event.preventDefault();
       } else if (event.key.toLowerCase() === "s") {
-        void handleSaveScene();
+        // Smart S: when drift exists on the active scene, save changes.
+        // Otherwise create a new scene with the autoname for fast capture.
+        if (isSceneModified && activeScene) {
+          void handleResaveScene();
+        } else {
+          void handleSaveScene();
+        }
         event.preventDefault();
       } else if (event.key === "Escape") {
         setSelectedGroupId(null);
@@ -881,7 +996,17 @@ export function LightingWorkspaceSurface({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleFixtureNudge, handleSaveScene, handleSelectFixture, persistedSelectedFixtureId, triggerRedo, triggerUndo]);
+  }, [
+    activeScene,
+    handleFixtureNudge,
+    handleResaveScene,
+    handleSaveScene,
+    handleSelectFixture,
+    isSceneModified,
+    persistedSelectedFixtureId,
+    triggerRedo,
+    triggerUndo,
+  ]);
 
   const lastSavedLabel = lastSavedAt
     ? lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -901,7 +1026,7 @@ export function LightingWorkspaceSurface({
         onSearchChange={setSearchQuery}
         patchMode={uiMode === "patch"}
         onTogglePatch={handleTogglePatch}
-        onAddFixture={handleAddFixture}
+        onAddFixture={requestAddFixture}
       />
 
       {feedback ? (
@@ -950,6 +1075,8 @@ export function LightingWorkspaceSurface({
           onResaveScene={handleResaveScene}
           onRevertScene={activeSceneId ? () => void handleRecallScene(activeSceneId) : undefined}
           onClearSearch={() => setSearchQuery("")}
+          onCreateGroup={() => setCreateGroupOpen(true)}
+          onInspectGroup={handleInspectGroup}
         />
 
         <ColumnResizer ariaLabel="Resize scene rail" onPointerDown={columns.startResize("rail")} />
@@ -996,11 +1123,23 @@ export function LightingWorkspaceSurface({
           onToggleGroupPower={handleToggleGroupPower}
           onSelectFixture={(id, options) => void handleSelectFixture(id, options)}
           onSaveScene={handleSaveScene}
+          onSaveSceneAs={() => setSaveSceneAsOpen(true)}
           onRecallScene={handleRecallScene}
           onResaveScene={handleResaveScene}
           onDeleteScene={handleDeleteScene}
           onDeleteFixture={(id) => void handleDeleteFixture(id)}
           onSpatialCommit={(id, partial) => void handleFixtureSpatialCommit(id, partial)}
+          onRenameScene={(sceneId, currentName) =>
+            setRenameTarget({ kind: "scene", sceneId, currentName })
+          }
+          onRenameFixture={(fixtureId, currentName) =>
+            setRenameTarget({ kind: "fixture", fixtureId, currentName })
+          }
+          onRenameGroup={(groupId, currentName) =>
+            setRenameTarget({ kind: "group", groupId, currentName })
+          }
+          onAssignFixtureGroup={(fixtureId, groupId) => void handleAssignFixtureGroup(fixtureId, groupId)}
+          onCreateGroup={() => setCreateGroupOpen(true)}
           selectedFixtures={selectedFixtureSnapshots}
           onClearSelection={() => void handleSelectFixture(null)}
           onBulkTogglePower={(ids, on) => void handleBulkTogglePower(ids, on)}
@@ -1076,6 +1215,80 @@ export function LightingWorkspaceSurface({
             void handleEmergencyCut();
           }}
           onCancel={() => setConfirmCutAllOpen(false)}
+        />
+      ) : null}
+
+      {createFixtureOpen ? (
+        <CreateFixtureDialog
+          fixtures={fixtures}
+          defaultName={`Fixture ${fixtures.length + 1}`}
+          busy={busyAction === "fixture-create"}
+          onConfirm={(spec) => {
+            setCreateFixtureOpen(false);
+            void handleAddFixture(spec);
+          }}
+          onCancel={() => setCreateFixtureOpen(false)}
+        />
+      ) : null}
+
+      {createGroupOpen ? (
+        <RenameDialog
+          title="New lighting group"
+          fieldLabel="Group name"
+          initialValue=""
+          placeholder="e.g. Key, Fill, Back"
+          confirmLabel="Create group"
+          busy={busyAction === "group-create"}
+          onConfirm={(name) => {
+            setCreateGroupOpen(false);
+            void handleCreateGroup(name);
+          }}
+          onCancel={() => setCreateGroupOpen(false)}
+        />
+      ) : null}
+
+      {saveSceneAsOpen ? (
+        <RenameDialog
+          title="Save as new scene"
+          fieldLabel="Scene name"
+          initialValue={`Scene ${scenes.length + 1}`}
+          placeholder="e.g. Talking head, Wide, Backlit"
+          confirmLabel="Save scene"
+          busy={busyAction === "scene-create"}
+          onConfirm={(name) => {
+            setSaveSceneAsOpen(false);
+            void handleSaveScene(name);
+          }}
+          onCancel={() => setSaveSceneAsOpen(false)}
+        />
+      ) : null}
+
+      {renameTarget ? (
+        <RenameDialog
+          title={
+            renameTarget.kind === "scene"
+              ? "Rename scene"
+              : renameTarget.kind === "fixture"
+                ? "Rename fixture"
+                : "Rename group"
+          }
+          fieldLabel="Name"
+          initialValue={renameTarget.currentName}
+          busy={
+            renameTarget.kind === "scene"
+              ? busyAction === "scene-rename"
+              : renameTarget.kind === "fixture"
+                ? busyAction === `fixture-rename:${renameTarget.fixtureId}`
+                : busyAction === `group-rename:${renameTarget.groupId}`
+          }
+          onConfirm={(name) => {
+            const target = renameTarget;
+            setRenameTarget(null);
+            if (target.kind === "scene") void handleRenameScene(target.sceneId, name);
+            else if (target.kind === "fixture") void handleRenameFixture(target.fixtureId, name);
+            else void handleRenameGroup(target.groupId, name);
+          }}
+          onCancel={() => setRenameTarget(null)}
         />
       ) : null}
     </div>

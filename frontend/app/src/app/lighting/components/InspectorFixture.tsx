@@ -1,8 +1,8 @@
 import { type ChangeEvent, useEffect, useState } from "react";
-import { Power, Trash2 } from "lucide-react";
+import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 
-import { Button, ConfirmDialog, InspectorSection, StatusDot } from "@sse/design-system";
-import type { LightingFixtureSnapshot } from "@sse/engine-client";
+import { Button, ConfirmDialog, IconButton, InspectorSection, StatusDot } from "@sse/design-system";
+import type { LightingFixtureSnapshot, LightingGroupSnapshot } from "@sse/engine-client";
 
 import { deriveMounting, type FixtureMounting } from "../fixtureMounting";
 import { defaultLightingBeamAngle, isLightingRangeCommitKey, lightingFixtureCctRange } from "../lightingHelpers";
@@ -18,6 +18,7 @@ const BEAM_ANGLE_MAX_DEGREES = 180;
 export interface InspectorFixtureProps {
   fixture: LightingFixtureSnapshot;
   groupName?: string;
+  groups?: readonly LightingGroupSnapshot[];
   bridgeReachable?: boolean;
   onTogglePower: (fixtureId: string, on: boolean) => void;
   onIntensityCommit: (fixtureId: string, intensity: number) => void;
@@ -33,9 +34,16 @@ export interface InspectorFixtureProps {
       beamAngleDegrees?: number | null;
     }
   ) => void;
+  onRenameFixture?: (fixtureId: string, currentName: string) => void;
+  onAssignFixtureGroup?: (fixtureId: string, groupId: string | null) => void;
+  onCreateGroup?: () => void;
   busy?: boolean;
   deleteBusy?: boolean;
+  renameBusy?: boolean;
+  assignGroupBusy?: boolean;
 }
+
+const ASSIGN_NEW_GROUP_VALUE = "__create_group__";
 
 const MOUNTING_LABEL: Record<FixtureMounting, string> = {
   "grid-panel": "Grid · panel",
@@ -57,6 +65,7 @@ function formatMaybeNumber(value: number | null | undefined): string {
 export function InspectorFixture({
   fixture,
   groupName,
+  groups = [],
   bridgeReachable = true,
   onTogglePower,
   onIntensityCommit,
@@ -64,8 +73,13 @@ export function InspectorFixture({
   onIdentifyBurst,
   onDeleteFixture,
   onSpatialCommit,
+  onRenameFixture,
+  onAssignFixtureGroup,
+  onCreateGroup,
   busy = false,
   deleteBusy = false,
+  renameBusy = false,
+  assignGroupBusy = false,
 }: InspectorFixtureProps) {
   const cctRange = lightingFixtureCctRange(fixture.type);
   const [intensityDraft, setIntensityDraft] = useState(fixture.intensity);
@@ -154,8 +168,20 @@ export function InspectorFixture({
     <>
       <InspectorSection title="Fixture">
         <div className={styles.fixtureHeader}>
-          <div>
-            <div className={styles.fixtureName}>{fixture.name}</div>
+          <div className={styles.fixtureNameStack}>
+            <div className={styles.fixtureNameRow}>
+              <div className={styles.fixtureName}>{fixture.name}</div>
+              {onRenameFixture ? (
+                <IconButton
+                  tone="ghost"
+                  size="sm"
+                  icon={Pencil}
+                  label={`Rename fixture ${fixture.name}`}
+                  onClick={() => onRenameFixture(fixture.id, fixture.name)}
+                  disabled={renameBusy}
+                />
+              ) : null}
+            </div>
             <div className={styles.fixtureSubline}>
               <StatusDot state={fixture.on ? "ok" : "info"} size="sm" />
               {fixture.on ? "Live" : "Standby"} · {MOUNTING_LABEL[deriveMounting(fixture.type)]}
@@ -177,14 +203,46 @@ export function InspectorFixture({
             <dd className={styles.factValue}>{fixture.type}</dd>
           </div>
           <div className={styles.fact}>
-            <dt className={styles.factLabel}>Group</dt>
-            <dd className={styles.factValue}>{groupName ?? "Ungrouped"}</dd>
-          </div>
-          <div className={styles.fact}>
             <dt className={styles.factLabel}>Kind</dt>
             <dd className={styles.factValue}>{fixture.kind}</dd>
           </div>
         </dl>
+        {onAssignFixtureGroup ? (
+          <label className={styles.groupAssignField}>
+            <span className={styles.factLabel}>Group</span>
+            <select
+              className={styles.groupAssignSelect}
+              value={fixture.groupId ?? ""}
+              disabled={assignGroupBusy}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                if (value === ASSIGN_NEW_GROUP_VALUE) {
+                  onCreateGroup?.();
+                  return;
+                }
+                onAssignFixtureGroup(fixture.id, value === "" ? null : value);
+              }}
+            >
+              <option value="">Ungrouped</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+              {onCreateGroup ? (
+                <option disabled>──────────</option>
+              ) : null}
+              {onCreateGroup ? <option value={ASSIGN_NEW_GROUP_VALUE}>+ Create new group…</option> : null}
+            </select>
+          </label>
+        ) : (
+          <dl className={styles.factGrid}>
+            <div className={styles.fact}>
+              <dt className={styles.factLabel}>Group</dt>
+              <dd className={styles.factValue}>{groupName ?? "Ungrouped"}</dd>
+            </div>
+          </dl>
+        )}
       </InspectorSection>
 
       <InspectorSection title="Intensity">
