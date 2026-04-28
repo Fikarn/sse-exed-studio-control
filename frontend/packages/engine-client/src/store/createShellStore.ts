@@ -465,6 +465,13 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         },
       });
     },
+    async setLightingSceneThumbs(thumbs) {
+      return performRequest("settings.update", {
+        lighting: {
+          sceneThumbs: thumbs as unknown as JsonObject,
+        },
+      });
+    },
     async runCommissioningCheck(request: CommissioningCheckRequest) {
       return performRequest("commissioning.check.run", request as unknown as JsonObject);
     },

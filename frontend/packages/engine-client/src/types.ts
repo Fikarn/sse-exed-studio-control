@@ -218,6 +218,7 @@ export interface ShellStore {
   setSetupSection(section: SetupSection): Promise<JsonValue>;
   setLightingSection(sectionId: string | null): Promise<JsonValue>;
   setLightingSelectedCue(cueId: string | null): Promise<JsonValue>;
+  setLightingSceneThumbs(thumbs: Record<string, string>): Promise<JsonValue>;
   runCommissioningCheck(request: CommissioningCheckRequest): Promise<JsonValue>;
   updateCommissioning(request: CommissioningUpdateRequest): Promise<JsonValue>;
   syncAudio(): Promise<JsonValue>;

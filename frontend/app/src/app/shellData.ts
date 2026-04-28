@@ -439,6 +439,32 @@ export function getLightingDmxChannels(snapshot: LightingDmxMonitorSnapshot | nu
     .sort((left, right) => left.channel - right.channel);
 }
 
+// Scene thumbnails persist on the engine-managed shell.lighting.sceneThumbs
+// blob (added in PR 3 §3.3 — extends shell_settings.rs). The map is full-
+// replace: callers read the current map, mutate locally, and call
+// store.setLightingSceneThumbs(updated). Per LightingSceneSnapshot being
+// ts-rs strict (Phase 0 V5), the engine treats each value as opaque and
+// the frontend owns rendering / serialization.
+export function getSceneThumbs(appSnapshot: SnapshotRecord | null): Record<string, string> {
+  const shell = asRecord(appSnapshot?.shell);
+  const lighting = asRecord(shell?.lighting);
+  const thumbs = asRecord(lighting?.sceneThumbs);
+  if (!thumbs) {
+    return {};
+  }
+  const result: Record<string, string> = {};
+  for (const [sceneId, value] of Object.entries(thumbs)) {
+    if (typeof value === "string") {
+      result[sceneId] = value;
+    }
+  }
+  return result;
+}
+
+export function getSceneThumb(appSnapshot: SnapshotRecord | null, sceneId: string): string | undefined {
+  return getSceneThumbs(appSnapshot)[sceneId];
+}
+
 // Audio helpers: thin pass-throughs over typed snapshot.
 export function getAudioChannels(snapshot: AudioSnapshot | null): AudioChannelEntry[] {
   return (snapshot?.channels ?? []).map((c: AudioChannelSnapshot) => ({
