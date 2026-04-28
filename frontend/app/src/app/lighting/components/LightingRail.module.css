@@ -113,6 +113,9 @@
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .masterName {
@@ -121,6 +124,9 @@
   font-weight: 600;
   font-size: 17px;
   color: var(--color-brand-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .masterOn .masterName {

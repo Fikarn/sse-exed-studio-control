@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 
-import { InspectorPanel } from "@sse/design-system";
 import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
 
 import type { LightingDmxChannelEntry } from "../../shellData";
@@ -114,7 +113,7 @@ export function LightingInspector({
   const fixtureGroup = selectedFixture ? (groups.find((group) => group.id === selectedFixture.groupId) ?? null) : null;
 
   return (
-    <InspectorPanel eyebrow="Inspector" title={TAB_TITLE[activeTab]} className={styles.inspector}>
+    <aside className={styles.inspector} aria-label={`Lighting inspector — ${TAB_TITLE[activeTab]}`}>
       <LightingInspectorTabs active={activeTab} onChange={onTabChange} visibleTabs={visibleTabs} />
 
       {activeTab === "scene" ? (
@@ -178,6 +177,6 @@ export function LightingInspector({
           busy={selectedFixture ? busyAction === `fixture-patch:${selectedFixture.id}` : false}
         />
       ) : null}
-    </InspectorPanel>
+    </aside>
   );
 }

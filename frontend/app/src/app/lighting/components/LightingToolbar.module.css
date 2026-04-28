@@ -10,6 +10,8 @@
   font-size: 13px;
   color: var(--color-brand-text-primary);
   position: relative;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .toolbar::before {
@@ -31,6 +33,7 @@
   font-size: 16px;
   color: var(--color-brand-text-primary);
   letter-spacing: -0.01em;
+  flex-shrink: 0;
 }
 
 .titleIcon {
@@ -61,6 +64,8 @@
   font-feature-settings: "tnum", "zero";
   color: var(--color-brand-text-primary);
   box-shadow: var(--shadow-inset-hi);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .chipGreen {
@@ -119,7 +124,8 @@
   color: var(--color-brand-text-secondary);
   font-family: var(--font-family-ui);
   font-size: 12px;
-  min-width: 220px;
+  min-width: 0;
+  flex: 0 1 240px;
 }
 
 .search:focus-within {
@@ -164,6 +170,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .kebab:hover {

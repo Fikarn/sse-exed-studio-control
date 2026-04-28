@@ -1,10 +1,14 @@
 .inspector {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px;
   background: linear-gradient(180deg, var(--color-bg-canvas) 0%, var(--color-bg-soft) 100%);
   border-left: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-ui);
   color: var(--color-brand-text-primary);
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .tabs {
