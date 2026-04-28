@@ -230,6 +230,7 @@ export interface ShellStore {
   createLightingGroup(name: string): Promise<JsonValue>;
   createLightingFixture(request: LightingFixtureCreateRequest): Promise<JsonValue>;
   createLightingScene(request: LightingSceneCreateRequest): Promise<JsonValue>;
+  deleteLightingScene(sceneId: string): Promise<JsonValue>;
   createLightingCue(request: LightingCueCreateRequest): Promise<JsonValue>;
   updateLightingCue(request: LightingCueUpdateRequest): Promise<JsonValue>;
   deleteLightingCue(cueId: string): Promise<JsonValue>;

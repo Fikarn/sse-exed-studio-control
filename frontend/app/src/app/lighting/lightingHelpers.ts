@@ -1,5 +1,3 @@
-import type { StatusTone } from "@sse/design-system";
-
 // ---------------------------------------------------------------------------
 // Studio plot dimensions used by both the stage rendering and the keyboard
 // nudge handler. Keep them here so any future tuning lives in one place.
@@ -8,7 +6,7 @@ export const LIGHTING_ROOM_WIDTH_METERS = 12;
 export const LIGHTING_NUDGE_METERS = 0.1;
 
 // ---------------------------------------------------------------------------
-// Status / cue tone mapping
+// Status tone mapping
 // ---------------------------------------------------------------------------
 
 export function lightingStatusTone(status: unknown) {
@@ -21,17 +19,6 @@ export function lightingStatusTone(status: unknown) {
       return "error";
     default:
       return "info";
-  }
-}
-
-export function lightingCueTone(state: string): StatusTone {
-  switch (state) {
-    case "active":
-      return "connected";
-    case "fired":
-      return "healthy";
-    default:
-      return "idle";
   }
 }
 
@@ -147,13 +134,9 @@ export function lightingFixtureCctPercent(cct: number, fixtureType: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Cue / value formatting (used by the cue rail, DMX monitor, and the patch
-// inspector's read-only displays).
+// Value formatting (used by the DMX monitor and the inspector's read-only
+// displays).
 // ---------------------------------------------------------------------------
-
-export function formatLightingCueFadeSeconds(fadeInMs: number) {
-  return `${(Math.max(0, fadeInMs) / 1000).toFixed(1)} s`;
-}
 
 export function formatLightingValueRange(min: number, max: number, suffix: string) {
   return min === max ? `${min}${suffix}` : `${min}-${max}${suffix}`;
