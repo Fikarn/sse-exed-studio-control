@@ -37,8 +37,6 @@ import type {
   CommissioningCheckRequest,
   CommissioningUpdateRequest,
   EngineTransport,
-  LightingCueCreateRequest,
-  LightingCueUpdateRequest,
   LightingFixtureCreateRequest,
   LightingFixtureUpdateRequest,
   LightingSceneCreateRequest,
@@ -458,13 +456,6 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         },
       });
     },
-    async setLightingSelectedCue(cueId) {
-      return performRequest("settings.update", {
-        lighting: {
-          selectedCueId: cueId,
-        },
-      });
-    },
     async setLightingSceneThumbs(thumbs) {
       return performRequest("settings.update", {
         lighting: {
@@ -508,15 +499,6 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async deleteLightingScene(sceneId: string) {
       return performRequest("lighting.scene.delete", { sceneId });
     },
-    async createLightingCue(request: LightingCueCreateRequest) {
-      return performRequest("lighting.cue.create", request as unknown as JsonObject);
-    },
-    async updateLightingCue(request: LightingCueUpdateRequest) {
-      return performRequest("lighting.cue.update", request as unknown as JsonObject);
-    },
-    async deleteLightingCue(cueId: string) {
-      return performRequest("lighting.cue.delete", { cueId });
-    },
     async updateLightingFixture(request: LightingFixtureUpdateRequest) {
       return performRequest("lighting.fixture.update", request as unknown as JsonObject);
     },
@@ -525,9 +507,6 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     },
     async setLightingAllPower(on: boolean) {
       return performRequest("lighting.power.all", { on });
-    },
-    async fireLightingCue(cueId: string, fadeOverrideMs?: number) {
-      return performRequest("lighting.cue.fire", fadeOverrideMs === undefined ? { cueId } : { cueId, fadeOverrideMs });
     },
     async recallLightingScene(sceneId: string, fadeDurationSeconds?: number) {
       return performRequest(

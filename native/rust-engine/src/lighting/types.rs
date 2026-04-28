@@ -51,9 +51,6 @@ pub struct LightingSnapshot {
     pub fixtures: Vec<LightingFixtureSnapshot>,
     pub groups: Vec<LightingGroupSnapshot>,
     pub scenes: Vec<LightingSceneSnapshot>,
-    pub cues: Vec<LightingCueSnapshot>,
-    #[serde(rename = "activeCueId")]
-    pub active_cue_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -120,25 +117,6 @@ pub struct LightingSceneFixtureSnapshot {
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
-}
-
-#[derive(Debug, Serialize, Clone)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct LightingCueSnapshot {
-    pub id: String,
-    pub ordinal: i64,
-    pub label: String,
-    #[serde(rename = "sceneId")]
-    pub scene_id: Option<String>,
-    #[serde(rename = "fadeInMs")]
-    pub fade_in_ms: i64,
-    #[serde(rename = "fadeOutMs")]
-    pub fade_out_ms: i64,
-    #[serde(rename = "followSeconds")]
-    pub follow_seconds: Option<f64>,
-    pub notes: Option<String>,
-    pub state: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -221,23 +199,6 @@ pub struct LightingEditorSceneFixtureState {
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LightingEditorCueState {
-    pub id: String,
-    pub ordinal: i64,
-    pub label: String,
-    #[serde(rename = "sceneId", default)]
-    pub scene_id: Option<String>,
-    #[serde(rename = "fadeInMs", default)]
-    pub fade_in_ms: i64,
-    #[serde(rename = "fadeOutMs", default)]
-    pub fade_out_ms: i64,
-    #[serde(rename = "followSeconds", default)]
-    pub follow_seconds: Option<f64>,
-    #[serde(default)]
-    pub notes: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -381,37 +342,6 @@ pub struct LightingSceneDeleteResult {
     pub summary: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct LightingCueCreateResult {
-    pub cue: LightingCueSnapshot,
-    pub summary: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct LightingCueUpdateResult {
-    pub cue: LightingCueSnapshot,
-    pub summary: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct LightingCueDeleteResult {
-    pub deleted: bool,
-    #[serde(rename = "cueId")]
-    pub cue_id: String,
-    pub summary: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct LightingCueFireResult {
-    #[serde(rename = "activeCueId")]
-    pub active_cue_id: String,
-    #[serde(rename = "previousCueId")]
-    pub previous_cue_id: Option<String>,
-    #[serde(rename = "appliedFadeMs")]
-    pub applied_fade_ms: i64,
-    pub summary: String,
-}
-
 #[derive(Debug)]
 pub enum LightingCommandError {
     Rejected(&'static str, String),
@@ -518,38 +448,4 @@ pub struct LightingSceneUpdateRequest {
 #[derive(Debug, Clone)]
 pub struct LightingSceneDeleteRequest {
     pub scene_id: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct LightingCueCreateRequest {
-    pub label: String,
-    pub after_cue_id: Option<String>,
-    pub scene_id: Option<String>,
-    pub fade_in_ms: Option<i64>,
-    pub fade_out_ms: Option<i64>,
-    pub follow_seconds: Option<Option<f64>>,
-    pub notes: Option<Option<String>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct LightingCueUpdateRequest {
-    pub cue_id: String,
-    pub label: Option<String>,
-    pub scene_id: Option<Option<String>>,
-    pub fade_in_ms: Option<i64>,
-    pub fade_out_ms: Option<i64>,
-    pub follow_seconds: Option<Option<f64>>,
-    pub notes: Option<Option<String>>,
-    pub ordinal: Option<i64>,
-}
-
-#[derive(Debug, Clone)]
-pub struct LightingCueDeleteRequest {
-    pub cue_id: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct LightingCueFireRequest {
-    pub cue_id: String,
-    pub fade_override_ms: Option<i64>,
 }

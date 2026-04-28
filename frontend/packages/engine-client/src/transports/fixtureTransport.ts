@@ -191,8 +191,6 @@ function buildDefaultLightingSnapshot(): JsonObject {
     fixtures: [],
     groups: [],
     scenes: [],
-    cues: [],
-    activeCueId: null,
     selectedSceneId: null,
     selectedFixtureId: null,
   };
@@ -1107,15 +1105,6 @@ function nextCustomSceneId(scenes: JsonObject[]) {
   return `scene-custom-${index}`;
 }
 
-function nextCustomCueId(cues: JsonObject[]) {
-  const usedIds = new Set(cues.map((cue) => asString(cue.id)));
-  let index = 1;
-  while (usedIds.has(`cue-custom-${index}`)) {
-    index += 1;
-  }
-  return `cue-custom-${index}`;
-}
-
 function synchronizeLightingGroupCounts(lightingSnapshot: JsonObject) {
   const fixtures = asArray(lightingSnapshot.fixtures)
     .map((fixture) => asRecord(fixture))
@@ -1421,7 +1410,6 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   shell.setup = shellSetup;
   shellLighting.currentSectionId =
     typeof shellLighting.currentSectionId === "string" ? shellLighting.currentSectionId : null;
-  shellLighting.selectedCueId = typeof shellLighting.selectedCueId === "string" ? shellLighting.selectedCueId : null;
   shell.lighting = shellLighting;
   shell.summary = hasCompletedSetup ? "Operator surface ready." : "Commissioning required before operator mode.";
   state.appSnapshot.shell = shell;
@@ -1513,8 +1501,6 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   lightingSnapshot.fixtures = asArray(lightingSnapshot.fixtures);
   lightingSnapshot.groups = asArray(lightingSnapshot.groups);
   lightingSnapshot.scenes = asArray(lightingSnapshot.scenes);
-  lightingSnapshot.cues = asArray(lightingSnapshot.cues);
-  lightingSnapshot.activeCueId = typeof lightingSnapshot.activeCueId === "string" ? lightingSnapshot.activeCueId : null;
   lightingSnapshot.selectedSceneId =
     typeof lightingSnapshot.selectedSceneId === "string" ? lightingSnapshot.selectedSceneId : null;
   lightingSnapshot.selectedFixtureId =
@@ -1774,16 +1760,11 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           emit("settings.changed", { reason: "setup-section-updated" });
         }
         const lighting = asRecord(params.lighting);
-        if (lighting && ("currentSectionId" in lighting || "selectedCueId" in lighting)) {
+        if (lighting && "currentSectionId" in lighting) {
           const shell = asRecord(state.appSnapshot.shell) ?? {};
           const shellLighting = asRecord(shell.lighting) ?? {};
-          if ("currentSectionId" in lighting) {
-            shellLighting.currentSectionId =
-              typeof lighting.currentSectionId === "string" ? lighting.currentSectionId : null;
-          }
-          if ("selectedCueId" in lighting) {
-            shellLighting.selectedCueId = typeof lighting.selectedCueId === "string" ? lighting.selectedCueId : null;
-          }
+          shellLighting.currentSectionId =
+            typeof lighting.currentSectionId === "string" ? lighting.currentSectionId : null;
           shell.lighting = shellLighting;
           state.appSnapshot.shell = shell;
           emit("settings.changed", { reason: "lighting-shell-state-updated" });
@@ -2130,357 +2111,6 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         emit("planning.changed", { reason: "sample-planning-seeded" });
         emit("commissioning.changed", { reason: "sample-planning-seeded" });
         return cloneJson(state.commissioningSnapshot);
-      }
-      case "lighting.cue.create": {
-        const label = asString(params.label).trim();
-        if (!label) {
-          throw new Error("label is required");
-        }
-
-        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        const scenes = asArray(lightingSnapshot.scenes)
-          .map((scene) => asRecord(scene))
-          .filter((scene): scene is JsonObject => scene !== null);
-        const cues = asArray(lightingSnapshot.cues)
-          .map((cue) => asRecord(cue))
-          .filter((cue): cue is JsonObject => cue !== null);
-        const afterCueId = asString(params.afterCueId).trim();
-        const sceneId = asString(params.sceneId).trim();
-        if (sceneId && !scenes.some((scene) => asString(scene.id) === sceneId)) {
-          throw new Error(`Lighting cue references scene '${sceneId}' but no matching scene exists.`);
-        }
-        if (afterCueId && !cues.some((cue) => asString(cue.id) === afterCueId)) {
-          throw new Error(`Lighting cue '${afterCueId}' is not present in the cue stack.`);
-        }
-
-        const insertIndex =
-          afterCueId.length > 0
-            ? Math.max(0, cues.findIndex((cue) => asString(cue.id) === afterCueId) + 1)
-            : cues.length;
-        const createdCue: JsonObject = {
-          id: nextCustomCueId(cues),
-          label,
-          ordinal: 0,
-          sceneId: sceneId || null,
-          fadeInMs: Math.max(0, Math.round(asNumber(params.fadeInMs, 1200))),
-          fadeOutMs: Math.max(0, Math.round(asNumber(params.fadeOutMs, 600))),
-          followSeconds:
-            params.followSeconds === null
-              ? null
-              : typeof params.followSeconds === "number"
-                ? params.followSeconds
-                : null,
-          notes:
-            params.notes === null
-              ? null
-              : typeof params.notes === "string" && params.notes.trim().length > 0
-                ? params.notes.trim()
-                : null,
-          state: "pending",
-        };
-        const nextCues = [...cues];
-        nextCues.splice(insertIndex, 0, createdCue);
-        const activeCueId = asString(lightingSnapshot.activeCueId).trim();
-        const resequencedCues: JsonObject[] = nextCues.map((cue, index) => ({
-          ...cue,
-          ordinal: index + 1,
-        }));
-        const activeCue = resequencedCues.find((cue) => asString(cue.id) === activeCueId) ?? null;
-        const activeOrdinal = activeCue ? asNumber(activeCue.ordinal, 0) : null;
-        lightingSnapshot.cues = resequencedCues.map((cue) => ({
-          ...cue,
-          state:
-            activeOrdinal === null
-              ? "pending"
-              : asString(cue.id) === activeCueId
-                ? "active"
-                : asNumber(cue.ordinal, 0) < activeOrdinal
-                  ? "fired"
-                  : "pending",
-        }));
-
-        const storedCue =
-          asArray(lightingSnapshot.cues)
-            .map((cue) => asRecord(cue))
-            .find((cue) => asString(cue?.id) === asString(createdCue.id)) ?? createdCue;
-        const summary = `Lighting cue '${label}' was added.`;
-        lightingSnapshot.lastActionStatus = "succeeded";
-        lightingSnapshot.lastActionCode = null;
-        lightingSnapshot.lastActionMessage = summary;
-        lightingSnapshot.summary = summary;
-        state.lightingSnapshot = lightingSnapshot;
-        synchronizeFixtureState(state);
-        emit("lighting.changed", { reason: "cue-created" });
-        return {
-          cue: cloneJson(storedCue),
-          summary,
-        };
-      }
-      case "lighting.cue.update": {
-        const cueId = asString(params.cueId).trim();
-        if (!cueId) {
-          throw new Error("cueId is required");
-        }
-
-        const hasLabel = Object.prototype.hasOwnProperty.call(params, "label");
-        const hasSceneId = Object.prototype.hasOwnProperty.call(params, "sceneId");
-        const hasFadeInMs = typeof params.fadeInMs === "number";
-        const hasFadeOutMs = typeof params.fadeOutMs === "number";
-        const hasFollowSeconds = Object.prototype.hasOwnProperty.call(params, "followSeconds");
-        const hasNotes = Object.prototype.hasOwnProperty.call(params, "notes");
-        const hasOrdinal = typeof params.ordinal === "number";
-        if (
-          !hasLabel &&
-          !hasSceneId &&
-          !hasFadeInMs &&
-          !hasFadeOutMs &&
-          !hasFollowSeconds &&
-          !hasNotes &&
-          !hasOrdinal
-        ) {
-          throw new Error("lighting.cue.update requires one or more supported fields");
-        }
-
-        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        const scenes = asArray(lightingSnapshot.scenes)
-          .map((scene) => asRecord(scene))
-          .filter((scene): scene is JsonObject => scene !== null);
-        const cues = asArray(lightingSnapshot.cues)
-          .map((cue) => asRecord(cue))
-          .filter((cue): cue is JsonObject => cue !== null);
-        const currentIndex = cues.findIndex((cue) => asString(cue.id) === cueId);
-        if (currentIndex < 0) {
-          throw new Error(`Lighting cue '${cueId}' is not present in the cue stack.`);
-        }
-
-        const nextSceneId = hasSceneId ? asString(params.sceneId).trim() : asString(cues[currentIndex]?.sceneId).trim();
-        if (nextSceneId && !scenes.some((scene) => asString(scene.id) === nextSceneId)) {
-          throw new Error(`Lighting cue references scene '${nextSceneId}' but no matching scene exists.`);
-        }
-
-        const updatedCue: JsonObject = {
-          ...cues[currentIndex],
-          ...(hasLabel ? { label: asString(params.label).trim() } : {}),
-          ...(hasSceneId ? { sceneId: nextSceneId || null } : {}),
-          ...(hasFadeInMs ? { fadeInMs: Math.max(0, Math.round(asNumber(params.fadeInMs, 0))) } : {}),
-          ...(hasFadeOutMs ? { fadeOutMs: Math.max(0, Math.round(asNumber(params.fadeOutMs, 0))) } : {}),
-          ...(hasFollowSeconds
-            ? {
-                followSeconds:
-                  params.followSeconds === null
-                    ? null
-                    : typeof params.followSeconds === "number"
-                      ? params.followSeconds
-                      : null,
-              }
-            : {}),
-          ...(hasNotes
-            ? {
-                notes:
-                  params.notes === null
-                    ? null
-                    : typeof params.notes === "string" && params.notes.trim().length > 0
-                      ? params.notes.trim()
-                      : null,
-              }
-            : {}),
-        };
-        if (!asString(updatedCue.label).trim()) {
-          throw new Error("label is required");
-        }
-
-        const nextCues = [...cues];
-        nextCues[currentIndex] = updatedCue;
-        if (hasOrdinal) {
-          const targetIndex = Math.max(
-            0,
-            Math.min(nextCues.length - 1, Math.round(asNumber(params.ordinal, currentIndex + 1)) - 1)
-          );
-          if (targetIndex !== currentIndex) {
-            const [movedCue] = nextCues.splice(currentIndex, 1);
-            nextCues.splice(targetIndex, 0, movedCue);
-          }
-        }
-
-        const resequencedCues: JsonObject[] = nextCues.map((cue, index) => ({
-          ...cue,
-          ordinal: index + 1,
-        }));
-        const activeCueId = asString(lightingSnapshot.activeCueId).trim();
-        const activeCue = resequencedCues.find((cue) => asString(cue.id) === activeCueId) ?? null;
-        const activeOrdinal = activeCue ? asNumber(activeCue.ordinal, 0) : null;
-        lightingSnapshot.cues = resequencedCues.map((cue) => ({
-          ...cue,
-          state:
-            activeOrdinal === null
-              ? "pending"
-              : asString(cue.id) === activeCueId
-                ? "active"
-                : asNumber(cue.ordinal, 0) < activeOrdinal
-                  ? "fired"
-                  : "pending",
-        }));
-
-        const storedCue =
-          asArray(lightingSnapshot.cues)
-            .map((cue) => asRecord(cue))
-            .find((cue) => asString(cue?.id) === cueId) ?? updatedCue;
-        const summary = `Lighting cue '${asString(storedCue.label, cueId)}' was updated.`;
-        lightingSnapshot.lastActionStatus = "succeeded";
-        lightingSnapshot.lastActionCode = null;
-        lightingSnapshot.lastActionMessage = summary;
-        lightingSnapshot.summary = summary;
-        state.lightingSnapshot = lightingSnapshot;
-        synchronizeFixtureState(state);
-        emit("lighting.changed", { reason: "cue-updated" });
-        return {
-          cue: cloneJson(storedCue),
-          summary,
-        };
-      }
-      case "lighting.cue.delete": {
-        const cueId = asString(params.cueId).trim();
-        if (!cueId) {
-          throw new Error("cueId is required");
-        }
-
-        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        const cues = asArray(lightingSnapshot.cues)
-          .map((cue) => asRecord(cue))
-          .filter((cue): cue is JsonObject => cue !== null);
-        const currentIndex = cues.findIndex((cue) => asString(cue.id) === cueId);
-        if (currentIndex < 0) {
-          throw new Error(`Lighting cue '${cueId}' is not present in the cue stack.`);
-        }
-
-        const removedCue = cues[currentIndex];
-        const nextCues = cues.filter((cue) => asString(cue.id) !== cueId);
-        const resequencedCues: JsonObject[] = nextCues.map((cue, index) => ({
-          ...cue,
-          ordinal: index + 1,
-        }));
-        const activeCueId = asString(lightingSnapshot.activeCueId).trim();
-        const nextActiveCueId = activeCueId === cueId ? "" : activeCueId;
-        const activeCue =
-          nextActiveCueId.length > 0
-            ? (resequencedCues.find((cue) => asString(cue.id) === nextActiveCueId) ?? null)
-            : null;
-        const activeOrdinal = activeCue ? asNumber(activeCue.ordinal, 0) : null;
-
-        lightingSnapshot.activeCueId = nextActiveCueId || null;
-        lightingSnapshot.cues = resequencedCues.map((cue) => ({
-          ...cue,
-          state:
-            activeOrdinal === null
-              ? "pending"
-              : asString(cue.id) === nextActiveCueId
-                ? "active"
-                : asNumber(cue.ordinal, 0) < activeOrdinal
-                  ? "fired"
-                  : "pending",
-        }));
-
-        const summary = `Lighting cue '${asString(removedCue.label, cueId)}' was deleted.`;
-        lightingSnapshot.lastActionStatus = "succeeded";
-        lightingSnapshot.lastActionCode = null;
-        lightingSnapshot.lastActionMessage = summary;
-        lightingSnapshot.summary = summary;
-        state.lightingSnapshot = lightingSnapshot;
-        synchronizeFixtureState(state);
-        emit("lighting.changed", { reason: "cue-deleted" });
-        return {
-          cueId,
-          deleted: true,
-          summary,
-        };
-      }
-      case "lighting.cue.fire": {
-        const cueId = asString(params.cueId).trim();
-        if (!cueId) {
-          throw new Error("cueId is required");
-        }
-
-        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        if (!asBoolean(lightingSnapshot.reachable, false)) {
-          throw new Error("Lighting cue fire requires a reachable lighting transport.");
-        }
-
-        const cues = asArray(lightingSnapshot.cues)
-          .map((cue) => asRecord(cue))
-          .filter((cue): cue is JsonObject => cue !== null);
-        const targetCue = cues.find((cue) => asString(cue.id) === cueId);
-        if (!targetCue) {
-          throw new Error(`Lighting cue '${cueId}' is not present in the cue stack.`);
-        }
-
-        const previousCueId = typeof lightingSnapshot.activeCueId === "string" ? lightingSnapshot.activeCueId : null;
-        const targetOrdinal = asNumber(targetCue.ordinal, 0);
-        const appliedFadeMs =
-          typeof params.fadeOverrideMs === "number" ? params.fadeOverrideMs : asNumber(targetCue.fadeInMs, 0);
-        const firedAt = new Date().toISOString();
-        const targetSceneId = asString(targetCue.sceneId).trim();
-
-        lightingSnapshot.activeCueId = cueId;
-        lightingSnapshot.cues = cues.map((cue) => ({
-          ...cue,
-          state: asString(cue.id) === cueId ? "active" : asNumber(cue.ordinal, 0) < targetOrdinal ? "fired" : "pending",
-        }));
-
-        if (targetSceneId) {
-          lightingSnapshot.selectedSceneId = targetSceneId;
-          lightingSnapshot.lastRecalledSceneId = targetSceneId;
-          lightingSnapshot.lastSceneRecallAt = firedAt;
-
-          const scenes = asArray(lightingSnapshot.scenes)
-            .map((scene) => asRecord(scene))
-            .filter((scene): scene is JsonObject => scene !== null);
-          lightingSnapshot.scenes = scenes.map((scene) => ({
-            ...scene,
-            lastRecalled: asString(scene.id) === targetSceneId,
-            lastRecalledAt: asString(scene.id) === targetSceneId ? firedAt : (scene.lastRecalledAt ?? null),
-          }));
-
-          const targetScene = scenes.find((scene) => asString(scene.id) === targetSceneId);
-          const fixtureStates = asArray(targetScene?.fixtureStates)
-            .map((fixtureState) => asRecord(fixtureState))
-            .filter((fixtureState): fixtureState is JsonObject => fixtureState !== null);
-
-          if (fixtureStates.length > 0) {
-            const fixtures = asArray(lightingSnapshot.fixtures)
-              .map((fixture) => asRecord(fixture))
-              .filter((fixture): fixture is JsonObject => fixture !== null);
-            lightingSnapshot.fixtures = fixtures.map((fixture) => {
-              const nextState = fixtureStates.find(
-                (fixtureState) => asString(fixtureState.fixtureId) === asString(fixture.id)
-              );
-              if (!nextState) {
-                return fixture;
-              }
-
-              return {
-                ...fixture,
-                cct: asNumber(nextState.cct, asNumber(fixture.cct, 3200)),
-                intensity: asNumber(nextState.intensity, asNumber(fixture.intensity, 0)),
-                on: asBoolean(nextState.on, asBoolean(fixture.on, false)),
-              };
-            });
-          }
-        }
-
-        const summary = `Lighting cue '${asString(targetCue.label, cueId)}' fired.`;
-        lightingSnapshot.lastActionStatus = "succeeded";
-        lightingSnapshot.lastActionCode = null;
-        lightingSnapshot.lastActionMessage = summary;
-        lightingSnapshot.summary = summary;
-        state.lightingSnapshot = lightingSnapshot;
-        synchronizeFixtureState(state);
-        emit("lighting.changed", { reason: "cue-fired" });
-        return {
-          activeCueId: cueId,
-          previousCueId,
-          appliedFadeMs,
-          summary,
-        };
       }
       case "lighting.scene.recall": {
         const sceneId = asString(params.sceneId).trim();

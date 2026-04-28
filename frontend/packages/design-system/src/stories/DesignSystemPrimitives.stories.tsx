@@ -4,7 +4,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Button } from "../components/Button";
 import { Crest } from "../components/Crest";
-import { CueRail } from "../components/CueRail";
 import { DenseList, DenseListRow, DenseTable } from "../components/DenseRows";
 import { EmptyState, DegradedState } from "../components/OperationalState";
 import { HealthBar } from "../components/HealthBar";
@@ -72,7 +71,6 @@ const dModYellow: React.CSSProperties = {
 function PrimitiveConsoleBoard() {
   const [mode, setMode] = useState("program");
   const [armed, setArmed] = useState(true);
-  const [selectedCue, setSelectedCue] = useState("cue-2");
 
   return (
     <main
@@ -137,35 +135,16 @@ function PrimitiveConsoleBoard() {
           <MetricCard caption="Lighting" tone="warning" value="2 notes" />
         </div>
 
-        <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "0.85fr 1.15fr" }}>
-          <MeterBridge
-            channels={[
-              { id: "pgm-l", label: "L", level: 72, peak: 80, state: "signal" },
-              { id: "pgm-r", label: "R", level: 69, peak: 77, state: "signal" },
-              { id: "mic-1", label: "Mic 1", level: 84, peak: 90, state: "hot" },
-              { id: "zoom", label: "Zoom", level: 24, peak: 41, state: "signal" },
-              { id: "usb", label: "USB", level: 0, peak: 3, state: "idle" },
-            ]}
-            label="Program audio meter bridge"
-          />
-          <CueRail
-            activeId={selectedCue}
-            cues={[
-              { detail: "Room warmup", id: "cue-1", label: "Preset checks", meta: "09:00", state: "complete" },
-              {
-                detail: "Lighting and stream deck",
-                id: "cue-2",
-                label: "Operator setup",
-                meta: "Now",
-                state: "active",
-              },
-              { detail: "Audio scene recall", id: "cue-3", label: "Presenter live", meta: "Next", state: "ready" },
-              { detail: "Requires device sync", id: "cue-4", label: "Recording wrap", meta: "Hold", state: "blocked" },
-            ]}
-            label="Session cue rail"
-            onSelect={setSelectedCue}
-          />
-        </div>
+        <MeterBridge
+          channels={[
+            { id: "pgm-l", label: "L", level: 72, peak: 80, state: "signal" },
+            { id: "pgm-r", label: "R", level: 69, peak: 77, state: "signal" },
+            { id: "mic-1", label: "Mic 1", level: 84, peak: 90, state: "hot" },
+            { id: "zoom", label: "Zoom", level: 24, peak: 41, state: "signal" },
+            { id: "usb", label: "USB", level: 0, peak: 3, state: "idle" },
+          ]}
+          label="Program audio meter bridge"
+        />
 
         <DenseTable
           caption="Patch diagnostics"

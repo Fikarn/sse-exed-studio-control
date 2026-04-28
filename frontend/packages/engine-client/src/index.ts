@@ -42,7 +42,6 @@ export type { AudioChannelSnapshot } from "./generated/snapshots/AudioChannelSna
 export type { AudioMixTargetSnapshot } from "./generated/snapshots/AudioMixTargetSnapshot";
 export type { AudioSceneSnapshot } from "./generated/snapshots/AudioSceneSnapshot";
 export type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
-export type { LightingCueSnapshot } from "./generated/snapshots/LightingCueSnapshot";
 export type { LightingDmxChannelSnapshot } from "./generated/snapshots/LightingDmxChannelSnapshot";
 export type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingDmxMonitorSnapshot";
 export type { LightingEffect } from "./generated/snapshots/LightingEffect";

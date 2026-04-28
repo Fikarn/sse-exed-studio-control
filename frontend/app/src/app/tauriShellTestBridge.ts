@@ -91,19 +91,6 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("createPlanningTask requires a request object.");
       }
       return store.createPlanningTask(command.request as never);
-    case "createLightingCue":
-      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
-        throw new Error("createLightingCue requires a request object.");
-      }
-      return store.createLightingCue(command.request as never);
-    case "fireLightingCue":
-      if (typeof command.cueId !== "string" || !command.cueId.trim()) {
-        throw new Error("fireLightingCue requires cueId.");
-      }
-      return store.fireLightingCue(
-        command.cueId,
-        typeof command.fadeOverrideMs === "number" ? command.fadeOverrideMs : undefined
-      );
     case "readPlanningTimeReport":
       return store.readPlanningTimeReport(typeof command.projectId === "string" ? command.projectId : undefined);
     case "recallAudioSnapshot":
