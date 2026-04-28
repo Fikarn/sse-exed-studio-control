@@ -854,10 +854,7 @@ export function LightingWorkspaceSurface({
   }, [handleFixtureNudge, handleSaveScene, handleSelectFixture, persistedSelectedFixtureId, triggerRedo, triggerUndo]);
 
   const lastSavedLabel = lastSavedAt
-    ? `${lastSavedAt.getUTCHours().toString().padStart(2, "0")}:${lastSavedAt
-        .getUTCMinutes()
-        .toString()
-        .padStart(2, "0")} UTC`
+    ? lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : undefined;
 
   return (
