@@ -18,6 +18,8 @@ export interface StagePlotProps {
   layout?: StudioLayout;
   selectedFixtureId: string | null;
   patchMode: boolean;
+  activeSceneName?: string;
+  isSceneModified?: boolean;
   onSelectFixture: (id: string | null) => void;
 }
 
@@ -35,10 +37,16 @@ export function StagePlot({
   layout = STUDIO_LAYOUT,
   selectedFixtureId,
   patchMode,
+  activeSceneName,
+  isSceneModified = false,
   onSelectFixture,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
+
+  const selectedFixture = selectedFixtureId
+    ? (fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null)
+    : null;
 
   return (
     <div
@@ -46,6 +54,34 @@ export function StagePlot({
       role="application"
       aria-label="Lighting stage plot"
     >
+      {!patchMode && activeSceneName ? (
+        <div className={`${styles.plotPill} ${isSceneModified ? styles.plotPillModified : ""}`}>
+          <span className={styles.plotPillDot} aria-hidden="true" />
+          <span className={styles.plotPillLabel}>Active scene</span>
+          <span className={styles.plotPillName}>{activeSceneName}</span>
+          {isSceneModified ? <span className={styles.plotPillMod}>· Modified</span> : null}
+        </div>
+      ) : null}
+
+      <div className={styles.plotOverlays} aria-hidden="true">
+        {selectedFixture ? (
+          <div className={`${styles.plotMeta} ${styles.plotMetaSelected}`}>
+            <span className={styles.plotMetaLabel}>Selected</span>
+            <span className={styles.plotMetaValue}>{selectedFixture.name}</span>
+          </div>
+        ) : null}
+        <div className={styles.plotMeta}>
+          <span className={styles.plotMetaLabel}>Floor</span>
+          <span className={styles.plotMetaValue}>
+            {layout.roomWidthMeters} m × {layout.roomDepthMeters} m
+          </span>
+        </div>
+        <div className={styles.plotMeta}>
+          <span className={styles.plotMetaLabel}>Grid</span>
+          <span className={styles.plotMetaValue}>0.5 / 1 / 5 m</span>
+        </div>
+      </div>
+
       <svg
         className={styles.plotSvg}
         viewBox={`0 0 ${widthCm} ${depthCm}`}
@@ -101,6 +137,7 @@ export function StagePlot({
             <FixtureMarker
               key={fixture.id}
               id={fixture.id}
+              name={fixture.name}
               centerX={xMeters * 100}
               centerY={yMeters * 100}
               rotationDegrees={fixture.spatialRotation}

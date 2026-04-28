@@ -519,6 +519,8 @@ export function LightingWorkspaceSurface({
             fixtures={fixtures}
             selectedFixtureId={selectedFixture?.id ?? null}
             patchMode={uiMode === "patch"}
+            activeSceneName={activeScene?.name}
+            isSceneModified={isSceneModified}
             onSelectFixture={(id) => void handleSelectFixture(id)}
           />
         </main>

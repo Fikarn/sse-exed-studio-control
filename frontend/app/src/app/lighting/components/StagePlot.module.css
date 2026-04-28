@@ -30,3 +30,110 @@
   height: 100%;
   display: block;
 }
+
+/* Plot pill — top-left "Active scene · {name}" overlay */
+.plotPill {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(8, 10, 8, 0.78);
+  border: 1px solid var(--color-brand-green-border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  color: var(--color-brand-text-primary);
+  backdrop-filter: blur(6px);
+}
+
+.plotPillModified {
+  border-color: var(--color-brand-yellow-border);
+}
+
+.plotPillDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-brand-green);
+  box-shadow: 0 0 6px rgba(153, 186, 146, 0.55);
+}
+
+.plotPillModified .plotPillDot {
+  background: var(--color-brand-yellow);
+  box-shadow: 0 0 6px rgba(232, 213, 97, 0.55);
+}
+
+.plotPillLabel {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+}
+
+.plotPillName {
+  font-family: var(--font-family-display);
+  font-variation-settings: "opsz" 24;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.plotPillMod {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-brand-yellow);
+  font-weight: 600;
+}
+
+/* Plot overlays — top-right meta column (Floor / Grid / Selected) */
+.plotOverlays {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.plotMeta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 10px;
+  background: rgba(8, 10, 8, 0.65);
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--color-brand-text-secondary);
+  backdrop-filter: blur(6px);
+}
+
+.plotMetaLabel {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+}
+
+.plotMetaValue {
+  font-feature-settings: "tnum", "zero";
+  color: var(--color-brand-text-primary);
+}
+
+.plotMetaSelected {
+  border-color: var(--color-brand-blue-border, rgba(63, 112, 200, 0.45));
+}
+
+.plotMetaSelected .plotMetaLabel,
+.plotMetaSelected .plotMetaValue {
+  color: var(--color-brand-blue, #3f70c8);
+}
