@@ -36,8 +36,8 @@ export function InspectorScene({
     return (
       <InspectorSection title="No scene">
         <p className={styles.empty}>
-          No scene is active. Press <kbd className={styles.kbd}>S</kbd> after editing fixtures to save the
-          current rig state as a new scene.
+          No scene is active. Press <kbd className={styles.kbd}>S</kbd> after editing fixtures to save the current rig
+          state as a new scene.
         </p>
         {onSaveScene ? (
           <div className={styles.actionRow}>
@@ -118,8 +118,8 @@ export function InspectorScene({
           ) : null}
         </div>
         <p className={styles.helpText}>
-          Re-save updates the active scene to match the current rig. Save as new captures the current state
-          as a new scene without overwriting.
+          Re-save updates the active scene to match the current rig. Save as new captures the current state as a new
+          scene without overwriting.
         </p>
       </InspectorSection>
     </>

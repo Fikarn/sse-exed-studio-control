@@ -18,12 +18,7 @@ const TAB_LABEL: Record<InspectorTab, string> = {
   patch: "Patch",
 };
 
-export function LightingInspectorTabs({
-  active,
-  onChange,
-  visibleTabs,
-  hint,
-}: LightingInspectorTabsProps) {
+export function LightingInspectorTabs({ active, onChange, visibleTabs, hint }: LightingInspectorTabsProps) {
   return (
     <div className={styles.tabs} role="tablist" aria-label="Inspector tabs">
       {visibleTabs.map((tab) => (

@@ -101,10 +101,7 @@ export function withSceneThumbUpserted(
   return { ...current, [sceneId]: thumb };
 }
 
-export function withSceneThumbRemoved(
-  current: Record<string, string>,
-  sceneId: string
-): Record<string, string> {
+export function withSceneThumbRemoved(current: Record<string, string>, sceneId: string): Record<string, string> {
   if (!(sceneId in current)) {
     return current;
   }

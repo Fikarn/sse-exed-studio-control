@@ -1,8 +1,5 @@
 import type { LightingDmxChannelEntry } from "../../shellData";
-import {
-  lightingFixtureChannelCount,
-  lightingFixtureChannelLabels,
-} from "../lightingPatch";
+import { lightingFixtureChannelCount, lightingFixtureChannelLabels } from "../lightingPatch";
 
 import { DMXChannel } from "./DMXChannel";
 import styles from "./LightingInspector.module.css";
@@ -14,12 +11,7 @@ export interface DMXPeekProps {
   stale?: boolean;
 }
 
-export function DMXPeek({
-  fixtureType,
-  fixtureDmxStartAddress,
-  channels,
-  stale = false,
-}: DMXPeekProps) {
+export function DMXPeek({ fixtureType, fixtureDmxStartAddress, channels, stale = false }: DMXPeekProps) {
   const channelCount = lightingFixtureChannelCount(fixtureType);
   const labels = lightingFixtureChannelLabels(fixtureType);
   const channelByNumber = new Map(channels.map((channel) => [channel.channel, channel]));
@@ -42,12 +34,7 @@ export function DMXPeek({
       aria-label={`DMX peek for fixture starting at ${fixtureDmxStartAddress}`}
     >
       {rows.map((row) => (
-        <DMXChannel
-          key={`peek:${row.channel}`}
-          channel={row.channel}
-          label={row.label}
-          value={row.value}
-        />
+        <DMXChannel key={`peek:${row.channel}`} channel={row.channel} label={row.label} value={row.value} />
       ))}
     </div>
   );

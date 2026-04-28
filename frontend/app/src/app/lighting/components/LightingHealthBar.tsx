@@ -8,9 +8,7 @@ import type { LightingDmxMonitorSnapshot, LightingSnapshot } from "@sse/engine-c
 const APP_VERSION = "v2.2.2";
 
 const SESSION_STARTED_AT =
-  typeof performance !== "undefined" && Number.isFinite(performance.timeOrigin)
-    ? performance.timeOrigin
-    : Date.now();
+  typeof performance !== "undefined" && Number.isFinite(performance.timeOrigin) ? performance.timeOrigin : Date.now();
 
 const SESSION_TICK_MS = 30_000;
 

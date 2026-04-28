@@ -1,11 +1,7 @@
 import { useMemo } from "react";
 
 import { InspectorPanel } from "@sse/design-system";
-import type {
-  LightingFixtureSnapshot,
-  LightingGroupSnapshot,
-  LightingSceneSnapshot,
-} from "@sse/engine-client";
+import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
 
 import type { LightingDmxChannelEntry } from "../../shellData";
 import { buildLightingPatchOverlapMap } from "../lightingPatch";
@@ -14,10 +10,7 @@ import { InspectorFixture } from "./InspectorFixture";
 import { InspectorGroup } from "./InspectorGroup";
 import { InspectorPatch } from "./InspectorPatch";
 import { InspectorScene } from "./InspectorScene";
-import {
-  LightingInspectorTabs,
-  type InspectorTab,
-} from "./LightingInspectorTabs";
+import { LightingInspectorTabs, type InspectorTab } from "./LightingInspectorTabs";
 
 import styles from "./LightingInspector.module.css";
 
@@ -118,21 +111,11 @@ export function LightingInspector({
   const visibleTabs: readonly InspectorTab[] =
     uiMode === "patch" ? ["patch"] : (["scene", "fixture", "group"] as const);
 
-  const fixtureGroup = selectedFixture
-    ? groups.find((group) => group.id === selectedFixture.groupId) ?? null
-    : null;
+  const fixtureGroup = selectedFixture ? (groups.find((group) => group.id === selectedFixture.groupId) ?? null) : null;
 
   return (
-    <InspectorPanel
-      eyebrow="Inspector"
-      title={TAB_TITLE[activeTab]}
-      className={styles.inspector}
-    >
-      <LightingInspectorTabs
-        active={activeTab}
-        onChange={onTabChange}
-        visibleTabs={visibleTabs}
-      />
+    <InspectorPanel eyebrow="Inspector" title={TAB_TITLE[activeTab]} className={styles.inspector}>
+      <LightingInspectorTabs active={activeTab} onChange={onTabChange} visibleTabs={visibleTabs} />
 
       {activeTab === "scene" ? (
         <InspectorScene

@@ -109,12 +109,7 @@ export function LightingToolbar({
         Fixture
       </Button>
 
-      <button
-        type="button"
-        className={styles.kebab}
-        onClick={onOpenMenu}
-        aria-label="Open lighting menu"
-      >
+      <button type="button" className={styles.kebab} onClick={onOpenMenu} aria-label="Open lighting menu">
         <MoreVertical aria-hidden="true" size={14} strokeWidth={1.75} />
       </button>
     </div>

@@ -25,11 +25,7 @@ export function DMXChannel({ channel, label, value, highlighted = false }: DMXCh
       <span className={styles.channelAddress}>{address}</span>
       <div className={styles.channelBar} aria-hidden="true">
         {Array.from({ length: SEGMENT_COUNT }, (_, index) => (
-          <span
-            key={index}
-            className={styles.channelSegment}
-            data-active={index < filledSegments}
-          />
+          <span key={index} className={styles.channelSegment} data-active={index < filledSegments} />
         ))}
       </div>
       <span className={styles.channelLabel}>{label}</span>

@@ -227,15 +227,14 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
 
             let mut thumbs: HashMap<String, String> = HashMap::with_capacity(scene_thumbs.len());
             for (scene_id, thumb_value) in scene_thumbs {
-                let thumb = thumb_value.as_str().ok_or_else(|| {
-                    format!("lighting.sceneThumbs.{scene_id} must be a string")
-                })?;
+                let thumb = thumb_value
+                    .as_str()
+                    .ok_or_else(|| format!("lighting.sceneThumbs.{scene_id} must be a string"))?;
                 thumbs.insert(scene_id.clone(), thumb.to_string());
             }
 
-            let serialized = serde_json::to_string(&thumbs).map_err(|err| {
-                format!("lighting.sceneThumbs failed to serialize: {err}")
-            })?;
+            let serialized = serde_json::to_string(&thumbs)
+                .map_err(|err| format!("lighting.sceneThumbs failed to serialize: {err}"))?;
             updates.push((LIGHTING_SCENE_THUMBS_KEY, serialized));
         }
     }
@@ -498,7 +497,8 @@ mod tests {
             }
         });
 
-        let error = parse_settings_update(&params).expect_err("non-string thumb should be rejected");
+        let error =
+            parse_settings_update(&params).expect_err("non-string thumb should be rejected");
         assert_eq!(error, "lighting.sceneThumbs.scene-a must be a string");
     }
 
@@ -533,15 +533,20 @@ mod tests {
 
         assert_eq!(snapshot.lighting_scene_thumbs.len(), 2);
         assert_eq!(
-            snapshot.lighting_scene_thumbs.get("scene-a").map(String::as_str),
+            snapshot
+                .lighting_scene_thumbs
+                .get("scene-a")
+                .map(String::as_str),
             Some("data:image/svg+xml;base64,AAA")
         );
     }
 
     #[test]
     fn snapshot_falls_back_to_empty_thumbs_when_blob_is_invalid() {
-        let settings =
-            HashMap::from([(String::from(LIGHTING_SCENE_THUMBS_KEY), String::from("not-json"))]);
+        let settings = HashMap::from([(
+            String::from(LIGHTING_SCENE_THUMBS_KEY),
+            String::from("not-json"),
+        )]);
         let snapshot = ShellSettingsSnapshot::from_settings(&settings);
 
         assert!(snapshot.lighting_scene_thumbs.is_empty());

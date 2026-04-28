@@ -5,10 +5,7 @@ import { Button, InspectorSection } from "@sse/design-system";
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
 
 import type { LightingDmxChannelEntry } from "../../shellData";
-import {
-  formatLightingBeamAngleValue,
-  formatLightingRigHeight,
-} from "../lightingHelpers";
+import { formatLightingBeamAngleValue, formatLightingRigHeight } from "../lightingHelpers";
 import {
   lightingFixtureChannelCount,
   lightingFixtureMaxStartAddress,
@@ -55,8 +52,8 @@ export function InspectorPatch({
     return (
       <InspectorSection title="Patch mode">
         <p className={styles.empty}>
-          Select a fixture on the stage plot to edit its DMX address. Press{" "}
-          <kbd className={styles.kbd}>P</kbd> to leave patch mode.
+          Select a fixture on the stage plot to edit its DMX address. Press <kbd className={styles.kbd}>P</kbd> to leave
+          patch mode.
         </p>
       </InspectorSection>
     );

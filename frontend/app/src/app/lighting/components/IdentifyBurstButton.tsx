@@ -12,12 +12,7 @@ export interface IdentifyBurstButtonProps {
   disabled?: boolean;
 }
 
-export function IdentifyBurstButton({
-  fixtureId,
-  fixtureName,
-  onTrigger,
-  disabled = false,
-}: IdentifyBurstButtonProps) {
+export function IdentifyBurstButton({ fixtureId, fixtureName, onTrigger, disabled = false }: IdentifyBurstButtonProps) {
   const [active, setActive] = useState(false);
   const timerRef = useRef<number | null>(null);
 

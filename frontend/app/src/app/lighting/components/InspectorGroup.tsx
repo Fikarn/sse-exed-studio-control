@@ -82,11 +82,7 @@ export function InspectorGroup({
           <ul className={styles.memberList}>
             {fixtures.map((fixture) => (
               <li key={fixture.id}>
-                <button
-                  type="button"
-                  className={styles.memberRow}
-                  onClick={() => onSelectFixture(fixture.id)}
-                >
+                <button type="button" className={styles.memberRow} onClick={() => onSelectFixture(fixture.id)}>
                   <span className={styles.memberName}>{fixture.name}</span>
                   <span className={styles.memberMeta}>
                     {fixture.on ? `${fixture.intensity}% · ${fixture.cct}K` : "off"}

@@ -21,7 +21,9 @@ export function SceneRail({
   onRecall,
 }: SceneRailProps) {
   if (scenes.length === 0) {
-    return <p className={styles.empty}>No scenes saved yet. Press S after editing fixtures to save the current state.</p>;
+    return (
+      <p className={styles.empty}>No scenes saved yet. Press S after editing fixtures to save the current state.</p>
+    );
   }
 
   return (

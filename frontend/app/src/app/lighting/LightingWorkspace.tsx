@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 
 import type {
   LightingDmxMonitorSnapshot,
@@ -24,20 +18,12 @@ import {
   type SnapshotRecord,
 } from "../shellData";
 import { LightingHealthBar } from "./components/LightingHealthBar";
-import {
-  LightingInspector,
-  deriveInspectorTab,
-  type LightingUiMode,
-} from "./components/LightingInspector";
+import { LightingInspector, deriveInspectorTab, type LightingUiMode } from "./components/LightingInspector";
 import type { InspectorTab } from "./components/LightingInspectorTabs";
 import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
 import { StagePlot } from "./components/StagePlot";
-import {
-  renderSceneThumbnailDataUri,
-  withSceneThumbRemoved,
-  withSceneThumbUpserted,
-} from "./sceneThumbnails";
+import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
 import styles from "./LightingWorkspace.module.css";
 
 interface LightingWorkspaceSurfaceProps {
