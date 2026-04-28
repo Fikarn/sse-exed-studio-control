@@ -39,9 +39,12 @@ export function lightingFixtureMaxStartAddress(fixtureType: string) {
   return 512 - lightingFixtureChannelCount(fixtureType) + 1;
 }
 
-export function lightingFixturePatchSummary(dmxStartAddress: number, fixtureType: string) {
+export function lightingFixturePatchSummary(dmxStartAddress: number, fixtureType: string, universe = 1) {
   const channelCount = lightingFixtureChannelCount(fixtureType);
-  return `u1 · ${dmxStartAddress}-${dmxStartAddress + channelCount - 1} (${channelCount} ch)`;
+  if (dmxStartAddress < 1) {
+    return `u${universe} · unpatched (${channelCount} ch needed)`;
+  }
+  return `u${universe} · ${dmxStartAddress}-${dmxStartAddress + channelCount - 1} (${channelCount} ch)`;
 }
 
 export function lightingFixtureModeLabel(fixtureType: string) {
@@ -85,27 +88,6 @@ export function lightingPatchRangeOverlaps(
     const existingEnd = existingStart + lightingFixtureChannelCount(fixture.type) - 1;
     return startAddress <= existingEnd && endAddress >= existingStart;
   });
-}
-
-export function buildLightingPatchCandidates(fixtures: Array<{ dmxStartAddress: number; type: string }>, limit = 12) {
-  if (fixtures.length === 0) {
-    return [1];
-  }
-
-  const requiredChannelCount = Math.max(...fixtures.map((fixture) => lightingFixtureChannelCount(fixture.type)));
-  const maxStartAddress = 512 - requiredChannelCount + 1;
-  const candidates: number[] = [];
-
-  for (let startAddress = 1; startAddress <= maxStartAddress; startAddress += 1) {
-    if (!lightingPatchRangeOverlaps(fixtures, startAddress, requiredChannelCount)) {
-      candidates.push(startAddress);
-    }
-    if (candidates.length >= limit) {
-      break;
-    }
-  }
-
-  return candidates;
 }
 
 export function buildLightingPatchOverlapMap(
@@ -158,18 +140,3 @@ export function buildLightingPatchOverlapMap(
   return overlaps;
 }
 
-export function formatLightingPatchOverlapSummary(conflictingFixtureNames: string[]) {
-  if (conflictingFixtureNames.length === 1) {
-    return `Overlaps ${conflictingFixtureNames[0]}`;
-  }
-
-  if (conflictingFixtureNames.length === 2) {
-    return `Overlaps ${conflictingFixtureNames[0]} + ${conflictingFixtureNames[1]}`;
-  }
-
-  return `Overlaps ${conflictingFixtureNames.length} fixtures`;
-}
-
-export function formatLightingPatchOverlapStageLabel(conflictingFixtureNames: string[]) {
-  return `⚠ ${formatLightingPatchOverlapSummary(conflictingFixtureNames).toUpperCase()}`;
-}

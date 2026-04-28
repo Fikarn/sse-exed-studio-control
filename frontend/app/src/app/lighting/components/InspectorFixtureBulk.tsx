@@ -15,6 +15,13 @@ export interface InspectorFixtureBulkProps {
   onBulkTogglePower: (fixtureIds: readonly string[], on: boolean) => void;
   onBulkIntensityCommit: (fixtureIds: readonly string[], intensity: number) => void;
   onBulkCctCommit: (fixtureIds: readonly string[], cct: number) => void;
+  /**
+   * Click → focus this fixture as the single primary selection.
+   * Shift-click → toggle the fixture out of the bulk extras (cannot remove
+   * the persisted primary; click another fixture first to swap primaries).
+   * Optional — when omitted the chips render non-interactive.
+   */
+  onSelectFixture?: (fixtureId: string, options?: { additive?: boolean }) => void;
 }
 
 function intersectCctRange(fixtures: readonly LightingFixtureSnapshot[]): { min: number; max: number } {
@@ -47,6 +54,7 @@ export function InspectorFixtureBulk({
   onBulkTogglePower,
   onBulkIntensityCommit,
   onBulkCctCommit,
+  onSelectFixture,
 }: InspectorFixtureBulkProps) {
   const ids = fixtures.map((fixture) => fixture.id);
   const allOn = fixtures.every((fixture) => fixture.on);
@@ -113,15 +121,37 @@ export function InspectorFixtureBulk({
           </Button>
         </div>
         <ul className={styles.sceneFixtureChips}>
-          {fixtures.map((fixture) => (
-            <li key={fixture.id} className={styles.sceneFixtureChip}>
-              <span className={styles.sceneFixtureName}>{fixture.name}</span>
-              <span className={styles.sceneFixtureLevel}>
-                {fixture.on ? `${Math.round(fixture.intensity)}%` : "off"}
-              </span>
-            </li>
-          ))}
+          {fixtures.map((fixture) => {
+            if (!onSelectFixture) {
+              return (
+                <li key={fixture.id} className={styles.sceneFixtureChip}>
+                  <span className={styles.sceneFixtureName}>{fixture.name}</span>
+                  <span className={styles.sceneFixtureLevel}>
+                    {fixture.on ? `${Math.round(fixture.intensity)}%` : "off"}
+                  </span>
+                </li>
+              );
+            }
+            return (
+              <li key={fixture.id}>
+                <button
+                  type="button"
+                  className={`${styles.sceneFixtureChip} ${styles.sceneFixtureChipButton}`}
+                  onClick={(event) => onSelectFixture(fixture.id, { additive: event.shiftKey })}
+                  aria-label={`${fixture.name} — click to focus, shift-click to remove from selection`}
+                >
+                  <span className={styles.sceneFixtureName}>{fixture.name}</span>
+                  <span className={styles.sceneFixtureLevel}>
+                    {fixture.on ? `${Math.round(fixture.intensity)}%` : "off"}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
+        <span className={styles.helpText}>
+          Click a chip to focus that fixture · Shift-click to remove it from the selection.
+        </span>
       </InspectorSection>
 
       <InspectorSection title="Bulk intensity">

@@ -23,7 +23,7 @@ export function LightingBridgeBanner({ reachable, bridgeIp, universe }: Lighting
     <StatusBand
       tone="error"
       title="DMX bridge unreachable"
-      summary={`Lighting commands won't reach the rig until the bridge at ${target} comes back online. Check the network or rerun the setup probe.`}
+      summary={`Lighting commands won't reach the rig until the bridge at ${target} comes back online. Check the network connection or run the bridge probe in Setup.`}
     />
   );
 }

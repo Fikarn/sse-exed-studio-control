@@ -15,9 +15,10 @@ export interface GroupRailProps {
   groups: readonly GroupRailEntry[];
   searchQuery?: string;
   onTogglePower: (id: string, on: boolean) => void;
+  onClearSearch?: () => void;
 }
 
-export function GroupRail({ groups, searchQuery = "", onTogglePower }: GroupRailProps) {
+export function GroupRail({ groups, searchQuery = "", onTogglePower, onClearSearch }: GroupRailProps) {
   const needle = searchQuery.trim().toLowerCase();
   const filteredGroups = needle ? groups.filter((group) => group.name.toLowerCase().includes(needle)) : groups;
 
@@ -26,7 +27,19 @@ export function GroupRail({ groups, searchQuery = "", onTogglePower }: GroupRail
   }
 
   if (needle && filteredGroups.length === 0) {
-    return <p className={styles.empty}>No groups match “{searchQuery}”.</p>;
+    return (
+      <p className={styles.empty}>
+        No groups match “{searchQuery}”.
+        {onClearSearch ? (
+          <>
+            {" "}
+            <button type="button" className={styles.emptyAction} onClick={onClearSearch}>
+              Clear search
+            </button>
+          </>
+        ) : null}
+      </p>
+    );
   }
 
   return (

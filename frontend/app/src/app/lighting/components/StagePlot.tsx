@@ -27,6 +27,12 @@ export interface StagePlotProps {
   patchMode: boolean;
   activeSceneName?: string;
   isSceneModified?: boolean;
+  /**
+   * When false, the plot's "modified" treatment is downgraded to neutral —
+   * drift detection in degraded states compares live state to a preview-only
+   * recall, not a scene actually driving the rig.
+   */
+  bridgeReachable?: boolean;
   searchQuery?: string;
   onSelectFixture: (id: string | null, options?: { additive?: boolean }) => void;
   onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
@@ -49,6 +55,7 @@ export function StagePlot({
   patchMode,
   activeSceneName,
   isSceneModified = false,
+  bridgeReachable = true,
   searchQuery = "",
   onSelectFixture,
   onPositionCommit,
@@ -75,11 +82,14 @@ export function StagePlot({
       aria-label="Lighting stage plot"
     >
       {!patchMode && activeSceneName ? (
-        <div className={`${styles.plotPill} ${isSceneModified ? styles.plotPillModified : ""}`}>
+        <div
+          className={`${styles.plotPill} ${
+            isSceneModified && bridgeReachable ? styles.plotPillModified : ""
+          }`}
+        >
           <span className={styles.plotPillDot} aria-hidden="true" />
           <span className={styles.plotPillLabel}>Active scene</span>
           <span className={styles.plotPillName}>{activeSceneName}</span>
-          {isSceneModified ? <span className={styles.plotPillMod}>· Modified</span> : null}
         </div>
       ) : null}
 
@@ -221,7 +231,7 @@ export function StagePlot({
           <EmptyState
             icon={Sun}
             title="No fixtures on the rig yet"
-            message="Add your first fixture from the toolbar (or press F) to start patching DMX addresses and saving scenes."
+            message="Add your first fixture with the + Fixture button in the toolbar to start patching DMX addresses and saving scenes."
           />
         </div>
       ) : null}

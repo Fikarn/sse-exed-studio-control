@@ -4,7 +4,7 @@ import { Pencil, Play, Save, Trash2 } from "lucide-react";
 import { Button, ConfirmDialog } from "@sse/design-system";
 import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
 
-import { lightingFixtureColor } from "../lightingHelpers";
+import { formatLightingRelativeTime, lightingFixtureColor } from "../lightingHelpers";
 
 import styles from "./LightingInspector.module.css";
 
@@ -63,19 +63,6 @@ function computeSceneStats(
   };
 }
 
-function formatRelativeTime(iso: string): string {
-  const parsed = Date.parse(iso);
-  if (!Number.isFinite(parsed)) return "—";
-  const elapsedMs = Date.now() - parsed;
-  if (elapsedMs < 60_000) return "just now";
-  const minutes = Math.floor(elapsedMs / 60_000);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
 export function InspectorScene({
   scene,
   fixtures,
@@ -129,8 +116,9 @@ export function InspectorScene({
       <span className={styles.sceneEyebrow}>{isModified ? "Active scene · modified" : "Active scene"}</span>
       <h2 className={styles.sceneTitle}>{scene.name}</h2>
       <p className={styles.sceneSub}>
-        {stats.onCount} of {stats.totalCount} fixture{stats.totalCount === 1 ? "" : "s"} emitting at an average of{" "}
-        {stats.avgIntensity > 0 ? `${stats.avgIntensity}% / ${stats.avgCct} K` : "rest"}.
+        {stats.onCount > 0
+          ? `${stats.onCount} of ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} on at ${stats.avgIntensity}% / ${stats.avgCct} K average.`
+          : `All ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} dark in this scene.`}
       </p>
 
       <dl className={styles.sceneStatGrid}>
@@ -142,26 +130,38 @@ export function InspectorScene({
           </dd>
         </div>
         <div className={styles.sceneStat}>
-          <dt className={styles.sceneStatLabel}>Avg intensity</dt>
-          <dd className={styles.sceneStatValue}>
-            {stats.avgIntensity}
-            <small> %</small>
-          </dd>
-        </div>
-        <div className={styles.sceneStat}>
-          <dt className={styles.sceneStatLabel}>CCT mean</dt>
-          <dd className={styles.sceneStatValue}>
-            {stats.avgCct || "—"}
-            <small>{stats.avgCct ? " K" : ""}</small>
-          </dd>
-        </div>
-        <div className={styles.sceneStat}>
           <dt className={styles.sceneStatLabel}>Groups on</dt>
           <dd className={styles.sceneStatValue}>
             {stats.groupsOn}
             <small> / {stats.groupsTotal}</small>
           </dd>
         </div>
+        {stats.onCount > 0 ? (
+          <>
+            <div className={styles.sceneStat}>
+              <dt className={styles.sceneStatLabel}>Avg intensity</dt>
+              <dd className={styles.sceneStatValue}>
+                {stats.avgIntensity}
+                <small> %</small>
+              </dd>
+            </div>
+            <div className={styles.sceneStat}>
+              <dt className={styles.sceneStatLabel}>CCT mean</dt>
+              <dd className={styles.sceneStatValue}>
+                {stats.avgCct}
+                <small> K</small>
+              </dd>
+            </div>
+          </>
+        ) : (
+          <div className={`${styles.sceneStat} ${styles.sceneStatSpan}`}>
+            <dt className={styles.sceneStatLabel}>State</dt>
+            <dd className={styles.sceneStatValue}>
+              All dark
+              <small> · no levels</small>
+            </dd>
+          </div>
+        )}
       </dl>
 
       {stats.onCount > 0 ? (
@@ -189,7 +189,7 @@ export function InspectorScene({
         <p className={styles.sceneProvenance}>
           {scene.lastRecalledAt ? (
             <>
-              Last recalled <b>{formatRelativeTime(scene.lastRecalledAt)}</b>
+              Last recalled <b>{formatLightingRelativeTime(scene.lastRecalledAt)}</b>
             </>
           ) : (
             <>Not yet recalled</>
@@ -207,7 +207,7 @@ export function InspectorScene({
             size="compact"
             leadingVisual={<Play aria-hidden="true" size={13} strokeWidth={1.75} />}
           >
-            Recall again
+            Re-apply scene
           </Button>
         ) : null}
         {onResaveScene ? (

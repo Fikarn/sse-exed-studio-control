@@ -67,11 +67,26 @@
   font-size: 10px;
   letter-spacing: 0.08em;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .headButton:hover {
   border-color: var(--color-brand-green-border);
   color: var(--color-brand-green);
+}
+
+.headButtonKbd {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  background: var(--color-bg-default);
+  border: 1px solid var(--color-bg-border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-tight-xs);
+  padding: 1px 5px;
+  color: var(--color-brand-text-secondary);
+  letter-spacing: 0;
 }
 
 .master {
@@ -417,6 +432,22 @@
   border-radius: var(--radius-tight-sm);
   border: 1px dashed var(--color-bg-stroke);
   text-align: center;
+}
+
+.emptyAction {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-brand-green);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.emptyAction:hover {
+  color: var(--color-brand-green-bright, var(--color-brand-green));
 }
 
 .groupGrid {

@@ -23,6 +23,12 @@
   pointer-events: none;
 }
 
+.toolbar[data-patch-mode="true"]::before {
+  height: 2px;
+  background: var(--color-brand-yellow);
+  box-shadow: 0 0 8px rgba(232, 213, 97, 0.35);
+}
+
 .title {
   display: inline-flex;
   align-items: center;
@@ -38,6 +44,28 @@
 
 .titleIcon {
   color: var(--color-brand-green);
+}
+
+.toolbar[data-patch-mode="true"] .titleIcon {
+  color: var(--color-brand-yellow);
+}
+
+.patchEyebrow {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  margin-left: 4px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, var(--color-brand-yellow-soft) 0%, rgba(232, 213, 97, 0.06) 100%);
+  border: 1px solid var(--color-brand-yellow-border);
+  color: var(--color-brand-yellow);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .divider {

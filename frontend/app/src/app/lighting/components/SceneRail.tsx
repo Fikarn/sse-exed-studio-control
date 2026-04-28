@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 
 import type { LightingSceneSnapshot } from "@sse/engine-client";
 
+import { formatLightingRelativeTime } from "../lightingHelpers";
 import { SceneTile } from "./SceneTile";
 import styles from "./LightingRail.module.css";
 
@@ -11,8 +12,10 @@ export interface SceneRailProps {
   modifiedSceneId: string | null;
   sceneThumbs: Record<string, string>;
   searchQuery?: string;
+  bridgeReachable?: boolean;
   onRecall: (sceneId: string) => void;
   onAddScene?: () => void;
+  onClearSearch?: () => void;
 }
 
 interface SceneStats {
@@ -38,8 +41,10 @@ export function SceneRail({
   modifiedSceneId,
   sceneThumbs,
   searchQuery = "",
+  bridgeReachable = true,
   onRecall,
   onAddScene,
+  onClearSearch,
 }: SceneRailProps) {
   const needle = searchQuery.trim().toLowerCase();
   const filteredScenes = needle ? scenes.filter((scene) => scene.name.toLowerCase().includes(needle)) : scenes;
@@ -51,13 +56,26 @@ export function SceneRail({
   }
 
   if (needle && filteredScenes.length === 0) {
-    return <p className={styles.empty}>No scenes match “{searchQuery}”.</p>;
+    return (
+      <p className={styles.empty}>
+        No scenes match “{searchQuery}”.
+        {onClearSearch ? (
+          <>
+            {" "}
+            <button type="button" className={styles.emptyAction} onClick={onClearSearch}>
+              Clear search
+            </button>
+          </>
+        ) : null}
+      </p>
+    );
   }
 
   return (
     <div className={styles.sceneGrid} role="list" aria-label="Saved scenes">
       {filteredScenes.map((scene) => {
         const stats = statsForScene(scene);
+        const lastRecalledLabel = scene.lastRecalledAt ? formatLightingRelativeTime(scene.lastRecalledAt) : undefined;
         return (
           <div key={scene.id} role="listitem">
             <SceneTile
@@ -67,6 +85,8 @@ export function SceneRail({
               avgCct={stats.avgCct}
               isActive={scene.id === activeSceneId}
               isModified={scene.id === modifiedSceneId}
+              bridgeReachable={bridgeReachable}
+              lastRecalledLabel={lastRecalledLabel}
               thumbDataUri={sceneThumbs[scene.id]}
               onRecall={onRecall}
             />

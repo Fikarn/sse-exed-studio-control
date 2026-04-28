@@ -134,6 +134,25 @@ export function lightingFixtureCctPercent(cct: number, fixtureType: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Time formatting — short relative strings for "last recalled" and similar.
+// ---------------------------------------------------------------------------
+
+export function formatLightingRelativeTime(iso: string | null | undefined): string {
+  if (!iso) return "never";
+  const parsed = Date.parse(iso);
+  if (!Number.isFinite(parsed)) return "—";
+  const elapsedMs = Date.now() - parsed;
+  if (elapsedMs < 0) return "just now";
+  if (elapsedMs < 60_000) return "just now";
+  const minutes = Math.floor(elapsedMs / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// ---------------------------------------------------------------------------
 // Value formatting (used by the DMX monitor and the inspector's read-only
 // displays).
 // ---------------------------------------------------------------------------

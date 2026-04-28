@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Zap } from "lucide-react";
 
-import { Button } from "@sse/design-system";
+import { Button, Tooltip } from "@sse/design-system";
 
 const BURST_DURATION_MS = 1200;
 
@@ -10,9 +10,21 @@ export interface IdentifyBurstButtonProps {
   fixtureName: string;
   onTrigger: (fixtureId: string, fixtureName: string) => void;
   disabled?: boolean;
+  /**
+   * When false, the button disables with an explanatory tooltip — the burst
+   * IPC depends on the bridge being live, so firing it offline is misleading
+   * (it would set the active state but no light would change).
+   */
+  bridgeReachable?: boolean;
 }
 
-export function IdentifyBurstButton({ fixtureId, fixtureName, onTrigger, disabled = false }: IdentifyBurstButtonProps) {
+export function IdentifyBurstButton({
+  fixtureId,
+  fixtureName,
+  onTrigger,
+  disabled = false,
+  bridgeReachable = true,
+}: IdentifyBurstButtonProps) {
   const [active, setActive] = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -33,8 +45,10 @@ export function IdentifyBurstButton({ fixtureId, fixtureName, onTrigger, disable
     setActive(false);
   }, [fixtureId]);
 
+  const effectiveDisabled = disabled || !bridgeReachable;
+
   const handleClick = () => {
-    if (active || disabled) {
+    if (active || effectiveDisabled) {
       return;
     }
     onTrigger(fixtureId, fixtureName);
@@ -48,10 +62,10 @@ export function IdentifyBurstButton({ fixtureId, fixtureName, onTrigger, disable
     }, BURST_DURATION_MS);
   };
 
-  return (
+  const button = (
     <Button
       onClick={handleClick}
-      disabled={disabled}
+      disabled={effectiveDisabled}
       loading={active}
       variant={active ? "primary" : "secondary"}
       size="compact"
@@ -61,4 +75,9 @@ export function IdentifyBurstButton({ fixtureId, fixtureName, onTrigger, disable
       {active ? "Identifying…" : "Identify"}
     </Button>
   );
+
+  if (!bridgeReachable) {
+    return <Tooltip content="Identify needs the DMX bridge — bridge unreachable">{button}</Tooltip>;
+  }
+  return button;
 }

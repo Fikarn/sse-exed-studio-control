@@ -105,6 +105,7 @@ export function LightingWorkspaceSurface({
   // together. Cleared on workspace switch / hot reload by being state.
   const [extraSelectedFixtureIds, setExtraSelectedFixtureIds] = useState<ReadonlySet<string>>(() => new Set());
   const [dmxMonitorOpen, setDmxMonitorOpen] = useState(false);
+  const [confirmCutAllOpen, setConfirmCutAllOpen] = useState(false);
   // Frontend-only "previewed" scene id. Set immediately when a scene tile is
   // clicked so the inspector can show its details even if the engine recall
   // IPC was rejected (e.g. bridge unreachable in dev / pre-probe states).
@@ -424,6 +425,10 @@ export function LightingWorkspaceSurface({
       setBusyAction(null);
     }
   });
+
+  const requestEmergencyCut = useCallback(() => {
+    setConfirmCutAllOpen(true);
+  }, []);
 
   const handleToggleAllPower = useEffectEvent(async (on: boolean) => {
     setBusyAction("lighting-master-toggle");
@@ -929,7 +934,7 @@ export function LightingWorkspaceSurface({
           fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}
           fixtureTotal={fixtures.length}
           onGrandMasterChange={handleGrandMasterChange}
-          onEmergencyCut={handleEmergencyCut}
+          onEmergencyCut={requestEmergencyCut}
           onToggleAllPower={handleToggleAllPower}
           scenes={scenes}
           activeSceneId={activeSceneId}
@@ -944,6 +949,7 @@ export function LightingWorkspaceSurface({
           isSceneModified={isSceneModified}
           onResaveScene={handleResaveScene}
           onRevertScene={activeSceneId ? () => void handleRecallScene(activeSceneId) : undefined}
+          onClearSearch={() => setSearchQuery("")}
         />
 
         <ColumnResizer ariaLabel="Resize scene rail" onPointerDown={columns.startResize("rail")} />
@@ -956,6 +962,7 @@ export function LightingWorkspaceSurface({
             patchMode={uiMode === "patch"}
             activeSceneName={activeScene?.name}
             isSceneModified={isSceneModified}
+            bridgeReachable={bridgeReachable}
             searchQuery={searchQuery}
             onSelectFixture={(id, options) => void handleSelectFixture(id, options ?? {})}
             onPositionCommit={(id, xMeters, yMeters) =>
@@ -987,7 +994,7 @@ export function LightingWorkspaceSurface({
           onIdentifyBurst={handleIdentifyBurst}
           onPatchCommit={handlePatchCommit}
           onToggleGroupPower={handleToggleGroupPower}
-          onSelectFixture={(id) => void handleSelectFixture(id)}
+          onSelectFixture={(id, options) => void handleSelectFixture(id, options)}
           onSaveScene={handleSaveScene}
           onRecallScene={handleRecallScene}
           onResaveScene={handleResaveScene}
@@ -1048,6 +1055,27 @@ export function LightingWorkspaceSurface({
             pendingLeaveResolveRef.current?.(false);
             pendingLeaveResolveRef.current = null;
           }}
+        />
+      ) : null}
+
+      {confirmCutAllOpen ? (
+        <ConfirmDialog
+          title="Cut all fixtures?"
+          body={
+            <>
+              This sends every fixture to <strong>off</strong> immediately. Saved scenes are unaffected — recall any
+              scene to restore the rig.
+            </>
+          }
+          confirmLabel="Cut all"
+          cancelLabel="Cancel"
+          danger
+          busy={busyAction === "lighting-blackout"}
+          onConfirm={() => {
+            setConfirmCutAllOpen(false);
+            void handleEmergencyCut();
+          }}
+          onCancel={() => setConfirmCutAllOpen(false)}
         />
       ) : null}
     </div>

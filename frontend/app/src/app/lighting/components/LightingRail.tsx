@@ -32,6 +32,7 @@ export interface LightingRailProps {
   isSceneModified?: boolean;
   onResaveScene?: () => void;
   onRevertScene?: () => void;
+  onClearSearch?: () => void;
 }
 
 export function LightingRail({
@@ -56,6 +57,7 @@ export function LightingRail({
   isSceneModified = false,
   onResaveScene,
   onRevertScene,
+  onClearSearch,
 }: LightingRailProps) {
   const railClass = patchMode ? `${styles.rail} ${styles.railPaused}` : styles.rail;
   return (
@@ -83,9 +85,11 @@ export function LightingRail({
         label="Scenes"
         count={patchMode ? "paused" : `${scenes.length} saved`}
         action={
-          <button type="button" className={styles.headButton} onClick={onSaveScene} disabled={patchMode}>
-            Save (S)
-          </button>
+          patchMode ? null : (
+            <button type="button" className={styles.headButton} onClick={onSaveScene}>
+              Save <kbd className={styles.headButtonKbd}>S</kbd>
+            </button>
+          )
         }
       />
       <SceneRail
@@ -94,8 +98,10 @@ export function LightingRail({
         modifiedSceneId={modifiedSceneId}
         sceneThumbs={sceneThumbs}
         searchQuery={searchQuery}
+        bridgeReachable={bridgeReachable}
         onRecall={onRecallScene}
         onAddScene={patchMode ? undefined : onSaveScene}
+        onClearSearch={onClearSearch}
       />
 
       <RailDivider />
@@ -110,7 +116,12 @@ export function LightingRail({
               : undefined
         }
       />
-      <GroupRail groups={groups} onTogglePower={onToggleGroupPower} searchQuery={searchQuery} />
+      <GroupRail
+        groups={groups}
+        onTogglePower={onToggleGroupPower}
+        searchQuery={searchQuery}
+        onClearSearch={onClearSearch}
+      />
 
       {!patchMode && isSceneModified ? (
         <div className={styles.actions}>

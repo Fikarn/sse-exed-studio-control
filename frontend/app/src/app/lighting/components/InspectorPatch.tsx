@@ -22,6 +22,7 @@ export interface InspectorPatchProps {
   universe: number;
   dmxChannels: readonly LightingDmxChannelEntry[];
   dmxStale: boolean;
+  bridgeReachable?: boolean;
   patchOverlap: {
     conflictingFixtureNames: string[];
     suggestedStartAddress: number | null;
@@ -37,6 +38,7 @@ export function InspectorPatch({
   universe,
   dmxChannels,
   dmxStale,
+  bridgeReachable = true,
   patchOverlap,
   onPatchCommit,
   onIdentifyBurst,
@@ -110,6 +112,7 @@ export function InspectorPatch({
             fixtureName={fixture.name}
             onTrigger={onIdentifyBurst}
             disabled={busy}
+            bridgeReachable={bridgeReachable}
           />
         </div>
 
@@ -121,8 +124,11 @@ export function InspectorPatch({
           <div className={styles.fact}>
             <dt className={styles.factLabel}>Range</dt>
             <dd className={styles.factValue}>
-              {String(fixture.dmxStartAddress).padStart(3, "0")}–
-              {String(fixture.dmxStartAddress + channelCount - 1).padStart(3, "0")}
+              {fixture.dmxStartAddress < 1
+                ? "Unpatched"
+                : `${String(fixture.dmxStartAddress).padStart(3, "0")}–${String(
+                    fixture.dmxStartAddress + channelCount - 1
+                  ).padStart(3, "0")}`}
             </dd>
           </div>
           <div className={styles.fact}>
@@ -166,7 +172,7 @@ export function InspectorPatch({
           </Button>
         </div>
         <div className={styles.helpText}>
-          {lightingFixturePatchSummary(fixture.dmxStartAddress, fixture.type)} · max start {maxStartAddress}
+          {lightingFixturePatchSummary(fixture.dmxStartAddress, fixture.type, universe)} · max start {maxStartAddress}
         </div>
       </InspectorSection>
 

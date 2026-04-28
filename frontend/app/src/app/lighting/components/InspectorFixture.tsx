@@ -5,14 +5,20 @@ import { Button, ConfirmDialog, InspectorSection, StatusDot } from "@sse/design-
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { deriveMounting, type FixtureMounting } from "../fixtureMounting";
-import { lightingFixtureCctRange, isLightingRangeCommitKey } from "../lightingHelpers";
+import { defaultLightingBeamAngle, isLightingRangeCommitKey, lightingFixtureCctRange } from "../lightingHelpers";
+import { STUDIO_LAYOUT } from "../studioLayout";
 
 import { IdentifyBurstButton } from "./IdentifyBurstButton";
 import styles from "./LightingInspector.module.css";
 
+const RIG_HEIGHT_MAX_METERS = 8;
+const BEAM_ANGLE_MIN_DEGREES = 1;
+const BEAM_ANGLE_MAX_DEGREES = 180;
+
 export interface InspectorFixtureProps {
   fixture: LightingFixtureSnapshot;
   groupName?: string;
+  bridgeReachable?: boolean;
   onTogglePower: (fixtureId: string, on: boolean) => void;
   onIntensityCommit: (fixtureId: string, intensity: number) => void;
   onCctCommit: (fixtureId: string, cct: number) => void;
@@ -51,6 +57,7 @@ function formatMaybeNumber(value: number | null | undefined): string {
 export function InspectorFixture({
   fixture,
   groupName,
+  bridgeReachable = true,
   onTogglePower,
   onIntensityCommit,
   onCctCommit,
@@ -114,6 +121,19 @@ export function InspectorFixture({
     }
   };
 
+  const clampSpatial = (field: "spatialX" | "spatialY" | "rigZ" | "beamAngleDegrees", raw: number): number => {
+    switch (field) {
+      case "spatialX":
+        return Math.max(0, Math.min(STUDIO_LAYOUT.roomWidthMeters, raw));
+      case "spatialY":
+        return Math.max(0, Math.min(STUDIO_LAYOUT.roomDepthMeters, raw));
+      case "rigZ":
+        return Math.max(0, Math.min(RIG_HEIGHT_MAX_METERS, raw));
+      case "beamAngleDegrees":
+        return Math.max(BEAM_ANGLE_MIN_DEGREES, Math.min(BEAM_ANGLE_MAX_DEGREES, raw));
+    }
+  };
+
   const commitSpatial = (field: "spatialX" | "spatialY" | "rigZ" | "beamAngleDegrees", rawDraft: string) => {
     if (!onSpatialCommit) return;
     const trimmed = rawDraft.trim();
@@ -124,9 +144,10 @@ export function InspectorFixture({
     }
     const parsed = Number.parseFloat(trimmed);
     if (!Number.isFinite(parsed)) return;
+    const clamped = clampSpatial(field, parsed);
     const current = fixture[field] ?? null;
-    if (parsed === current) return;
-    onSpatialCommit(fixture.id, { [field]: parsed });
+    if (clamped === current) return;
+    onSpatialCommit(fixture.id, { [field]: clamped });
   };
 
   return (
@@ -225,6 +246,7 @@ export function InspectorFixture({
             fixtureName={fixture.name}
             onTrigger={onIdentifyBurst}
             disabled={busy}
+            bridgeReachable={bridgeReachable}
           />
           <span className={styles.helpText}>
             Sends a 1.2 s burst of full intensity through the bridge so you can spot the fixture on stage.
@@ -310,7 +332,10 @@ export function InspectorFixture({
           </div>
           <span className={styles.helpText}>
             Drag the marker on the plot, hold ⌥ to free-position, or use the arrow keys (Shift = 0.5 m steps) when the
-            fixture is selected.
+            fixture is selected. Stage X clamps to 0–{STUDIO_LAYOUT.roomWidthMeters} m, Y to 0–
+            {STUDIO_LAYOUT.roomDepthMeters} m, rig height to 0–{RIG_HEIGHT_MAX_METERS} m, beam angle to{" "}
+            {BEAM_ANGLE_MIN_DEGREES}°–{BEAM_ANGLE_MAX_DEGREES}° (default for {fixture.type}:{" "}
+            {defaultLightingBeamAngle(fixture.type)}°).
           </span>
         </InspectorSection>
       ) : null}

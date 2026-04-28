@@ -35,7 +35,10 @@ export function InspectorGroup({
   const cctMin = ccts.length > 0 ? Math.min(...ccts) : 0;
   const cctMax = ccts.length > 0 ? Math.max(...ccts) : 0;
 
-  const dotState = allOn ? "ok" : mixed ? "attn" : "info";
+  // "Mixed" is a partial state, not an alert — keep the dot informational so
+  // it doesn't read as a warning. The textual " · mixed" suffix conveys the
+  // distinction.
+  const dotState = allOn ? "ok" : "info";
 
   return (
     <>

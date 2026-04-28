@@ -88,8 +88,9 @@ export function LightingHealthBar({
     },
     {
       label: "Universe",
-      dot: "ok",
+      dot: reachable ? "ok" : "info",
       value: `${channelCount} / ${DMX_UNIVERSE_TOTAL_CHANNELS} ch`,
+      suffix: reachable ? undefined : "stale",
     },
     {
       label: "Fixtures",
@@ -97,7 +98,7 @@ export function LightingHealthBar({
       value: `${fixturesPatched} / ${fixturesTotal} patched`,
     },
     {
-      label: "Auto-save",
+      label: "Scene state",
       dot: driftDetected ? "attn" : "ok",
       value: driftDetected ? "Unsaved changes" : "Saved",
       suffix: !driftDetected && lastSavedLabel ? `· last ${lastSavedLabel}` : undefined,

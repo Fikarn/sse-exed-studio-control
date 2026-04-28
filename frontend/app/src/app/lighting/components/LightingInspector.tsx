@@ -10,7 +10,12 @@ import { InspectorFixtureBulk } from "./InspectorFixtureBulk";
 import { InspectorGroup } from "./InspectorGroup";
 import { InspectorPatch } from "./InspectorPatch";
 import { InspectorScene } from "./InspectorScene";
-import { LightingInspectorTabs, type InspectorTab } from "./LightingInspectorTabs";
+import {
+  LIGHTING_TAB_BUTTON_ID,
+  LIGHTING_TAB_PANEL_ID,
+  LightingInspectorTabs,
+  type InspectorTab,
+} from "./LightingInspectorTabs";
 
 import styles from "./LightingInspector.module.css";
 
@@ -41,7 +46,7 @@ export interface LightingInspectorProps {
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   onPatchCommit: (fixtureId: string, nextStartAddress: number) => void;
   onToggleGroupPower: (groupId: string, on: boolean) => void;
-  onSelectFixture: (fixtureId: string) => void;
+  onSelectFixture: (fixtureId: string, options?: { additive?: boolean }) => void;
   onSaveScene?: () => void;
   onRecallScene?: (sceneId: string) => void;
   onResaveScene?: () => void;
@@ -142,81 +147,91 @@ export function LightingInspector({
     <aside className={styles.inspector} aria-label={`Lighting inspector — ${TAB_TITLE[activeTab]}`}>
       <LightingInspectorTabs active={activeTab} onChange={onTabChange} visibleTabs={visibleTabs} />
 
-      {activeTab === "scene" ? (
-        <InspectorScene
-          scene={activeScene}
-          fixtures={fixtures}
-          groups={groups}
-          isModified={isSceneModified}
-          bridgeReachable={bridgeReachable}
-          onSaveScene={onSaveScene}
-          onRecallScene={onRecallScene}
-          onResaveScene={onResaveScene}
-          onDeleteScene={onDeleteScene}
-          saveBusy={busyAction === "scene-create"}
-          recallBusy={busyAction?.startsWith("scene:") ?? false}
-          resaveBusy={busyAction === "scene-resave"}
-          deleteBusy={busyAction === "scene-delete"}
-        />
-      ) : null}
+      <section
+        role="tabpanel"
+        id={LIGHTING_TAB_PANEL_ID[activeTab]}
+        aria-labelledby={LIGHTING_TAB_BUTTON_ID[activeTab]}
+        className={styles.tabPanel}
+      >
+        {activeTab === "scene" ? (
+          <InspectorScene
+            scene={activeScene}
+            fixtures={fixtures}
+            groups={groups}
+            isModified={isSceneModified}
+            bridgeReachable={bridgeReachable}
+            onSaveScene={onSaveScene}
+            onRecallScene={onRecallScene}
+            onResaveScene={onResaveScene}
+            onDeleteScene={onDeleteScene}
+            saveBusy={busyAction === "scene-create"}
+            recallBusy={busyAction?.startsWith("scene:") ?? false}
+            resaveBusy={busyAction === "scene-resave"}
+            deleteBusy={busyAction === "scene-delete"}
+          />
+        ) : null}
 
-      {activeTab === "fixture" && selectedFixtures && selectedFixtures.length > 1 ? (
-        <InspectorFixtureBulk
-          fixtures={selectedFixtures}
-          busy={busyAction?.startsWith("fixture-bulk-") ?? false}
-          onClearSelection={onClearSelection ?? (() => undefined)}
-          onBulkTogglePower={onBulkTogglePower ?? (() => undefined)}
-          onBulkIntensityCommit={onBulkIntensityCommit ?? (() => undefined)}
-          onBulkCctCommit={onBulkCctCommit ?? (() => undefined)}
-        />
-      ) : null}
+        {activeTab === "fixture" && selectedFixtures && selectedFixtures.length > 1 ? (
+          <InspectorFixtureBulk
+            fixtures={selectedFixtures}
+            busy={busyAction?.startsWith("fixture-bulk-") ?? false}
+            onClearSelection={onClearSelection ?? (() => undefined)}
+            onBulkTogglePower={onBulkTogglePower ?? (() => undefined)}
+            onBulkIntensityCommit={onBulkIntensityCommit ?? (() => undefined)}
+            onBulkCctCommit={onBulkCctCommit ?? (() => undefined)}
+            onSelectFixture={onSelectFixture}
+          />
+        ) : null}
 
-      {activeTab === "fixture" && selectedFixture && (!selectedFixtures || selectedFixtures.length <= 1) ? (
-        <InspectorFixture
-          fixture={selectedFixture}
-          groupName={fixtureGroup?.name}
-          onTogglePower={onTogglePower}
-          onIntensityCommit={onIntensityCommit}
-          onCctCommit={onCctCommit}
-          onIdentifyBurst={onIdentifyBurst}
-          onDeleteFixture={onDeleteFixture}
-          onSpatialCommit={onSpatialCommit}
-          busy={busyAction?.startsWith(`fixture-`) ?? false}
-          deleteBusy={busyAction === `fixture-delete:${selectedFixture.id}`}
-        />
-      ) : null}
+        {activeTab === "fixture" && selectedFixture && (!selectedFixtures || selectedFixtures.length <= 1) ? (
+          <InspectorFixture
+            fixture={selectedFixture}
+            groupName={fixtureGroup?.name}
+            bridgeReachable={bridgeReachable}
+            onTogglePower={onTogglePower}
+            onIntensityCommit={onIntensityCommit}
+            onCctCommit={onCctCommit}
+            onIdentifyBurst={onIdentifyBurst}
+            onDeleteFixture={onDeleteFixture}
+            onSpatialCommit={onSpatialCommit}
+            busy={busyAction?.startsWith(`fixture-`) ?? false}
+            deleteBusy={busyAction === `fixture-delete:${selectedFixture.id}`}
+          />
+        ) : null}
 
-      {activeTab === "fixture" && !selectedFixture ? (
-        <p className={styles.empty}>Select a fixture on the stage plot to see its controls.</p>
-      ) : null}
+        {activeTab === "fixture" && !selectedFixture ? (
+          <p className={styles.empty}>Select a fixture on the stage plot to see its controls.</p>
+        ) : null}
 
-      {activeTab === "group" && selectedGroup ? (
-        <InspectorGroup
-          groupId={selectedGroup.id}
-          groupName={selectedGroup.name}
-          fixtures={groupFixtures}
-          onTogglePower={onToggleGroupPower}
-          onSelectFixture={onSelectFixture}
-          busy={busyAction === `group:${selectedGroup.id}`}
-        />
-      ) : null}
+        {activeTab === "group" && selectedGroup ? (
+          <InspectorGroup
+            groupId={selectedGroup.id}
+            groupName={selectedGroup.name}
+            fixtures={groupFixtures}
+            onTogglePower={onToggleGroupPower}
+            onSelectFixture={onSelectFixture}
+            busy={busyAction === `group:${selectedGroup.id}`}
+          />
+        ) : null}
 
-      {activeTab === "group" && !selectedGroup ? (
-        <p className={styles.empty}>Select a group from the rail to inspect its members.</p>
-      ) : null}
+        {activeTab === "group" && !selectedGroup ? (
+          <p className={styles.empty}>Select a group from the rail to inspect its members.</p>
+        ) : null}
 
-      {activeTab === "patch" ? (
-        <InspectorPatch
-          fixture={selectedFixture}
-          universe={universe}
-          dmxChannels={dmxChannels}
-          dmxStale={dmxStale}
-          patchOverlap={patchOverlap}
-          onPatchCommit={onPatchCommit}
-          onIdentifyBurst={onIdentifyBurst}
-          busy={selectedFixture ? busyAction === `fixture-patch:${selectedFixture.id}` : false}
-        />
-      ) : null}
+        {activeTab === "patch" ? (
+          <InspectorPatch
+            fixture={selectedFixture}
+            universe={universe}
+            dmxChannels={dmxChannels}
+            dmxStale={dmxStale}
+            bridgeReachable={bridgeReachable}
+            patchOverlap={patchOverlap}
+            onPatchCommit={onPatchCommit}
+            onIdentifyBurst={onIdentifyBurst}
+            busy={selectedFixture ? busyAction === `fixture-patch:${selectedFixture.id}` : false}
+          />
+        ) : null}
+      </section>
     </aside>
   );
 }

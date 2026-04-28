@@ -39,7 +39,7 @@ export function MasterCard({
   const anyOn = fixtureOnCount > 0;
   const sliderDisabled = !enabled || !bridgeReachable;
   const cardClass = anyOn ? `${styles.master} ${styles.masterOn}` : styles.master;
-  const resolvedEyebrow = eyebrow ?? `Master · ${fixtureOnCount} / ${fixtureTotal} emitting`;
+  const resolvedEyebrow = eyebrow ?? `Master · ${fixtureOnCount} / ${fixtureTotal} on`;
   const stateName = !bridgeReachable ? "Lighting offline" : anyOn ? "Lighting on" : "Lighting paused";
 
   return (
@@ -55,7 +55,7 @@ export function MasterCard({
             className={`${styles.masterToggle} ${anyOn ? styles.masterToggleOn : ""}`}
             onClick={() => onToggleAllPower(!anyOn)}
             aria-pressed={anyOn}
-            aria-label={anyOn ? "Pause all lighting fixtures" : "Resume all lighting fixtures"}
+            aria-label={anyOn ? "Pause lighting" : "Resume lighting"}
             disabled={!bridgeReachable}
           >
             <span className={styles.masterTogglePin} aria-hidden="true" />

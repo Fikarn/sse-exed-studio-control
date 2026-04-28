@@ -21,6 +21,13 @@
   border-radius: var(--radius-tight-md);
 }
 
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
 .tab {
   appearance: none;
   background: transparent;
@@ -129,6 +136,8 @@
   color: var(--color-brand-text-primary);
   margin: 0;
   letter-spacing: -0.01em;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .sceneSub {
@@ -155,6 +164,10 @@
   flex-direction: column;
   gap: 4px;
   margin: 0;
+}
+
+.sceneStatSpan {
+  grid-column: 1 / -1;
 }
 
 .sceneStatLabel {
@@ -219,6 +232,18 @@
   font-family: var(--font-family-ui);
   font-size: 11px;
   color: var(--color-brand-text-primary);
+}
+
+.sceneFixtureChipButton {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color var(--motion-duration-fast) ease;
+}
+
+.sceneFixtureChipButton:hover {
+  border-color: var(--color-brand-green-border);
 }
 
 .sceneFixtureSwatch {
