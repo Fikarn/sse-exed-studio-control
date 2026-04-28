@@ -65,8 +65,17 @@
       }
     },
     "bg": {
-      "deep": { "$value": "#0A0D0A" },
-      "canvas": { "$value": "#0E110E" }
+      "deep": { "$value": "#08090A" },
+      "canvas": { "$value": "#0D0F0D" },
+      "default": { "$value": "#121412" },
+      "soft": { "$value": "#0F110F" },
+      "raised": { "$value": "#161916" },
+      "strong": { "$value": "#1C201C" },
+      "elevated": { "$value": "#20251F" },
+      "stroke": { "$value": "#21251F" },
+      "hairline": { "$value": "rgba(250, 246, 230, 0.04)" },
+      "border": { "$value": "#2A2F28" },
+      "borderStrong": { "$value": "#383F35" }
     },
     "cct": {
       "2700": { "$value": "#EF8E5A" },
@@ -114,11 +123,13 @@
     "sm": { "$value": "8px" },
     "md": { "$value": "14px" },
     "lg": { "$value": "20px" },
+    "pill": { "$value": "999px" },
     "tight": {
       "xs": { "$value": "3px" },
       "sm": { "$value": "4px" },
       "md": { "$value": "6px" },
-      "lg": { "$value": "8px" }
+      "lg": { "$value": "8px" },
+      "xl": { "$value": "12px" }
     }
   },
   "size": {
@@ -137,7 +148,16 @@
     "sm": { "$value": "0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(250, 246, 230, 0.04)" },
     "md": { "$value": "0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(250, 246, 230, 0.05)" },
     "lg": { "$value": "0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(250, 246, 230, 0.06)" },
-    "glass": { "$value": "0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.10)" }
+    "glass": { "$value": "0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.10)" },
+    "glowGreen": {
+      "$value": "0 0 0 1px {color.brand.green}, 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
+    },
+    "glowYellow": {
+      "$value": "0 0 0 1px {color.brand.yellow}, 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
+    },
+    "glowBlue": {
+      "$value": "0 0 0 1px {color.brand.blue}, 0 12px 28px rgba(63, 112, 200, 0.20), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
+    }
   },
   "motion": {
     "duration": {

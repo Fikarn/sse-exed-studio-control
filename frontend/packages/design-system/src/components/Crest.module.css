@@ -1,0 +1,20 @@
+@layer components {
+  .crest {
+    display: block;
+    width: auto;
+    image-rendering: -webkit-optimize-contrast;
+    opacity: 0.96;
+  }
+
+  .sm {
+    height: 36px;
+  }
+
+  .md {
+    height: 52px;
+  }
+
+  .lg {
+    height: 72px;
+  }
+}
