@@ -44,7 +44,7 @@
         --sse-green: #99ba92;
         --sse-green-hot: #b5d4ad;
         --sse-green-soft: rgba(153, 186, 146, 0.16);
-        --sse-green-glow: rgba(153, 186, 146, 0.10);
+        --sse-green-glow: rgba(153, 186, 146, 0.1);
         --sse-green-border: rgba(153, 186, 146, 0.5);
 
         /* Brand secondary */
@@ -102,10 +102,13 @@
         --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(250, 246, 230, 0.04);
         --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(250, 246, 230, 0.05);
         --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(250, 246, 230, 0.06);
-        --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.10);
-        --glow-green: 0 0 0 1px var(--sse-green), 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
-        --glow-yellow: 0 0 0 1px var(--sse-yellow), 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08);
-        --glow-blue: 0 0 0 1px var(--sse-blue), 0 12px 28px rgba(63, 112, 200, 0.20), inset 0 1px 0 rgba(250, 246, 230, 0.08);
+        --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.1);
+        --glow-green:
+          0 0 0 1px var(--sse-green), 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
+        --glow-yellow:
+          0 0 0 1px var(--sse-yellow), 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08);
+        --glow-blue:
+          0 0 0 1px var(--sse-blue), 0 12px 28px rgba(63, 112, 200, 0.2), inset 0 1px 0 rgba(250, 246, 230, 0.08);
 
         /* Glass */
         --glass-bg: rgba(8, 10, 8, 0.78);
@@ -113,8 +116,11 @@
         --glass-border: rgba(250, 246, 230, 0.08);
       }
 
-      * { box-sizing: border-box; }
-      html, body {
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
         margin: 0;
         padding: 0;
         background: var(--bg-deep);
@@ -166,7 +172,7 @@
         font-weight: 600;
         font-variation-settings: "opsz" 144;
         font-size: 64px;
-        line-height: 1.0;
+        line-height: 1;
         letter-spacing: -0.03em;
         margin: 0 0 20px;
       }
@@ -181,8 +187,13 @@
         color: var(--text-sec);
         max-width: 1080px;
       }
-      .page-head .sub p { margin: 0 0 14px; }
-      .page-head .sub b { color: var(--text-pri); font-weight: 600; }
+      .page-head .sub p {
+        margin: 0 0 14px;
+      }
+      .page-head .sub b {
+        color: var(--text-pri);
+        font-weight: 600;
+      }
 
       .spec {
         display: grid;
@@ -217,11 +228,22 @@
         align-self: center;
         font-weight: 600;
       }
-      .spec .v { color: var(--text-pri); font-weight: 500; }
-      .spec .v.green { color: var(--sse-green); }
-      .spec .v.yellow { color: var(--sse-yellow); }
-      .spec .v.blue { color: var(--sse-blue-hot); }
-      .spec .v.darkgreen { color: var(--sse-dark-green-mid); }
+      .spec .v {
+        color: var(--text-pri);
+        font-weight: 500;
+      }
+      .spec .v.green {
+        color: var(--sse-green);
+      }
+      .spec .v.yellow {
+        color: var(--sse-yellow);
+      }
+      .spec .v.blue {
+        color: var(--sse-blue-hot);
+      }
+      .spec .v.darkgreen {
+        color: var(--sse-dark-green-mid);
+      }
 
       .section-label {
         font-family: var(--mono-font);
@@ -274,9 +296,15 @@
         width: 3px;
         background: var(--sse-green);
       }
-      .change.darkgreen:before { background: var(--sse-dark-green-mid); }
-      .change.yellow:before { background: var(--sse-yellow); }
-      .change.coral:before { background: var(--sse-coral); }
+      .change.darkgreen:before {
+        background: var(--sse-dark-green-mid);
+      }
+      .change.yellow:before {
+        background: var(--sse-yellow);
+      }
+      .change.coral:before {
+        background: var(--sse-coral);
+      }
       .change .h {
         font-family: var(--mono-font);
         font-size: 10px;
@@ -286,9 +314,15 @@
         margin-bottom: 12px;
         font-weight: 600;
       }
-      .change.darkgreen .h { color: var(--sse-dark-green-mid); }
-      .change.yellow .h { color: var(--sse-yellow); }
-      .change.coral .h { color: var(--sse-coral); }
+      .change.darkgreen .h {
+        color: var(--sse-dark-green-mid);
+      }
+      .change.yellow .h {
+        color: var(--sse-yellow);
+      }
+      .change.coral .h {
+        color: var(--sse-coral);
+      }
       .change .t {
         font-family: var(--display-font);
         font-variation-settings: "opsz" 36;
@@ -328,7 +362,9 @@
         width: 3px;
         background: linear-gradient(180deg, var(--sse-green) 0%, var(--sse-dark-green-mid) 70%, transparent 100%);
       }
-      .persona.senior:before { background: linear-gradient(180deg, var(--sse-blue) 0%, rgba(63, 112, 200, 0.4) 70%, transparent 100%); }
+      .persona.senior:before {
+        background: linear-gradient(180deg, var(--sse-blue) 0%, rgba(63, 112, 200, 0.4) 70%, transparent 100%);
+      }
       .persona .role {
         font-family: var(--mono-font);
         font-size: 10px;
@@ -338,7 +374,9 @@
         margin-bottom: 10px;
         font-weight: 600;
       }
-      .persona.senior .role { color: var(--sse-blue-hot); }
+      .persona.senior .role {
+        color: var(--sse-blue-hot);
+      }
       .persona .who {
         font-family: var(--display-font);
         font-variation-settings: "opsz" 72;
@@ -356,9 +394,18 @@
         line-height: 1.7;
         color: var(--text-sec);
       }
-      .persona ol li { margin-bottom: 8px; }
-      .persona ol li b { color: var(--text-pri); font-weight: 600; }
-      .persona ol li em { color: var(--text-pri); font-style: normal; font-weight: 500; }
+      .persona ol li {
+        margin-bottom: 8px;
+      }
+      .persona ol li b {
+        color: var(--text-pri);
+        font-weight: 600;
+      }
+      .persona ol li em {
+        color: var(--text-pri);
+        font-style: normal;
+        font-weight: 500;
+      }
 
       /* ============================================================
          Workspace canvas
@@ -371,7 +418,9 @@
         border-radius: var(--r-lg);
         overflow: hidden;
         position: relative;
-        box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(250, 246, 230, 0.04);
+        box-shadow:
+          0 40px 100px rgba(0, 0, 0, 0.6),
+          inset 0 1px 0 rgba(250, 246, 230, 0.04);
       }
 
       /* App shell — taller (92 px), nav more prominent */
@@ -393,7 +442,13 @@
         position: absolute;
         inset: auto 0 0 0;
         height: 1px;
-        background: linear-gradient(90deg, transparent, var(--sse-dark-green-soft) 30%, var(--sse-dark-green-soft) 70%, transparent);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--sse-dark-green-soft) 30%,
+          var(--sse-dark-green-soft) 70%,
+          transparent
+        );
         opacity: 0.6;
       }
       .canvas .shell .brand {
@@ -451,8 +506,12 @@
         opacity: 0.7;
         flex-shrink: 0;
       }
-      .canvas .shell .nav .item:hover { color: var(--text-sec); }
-      .canvas .shell .nav .item:hover .ico { opacity: 0.9; }
+      .canvas .shell .nav .item:hover {
+        color: var(--text-sec);
+      }
+      .canvas .shell .nav .item:hover .ico {
+        opacity: 0.9;
+      }
       .canvas .shell .nav .item.active {
         background: linear-gradient(180deg, var(--sse-green-soft) 0%, var(--sse-green-glow) 100%);
         color: var(--text-pri);
@@ -525,11 +584,13 @@
         letter-spacing: -0.01em;
       }
       .tb-title .ico {
-        width: 17px; height: 17px;
+        width: 17px;
+        height: 17px;
         color: var(--sse-green);
       }
       .tb-divider {
-        width: 1px; height: 22px;
+        width: 1px;
+        height: 22px;
         background: var(--surface-border);
         margin: 0 4px;
       }
@@ -561,7 +622,8 @@
         background: linear-gradient(180deg, var(--sse-blue-soft) 0%, rgba(63, 112, 200, 0.06) 100%);
       }
       .chip .dot {
-        width: 6px; height: 6px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
         background: currentColor;
         box-shadow: 0 0 6px currentColor;
@@ -598,10 +660,15 @@
         font-weight: 600;
         margin-top: 1px;
       }
-      .tb-spacer { flex: 1; }
+      .tb-spacer {
+        flex: 1;
+      }
       .tb-search {
-        display: flex; align-items: center; gap: 8px;
-        height: 30px; padding: 0 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 30px;
+        padding: 0 12px;
         border-radius: var(--r-sm);
         background: var(--surface-soft);
         border: 1px solid var(--surface-stroke);
@@ -611,8 +678,11 @@
         box-shadow: var(--inset-hi);
       }
       .tb-btn {
-        display: inline-flex; align-items: center; gap: 7px;
-        height: 30px; padding: 0 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 30px;
+        padding: 0 14px;
         border-radius: var(--r-sm);
         background: var(--surface-raised);
         border: 1px solid var(--surface-border);
@@ -627,33 +697,42 @@
         color: var(--bg-deep);
         border-color: var(--sse-green);
         font-weight: 600;
-        box-shadow: var(--inset-hi-strong), 0 1px 2px rgba(0,0,0,0.4);
+        box-shadow:
+          var(--inset-hi-strong),
+          0 1px 2px rgba(0, 0, 0, 0.4);
       }
       .tb-btn.blue {
         background: linear-gradient(180deg, var(--sse-blue-hot) 0%, var(--sse-blue) 100%);
         color: var(--text-pri);
         border-color: var(--sse-blue);
         font-weight: 600;
-        box-shadow: var(--inset-hi-strong), 0 1px 2px rgba(0,0,0,0.4);
+        box-shadow:
+          var(--inset-hi-strong),
+          0 1px 2px rgba(0, 0, 0, 0.4);
       }
       .tb-btn.ghost {
         background: transparent;
         box-shadow: none;
         border-color: var(--surface-stroke);
       }
-      .tb-btn.ghost:hover { border-color: var(--surface-border); }
+      .tb-btn.ghost:hover {
+        border-color: var(--surface-border);
+      }
       .tb-btn.active-patch {
         background: linear-gradient(180deg, var(--sse-blue-hot) 0%, var(--sse-blue) 100%);
         color: var(--text-pri);
         border-color: var(--sse-blue);
         font-weight: 600;
-        box-shadow: var(--inset-hi-strong), 0 0 0 1px var(--sse-blue), 0 0 14px rgba(63, 112, 200, 0.3);
+        box-shadow:
+          var(--inset-hi-strong),
+          0 0 0 1px var(--sse-blue),
+          0 0 14px rgba(63, 112, 200, 0.3);
       }
       .tb-btn .kbd {
         font-family: var(--mono-font);
         font-size: 9.5px;
         padding: 1px 4px;
-        background: rgba(0,0,0,0.25);
+        background: rgba(0, 0, 0, 0.25);
         border-radius: 3px;
         color: inherit;
         opacity: 0.7;
@@ -691,7 +770,9 @@
       .rail-master.on {
         background: linear-gradient(180deg, var(--sse-green-soft) 0%, var(--surface-raised) 100%);
         border-color: var(--sse-green-border);
-        box-shadow: var(--shadow-sm), inset 0 0 0 1px rgba(153, 186, 146, 0.08);
+        box-shadow:
+          var(--shadow-sm),
+          inset 0 0 0 1px rgba(153, 186, 146, 0.08);
       }
       .rail-master:before {
         content: "";
@@ -705,7 +786,10 @@
         box-shadow: 0 0 10px rgba(153, 186, 146, 0.4);
       }
       .rail-master .info {
-        display: flex; flex-direction: column; gap: 5px; min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
       }
       .rail-master .eyebrow {
         font-family: var(--mono-font);
@@ -716,7 +800,9 @@
         font-weight: 600;
         font-feature-settings: "tnum", "zero";
       }
-      .rail-master.on .eyebrow { color: var(--sse-green); }
+      .rail-master.on .eyebrow {
+        color: var(--sse-green);
+      }
       .rail-master .name {
         font-family: var(--display-font);
         font-variation-settings: "opsz" 36;
@@ -727,12 +813,16 @@
         line-height: 1.05;
       }
       .toggle.large {
-        width: 46px; height: 26px;
+        width: 46px;
+        height: 26px;
       }
       .toggle.large .pin {
-        width: 20px; height: 20px;
+        width: 20px;
+        height: 20px;
       }
-      .toggle.large.on .pin { left: 22px; }
+      .toggle.large.on .pin {
+        left: 22px;
+      }
 
       /* Section divider line in rail */
       .rail-divider {
@@ -784,7 +874,9 @@
         gap: 6px;
         cursor: pointer;
         box-shadow: var(--shadow-sm);
-        transition: border-color 0.15s, transform 0.1s;
+        transition:
+          border-color 0.15s,
+          transform 0.1s;
       }
       .scene-tile:hover {
         border-color: var(--surface-border);
@@ -806,9 +898,13 @@
         border: 1px solid var(--surface-stroke);
         position: relative;
         overflow: hidden;
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
       }
-      .scene-tile .thumb svg { display: block; width: 100%; height: 100%; }
+      .scene-tile .thumb svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
       .scene-tile .meta {
         display: flex;
         align-items: center;
@@ -836,7 +932,9 @@
         font-weight: 600;
         white-space: nowrap;
       }
-      .scene-tile.active.modified .badge { color: var(--sse-yellow); }
+      .scene-tile.active.modified .badge {
+        color: var(--sse-yellow);
+      }
       .scene-tile .sub {
         font-family: var(--mono-font);
         font-size: 10px;
@@ -896,7 +994,9 @@
         border-color: var(--sse-yellow);
         color: var(--sse-yellow);
         font-weight: 600;
-        box-shadow: var(--inset-hi-strong), 0 0 12px rgba(232, 213, 97, 0.12);
+        box-shadow:
+          var(--inset-hi-strong),
+          0 0 12px rgba(232, 213, 97, 0.12);
       }
       .rail-action.yellow.alt {
         background: transparent;
@@ -937,15 +1037,30 @@
         box-shadow: var(--shadow-glass);
       }
       .plot-pill .dot {
-        width: 8px; height: 8px; border-radius: 50%;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
         background: var(--sse-green);
         box-shadow: 0 0 14px var(--sse-green);
       }
-      .plot-pill.modified { border-color: var(--sse-yellow-border); }
-      .plot-pill.modified .dot { background: var(--sse-yellow); box-shadow: 0 0 14px var(--sse-yellow); }
-      .plot-pill.patch { border-color: var(--sse-blue-border); background: var(--glass-bg-blue); }
-      .plot-pill.patch .dot { background: var(--sse-blue-hot); box-shadow: 0 0 14px var(--sse-blue); }
-      .plot-pill .label-mut { color: var(--text-mut); }
+      .plot-pill.modified {
+        border-color: var(--sse-yellow-border);
+      }
+      .plot-pill.modified .dot {
+        background: var(--sse-yellow);
+        box-shadow: 0 0 14px var(--sse-yellow);
+      }
+      .plot-pill.patch {
+        border-color: var(--sse-blue-border);
+        background: var(--glass-bg-blue);
+      }
+      .plot-pill.patch .dot {
+        background: var(--sse-blue-hot);
+        box-shadow: 0 0 14px var(--sse-blue);
+      }
+      .plot-pill .label-mut {
+        color: var(--text-mut);
+      }
       .plot-pill .name {
         font-family: var(--display-font);
         font-variation-settings: "opsz" 24;
@@ -961,7 +1076,9 @@
         color: var(--sse-yellow);
         font-weight: 600;
       }
-      .plot-pill .mod.blue { color: var(--sse-blue-hot); }
+      .plot-pill .mod.blue {
+        color: var(--sse-blue-hot);
+      }
       .plot-overlays {
         position: absolute;
         top: 20px;
@@ -988,9 +1105,16 @@
         box-shadow: var(--shadow-glass);
         font-feature-settings: "tnum", "zero";
       }
-      .plot-meta .v { color: var(--text-pri); font-weight: 500; }
-      .plot-meta.blue { border-color: var(--sse-blue-border); }
-      .plot-meta.blue .v { color: var(--sse-blue-hot); }
+      .plot-meta .v {
+        color: var(--text-pri);
+        font-weight: 500;
+      }
+      .plot-meta.blue {
+        border-color: var(--sse-blue-border);
+      }
+      .plot-meta.blue .v {
+        color: var(--sse-blue-hot);
+      }
       .plot-svg {
         position: absolute;
         inset: 0;
@@ -1016,7 +1140,13 @@
         position: absolute;
         inset: 0 auto 0 0;
         width: 3px;
-        background: linear-gradient(180deg, var(--sse-dark-green) 0%, var(--sse-dark-green-mid) 30%, rgba(31, 77, 56, 0.5) 75%, transparent 100%);
+        background: linear-gradient(
+          180deg,
+          var(--sse-dark-green) 0%,
+          var(--sse-dark-green-mid) 30%,
+          rgba(31, 77, 56, 0.5) 75%,
+          transparent 100%
+        );
         z-index: 1;
       }
       .insp-tabs {
@@ -1060,7 +1190,9 @@
         margin-bottom: 10px;
         font-weight: 600;
       }
-      .insp-eyebrow.blue { color: var(--sse-blue-hot); }
+      .insp-eyebrow.blue {
+        color: var(--sse-blue-hot);
+      }
       .insp-title {
         font-family: var(--display-font);
         font-variation-settings: "opsz" 96;
@@ -1077,7 +1209,10 @@
         margin: 0 0 24px;
         line-height: 1.6;
       }
-      .insp-sub b { color: var(--text-pri); font-weight: 600; }
+      .insp-sub b {
+        color: var(--text-pri);
+        font-weight: 600;
+      }
       .insp-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -1128,9 +1263,15 @@
         margin-bottom: 14px;
         font-weight: 600;
       }
-      .insp-section .sh.blue { color: var(--sse-blue-hot); }
+      .insp-section .sh.blue {
+        color: var(--sse-blue-hot);
+      }
 
-      .fchips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .fchips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
       .fchip {
         padding: 4px 10px;
         background: var(--surface-soft);
@@ -1145,7 +1286,9 @@
       }
       .fchip .swatch {
         display: inline-block;
-        width: 6px; height: 6px; border-radius: 50%;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
         margin-right: 6px;
         vertical-align: 1px;
         box-shadow: 0 0 4px currentColor;
@@ -1157,7 +1300,10 @@
         line-height: 1.85;
         font-feature-settings: "tnum", "zero";
       }
-      .prov b { color: var(--text-pri); font-weight: 600; }
+      .prov b {
+        color: var(--text-pri);
+        font-weight: 600;
+      }
 
       .insp-actions {
         margin-top: auto;
@@ -1183,13 +1329,17 @@
         background: linear-gradient(180deg, var(--sse-green-hot) 0%, var(--sse-green) 100%);
         color: var(--bg-deep);
         border-color: var(--sse-green);
-        box-shadow: var(--inset-hi-strong), 0 1px 2px rgba(0,0,0,0.4);
+        box-shadow:
+          var(--inset-hi-strong),
+          0 1px 2px rgba(0, 0, 0, 0.4);
       }
       .insp-action.blue {
         background: linear-gradient(180deg, var(--sse-blue-hot) 0%, var(--sse-blue) 100%);
         color: var(--text-pri);
         border-color: var(--sse-blue);
-        box-shadow: var(--inset-hi-strong), 0 1px 2px rgba(0,0,0,0.4);
+        box-shadow:
+          var(--inset-hi-strong),
+          0 1px 2px rgba(0, 0, 0, 0.4);
       }
       .insp-action.burgundy {
         background: transparent;
@@ -1212,7 +1362,11 @@
         color: var(--text-mut);
         font-weight: 500;
       }
-      .frow .ctrl { display: flex; align-items: center; gap: 10px; }
+      .frow .ctrl {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
       .slider {
         flex: 1;
         height: 8px;
@@ -1220,7 +1374,7 @@
         background: var(--surface-soft);
         position: relative;
         border: 1px solid var(--surface-stroke);
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
       }
       .slider .fill {
         position: absolute;
@@ -1232,15 +1386,22 @@
       .slider .knob {
         position: absolute;
         top: 50%;
-        width: 16px; height: 16px;
+        width: 16px;
+        height: 16px;
         border-radius: 50%;
         background: var(--text-pri);
         border: 2px solid var(--sse-green);
         transform: translate(-50%, -50%);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2);
+        box-shadow:
+          0 1px 3px rgba(0, 0, 0, 0.6),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
       }
-      .slider.cct .fill { background: linear-gradient(90deg, var(--cct-2700), var(--cct-3800), var(--cct-5000), var(--cct-5600)); }
-      .slider.cct .knob { border-color: var(--text-pri); }
+      .slider.cct .fill {
+        background: linear-gradient(90deg, var(--cct-2700), var(--cct-3800), var(--cct-5000), var(--cct-5600));
+      }
+      .slider.cct .knob {
+        border-color: var(--text-pri);
+      }
       .frow .val {
         font-family: var(--mono-font);
         font-size: 12px;
@@ -1251,27 +1412,36 @@
         font-feature-settings: "tnum", "zero";
       }
       .toggle {
-        width: 38px; height: 22px;
+        width: 38px;
+        height: 22px;
         background: var(--surface-stroke);
         border-radius: var(--r-pill);
         position: relative;
         border: 1px solid var(--surface-border);
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
       }
       .toggle.on {
         background: linear-gradient(180deg, var(--sse-green-hot) 0%, var(--sse-green) 100%);
         border-color: var(--sse-green);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 0 8px rgba(153, 186, 146, 0.3);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.15),
+          0 0 8px rgba(153, 186, 146, 0.3);
       }
       .toggle .pin {
         position: absolute;
-        top: 2px; left: 2px;
-        width: 16px; height: 16px;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
         border-radius: 50%;
         background: var(--text-pri);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+        box-shadow:
+          0 1px 2px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
       }
-      .toggle.on .pin { left: 18px; }
+      .toggle.on .pin {
+        left: 18px;
+      }
       .field-input {
         flex: 1;
         height: 32px;
@@ -1285,7 +1455,7 @@
         display: flex;
         align-items: center;
         font-weight: 500;
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
         font-feature-settings: "tnum", "zero";
       }
       .field-suffix {
@@ -1306,7 +1476,9 @@
         font-family: var(--mono-font);
         letter-spacing: 0.18em;
         text-transform: uppercase;
-        box-shadow: var(--inset-hi-strong), 0 0 12px rgba(63, 112, 200, 0.12);
+        box-shadow:
+          var(--inset-hi-strong),
+          0 0 12px rgba(63, 112, 200, 0.12);
       }
 
       /* DMX peek */
@@ -1354,8 +1526,15 @@
         background: linear-gradient(180deg, transparent 0%, var(--sse-blue-soft) 100%);
         z-index: 1;
       }
-      .dmx-cell.live { border-color: var(--sse-blue); box-shadow: var(--inset-hi-strong), 0 0 8px rgba(63, 112, 200, 0.18); }
-      .dmx-cell.live .ch { color: var(--sse-blue-hot); }
+      .dmx-cell.live {
+        border-color: var(--sse-blue);
+        box-shadow:
+          var(--inset-hi-strong),
+          0 0 8px rgba(63, 112, 200, 0.18);
+      }
+      .dmx-cell.live .ch {
+        color: var(--sse-blue-hot);
+      }
 
       /* ============================================================
          Group chips (now in rail, retained styles)
@@ -1373,10 +1552,21 @@
         font-weight: 500;
         box-shadow: var(--inset-hi);
       }
-      .gchip.on .dot { background: var(--sse-green); box-shadow: 0 0 6px var(--sse-green); }
-      .gchip.off { color: var(--text-mut); }
-      .gchip.off .dot { background: var(--text-faint); }
-      .gchip .dot { width: 8px; height: 8px; border-radius: 50%; }
+      .gchip.on .dot {
+        background: var(--sse-green);
+        box-shadow: 0 0 6px var(--sse-green);
+      }
+      .gchip.off {
+        color: var(--text-mut);
+      }
+      .gchip.off .dot {
+        background: var(--text-faint);
+      }
+      .gchip .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
       .gchip .lvl {
         font-family: var(--mono-font);
         font-size: 10px;
@@ -1401,7 +1591,13 @@
         position: absolute;
         inset: 0 0 auto 0;
         height: 1px;
-        background: linear-gradient(90deg, transparent, var(--sse-dark-green-soft) 25%, var(--sse-dark-green-soft) 75%, transparent);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--sse-dark-green-soft) 25%,
+          var(--sse-dark-green-soft) 75%,
+          transparent
+        );
         opacity: 0.5;
       }
       .health-item {
@@ -1414,7 +1610,9 @@
         border-right: 1px solid var(--surface-stroke);
         min-width: 0;
       }
-      .health-item:last-of-type { border-right: none; }
+      .health-item:last-of-type {
+        border-right: none;
+      }
       .health-item .lbl {
         font-family: var(--mono-font);
         font-size: 9px;
@@ -1438,7 +1636,8 @@
         text-overflow: ellipsis;
       }
       .health-item .v .dot {
-        width: 8px; height: 8px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
         flex-shrink: 0;
       }
@@ -1454,8 +1653,14 @@
         background: var(--sse-coral);
         box-shadow: 0 0 8px var(--sse-coral);
       }
-      .health-item .v .ok-text { color: var(--sse-green); font-weight: 600; }
-      .health-item .v .attn-text { color: var(--sse-yellow); font-weight: 600; }
+      .health-item .v .ok-text {
+        color: var(--sse-green);
+        font-weight: 600;
+      }
+      .health-item .v .attn-text {
+        color: var(--sse-yellow);
+        font-weight: 600;
+      }
       .health-item .v small {
         color: var(--text-mut);
         font-weight: 500;
@@ -1496,8 +1701,15 @@
         color: var(--text-sec);
         box-shadow: var(--shadow-md);
       }
-      .notes b { color: var(--text-pri); font-weight: 600; }
-      .notes em { color: var(--text-pri); font-style: normal; font-weight: 500; }
+      .notes b {
+        color: var(--text-pri);
+        font-weight: 600;
+      }
+      .notes em {
+        color: var(--text-pri);
+        font-style: normal;
+        font-weight: 500;
+      }
       .notes .tag {
         display: inline-block;
         padding: 4px 11px;
@@ -1539,37 +1751,82 @@
   </head>
   <body>
     <div class="page">
-
       <!-- Official SSE Executive Education brand assets used directly via <img> in shell header below
            Source: docs/redesign/assets/lighting/logos/SSE_Logo_Unit_ExecutiveEducation_White_RGB.png -->
 
       <!-- Reusable workspace nav icons -->
-      <svg style="display:none">
-        <symbol id="navSetup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
-          <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
-          <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+      <svg style="display: none">
+        <symbol
+          id="navSetup"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="4" y1="21" x2="4" y2="14" />
+          <line x1="4" y1="10" x2="4" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12" y2="3" />
+          <line x1="20" y1="21" x2="20" y2="16" />
+          <line x1="20" y1="12" x2="20" y2="3" />
+          <line x1="1" y1="14" x2="7" y2="14" />
+          <line x1="9" y1="8" x2="15" y2="8" />
+          <line x1="17" y1="16" x2="23" y2="16" />
         </symbol>
-        <symbol id="navPlanning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
+        <symbol
+          id="navPlanning"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
         </symbol>
-        <symbol id="navLighting" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="4"/>
-          <path d="M12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2"/>
+        <symbol
+          id="navLighting"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2" />
         </symbol>
-        <symbol id="navAudio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="23"/>
+        <symbol
+          id="navAudio"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="23" />
         </symbol>
-        <symbol id="navStreamDeck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1"/>
-          <rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/>
-          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        <symbol
+          id="navStreamDeck"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
         </symbol>
       </svg>
 
@@ -1582,34 +1839,48 @@
           <h1 class="title">Lighting · <em>Direction D — Scene desk</em></h1>
           <div class="sub">
             <p>
-              Recall-driven studio lighting for two operators sharing one canvas. Stage plot anchor;
-              scenes are the unit of work; no theatrical cue model.
+              Recall-driven studio lighting for two operators sharing one canvas. Stage plot anchor; scenes are the unit
+              of work; no theatrical cue model.
             </p>
             <p>
-              <b>v6 — layout reorganisation:</b> the left rail now hosts the entire control hierarchy —
-              <b>Master</b> at the top, <b>Scenes</b> as the gravity well, <b>Groups</b> directly below.
-              The bottom strip consolidates as a full-width <b>Health bar</b> with six monitored
-              signals. The shell header grows from 76 → 92 px; workspace tabs gain icons and a stronger
-              active-state treatment so the current page is unmistakable. All v5 polish carries through:
-              tactile depth, glass overlays, refined micro-typography, semantic colour discipline.
+              <b>v6 — layout reorganisation:</b> the left rail now hosts the entire control hierarchy — <b>Master</b> at
+              the top, <b>Scenes</b> as the gravity well, <b>Groups</b> directly below. The bottom strip consolidates as
+              a full-width <b>Health bar</b> with six monitored signals. The shell header grows from 76 → 92 px;
+              workspace tabs gain icons and a stronger active-state treatment so the current page is unmistakable. All
+              v5 polish carries through: tactile depth, glass overlays, refined micro-typography, semantic colour
+              discipline.
             </p>
           </div>
         </div>
         <aside class="spec">
-          <div class="k">Direction</div><div class="v green">D — Scene desk · v6</div>
-          <div class="k">Brand</div><div class="v green">SSE · Stockholm School of Economics</div>
-          <div class="k">Rail content</div><div class="v">Master · Scenes · Groups · Actions</div>
-          <div class="k">Bottom bar</div><div class="v">Health (full-width, 6 signals)</div>
-          <div class="k">Shell height</div><div class="v">92 px (was 76)</div>
-          <div class="k">Nav</div><div class="v">Icons + green tint + glowing underline</div>
-          <div class="k">Primary accent</div><div class="v green">SSE Green #99BA92</div>
-          <div class="k">Drift / modified</div><div class="v yellow">Yellow #E8D561</div>
-          <div class="k">Selection / info</div><div class="v blue">Blue #3F70C8</div>
-          <div class="k">Display face</div><div class="v">Fraunces (variable, opsz)</div>
-          <div class="k">UI face</div><div class="v">Inter (with cv01–cv11)</div>
-          <div class="k">Data face</div><div class="v">JetBrains Mono (tnum, zero)</div>
-          <div class="k">Brand mark</div><div class="v green">SSE ExEd · Horizontal White (official)</div>
-          <div class="k">Primary res.</div><div class="v">2560 × 1440</div>
+          <div class="k">Direction</div>
+          <div class="v green">D — Scene desk · v6</div>
+          <div class="k">Brand</div>
+          <div class="v green">SSE · Stockholm School of Economics</div>
+          <div class="k">Rail content</div>
+          <div class="v">Master · Scenes · Groups · Actions</div>
+          <div class="k">Bottom bar</div>
+          <div class="v">Health (full-width, 6 signals)</div>
+          <div class="k">Shell height</div>
+          <div class="v">92 px (was 76)</div>
+          <div class="k">Nav</div>
+          <div class="v">Icons + green tint + glowing underline</div>
+          <div class="k">Primary accent</div>
+          <div class="v green">SSE Green #99BA92</div>
+          <div class="k">Drift / modified</div>
+          <div class="v yellow">Yellow #E8D561</div>
+          <div class="k">Selection / info</div>
+          <div class="v blue">Blue #3F70C8</div>
+          <div class="k">Display face</div>
+          <div class="v">Fraunces (variable, opsz)</div>
+          <div class="k">UI face</div>
+          <div class="v">Inter (with cv01–cv11)</div>
+          <div class="k">Data face</div>
+          <div class="v">JetBrains Mono (tnum, zero)</div>
+          <div class="k">Brand mark</div>
+          <div class="v green">SSE ExEd · Horizontal White (official)</div>
+          <div class="k">Primary res.</div>
+          <div class="v">2560 × 1440</div>
         </aside>
       </header>
 
@@ -1621,22 +1892,34 @@
         <div class="change">
           <div class="h">Top-left primacy</div>
           <div class="t">Master sits above Scenes</div>
-          <div class="b">The single most important control is at the very top of the rail. Green-tinted card when on, with eyebrow + status name + larger toggle. Standard op confirms "lighting on" without moving their eye.</div>
+          <div class="b">
+            The single most important control is at the very top of the rail. Green-tinted card when on, with eyebrow +
+            status name + larger toggle. Standard op confirms "lighting on" without moving their eye.
+          </div>
         </div>
         <div class="change darkgreen">
           <div class="h">Co-located</div>
           <div class="t">Groups join the rail</div>
-          <div class="b">Group chips moved out of the bottom strip into the rail directly below the scene grid. The full lighting control hierarchy now reads top-to-bottom in one column: Master → Scenes → Groups → Actions.</div>
+          <div class="b">
+            Group chips moved out of the bottom strip into the rail directly below the scene grid. The full lighting
+            control hierarchy now reads top-to-bottom in one column: Master → Scenes → Groups → Actions.
+          </div>
         </div>
         <div class="change yellow">
           <div class="h">Wide instrument</div>
           <div class="t">Health stretches the bottom</div>
-          <div class="b">Six monitored signals across one strip: Bridge · Universe · Fixtures · Auto-save · Session · App. Each with a clear status colour. Right-pinned ⌘ M hint for the full DMX monitor.</div>
+          <div class="b">
+            Six monitored signals across one strip: Bridge · Universe · Fixtures · Auto-save · Session · App. Each with
+            a clear status colour. Right-pinned ⌘ M hint for the full DMX monitor.
+          </div>
         </div>
         <div class="change coral">
           <div class="h">Workspace presence</div>
           <div class="t">Header gets weight + icons</div>
-          <div class="b">Shell grows to 92 px. Each workspace tab gains a 16 px line icon. Active tab has a green-tinted fill, brighter icon, and a glowing 3 px green underline. The current page reads at a glance.</div>
+          <div class="b">
+            Shell grows to 92 px. Each workspace tab gains a 16 px line icon. Active tab has a green-tinted fill,
+            brighter icon, and a glowing 3 px green underline. The current page reads at a glance.
+          </div>
         </div>
       </div>
 
@@ -1659,9 +1942,18 @@
           <div class="role">Senior operator</div>
           <div class="who">Setup &amp; commissioning — many edits, same canvas</div>
           <ol>
-            <li>Patches new fixtures via <b>P</b> overlay: assigns DMX, rig height, beam angle, fires Identify. <em>(DMX peek surfaces here.)</em></li>
-            <li>Drags fixtures on the plot to their spatial positions; clicks one to edit intensity / CCT in the inspector.</li>
-            <li>Saves the current state as a new scene (<b>+ New scene</b>) or updates an existing one (drift → <b>Save</b>).</li>
+            <li>
+              Patches new fixtures via <b>P</b> overlay: assigns DMX, rig height, beam angle, fires Identify.
+              <em>(DMX peek surfaces here.)</em>
+            </li>
+            <li>
+              Drags fixtures on the plot to their spatial positions; clicks one to edit intensity / CCT in the
+              inspector.
+            </li>
+            <li>
+              Saves the current state as a new scene (<b>+ New scene</b>) or updates an existing one (drift →
+              <b>Save</b>).
+            </li>
             <li>Manages groups via the bottom strip + inspector Group tab.</li>
           </ol>
         </div>
@@ -1675,15 +1967,29 @@
       <div class="canvas">
         <div class="shell">
           <div class="brand">
-            <img class="brand-mark" src="logos/SSE_Logo_Unit_ExecutiveEducation_White_RGB.png" alt="SSE Executive Education" />
+            <img
+              class="brand-mark"
+              src="logos/SSE_Logo_Unit_ExecutiveEducation_White_RGB.png"
+              alt="SSE Executive Education"
+            />
             <span class="brand-divider"></span>
             <span class="product">Studio Control</span>
             <div class="nav">
-              <span class="item"><svg class="ico"><use href="#navSetup"/></svg>Setup</span>
-              <span class="item"><svg class="ico"><use href="#navPlanning"/></svg>Planning</span>
-              <span class="item active"><svg class="ico"><use href="#navLighting"/></svg>Lighting</span>
-              <span class="item"><svg class="ico"><use href="#navAudio"/></svg>Audio</span>
-              <span class="item"><svg class="ico"><use href="#navStreamDeck"/></svg>Stream Deck</span>
+              <span class="item"
+                ><svg class="ico"><use href="#navSetup" /></svg>Setup</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navPlanning" /></svg>Planning</span
+              >
+              <span class="item active"
+                ><svg class="ico"><use href="#navLighting" /></svg>Lighting</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navAudio" /></svg>Audio</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navStreamDeck" /></svg>Stream Deck</span
+              >
             </div>
           </div>
           <span class="clock">19 : 42 : 08 UTC</span>
@@ -1693,7 +1999,18 @@
           <!-- Toolbar -->
           <div class="lw-toolbar">
             <div class="tb-title">
-              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2"/></svg>
+              <svg
+                class="ico"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2" />
+              </svg>
               Lighting
             </div>
             <span class="chip green"><span class="dot"></span>DMX U1 · reachable</span>
@@ -1706,19 +2023,66 @@
             </div>
             <span class="tb-spacer"></span>
             <div class="tb-search">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
               Search fixtures…
             </div>
             <button class="tb-btn ghost">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+              </svg>
               Patch <span class="kbd">P</span>
             </button>
             <button class="tb-btn green">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
               Fixture
             </button>
-            <button class="tb-btn ghost" style="padding: 0 10px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            <button class="tb-btn ghost" style="padding: 0 10px">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+              >
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="12" cy="5" r="1" />
+                <circle cx="12" cy="19" r="1" />
+              </svg>
             </button>
           </div>
 
@@ -1741,33 +2105,110 @@
             </div>
             <div class="scene-grid">
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5"/><rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8"/><g fill="none" stroke="#5a5547" stroke-width="0.7"><line x1="76" y1="61" x2="79" y2="64"/><line x1="79" y1="61" x2="76" y2="64"/><line x1="80" y1="61" x2="83" y2="64"/><line x1="83" y1="61" x2="80" y2="64"/></g><circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/><circle cx="110" cy="68" r="3" fill="#2a2f28" opacity="0.55"/><circle cx="60" cy="42" r="2.8" fill="#f0dfb8" opacity="0.65"/><circle cx="100" cy="42" r="2.5" fill="#2a2f28" opacity="0.5"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5" />
+                    <rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8" />
+                    <g fill="none" stroke="#5a5547" stroke-width="0.7">
+                      <line x1="76" y1="61" x2="79" y2="64" />
+                      <line x1="79" y1="61" x2="76" y2="64" />
+                      <line x1="80" y1="61" x2="83" y2="64" />
+                      <line x1="83" y1="61" x2="80" y2="64" />
+                    </g>
+                    <circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                    <circle cx="110" cy="68" r="3" fill="#2a2f28" opacity="0.55" />
+                    <circle cx="60" cy="42" r="2.8" fill="#f0dfb8" opacity="0.65" />
+                    <circle cx="100" cy="42" r="2.5" fill="#2a2f28" opacity="0.5" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Talking head</span></div>
                 <div class="sub">3 on · 3800 K</div>
               </div>
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5"/><rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8"/><g fill="none" stroke="#5a5547" stroke-width="0.7"><line x1="74" y1="61" x2="77" y2="64"/><line x1="77" y1="61" x2="74" y2="64"/><line x1="83" y1="61" x2="86" y2="64"/><line x1="86" y1="61" x2="83" y2="64"/></g><circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/><circle cx="110" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/><circle cx="60" cy="42" r="2.8" fill="#f0dfb8" opacity="0.7"/><circle cx="100" cy="42" r="2.8" fill="#f0dfb8" opacity="0.7"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5" />
+                    <rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8" />
+                    <g fill="none" stroke="#5a5547" stroke-width="0.7">
+                      <line x1="74" y1="61" x2="77" y2="64" />
+                      <line x1="77" y1="61" x2="74" y2="64" />
+                      <line x1="83" y1="61" x2="86" y2="64" />
+                      <line x1="86" y1="61" x2="83" y2="64" />
+                    </g>
+                    <circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                    <circle cx="110" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                    <circle cx="60" cy="42" r="2.8" fill="#f0dfb8" opacity="0.7" />
+                    <circle cx="100" cy="42" r="2.8" fill="#f0dfb8" opacity="0.7" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Two-shot</span></div>
                 <div class="sub">5 on · 4000 K</div>
               </div>
               <!-- Demo bench (ACTIVE) -->
               <div class="scene-tile active">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#3a4138" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#1f4d38" opacity="0.65"/><rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8"/><g fill="none" stroke="#7a7263" stroke-width="0.8"><line x1="73" y1="61" x2="76" y2="64"/><line x1="76" y1="61" x2="73" y2="64"/><line x1="78" y1="61" x2="81" y2="64"/><line x1="81" y1="61" x2="78" y2="64"/><line x1="83" y1="61" x2="86" y2="64"/><line x1="86" y1="61" x2="83" y2="64"/></g><circle cx="50" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95"/><circle cx="110" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95"/><circle cx="60" cy="42" r="3.5" fill="#ebe5d2" opacity="0.95"/><circle cx="100" cy="42" r="3.5" fill="#ebe5d2" opacity="0.95"/><circle cx="80" cy="38" r="3.5" fill="#f0dfb8" opacity="0.92"/><rect x="76" y="20" width="8" height="2.6" fill="#d4dde2" opacity="0.95"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#3a4138" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#1f4d38" opacity="0.65" />
+                    <rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8" />
+                    <g fill="none" stroke="#7a7263" stroke-width="0.8">
+                      <line x1="73" y1="61" x2="76" y2="64" />
+                      <line x1="76" y1="61" x2="73" y2="64" />
+                      <line x1="78" y1="61" x2="81" y2="64" />
+                      <line x1="81" y1="61" x2="78" y2="64" />
+                      <line x1="83" y1="61" x2="86" y2="64" />
+                      <line x1="86" y1="61" x2="83" y2="64" />
+                    </g>
+                    <circle cx="50" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95" />
+                    <circle cx="110" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95" />
+                    <circle cx="60" cy="42" r="3.5" fill="#ebe5d2" opacity="0.95" />
+                    <circle cx="100" cy="42" r="3.5" fill="#ebe5d2" opacity="0.95" />
+                    <circle cx="80" cy="38" r="3.5" fill="#f0dfb8" opacity="0.92" />
+                    <rect x="76" y="20" width="8" height="2.6" fill="#d4dde2" opacity="0.95" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Demo bench</span><span class="badge">● Active</span></div>
                 <div class="sub">6 on · 4400 K</div>
               </div>
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5"/><rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8"/><circle cx="60" cy="42" r="2.5" fill="#ef8e5a" opacity="0.45"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5" />
+                    <rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8" />
+                    <circle cx="60" cy="42" r="2.5" fill="#ef8e5a" opacity="0.45" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Off air</span></div>
                 <div class="sub">1 on · 2700 K</div>
               </div>
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5"/><rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8"/><circle cx="50" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95"/><circle cx="110" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95"/><circle cx="60" cy="42" r="3.5" fill="#d4dde2" opacity="0.95"/><circle cx="100" cy="42" r="3.5" fill="#d4dde2" opacity="0.95"/><circle cx="80" cy="38" r="3.5" fill="#ebe5d2" opacity="0.9"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5" />
+                    <rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8" />
+                    <circle cx="50" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95" />
+                    <circle cx="110" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95" />
+                    <circle cx="60" cy="42" r="3.5" fill="#d4dde2" opacity="0.95" />
+                    <circle cx="100" cy="42" r="3.5" fill="#d4dde2" opacity="0.95" />
+                    <circle cx="80" cy="38" r="3.5" fill="#ebe5d2" opacity="0.9" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Wide stage</span></div>
                 <div class="sub">6 on · 5000 K</div>
               </div>
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5"/><rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8"/><circle cx="60" cy="42" r="5.5" fill="#f3a87a" opacity="0.95"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5" />
+                    <rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8" />
+                    <circle cx="60" cy="42" r="5.5" fill="#f3a87a" opacity="0.95" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Dramatic key</span></div>
                 <div class="sub">1 on · 3200 K</div>
               </div>
@@ -1810,170 +2251,527 @@
             <svg class="plot-svg" viewBox="0 0 1740 1176" preserveAspectRatio="xMidYMid meet">
               <defs>
                 <radialGradient id="floorGlow" cx="50%" cy="50%" r="60%">
-                  <stop offset="0%" stop-color="#13180f" stop-opacity="0.55"/>
-                  <stop offset="100%" stop-color="#050805" stop-opacity="0"/>
+                  <stop offset="0%" stop-color="#13180f" stop-opacity="0.55" />
+                  <stop offset="100%" stop-color="#050805" stop-opacity="0" />
                 </radialGradient>
                 <radialGradient id="poolWarm">
-                  <stop offset="0%" stop-color="#f0dfb8" stop-opacity="0.55"/>
-                  <stop offset="55%" stop-color="#f0dfb8" stop-opacity="0.18"/>
-                  <stop offset="100%" stop-color="#f0dfb8" stop-opacity="0"/>
+                  <stop offset="0%" stop-color="#f0dfb8" stop-opacity="0.55" />
+                  <stop offset="55%" stop-color="#f0dfb8" stop-opacity="0.18" />
+                  <stop offset="100%" stop-color="#f0dfb8" stop-opacity="0" />
                 </radialGradient>
                 <radialGradient id="poolMid">
-                  <stop offset="0%" stop-color="#ebe5d2" stop-opacity="0.55"/>
-                  <stop offset="55%" stop-color="#ebe5d2" stop-opacity="0.18"/>
-                  <stop offset="100%" stop-color="#ebe5d2" stop-opacity="0"/>
+                  <stop offset="0%" stop-color="#ebe5d2" stop-opacity="0.55" />
+                  <stop offset="55%" stop-color="#ebe5d2" stop-opacity="0.18" />
+                  <stop offset="100%" stop-color="#ebe5d2" stop-opacity="0" />
                 </radialGradient>
                 <radialGradient id="poolCool">
-                  <stop offset="0%" stop-color="#d4dde2" stop-opacity="0.5"/>
-                  <stop offset="55%" stop-color="#d4dde2" stop-opacity="0.16"/>
-                  <stop offset="100%" stop-color="#d4dde2" stop-opacity="0"/>
+                  <stop offset="0%" stop-color="#d4dde2" stop-opacity="0.5" />
+                  <stop offset="55%" stop-color="#d4dde2" stop-opacity="0.16" />
+                  <stop offset="100%" stop-color="#d4dde2" stop-opacity="0" />
                 </radialGradient>
                 <pattern id="backdrop" width="14" height="14" patternUnits="userSpaceOnUse">
-                  <line x1="0" y1="14" x2="14" y2="0" stroke="#4d5544" stroke-width="0.9" opacity="0.7"/>
+                  <line x1="0" y1="14" x2="14" y2="0" stroke="#4d5544" stroke-width="0.9" opacity="0.7" />
                 </pattern>
                 <filter id="grain" x="0%" y="0%" width="100%" height="100%">
-                  <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3"/>
-                  <feColorMatrix type="matrix" values="0 0 0 0 0.96, 0 0 0 0 0.93, 0 0 0 0 0.81, 0 0 0 0.04 0"/>
+                  <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3" />
+                  <feColorMatrix type="matrix" values="0 0 0 0 0.96, 0 0 0 0 0.93, 0 0 0 0 0.81, 0 0 0 0.04 0" />
                 </filter>
                 <linearGradient id="floorTone" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stop-color="#0a0c0a" stop-opacity="0.5"/>
-                  <stop offset="100%" stop-color="#050805" stop-opacity="0.2"/>
+                  <stop offset="0%" stop-color="#0a0c0a" stop-opacity="0.5" />
+                  <stop offset="100%" stop-color="#050805" stop-opacity="0.2" />
                 </linearGradient>
               </defs>
 
-              <rect x="0" y="0" width="1740" height="1176" fill="url(#floorGlow)"/>
-              <rect x="0" y="0" width="1740" height="1176" filter="url(#grain)" opacity="0.5"/>
+              <rect x="0" y="0" width="1740" height="1176" fill="url(#floorGlow)" />
+              <rect x="0" y="0" width="1740" height="1176" filter="url(#grain)" opacity="0.5" />
 
               <!-- Floor base inside walls -->
-              <rect x="100" y="88" width="1540" height="1024" fill="url(#floorTone)"/>
+              <rect x="100" y="88" width="1540" height="1024" fill="url(#floorTone)" />
 
               <!-- Grid: 0.5m whisper, 1m subtle, 5m clear -->
               <g stroke="#d4cdb3" stroke-opacity="0.025" stroke-width="1">
-                <line x1="164" y1="88" x2="164" y2="1112"/><line x1="292" y1="88" x2="292" y2="1112"/><line x1="420" y1="88" x2="420" y2="1112"/><line x1="548" y1="88" x2="548" y2="1112"/><line x1="676" y1="88" x2="676" y2="1112"/><line x1="804" y1="88" x2="804" y2="1112"/><line x1="932" y1="88" x2="932" y2="1112"/><line x1="1060" y1="88" x2="1060" y2="1112"/><line x1="1188" y1="88" x2="1188" y2="1112"/><line x1="1316" y1="88" x2="1316" y2="1112"/><line x1="1444" y1="88" x2="1444" y2="1112"/><line x1="1572" y1="88" x2="1572" y2="1112"/>
-                <line x1="100" y1="152" x2="1640" y2="152"/><line x1="100" y1="280" x2="1640" y2="280"/><line x1="100" y1="408" x2="1640" y2="408"/><line x1="100" y1="536" x2="1640" y2="536"/><line x1="100" y1="664" x2="1640" y2="664"/><line x1="100" y1="792" x2="1640" y2="792"/><line x1="100" y1="920" x2="1640" y2="920"/><line x1="100" y1="1048" x2="1640" y2="1048"/>
+                <line x1="164" y1="88" x2="164" y2="1112" />
+                <line x1="292" y1="88" x2="292" y2="1112" />
+                <line x1="420" y1="88" x2="420" y2="1112" />
+                <line x1="548" y1="88" x2="548" y2="1112" />
+                <line x1="676" y1="88" x2="676" y2="1112" />
+                <line x1="804" y1="88" x2="804" y2="1112" />
+                <line x1="932" y1="88" x2="932" y2="1112" />
+                <line x1="1060" y1="88" x2="1060" y2="1112" />
+                <line x1="1188" y1="88" x2="1188" y2="1112" />
+                <line x1="1316" y1="88" x2="1316" y2="1112" />
+                <line x1="1444" y1="88" x2="1444" y2="1112" />
+                <line x1="1572" y1="88" x2="1572" y2="1112" />
+                <line x1="100" y1="152" x2="1640" y2="152" />
+                <line x1="100" y1="280" x2="1640" y2="280" />
+                <line x1="100" y1="408" x2="1640" y2="408" />
+                <line x1="100" y1="536" x2="1640" y2="536" />
+                <line x1="100" y1="664" x2="1640" y2="664" />
+                <line x1="100" y1="792" x2="1640" y2="792" />
+                <line x1="100" y1="920" x2="1640" y2="920" />
+                <line x1="100" y1="1048" x2="1640" y2="1048" />
               </g>
               <g stroke="#d4cdb3" stroke-opacity="0.05" stroke-width="1">
-                <line x1="228" y1="88" x2="228" y2="1112"/><line x1="356" y1="88" x2="356" y2="1112"/><line x1="484" y1="88" x2="484" y2="1112"/><line x1="612" y1="88" x2="612" y2="1112"/><line x1="868" y1="88" x2="868" y2="1112"/><line x1="996" y1="88" x2="996" y2="1112"/><line x1="1124" y1="88" x2="1124" y2="1112"/><line x1="1252" y1="88" x2="1252" y2="1112"/><line x1="1380" y1="88" x2="1380" y2="1112"/><line x1="1508" y1="88" x2="1508" y2="1112"/>
-                <line x1="100" y1="216" x2="1640" y2="216"/><line x1="100" y1="344" x2="1640" y2="344"/><line x1="100" y1="472" x2="1640" y2="472"/><line x1="100" y1="728" x2="1640" y2="728"/><line x1="100" y1="856" x2="1640" y2="856"/><line x1="100" y1="984" x2="1640" y2="984"/>
+                <line x1="228" y1="88" x2="228" y2="1112" />
+                <line x1="356" y1="88" x2="356" y2="1112" />
+                <line x1="484" y1="88" x2="484" y2="1112" />
+                <line x1="612" y1="88" x2="612" y2="1112" />
+                <line x1="868" y1="88" x2="868" y2="1112" />
+                <line x1="996" y1="88" x2="996" y2="1112" />
+                <line x1="1124" y1="88" x2="1124" y2="1112" />
+                <line x1="1252" y1="88" x2="1252" y2="1112" />
+                <line x1="1380" y1="88" x2="1380" y2="1112" />
+                <line x1="1508" y1="88" x2="1508" y2="1112" />
+                <line x1="100" y1="216" x2="1640" y2="216" />
+                <line x1="100" y1="344" x2="1640" y2="344" />
+                <line x1="100" y1="472" x2="1640" y2="472" />
+                <line x1="100" y1="728" x2="1640" y2="728" />
+                <line x1="100" y1="856" x2="1640" y2="856" />
+                <line x1="100" y1="984" x2="1640" y2="984" />
               </g>
               <g stroke="#d4cdb3" stroke-opacity="0.13" stroke-width="1.2">
-                <line x1="740" y1="88" x2="740" y2="1112"/>
-                <line x1="100" y1="600" x2="1640" y2="600"/>
+                <line x1="740" y1="88" x2="740" y2="1112" />
+                <line x1="100" y1="600" x2="1640" y2="600" />
               </g>
               <!-- Grid scale anchor labels -->
-              <text x="745" y="80" font-family="JetBrains Mono" font-size="9" fill="#5a5547" letter-spacing="2" font-weight="600">5 m</text>
-              <text x="92" y="606" text-anchor="end" font-family="JetBrains Mono" font-size="9" fill="#5a5547" letter-spacing="2" font-weight="600">4 m</text>
+              <text
+                x="745"
+                y="80"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#5a5547"
+                letter-spacing="2"
+                font-weight="600"
+              >
+                5 m
+              </text>
+              <text
+                x="92"
+                y="606"
+                text-anchor="end"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#5a5547"
+                letter-spacing="2"
+                font-weight="600"
+              >
+                4 m
+              </text>
 
               <!-- Light pools first (under fixtures) -->
-              <ellipse cx="640" cy="720" rx="180" ry="155" fill="url(#poolWarm)"/>
-              <ellipse cx="1100" cy="720" rx="180" ry="155" fill="url(#poolWarm)"/>
-              <ellipse cx="780" cy="640" rx="200" ry="140" fill="url(#poolMid)" opacity="0.85"/>
-              <ellipse cx="960" cy="640" rx="200" ry="140" fill="url(#poolMid)" opacity="0.85"/>
-              <ellipse cx="870" cy="700" rx="280" ry="220" fill="url(#poolMid)" opacity="0.7"/>
-              <ellipse cx="870" cy="380" rx="380" ry="120" fill="url(#poolCool)" opacity="0.85"/>
+              <ellipse cx="640" cy="720" rx="180" ry="155" fill="url(#poolWarm)" />
+              <ellipse cx="1100" cy="720" rx="180" ry="155" fill="url(#poolWarm)" />
+              <ellipse cx="780" cy="640" rx="200" ry="140" fill="url(#poolMid)" opacity="0.85" />
+              <ellipse cx="960" cy="640" rx="200" ry="140" fill="url(#poolMid)" opacity="0.85" />
+              <ellipse cx="870" cy="700" rx="280" ry="220" fill="url(#poolMid)" opacity="0.7" />
+              <ellipse cx="870" cy="380" rx="380" ry="120" fill="url(#poolCool)" opacity="0.85" />
 
               <!-- Walls — refined -->
-              <rect x="100" y="88" width="1540" height="1024" fill="none" stroke="var(--plot-wall)" stroke-width="2.4"/>
-              <rect x="100" y="80" width="1540" height="14" fill="url(#backdrop)" stroke="var(--plot-wall-strong)" stroke-width="1.2"/>
-              <text x="124" y="74" font-family="JetBrains Mono" font-size="10" fill="#8a8470" letter-spacing="3" font-weight="600">BACKDROP / CYC</text>
+              <rect
+                x="100"
+                y="88"
+                width="1540"
+                height="1024"
+                fill="none"
+                stroke="var(--plot-wall)"
+                stroke-width="2.4"
+              />
+              <rect
+                x="100"
+                y="80"
+                width="1540"
+                height="14"
+                fill="url(#backdrop)"
+                stroke="var(--plot-wall-strong)"
+                stroke-width="1.2"
+              />
+              <text
+                x="124"
+                y="74"
+                font-family="JetBrains Mono"
+                font-size="10"
+                fill="#8a8470"
+                letter-spacing="3"
+                font-weight="600"
+              >
+                BACKDROP / CYC
+              </text>
 
               <!-- Door (architectural — gap + arc) -->
-              <line x1="1640" y1="800" x2="1640" y2="970" stroke="#0a0d0a" stroke-width="6"/>
-              <path d="M 1640 800 L 1640 970" stroke="#4d5544" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>
-              <path d="M 1640 800 Q 1700 800 1700 860" fill="none" stroke="#4d5544" stroke-width="1" opacity="0.5"/>
-              <text x="1656" y="888" font-family="JetBrains Mono" font-size="9" fill="#8a8470" letter-spacing="2.5" font-weight="600">DOOR</text>
+              <line x1="1640" y1="800" x2="1640" y2="970" stroke="#0a0d0a" stroke-width="6" />
+              <path d="M 1640 800 L 1640 970" stroke="#4d5544" stroke-width="1" stroke-dasharray="3 3" opacity="0.7" />
+              <path d="M 1640 800 Q 1700 800 1700 860" fill="none" stroke="#4d5544" stroke-width="1" opacity="0.5" />
+              <text
+                x="1656"
+                y="888"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#8a8470"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                DOOR
+              </text>
 
               <!-- Control booth window (south wall, between cameras) -->
-              <line x1="380" y1="1112" x2="600" y2="1112" stroke="#3f70c8" stroke-width="3" opacity="0.55"/>
-              <line x1="380" y1="1116" x2="600" y2="1116" stroke="#3f70c8" stroke-width="1" opacity="0.35"/>
-              <text x="490" y="1140" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#5a5547" letter-spacing="2.5" font-weight="600">CONTROL BOOTH</text>
+              <line x1="380" y1="1112" x2="600" y2="1112" stroke="#3f70c8" stroke-width="3" opacity="0.55" />
+              <line x1="380" y1="1116" x2="600" y2="1116" stroke="#3f70c8" stroke-width="1" opacity="0.35" />
+              <text
+                x="490"
+                y="1140"
+                text-anchor="middle"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#5a5547"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                CONTROL BOOTH
+              </text>
 
               <!-- Bench / set element -->
-              <rect x="780" y="380" width="180" height="38" fill="#0e110e" stroke="#3a4138" stroke-width="1.5" rx="2"/>
-              <line x1="780" y1="395" x2="960" y2="395" stroke="#3a4138" stroke-width="0.6" stroke-dasharray="2 2" opacity="0.7"/>
-              <text x="870" y="404" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#8a8470" letter-spacing="2.5" font-weight="600">BENCH</text>
+              <rect x="780" y="380" width="180" height="38" fill="#0e110e" stroke="#3a4138" stroke-width="1.5" rx="2" />
+              <line
+                x1="780"
+                y1="395"
+                x2="960"
+                y2="395"
+                stroke="#3a4138"
+                stroke-width="0.6"
+                stroke-dasharray="2 2"
+                opacity="0.7"
+              />
+              <text
+                x="870"
+                y="404"
+                text-anchor="middle"
+                font-family="JetBrains Mono"
+                font-size="10"
+                fill="#8a8470"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                BENCH
+              </text>
 
               <!-- Talent marks — refined classical X with subtle dot -->
               <g opacity="0.85">
-                <g transform="translate(740, 700)" stroke="#7a7263" stroke-width="1.5" fill="none" stroke-linecap="round"><line x1="-7" y1="-7" x2="7" y2="7"/><line x1="-7" y1="7" x2="7" y2="-7"/><circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none"/></g>
-                <g transform="translate(870, 700)" stroke="#7a7263" stroke-width="1.5" fill="none" stroke-linecap="round"><line x1="-7" y1="-7" x2="7" y2="7"/><line x1="-7" y1="7" x2="7" y2="-7"/><circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none"/></g>
-                <g transform="translate(1000, 700)" stroke="#7a7263" stroke-width="1.5" fill="none" stroke-linecap="round"><line x1="-7" y1="-7" x2="7" y2="7"/><line x1="-7" y1="7" x2="7" y2="-7"/><circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none"/></g>
+                <g
+                  transform="translate(740, 700)"
+                  stroke="#7a7263"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linecap="round"
+                >
+                  <line x1="-7" y1="-7" x2="7" y2="7" />
+                  <line x1="-7" y1="7" x2="7" y2="-7" />
+                  <circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none" />
+                </g>
+                <g
+                  transform="translate(870, 700)"
+                  stroke="#7a7263"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linecap="round"
+                >
+                  <line x1="-7" y1="-7" x2="7" y2="7" />
+                  <line x1="-7" y1="7" x2="7" y2="-7" />
+                  <circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none" />
+                </g>
+                <g
+                  transform="translate(1000, 700)"
+                  stroke="#7a7263"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linecap="round"
+                >
+                  <line x1="-7" y1="-7" x2="7" y2="7" />
+                  <line x1="-7" y1="7" x2="7" y2="-7" />
+                  <circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none" />
+                </g>
               </g>
-              <text x="870" y="745" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#5a5547" letter-spacing="2.5" font-weight="600">TALENT MARKS · 3</text>
+              <text
+                x="870"
+                y="745"
+                text-anchor="middle"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#5a5547"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                TALENT MARKS · 3
+              </text>
 
               <!-- Cameras — refined with body, lens, FOV -->
               <g transform="translate(870, 1020)">
-                <polygon points="0,-12 -100,-260 100,-260" fill="#3f70c8" opacity="0.05" stroke="#3f70c8" stroke-opacity="0.18" stroke-width="0.8" stroke-dasharray="3 4"/>
-                <rect x="-22" y="-13" width="44" height="30" fill="#0e110e" stroke="#3f70c8" stroke-width="1.5" rx="2"/>
-                <rect x="-22" y="-13" width="44" height="3" fill="#3f70c8" opacity="0.4"/>
-                <circle cx="0" cy="-2" r="6" fill="#0a0d0a" stroke="#3f70c8" stroke-width="1.5"/>
-                <circle cx="0" cy="-2" r="3" fill="none" stroke="#5a5547" stroke-width="0.8"/>
-                <text x="0" y="34" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#6a93dc" letter-spacing="1.5" font-weight="600">CAM A</text>
+                <polygon
+                  points="0,-12 -100,-260 100,-260"
+                  fill="#3f70c8"
+                  opacity="0.05"
+                  stroke="#3f70c8"
+                  stroke-opacity="0.18"
+                  stroke-width="0.8"
+                  stroke-dasharray="3 4"
+                />
+                <rect
+                  x="-22"
+                  y="-13"
+                  width="44"
+                  height="30"
+                  fill="#0e110e"
+                  stroke="#3f70c8"
+                  stroke-width="1.5"
+                  rx="2"
+                />
+                <rect x="-22" y="-13" width="44" height="3" fill="#3f70c8" opacity="0.4" />
+                <circle cx="0" cy="-2" r="6" fill="#0a0d0a" stroke="#3f70c8" stroke-width="1.5" />
+                <circle cx="0" cy="-2" r="3" fill="none" stroke="#5a5547" stroke-width="0.8" />
+                <text
+                  x="0"
+                  y="34"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#6a93dc"
+                  letter-spacing="1.5"
+                  font-weight="600"
+                >
+                  CAM A
+                </text>
               </g>
               <g transform="translate(1300, 980) rotate(-25)">
-                <polygon points="0,-12 -100,-260 100,-260" fill="#3f70c8" opacity="0.04" stroke="#3f70c8" stroke-opacity="0.14" stroke-width="0.8" stroke-dasharray="3 4"/>
-                <rect x="-18" y="-11" width="36" height="24" fill="#0e110e" stroke="#3f70c8" stroke-width="1.5" rx="2"/>
-                <rect x="-18" y="-11" width="36" height="3" fill="#3f70c8" opacity="0.4"/>
-                <circle cx="0" cy="-1" r="5" fill="#0a0d0a" stroke="#3f70c8" stroke-width="1.5"/>
-                <text x="0" y="28" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#6a93dc" letter-spacing="1.5" font-weight="600">CAM B</text>
+                <polygon
+                  points="0,-12 -100,-260 100,-260"
+                  fill="#3f70c8"
+                  opacity="0.04"
+                  stroke="#3f70c8"
+                  stroke-opacity="0.14"
+                  stroke-width="0.8"
+                  stroke-dasharray="3 4"
+                />
+                <rect
+                  x="-18"
+                  y="-11"
+                  width="36"
+                  height="24"
+                  fill="#0e110e"
+                  stroke="#3f70c8"
+                  stroke-width="1.5"
+                  rx="2"
+                />
+                <rect x="-18" y="-11" width="36" height="3" fill="#3f70c8" opacity="0.4" />
+                <circle cx="0" cy="-1" r="5" fill="#0a0d0a" stroke="#3f70c8" stroke-width="1.5" />
+                <text
+                  x="0"
+                  y="28"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#6a93dc"
+                  letter-spacing="1.5"
+                  font-weight="600"
+                >
+                  CAM B
+                </text>
               </g>
 
               <!-- Fixtures — refined markers -->
               <!-- Apollo Bridge L (grid-hung panel) -->
               <g transform="translate(640, 720)">
-                <circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2"/>
-                <circle cx="0" cy="0" r="22" fill="none" stroke="#99ba92" stroke-width="0.6" opacity="0.4" transform="scale(1.18)"/>
-                <rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1"/>
-                <line x1="-9" y1="0" x2="9" y2="0" stroke="#0e110e" stroke-width="0.6" opacity="0.4"/>
-                <text x="0" y="-32" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600" letter-spacing="0.8">APOLLO L</text>
-                <text x="0" y="-46" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8a8470" letter-spacing="0.6">88% · 4400 K · grid</text>
+                <circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="22"
+                  fill="none"
+                  stroke="#99ba92"
+                  stroke-width="0.6"
+                  opacity="0.4"
+                  transform="scale(1.18)"
+                />
+                <rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1" />
+                <line x1="-9" y1="0" x2="9" y2="0" stroke="#0e110e" stroke-width="0.6" opacity="0.4" />
+                <text
+                  x="0"
+                  y="-32"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                  letter-spacing="0.8"
+                >
+                  APOLLO L
+                </text>
+                <text
+                  x="0"
+                  y="-46"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="9"
+                  fill="#8a8470"
+                  letter-spacing="0.6"
+                >
+                  88% · 4400 K · grid
+                </text>
               </g>
               <g transform="translate(1100, 720)">
-                <circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2"/>
-                <circle cx="0" cy="0" r="22" fill="none" stroke="#99ba92" stroke-width="0.6" opacity="0.4" transform="scale(1.18)"/>
-                <rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1"/>
-                <line x1="-9" y1="0" x2="9" y2="0" stroke="#0e110e" stroke-width="0.6" opacity="0.4"/>
-                <text x="0" y="-32" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600" letter-spacing="0.8">APOLLO R</text>
-                <text x="0" y="-46" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8a8470" letter-spacing="0.6">88% · 4400 K · grid</text>
+                <circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="22"
+                  fill="none"
+                  stroke="#99ba92"
+                  stroke-width="0.6"
+                  opacity="0.4"
+                  transform="scale(1.18)"
+                />
+                <rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1" />
+                <line x1="-9" y1="0" x2="9" y2="0" stroke="#0e110e" stroke-width="0.6" opacity="0.4" />
+                <text
+                  x="0"
+                  y="-32"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                  letter-spacing="0.8"
+                >
+                  APOLLO R
+                </text>
+                <text
+                  x="0"
+                  y="-46"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="9"
+                  fill="#8a8470"
+                  letter-spacing="0.6"
+                >
+                  88% · 4400 K · grid
+                </text>
               </g>
               <!-- Astra L (floor stand) -->
               <g transform="translate(420, 640)">
                 <g stroke="#7a7263" stroke-width="1.5" stroke-linecap="round">
-                  <line x1="0" y1="14" x2="-12" y2="22"/>
-                  <line x1="0" y1="14" x2="12" y2="22"/>
-                  <line x1="0" y1="14" x2="0" y2="24"/>
+                  <line x1="0" y1="14" x2="-12" y2="22" />
+                  <line x1="0" y1="14" x2="12" y2="22" />
+                  <line x1="0" y1="14" x2="0" y2="24" />
                 </g>
-                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="1"/>
-                <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5"/>
-                <text x="0" y="-22" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600" letter-spacing="0.8">ASTRA L</text>
-                <text x="0" y="-34" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8a8470" letter-spacing="0.6">75% · 4400 K · stand</text>
+                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="1" />
+                <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5" />
+                <text
+                  x="0"
+                  y="-22"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                  letter-spacing="0.8"
+                >
+                  ASTRA L
+                </text>
+                <text
+                  x="0"
+                  y="-34"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="9"
+                  fill="#8a8470"
+                  letter-spacing="0.6"
+                >
+                  75% · 4400 K · stand
+                </text>
               </g>
               <g transform="translate(1320, 640)">
                 <g stroke="#7a7263" stroke-width="1.5" stroke-linecap="round">
-                  <line x1="0" y1="14" x2="-12" y2="22"/>
-                  <line x1="0" y1="14" x2="12" y2="22"/>
-                  <line x1="0" y1="14" x2="0" y2="24"/>
+                  <line x1="0" y1="14" x2="-12" y2="22" />
+                  <line x1="0" y1="14" x2="12" y2="22" />
+                  <line x1="0" y1="14" x2="0" y2="24" />
                 </g>
-                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="1"/>
-                <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5"/>
-                <text x="0" y="-22" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600" letter-spacing="0.8">ASTRA R</text>
-                <text x="0" y="-34" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8a8470" letter-spacing="0.6">75% · 4400 K · stand</text>
+                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="1" />
+                <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5" />
+                <text
+                  x="0"
+                  y="-22"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                  letter-spacing="0.8"
+                >
+                  ASTRA R
+                </text>
+                <text
+                  x="0"
+                  y="-34"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="9"
+                  fill="#8a8470"
+                  letter-spacing="0.6"
+                >
+                  75% · 4400 K · stand
+                </text>
               </g>
               <!-- Infinimat (grid-hung soft) -->
               <g transform="translate(870, 540)">
-                <rect x="-34" y="-19" width="68" height="38" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="14"/>
-                <rect x="-28" y="-14" width="56" height="28" fill="#ebe5d2" rx="9"/>
-                <text x="0" y="-30" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600" letter-spacing="0.8">INFINIMAT</text>
-                <text x="0" y="-44" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8a8470" letter-spacing="0.6">92% · 5000 K · grid</text>
+                <rect x="-34" y="-19" width="68" height="38" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="14" />
+                <rect x="-28" y="-14" width="56" height="28" fill="#ebe5d2" rx="9" />
+                <text
+                  x="0"
+                  y="-30"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                  letter-spacing="0.8"
+                >
+                  INFINIMAT
+                </text>
+                <text
+                  x="0"
+                  y="-44"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="9"
+                  fill="#8a8470"
+                  letter-spacing="0.6"
+                >
+                  92% · 5000 K · grid
+                </text>
               </g>
               <!-- Infinibar PB12 (wall-mounted bar) -->
               <g transform="translate(870, 130)">
-                <rect x="-180" y="-7" width="360" height="14" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="2"/>
-                <rect x="-175" y="-4" width="350" height="8" fill="#d4dde2" rx="1"/>
+                <rect x="-180" y="-7" width="360" height="14" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="2" />
+                <rect x="-175" y="-4" width="350" height="8" fill="#d4dde2" rx="1" />
                 <g stroke="#0e110e" stroke-width="0.5" opacity="0.4">
-                  <line x1="-150" y1="-4" x2="-150" y2="4"/><line x1="-100" y1="-4" x2="-100" y2="4"/><line x1="-50" y1="-4" x2="-50" y2="4"/><line x1="0" y1="-4" x2="0" y2="4"/><line x1="50" y1="-4" x2="50" y2="4"/><line x1="100" y1="-4" x2="100" y2="4"/><line x1="150" y1="-4" x2="150" y2="4"/>
+                  <line x1="-150" y1="-4" x2="-150" y2="4" />
+                  <line x1="-100" y1="-4" x2="-100" y2="4" />
+                  <line x1="-50" y1="-4" x2="-50" y2="4" />
+                  <line x1="0" y1="-4" x2="0" y2="4" />
+                  <line x1="50" y1="-4" x2="50" y2="4" />
+                  <line x1="100" y1="-4" x2="100" y2="4" />
+                  <line x1="150" y1="-4" x2="150" y2="4" />
                 </g>
-                <text x="0" y="-14" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600" letter-spacing="0.8">INFINIBAR PB12 · 70% · 5600 K · backdrop</text>
+                <text
+                  x="0"
+                  y="-14"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                  letter-spacing="0.8"
+                >
+                  INFINIBAR PB12 · 70% · 5600 K · backdrop
+                </text>
               </g>
             </svg>
           </div>
@@ -1990,34 +2788,64 @@
               <div class="insp-eyebrow">Active scene</div>
               <h2 class="insp-title">Demo bench</h2>
               <p class="insp-sub">
-                Wide-front key with overhead bar fill, neutral 4400 K. Built for benchtop product
-                demos with a presenter mid-stage.
+                Wide-front key with overhead bar fill, neutral 4400 K. Built for benchtop product demos with a presenter
+                mid-stage.
               </p>
 
               <div class="insp-grid">
-                <div class="insp-stat"><div class="l">Fixtures</div><div class="v">6 <small>/ 6 patched</small></div></div>
-                <div class="insp-stat"><div class="l">Avg intensity</div><div class="v">83 <small>%</small></div></div>
-                <div class="insp-stat"><div class="l">CCT mean</div><div class="v">4400 <small>K</small></div></div>
-                <div class="insp-stat"><div class="l">Groups on</div><div class="v">3 <small>/ 4</small></div></div>
+                <div class="insp-stat">
+                  <div class="l">Fixtures</div>
+                  <div class="v">6 <small>/ 6 patched</small></div>
+                </div>
+                <div class="insp-stat">
+                  <div class="l">Avg intensity</div>
+                  <div class="v">83 <small>%</small></div>
+                </div>
+                <div class="insp-stat">
+                  <div class="l">CCT mean</div>
+                  <div class="v">4400 <small>K</small></div>
+                </div>
+                <div class="insp-stat">
+                  <div class="l">Groups on</div>
+                  <div class="v">3 <small>/ 4</small></div>
+                </div>
               </div>
 
               <div class="insp-section">
                 <div class="sh">Fixtures used</div>
                 <div class="fchips">
-                  <span class="fchip" style="color: #f0dfb8;"><span class="swatch" style="background: #f0dfb8;"></span><span style="color: var(--text-pri);">Apollo L · 88%</span></span>
-                  <span class="fchip" style="color: #f0dfb8;"><span class="swatch" style="background: #f0dfb8;"></span><span style="color: var(--text-pri);">Apollo R · 88%</span></span>
-                  <span class="fchip" style="color: #f0dfb8;"><span class="swatch" style="background: #f0dfb8;"></span><span style="color: var(--text-pri);">Astra L · 75%</span></span>
-                  <span class="fchip" style="color: #f0dfb8;"><span class="swatch" style="background: #f0dfb8;"></span><span style="color: var(--text-pri);">Astra R · 75%</span></span>
-                  <span class="fchip" style="color: #ebe5d2;"><span class="swatch" style="background: #ebe5d2;"></span><span style="color: var(--text-pri);">Infinimat · 92%</span></span>
-                  <span class="fchip" style="color: #d4dde2;"><span class="swatch" style="background: #d4dde2;"></span><span style="color: var(--text-pri);">Infinibar · 70%</span></span>
+                  <span class="fchip" style="color: #f0dfb8"
+                    ><span class="swatch" style="background: #f0dfb8"></span
+                    ><span style="color: var(--text-pri)">Apollo L · 88%</span></span
+                  >
+                  <span class="fchip" style="color: #f0dfb8"
+                    ><span class="swatch" style="background: #f0dfb8"></span
+                    ><span style="color: var(--text-pri)">Apollo R · 88%</span></span
+                  >
+                  <span class="fchip" style="color: #f0dfb8"
+                    ><span class="swatch" style="background: #f0dfb8"></span
+                    ><span style="color: var(--text-pri)">Astra L · 75%</span></span
+                  >
+                  <span class="fchip" style="color: #f0dfb8"
+                    ><span class="swatch" style="background: #f0dfb8"></span
+                    ><span style="color: var(--text-pri)">Astra R · 75%</span></span
+                  >
+                  <span class="fchip" style="color: #ebe5d2"
+                    ><span class="swatch" style="background: #ebe5d2"></span
+                    ><span style="color: var(--text-pri)">Infinimat · 92%</span></span
+                  >
+                  <span class="fchip" style="color: #d4dde2"
+                    ><span class="swatch" style="background: #d4dde2"></span
+                    ><span style="color: var(--text-pri)">Infinibar · 70%</span></span
+                  >
                 </div>
               </div>
 
               <div class="insp-section">
                 <div class="sh">Provenance</div>
                 <div class="prov">
-                  Last edited <b>2 days ago</b> by senior op<br>
-                  Created <b>2026-04-12</b><br>
+                  Last edited <b>2 days ago</b> by senior op<br />
+                  Created <b>2026-04-12</b><br />
                   Recall count <b>47</b> · last 19 : 40 UTC
                 </div>
               </div>
@@ -2033,7 +2861,9 @@
           <div class="lw-health">
             <div class="health-item">
               <div class="lbl">Bridge</div>
-              <div class="v"><span class="dot ok"></span><span class="ok-text">Reachable</span><small>· 28 ms · Litepanels</small></div>
+              <div class="v">
+                <span class="dot ok"></span><span class="ok-text">Reachable</span><small>· 28 ms · Litepanels</small>
+              </div>
             </div>
             <div class="health-item">
               <div class="lbl">Universe</div>
@@ -2062,7 +2892,12 @@
 
       <div class="notes">
         <span class="tag">A</span>
-        <b>Standard operator finishes here.</b> The rail now reads top-to-bottom in clean hierarchy: <em>Master</em> (green when on) → <em>Scenes</em> → <em>Groups</em> → Actions. The full-width <em>Health bar</em> across the bottom monitors six signals — bridge, universe, fixtures, auto-save, session, app — so the operator can confirm everything is healthy before walking away. Workspace tabs are unmistakable; <em>Lighting</em> reads as the active page at a glance, with green-tinted fill, glowing underline, and bright icon. <em>No DMX hex anywhere</em> — that's senior-op terrain in State C.
+        <b>Standard operator finishes here.</b> The rail now reads top-to-bottom in clean hierarchy:
+        <em>Master</em> (green when on) → <em>Scenes</em> → <em>Groups</em> → Actions. The full-width
+        <em>Health bar</em> across the bottom monitors six signals — bridge, universe, fixtures, auto-save, session, app
+        — so the operator can confirm everything is healthy before walking away. Workspace tabs are unmistakable;
+        <em>Lighting</em> reads as the active page at a glance, with green-tinted fill, glowing underline, and bright
+        icon. <em>No DMX hex anywhere</em> — that's senior-op terrain in State C.
       </div>
 
       <!-- ====================================================
@@ -2073,15 +2908,29 @@
       <div class="canvas">
         <div class="shell">
           <div class="brand">
-            <img class="brand-mark" src="logos/SSE_Logo_Unit_ExecutiveEducation_White_RGB.png" alt="SSE Executive Education" />
+            <img
+              class="brand-mark"
+              src="logos/SSE_Logo_Unit_ExecutiveEducation_White_RGB.png"
+              alt="SSE Executive Education"
+            />
             <span class="brand-divider"></span>
             <span class="product">Studio Control</span>
             <div class="nav">
-              <span class="item"><svg class="ico"><use href="#navSetup"/></svg>Setup</span>
-              <span class="item"><svg class="ico"><use href="#navPlanning"/></svg>Planning</span>
-              <span class="item active"><svg class="ico"><use href="#navLighting"/></svg>Lighting</span>
-              <span class="item"><svg class="ico"><use href="#navAudio"/></svg>Audio</span>
-              <span class="item"><svg class="ico"><use href="#navStreamDeck"/></svg>Stream Deck</span>
+              <span class="item"
+                ><svg class="ico"><use href="#navSetup" /></svg>Setup</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navPlanning" /></svg>Planning</span
+              >
+              <span class="item active"
+                ><svg class="ico"><use href="#navLighting" /></svg>Lighting</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navAudio" /></svg>Audio</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navStreamDeck" /></svg>Stream Deck</span
+              >
             </div>
           </div>
           <span class="clock">19 : 43 : 21 UTC</span>
@@ -2090,7 +2939,18 @@
         <div class="lw">
           <div class="lw-toolbar">
             <div class="tb-title">
-              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2"/></svg>
+              <svg
+                class="ico"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2" />
+              </svg>
               Lighting
             </div>
             <span class="chip green"><span class="dot"></span>DMX U1 · reachable</span>
@@ -2103,12 +2963,24 @@
             </div>
             <span class="tb-spacer"></span>
             <div class="tb-search">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
               Search fixtures…
             </div>
             <button class="tb-btn ghost">Patch <span class="kbd">P</span></button>
             <button class="tb-btn green">+ Fixture</button>
-            <button class="tb-btn ghost" style="padding: 0 10px;">⋮</button>
+            <button class="tb-btn ghost" style="padding: 0 10px">⋮</button>
           </div>
 
           <div class="lw-rail">
@@ -2128,33 +3000,74 @@
             </div>
             <div class="scene-grid">
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5"/><circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/><circle cx="60" cy="42" r="2.8" fill="#f0dfb8" opacity="0.65"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5" />
+                    <circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                    <circle cx="60" cy="42" r="2.8" fill="#f0dfb8" opacity="0.65" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Talking head</span></div>
                 <div class="sub">3 on · 3800 K</div>
               </div>
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5"/><circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/><circle cx="110" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#2a2f28" opacity="0.5" />
+                    <circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                    <circle cx="110" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Two-shot</span></div>
                 <div class="sub">5 on · 4000 K</div>
               </div>
               <!-- Demo bench MODIFIED -->
               <div class="scene-tile active modified">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#7c722e" stroke-width="0.8" rx="2"/><rect x="6" y="6" width="148" height="13" fill="#7c722e" opacity="0.45"/><rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8"/><circle cx="50" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95"/><circle cx="110" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95"/><circle cx="60" cy="42" r="3.5" fill="#ebe5d2" opacity="0.95"/><circle cx="100" cy="42" r="3.5" fill="#ebe5d2" opacity="0.95"/><circle cx="80" cy="38" r="3.5" fill="#f0dfb8" opacity="0.92"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#7c722e" stroke-width="0.8" rx="2" />
+                    <rect x="6" y="6" width="148" height="13" fill="#7c722e" opacity="0.45" />
+                    <rect x="68" y="50" width="24" height="5" fill="#2a2f28" rx="0.8" />
+                    <circle cx="50" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95" />
+                    <circle cx="110" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95" />
+                    <circle cx="60" cy="42" r="3.5" fill="#ebe5d2" opacity="0.95" />
+                    <circle cx="100" cy="42" r="3.5" fill="#ebe5d2" opacity="0.95" />
+                    <circle cx="80" cy="38" r="3.5" fill="#f0dfb8" opacity="0.92" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Demo bench</span><span class="badge">● Modified</span></div>
                 <div class="sub">6 on · 4400 K</div>
               </div>
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><circle cx="60" cy="42" r="2.5" fill="#ef8e5a" opacity="0.45"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <circle cx="60" cy="42" r="2.5" fill="#ef8e5a" opacity="0.45" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Off air</span></div>
                 <div class="sub">1 on · 2700 K</div>
               </div>
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><circle cx="50" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95"/><circle cx="110" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <circle cx="50" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95" />
+                    <circle cx="110" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Wide stage</span></div>
                 <div class="sub">6 on · 5000 K</div>
               </div>
               <div class="scene-tile">
-                <div class="thumb"><svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><circle cx="60" cy="42" r="5.5" fill="#f3a87a" opacity="0.95"/></svg></div>
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110" preserveAspectRatio="xMidYMid meet">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <circle cx="60" cy="42" r="5.5" fill="#f3a87a" opacity="0.95" />
+                  </svg>
+                </div>
                 <div class="meta"><span class="name">Dramatic key</span></div>
                 <div class="sub">1 on · 3200 K</div>
               </div>
@@ -2171,7 +3084,9 @@
             </div>
             <div class="rail-groups">
               <span class="gchip on"><span class="dot"></span>Key <span class="lvl">100%</span></span>
-              <span class="gchip on"><span class="dot"></span>Fill <span class="lvl" style="color: var(--sse-yellow);">82% ▲</span></span>
+              <span class="gchip on"
+                ><span class="dot"></span>Fill <span class="lvl" style="color: var(--sse-yellow)">82% ▲</span></span
+              >
               <span class="gchip on"><span class="dot"></span>Back <span class="lvl">70%</span></span>
               <span class="gchip off"><span class="dot"></span>Practical</span>
             </div>
@@ -2195,90 +3110,391 @@
             </div>
             <svg class="plot-svg" viewBox="0 0 1740 1176" preserveAspectRatio="xMidYMid meet">
               <defs>
-                <radialGradient id="floorGlow2" cx="50%" cy="50%" r="60%"><stop offset="0%" stop-color="#13180f" stop-opacity="0.55"/><stop offset="100%" stop-color="#050805" stop-opacity="0"/></radialGradient>
-                <radialGradient id="poolWarm2"><stop offset="0%" stop-color="#f0dfb8" stop-opacity="0.55"/><stop offset="55%" stop-color="#f0dfb8" stop-opacity="0.18"/><stop offset="100%" stop-color="#f0dfb8" stop-opacity="0"/></radialGradient>
-                <radialGradient id="poolMid2"><stop offset="0%" stop-color="#ebe5d2" stop-opacity="0.55"/><stop offset="55%" stop-color="#ebe5d2" stop-opacity="0.18"/><stop offset="100%" stop-color="#ebe5d2" stop-opacity="0"/></radialGradient>
-                <radialGradient id="poolMidHot"><stop offset="0%" stop-color="#f6c39a" stop-opacity="0.85"/><stop offset="50%" stop-color="#f6c39a" stop-opacity="0.32"/><stop offset="100%" stop-color="#f6c39a" stop-opacity="0"/></radialGradient>
-                <radialGradient id="poolCool2"><stop offset="0%" stop-color="#d4dde2" stop-opacity="0.5"/><stop offset="55%" stop-color="#d4dde2" stop-opacity="0.16"/><stop offset="100%" stop-color="#d4dde2" stop-opacity="0"/></radialGradient>
-                <pattern id="backdrop2" width="14" height="14" patternUnits="userSpaceOnUse"><line x1="0" y1="14" x2="14" y2="0" stroke="#4d5544" stroke-width="0.9" opacity="0.7"/></pattern>
-                <filter id="grain2" x="0%" y="0%" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3"/><feColorMatrix type="matrix" values="0 0 0 0 0.96, 0 0 0 0 0.93, 0 0 0 0 0.81, 0 0 0 0.04 0"/></filter>
-                <linearGradient id="floorTone2" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#0a0c0a" stop-opacity="0.5"/><stop offset="100%" stop-color="#050805" stop-opacity="0.2"/></linearGradient>
+                <radialGradient id="floorGlow2" cx="50%" cy="50%" r="60%">
+                  <stop offset="0%" stop-color="#13180f" stop-opacity="0.55" />
+                  <stop offset="100%" stop-color="#050805" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient id="poolWarm2">
+                  <stop offset="0%" stop-color="#f0dfb8" stop-opacity="0.55" />
+                  <stop offset="55%" stop-color="#f0dfb8" stop-opacity="0.18" />
+                  <stop offset="100%" stop-color="#f0dfb8" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient id="poolMid2">
+                  <stop offset="0%" stop-color="#ebe5d2" stop-opacity="0.55" />
+                  <stop offset="55%" stop-color="#ebe5d2" stop-opacity="0.18" />
+                  <stop offset="100%" stop-color="#ebe5d2" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient id="poolMidHot">
+                  <stop offset="0%" stop-color="#f6c39a" stop-opacity="0.85" />
+                  <stop offset="50%" stop-color="#f6c39a" stop-opacity="0.32" />
+                  <stop offset="100%" stop-color="#f6c39a" stop-opacity="0" />
+                </radialGradient>
+                <radialGradient id="poolCool2">
+                  <stop offset="0%" stop-color="#d4dde2" stop-opacity="0.5" />
+                  <stop offset="55%" stop-color="#d4dde2" stop-opacity="0.16" />
+                  <stop offset="100%" stop-color="#d4dde2" stop-opacity="0" />
+                </radialGradient>
+                <pattern id="backdrop2" width="14" height="14" patternUnits="userSpaceOnUse">
+                  <line x1="0" y1="14" x2="14" y2="0" stroke="#4d5544" stroke-width="0.9" opacity="0.7" />
+                </pattern>
+                <filter id="grain2" x="0%" y="0%" width="100%" height="100%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3" />
+                  <feColorMatrix type="matrix" values="0 0 0 0 0.96, 0 0 0 0 0.93, 0 0 0 0 0.81, 0 0 0 0.04 0" />
+                </filter>
+                <linearGradient id="floorTone2" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#0a0c0a" stop-opacity="0.5" />
+                  <stop offset="100%" stop-color="#050805" stop-opacity="0.2" />
+                </linearGradient>
               </defs>
-              <rect x="0" y="0" width="1740" height="1176" fill="url(#floorGlow2)"/>
-              <rect x="0" y="0" width="1740" height="1176" filter="url(#grain2)" opacity="0.5"/>
-              <rect x="100" y="88" width="1540" height="1024" fill="url(#floorTone2)"/>
+              <rect x="0" y="0" width="1740" height="1176" fill="url(#floorGlow2)" />
+              <rect x="0" y="0" width="1740" height="1176" filter="url(#grain2)" opacity="0.5" />
+              <rect x="100" y="88" width="1540" height="1024" fill="url(#floorTone2)" />
 
               <g stroke="#d4cdb3" stroke-opacity="0.025" stroke-width="1">
-                <line x1="164" y1="88" x2="164" y2="1112"/><line x1="292" y1="88" x2="292" y2="1112"/><line x1="420" y1="88" x2="420" y2="1112"/><line x1="548" y1="88" x2="548" y2="1112"/><line x1="676" y1="88" x2="676" y2="1112"/><line x1="804" y1="88" x2="804" y2="1112"/><line x1="932" y1="88" x2="932" y2="1112"/><line x1="1060" y1="88" x2="1060" y2="1112"/><line x1="1188" y1="88" x2="1188" y2="1112"/><line x1="1316" y1="88" x2="1316" y2="1112"/><line x1="1444" y1="88" x2="1444" y2="1112"/><line x1="1572" y1="88" x2="1572" y2="1112"/>
-                <line x1="100" y1="152" x2="1640" y2="152"/><line x1="100" y1="280" x2="1640" y2="280"/><line x1="100" y1="408" x2="1640" y2="408"/><line x1="100" y1="536" x2="1640" y2="536"/><line x1="100" y1="664" x2="1640" y2="664"/><line x1="100" y1="792" x2="1640" y2="792"/><line x1="100" y1="920" x2="1640" y2="920"/><line x1="100" y1="1048" x2="1640" y2="1048"/>
+                <line x1="164" y1="88" x2="164" y2="1112" />
+                <line x1="292" y1="88" x2="292" y2="1112" />
+                <line x1="420" y1="88" x2="420" y2="1112" />
+                <line x1="548" y1="88" x2="548" y2="1112" />
+                <line x1="676" y1="88" x2="676" y2="1112" />
+                <line x1="804" y1="88" x2="804" y2="1112" />
+                <line x1="932" y1="88" x2="932" y2="1112" />
+                <line x1="1060" y1="88" x2="1060" y2="1112" />
+                <line x1="1188" y1="88" x2="1188" y2="1112" />
+                <line x1="1316" y1="88" x2="1316" y2="1112" />
+                <line x1="1444" y1="88" x2="1444" y2="1112" />
+                <line x1="1572" y1="88" x2="1572" y2="1112" />
+                <line x1="100" y1="152" x2="1640" y2="152" />
+                <line x1="100" y1="280" x2="1640" y2="280" />
+                <line x1="100" y1="408" x2="1640" y2="408" />
+                <line x1="100" y1="536" x2="1640" y2="536" />
+                <line x1="100" y1="664" x2="1640" y2="664" />
+                <line x1="100" y1="792" x2="1640" y2="792" />
+                <line x1="100" y1="920" x2="1640" y2="920" />
+                <line x1="100" y1="1048" x2="1640" y2="1048" />
               </g>
               <g stroke="#d4cdb3" stroke-opacity="0.05" stroke-width="1">
-                <line x1="228" y1="88" x2="228" y2="1112"/><line x1="356" y1="88" x2="356" y2="1112"/><line x1="484" y1="88" x2="484" y2="1112"/><line x1="612" y1="88" x2="612" y2="1112"/><line x1="868" y1="88" x2="868" y2="1112"/><line x1="996" y1="88" x2="996" y2="1112"/><line x1="1124" y1="88" x2="1124" y2="1112"/><line x1="1252" y1="88" x2="1252" y2="1112"/><line x1="1380" y1="88" x2="1380" y2="1112"/><line x1="1508" y1="88" x2="1508" y2="1112"/>
-                <line x1="100" y1="216" x2="1640" y2="216"/><line x1="100" y1="344" x2="1640" y2="344"/><line x1="100" y1="472" x2="1640" y2="472"/><line x1="100" y1="728" x2="1640" y2="728"/><line x1="100" y1="856" x2="1640" y2="856"/><line x1="100" y1="984" x2="1640" y2="984"/>
+                <line x1="228" y1="88" x2="228" y2="1112" />
+                <line x1="356" y1="88" x2="356" y2="1112" />
+                <line x1="484" y1="88" x2="484" y2="1112" />
+                <line x1="612" y1="88" x2="612" y2="1112" />
+                <line x1="868" y1="88" x2="868" y2="1112" />
+                <line x1="996" y1="88" x2="996" y2="1112" />
+                <line x1="1124" y1="88" x2="1124" y2="1112" />
+                <line x1="1252" y1="88" x2="1252" y2="1112" />
+                <line x1="1380" y1="88" x2="1380" y2="1112" />
+                <line x1="1508" y1="88" x2="1508" y2="1112" />
+                <line x1="100" y1="216" x2="1640" y2="216" />
+                <line x1="100" y1="344" x2="1640" y2="344" />
+                <line x1="100" y1="472" x2="1640" y2="472" />
+                <line x1="100" y1="728" x2="1640" y2="728" />
+                <line x1="100" y1="856" x2="1640" y2="856" />
+                <line x1="100" y1="984" x2="1640" y2="984" />
               </g>
-              <g stroke="#d4cdb3" stroke-opacity="0.13" stroke-width="1.2"><line x1="740" y1="88" x2="740" y2="1112"/><line x1="100" y1="600" x2="1640" y2="600"/></g>
+              <g stroke="#d4cdb3" stroke-opacity="0.13" stroke-width="1.2">
+                <line x1="740" y1="88" x2="740" y2="1112" />
+                <line x1="100" y1="600" x2="1640" y2="600" />
+              </g>
 
-              <ellipse cx="640" cy="720" rx="180" ry="155" fill="url(#poolWarm2)"/>
-              <ellipse cx="1100" cy="720" rx="180" ry="155" fill="url(#poolWarm2)"/>
-              <ellipse cx="780" cy="640" rx="240" ry="180" fill="url(#poolMidHot)"/>
-              <ellipse cx="960" cy="640" rx="200" ry="140" fill="url(#poolMid2)" opacity="0.85"/>
-              <ellipse cx="870" cy="700" rx="280" ry="220" fill="url(#poolMid2)" opacity="0.7"/>
-              <ellipse cx="870" cy="380" rx="380" ry="120" fill="url(#poolCool2)" opacity="0.85"/>
+              <ellipse cx="640" cy="720" rx="180" ry="155" fill="url(#poolWarm2)" />
+              <ellipse cx="1100" cy="720" rx="180" ry="155" fill="url(#poolWarm2)" />
+              <ellipse cx="780" cy="640" rx="240" ry="180" fill="url(#poolMidHot)" />
+              <ellipse cx="960" cy="640" rx="200" ry="140" fill="url(#poolMid2)" opacity="0.85" />
+              <ellipse cx="870" cy="700" rx="280" ry="220" fill="url(#poolMid2)" opacity="0.7" />
+              <ellipse cx="870" cy="380" rx="380" ry="120" fill="url(#poolCool2)" opacity="0.85" />
 
-              <rect x="100" y="88" width="1540" height="1024" fill="none" stroke="#4d5544" stroke-width="2.4"/>
-              <rect x="100" y="80" width="1540" height="14" fill="url(#backdrop2)" stroke="#6b7560" stroke-width="1.2"/>
-              <text x="124" y="74" font-family="JetBrains Mono" font-size="10" fill="#8a8470" letter-spacing="3" font-weight="600">BACKDROP / CYC</text>
-              <line x1="1640" y1="800" x2="1640" y2="970" stroke="#0a0d0a" stroke-width="6"/>
-              <path d="M 1640 800 Q 1700 800 1700 860" fill="none" stroke="#4d5544" stroke-width="1" opacity="0.5"/>
-              <text x="1656" y="888" font-family="JetBrains Mono" font-size="9" fill="#8a8470" letter-spacing="2.5" font-weight="600">DOOR</text>
-              <line x1="380" y1="1112" x2="600" y2="1112" stroke="#3f70c8" stroke-width="3" opacity="0.55"/>
-              <line x1="380" y1="1116" x2="600" y2="1116" stroke="#3f70c8" stroke-width="1" opacity="0.35"/>
-              <text x="490" y="1140" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#5a5547" letter-spacing="2.5" font-weight="600">CONTROL BOOTH</text>
+              <rect x="100" y="88" width="1540" height="1024" fill="none" stroke="#4d5544" stroke-width="2.4" />
+              <rect
+                x="100"
+                y="80"
+                width="1540"
+                height="14"
+                fill="url(#backdrop2)"
+                stroke="#6b7560"
+                stroke-width="1.2"
+              />
+              <text
+                x="124"
+                y="74"
+                font-family="JetBrains Mono"
+                font-size="10"
+                fill="#8a8470"
+                letter-spacing="3"
+                font-weight="600"
+              >
+                BACKDROP / CYC
+              </text>
+              <line x1="1640" y1="800" x2="1640" y2="970" stroke="#0a0d0a" stroke-width="6" />
+              <path d="M 1640 800 Q 1700 800 1700 860" fill="none" stroke="#4d5544" stroke-width="1" opacity="0.5" />
+              <text
+                x="1656"
+                y="888"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#8a8470"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                DOOR
+              </text>
+              <line x1="380" y1="1112" x2="600" y2="1112" stroke="#3f70c8" stroke-width="3" opacity="0.55" />
+              <line x1="380" y1="1116" x2="600" y2="1116" stroke="#3f70c8" stroke-width="1" opacity="0.35" />
+              <text
+                x="490"
+                y="1140"
+                text-anchor="middle"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#5a5547"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                CONTROL BOOTH
+              </text>
 
-              <rect x="780" y="380" width="180" height="38" fill="#0e110e" stroke="#3a4138" stroke-width="1.5" rx="2"/>
-              <line x1="780" y1="395" x2="960" y2="395" stroke="#3a4138" stroke-width="0.6" stroke-dasharray="2 2" opacity="0.7"/>
-              <text x="870" y="404" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#8a8470" letter-spacing="2.5" font-weight="600">BENCH</text>
+              <rect x="780" y="380" width="180" height="38" fill="#0e110e" stroke="#3a4138" stroke-width="1.5" rx="2" />
+              <line
+                x1="780"
+                y1="395"
+                x2="960"
+                y2="395"
+                stroke="#3a4138"
+                stroke-width="0.6"
+                stroke-dasharray="2 2"
+                opacity="0.7"
+              />
+              <text
+                x="870"
+                y="404"
+                text-anchor="middle"
+                font-family="JetBrains Mono"
+                font-size="10"
+                fill="#8a8470"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                BENCH
+              </text>
               <g opacity="0.85">
-                <g transform="translate(740, 700)" stroke="#7a7263" stroke-width="1.5" fill="none" stroke-linecap="round"><line x1="-7" y1="-7" x2="7" y2="7"/><line x1="-7" y1="7" x2="7" y2="-7"/><circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none"/></g>
-                <g transform="translate(870, 700)" stroke="#7a7263" stroke-width="1.5" fill="none" stroke-linecap="round"><line x1="-7" y1="-7" x2="7" y2="7"/><line x1="-7" y1="7" x2="7" y2="-7"/><circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none"/></g>
-                <g transform="translate(1000, 700)" stroke="#7a7263" stroke-width="1.5" fill="none" stroke-linecap="round"><line x1="-7" y1="-7" x2="7" y2="7"/><line x1="-7" y1="7" x2="7" y2="-7"/><circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none"/></g>
+                <g
+                  transform="translate(740, 700)"
+                  stroke="#7a7263"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linecap="round"
+                >
+                  <line x1="-7" y1="-7" x2="7" y2="7" />
+                  <line x1="-7" y1="7" x2="7" y2="-7" />
+                  <circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none" />
+                </g>
+                <g
+                  transform="translate(870, 700)"
+                  stroke="#7a7263"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linecap="round"
+                >
+                  <line x1="-7" y1="-7" x2="7" y2="7" />
+                  <line x1="-7" y1="7" x2="7" y2="-7" />
+                  <circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none" />
+                </g>
+                <g
+                  transform="translate(1000, 700)"
+                  stroke="#7a7263"
+                  stroke-width="1.5"
+                  fill="none"
+                  stroke-linecap="round"
+                >
+                  <line x1="-7" y1="-7" x2="7" y2="7" />
+                  <line x1="-7" y1="7" x2="7" y2="-7" />
+                  <circle cx="0" cy="0" r="1.5" fill="#7a7263" stroke="none" />
+                </g>
               </g>
 
               <g transform="translate(870, 1020)">
-                <polygon points="0,-12 -100,-260 100,-260" fill="#3f70c8" opacity="0.05" stroke="#3f70c8" stroke-opacity="0.18" stroke-width="0.8" stroke-dasharray="3 4"/>
-                <rect x="-22" y="-13" width="44" height="30" fill="#0e110e" stroke="#3f70c8" stroke-width="1.5" rx="2"/>
-                <rect x="-22" y="-13" width="44" height="3" fill="#3f70c8" opacity="0.4"/>
-                <circle cx="0" cy="-2" r="6" fill="#0a0d0a" stroke="#3f70c8" stroke-width="1.5"/>
-                <text x="0" y="34" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#6a93dc" letter-spacing="1.5" font-weight="600">CAM A</text>
+                <polygon
+                  points="0,-12 -100,-260 100,-260"
+                  fill="#3f70c8"
+                  opacity="0.05"
+                  stroke="#3f70c8"
+                  stroke-opacity="0.18"
+                  stroke-width="0.8"
+                  stroke-dasharray="3 4"
+                />
+                <rect
+                  x="-22"
+                  y="-13"
+                  width="44"
+                  height="30"
+                  fill="#0e110e"
+                  stroke="#3f70c8"
+                  stroke-width="1.5"
+                  rx="2"
+                />
+                <rect x="-22" y="-13" width="44" height="3" fill="#3f70c8" opacity="0.4" />
+                <circle cx="0" cy="-2" r="6" fill="#0a0d0a" stroke="#3f70c8" stroke-width="1.5" />
+                <text
+                  x="0"
+                  y="34"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#6a93dc"
+                  letter-spacing="1.5"
+                  font-weight="600"
+                >
+                  CAM A
+                </text>
               </g>
               <g transform="translate(1300, 980) rotate(-25)">
-                <polygon points="0,-12 -100,-260 100,-260" fill="#3f70c8" opacity="0.04" stroke="#3f70c8" stroke-opacity="0.14" stroke-width="0.8" stroke-dasharray="3 4"/>
-                <rect x="-18" y="-11" width="36" height="24" fill="#0e110e" stroke="#3f70c8" stroke-width="1.5" rx="2"/>
-                <circle cx="0" cy="-1" r="5" fill="#0a0d0a" stroke="#3f70c8" stroke-width="1.5"/>
-                <text x="0" y="28" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#6a93dc" letter-spacing="1.5" font-weight="600">CAM B</text>
+                <polygon
+                  points="0,-12 -100,-260 100,-260"
+                  fill="#3f70c8"
+                  opacity="0.04"
+                  stroke="#3f70c8"
+                  stroke-opacity="0.14"
+                  stroke-width="0.8"
+                  stroke-dasharray="3 4"
+                />
+                <rect
+                  x="-18"
+                  y="-11"
+                  width="36"
+                  height="24"
+                  fill="#0e110e"
+                  stroke="#3f70c8"
+                  stroke-width="1.5"
+                  rx="2"
+                />
+                <circle cx="0" cy="-1" r="5" fill="#0a0d0a" stroke="#3f70c8" stroke-width="1.5" />
+                <text
+                  x="0"
+                  y="28"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#6a93dc"
+                  letter-spacing="1.5"
+                  font-weight="600"
+                >
+                  CAM B
+                </text>
               </g>
 
-              <g transform="translate(640, 720)"><circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2"/><rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1"/><text x="0" y="-32" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600">APOLLO L · 88%</text></g>
-              <g transform="translate(1100, 720)"><circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2"/><rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1"/><text x="0" y="-32" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600">APOLLO R · 88%</text></g>
+              <g transform="translate(640, 720)">
+                <circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" />
+                <rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1" />
+                <text
+                  x="0"
+                  y="-32"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                >
+                  APOLLO L · 88%
+                </text>
+              </g>
+              <g transform="translate(1100, 720)">
+                <circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" />
+                <rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1" />
+                <text
+                  x="0"
+                  y="-32"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                >
+                  APOLLO R · 88%
+                </text>
+              </g>
               <!-- Astra L SELECTED — blue ring -->
               <g transform="translate(420, 640)">
-                <circle cx="0" cy="0" r="38" fill="none" stroke="#3f70c8" stroke-width="1.8" stroke-dasharray="5 4"/>
+                <circle cx="0" cy="0" r="38" fill="none" stroke="#3f70c8" stroke-width="1.8" stroke-dasharray="5 4" />
                 <g stroke="#7a7263" stroke-width="1.5" stroke-linecap="round">
-                  <line x1="0" y1="14" x2="-12" y2="22"/><line x1="0" y1="14" x2="12" y2="22"/><line x1="0" y1="14" x2="0" y2="24"/>
+                  <line x1="0" y1="14" x2="-12" y2="22" />
+                  <line x1="0" y1="14" x2="12" y2="22" />
+                  <line x1="0" y1="14" x2="0" y2="24" />
                 </g>
-                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#3f70c8" stroke-width="2.5" rx="1"/>
-                <rect x="-10" y="-6" width="20" height="16" fill="#f6c39a" rx="0.5"/>
-                <text x="0" y="-32" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#6a93dc" font-weight="700" letter-spacing="0.6">ASTRA L · 100% ▲</text>
-                <text x="0" y="-46" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#6a93dc" letter-spacing="2.5" font-weight="600">SELECTED</text>
+                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#3f70c8" stroke-width="2.5" rx="1" />
+                <rect x="-10" y="-6" width="20" height="16" fill="#f6c39a" rx="0.5" />
+                <text
+                  x="0"
+                  y="-32"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="11"
+                  fill="#6a93dc"
+                  font-weight="700"
+                  letter-spacing="0.6"
+                >
+                  ASTRA L · 100% ▲
+                </text>
+                <text
+                  x="0"
+                  y="-46"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="9"
+                  fill="#6a93dc"
+                  letter-spacing="2.5"
+                  font-weight="600"
+                >
+                  SELECTED
+                </text>
               </g>
               <g transform="translate(1320, 640)">
-                <g stroke="#7a7263" stroke-width="1.5" stroke-linecap="round"><line x1="0" y1="14" x2="-12" y2="22"/><line x1="0" y1="14" x2="12" y2="22"/><line x1="0" y1="14" x2="0" y2="24"/></g>
-                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="1"/>
-                <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5"/>
-                <text x="0" y="-22" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600">ASTRA R · 75%</text>
+                <g stroke="#7a7263" stroke-width="1.5" stroke-linecap="round">
+                  <line x1="0" y1="14" x2="-12" y2="22" />
+                  <line x1="0" y1="14" x2="12" y2="22" />
+                  <line x1="0" y1="14" x2="0" y2="24" />
+                </g>
+                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="1" />
+                <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5" />
+                <text
+                  x="0"
+                  y="-22"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                >
+                  ASTRA R · 75%
+                </text>
               </g>
-              <g transform="translate(870, 540)"><rect x="-34" y="-19" width="68" height="38" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="14"/><rect x="-28" y="-14" width="56" height="28" fill="#ebe5d2" rx="9"/><text x="0" y="-30" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600">INFINIMAT · 92%</text></g>
-              <g transform="translate(870, 130)"><rect x="-180" y="-7" width="360" height="14" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="2"/><rect x="-175" y="-4" width="350" height="8" fill="#d4dde2" rx="1"/><text x="0" y="-14" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#d4cdb3" font-weight="600">INFINIBAR · 70%</text></g>
+              <g transform="translate(870, 540)">
+                <rect x="-34" y="-19" width="68" height="38" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="14" />
+                <rect x="-28" y="-14" width="56" height="28" fill="#ebe5d2" rx="9" />
+                <text
+                  x="0"
+                  y="-30"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                >
+                  INFINIMAT · 92%
+                </text>
+              </g>
+              <g transform="translate(870, 130)">
+                <rect x="-180" y="-7" width="360" height="14" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="2" />
+                <rect x="-175" y="-4" width="350" height="8" fill="#d4dde2" rx="1" />
+                <text
+                  x="0"
+                  y="-14"
+                  text-anchor="middle"
+                  font-family="JetBrains Mono"
+                  font-size="10"
+                  fill="#d4cdb3"
+                  font-weight="600"
+                >
+                  INFINIBAR · 70%
+                </text>
+              </g>
             </svg>
           </div>
 
@@ -2292,22 +3508,35 @@
             <div class="insp-body">
               <div class="insp-eyebrow blue">Selected fixture</div>
               <h2 class="insp-title">Astra L</h2>
-              <p class="insp-sub">
-                Litepanels Astra Bi-Color · group <b>Fill</b> · stand-mounted, stage left.
-              </p>
+              <p class="insp-sub">Litepanels Astra Bi-Color · group <b>Fill</b> · stand-mounted, stage left.</p>
 
-              <div class="insp-section" style="border-top: none; padding-top: 0; margin-top: 0;">
+              <div class="insp-section" style="border-top: none; padding-top: 0; margin-top: 0">
                 <div class="frow">
                   <span class="l">Power</span>
-                  <div class="ctrl"><div class="toggle on"><div class="pin"></div></div><span class="val">On</span></div>
+                  <div class="ctrl">
+                    <div class="toggle on"><div class="pin"></div></div>
+                    <span class="val">On</span>
+                  </div>
                 </div>
                 <div class="frow">
                   <span class="l">Intensity</span>
-                  <div class="ctrl"><div class="slider"><div class="fill" style="width: 100%;"></div><div class="knob" style="left: 100%;"></div></div><span class="val">100 %</span></div>
+                  <div class="ctrl">
+                    <div class="slider">
+                      <div class="fill" style="width: 100%"></div>
+                      <div class="knob" style="left: 100%"></div>
+                    </div>
+                    <span class="val">100 %</span>
+                  </div>
                 </div>
                 <div class="frow">
                   <span class="l">CCT</span>
-                  <div class="ctrl"><div class="slider cct"><div class="fill" style="width: 60%;"></div><div class="knob" style="left: 60%;"></div></div><span class="val">4400 K</span></div>
+                  <div class="ctrl">
+                    <div class="slider cct">
+                      <div class="fill" style="width: 60%"></div>
+                      <div class="knob" style="left: 60%"></div>
+                    </div>
+                    <span class="val">4400 K</span>
+                  </div>
                 </div>
               </div>
 
@@ -2315,15 +3544,24 @@
                 <div class="sh blue">Position · physical</div>
                 <div class="frow">
                   <span class="l">Stage X</span>
-                  <div class="ctrl"><div class="field-input">3.5</div><span class="field-suffix">m</span></div>
+                  <div class="ctrl">
+                    <div class="field-input">3.5</div>
+                    <span class="field-suffix">m</span>
+                  </div>
                 </div>
                 <div class="frow">
                   <span class="l">Stage Y</span>
-                  <div class="ctrl"><div class="field-input">4.8</div><span class="field-suffix">m</span></div>
+                  <div class="ctrl">
+                    <div class="field-input">4.8</div>
+                    <span class="field-suffix">m</span>
+                  </div>
                 </div>
                 <div class="frow">
                   <span class="l">Rig height</span>
-                  <div class="ctrl"><div class="field-input">2.70</div><span class="field-suffix">m</span></div>
+                  <div class="ctrl">
+                    <div class="field-input">2.70</div>
+                    <span class="field-suffix">m</span>
+                  </div>
                 </div>
               </div>
 
@@ -2338,7 +3576,9 @@
           <div class="lw-health">
             <div class="health-item">
               <div class="lbl">Bridge</div>
-              <div class="v"><span class="dot ok"></span><span class="ok-text">Reachable</span><small>· 28 ms · Litepanels</small></div>
+              <div class="v">
+                <span class="dot ok"></span><span class="ok-text">Reachable</span><small>· 28 ms · Litepanels</small>
+              </div>
             </div>
             <div class="health-item">
               <div class="lbl">Universe</div>
@@ -2350,7 +3590,10 @@
             </div>
             <div class="health-item">
               <div class="lbl">Auto-save</div>
-              <div class="v"><span class="dot attn"></span><span class="attn-text">Unsaved changes</span><small>· last 19 : 38 UTC</small></div>
+              <div class="v">
+                <span class="dot attn"></span><span class="attn-text">Unsaved changes</span
+                ><small>· last 19 : 38 UTC</small>
+              </div>
             </div>
             <div class="health-item">
               <div class="lbl">Session</div>
@@ -2367,7 +3610,12 @@
 
       <div class="notes">
         <span class="tag yellow">B</span>
-        <b>Senior op edits in place.</b> Selection ring picks up <b>SSE Blue</b> #3F70C8; Fixture inspector tab underline matches. Drift surfaces in <em>four</em> coordinated places now — active scene tile flips to <b>SSE Yellow</b> #E8D561 with Save / Revert affordances; plot pill picks up <em>· Modified</em>; Fill group chip in the rail carries the level delta; and — new in v6 — the Health bar's <em>Auto-save</em> indicator turns amber to flag <em>"Unsaved changes,"</em> tying persistence health directly to the operator's intent. Delete uses Burgundy as a quiet warning. <em>Still no DMX hex anywhere</em>.
+        <b>Senior op edits in place.</b> Selection ring picks up <b>SSE Blue</b> #3F70C8; Fixture inspector tab
+        underline matches. Drift surfaces in <em>four</em> coordinated places now — active scene tile flips to
+        <b>SSE Yellow</b> #E8D561 with Save / Revert affordances; plot pill picks up <em>· Modified</em>; Fill group
+        chip in the rail carries the level delta; and — new in v6 — the Health bar's <em>Auto-save</em> indicator turns
+        amber to flag <em>"Unsaved changes,"</em> tying persistence health directly to the operator's intent. Delete
+        uses Burgundy as a quiet warning. <em>Still no DMX hex anywhere</em>.
       </div>
 
       <!-- ====================================================
@@ -2378,15 +3626,29 @@
       <div class="canvas">
         <div class="shell">
           <div class="brand">
-            <img class="brand-mark" src="logos/SSE_Logo_Unit_ExecutiveEducation_White_RGB.png" alt="SSE Executive Education" />
+            <img
+              class="brand-mark"
+              src="logos/SSE_Logo_Unit_ExecutiveEducation_White_RGB.png"
+              alt="SSE Executive Education"
+            />
             <span class="brand-divider"></span>
             <span class="product">Studio Control</span>
             <div class="nav">
-              <span class="item"><svg class="ico"><use href="#navSetup"/></svg>Setup</span>
-              <span class="item"><svg class="ico"><use href="#navPlanning"/></svg>Planning</span>
-              <span class="item active"><svg class="ico"><use href="#navLighting"/></svg>Lighting</span>
-              <span class="item"><svg class="ico"><use href="#navAudio"/></svg>Audio</span>
-              <span class="item"><svg class="ico"><use href="#navStreamDeck"/></svg>Stream Deck</span>
+              <span class="item"
+                ><svg class="ico"><use href="#navSetup" /></svg>Setup</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navPlanning" /></svg>Planning</span
+              >
+              <span class="item active"
+                ><svg class="ico"><use href="#navLighting" /></svg>Lighting</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navAudio" /></svg>Audio</span
+              >
+              <span class="item"
+                ><svg class="ico"><use href="#navStreamDeck" /></svg>Stream Deck</span
+              >
             </div>
           </div>
           <span class="clock">19 : 45 : 02 UTC</span>
@@ -2395,7 +3657,18 @@
         <div class="lw">
           <div class="lw-toolbar">
             <div class="tb-title">
-              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2"/></svg>
+              <svg
+                class="ico"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v3M12 19v3M5 5l2 2M17 17l2 2M2 12h3M19 12h3M5 19l2-2M17 7l2-2" />
+              </svg>
               Lighting
             </div>
             <span class="chip green"><span class="dot"></span>DMX U1 · reachable</span>
@@ -2408,16 +3681,28 @@
             </div>
             <span class="tb-spacer"></span>
             <div class="tb-search">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
               Search fixtures…
             </div>
             <button class="tb-btn active-patch">▣ Patch · ON <span class="kbd">P</span></button>
             <button class="tb-btn green">+ Fixture</button>
-            <button class="tb-btn ghost" style="padding: 0 10px;">⋮</button>
+            <button class="tb-btn ghost" style="padding: 0 10px">⋮</button>
           </div>
 
           <!-- Rail dimmed during patch mode -->
-          <div class="lw-rail" style="opacity: 0.42;">
+          <div class="lw-rail" style="opacity: 0.42">
             <div class="rail-master on">
               <div class="info">
                 <div class="eyebrow">Master · paused · patch mode</div>
@@ -2433,13 +3718,72 @@
               <span class="count">paused</span>
             </div>
             <div class="scene-grid">
-              <div class="scene-tile"><div class="thumb"><svg viewBox="0 0 160 110"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/></svg></div><div class="meta"><span class="name">Talking head</span></div><div class="sub">3 on</div></div>
-              <div class="scene-tile"><div class="thumb"><svg viewBox="0 0 160 110"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/><circle cx="110" cy="68" r="3.5" fill="#f6c39a" opacity="0.85"/></svg></div><div class="meta"><span class="name">Two-shot</span></div><div class="sub">5 on</div></div>
-              <div class="scene-tile active"><div class="thumb"><svg viewBox="0 0 160 110"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#3a4138" stroke-width="0.8" rx="2"/><circle cx="50" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95"/><circle cx="110" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95"/></svg></div><div class="meta"><span class="name">Demo bench</span></div><div class="sub">6 on</div></div>
-              <div class="scene-tile"><div class="thumb"><svg viewBox="0 0 160 110"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><circle cx="60" cy="42" r="2.5" fill="#ef8e5a" opacity="0.45"/></svg></div><div class="meta"><span class="name">Off air</span></div><div class="sub">1 on</div></div>
-              <div class="scene-tile"><div class="thumb"><svg viewBox="0 0 160 110"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><circle cx="50" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95"/></svg></div><div class="meta"><span class="name">Wide stage</span></div><div class="sub">6 on</div></div>
-              <div class="scene-tile"><div class="thumb"><svg viewBox="0 0 160 110"><rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2"/><circle cx="60" cy="42" r="5.5" fill="#f3a87a" opacity="0.95"/></svg></div><div class="meta"><span class="name">Dramatic key</span></div><div class="sub">1 on</div></div>
-              <div class="scene-tile add"><div class="plus">+</div><div>New scene</div></div>
+              <div class="scene-tile">
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                  </svg>
+                </div>
+                <div class="meta"><span class="name">Talking head</span></div>
+                <div class="sub">3 on</div>
+              </div>
+              <div class="scene-tile">
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <circle cx="50" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                    <circle cx="110" cy="68" r="3.5" fill="#f6c39a" opacity="0.85" />
+                  </svg>
+                </div>
+                <div class="meta"><span class="name">Two-shot</span></div>
+                <div class="sub">5 on</div>
+              </div>
+              <div class="scene-tile active">
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#3a4138" stroke-width="0.8" rx="2" />
+                    <circle cx="50" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95" />
+                    <circle cx="110" cy="68" r="4.5" fill="#f0dfb8" opacity="0.95" />
+                  </svg>
+                </div>
+                <div class="meta"><span class="name">Demo bench</span></div>
+                <div class="sub">6 on</div>
+              </div>
+              <div class="scene-tile">
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <circle cx="60" cy="42" r="2.5" fill="#ef8e5a" opacity="0.45" />
+                  </svg>
+                </div>
+                <div class="meta"><span class="name">Off air</span></div>
+                <div class="sub">1 on</div>
+              </div>
+              <div class="scene-tile">
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <circle cx="50" cy="68" r="4.5" fill="#ebe5d2" opacity="0.95" />
+                  </svg>
+                </div>
+                <div class="meta"><span class="name">Wide stage</span></div>
+                <div class="sub">6 on</div>
+              </div>
+              <div class="scene-tile">
+                <div class="thumb">
+                  <svg viewBox="0 0 160 110">
+                    <rect x="6" y="6" width="148" height="98" fill="none" stroke="#2a2f28" stroke-width="0.8" rx="2" />
+                    <circle cx="60" cy="42" r="5.5" fill="#f3a87a" opacity="0.95" />
+                  </svg>
+                </div>
+                <div class="meta"><span class="name">Dramatic key</span></div>
+                <div class="sub">1 on</div>
+              </div>
+              <div class="scene-tile add">
+                <div class="plus">+</div>
+                <div>New scene</div>
+              </div>
             </div>
 
             <div class="rail-divider"></div>
@@ -2462,12 +3806,12 @@
           </div>
 
           <!-- Plot in patch mode -->
-          <div class="lw-plot" style="background: #03060a;">
+          <div class="lw-plot" style="background: #03060a">
             <div class="plot-pill patch">
               <span class="dot"></span>
               <span class="label-mut">Patch overlay</span>
               <span class="name">Astra L</span>
-              <span style="color: var(--text-mut);">· candidate DMX 005</span>
+              <span style="color: var(--text-mut)">· candidate DMX 005</span>
               <span class="mod blue">· P to exit</span>
             </div>
             <div class="plot-overlays">
@@ -2476,56 +3820,322 @@
             </div>
             <svg class="plot-svg" viewBox="0 0 1740 1176" preserveAspectRatio="xMidYMid meet">
               <defs>
-                <radialGradient id="floorGlow3" cx="50%" cy="50%" r="60%"><stop offset="0%" stop-color="#0a1018" stop-opacity="0.4"/><stop offset="100%" stop-color="#03060a" stop-opacity="0"/></radialGradient>
-                <pattern id="backdrop3" width="14" height="14" patternUnits="userSpaceOnUse"><line x1="0" y1="14" x2="14" y2="0" stroke="#3a4138" stroke-width="0.9" opacity="0.45"/></pattern>
-                <filter id="grain3" x="0%" y="0%" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3"/><feColorMatrix type="matrix" values="0 0 0 0 0.78, 0 0 0 0 0.83, 0 0 0 0 0.87, 0 0 0 0.04 0"/></filter>
+                <radialGradient id="floorGlow3" cx="50%" cy="50%" r="60%">
+                  <stop offset="0%" stop-color="#0a1018" stop-opacity="0.4" />
+                  <stop offset="100%" stop-color="#03060a" stop-opacity="0" />
+                </radialGradient>
+                <pattern id="backdrop3" width="14" height="14" patternUnits="userSpaceOnUse">
+                  <line x1="0" y1="14" x2="14" y2="0" stroke="#3a4138" stroke-width="0.9" opacity="0.45" />
+                </pattern>
+                <filter id="grain3" x="0%" y="0%" width="100%" height="100%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3" />
+                  <feColorMatrix type="matrix" values="0 0 0 0 0.78, 0 0 0 0 0.83, 0 0 0 0 0.87, 0 0 0 0.04 0" />
+                </filter>
               </defs>
-              <rect x="0" y="0" width="1740" height="1176" fill="url(#floorGlow3)"/>
-              <rect x="0" y="0" width="1740" height="1176" filter="url(#grain3)" opacity="0.45"/>
+              <rect x="0" y="0" width="1740" height="1176" fill="url(#floorGlow3)" />
+              <rect x="0" y="0" width="1740" height="1176" filter="url(#grain3)" opacity="0.45" />
 
               <g stroke="#3f70c8" stroke-opacity="0.05" stroke-width="1">
-                <line x1="228" y1="88" x2="228" y2="1112"/><line x1="356" y1="88" x2="356" y2="1112"/><line x1="484" y1="88" x2="484" y2="1112"/><line x1="612" y1="88" x2="612" y2="1112"/><line x1="868" y1="88" x2="868" y2="1112"/><line x1="996" y1="88" x2="996" y2="1112"/><line x1="1124" y1="88" x2="1124" y2="1112"/><line x1="1252" y1="88" x2="1252" y2="1112"/><line x1="1380" y1="88" x2="1380" y2="1112"/><line x1="1508" y1="88" x2="1508" y2="1112"/>
-                <line x1="100" y1="216" x2="1640" y2="216"/><line x1="100" y1="344" x2="1640" y2="344"/><line x1="100" y1="472" x2="1640" y2="472"/><line x1="100" y1="728" x2="1640" y2="728"/><line x1="100" y1="856" x2="1640" y2="856"/><line x1="100" y1="984" x2="1640" y2="984"/>
+                <line x1="228" y1="88" x2="228" y2="1112" />
+                <line x1="356" y1="88" x2="356" y2="1112" />
+                <line x1="484" y1="88" x2="484" y2="1112" />
+                <line x1="612" y1="88" x2="612" y2="1112" />
+                <line x1="868" y1="88" x2="868" y2="1112" />
+                <line x1="996" y1="88" x2="996" y2="1112" />
+                <line x1="1124" y1="88" x2="1124" y2="1112" />
+                <line x1="1252" y1="88" x2="1252" y2="1112" />
+                <line x1="1380" y1="88" x2="1380" y2="1112" />
+                <line x1="1508" y1="88" x2="1508" y2="1112" />
+                <line x1="100" y1="216" x2="1640" y2="216" />
+                <line x1="100" y1="344" x2="1640" y2="344" />
+                <line x1="100" y1="472" x2="1640" y2="472" />
+                <line x1="100" y1="728" x2="1640" y2="728" />
+                <line x1="100" y1="856" x2="1640" y2="856" />
+                <line x1="100" y1="984" x2="1640" y2="984" />
               </g>
-              <g stroke="#3f70c8" stroke-opacity="0.13" stroke-width="1.2"><line x1="740" y1="88" x2="740" y2="1112"/><line x1="100" y1="600" x2="1640" y2="600"/></g>
+              <g stroke="#3f70c8" stroke-opacity="0.13" stroke-width="1.2">
+                <line x1="740" y1="88" x2="740" y2="1112" />
+                <line x1="100" y1="600" x2="1640" y2="600" />
+              </g>
 
-              <rect x="100" y="88" width="1540" height="1024" fill="none" stroke="#3a4138" stroke-width="2"/>
-              <rect x="100" y="80" width="1540" height="14" fill="url(#backdrop3)" stroke="#3a4138" stroke-width="1"/>
-              <text x="124" y="74" font-family="JetBrains Mono" font-size="10" fill="#5a5547" letter-spacing="3" font-weight="600">BACKDROP / CYC</text>
-              <line x1="1640" y1="800" x2="1640" y2="970" stroke="#03060a" stroke-width="6"/>
-              <text x="1656" y="888" font-family="JetBrains Mono" font-size="9" fill="#5a5547" letter-spacing="2.5" font-weight="600">DOOR</text>
-              <line x1="380" y1="1112" x2="600" y2="1112" stroke="#3f70c8" stroke-width="3" opacity="0.55"/>
-              <text x="490" y="1140" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#5a5547" letter-spacing="2.5" font-weight="600">CONTROL BOOTH</text>
+              <rect x="100" y="88" width="1540" height="1024" fill="none" stroke="#3a4138" stroke-width="2" />
+              <rect x="100" y="80" width="1540" height="14" fill="url(#backdrop3)" stroke="#3a4138" stroke-width="1" />
+              <text
+                x="124"
+                y="74"
+                font-family="JetBrains Mono"
+                font-size="10"
+                fill="#5a5547"
+                letter-spacing="3"
+                font-weight="600"
+              >
+                BACKDROP / CYC
+              </text>
+              <line x1="1640" y1="800" x2="1640" y2="970" stroke="#03060a" stroke-width="6" />
+              <text
+                x="1656"
+                y="888"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#5a5547"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                DOOR
+              </text>
+              <line x1="380" y1="1112" x2="600" y2="1112" stroke="#3f70c8" stroke-width="3" opacity="0.55" />
+              <text
+                x="490"
+                y="1140"
+                text-anchor="middle"
+                font-family="JetBrains Mono"
+                font-size="9"
+                fill="#5a5547"
+                letter-spacing="2.5"
+                font-weight="600"
+              >
+                CONTROL BOOTH
+              </text>
 
-              <rect x="780" y="380" width="180" height="38" fill="#070a07" stroke="#3a4138" stroke-width="1.5" rx="2" opacity="0.5"/>
-              <text x="870" y="404" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#5a5547" letter-spacing="2.5" font-weight="600" opacity="0.6">BENCH</text>
+              <rect
+                x="780"
+                y="380"
+                width="180"
+                height="38"
+                fill="#070a07"
+                stroke="#3a4138"
+                stroke-width="1.5"
+                rx="2"
+                opacity="0.5"
+              />
+              <text
+                x="870"
+                y="404"
+                text-anchor="middle"
+                font-family="JetBrains Mono"
+                font-size="10"
+                fill="#5a5547"
+                letter-spacing="2.5"
+                font-weight="600"
+                opacity="0.6"
+              >
+                BENCH
+              </text>
 
               <g opacity="0.4">
-                <g transform="translate(640, 720)"><circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2"/><rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1"/></g>
-                <g transform="translate(1100, 720)"><circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2"/><rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1"/></g>
-                <g transform="translate(1320, 640)"><g stroke="#7a7263" stroke-width="1.5" stroke-linecap="round"><line x1="0" y1="14" x2="-12" y2="22"/><line x1="0" y1="14" x2="12" y2="22"/></g><rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="1"/><rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5"/></g>
-                <g transform="translate(870, 540)"><rect x="-34" y="-19" width="68" height="38" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="14"/><rect x="-28" y="-14" width="56" height="28" fill="#ebe5d2" rx="9"/></g>
-                <g transform="translate(870, 130)"><rect x="-180" y="-7" width="360" height="14" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="2"/><rect x="-175" y="-4" width="350" height="8" fill="#d4dde2" rx="1"/></g>
+                <g transform="translate(640, 720)">
+                  <circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" />
+                  <rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1" />
+                </g>
+                <g transform="translate(1100, 720)">
+                  <circle cx="0" cy="0" r="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" />
+                  <rect x="-13" y="-10" width="26" height="20" fill="#f0dfb8" rx="1" />
+                </g>
+                <g transform="translate(1320, 640)">
+                  <g stroke="#7a7263" stroke-width="1.5" stroke-linecap="round">
+                    <line x1="0" y1="14" x2="-12" y2="22" />
+                    <line x1="0" y1="14" x2="12" y2="22" />
+                  </g>
+                  <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#99ba92" stroke-width="2" rx="1" />
+                  <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5" />
+                </g>
+                <g transform="translate(870, 540)">
+                  <rect
+                    x="-34"
+                    y="-19"
+                    width="68"
+                    height="38"
+                    fill="#0e110e"
+                    stroke="#99ba92"
+                    stroke-width="2"
+                    rx="14"
+                  />
+                  <rect x="-28" y="-14" width="56" height="28" fill="#ebe5d2" rx="9" />
+                </g>
+                <g transform="translate(870, 130)">
+                  <rect
+                    x="-180"
+                    y="-7"
+                    width="360"
+                    height="14"
+                    fill="#0e110e"
+                    stroke="#99ba92"
+                    stroke-width="2"
+                    rx="2"
+                  />
+                  <rect x="-175" y="-4" width="350" height="8" fill="#d4dde2" rx="1" />
+                </g>
               </g>
 
               <!-- Astra L active patch target -->
               <g transform="translate(420, 640)">
-                <circle cx="0" cy="0" r="48" fill="rgba(63, 112, 200, 0.10)" stroke="#3f70c8" stroke-width="2"/>
-                <circle cx="0" cy="0" r="48" fill="none" stroke="#3f70c8" stroke-width="0.6" opacity="0.4" transform="scale(1.18)"/>
+                <circle cx="0" cy="0" r="48" fill="rgba(63, 112, 200, 0.10)" stroke="#3f70c8" stroke-width="2" />
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="48"
+                  fill="none"
+                  stroke="#3f70c8"
+                  stroke-width="0.6"
+                  opacity="0.4"
+                  transform="scale(1.18)"
+                />
                 <g stroke="#7a7263" stroke-width="1.5" stroke-linecap="round">
-                  <line x1="0" y1="14" x2="-12" y2="22"/><line x1="0" y1="14" x2="12" y2="22"/><line x1="0" y1="14" x2="0" y2="24"/>
+                  <line x1="0" y1="14" x2="-12" y2="22" />
+                  <line x1="0" y1="14" x2="12" y2="22" />
+                  <line x1="0" y1="14" x2="0" y2="24" />
                 </g>
-                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#3f70c8" stroke-width="2.5" rx="1"/>
-                <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5"/>
+                <rect x="-14" y="-9" width="28" height="22" fill="#0e110e" stroke="#3f70c8" stroke-width="2.5" rx="1" />
+                <rect x="-10" y="-6" width="20" height="16" fill="#f0dfb8" rx="0.5" />
               </g>
 
               <!-- DMX address tags -->
-              <foreignObject x="540" y="608" width="160" height="32"><div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;display:inline-block;background:rgba(7,12,22,0.94);border:1px solid #3f70c8;border-radius:4px;padding:6px 9px;font-family:'JetBrains Mono';font-size:10px;color:#6a93dc;font-weight:600;letter-spacing:0.1em;box-shadow:0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(250,246,230,0.08);"><span style="background:#3f70c8;color:#faf6e6;padding:1px 6px;border-radius:3px;margin-right:7px;">005</span>ASTRA L</div></foreignObject>
-              <foreignObject x="540" y="688" width="140" height="32"><div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;display:inline-block;background:rgba(8,10,8,0.85);border:1px solid #3a4138;border-radius:4px;padding:6px 9px;font-family:'JetBrains Mono';font-size:10px;color:#8a8470;font-weight:600;letter-spacing:0.1em;box-shadow:0 4px 12px rgba(0,0,0,0.5);"><span style="background:#3a4138;color:#d4cdb3;padding:1px 6px;border-radius:3px;margin-right:7px;">001</span>APOLLO L</div></foreignObject>
-              <foreignObject x="1170" y="688" width="140" height="32"><div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;display:inline-block;background:rgba(8,10,8,0.85);border:1px solid #3a4138;border-radius:4px;padding:6px 9px;font-family:'JetBrains Mono';font-size:10px;color:#8a8470;font-weight:600;letter-spacing:0.1em;box-shadow:0 4px 12px rgba(0,0,0,0.5);"><span style="background:#3a4138;color:#d4cdb3;padding:1px 6px;border-radius:3px;margin-right:7px;">003</span>APOLLO R</div></foreignObject>
-              <foreignObject x="1390" y="608" width="140" height="32"><div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;display:inline-block;background:rgba(8,10,8,0.85);border:1px solid #3a4138;border-radius:4px;padding:6px 9px;font-family:'JetBrains Mono';font-size:10px;color:#8a8470;font-weight:600;letter-spacing:0.1em;box-shadow:0 4px 12px rgba(0,0,0,0.5);"><span style="background:#3a4138;color:#d4cdb3;padding:1px 6px;border-radius:3px;margin-right:7px;">007</span>ASTRA R</div></foreignObject>
-              <foreignObject x="950" y="510" width="160" height="32"><div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;display:inline-block;background:rgba(8,10,8,0.85);border:1px solid #3a4138;border-radius:4px;padding:6px 9px;font-family:'JetBrains Mono';font-size:10px;color:#8a8470;font-weight:600;letter-spacing:0.1em;box-shadow:0 4px 12px rgba(0,0,0,0.5);"><span style="background:#3a4138;color:#d4cdb3;padding:1px 6px;border-radius:3px;margin-right:7px;">009</span>INFINIMAT</div></foreignObject>
-              <foreignObject x="1080" y="100" width="160" height="32"><div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;display:inline-block;background:rgba(8,10,8,0.85);border:1px solid #3a4138;border-radius:4px;padding:6px 9px;font-family:'JetBrains Mono';font-size:10px;color:#8a8470;font-weight:600;letter-spacing:0.1em;box-shadow:0 4px 12px rgba(0,0,0,0.5);"><span style="background:#3a4138;color:#d4cdb3;padding:1px 6px;border-radius:3px;margin-right:7px;">011</span>INFINIBAR</div></foreignObject>
+              <foreignObject x="540" y="608" width="160" height="32"
+                ><div
+                  xmlns="http://www.w3.org/1999/xhtml"
+                  style="
+                    position: relative;
+                    display: inline-block;
+                    background: rgba(7, 12, 22, 0.94);
+                    border: 1px solid #3f70c8;
+                    border-radius: 4px;
+                    padding: 6px 9px;
+                    font-family: &quot;JetBrains Mono&quot;;
+                    font-size: 10px;
+                    color: #6a93dc;
+                    font-weight: 600;
+                    letter-spacing: 0.1em;
+                    box-shadow:
+                      0 4px 12px rgba(0, 0, 0, 0.5),
+                      inset 0 1px 0 rgba(250, 246, 230, 0.08);
+                  "
+                >
+                  <span
+                    style="background: #3f70c8; color: #faf6e6; padding: 1px 6px; border-radius: 3px; margin-right: 7px"
+                    >005</span
+                  >ASTRA L
+                </div></foreignObject
+              >
+              <foreignObject x="540" y="688" width="140" height="32"
+                ><div
+                  xmlns="http://www.w3.org/1999/xhtml"
+                  style="
+                    position: relative;
+                    display: inline-block;
+                    background: rgba(8, 10, 8, 0.85);
+                    border: 1px solid #3a4138;
+                    border-radius: 4px;
+                    padding: 6px 9px;
+                    font-family: &quot;JetBrains Mono&quot;;
+                    font-size: 10px;
+                    color: #8a8470;
+                    font-weight: 600;
+                    letter-spacing: 0.1em;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                  "
+                >
+                  <span
+                    style="background: #3a4138; color: #d4cdb3; padding: 1px 6px; border-radius: 3px; margin-right: 7px"
+                    >001</span
+                  >APOLLO L
+                </div></foreignObject
+              >
+              <foreignObject x="1170" y="688" width="140" height="32"
+                ><div
+                  xmlns="http://www.w3.org/1999/xhtml"
+                  style="
+                    position: relative;
+                    display: inline-block;
+                    background: rgba(8, 10, 8, 0.85);
+                    border: 1px solid #3a4138;
+                    border-radius: 4px;
+                    padding: 6px 9px;
+                    font-family: &quot;JetBrains Mono&quot;;
+                    font-size: 10px;
+                    color: #8a8470;
+                    font-weight: 600;
+                    letter-spacing: 0.1em;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                  "
+                >
+                  <span
+                    style="background: #3a4138; color: #d4cdb3; padding: 1px 6px; border-radius: 3px; margin-right: 7px"
+                    >003</span
+                  >APOLLO R
+                </div></foreignObject
+              >
+              <foreignObject x="1390" y="608" width="140" height="32"
+                ><div
+                  xmlns="http://www.w3.org/1999/xhtml"
+                  style="
+                    position: relative;
+                    display: inline-block;
+                    background: rgba(8, 10, 8, 0.85);
+                    border: 1px solid #3a4138;
+                    border-radius: 4px;
+                    padding: 6px 9px;
+                    font-family: &quot;JetBrains Mono&quot;;
+                    font-size: 10px;
+                    color: #8a8470;
+                    font-weight: 600;
+                    letter-spacing: 0.1em;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                  "
+                >
+                  <span
+                    style="background: #3a4138; color: #d4cdb3; padding: 1px 6px; border-radius: 3px; margin-right: 7px"
+                    >007</span
+                  >ASTRA R
+                </div></foreignObject
+              >
+              <foreignObject x="950" y="510" width="160" height="32"
+                ><div
+                  xmlns="http://www.w3.org/1999/xhtml"
+                  style="
+                    position: relative;
+                    display: inline-block;
+                    background: rgba(8, 10, 8, 0.85);
+                    border: 1px solid #3a4138;
+                    border-radius: 4px;
+                    padding: 6px 9px;
+                    font-family: &quot;JetBrains Mono&quot;;
+                    font-size: 10px;
+                    color: #8a8470;
+                    font-weight: 600;
+                    letter-spacing: 0.1em;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                  "
+                >
+                  <span
+                    style="background: #3a4138; color: #d4cdb3; padding: 1px 6px; border-radius: 3px; margin-right: 7px"
+                    >009</span
+                  >INFINIMAT
+                </div></foreignObject
+              >
+              <foreignObject x="1080" y="100" width="160" height="32"
+                ><div
+                  xmlns="http://www.w3.org/1999/xhtml"
+                  style="
+                    position: relative;
+                    display: inline-block;
+                    background: rgba(8, 10, 8, 0.85);
+                    border: 1px solid #3a4138;
+                    border-radius: 4px;
+                    padding: 6px 9px;
+                    font-family: &quot;JetBrains Mono&quot;;
+                    font-size: 10px;
+                    color: #8a8470;
+                    font-weight: 600;
+                    letter-spacing: 0.1em;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                  "
+                >
+                  <span
+                    style="background: #3a4138; color: #d4cdb3; padding: 1px 6px; border-radius: 3px; margin-right: 7px"
+                    >011</span
+                  >INFINIBAR
+                </div></foreignObject
+              >
             </svg>
           </div>
 
@@ -2540,26 +4150,36 @@
             <div class="insp-body">
               <div class="insp-eyebrow blue">Commissioning</div>
               <h2 class="insp-title">Astra L</h2>
-              <p class="insp-sub">
-                Litepanels Astra Bi-Color · 2-channel · stand-mounted, stage left.
-              </p>
+              <p class="insp-sub">Litepanels Astra Bi-Color · 2-channel · stand-mounted, stage left.</p>
 
-              <div class="insp-section" style="border-top: none; padding-top: 0; margin-top: 0;">
+              <div class="insp-section" style="border-top: none; padding-top: 0; margin-top: 0">
                 <div class="frow">
                   <span class="l">DMX start</span>
-                  <div class="ctrl"><div class="field-input">005</div><span class="field-suffix">/ 512</span></div>
+                  <div class="ctrl">
+                    <div class="field-input">005</div>
+                    <span class="field-suffix">/ 512</span>
+                  </div>
                 </div>
                 <div class="frow">
                   <span class="l">Channels</span>
-                  <div class="ctrl"><div class="field-input">005 – 006</div><span class="field-suffix">2 ch</span></div>
+                  <div class="ctrl">
+                    <div class="field-input">005 – 006</div>
+                    <span class="field-suffix">2 ch</span>
+                  </div>
                 </div>
                 <div class="frow">
                   <span class="l">Rig height</span>
-                  <div class="ctrl"><div class="field-input">2.70</div><span class="field-suffix">m</span></div>
+                  <div class="ctrl">
+                    <div class="field-input">2.70</div>
+                    <span class="field-suffix">m</span>
+                  </div>
                 </div>
                 <div class="frow">
                   <span class="l">Beam angle</span>
-                  <div class="ctrl"><div class="field-input">50</div><span class="field-suffix">°</span></div>
+                  <div class="ctrl">
+                    <div class="field-input">50</div>
+                    <span class="field-suffix">°</span>
+                  </div>
                 </div>
                 <button class="identify-btn">▣ Identify · 1 s burst</button>
               </div>
@@ -2567,18 +4187,66 @@
               <div class="insp-section">
                 <div class="sh blue">DMX peek · live · channels 1–12</div>
                 <div class="dmx-peek">
-                  <div class="dmx-cell"><div class="ch">001</div><div class="hex">E0</div><div class="bar" style="--bar: 88%"></div></div>
-                  <div class="dmx-cell"><div class="ch">002</div><div class="hex">FF</div><div class="bar" style="--bar: 100%"></div></div>
-                  <div class="dmx-cell"><div class="ch">003</div><div class="hex">E0</div><div class="bar" style="--bar: 88%"></div></div>
-                  <div class="dmx-cell"><div class="ch">004</div><div class="hex">FF</div><div class="bar" style="--bar: 100%"></div></div>
-                  <div class="dmx-cell live"><div class="ch">005</div><div class="hex">BF</div><div class="bar" style="--bar: 75%"></div></div>
-                  <div class="dmx-cell live"><div class="ch">006</div><div class="hex">9A</div><div class="bar" style="--bar: 60%"></div></div>
-                  <div class="dmx-cell"><div class="ch">007</div><div class="hex">BF</div><div class="bar" style="--bar: 75%"></div></div>
-                  <div class="dmx-cell"><div class="ch">008</div><div class="hex">9A</div><div class="bar" style="--bar: 60%"></div></div>
-                  <div class="dmx-cell"><div class="ch">009</div><div class="hex">EB</div><div class="bar" style="--bar: 92%"></div></div>
-                  <div class="dmx-cell"><div class="ch">010</div><div class="hex">D0</div><div class="bar" style="--bar: 81%"></div></div>
-                  <div class="dmx-cell"><div class="ch">011</div><div class="hex">B3</div><div class="bar" style="--bar: 70%"></div></div>
-                  <div class="dmx-cell"><div class="ch">012</div><div class="hex">A0</div><div class="bar" style="--bar: 62%"></div></div>
+                  <div class="dmx-cell">
+                    <div class="ch">001</div>
+                    <div class="hex">E0</div>
+                    <div class="bar" style="--bar: 88%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">002</div>
+                    <div class="hex">FF</div>
+                    <div class="bar" style="--bar: 100%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">003</div>
+                    <div class="hex">E0</div>
+                    <div class="bar" style="--bar: 88%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">004</div>
+                    <div class="hex">FF</div>
+                    <div class="bar" style="--bar: 100%"></div>
+                  </div>
+                  <div class="dmx-cell live">
+                    <div class="ch">005</div>
+                    <div class="hex">BF</div>
+                    <div class="bar" style="--bar: 75%"></div>
+                  </div>
+                  <div class="dmx-cell live">
+                    <div class="ch">006</div>
+                    <div class="hex">9A</div>
+                    <div class="bar" style="--bar: 60%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">007</div>
+                    <div class="hex">BF</div>
+                    <div class="bar" style="--bar: 75%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">008</div>
+                    <div class="hex">9A</div>
+                    <div class="bar" style="--bar: 60%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">009</div>
+                    <div class="hex">EB</div>
+                    <div class="bar" style="--bar: 92%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">010</div>
+                    <div class="hex">D0</div>
+                    <div class="bar" style="--bar: 81%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">011</div>
+                    <div class="hex">B3</div>
+                    <div class="bar" style="--bar: 70%"></div>
+                  </div>
+                  <div class="dmx-cell">
+                    <div class="ch">012</div>
+                    <div class="hex">A0</div>
+                    <div class="bar" style="--bar: 62%"></div>
+                  </div>
                 </div>
               </div>
 
@@ -2593,7 +4261,9 @@
           <div class="lw-health">
             <div class="health-item">
               <div class="lbl">Bridge</div>
-              <div class="v"><span class="dot ok"></span><span class="ok-text">Reachable</span><small>· 28 ms · Litepanels</small></div>
+              <div class="v">
+                <span class="dot ok"></span><span class="ok-text">Reachable</span><small>· 28 ms · Litepanels</small>
+              </div>
             </div>
             <div class="health-item">
               <div class="lbl">Universe</div>
@@ -2622,12 +4292,19 @@
 
       <div class="notes">
         <span class="tag blue">C</span>
-        <b>Patch context surfaces DMX in SSE Blue.</b> Plot grid picks up cyan-blue tint to distinguish patch mode from normal recall. Active patch target gets the blue ring; address tags float in blue chrome with shadow lift; DMX peek strip in inspector marks live channels (005 – 006) in blue with subtle glow. Identify button is blue-bordered with a soft inner glow. The rail (Master · Scenes · Groups) dims as a single block — control returns when patch mode exits via <em>P</em>. The Health bar stays bright across the bottom; bridge and universe are still actively monitored even during commissioning. <em>This is the only context where DMX hex appears in the standing UI.</em>
+        <b>Patch context surfaces DMX in SSE Blue.</b> Plot grid picks up cyan-blue tint to distinguish patch mode from
+        normal recall. Active patch target gets the blue ring; address tags float in blue chrome with shadow lift; DMX
+        peek strip in inspector marks live channels (005 – 006) in blue with subtle glow. Identify button is
+        blue-bordered with a soft inner glow. The rail (Master · Scenes · Groups) dims as a single block — control
+        returns when patch mode exits via <em>P</em>. The Health bar stays bright across the bottom; bridge and universe
+        are still actively monitored even during commissioning.
+        <em>This is the only context where DMX hex appears in the standing UI.</em>
       </div>
 
       <!-- Footer -->
       <div class="footer">
-        SSE ExEd Studio Control · Lighting workspace · Direction D — Scene desk · v6 (layout reorganised) · 2026-04-27 · 2560×1440 review · supersedes Cr (docs/redesign/lighting.md)
+        SSE ExEd Studio Control · Lighting workspace · Direction D — Scene desk · v6 (layout reorganised) · 2026-04-27 ·
+        2560×1440 review · supersedes Cr (docs/redesign/lighting.md)
       </div>
     </div>
   </body>

@@ -79,11 +79,7 @@ export function AppShellFrame({
         </div>
         <div className={styles.shellMeta}>
           {monitorItems.map((item, index) => (
-            <StatusPill
-              key={`${item.status}:${item.label}:${index}`}
-              label={item.label}
-              status={item.status}
-            />
+            <StatusPill key={`${item.status}:${item.label}:${index}`} label={item.label} status={item.status} />
           ))}
           {clock ? <span className={styles.clock}>{clock}</span> : null}
         </div>

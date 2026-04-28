@@ -20,12 +20,7 @@ export type { DialogProps } from "./components/Dialog";
 export { EmptyState, DegradedState } from "./components/OperationalState";
 export type { DegradedStateProps, EmptyStateProps } from "./components/OperationalState";
 export { HealthBar, HealthItem } from "./components/HealthBar";
-export type {
-  HealthBarHint,
-  HealthBarItemData,
-  HealthBarProps,
-  HealthItemProps,
-} from "./components/HealthBar";
+export type { HealthBarHint, HealthBarItemData, HealthBarProps, HealthItemProps } from "./components/HealthBar";
 export { IconButton } from "./components/IconButton";
 export type { IconButtonProps, IconButtonSize, IconButtonTone } from "./components/IconButton";
 export { InspectorPanel, InspectorSection } from "./components/InspectorPanel";

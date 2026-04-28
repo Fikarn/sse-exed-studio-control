@@ -146,17 +146,13 @@ export const PlotPillStates: StoryObj = {
         <div style={row}>
           <PlotPill state="default">
             <span style={{ color: "var(--color-brand-text-muted)" }}>Recall:</span>
-            <span style={{ fontFamily: "var(--font-family-display)", fontWeight: 600, fontSize: 16 }}>
-              Standup
-            </span>
+            <span style={{ fontFamily: "var(--font-family-display)", fontWeight: 600, fontSize: 16 }}>Standup</span>
           </PlotPill>
         </div>
         <div style={row}>
           <PlotPill state="modified">
             <span style={{ color: "var(--color-brand-text-muted)" }}>Recall:</span>
-            <span style={{ fontFamily: "var(--font-family-display)", fontWeight: 600, fontSize: 16 }}>
-              Standup
-            </span>
+            <span style={{ fontFamily: "var(--font-family-display)", fontWeight: 600, fontSize: 16 }}>Standup</span>
             <span
               style={{
                 fontFamily: "var(--font-family-mono)",
