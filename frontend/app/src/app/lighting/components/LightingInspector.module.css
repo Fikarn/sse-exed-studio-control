@@ -58,18 +58,24 @@
 
 .empty {
   margin: 0;
-  padding: 12px;
+  padding: 14px 16px;
   font-family: var(--font-family-ui);
+  font-feature-settings: "ss01", "cv01", "cv02", "cv11";
   font-size: 12px;
-  color: var(--color-brand-text-muted);
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--color-brand-text-secondary);
   background: var(--color-bg-soft);
   border-radius: var(--radius-tight-sm);
+  text-align: center;
   border: 1px dashed var(--color-bg-stroke);
 }
 
 .helpText {
   font-family: var(--font-family-ui);
+  font-feature-settings: "ss01", "cv01", "cv02", "cv11";
   font-size: 11px;
+  line-height: 1.5;
   color: var(--color-brand-text-muted);
   margin: 0;
 }
