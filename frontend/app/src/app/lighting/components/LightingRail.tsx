@@ -56,6 +56,7 @@ export function LightingRail({
 
       <RailHead
         label="Scenes"
+        count={`${scenes.length} saved`}
         action={
           <button type="button" className={styles.headButton} onClick={onSaveScene}>
             Save (S)
@@ -69,11 +70,15 @@ export function LightingRail({
         sceneThumbs={sceneThumbs}
         lastRecalledLabel={lastRecalledLabel}
         onRecall={onRecallScene}
+        onAddScene={onSaveScene}
       />
 
       <RailDivider />
 
-      <RailHead label="Groups" />
+      <RailHead
+        label="Groups"
+        count={groups.length > 0 ? `${groups.filter((group) => group.on).length} / ${groups.length} on` : undefined}
+      />
       <GroupRail groups={groups} onTogglePower={onToggleGroupPower} />
     </aside>
   );

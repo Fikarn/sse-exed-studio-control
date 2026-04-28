@@ -36,6 +36,16 @@
   font-weight: 600;
 }
 
+.headCount {
+  margin-right: auto;
+  margin-left: 8px;
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--color-brand-text-muted);
+}
+
 .headAction {
   display: inline-flex;
   align-items: center;
@@ -246,6 +256,38 @@
   border-radius: var(--radius-tight-sm);
   background: var(--color-bg-deep);
   border: 1px dashed var(--color-bg-border);
+}
+
+.tileAdd {
+  appearance: none;
+  background: var(--color-bg-soft);
+  border: 1px dashed var(--color-bg-stroke);
+  border-radius: var(--radius-tight-md);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  color: var(--color-brand-text-secondary);
+  width: 100%;
+  text-align: left;
+  transition:
+    border-color var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
+    background var(--motion-duration-fast) ease;
+}
+
+.tileAdd:hover {
+  border-color: var(--color-brand-green-border);
+  color: var(--color-brand-green);
+  background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, rgba(153, 186, 146, 0.04) 100%);
+}
+
+.tileAdd > svg {
+  justify-self: center;
 }
 
 .empty {

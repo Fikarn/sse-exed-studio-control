@@ -91,5 +91,5 @@ export function LightingHealthBar({
     },
   ];
 
-  return <HealthBar items={items} hint={{ kbd: "?", label: "Shortcuts" }} />;
+  return <HealthBar items={items} hint={{ kbd: "⌘ M", label: "full DMX monitor" }} />;
 }

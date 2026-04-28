@@ -1,6 +1,6 @@
 .shell {
   display: grid;
-  grid-template-rows: var(--size-toolbar-height, 56px) auto minmax(0, 1fr) var(--size-healthBarHeight, 40px);
+  grid-template-rows: var(--size-toolbar-height, 44px) auto minmax(0, 1fr) var(--size-health-bar-height, 64px);
   height: 100%;
   background: var(--color-bg-canvas);
   color: var(--color-brand-text-primary);
