@@ -9,12 +9,32 @@ export interface GroupChipProps {
   on: boolean;
   level: number;
   drifted: boolean;
+  /** Signed delta vs. the active scene's saved level for this group (% points). */
+  levelDelta?: number;
   onTogglePower: (id: string, on: boolean) => void;
 }
 
-export function GroupChip({ id, name, fixtureCount, on, level, drifted, onTogglePower }: GroupChipProps) {
+export function GroupChip({
+  id,
+  name,
+  fixtureCount,
+  on,
+  level,
+  drifted,
+  levelDelta = 0,
+  onTogglePower,
+}: GroupChipProps) {
   const className = on ? `${styles.groupChip} ${styles.groupChipOn}` : styles.groupChip;
   const levelClass = drifted ? `${styles.groupChipLevel} ${styles.groupChipLevelDrifted}` : styles.groupChipLevel;
+  // Surface direction + magnitude when the live level diverges from the
+  // active scene's saved level by ≥ 1 % point. ▲ for above, ▼ for below.
+  const meaningfulDelta = drifted && Math.abs(levelDelta) >= 1;
+  const arrow = levelDelta > 0 ? "▲" : "▼";
+  const deltaLabel = meaningfulDelta
+    ? ` ${arrow} ${levelDelta > 0 ? "+" : ""}${Math.round(levelDelta)}`
+    : drifted
+      ? " ▲"
+      : "";
   return (
     <button
       type="button"
@@ -28,7 +48,7 @@ export function GroupChip({ id, name, fixtureCount, on, level, drifted, onToggle
       <span className={styles.groupChipName}>{name}</span>
       {on ? (
         <span className={levelClass}>
-          {level}%{drifted ? <span aria-hidden="true">{` ▲`}</span> : null}
+          {level}%{deltaLabel ? <span aria-hidden="true">{deltaLabel}</span> : null}
         </span>
       ) : null}
     </button>

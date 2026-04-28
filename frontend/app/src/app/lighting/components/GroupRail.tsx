@@ -8,6 +8,7 @@ export interface GroupRailEntry {
   on: boolean;
   level: number;
   drifted: boolean;
+  levelDelta?: number;
 }
 
 export interface GroupRailProps {
@@ -39,6 +40,7 @@ export function GroupRail({ groups, searchQuery = "", onTogglePower }: GroupRail
             on={group.on}
             level={group.level}
             drifted={group.drifted}
+            levelDelta={group.levelDelta}
             onTogglePower={onTogglePower}
           />
         </div>

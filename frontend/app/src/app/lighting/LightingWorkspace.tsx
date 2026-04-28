@@ -239,6 +239,18 @@ export function LightingWorkspaceSurface({
             return false;
           })
         : false;
+      // Saved-scene reference level: average intensity across this group's
+      // fixtures that are on in the active scene's saved state. Used to
+      // surface the direction + magnitude of drift on the chip.
+      const sceneOnIntensities = groupFixtures
+        .map((fixture) => sceneStateById.get(fixture.id))
+        .filter((state): state is NonNullable<typeof state> => Boolean(state?.on))
+        .map((state) => state.intensity);
+      const sceneLevel =
+        sceneOnIntensities.length > 0
+          ? Math.round(sceneOnIntensities.reduce((sum, n) => sum + n, 0) / sceneOnIntensities.length)
+          : 0;
+      const levelDelta = drifted ? level - sceneLevel : 0;
       return {
         id: group.id,
         name: group.name,
@@ -246,6 +258,7 @@ export function LightingWorkspaceSurface({
         on: allOn,
         level,
         drifted,
+        levelDelta,
       };
     });
   }, [groupEntries, fixtureEntries, activeScene]);
@@ -571,6 +584,23 @@ export function LightingWorkspaceSurface({
     setBusyAction(`fixture-patch:${fixtureId}`);
     try {
       await store.updateLightingFixture({ fixtureId, dmxStartAddress });
+      // Auto-advance to the next unpaired fixture (dmxStartAddress < 1).
+      // Excludes the just-patched id since the snapshot may not have caught
+      // up. If none remain, exit patch mode.
+      const remaining = fixtures.filter((candidate) => candidate.id !== fixtureId && candidate.dmxStartAddress < 1);
+      if (remaining.length > 0) {
+        const next = remaining[0]!;
+        try {
+          await store.updateLightingSettings({ selectedFixtureId: next.id });
+          setExtraSelectedFixtureIds(new Set());
+          setFeedback({ message: `Patched. Now patching ‘${next.name}’.`, tone: "ok" });
+        } catch (error) {
+          reportError(error, "Auto-advance to next fixture failed.");
+        }
+      } else {
+        setUiMode("recall");
+        setFeedback({ message: "All fixtures patched.", tone: "ok" });
+      }
     } catch (error) {
       reportError(error, "Patch update failed.");
     } finally {
