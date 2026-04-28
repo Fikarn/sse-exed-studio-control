@@ -9,6 +9,7 @@ export interface MasterCardProps {
   bridgeReachable: boolean;
   onGrandMasterChange: (value: number) => void;
   onEmergencyCut: () => void;
+  eyebrow?: string;
 }
 
 export function MasterCard({
@@ -17,6 +18,7 @@ export function MasterCard({
   bridgeReachable,
   onGrandMasterChange,
   onEmergencyCut,
+  eyebrow,
 }: MasterCardProps) {
   const handleSlider = (event: ChangeEvent<HTMLInputElement>) => {
     const value = Number(event.target.value);
@@ -29,6 +31,7 @@ export function MasterCard({
 
   return (
     <section className={styles.master} aria-label="Lighting master controls">
+      {eyebrow ? <span className={styles.masterEyebrow}>{eyebrow}</span> : null}
       <header className={styles.masterHeader}>
         <span className={styles.masterLabel}>Master</span>
         <span className={styles.masterValue}>{Math.round(grandMaster)} %</span>

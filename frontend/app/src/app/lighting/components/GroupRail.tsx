@@ -6,6 +6,8 @@ export interface GroupRailEntry {
   name: string;
   fixtureCount: number;
   on: boolean;
+  level: number;
+  drifted: boolean;
 }
 
 export interface GroupRailProps {
@@ -27,6 +29,8 @@ export function GroupRail({ groups, onTogglePower }: GroupRailProps) {
             name={group.name}
             fixtureCount={group.fixtureCount}
             on={group.on}
+            level={group.level}
+            drifted={group.drifted}
             onTogglePower={onTogglePower}
           />
         </div>

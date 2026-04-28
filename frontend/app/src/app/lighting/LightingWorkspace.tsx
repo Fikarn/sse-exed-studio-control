@@ -151,21 +151,41 @@ export function LightingWorkspaceSurface({
     setActiveTabOverride(null);
   }, [uiMode, persistedSelectedFixtureId, selectedGroupId]);
 
-  // Group rail entries: GroupRailEntry takes id/name/fixtureCount/on.
-  const railGroupEntries = useMemo(
-    () =>
-      groupEntries.map((group) => {
-        const groupFixtures = fixtureEntries.filter((fixture) => fixture.groupId === group.id);
-        const onFixtures = groupFixtures.filter((fixture) => fixture.on === true).length;
-        return {
-          id: group.id,
-          name: group.name,
-          fixtureCount: group.fixtureCount,
-          on: groupFixtures.length > 0 && onFixtures === groupFixtures.length,
-        };
-      }),
-    [groupEntries, fixtureEntries]
-  );
+  // Group rail entries: GroupRailEntry needs id/name/fixtureCount/on/level/drifted.
+  // - level: average intensity across the group's currently-on fixtures (0 when
+  //   the group is fully off).
+  // - drifted: any of the group's fixtures has live state diverging from the
+  //   active scene's saved state (intensity/cct/on). Yellow signal in the chip.
+  const railGroupEntries = useMemo(() => {
+    const sceneStateById = new Map(activeScene?.fixtureStates.map((state) => [state.fixtureId, state]) ?? []);
+    return groupEntries.map((group) => {
+      const groupFixtures = fixtureEntries.filter((fixture) => fixture.groupId === group.id);
+      const onFixtures = groupFixtures.filter((fixture) => fixture.on === true);
+      const allOn = groupFixtures.length > 0 && onFixtures.length === groupFixtures.length;
+      const level =
+        onFixtures.length > 0
+          ? Math.round(onFixtures.reduce((sum, fixture) => sum + fixture.intensity, 0) / onFixtures.length)
+          : 0;
+      const drifted = activeScene
+        ? groupFixtures.some((fixture) => {
+            const sceneState = sceneStateById.get(fixture.id);
+            if (!sceneState) return false;
+            if (sceneState.on !== fixture.on) return true;
+            if (sceneState.on && Math.abs(sceneState.intensity - fixture.intensity) > 0.5) return true;
+            if (sceneState.on && Math.abs(sceneState.cct - fixture.cct) > 25) return true;
+            return false;
+          })
+        : false;
+      return {
+        id: group.id,
+        name: group.name,
+        fixtureCount: group.fixtureCount,
+        on: allOn,
+        level,
+        drifted,
+      };
+    });
+  }, [groupEntries, fixtureEntries, activeScene]);
 
   const fixturesPatched = fixtureEntries.filter((fixture) => fixture.dmxStartAddress > 0).length;
 
@@ -488,6 +508,10 @@ export function LightingWorkspaceSurface({
           onSaveScene={handleSaveScene}
           groups={railGroupEntries}
           onToggleGroupPower={handleToggleGroupPower}
+          patchMode={uiMode === "patch"}
+          isSceneModified={isSceneModified}
+          onResaveScene={handleResaveScene}
+          onRevertScene={activeSceneId ? () => void handleRecallScene(activeSceneId) : undefined}
         />
 
         <main className={styles.stage}>
