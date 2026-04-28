@@ -190,50 +190,9 @@ export function fallbackFixturePosition(index: number) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Stage section bins. The keyboard `1`-`5` shortcuts pivot between these,
-// and the stage plot uses them to decide which fixtures glow when a section
-// is "active".
-// ---------------------------------------------------------------------------
-
-export interface LightingSectionDefinition {
-  id: string;
-  key: string;
-  label: string;
-  xMax: number;
-  xMin: number;
-  yMax: number;
-  yMin: number;
-}
-
-export const LIGHTING_SECTION_DEFINITIONS: LightingSectionDefinition[] = [
-  { id: "stage-left", key: "1", label: "Stage Left", xMin: 0, xMax: 0.34, yMin: 0, yMax: 1 },
-  { id: "center-line", key: "2", label: "Center Line", xMin: 0.34, xMax: 0.66, yMin: 0, yMax: 1 },
-  { id: "stage-right", key: "3", label: "Stage Right", xMin: 0.66, xMax: 1, yMin: 0, yMax: 1 },
-  { id: "upstage", key: "4", label: "Upstage", xMin: 0, xMax: 1, yMin: 0, yMax: 0.42 },
-  { id: "downstage", key: "5", label: "Downstage", xMin: 0, xMax: 1, yMin: 0.42, yMax: 1 },
-];
-
-export function fixtureMatchesLightingSection(
-  fixture: { spatialX?: number; spatialY?: number },
-  section: LightingSectionDefinition
-) {
-  if (typeof fixture.spatialX !== "number" || typeof fixture.spatialY !== "number") {
-    return false;
-  }
-
-  return (
-    fixture.spatialX >= section.xMin &&
-    fixture.spatialX <= section.xMax &&
-    fixture.spatialY >= section.yMin &&
-    fixture.spatialY <= section.yMax
-  );
-}
-
-export function buildLightingSections(
-  fixtures: Array<{ spatialX?: number; spatialY?: number }>
-): LightingSectionDefinition[] {
-  return LIGHTING_SECTION_DEFINITIONS.filter((section) =>
-    fixtures.some((fixture) => fixtureMatchesLightingSection(fixture, section))
-  );
-}
+// Stage section helpers (LIGHTING_SECTION_DEFINITIONS / fixtureMatchesLightingSection /
+// buildLightingSections) were removed in PR 3 — Direction D's Scene desk
+// recall model does not bin fixtures by stage section. The persisted
+// `app.shell.lighting.currentSectionId` blob is left untouched so older
+// engine binaries keep their value; PR 4 will purge the storage key alongside
+// the cue-model strip if no consumer surfaces.
