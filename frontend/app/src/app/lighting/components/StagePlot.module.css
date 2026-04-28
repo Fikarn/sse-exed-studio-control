@@ -29,6 +29,12 @@
   width: 100%;
   height: 100%;
   display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.plotSvgPanning {
+  cursor: grabbing;
 }
 
 /* Plot pill — top-left "Active scene · {name}" overlay */

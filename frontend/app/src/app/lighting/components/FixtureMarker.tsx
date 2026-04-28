@@ -80,6 +80,7 @@ export function FixtureMarker({
 
   return (
     <g
+      onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
         onSelect(id);

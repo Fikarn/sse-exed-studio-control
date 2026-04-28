@@ -17,6 +17,7 @@ import {
   isEditableTarget,
   type SnapshotRecord,
 } from "../shellData";
+import { ColumnResizer } from "./components/ColumnResizer";
 import { LightingHealthBar } from "./components/LightingHealthBar";
 import { LightingInspector, deriveInspectorTab, type LightingUiMode } from "./components/LightingInspector";
 import type { InspectorTab } from "./components/LightingInspectorTabs";
@@ -24,6 +25,7 @@ import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
 import { StagePlot } from "./components/StagePlot";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
+import { useResizableColumns } from "./useResizableColumns";
 import styles from "./LightingWorkspace.module.css";
 
 interface LightingWorkspaceSurfaceProps {
@@ -93,6 +95,8 @@ export function LightingWorkspaceSurface({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [grandMaster, setGrandMaster] = useState(100);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  const columns = useResizableColumns();
 
   // Active scene = the most recently recalled scene (engine-tracked) falling
   // back to the persisted selectedSceneId. Kept lean — no persisted "active
@@ -505,7 +509,13 @@ export function LightingWorkspaceSurface({
         </div>
       ) : null}
 
-      <div className={styles.body}>
+      <div
+        className={`${styles.body} ${columns.isResizing ? styles.bodyResizing : ""}`}
+        style={{
+          ["--lighting-rail-width" as string]: `${columns.railWidth}px`,
+          ["--lighting-inspector-width" as string]: `${columns.inspectorWidth}px`,
+        }}
+      >
         <LightingRail
           grandMaster={grandMaster}
           masterEnabled={bridgeReachable}
@@ -529,6 +539,8 @@ export function LightingWorkspaceSurface({
           onRevertScene={activeSceneId ? () => void handleRecallScene(activeSceneId) : undefined}
         />
 
+        <ColumnResizer ariaLabel="Resize scene rail" onPointerDown={columns.startResize("rail")} />
+
         <main className={styles.stage}>
           <StagePlot
             fixtures={fixtures}
@@ -539,6 +551,8 @@ export function LightingWorkspaceSurface({
             onSelectFixture={(id) => void handleSelectFixture(id)}
           />
         </main>
+
+        <ColumnResizer ariaLabel="Resize inspector" onPointerDown={columns.startResize("inspector")} />
 
         <LightingInspector
           uiMode={uiMode}
