@@ -19,6 +19,13 @@ export { Dialog } from "./components/Dialog";
 export type { DialogProps } from "./components/Dialog";
 export { EmptyState, DegradedState } from "./components/OperationalState";
 export type { DegradedStateProps, EmptyStateProps } from "./components/OperationalState";
+export { HealthBar, HealthItem } from "./components/HealthBar";
+export type {
+  HealthBarHint,
+  HealthBarItemData,
+  HealthBarProps,
+  HealthItemProps,
+} from "./components/HealthBar";
 export { IconButton } from "./components/IconButton";
 export type { IconButtonProps, IconButtonSize, IconButtonTone } from "./components/IconButton";
 export { InspectorPanel, InspectorSection } from "./components/InspectorPanel";
@@ -33,6 +40,8 @@ export { SegmentedControl } from "./components/SegmentedControl";
 export type { SegmentedControlOption, SegmentedControlProps } from "./components/SegmentedControl";
 export { StatusBadge } from "./components/StatusBadge";
 export type { StatusBadgeProps, StatusTone } from "./components/StatusBadge";
+export { StatusDot } from "./components/StatusDot";
+export type { StatusDotProps, StatusDotSize, StatusDotState } from "./components/StatusDot";
 export { StatusBand } from "./components/StatusBand";
 export type { StatusBandProps, StatusBandTone } from "./components/StatusBand";
 export { StatusPill } from "./components/StatusPill";
