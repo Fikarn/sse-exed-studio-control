@@ -477,15 +477,16 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleIdentifyBurst = useEffectEvent((fixtureId: string, fixtureName: string) => {
-    setFeedback({
-      message: `Identify burst preview active for '${fixtureName}'.`,
-      tone: "info",
-    });
-    // Identify burst is purely a visual preview at this layer. The IPC for a
-    // real burst will land alongside PR 4 cue cleanup. For now we log
-    // feedback and let IdentifyBurstButton manage its own visual timer.
-    void fixtureId;
+  const handleIdentifyBurst = useEffectEvent(async (fixtureId: string, fixtureName: string) => {
+    setBusyAction(`fixture-identify:${fixtureId}`);
+    try {
+      await store.identifyLightingFixture(fixtureId);
+      setFeedback({ message: `Identify burst sent to '${fixtureName}'.`, tone: "ok" });
+    } catch (error) {
+      reportError(error, "Identify burst failed.");
+    } finally {
+      setBusyAction(null);
+    }
   });
 
   // ---------------- keyboard shortcuts ----------------

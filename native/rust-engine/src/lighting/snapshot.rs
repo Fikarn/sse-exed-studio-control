@@ -19,11 +19,24 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     let last_action_message = read_optional_setting(settings, LIGHTING_LAST_ACTION_MESSAGE_KEY);
     let grand_master = read_lighting_grand_master(settings);
     let editor_state = load_lighting_editor_state_with_inventory(settings, &config, &inventory);
+    let active_burst_ids = active_identify_burst_ids(settings, current_unix_ms());
     let fixtures = editor_state
         .fixtures
         .iter()
         .cloned()
         .map(lighting_fixture_snapshot_from_state)
+        .map(|mut fixture| {
+            // Identify burst overlay: while a burst is active, the snapshot
+            // reports the fixture as full white so downstream DMX rendering +
+            // UI both reflect the flash without mutating the stored state.
+            if active_burst_ids.contains(&fixture.id) {
+                let (_, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
+                fixture.intensity = 100;
+                fixture.on = true;
+                fixture.cct = max_cct;
+            }
+            fixture
+        })
         .collect::<Vec<_>>();
     let groups = editor_state
         .groups

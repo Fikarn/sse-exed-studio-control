@@ -502,6 +502,15 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async updateLightingFixture(request: LightingFixtureUpdateRequest) {
       return performRequest("lighting.fixture.update", request as unknown as JsonObject);
     },
+    async identifyLightingFixture(fixtureId: string, durationMs?: number) {
+      return performRequest(
+        "lighting.fixture.identify",
+        durationMs === undefined ? { fixtureId } : { fixtureId, durationMs }
+      );
+    },
+    async deleteLightingFixture(fixtureId: string) {
+      return performRequest("lighting.fixture.delete", { fixtureId });
+    },
     async setLightingGroupPower(groupId: string, on: boolean) {
       return performRequest("lighting.group.power", { groupId, on });
     },
