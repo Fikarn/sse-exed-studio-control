@@ -237,19 +237,6 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const upsertSceneThumb = useEffectEvent(async (scene: LightingSceneSnapshot) => {
-    try {
-      const dataUri = renderSceneThumbnailDataUri({
-        fixtures,
-        fixtureStates: scene.fixtureStates,
-      });
-      const next = withSceneThumbUpserted(sceneThumbs, scene.id, dataUri);
-      await store.setLightingSceneThumbs(next);
-    } catch (error) {
-      reportError(error, "Scene thumbnail persist failed.");
-    }
-  });
-
   const handleSaveScene = useEffectEvent(async () => {
     setBusyAction("scene-create");
     try {
@@ -342,21 +329,23 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  // Backfill missing thumbs: re-render one missing scene per pass to keep IPC
-  // traffic bounded. The next snapshot tick refreshes the thumbs map.
-  useEffect(() => {
-    if (scenes.length === 0) return;
-    let cancelled = false;
-    const missingScene = scenes.find((scene) => !sceneThumbs[scene.id]);
-    if (!missingScene) return;
-    (async () => {
-      if (cancelled) return;
-      await upsertSceneThumb(missingScene);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [scenes, sceneThumbs, upsertSceneThumb]);
+  // Per plan §3.3: prefer the cached thumb; fall back to a live render for
+  // scenes without an entry yet. The fallback runs on render — write-backs
+  // only happen on user-initiated save / re-save / delete to avoid an
+  // infinite snapshot ↔ effect loop when the transport doesn't echo the
+  // upserted blob back into the next snapshot.
+  const displayedSceneThumbs = useMemo(() => {
+    if (scenes.length === 0) return sceneThumbs;
+    const result: Record<string, string> = { ...sceneThumbs };
+    for (const scene of scenes) {
+      if (result[scene.id]) continue;
+      result[scene.id] = renderSceneThumbnailDataUri({
+        fixtures,
+        fixtureStates: scene.fixtureStates,
+      });
+    }
+    return result;
+  }, [scenes, sceneThumbs, fixtures]);
 
   const handleToggleGroupPower = useEffectEvent(async (groupId: string, on: boolean) => {
     setBusyAction(`group:${groupId}`);
@@ -494,7 +483,7 @@ export function LightingWorkspaceSurface({
           scenes={scenes}
           activeSceneId={activeSceneId}
           modifiedSceneId={modifiedSceneId}
-          sceneThumbs={sceneThumbs}
+          sceneThumbs={displayedSceneThumbs}
           onRecallScene={handleRecallScene}
           onSaveScene={handleSaveScene}
           groups={railGroupEntries}
@@ -523,7 +512,7 @@ export function LightingWorkspaceSurface({
           selectedFixtureId={selectedFixture?.id ?? null}
           selectedGroupId={selectedGroupId}
           activeSceneId={activeSceneId}
-          sceneThumb={activeSceneId ? sceneThumbs[activeSceneId] : undefined}
+          sceneThumb={activeSceneId ? displayedSceneThumbs[activeSceneId] : undefined}
           isSceneModified={isSceneModified}
           bridgeReachable={bridgeReachable}
           onTogglePower={handleToggleFixturePower}
