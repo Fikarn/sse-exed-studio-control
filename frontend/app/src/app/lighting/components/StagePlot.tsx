@@ -1,3 +1,6 @@
+import { Sun } from "lucide-react";
+
+import { EmptyState } from "@sse/design-system";
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { deriveMounting } from "../fixtureMounting";
@@ -212,6 +215,16 @@ export function StagePlot({
         onZoomOut={viewport.zoomOut}
         onReset={viewport.reset}
       />
+
+      {fixtures.length === 0 ? (
+        <div className={styles.plotEmpty}>
+          <EmptyState
+            icon={Sun}
+            title="No fixtures on the rig yet"
+            message="Add your first fixture from the toolbar (or press F) to start patching DMX addresses and saving scenes."
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

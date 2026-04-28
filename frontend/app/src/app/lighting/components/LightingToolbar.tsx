@@ -1,7 +1,7 @@
 import { type ChangeEvent } from "react";
 import { MoreVertical, Pencil, Plus, Search, Sun } from "lucide-react";
 
-import { Button, StatusDot } from "@sse/design-system";
+import { Button, StatusDot, Tooltip } from "@sse/design-system";
 
 import styles from "./LightingToolbar.module.css";
 
@@ -58,22 +58,30 @@ export function LightingToolbar({
       <span className={styles.divider} aria-hidden="true" />
 
       <div className={styles.stats}>
-        <div className={styles.stat}>
-          <span className={styles.statValue}>{fixtureCount}</span>
-          <span className={styles.statLabel}>Fix</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.statValue}>{fixtureOnCount}</span>
-          <span className={styles.statLabel}>On</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.statValue}>{groupCount}</span>
-          <span className={styles.statLabel}>Grp</span>
-        </div>
-        <div className={styles.stat}>
-          <span className={styles.statValue}>{sceneCount}</span>
-          <span className={styles.statLabel}>Scn</span>
-        </div>
+        <Tooltip content="Fixtures patched on the rig" placement="bottom">
+          <div className={styles.stat}>
+            <span className={styles.statValue}>{fixtureCount}</span>
+            <span className={styles.statLabel}>Fix</span>
+          </div>
+        </Tooltip>
+        <Tooltip content="Fixtures currently emitting" placement="bottom">
+          <div className={styles.stat}>
+            <span className={styles.statValue}>{fixtureOnCount}</span>
+            <span className={styles.statLabel}>On</span>
+          </div>
+        </Tooltip>
+        <Tooltip content="Groups defined" placement="bottom">
+          <div className={styles.stat}>
+            <span className={styles.statValue}>{groupCount}</span>
+            <span className={styles.statLabel}>Grp</span>
+          </div>
+        </Tooltip>
+        <Tooltip content="Scenes saved" placement="bottom">
+          <div className={styles.stat}>
+            <span className={styles.statValue}>{sceneCount}</span>
+            <span className={styles.statLabel}>Scn</span>
+          </div>
+        </Tooltip>
       </div>
 
       <span className={styles.spacer} />

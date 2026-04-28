@@ -19,6 +19,7 @@ import {
   type SnapshotRecord,
 } from "../shellData";
 import { ColumnResizer } from "./components/ColumnResizer";
+import { LightingBridgeBanner } from "./components/LightingBridgeBanner";
 import { LightingHealthBar } from "./components/LightingHealthBar";
 import { LightingInspector, deriveInspectorTab, type LightingUiMode } from "./components/LightingInspector";
 import type { InspectorTab } from "./components/LightingInspectorTabs";
@@ -887,6 +888,8 @@ export function LightingWorkspaceSurface({
           </button>
         </div>
       ) : null}
+
+      <LightingBridgeBanner reachable={bridgeReachable} bridgeIp={bridgeIp} universe={bridgeUniverse} />
 
       <div
         className={`${styles.body} ${columns.isResizing ? styles.bodyResizing : ""}`}

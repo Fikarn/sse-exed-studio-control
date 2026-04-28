@@ -37,6 +37,24 @@
   cursor: grabbing;
 }
 
+.plotEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.plotEmpty > * {
+  pointer-events: auto;
+  max-width: 320px;
+  background: rgba(8, 10, 8, 0.85);
+  backdrop-filter: blur(6px);
+  border-radius: var(--radius-tight-md);
+}
+
 /* Plot pill — top-left "Active scene · {name}" overlay */
 .plotPill {
   position: absolute;

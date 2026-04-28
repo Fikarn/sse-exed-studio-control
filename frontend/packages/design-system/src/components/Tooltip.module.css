@@ -1,0 +1,62 @@
+.wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  outline: none;
+}
+
+.bubble {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  z-index: 50;
+  background: var(--color-bg-deep);
+  border: 1px solid var(--color-bg-border);
+  border-radius: var(--radius-tight-sm);
+  color: var(--color-brand-text-primary);
+  font-family: var(--font-family-ui);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 6px 9px;
+  max-width: 240px;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    visibility 0s 120ms;
+  box-shadow: var(--shadow-md);
+}
+
+.bubble[data-visible] {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  transform: translateX(-50%) translateY(0);
+}
+
+.bubbleTop {
+  bottom: 100%;
+  margin-bottom: 6px;
+}
+
+.bubbleTop[data-visible] {
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.bubbleBottom {
+  top: 100%;
+  margin-top: 6px;
+}
+
+.bubbleBottom[data-visible] {
+  transform: translateX(-50%) translateY(2px);
+}
