@@ -16,6 +16,9 @@
     "tauri:build": "cd ../../native/tauri-shell && tauri build"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "^5.2.9",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@sse/design-system": "file:../packages/design-system",
     "@sse/engine-client": "file:../packages/engine-client",
     "@sse/shared-graphics": "file:../packages/shared-graphics",

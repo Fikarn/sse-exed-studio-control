@@ -86,9 +86,9 @@
   "font": {
     "family": {
       "sans": { "$value": "{font.family.ui}" },
-      "mono": { "$value": "\"JetBrains Mono\", ui-monospace, monospace" },
-      "ui": { "$value": "\"Inter\", system-ui, sans-serif" },
-      "display": { "$value": "\"Fraunces\", \"Source Serif 4\", Georgia, serif" }
+      "mono": { "$value": "\"JetBrains Mono Variable\", \"JetBrains Mono\", ui-monospace, monospace" },
+      "ui": { "$value": "\"Inter Variable\", \"Inter\", system-ui, sans-serif" },
+      "display": { "$value": "\"Fraunces Variable\", \"Fraunces\", \"Source Serif 4\", Georgia, serif" }
     },
     "size": {
       "sm": { "$value": "12px" },
