@@ -9,6 +9,11 @@
   background: color-mix(in srgb, var(--tone, var(--color-surface-700)) 28%, transparent);
   color: var(--color-text-strong);
   font: var(--font-weight-medium) var(--font-size-md) / 1 var(--font-family-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  min-width: 0;
 }
 
 .dot {
@@ -17,4 +22,13 @@
   border-radius: 999px;
   background: var(--tone, var(--color-primary-500));
   box-shadow: 0 0 0 5px color-mix(in srgb, var(--tone, var(--color-primary-500)) 18%, transparent);
+  flex-shrink: 0;
+}
+
+.label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

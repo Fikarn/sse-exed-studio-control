@@ -28,13 +28,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 0 36px;
+  padding: 0 24px 0 36px;
   background: linear-gradient(180deg, var(--color-bg-deep) 0%, #060706 100%);
   border-bottom: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-mono);
   font-size: 13px;
   color: var(--color-brand-text-muted);
   position: relative;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .shellHeader::after {
@@ -56,9 +58,11 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 26px;
+  gap: 22px;
   height: 100%;
   min-width: 0;
+  overflow: hidden;
+  flex-shrink: 1;
 }
 
 .brandDivider {
@@ -94,8 +98,10 @@
 .shellMeta {
   display: flex;
   align-items: center;
-  gap: 14px;
-  flex-shrink: 0;
+  gap: 10px;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .clock {

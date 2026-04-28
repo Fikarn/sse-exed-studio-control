@@ -33,6 +33,17 @@
   :root {
     color-scheme: dark;
     font-family: var(--font-family-sans);
+    /*
+     * Activate Inter's stylistic alternates at the body level to match the
+     * v6 Direction D prototype (ss01 + cv01 + cv02 + cv11). Without these
+     * the variable Inter font renders the default letterforms instead of
+     * the design-tuned glyphs the prototype was designed against. Token
+     * overrides on individual elements (display font opsz, mono tnum/zero)
+     * still take precedence per the cascade.
+     */
+    font-feature-settings: "ss01", "cv01", "cv02", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     background: var(--color-background-950);
     color: var(--color-text-strong);
   }
