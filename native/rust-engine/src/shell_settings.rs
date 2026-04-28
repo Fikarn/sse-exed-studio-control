@@ -7,6 +7,7 @@ pub const WORKSPACE_KEY: &str = "shell.workspace";
 pub const SETUP_ACTIVE_SECTION_KEY: &str = "shell.setup.activeSection";
 pub const LIGHTING_CURRENT_SECTION_ID_KEY: &str = "shell.lighting.currentSectionId";
 pub const LIGHTING_SELECTED_CUE_ID_KEY: &str = "shell.lighting.selectedCueId";
+pub const LIGHTING_SCENE_THUMBS_KEY: &str = "shell.lighting.sceneThumbs";
 pub const WINDOW_WIDTH_KEY: &str = "shell.window.width";
 pub const WINDOW_HEIGHT_KEY: &str = "shell.window.height";
 pub const WINDOW_MAXIMIZED_KEY: &str = "shell.window.maximized";
@@ -30,6 +31,7 @@ pub struct ShellSettingsSnapshot {
     pub setup_active_section: String,
     pub lighting_current_section_id: Option<String>,
     pub lighting_selected_cue_id: Option<String>,
+    pub lighting_scene_thumbs: HashMap<String, String>,
     pub window_width: i64,
     pub window_height: i64,
     pub window_maximized: bool,
@@ -43,6 +45,7 @@ impl Default for ShellSettingsSnapshot {
             setup_active_section: String::from(DEFAULT_SETUP_ACTIVE_SECTION),
             lighting_current_section_id: None,
             lighting_selected_cue_id: None,
+            lighting_scene_thumbs: HashMap::new(),
             window_width: DEFAULT_WINDOW_WIDTH,
             window_height: DEFAULT_WINDOW_HEIGHT,
             window_maximized: DEFAULT_WINDOW_MAXIMIZED,
@@ -73,6 +76,10 @@ impl ShellSettingsSnapshot {
         snapshot.lighting_selected_cue_id = settings
             .get(LIGHTING_SELECTED_CUE_ID_KEY)
             .and_then(|value| parse_optional_shell_state_value(value));
+        snapshot.lighting_scene_thumbs = settings
+            .get(LIGHTING_SCENE_THUMBS_KEY)
+            .and_then(|raw| serde_json::from_str::<HashMap<String, String>>(raw).ok())
+            .unwrap_or_default();
 
         if let Some(width) = settings
             .get(WINDOW_WIDTH_KEY)
@@ -122,6 +129,7 @@ impl ShellSettingsSnapshot {
                 "lighting": {
                     "currentSectionId": self.lighting_current_section_id,
                     "selectedCueId": self.lighting_selected_cue_id,
+                    "sceneThumbs": self.lighting_scene_thumbs,
                 },
                 "window": {
                     "width": self.window_width,
@@ -140,6 +148,7 @@ pub fn default_settings_entries() -> Vec<(&'static str, &'static str)> {
         (SETUP_ACTIVE_SECTION_KEY, DEFAULT_SETUP_ACTIVE_SECTION),
         (LIGHTING_CURRENT_SECTION_ID_KEY, ""),
         (LIGHTING_SELECTED_CUE_ID_KEY, ""),
+        (LIGHTING_SCENE_THUMBS_KEY, "{}"),
         (WINDOW_WIDTH_KEY, "1280"),
         (WINDOW_HEIGHT_KEY, "800"),
         (WINDOW_MAXIMIZED_KEY, "false"),
@@ -209,6 +218,24 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
                 LIGHTING_SELECTED_CUE_ID_KEY,
                 selected_cue_id.unwrap_or_default(),
             ));
+        }
+
+        if let Some(scene_thumbs_value) = lighting.get("sceneThumbs") {
+            let scene_thumbs = scene_thumbs_value
+                .as_object()
+                .ok_or_else(|| String::from("lighting.sceneThumbs must be an object"))?;
+
+            let mut thumbs: HashMap<String, String> = HashMap::with_capacity(scene_thumbs.len());
+            for (scene_id, thumb_value) in scene_thumbs {
+                let thumb = thumb_value
+                    .as_str()
+                    .ok_or_else(|| format!("lighting.sceneThumbs.{scene_id} must be a string"))?;
+                thumbs.insert(scene_id.clone(), thumb.to_string());
+            }
+
+            let serialized = serde_json::to_string(&thumbs)
+                .map_err(|err| format!("lighting.sceneThumbs failed to serialize: {err}"))?;
+            updates.push((LIGHTING_SCENE_THUMBS_KEY, serialized));
         }
     }
 
@@ -429,6 +456,100 @@ mod tests {
                 (WINDOW_MAXIMIZED_KEY, String::from("false")),
             ]
         );
+    }
+
+    #[test]
+    fn settings_update_accepts_lighting_scene_thumbs() {
+        let params = json!({
+            "lighting": {
+                "sceneThumbs": {
+                    "scene-a": "data:image/svg+xml;base64,AAA",
+                    "scene-b": "data:image/svg+xml;base64,BBB"
+                }
+            }
+        });
+
+        let updates = parse_settings_update(&params).expect("scene thumbs should parse");
+
+        assert_eq!(updates.len(), 1);
+        assert_eq!(updates[0].0, LIGHTING_SCENE_THUMBS_KEY);
+
+        let parsed: HashMap<String, String> =
+            serde_json::from_str(&updates[0].1).expect("serialised thumbs should parse");
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(
+            parsed.get("scene-a").map(String::as_str),
+            Some("data:image/svg+xml;base64,AAA")
+        );
+        assert_eq!(
+            parsed.get("scene-b").map(String::as_str),
+            Some("data:image/svg+xml;base64,BBB")
+        );
+    }
+
+    #[test]
+    fn settings_update_rejects_non_string_scene_thumb_entry() {
+        let params = json!({
+            "lighting": {
+                "sceneThumbs": {
+                    "scene-a": 42
+                }
+            }
+        });
+
+        let error =
+            parse_settings_update(&params).expect_err("non-string thumb should be rejected");
+        assert_eq!(error, "lighting.sceneThumbs.scene-a must be a string");
+    }
+
+    #[test]
+    fn settings_update_rejects_non_object_scene_thumbs() {
+        let params = json!({
+            "lighting": {
+                "sceneThumbs": "not-an-object"
+            }
+        });
+
+        let error =
+            parse_settings_update(&params).expect_err("non-object thumbs should be rejected");
+        assert_eq!(error, "lighting.sceneThumbs must be an object");
+    }
+
+    #[test]
+    fn snapshot_round_trips_lighting_scene_thumbs() {
+        let mut thumbs = HashMap::new();
+        thumbs.insert(
+            String::from("scene-a"),
+            String::from("data:image/svg+xml;base64,AAA"),
+        );
+        thumbs.insert(
+            String::from("scene-b"),
+            String::from("data:image/svg+xml;base64,BBB"),
+        );
+        let serialised = serde_json::to_string(&thumbs).expect("serialise");
+
+        let settings = HashMap::from([(String::from(LIGHTING_SCENE_THUMBS_KEY), serialised)]);
+        let snapshot = ShellSettingsSnapshot::from_settings(&settings);
+
+        assert_eq!(snapshot.lighting_scene_thumbs.len(), 2);
+        assert_eq!(
+            snapshot
+                .lighting_scene_thumbs
+                .get("scene-a")
+                .map(String::as_str),
+            Some("data:image/svg+xml;base64,AAA")
+        );
+    }
+
+    #[test]
+    fn snapshot_falls_back_to_empty_thumbs_when_blob_is_invalid() {
+        let settings = HashMap::from([(
+            String::from(LIGHTING_SCENE_THUMBS_KEY),
+            String::from("not-json"),
+        )]);
+        let snapshot = ShellSettingsSnapshot::from_settings(&settings);
+
+        assert!(snapshot.lighting_scene_thumbs.is_empty());
     }
 
     #[test]

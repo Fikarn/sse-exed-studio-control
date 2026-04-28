@@ -465,6 +465,13 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         },
       });
     },
+    async setLightingSceneThumbs(thumbs) {
+      return performRequest("settings.update", {
+        lighting: {
+          sceneThumbs: thumbs as unknown as JsonObject,
+        },
+      });
+    },
     async runCommissioningCheck(request: CommissioningCheckRequest) {
       return performRequest("commissioning.check.run", request as unknown as JsonObject);
     },
@@ -497,6 +504,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     },
     async createLightingScene(request: LightingSceneCreateRequest) {
       return performRequest("lighting.scene.create", request as unknown as JsonObject);
+    },
+    async deleteLightingScene(sceneId: string) {
+      return performRequest("lighting.scene.delete", { sceneId });
     },
     async createLightingCue(request: LightingCueCreateRequest) {
       return performRequest("lighting.cue.create", request as unknown as JsonObject);

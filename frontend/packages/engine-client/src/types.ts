@@ -218,6 +218,7 @@ export interface ShellStore {
   setSetupSection(section: SetupSection): Promise<JsonValue>;
   setLightingSection(sectionId: string | null): Promise<JsonValue>;
   setLightingSelectedCue(cueId: string | null): Promise<JsonValue>;
+  setLightingSceneThumbs(thumbs: Record<string, string>): Promise<JsonValue>;
   runCommissioningCheck(request: CommissioningCheckRequest): Promise<JsonValue>;
   updateCommissioning(request: CommissioningUpdateRequest): Promise<JsonValue>;
   syncAudio(): Promise<JsonValue>;
@@ -229,6 +230,7 @@ export interface ShellStore {
   createLightingGroup(name: string): Promise<JsonValue>;
   createLightingFixture(request: LightingFixtureCreateRequest): Promise<JsonValue>;
   createLightingScene(request: LightingSceneCreateRequest): Promise<JsonValue>;
+  deleteLightingScene(sceneId: string): Promise<JsonValue>;
   createLightingCue(request: LightingCueCreateRequest): Promise<JsonValue>;
   updateLightingCue(request: LightingCueUpdateRequest): Promise<JsonValue>;
   deleteLightingCue(cueId: string): Promise<JsonValue>;
