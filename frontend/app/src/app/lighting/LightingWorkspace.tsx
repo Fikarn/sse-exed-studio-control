@@ -27,6 +27,7 @@ import { LightingToolbar } from "./components/LightingToolbar";
 import { StagePlot } from "./components/StagePlot";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
 import { useResizableColumns } from "./useResizableColumns";
+import { UndoRefusedError, useUndoStack, type UndoOutcome } from "./useUndoStack";
 import { useUnsavedChangesGuard } from "./useUnsavedScenePrompt";
 import styles from "./LightingWorkspace.module.css";
 
@@ -118,6 +119,15 @@ export function LightingWorkspaceSurface({
   }, []);
 
   const columns = useResizableColumns();
+  const undoStack = useUndoStack();
+
+  // Stable ref to the latest scenes list — undo entries close over this so
+  // they can ref-count against the CURRENT scenes at undo time, not whatever
+  // was visible when the entry was pushed.
+  const scenesRef = useRef(scenes);
+  useEffect(() => {
+    scenesRef.current = scenes;
+  }, [scenes]);
 
   // Active scene = the most recently recalled scene (engine-tracked) falling
   // back to the persisted selectedSceneId. Kept lean — no persisted "active
@@ -269,17 +279,43 @@ export function LightingWorkspaceSurface({
   const handleAddFixture = useEffectEvent(async () => {
     setBusyAction("fixture-create");
     try {
-      const result = asRecord(
-        await store.createLightingFixture({
-          dmxStartAddress: 1,
-          name: `Fixture ${fixtures.length + 1}`,
-          type: "astra-bicolor",
-        })
-      );
+      const fixtureSpec = {
+        dmxStartAddress: 1,
+        name: `Fixture ${fixtures.length + 1}`,
+        type: "astra-bicolor",
+      };
+      const result = asRecord(await store.createLightingFixture(fixtureSpec));
       const createdFixture = asRecord(result?.fixture);
       const createdFixtureId = typeof createdFixture?.id === "string" ? createdFixture.id : null;
       if (createdFixtureId) {
         await store.updateLightingSettings({ selectedFixtureId: createdFixtureId });
+
+        // Push undo: deleting the just-created fixture. Refuses if any
+        // scene saved AFTER this push references the fixture (the engine
+        // captures fixture id on save), since deletion would orphan that
+        // saved-state entry.
+        let currentId = createdFixtureId;
+        undoStack.push({
+          label: `Add fixture ${fixtureSpec.name}`,
+          undo: async () => {
+            const refs = scenesRef.current.reduce(
+              (sum, scene) => sum + scene.fixtureStates.filter((state) => state.fixtureId === currentId).length,
+              0
+            );
+            if (refs > 0) {
+              throw new UndoRefusedError(
+                `fixture is referenced by ${refs} scene${refs === 1 ? "" : "s"} saved after it was added`
+              );
+            }
+            await store.deleteLightingFixture(currentId);
+          },
+          redo: async () => {
+            const redoResult = asRecord(await store.createLightingFixture(fixtureSpec));
+            const redoCreated = asRecord(redoResult?.fixture);
+            const newId = typeof redoCreated?.id === "string" ? redoCreated.id : null;
+            if (newId) currentId = newId;
+          },
+        });
       }
       setFeedback({ message: String(result?.summary ?? "Fixture added."), tone: "ok" });
     } catch (error) {
@@ -515,6 +551,9 @@ export function LightingWorkspaceSurface({
   });
 
   const handleDeleteFixture = useEffectEvent(async (fixtureId: string) => {
+    // Snapshot the live fixture before deletion so undo can recreate it.
+    // groupId / spatial / beam-angle are restored via a follow-up update IPC
+    // because createLightingFixture only takes the create-time fields.
     const target = fixtures.find((fixture) => fixture.id === fixtureId);
     setBusyAction(`fixture-delete:${fixtureId}`);
     try {
@@ -523,6 +562,44 @@ export function LightingWorkspaceSurface({
       // inspector falls back to the scene tab.
       if (persistedSelectedFixtureId === fixtureId) {
         await store.updateLightingSettings({ selectedFixtureId: null });
+      }
+      if (target) {
+        const snapshot = { ...target };
+        let currentId = fixtureId;
+        undoStack.push({
+          label: `Delete fixture ${snapshot.name}`,
+          undo: async () => {
+            const result = asRecord(
+              await store.createLightingFixture({
+                name: snapshot.name,
+                type: snapshot.type,
+                dmxStartAddress: snapshot.dmxStartAddress > 0 ? snapshot.dmxStartAddress : 1,
+                groupId: snapshot.groupId ?? undefined,
+              })
+            );
+            const created = asRecord(result?.fixture);
+            const newId = typeof created?.id === "string" ? created.id : null;
+            if (newId) {
+              currentId = newId;
+              // spatialRotation isn't yet on LightingFixtureUpdateRequest in
+              // the TS types (Wave 9 will add it); seeded fixtures all have
+              // rotation 0 today so the omission doesn't lose data.
+              await store.updateLightingFixture({
+                fixtureId: newId,
+                intensity: snapshot.intensity,
+                cct: snapshot.cct,
+                on: snapshot.on,
+                spatialX: snapshot.spatialX ?? null,
+                spatialY: snapshot.spatialY ?? null,
+                rigZ: snapshot.rigZ ?? null,
+                beamAngleDegrees: snapshot.beamAngleDegrees ?? null,
+              });
+            }
+          },
+          redo: async () => {
+            await store.deleteLightingFixture(currentId);
+          },
+        });
       }
       setFeedback({
         message: target ? `Fixture '${target.name}' deleted.` : "Fixture deleted.",
@@ -535,11 +612,68 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const reportUndoOutcome = useEffectEvent((outcome: UndoOutcome, kind: "Undo" | "Redo") => {
+    switch (outcome.kind) {
+      case "ok":
+        setFeedback({
+          message: `${kind === "Undo" ? "Undid" : "Redid"} ‘${outcome.label}’ · ${kind === "Undo" ? "⌘⇧Z to redo" : "⌘Z to undo"}`,
+          tone: "ok",
+        });
+        break;
+      case "rejected":
+        setFeedback({
+          message: `Cannot ${kind.toLowerCase()} ‘${outcome.label}’: ${outcome.reason}.`,
+          tone: "info",
+        });
+        break;
+      case "error":
+        reportError(outcome.error, `${kind} of ‘${outcome.label}’ failed.`);
+        break;
+      case "noop":
+        // Nothing to undo / redo — silent.
+        break;
+    }
+  });
+
+  const triggerUndo = useEffectEvent(async () => {
+    setBusyAction("undo");
+    try {
+      const outcome = await undoStack.undo();
+      reportUndoOutcome(outcome, "Undo");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
+  const triggerRedo = useEffectEvent(async () => {
+    setBusyAction("redo");
+    try {
+      const outcome = await undoStack.redo();
+      reportUndoOutcome(outcome, "Redo");
+    } finally {
+      setBusyAction(null);
+    }
+  });
+
   // ---------------- keyboard shortcuts ----------------
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || isEditableTarget(event.target)) return;
+
+      // Undo / redo first because they require the modifier keys we filter
+      // out for the un-modified shortcuts below.
+      const modifier = event.metaKey || event.ctrlKey;
+      if (modifier && !event.altKey && event.key.toLowerCase() === "z") {
+        if (event.shiftKey) {
+          void triggerRedo();
+        } else {
+          void triggerUndo();
+        }
+        event.preventDefault();
+        return;
+      }
+
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (event.key.toLowerCase() === "p") {
         setUiMode((current) => (current === "patch" ? "recall" : "patch"));
@@ -554,7 +688,7 @@ export function LightingWorkspaceSurface({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSaveScene, handleSelectFixture]);
+  }, [handleSaveScene, handleSelectFixture, triggerRedo, triggerUndo]);
 
   const lastSavedLabel = lastSavedAt
     ? `${lastSavedAt.getUTCHours().toString().padStart(2, "0")}:${lastSavedAt
