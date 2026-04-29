@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default capability for the frontend replatform shell window.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-set-title"]
 }
