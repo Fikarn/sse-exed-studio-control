@@ -370,14 +370,15 @@
   transition:
     border-color 200ms var(--motion-easing-standard),
     background 200ms var(--motion-easing-standard),
-    transform var(--motion-duration-fast) ease,
-    box-shadow var(--motion-duration-fast) ease;
+    transform 200ms var(--motion-easing-standard),
+    box-shadow var(--motion-duration-fast) ease,
+    opacity var(--motion-duration-fast) ease;
 }
 
-.tile[data-drag-over="true"] {
-  border-color: var(--color-brand-green);
-  box-shadow: 0 -2px 0 var(--color-brand-green) inset;
-}
+/* Sortable drag visuals are owned by dnd-kit — it sets `transform`,
+   `transition`, and `opacity` inline as the user picks up / moves /
+   drops a tile. The CSS layer here only handles resting visuals and
+   keyboard focus. */
 
 .tilePinned {
   border-color: var(--color-brand-yellow-border);

@@ -1,5 +1,7 @@
-import { type DragEvent, useState } from "react";
+import { type CSSProperties, type KeyboardEvent } from "react";
 import { Pin, PinOff } from "lucide-react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { SceneThumbnail } from "./SceneThumbnail";
 import styles from "./LightingRail.module.css";
@@ -23,10 +25,11 @@ export interface SceneTileProps {
   lastRecalledLabel?: string;
   thumbDataUri?: string;
   pinned?: boolean;
+  /** When true, dnd-kit sortable hooks are wired in. The parent
+   *  <SortableContext> still has to be present for sorting to actually
+   *  work — this prop only controls whether THIS tile participates. */
+  sortable?: boolean;
   onRecall: (sceneId: string) => void;
-  /** When provided, the tile is drag-reorder-enabled. Drop on tile X
-   *  reorders the dragged scene to immediately before X. */
-  onReorder?: (draggedSceneId: string, beforeSceneId: string) => void;
   /** When provided, renders an inline pin / unpin button. */
   onPin?: (sceneId: string, pinned: boolean) => void;
 }
@@ -42,8 +45,8 @@ export function SceneTile({
   lastRecalledLabel,
   thumbDataUri,
   pinned = false,
+  sortable = false,
   onRecall,
-  onReorder,
   onPin,
 }: SceneTileProps) {
   // When the bridge is unreachable, "modified" is comparing live state to a
@@ -60,47 +63,64 @@ export function SceneTile({
   const badgeText = isActive ? (showAsModified ? "Modified" : isModified ? "Preview" : "Active") : null;
   const ariaLabel = `Recall scene ${name}${badgeText ? ` (${badgeText.toLowerCase()})` : ""}${pinned ? ", pinned" : ""}`;
 
-  const [isDragOver, setIsDragOver] = useState(false);
-  const draggable = Boolean(onReorder);
+  // dnd-kit sortable hook. Provides setNodeRef, transform/transition that
+  // animate the tile to its previewed position as siblings shift around,
+  // attributes (role, aria-*), and listeners (pointer + keyboard) that
+  // drive the drag gesture. When `sortable` is false the hook still runs
+  // (rules-of-hooks) but we skip wiring its outputs.
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: !sortable,
+  });
 
-  const handleDragStart = (event: DragEvent<HTMLButtonElement>) => {
-    if (!onReorder) return;
-    event.dataTransfer.setData("application/x-sse-scene-id", id);
-    event.dataTransfer.effectAllowed = "move";
+  const tileStyle: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // While picked up: dim the resting tile so the operator can see the
+    // displacement preview clearly. dnd-kit doesn't render a drag image —
+    // it transforms the tile itself — so reducing opacity here is the
+    // standard sortable pattern. Lift via z-index so the dragged tile
+    // paints above its siblings (the OS doesn't do this for us when the
+    // tile is just being CSS-transformed, not picked up by a real drag).
+    opacity: isDragging ? 0.4 : undefined,
+    zIndex: isDragging ? 2 : undefined,
+    cursor: sortable ? (isDragging ? "grabbing" : "grab") : "pointer",
   };
-  const handleDragOver = (event: DragEvent<HTMLButtonElement>) => {
-    if (!onReorder) return;
-    if (event.dataTransfer.types.includes("application/x-sse-scene-id")) {
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    // Space inside dnd-kit's sortable enters keyboard-drag mode, so don't
+    // intercept it here when sortable is enabled.
+    if (event.key === "Enter" || (event.key === " " && !sortable)) {
       event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      setIsDragOver(true);
-    }
-  };
-  const handleDragLeave = () => setIsDragOver(false);
-  const handleDrop = (event: DragEvent<HTMLButtonElement>) => {
-    if (!onReorder) return;
-    event.preventDefault();
-    setIsDragOver(false);
-    const draggedId = event.dataTransfer.getData("application/x-sse-scene-id");
-    if (draggedId && draggedId !== id) {
-      onReorder(draggedId, id);
+      onRecall(id);
     }
   };
 
+  // Rendered as <div role="button"> instead of <button> — dnd-kit's
+  // listeners include drag-start handlers that want to be free of the
+  // browser's button keyboard activation semantics. Keyboard activation
+  // (Enter / Space-when-not-sortable) and aria attributes preserve
+  // button-like semantics for screen readers.
   return (
-    <button
-      type="button"
+    <div
+      ref={setNodeRef}
       className={stateClass}
+      style={tileStyle}
       onClick={() => onRecall(id)}
+      onKeyDown={handleKeyDown}
       aria-current={isActive ? "true" : undefined}
       aria-label={ariaLabel}
-      draggable={draggable}
-      onDragStart={draggable ? handleDragStart : undefined}
-      onDragOver={draggable ? handleDragOver : undefined}
-      onDragLeave={draggable ? handleDragLeave : undefined}
-      onDrop={draggable ? handleDrop : undefined}
-      data-drag-over={isDragOver || undefined}
       data-pinned={pinned || undefined}
+      data-dragging={isDragging || undefined}
+      {...attributes}
+      {...listeners}
+      // dnd-kit's `attributes` already provides role="button" and
+      // tabIndex={0}; spreading them earlier would conflict with
+      // setting them explicitly below. Override role only after the
+      // spread so we keep sortable-aware aria semantics from dnd-kit
+      // but pin the role to "button" for screen-reader expectations.
+      role="button"
+      tabIndex={0}
     >
       <SceneThumbnail src={thumbDataUri} alt={`${name} preview`} />
       <span className={styles.tileBody}>
@@ -123,6 +143,12 @@ export function SceneTile({
           tabIndex={0}
           aria-label={pinned ? `Unpin scene ${name}` : `Pin scene ${name}`}
           aria-pressed={pinned}
+          onPointerDown={(event) => {
+            // Stop the pointer event from initiating a drag on the parent
+            // sortable wrapper — pin and drag share the same starting
+            // gesture otherwise.
+            event.stopPropagation();
+          }}
           onClick={(event) => {
             event.stopPropagation();
             onPin(id, !pinned);
@@ -142,6 +168,6 @@ export function SceneTile({
           )}
         </span>
       ) : null}
-    </button>
+    </div>
   );
 }
