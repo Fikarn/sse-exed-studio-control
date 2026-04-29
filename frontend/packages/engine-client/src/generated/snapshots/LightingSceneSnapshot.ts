@@ -8,4 +8,10 @@ export type LightingSceneSnapshot = {
   fixtureStates: Array<LightingSceneFixtureSnapshot>;
   lastRecalled: boolean;
   lastRecalledAt: string | null;
+  /**
+   * True when the scene is in the operator's pinned set. Pinned
+   * scenes sort to the top of the rail (snapshot ordering already
+   * reflects this, but the flag drives the rail's visual treatment).
+   */
+  pinned: boolean;
 };

@@ -638,6 +638,31 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const handleReorderScene = useEffectEvent(async (sceneId: string, beforeSceneId: string | null) => {
+    const busyKey = `scene-reorder:${sceneId}`;
+    startBusy(busyKey);
+    try {
+      await store.reorderLightingScene(sceneId, beforeSceneId);
+    } catch (error) {
+      reportError(error, "Scene reorder failed.");
+    } finally {
+      finishBusy(busyKey);
+    }
+  });
+
+  const handlePinScene = useEffectEvent(async (sceneId: string, pinned: boolean) => {
+    const busyKey = `scene-pin:${sceneId}`;
+    startBusy(busyKey);
+    try {
+      await store.pinLightingScene(sceneId, pinned);
+      setFeedback({ message: pinned ? "Scene pinned." : "Scene unpinned.", tone: "ok" });
+    } catch (error) {
+      reportError(error, pinned ? "Scene pin failed." : "Scene unpin failed.");
+    } finally {
+      finishBusy(busyKey);
+    }
+  });
+
   const handleRecallScene = useEffectEvent(async (sceneId: string) => {
     if (uiMode === "patch") {
       setFeedback({
@@ -1197,6 +1222,8 @@ export function LightingWorkspaceSurface({
           sceneThumbs={displayedSceneThumbs}
           onRecallScene={handleRecallScene}
           onSaveScene={handleSaveScene}
+          onReorderScene={handleReorderScene}
+          onPinScene={handlePinScene}
           groups={railGroupEntries}
           onToggleGroupPower={handleToggleGroupPower}
           searchQuery={searchQuery}

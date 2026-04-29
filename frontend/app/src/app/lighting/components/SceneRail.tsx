@@ -26,6 +26,10 @@ export interface SceneRailProps {
   onRecall: (sceneId: string) => void;
   onAddScene?: () => void;
   onClearSearch?: () => void;
+  /** Drag-to-reorder handler. When omitted, tiles aren't draggable. */
+  onReorderScene?: (sceneId: string, beforeSceneId: string | null) => void;
+  /** Pin / unpin handler. When omitted, the inline pin chip isn't rendered. */
+  onPinScene?: (sceneId: string, pinned: boolean) => void;
 }
 
 interface SceneStats {
@@ -52,6 +56,8 @@ interface CellPayload {
   sceneThumbs: Record<string, string>;
   bridgeReachable: boolean;
   onRecall: (sceneId: string) => void;
+  onReorder?: (draggedSceneId: string, beforeSceneId: string) => void;
+  onPin?: (sceneId: string, pinned: boolean) => void;
   onAddScene?: () => void;
   showAddTile: boolean;
   totalCellCount: number;
@@ -67,6 +73,8 @@ function VirtualizedCell({
   sceneThumbs,
   bridgeReachable,
   onRecall,
+  onReorder,
+  onPin,
   onAddScene,
   showAddTile,
   totalCellCount,
@@ -98,7 +106,10 @@ function VirtualizedCell({
           bridgeReachable={bridgeReachable}
           lastRecalledLabel={lastRecalledLabel}
           thumbDataUri={sceneThumbs[scene.id]}
+          pinned={scene.pinned}
           onRecall={onRecall}
+          onReorder={onReorder}
+          onPin={onPin}
         />
       </div>
     );
@@ -133,7 +144,14 @@ export function SceneRail({
   onRecall,
   onAddScene,
   onClearSearch,
+  onReorderScene,
+  onPinScene,
 }: SceneRailProps) {
+  // Adapter — the SceneTile drop handler emits "drop on tile X"; the
+  // engine IPC takes "before scene id". They match shape exactly.
+  const onTileReorder = onReorderScene
+    ? (draggedSceneId: string, beforeSceneId: string) => onReorderScene(draggedSceneId, beforeSceneId)
+    : undefined;
   const needle = searchQuery.trim().toLowerCase();
   const filteredScenes = needle ? scenes.filter((scene) => scene.name.toLowerCase().includes(needle)) : scenes;
 
@@ -171,6 +189,8 @@ export function SceneRail({
       sceneThumbs,
       bridgeReachable,
       onRecall,
+      onReorder: onTileReorder,
+      onPin: onPinScene,
       onAddScene,
       showAddTile,
       totalCellCount,
@@ -199,8 +219,35 @@ export function SceneRail({
     );
   }
 
+  // Drop on the rail container (outside any tile) reorders the dragged
+  // scene to the end of the list. Plain "+ New scene" tile clicks still
+  // fire normally; the drop event lives on the wrapper div.
+  const containerDragOver = onReorderScene
+    ? (event: React.DragEvent<HTMLDivElement>) => {
+        if (event.dataTransfer.types.includes("application/x-sse-scene-id")) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }
+      }
+    : undefined;
+  const containerDrop = onReorderScene
+    ? (event: React.DragEvent<HTMLDivElement>) => {
+        if (event.defaultPrevented) return;
+        if (!event.dataTransfer.types.includes("application/x-sse-scene-id")) return;
+        event.preventDefault();
+        const draggedId = event.dataTransfer.getData("application/x-sse-scene-id");
+        if (draggedId) onReorderScene(draggedId, null);
+      }
+    : undefined;
+
   return (
-    <div className={styles.sceneGrid} role="list" aria-label="Saved scenes">
+    <div
+      className={styles.sceneGrid}
+      role="list"
+      aria-label="Saved scenes"
+      onDragOver={containerDragOver}
+      onDrop={containerDrop}
+    >
       {filteredScenes.map((scene) => {
         const stats = statsForScene(scene);
         const lastRecalledLabel = scene.lastRecalledAt ? formatLightingRelativeTime(scene.lastRecalledAt) : undefined;
@@ -216,7 +263,10 @@ export function SceneRail({
               bridgeReachable={bridgeReachable}
               lastRecalledLabel={lastRecalledLabel}
               thumbDataUri={sceneThumbs[scene.id]}
+              pinned={scene.pinned}
               onRecall={onRecall}
+              onReorder={onTileReorder}
+              onPin={onPinScene}
             />
           </div>
         );

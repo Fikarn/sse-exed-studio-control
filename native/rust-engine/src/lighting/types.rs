@@ -106,6 +106,11 @@ pub struct LightingSceneSnapshot {
     pub last_recalled: bool,
     #[serde(rename = "lastRecalledAt")]
     pub last_recalled_at: Option<String>,
+    /// True when the scene is in the operator's pinned set. Pinned
+    /// scenes sort to the top of the rail (snapshot ordering already
+    /// reflects this, but the flag drives the rail's visual treatment).
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -127,6 +132,19 @@ pub struct LightingEditorState {
     pub removed_fixture_ids: Vec<String>,
     pub fixtures: Vec<LightingEditorFixtureState>,
     pub scenes: Vec<LightingEditorSceneState>,
+    /// Display order for scenes. Stores scene ids; the snapshot emits
+    /// scenes in this order. Empty on legacy state — populated from
+    /// insertion order at load time (see `load_lighting_editor_state`).
+    /// Reordered via the `lighting.scene.reorder` IPC; create / delete
+    /// keep the vec in sync. Pinned scenes (#56) are tracked separately
+    /// via `pinned_scene_ids` so reorder stays orthogonal to favourites.
+    #[serde(default, rename = "sceneOrder")]
+    pub scene_order: Vec<String>,
+    /// Ids of scenes the operator has pinned to the top of the rail.
+    /// Empty for new / legacy state. Maintained alongside scene mutations
+    /// so deletes remove stale ids and creates leave new scenes unpinned.
+    #[serde(default, rename = "pinnedSceneIds")]
+    pub pinned_scene_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -343,6 +361,19 @@ pub struct LightingSceneDeleteResult {
 }
 
 #[derive(Debug, Serialize)]
+pub struct LightingSceneReorderResult {
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingScenePinResult {
+    pub scene: LightingSceneSnapshot,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct LightingFixtureIdentifyResult {
     #[serde(rename = "fixtureId")]
     pub fixture_id: String,
@@ -473,4 +504,23 @@ pub struct LightingSceneUpdateRequest {
 #[derive(Debug, Clone)]
 pub struct LightingSceneDeleteRequest {
     pub scene_id: String,
+}
+
+/// Reorder a scene by moving it before another scene id, or to the
+/// end of the list when `before_scene_id` is `None`. Pinned scenes are
+/// reordered within the pinned cluster — moving a pinned scene to the
+/// "end" places it last among pinned scenes (still ahead of unpinned).
+#[derive(Debug, Clone)]
+pub struct LightingSceneReorderRequest {
+    pub scene_id: String,
+    pub before_scene_id: Option<String>,
+}
+
+/// Toggle a scene's pinned status. Pinned scenes float to the top of
+/// the rail; unpinning moves the scene back to its position in
+/// `scene_order` among the unpinned cluster.
+#[derive(Debug, Clone)]
+pub struct LightingScenePinRequest {
+    pub scene_id: String,
+    pub pinned: bool,
 }

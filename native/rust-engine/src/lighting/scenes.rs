@@ -104,6 +104,11 @@ pub fn create_lighting_scene(
         fixture_states: capture_scene_fixture_states(&editor_state.fixtures),
     };
     editor_state.scenes.push(scene.clone());
+    // New scenes append to the display order. Pinned scenes float to
+    // the top of the rail (snapshot ordering rule), so a fresh scene
+    // is not pinned by default; operators can pin via the lighting
+    // .scene.pin IPC.
+    editor_state.scene_order.push(scene.id.clone());
 
     let summary = format!(
         "Lighting scene '{}' was saved from the current fixture state.",
@@ -128,6 +133,7 @@ pub fn create_lighting_scene(
             &scene,
             read_optional_setting(&app_settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY).as_deref(),
             read_optional_setting(&app_settings, LIGHTING_LAST_SCENE_RECALL_AT_KEY).as_deref(),
+            false,
         ),
         summary,
     })
@@ -181,11 +187,16 @@ pub fn update_lighting_scene(
     ]);
     persist_lighting_state(db_path, &updates)?;
 
+    let pinned = editor_state
+        .pinned_scene_ids
+        .iter()
+        .any(|id| id == &updated_scene.id);
     Ok(LightingSceneUpdateResult {
         scene: lighting_scene_snapshot_from_state(
             &updated_scene,
             read_optional_setting(&app_settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY).as_deref(),
             read_optional_setting(&app_settings, LIGHTING_LAST_SCENE_RECALL_AT_KEY).as_deref(),
+            pinned,
         ),
         summary,
     })
@@ -214,6 +225,12 @@ pub fn delete_lighting_scene(
     editor_state
         .scenes
         .retain(|scene| scene.id != request.scene_id);
+    editor_state
+        .scene_order
+        .retain(|id| id != &request.scene_id);
+    editor_state
+        .pinned_scene_ids
+        .retain(|id| id != &request.scene_id);
 
     let last_recalled_scene_id =
         read_optional_setting(&app_settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY);
@@ -257,6 +274,151 @@ pub fn delete_lighting_scene(
     Ok(LightingSceneDeleteResult {
         deleted: true,
         scene_id: request.scene_id.clone(),
+        summary,
+    })
+}
+
+pub fn reorder_lighting_scene(
+    db_path: &Path,
+    request: &LightingSceneReorderRequest,
+) -> Result<LightingSceneReorderResult, LightingCommandError> {
+    let app_settings = load_lighting_settings(db_path)?;
+    let mut editor_state = load_lighting_editor_state(&app_settings);
+
+    if !editor_state
+        .scenes
+        .iter()
+        .any(|scene| scene.id == request.scene_id)
+    {
+        return Err(LightingCommandError::Rejected(
+            "LIGHTING_SCENE_NOT_FOUND",
+            format!(
+                "Lighting scene '{}' is not exposed by the native editor state.",
+                request.scene_id
+            ),
+        ));
+    }
+
+    if let Some(before_id) = &request.before_scene_id {
+        if !editor_state
+            .scenes
+            .iter()
+            .any(|scene| &scene.id == before_id)
+        {
+            return Err(LightingCommandError::Rejected(
+                "LIGHTING_SCENE_NOT_FOUND",
+                format!(
+                    "Reorder anchor scene '{}' is not exposed by the native editor state.",
+                    before_id
+                ),
+            ));
+        }
+    }
+
+    // Drop the moved id, then insert before the anchor (or push when no
+    // anchor is provided — "move to end").
+    editor_state
+        .scene_order
+        .retain(|id| id != &request.scene_id);
+    if let Some(before_id) = &request.before_scene_id {
+        let position = editor_state
+            .scene_order
+            .iter()
+            .position(|id| id == before_id);
+        match position {
+            Some(idx) => editor_state
+                .scene_order
+                .insert(idx, request.scene_id.clone()),
+            None => editor_state.scene_order.push(request.scene_id.clone()),
+        }
+    } else {
+        editor_state.scene_order.push(request.scene_id.clone());
+    }
+
+    let summary = format!(
+        "Lighting scene '{}' was reordered in the rail.",
+        request.scene_id
+    );
+    let mut updates = lighting_editor_state_updates(&editor_state)?;
+    updates.extend_from_slice(&[
+        (
+            String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
+            String::from("succeeded"),
+        ),
+        (String::from(LIGHTING_LAST_ACTION_CODE_KEY), String::new()),
+        (
+            String::from(LIGHTING_LAST_ACTION_MESSAGE_KEY),
+            summary.clone(),
+        ),
+    ]);
+    persist_lighting_state(db_path, &updates)?;
+
+    Ok(LightingSceneReorderResult {
+        scene_id: request.scene_id.clone(),
+        summary,
+    })
+}
+
+pub fn pin_lighting_scene(
+    db_path: &Path,
+    request: &LightingScenePinRequest,
+) -> Result<LightingScenePinResult, LightingCommandError> {
+    let app_settings = load_lighting_settings(db_path)?;
+    let mut editor_state = load_lighting_editor_state(&app_settings);
+
+    let scene = editor_state
+        .scenes
+        .iter()
+        .find(|scene| scene.id == request.scene_id)
+        .cloned()
+        .ok_or_else(|| {
+            LightingCommandError::Rejected(
+                "LIGHTING_SCENE_NOT_FOUND",
+                format!(
+                    "Lighting scene '{}' is not exposed by the native editor state.",
+                    request.scene_id
+                ),
+            )
+        })?;
+
+    let already_pinned = editor_state
+        .pinned_scene_ids
+        .iter()
+        .any(|id| id == &request.scene_id);
+    if request.pinned && !already_pinned {
+        editor_state.pinned_scene_ids.push(request.scene_id.clone());
+    } else if !request.pinned && already_pinned {
+        editor_state
+            .pinned_scene_ids
+            .retain(|id| id != &request.scene_id);
+    }
+
+    let summary = if request.pinned {
+        format!("Lighting scene '{}' was pinned.", scene.name)
+    } else {
+        format!("Lighting scene '{}' was unpinned.", scene.name)
+    };
+    let mut updates = lighting_editor_state_updates(&editor_state)?;
+    updates.extend_from_slice(&[
+        (
+            String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
+            String::from("succeeded"),
+        ),
+        (String::from(LIGHTING_LAST_ACTION_CODE_KEY), String::new()),
+        (
+            String::from(LIGHTING_LAST_ACTION_MESSAGE_KEY),
+            summary.clone(),
+        ),
+    ]);
+    persist_lighting_state(db_path, &updates)?;
+
+    Ok(LightingScenePinResult {
+        scene: lighting_scene_snapshot_from_state(
+            &scene,
+            read_optional_setting(&app_settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY).as_deref(),
+            read_optional_setting(&app_settings, LIGHTING_LAST_SCENE_RECALL_AT_KEY).as_deref(),
+            request.pinned,
+        ),
         summary,
     })
 }

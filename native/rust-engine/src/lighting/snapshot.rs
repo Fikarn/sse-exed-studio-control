@@ -56,14 +56,47 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     let selected_fixture_id = read_selected_fixture_id(settings, &fixtures);
     let camera_marker = read_marker_setting(settings, LIGHTING_CAMERA_MARKER_KEY);
     let subject_marker = read_marker_setting(settings, LIGHTING_SUBJECT_MARKER_KEY);
-    let scenes = editor_state
+    // Emit scenes in display order: pinned first (preserving their slot
+    // in scene_order), then unpinned (in scene_order). Per-scene `pinned`
+    // flag drives the rail's visual treatment and snapshots reflect
+    // recall / pin state from the engine without the frontend
+    // re-deriving order. If scene_order somehow drops an id the live
+    // scenes have, the orphans tail-pad in scenes-vec order.
+    let pinned_set: std::collections::HashSet<&str> = editor_state
+        .pinned_scene_ids
+        .iter()
+        .map(|id| id.as_str())
+        .collect();
+    let scene_by_id: std::collections::HashMap<&str, &LightingEditorSceneState> = editor_state
         .scenes
         .iter()
+        .map(|scene| (scene.id.as_str(), scene))
+        .collect();
+    let mut ordered: Vec<&LightingEditorSceneState> = Vec::with_capacity(editor_state.scenes.len());
+    for is_pinned_pass in [true, false] {
+        for id in &editor_state.scene_order {
+            if let Some(scene) = scene_by_id.get(id.as_str()).copied() {
+                if pinned_set.contains(scene.id.as_str()) == is_pinned_pass
+                    && !ordered.iter().any(|other| other.id == scene.id)
+                {
+                    ordered.push(scene);
+                }
+            }
+        }
+    }
+    for scene in &editor_state.scenes {
+        if !ordered.iter().any(|other| other.id == scene.id) {
+            ordered.push(scene);
+        }
+    }
+    let scenes = ordered
+        .into_iter()
         .map(|scene| {
             lighting_scene_snapshot_from_state(
                 scene,
                 last_recalled_scene_id.as_deref(),
                 last_scene_recall_at.as_deref(),
+                pinned_set.contains(scene.id.as_str()),
             )
         })
         .collect::<Vec<_>>();
