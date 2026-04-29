@@ -124,7 +124,7 @@
     "native:installer-acceptance:win:verify": "node scripts/native-installer-acceptance.mjs --target=windows",
     "native:release:mac:local": "npm run native:release:build && npm run native:package:mac:smoke && npm run native:package:mac:clean-smoke && npm run native:package:mac:acceptance && npm run native:bridge:mac:verify && npm run native:installer:mac:local && npm run native:update-repo:mac:local && npm run native:checksums:mac:write && npm run native:artifacts:mac:verify && npm run native:continuity:mac:verify && npm run native:delivery:mac:verify && npm run native:installer-acceptance:mac:verify",
     "native:release:win:local": "npm run native:release:build && npm run native:package:win:smoke && npm run native:package:win:clean-smoke && npm run native:package:win:acceptance && npm run native:bridge:win:verify && npm run native:installer:win:local && npm run native:update-repo:win:local && npm run native:checksums:win:write && npm run native:artifacts:win:verify && npm run native:continuity:win:verify && npm run native:delivery:win:verify && npm run native:installer-acceptance:win:verify",
-    "native:acceptance": "node scripts/native-acceptance.mjs",
+    "native:acceptance": "npm run native:engine:build && node scripts/native-acceptance.mjs",
     "native:shipping:foundation": "npm run native:check && npm run native:test && npm run tauri:foundation",
     "native:foundation": "npm run native:shipping:foundation",
     "ci": "npm run format:check && npm run release:check && npm run native:foundation",
