@@ -15,7 +15,8 @@ export function LightPool({ id, centerX, centerY, radius, intensity, cct, on }: 
     return null;
   }
   const color = lightingFixtureColor(cct, on);
-  const opacity = Math.min(0.45, 0.15 + (intensity / 100) * 0.3);
+  const normalized = Math.max(0, Math.min(1, intensity / 100));
+  const opacity = 0.18 + Math.pow(normalized, 0.85) * 0.44;
   const gradientId = `pool-${id}`;
 
   return (

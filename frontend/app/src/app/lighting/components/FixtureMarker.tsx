@@ -270,7 +270,7 @@ export function FixtureMarker({
           />
         </g>
       ) : null}
-      <g transform={`translate(${renderX}, ${renderY}) rotate(${rotationDegrees})`}>
+      <g transform={`translate(${renderX}, ${renderY}) rotate(${rotationDegrees})`} filter="url(#sse-fixture-shadow)">
         {shapeForMounting(mounting)}
         <circle r={3.6} fill={color} fillOpacity={dotOpacity} />
         {selected ? (

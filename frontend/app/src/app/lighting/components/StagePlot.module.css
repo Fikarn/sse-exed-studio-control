@@ -8,6 +8,7 @@
   display: flex;
   align-items: stretch;
   justify-content: stretch;
+  transition: filter var(--motion-duration-normal) ease;
 }
 
 .plotShell::after {
@@ -19,7 +20,7 @@
 }
 
 .plotShellPatch {
-  filter: brightness(0.7) saturate(0.8);
+  filter: brightness(0.78) saturate(0.85);
 }
 
 .plotShellPatch::after {
@@ -56,40 +57,12 @@
   border-radius: var(--radius-tight-md);
 }
 
-/* Plot pill — top-left "Active scene · {name}" overlay */
-.plotPill {
+/* Slot positioning for the design-system PlotPill primitive (top-left). */
+.plotPillSlot {
   position: absolute;
   top: 16px;
   left: 16px;
   z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: var(--color-glass-bg);
-  border: 1px solid var(--color-brand-green-border);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-family-ui);
-  font-size: 12px;
-  color: var(--color-brand-text-primary);
-  backdrop-filter: blur(6px);
-}
-
-.plotPillModified {
-  border-color: var(--color-brand-yellow-border);
-}
-
-.plotPillDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-brand-green);
-  box-shadow: var(--shadow-glow-green-dot-subtle);
-}
-
-.plotPillModified .plotPillDot {
-  background: var(--color-brand-yellow);
-  box-shadow: var(--shadow-glow-yellow-dot-subtle);
 }
 
 .plotPillLabel {
@@ -107,17 +80,8 @@
   font-size: 13px;
 }
 
-.plotPillMod {
-  font-family: var(--font-family-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--color-brand-yellow);
-  font-weight: 600;
-}
-
-/* Plot overlays — top-right meta column (Floor / Grid / Selected) */
-.plotOverlays {
+/* Slot positioning for the design-system PlotMeta column (top-right). */
+.plotOverlaysSlot {
   position: absolute;
   top: 16px;
   right: 16px;
@@ -126,39 +90,4 @@
   flex-direction: column;
   gap: 6px;
   align-items: flex-end;
-}
-
-.plotMeta {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 4px 10px;
-  background: var(--color-glass-bg-subtle);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-sm);
-  font-family: var(--font-family-mono);
-  font-size: 10px;
-  color: var(--color-brand-text-secondary);
-  backdrop-filter: blur(6px);
-}
-
-.plotMetaLabel {
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--color-brand-text-muted);
-}
-
-.plotMetaValue {
-  font-feature-settings: "tnum", "zero";
-  color: var(--color-brand-text-primary);
-}
-
-.plotMetaSelected {
-  border-color: var(--color-brand-blue-border);
-}
-
-.plotMetaSelected .plotMetaLabel,
-.plotMetaSelected .plotMetaValue {
-  color: var(--color-brand-blue);
 }

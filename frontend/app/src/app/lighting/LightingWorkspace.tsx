@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
+import { X } from "lucide-react";
+
 import { ConfirmDialog } from "@sse/design-system";
 import type {
   LightingDmxMonitorSnapshot,
@@ -104,6 +106,12 @@ export function LightingWorkspaceSurface({
   const [activeTabOverride, setActiveTabOverride] = useState<InspectorTab | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
+  useEffect(() => {
+    if (!feedback) return;
+    if (feedback.tone === "error") return; // errors are sticky until manual dismiss
+    const timer = window.setTimeout(() => setFeedback(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   // Frontend-only multi-select. The persisted single id (read from snapshot)
@@ -1037,7 +1045,7 @@ export function LightingWorkspaceSurface({
             onClick={() => setFeedback(null)}
             aria-label="Dismiss"
           >
-            ×
+            <X aria-hidden="true" size={12} strokeWidth={2} />
           </button>
         </div>
       ) : null}

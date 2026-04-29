@@ -1,6 +1,6 @@
 import { Sun } from "lucide-react";
 
-import { EmptyState } from "@sse/design-system";
+import { EmptyState, PlotMeta, PlotPill } from "@sse/design-system";
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { deriveMounting } from "../fixtureMounting";
@@ -82,30 +82,20 @@ export function StagePlot({
       aria-label="Lighting stage plot"
     >
       {!patchMode && activeSceneName ? (
-        <div className={`${styles.plotPill} ${isSceneModified && bridgeReachable ? styles.plotPillModified : ""}`}>
-          <span className={styles.plotPillDot} aria-hidden="true" />
-          <span className={styles.plotPillLabel}>Active scene</span>
-          <span className={styles.plotPillName}>{activeSceneName}</span>
+        <div className={styles.plotPillSlot}>
+          <PlotPill state={isSceneModified && bridgeReachable ? "modified" : "default"}>
+            <span className={styles.plotPillLabel}>
+              {isSceneModified && bridgeReachable ? "Active scene · modified" : "Active scene"}
+            </span>
+            <span className={styles.plotPillName}>{activeSceneName}</span>
+          </PlotPill>
         </div>
       ) : null}
 
-      <div className={styles.plotOverlays} aria-hidden="true">
-        {selectedFixture ? (
-          <div className={`${styles.plotMeta} ${styles.plotMetaSelected}`}>
-            <span className={styles.plotMetaLabel}>Selected</span>
-            <span className={styles.plotMetaValue}>{selectedFixture.name}</span>
-          </div>
-        ) : null}
-        <div className={styles.plotMeta}>
-          <span className={styles.plotMetaLabel}>Floor</span>
-          <span className={styles.plotMetaValue}>
-            {layout.roomWidthMeters} m × {layout.roomDepthMeters} m
-          </span>
-        </div>
-        <div className={styles.plotMeta}>
-          <span className={styles.plotMetaLabel}>Grid</span>
-          <span className={styles.plotMetaValue}>0.5 / 1 / 5 m</span>
-        </div>
+      <div className={styles.plotOverlaysSlot} role="region" aria-label="Stage plot context">
+        {selectedFixture ? <PlotMeta label="Selected" value={selectedFixture.name} tone="blue" /> : null}
+        <PlotMeta label="Floor" value={`${layout.roomWidthMeters} m × ${layout.roomDepthMeters} m`} />
+        <PlotMeta label="Grid" value="0.5 / 1 / 5 m" />
       </div>
 
       <svg
@@ -122,6 +112,19 @@ export function StagePlot({
         onDoubleClick={viewport.reset}
       >
         <g transform={viewport.transform}>
+          <defs>
+            <filter id="sse-fixture-shadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="1.2" />
+              <feOffset dx="0" dy="1" result="offsetblur" />
+              <feComponentTransfer>
+                <feFuncA type="linear" slope="0.45" />
+              </feComponentTransfer>
+              <feMerge>
+                <feMergeNode />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           <StudioFloor layout={layout} />
           <StagePlotGrid layout={layout} />
 
@@ -150,16 +153,29 @@ export function StagePlot({
             const { xMeters, yMeters } = meterPositionFor(fixture, index);
             const length = lightingFixtureBeamLength(fixture.kind ?? fixture.type) * 100;
             return (
-              <line
-                key={`beam-${fixture.id}`}
-                x1={xMeters * 100}
-                y1={yMeters * 100}
-                x2={xMeters * 100}
-                y2={yMeters * 100 + length}
-                strokeWidth={0.6}
-                strokeDasharray="4 4"
-                style={{ stroke: "var(--color-stage-beam-line)" }}
-              />
+              <g key={`beam-${fixture.id}`}>
+                <defs>
+                  <linearGradient
+                    id={`beam-grad-${fixture.id}`}
+                    x1={xMeters * 100}
+                    y1={yMeters * 100}
+                    x2={xMeters * 100}
+                    y2={yMeters * 100 + length}
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <stop offset="0%" style={{ stopColor: "var(--color-stage-beam-line)", stopOpacity: 0.6 }} />
+                    <stop offset="100%" style={{ stopColor: "var(--color-stage-beam-line)", stopOpacity: 0 }} />
+                  </linearGradient>
+                </defs>
+                <line
+                  x1={xMeters * 100}
+                  y1={yMeters * 100}
+                  x2={xMeters * 100}
+                  y2={yMeters * 100 + length}
+                  stroke={`url(#beam-grad-${fixture.id})`}
+                  strokeWidth={1}
+                />
+              </g>
             );
           })}
 

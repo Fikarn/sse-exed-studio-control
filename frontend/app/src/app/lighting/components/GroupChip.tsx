@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, TrendingDown, TrendingUp } from "lucide-react";
 
 import { StatusDot } from "@sse/design-system";
 
@@ -32,12 +32,8 @@ export function GroupChip({
   const className = on ? `${styles.groupChip} ${styles.groupChipOn}` : styles.groupChip;
   const levelClass = drifted ? `${styles.groupChipLevel} ${styles.groupChipLevelDrifted}` : styles.groupChipLevel;
   const meaningfulDelta = drifted && Math.abs(levelDelta) >= 1;
-  const arrow = levelDelta > 0 ? "▲" : "▼";
-  const deltaLabel = meaningfulDelta
-    ? ` ${arrow} ${levelDelta > 0 ? "+" : ""}${Math.round(levelDelta)}`
-    : drifted
-      ? " ▲"
-      : "";
+  const TrendIcon = levelDelta > 0 ? TrendingUp : TrendingDown;
+  const deltaText = meaningfulDelta ? `${levelDelta > 0 ? "+" : ""}${Math.round(levelDelta)}` : "";
   const fixtureLabel = `${fixtureCount} fixture${fixtureCount === 1 ? "" : "s"}`;
   const driftSuffix = drifted ? ", drifted" : "";
   const powerAriaLabel = `${name} — ${fixtureLabel}${on ? `, ${level}%` : ""}${driftSuffix}, currently ${
@@ -58,7 +54,13 @@ export function GroupChip({
         <span className={styles.groupChipCount}>{fixtureCount}F</span>
         {on ? (
           <span className={levelClass}>
-            {level}%{deltaLabel ? <span aria-hidden="true">{deltaLabel}</span> : null}
+            {level}%
+            {meaningfulDelta || drifted ? (
+              <span className={styles.groupChipDelta} aria-hidden="true">
+                <TrendIcon size={11} strokeWidth={2.5} />
+                {deltaText ? <span>{deltaText}</span> : null}
+              </span>
+            ) : null}
           </span>
         ) : null}
       </button>
