@@ -21,7 +21,7 @@ temp/
 *.orig
 native/build/
 native/**/build/
-native/target/
+native/**/target/
 artifacts/
 frontend/**/dist/
 frontend/**/storybook-static/
