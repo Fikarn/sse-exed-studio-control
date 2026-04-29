@@ -83,8 +83,8 @@ export function LightingHealthBar({
     {
       label: "Bridge",
       dot: reachable ? "ok" : "err",
-      value: bridgeIp ? `DMX U${universe} · ${bridgeIp}` : `DMX U${universe} · —`,
-      suffix: reachable ? "reachable" : "unreachable",
+      value: bridgeIp ? `${bridgeIp} · U${universe}` : `U${universe} · no IP`,
+      suffix: reachable ? undefined : "unreachable",
     },
     {
       label: "Universe",

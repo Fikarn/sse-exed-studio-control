@@ -36,9 +36,7 @@ export function GroupChip({
   const deltaText = meaningfulDelta ? `${levelDelta > 0 ? "+" : ""}${Math.round(levelDelta)}` : "";
   const fixtureLabel = `${fixtureCount} fixture${fixtureCount === 1 ? "" : "s"}`;
   const driftSuffix = drifted ? ", drifted" : "";
-  const powerAriaLabel = `${name} — ${fixtureLabel}${on ? `, ${level}%` : ""}${driftSuffix}, currently ${
-    on ? "on" : "off"
-  }. Click to turn ${on ? "off" : "on"}.`;
+  const powerAriaLabel = `${name}, ${fixtureLabel}${on ? ` at ${level}%` : ""}${driftSuffix}, ${on ? "on" : "off"}. Toggle ${on ? "off" : "on"}.`;
 
   return (
     <div className={styles.groupChipRow}>

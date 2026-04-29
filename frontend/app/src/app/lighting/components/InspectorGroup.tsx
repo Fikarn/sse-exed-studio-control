@@ -30,7 +30,6 @@ export function InspectorGroup({
 }: InspectorGroupProps) {
   const onCount = fixtures.filter((fixture) => fixture.on).length;
   const allOn = fixtures.length > 0 && onCount === fixtures.length;
-  const mixed = onCount > 0 && onCount < fixtures.length;
 
   const intensities = fixtures.map((fixture) => fixture.intensity);
   const ccts = fixtures.map((fixture) => fixture.cct);
@@ -39,9 +38,6 @@ export function InspectorGroup({
   const cctMin = ccts.length > 0 ? Math.min(...ccts) : 0;
   const cctMax = ccts.length > 0 ? Math.max(...ccts) : 0;
 
-  // "Mixed" is a partial state, not an alert — keep the dot informational so
-  // it doesn't read as a warning. The textual " · mixed" suffix conveys the
-  // distinction.
   const dotState = allOn ? "ok" : "info";
 
   return (
@@ -65,7 +61,6 @@ export function InspectorGroup({
             <div className={styles.fixtureSubline}>
               <StatusDot state={dotState} size="sm" />
               {onCount}/{fixtures.length} on
-              {mixed ? " · mixed" : ""}
             </div>
           </div>
           <Button

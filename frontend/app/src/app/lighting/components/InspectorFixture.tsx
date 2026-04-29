@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useState } from "react";
+import { type ChangeEvent, useEffect, useId, useState } from "react";
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 
 import { Button, ConfirmDialog, IconButton, InspectorSection, StatusDot } from "@sse/design-system";
@@ -82,6 +82,7 @@ export function InspectorFixture({
   assignGroupBusy = false,
 }: InspectorFixtureProps) {
   const cctRange = lightingFixtureCctRange(fixture.type);
+  const cctScaleId = useId();
   const [intensityDraft, setIntensityDraft] = useState(fixture.intensity);
   const [cctDraft, setCctDraft] = useState(fixture.cct);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -271,6 +272,7 @@ export function InspectorFixture({
         <div className={styles.sliderRow}>
           <input
             aria-label="Fixture CCT"
+            aria-describedby={cctScaleId}
             className={`${styles.slider} ${styles.sliderCct}`}
             disabled={busy}
             type="range"
@@ -289,7 +291,7 @@ export function InspectorFixture({
           />
           <span className={styles.sliderValue}>{cctDraft}K</span>
         </div>
-        <div className={styles.cctScale} aria-hidden="true">
+        <div id={cctScaleId} className={styles.cctScale}>
           <span>{cctRange.min}K · warm</span>
           <span>{cctRange.max}K · cool</span>
         </div>

@@ -131,12 +131,16 @@ export function FixtureMarker({
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
   // Show a green focus ring around the marker when keyboard focus lands on
   // it (and only on keyboard focus — pointer interactions don't trigger).
+  // The :focus-visible CSS pseudo-class is unreliable on SVG <g> in Chromium
+  // webviews, so we shim with matches(":focus-visible") inside onFocus and a
+  // try/catch fallback for older engines. Retained intentionally per
+  // audit-fix-plan #29 / Wave 21 finding #30.
   const [keyboardFocused, setKeyboardFocused] = useState(false);
 
   // Per the v6 prototype: name + meta lines sit above the marker, not rotated
-  // with the fixture body. Label upper-cased to match the prototype's
-  // "APOLLO L" / "ASTRA L" style.
-  const displayName = name.toUpperCase();
+  // with the fixture body. Uppercase styling lives in CSS so the aria-label
+  // can reuse the original mixed-case name for screen readers (closes #35).
+  const displayName = name.length > 18 ? `${name.slice(0, 17)}…` : name;
   const intensityLabel = on ? `${Math.round(intensity)}%` : "OFF";
   const metaLabel = `${intensityLabel} · ${Math.round(cct)} K · ${MOUNTING_SHORT_LABEL[mounting]}`;
 
@@ -302,7 +306,7 @@ export function FixtureMarker({
         fontWeight={600}
         letterSpacing={0.8}
         pointerEvents="none"
-        style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)" }}
+        style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)", textTransform: "uppercase" }}
       >
         {displayName}
       </text>

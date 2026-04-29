@@ -233,7 +233,9 @@ export function LightingInspector({
         ) : null}
 
         {activeTab === "fixture" && !selectedFixture ? (
-          <p className={styles.empty}>Select a fixture on the stage plot to see its controls.</p>
+          <p className={styles.empty}>
+            Choose a fixture on the stage plot to see its controls. Or use the toolbar search to find one by name.
+          </p>
         ) : null}
 
         {activeTab === "group" && selectedGroup ? (
@@ -250,7 +252,7 @@ export function LightingInspector({
         ) : null}
 
         {activeTab === "group" && !selectedGroup ? (
-          <p className={styles.empty}>Pick a group from the rail (chevron icon) to see its members.</p>
+          <p className={styles.empty}>Choose a group from the rail (chevron icon) to see its members.</p>
         ) : null}
 
         {activeTab === "patch" ? (

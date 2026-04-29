@@ -42,6 +42,10 @@
   overflow-y: auto;
 }
 
+.row {
+  display: contents;
+}
+
 .cell {
   position: relative;
   display: flex;
