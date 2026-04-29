@@ -76,7 +76,9 @@ export interface LightingInspectorProps {
   onBulkIntensityCommit?: (fixtureIds: readonly string[], intensity: number) => void;
   onBulkCctCommit?: (fixtureIds: readonly string[], cct: number) => void;
 
-  busyAction: string | null;
+  /** Set of in-flight mutation keys; check with `.has(key)` or
+   *  `Array.from(set).some((k) => k.startsWith(prefix))` for prefix queries. */
+  busyActions: ReadonlySet<string>;
 }
 
 export function deriveInspectorTab(opts: {
@@ -150,8 +152,9 @@ export function LightingInspector({
   onBulkTogglePower,
   onBulkIntensityCommit,
   onBulkCctCommit,
-  busyAction,
+  busyActions,
 }: LightingInspectorProps) {
+  const hasBusyPrefix = (prefix: string) => Array.from(busyActions).some((key) => key.startsWith(prefix));
   const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
   const activeScene = scenes.find((scene) => scene.id === activeSceneId) ?? null;
@@ -191,17 +194,17 @@ export function LightingInspector({
             onResaveScene={onResaveScene}
             onDeleteScene={onDeleteScene}
             onRenameScene={onRenameScene}
-            saveBusy={busyAction === "scene-create"}
-            recallBusy={busyAction?.startsWith("scene:") ?? false}
-            resaveBusy={busyAction === "scene-resave"}
-            deleteBusy={busyAction === "scene-delete"}
+            saveBusy={busyActions.has("scene-create")}
+            recallBusy={hasBusyPrefix("scene:")}
+            resaveBusy={busyActions.has("scene-resave")}
+            deleteBusy={busyActions.has("scene-delete")}
           />
         ) : null}
 
         {activeTab === "fixture" && selectedFixtures && selectedFixtures.length > 1 ? (
           <InspectorFixtureBulk
             fixtures={selectedFixtures}
-            busy={busyAction?.startsWith("fixture-bulk-") ?? false}
+            busy={hasBusyPrefix("fixture-bulk-")}
             onClearSelection={onClearSelection ?? (() => undefined)}
             onBulkTogglePower={onBulkTogglePower ?? (() => undefined)}
             onBulkIntensityCommit={onBulkIntensityCommit ?? (() => undefined)}
@@ -225,10 +228,10 @@ export function LightingInspector({
             onRenameFixture={onRenameFixture}
             onAssignFixtureGroup={onAssignFixtureGroup}
             onCreateGroup={onCreateGroup}
-            busy={busyAction?.startsWith(`fixture-`) ?? false}
-            deleteBusy={busyAction === `fixture-delete:${selectedFixture.id}`}
-            renameBusy={busyAction === `fixture-rename:${selectedFixture.id}`}
-            assignGroupBusy={busyAction === `fixture-group:${selectedFixture.id}`}
+            busy={hasBusyPrefix("fixture-")}
+            deleteBusy={busyActions.has(`fixture-delete:${selectedFixture.id}`)}
+            renameBusy={busyActions.has(`fixture-rename:${selectedFixture.id}`)}
+            assignGroupBusy={busyActions.has(`fixture-group:${selectedFixture.id}`)}
           />
         ) : null}
 
@@ -246,8 +249,8 @@ export function LightingInspector({
             onTogglePower={onToggleGroupPower}
             onSelectFixture={onSelectFixture}
             onRenameGroup={onRenameGroup}
-            busy={busyAction === `group:${selectedGroup.id}`}
-            renameBusy={busyAction === `group-rename:${selectedGroup.id}`}
+            busy={busyActions.has(`group:${selectedGroup.id}`)}
+            renameBusy={busyActions.has(`group-rename:${selectedGroup.id}`)}
           />
         ) : null}
 
@@ -265,7 +268,7 @@ export function LightingInspector({
             patchOverlap={patchOverlap}
             onPatchCommit={onPatchCommit}
             onIdentifyBurst={onIdentifyBurst}
-            busy={selectedFixture ? busyAction === `fixture-patch:${selectedFixture.id}` : false}
+            busy={selectedFixture ? busyActions.has(`fixture-patch:${selectedFixture.id}`) : false}
           />
         ) : null}
       </section>

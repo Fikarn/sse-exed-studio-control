@@ -38,7 +38,7 @@
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-sm);
   padding: 4px;
-  max-height: 540px;
+  max-height: min(540px, 70vh);
   overflow-y: auto;
 }
 

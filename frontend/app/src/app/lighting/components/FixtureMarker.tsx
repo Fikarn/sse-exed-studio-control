@@ -26,6 +26,8 @@ export interface FixtureMarkerProps {
   on: boolean;
   selected: boolean;
   dimmed?: boolean;
+  /** Render an animated pulse ring while the engine identify burst is live. */
+  identifying?: boolean;
   onSelect: (id: string, options: { additive: boolean }) => void;
   /**
    * Optional commit callback when the marker is dragged. xMeters / yMeters
@@ -117,6 +119,7 @@ export function FixtureMarker({
   on,
   selected,
   dimmed = false,
+  identifying = false,
   onSelect,
   onPositionCommit,
 }: FixtureMarkerProps) {
@@ -297,6 +300,24 @@ export function FixtureMarker({
           pointerEvents="none"
           style={{ stroke: SELECTED_STROKE, strokeWidth: 2 }}
         />
+      ) : null}
+      {/* Identify-burst pulse ring — total 1.2 s matches engine
+          identify.rs default duration_ms. SVG <animate> runs natively;
+          we don't gate on prefers-reduced-motion because the burst is the
+          point of the gesture (user-initiated, opt-in). */}
+      {identifying ? (
+        <circle
+          cx={renderX}
+          cy={renderY}
+          r={mounting === "wall-bar" ? 36 : 22}
+          fill="none"
+          strokeWidth={2}
+          pointerEvents="none"
+          style={{ stroke: SELECTED_STROKE }}
+        >
+          <animate attributeName="r" values="14;28;14" dur="0.4s" repeatCount="3" />
+          <animate attributeName="opacity" values="1;0.3;1" dur="0.4s" repeatCount="3" />
+        </circle>
       ) : null}
       <text
         x={renderX}
