@@ -333,7 +333,7 @@ button.lightingDmxDrawerCell {
   gap: var(--space-4);
   min-height: 100vh;
   min-height: 100dvh;
-  padding: var(--space-3) 0;
+  padding: var(--space-2) 0;
 }
 
 .setupFeedbackBanner {
