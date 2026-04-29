@@ -514,7 +514,12 @@ export function LightingWorkspaceSurface({
   const handleSaveScene = useEffectEvent(async (overrideName?: string) => {
     setBusyAction("scene-create");
     try {
-      const name = overrideName?.trim() || `Scene ${scenes.length + 1}`;
+      // The button onClick paths (scene-rail head, "+ New scene" tile,
+      // inspector save) wire this handler directly, so React passes a
+      // SyntheticEvent as the first arg. Treat anything non-string as "no
+      // override" instead of calling .trim() on the event and crashing.
+      const trimmed = typeof overrideName === "string" ? overrideName.trim() : "";
+      const name = trimmed || `Scene ${scenes.length + 1}`;
       const result = asRecord(await store.createLightingScene({ name }));
       const created = asRecord(result?.scene);
       const createdId = typeof created?.id === "string" ? created.id : null;
