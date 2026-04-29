@@ -113,13 +113,34 @@ export function LightingWorkspaceSurface({
     const timer = window.setTimeout(() => setFeedback(null), 3500);
     return () => window.clearTimeout(timer);
   }, [feedback]);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
+  // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
+  // while saving Scene A) don't stomp each other. Each handler scopes its
+  // own key; the inspector reads via `busyActions.has(key)` /
+  // `busyHasPrefix(busyActions, prefix)`.
+  const [busyActions, setBusyActions] = useState<ReadonlySet<string>>(() => new Set());
+  const startBusy = useCallback((key: string) => {
+    setBusyActions((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
+  const finishBusy = useCallback((key: string) => {
+    setBusyActions((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   // Frontend-only multi-select. The persisted single id (read from snapshot)
   // is the "primary" focus that's synced to the engine; the set tracks the
   // additional shift-click selections so the bulk inspector can edit them
   // together. Cleared on workspace switch / hot reload by being state.
   const [extraSelectedFixtureIds, setExtraSelectedFixtureIds] = useState<ReadonlySet<string>>(() => new Set());
+  // Mirror identify-burst pulses on the plot marker. 1.2 s window matches
+  // engine identify.rs default. Cleared by setTimeout in handleIdentifyBurst.
+  const [identifyingIds, setIdentifyingIds] = useState<ReadonlySet<string>>(() => new Set());
   const [dmxMonitorOpen, setDmxMonitorOpen] = useState(false);
   const [confirmCutAllOpen, setConfirmCutAllOpen] = useState(false);
   const [createFixtureOpen, setCreateFixtureOpen] = useState(false);
@@ -337,13 +358,13 @@ export function LightingWorkspaceSurface({
       setExtraSelectedFixtureIds(new Set());
     }
 
-    setBusyAction("fixture-select");
+    startBusy("fixture-select");
     try {
       await store.updateLightingSettings({ selectedFixtureId: fixtureId });
     } catch (error) {
       reportError(error, "Lighting selection update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("fixture-select");
     }
   });
 
@@ -368,7 +389,7 @@ export function LightingWorkspaceSurface({
 
   const handleAddFixture = useEffectEvent(
     async (fixtureSpec: { name: string; type: string; dmxStartAddress: number }) => {
-      setBusyAction("fixture-create");
+      startBusy("fixture-create");
       try {
         const result = asRecord(await store.createLightingFixture(fixtureSpec));
         const createdFixture = asRecord(result?.fixture);
@@ -407,56 +428,58 @@ export function LightingWorkspaceSurface({
       } catch (error) {
         reportError(error, "Lighting fixture create failed.");
       } finally {
-        setBusyAction(null);
+        finishBusy("fixture-create");
       }
     }
   );
 
   const handleCreateGroup = useEffectEvent(async (name: string) => {
-    setBusyAction("group-create");
+    startBusy("group-create");
     try {
       const result = asRecord(await store.createLightingGroup(name));
       setFeedback({ message: String(result?.summary ?? `Group '${name}' created.`), tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting group create failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("group-create");
     }
   });
 
   const handleRenameScene = useEffectEvent(async (sceneId: string, name: string) => {
-    setBusyAction("scene-rename");
+    startBusy("scene-rename");
     try {
       await store.updateLightingScene({ sceneId, name });
       setFeedback({ message: `Scene renamed to '${name}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Scene rename failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("scene-rename");
     }
   });
 
   const handleRenameFixture = useEffectEvent(async (fixtureId: string, name: string) => {
-    setBusyAction(`fixture-rename:${fixtureId}`);
+    const busyKey = `fixture-rename:${fixtureId}`;
+    startBusy(busyKey);
     try {
       await store.updateLightingFixture({ fixtureId, name });
       setFeedback({ message: `Fixture renamed to '${name}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Fixture rename failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
   const handleRenameGroup = useEffectEvent(async (groupId: string, name: string) => {
-    setBusyAction(`group-rename:${groupId}`);
+    const busyKey = `group-rename:${groupId}`;
+    startBusy(busyKey);
     try {
       await store.updateLightingGroup({ groupId, name });
       setFeedback({ message: `Group renamed to '${name}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Group rename failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
@@ -484,14 +507,14 @@ export function LightingWorkspaceSurface({
   );
 
   const handleEmergencyCut = useEffectEvent(async () => {
-    setBusyAction("lighting-blackout");
+    startBusy("lighting-blackout");
     try {
       await store.setLightingAllPower(false);
       setFeedback({ message: "All fixtures cut.", tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting blackout failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("lighting-blackout");
     }
   });
 
@@ -500,19 +523,19 @@ export function LightingWorkspaceSurface({
   }, []);
 
   const handleToggleAllPower = useEffectEvent(async (on: boolean) => {
-    setBusyAction("lighting-master-toggle");
+    startBusy("lighting-master-toggle");
     try {
       await store.setLightingAllPower(on);
       setFeedback({ message: on ? "Lighting resumed." : "Lighting paused.", tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting master toggle failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("lighting-master-toggle");
     }
   });
 
   const handleSaveScene = useEffectEvent(async (overrideName?: string) => {
-    setBusyAction("scene-create");
+    startBusy("scene-create");
     try {
       // The button onClick paths (scene-rail head, "+ New scene" tile,
       // inspector save) wire this handler directly, so React passes a
@@ -539,13 +562,13 @@ export function LightingWorkspaceSurface({
     } catch (error) {
       reportError(error, "Scene save failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("scene-create");
     }
   });
 
   const handleResaveScene = useEffectEvent(async () => {
     if (!activeScene) return;
-    setBusyAction("scene-resave");
+    startBusy("scene-resave");
     try {
       const sceneId = activeScene.id;
       const sceneName = activeScene.name;
@@ -571,13 +594,13 @@ export function LightingWorkspaceSurface({
     } catch (error) {
       reportError(error, "Scene re-save failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("scene-resave");
     }
   });
 
   const handleDeleteScene = useEffectEvent(async () => {
     if (!activeScene) return;
-    setBusyAction("scene-delete");
+    startBusy("scene-delete");
     try {
       await store.deleteLightingScene(activeScene.id);
       const next = withSceneThumbRemoved(sceneThumbs, activeScene.id);
@@ -586,7 +609,7 @@ export function LightingWorkspaceSurface({
     } catch (error) {
       reportError(error, "Scene delete failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("scene-delete");
     }
   });
 
@@ -612,14 +635,15 @@ export function LightingWorkspaceSurface({
       });
       return;
     }
-    setBusyAction(`scene:${sceneId}`);
+    const busyKey = `scene:${sceneId}`;
+    startBusy(busyKey);
     try {
       await store.recallLightingScene(sceneId, 0);
       setFeedback({ message: "Scene recalled.", tone: "ok" });
     } catch (error) {
       reportError(error, "Scene recall failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
@@ -642,52 +666,57 @@ export function LightingWorkspaceSurface({
   }, [scenes, sceneThumbs, fixtures]);
 
   const handleToggleGroupPower = useEffectEvent(async (groupId: string, on: boolean) => {
-    setBusyAction(`group:${groupId}`);
+    const busyKey = `group:${groupId}`;
+    startBusy(busyKey);
     try {
       await store.setLightingGroupPower(groupId, on);
       setFeedback({ message: `Group ${on ? "on" : "off"}.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Group power update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
   const handleToggleFixturePower = useEffectEvent(async (fixtureId: string, on: boolean) => {
-    setBusyAction(`fixture-power:${fixtureId}`);
+    const busyKey = `fixture-power:${fixtureId}`;
+    startBusy(busyKey);
     try {
       await store.updateLightingFixture({ fixtureId, on });
     } catch (error) {
       reportError(error, "Fixture power update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
   const handleIntensityCommit = useEffectEvent(async (fixtureId: string, intensity: number) => {
-    setBusyAction(`fixture-intensity:${fixtureId}`);
+    const busyKey = `fixture-intensity:${fixtureId}`;
+    startBusy(busyKey);
     try {
       await store.updateLightingFixture({ fixtureId, intensity });
     } catch (error) {
       reportError(error, "Intensity update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
   const handleCctCommit = useEffectEvent(async (fixtureId: string, cct: number) => {
-    setBusyAction(`fixture-cct:${fixtureId}`);
+    const busyKey = `fixture-cct:${fixtureId}`;
+    startBusy(busyKey);
     try {
       await store.updateLightingFixture({ fixtureId, cct });
     } catch (error) {
       reportError(error, "CCT update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
   const handlePatchCommit = useEffectEvent(async (fixtureId: string, dmxStartAddress: number) => {
-    setBusyAction(`fixture-patch:${fixtureId}`);
+    const busyKey = `fixture-patch:${fixtureId}`;
+    startBusy(busyKey);
     try {
       await store.updateLightingFixture({ fixtureId, dmxStartAddress });
       // Auto-advance to the next unpaired fixture (dmxStartAddress < 1).
@@ -710,19 +739,34 @@ export function LightingWorkspaceSurface({
     } catch (error) {
       reportError(error, "Patch update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
   const handleIdentifyBurst = useEffectEvent(async (fixtureId: string, fixtureName: string) => {
-    setBusyAction(`fixture-identify:${fixtureId}`);
+    // Mirror the engine burst on the plot marker: 1.2 s window matches the
+    // identify.rs default duration_ms.
+    setIdentifyingIds((prev) => {
+      const next = new Set(prev);
+      next.add(fixtureId);
+      return next;
+    });
+    window.setTimeout(() => {
+      setIdentifyingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(fixtureId);
+        return next;
+      });
+    }, 1200);
+    const busyKey = `fixture-identify:${fixtureId}`;
+    startBusy(busyKey);
     try {
       await store.identifyLightingFixture(fixtureId);
       setFeedback({ message: `Identify burst sent to '${fixtureName}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Identify burst failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
@@ -731,7 +775,8 @@ export function LightingWorkspaceSurface({
     // groupId / spatial / beam-angle are restored via a follow-up update IPC
     // because createLightingFixture only takes the create-time fields.
     const target = fixtures.find((fixture) => fixture.id === fixtureId);
-    setBusyAction(`fixture-delete:${fixtureId}`);
+    const busyKey = `fixture-delete:${fixtureId}`;
+    startBusy(busyKey);
     try {
       await store.deleteLightingFixture(fixtureId);
       // Clear the selection if we just deleted the selected fixture so the
@@ -784,12 +829,12 @@ export function LightingWorkspaceSurface({
     } catch (error) {
       reportError(error, "Fixture delete failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
   const handleBulkTogglePower = useEffectEvent(async (fixtureIds: readonly string[], on: boolean) => {
-    setBusyAction("fixture-bulk-power");
+    startBusy("fixture-bulk-power");
     try {
       await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, on })));
       setFeedback({
@@ -799,29 +844,29 @@ export function LightingWorkspaceSurface({
     } catch (error) {
       reportError(error, "Bulk power update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("fixture-bulk-power");
     }
   });
 
   const handleBulkIntensityCommit = useEffectEvent(async (fixtureIds: readonly string[], intensity: number) => {
-    setBusyAction("fixture-bulk-intensity");
+    startBusy("fixture-bulk-intensity");
     try {
       await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, intensity })));
     } catch (error) {
       reportError(error, "Bulk intensity update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("fixture-bulk-intensity");
     }
   });
 
   const handleBulkCctCommit = useEffectEvent(async (fixtureIds: readonly string[], cct: number) => {
-    setBusyAction("fixture-bulk-cct");
+    startBusy("fixture-bulk-cct");
     try {
       await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, cct })));
     } catch (error) {
       reportError(error, "Bulk CCT update failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy("fixture-bulk-cct");
     }
   });
 
@@ -836,19 +881,21 @@ export function LightingWorkspaceSurface({
         spatialRotation?: number;
       }
     ) => {
-      setBusyAction(`fixture-spatial:${fixtureId}`);
+      const busyKey = `fixture-spatial:${fixtureId}`;
+      startBusy(busyKey);
       try {
         await store.updateLightingFixture({ fixtureId, ...partial });
       } catch (error) {
         reportError(error, "Fixture spatial update failed.");
       } finally {
-        setBusyAction(null);
+        finishBusy(busyKey);
       }
     }
   );
 
   const handleAssignFixtureGroup = useEffectEvent(async (fixtureId: string, groupId: string | null) => {
-    setBusyAction(`fixture-group:${fixtureId}`);
+    const busyKey = `fixture-group:${fixtureId}`;
+    startBusy(busyKey);
     try {
       await store.updateLightingFixture({ fixtureId, groupId });
       setFeedback({
@@ -858,7 +905,7 @@ export function LightingWorkspaceSurface({
     } catch (error) {
       reportError(error, "Fixture group assignment failed.");
     } finally {
-      setBusyAction(null);
+      finishBusy(busyKey);
     }
   });
 
@@ -904,22 +951,22 @@ export function LightingWorkspaceSurface({
   });
 
   const triggerUndo = useEffectEvent(async () => {
-    setBusyAction("undo");
+    startBusy("undo");
     try {
       const outcome = await undoStack.undo();
       reportUndoOutcome(outcome, "Undo");
     } finally {
-      setBusyAction(null);
+      finishBusy("undo");
     }
   });
 
   const triggerRedo = useEffectEvent(async () => {
-    setBusyAction("redo");
+    startBusy("redo");
     try {
       const outcome = await undoStack.redo();
       reportUndoOutcome(outcome, "Redo");
     } finally {
-      setBusyAction(null);
+      finishBusy("redo");
     }
   });
 
@@ -972,6 +1019,26 @@ export function LightingWorkspaceSurface({
         return;
       }
 
+      // ⌘A / Ctrl+A → select every fixture (multi-select). isEditableTarget
+      // gate above keeps native text-selection in inputs intact.
+      if (modifier && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        const all = new Set(fixtures.map((fixture) => fixture.id));
+        setExtraSelectedFixtureIds(all);
+        if (!persistedSelectedFixtureId && fixtures.length > 0) {
+          void store.updateLightingSettings({ selectedFixtureId: fixtures[0]!.id });
+        }
+        return;
+      }
+
+      // ⌘F / Ctrl+F → focus the toolbar search field. Shifted variant left
+      // alone so the OS Find Bar binding still resolves elsewhere.
+      if (modifier && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        document.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+        return;
+      }
+
       // ⌘S / Ctrl+S → save changes when drift exists, otherwise no-op with
       // feedback. ⌘⇧S → always opens the "Save as new" dialog with rename.
       if (modifier && !event.altKey && event.key.toLowerCase() === "s") {
@@ -1002,6 +1069,14 @@ export function LightingWorkspaceSurface({
           void handleSaveScene();
         }
         event.preventDefault();
+      } else if (/^[1-9]$/.test(event.key)) {
+        // Quick scene recall — number key matches the rail's positional
+        // index. Falls through silently when fewer than N scenes exist.
+        const idx = Number.parseInt(event.key, 10) - 1;
+        if (idx < scenes.length) {
+          event.preventDefault();
+          void handleRecallScene(scenes[idx]!.id);
+        }
       } else if (event.key === "Escape") {
         setSelectedGroupId(null);
         void handleSelectFixture(null);
@@ -1011,12 +1086,16 @@ export function LightingWorkspaceSurface({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     activeScene,
+    fixtures,
     handleFixtureNudge,
+    handleRecallScene,
     handleResaveScene,
     handleSaveScene,
     handleSelectFixture,
     isSceneModified,
     persistedSelectedFixtureId,
+    scenes,
+    store,
     triggerRedo,
     triggerUndo,
   ]);
@@ -1024,6 +1103,19 @@ export function LightingWorkspaceSurface({
   const lastSavedLabel = lastSavedAt
     ? lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : undefined;
+
+  if (!lightingSnapshot) {
+    return (
+      <div className={styles.shell}>
+        <div className={styles.connectingState} role="status" aria-live="polite">
+          <p className={styles.connectingTitle}>Connecting to lighting engine…</p>
+          <p className={styles.connectingHint}>
+            Loading the rust engine snapshot. This usually takes a fraction of a second.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.shell}>
@@ -1104,6 +1196,7 @@ export function LightingWorkspaceSurface({
             isSceneModified={isSceneModified}
             bridgeReachable={bridgeReachable}
             searchQuery={searchQuery}
+            identifyingFixtureIds={identifyingIds}
             onSelectFixture={(id, options) => void handleSelectFixture(id, options ?? {})}
             onPositionCommit={(id, xMeters, yMeters) =>
               void handleFixtureSpatialCommit(id, { spatialX: xMeters, spatialY: yMeters })
@@ -1152,7 +1245,7 @@ export function LightingWorkspaceSurface({
           onBulkTogglePower={(ids, on) => void handleBulkTogglePower(ids, on)}
           onBulkIntensityCommit={(ids, intensity) => void handleBulkIntensityCommit(ids, intensity)}
           onBulkCctCommit={(ids, cct) => void handleBulkCctCommit(ids, cct)}
-          busyAction={busyAction}
+          busyActions={busyActions}
         />
       </div>
 
@@ -1216,7 +1309,7 @@ export function LightingWorkspaceSurface({
           confirmLabel="Cut all"
           cancelLabel="Cancel"
           danger
-          busy={busyAction === "lighting-blackout"}
+          busy={busyActions.has("lighting-blackout")}
           onConfirm={() => {
             setConfirmCutAllOpen(false);
             void handleEmergencyCut();
@@ -1229,7 +1322,7 @@ export function LightingWorkspaceSurface({
         <CreateFixtureDialog
           fixtures={fixtures}
           defaultName={nextLightingFixtureName(fixtures)}
-          busy={busyAction === "fixture-create"}
+          busy={busyActions.has("fixture-create")}
           onConfirm={(spec) => {
             setCreateFixtureOpen(false);
             void handleAddFixture(spec);
@@ -1245,7 +1338,7 @@ export function LightingWorkspaceSurface({
           initialValue=""
           placeholder="e.g. Key, Fill, Back"
           confirmLabel="Create group"
-          busy={busyAction === "group-create"}
+          busy={busyActions.has("group-create")}
           onConfirm={(name) => {
             setCreateGroupOpen(false);
             void handleCreateGroup(name);
@@ -1261,7 +1354,7 @@ export function LightingWorkspaceSurface({
           initialValue={`Scene ${scenes.length + 1}`}
           placeholder="e.g. Talking head, Wide, Backlit"
           confirmLabel="Save scene"
-          busy={busyAction === "scene-create"}
+          busy={busyActions.has("scene-create")}
           onConfirm={(name) => {
             setSaveSceneAsOpen(false);
             void handleSaveScene(name);
@@ -1283,10 +1376,10 @@ export function LightingWorkspaceSurface({
           initialValue={renameTarget.currentName}
           busy={
             renameTarget.kind === "scene"
-              ? busyAction === "scene-rename"
+              ? busyActions.has("scene-rename")
               : renameTarget.kind === "fixture"
-                ? busyAction === `fixture-rename:${renameTarget.fixtureId}`
-                : busyAction === `group-rename:${renameTarget.groupId}`
+                ? busyActions.has(`fixture-rename:${renameTarget.fixtureId}`)
+                : busyActions.has(`group-rename:${renameTarget.groupId}`)
           }
           onConfirm={(name) => {
             const target = renameTarget;

@@ -34,6 +34,8 @@ export interface StagePlotProps {
    */
   bridgeReachable?: boolean;
   searchQuery?: string;
+  /** Fixture ids currently mid-identify-burst — markers animate a pulse ring. */
+  identifyingFixtureIds?: ReadonlySet<string>;
   onSelectFixture: (id: string | null, options?: { additive?: boolean }) => void;
   onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
 }
@@ -57,6 +59,7 @@ export function StagePlot({
   isSceneModified = false,
   bridgeReachable = true,
   searchQuery = "",
+  identifyingFixtureIds,
   onSelectFixture,
   onPositionCommit,
 }: StagePlotProps) {
@@ -210,6 +213,7 @@ export function StagePlot({
                   on={fixture.on}
                   selected={selectedFixtureIds ? selectedFixtureIds.has(fixture.id) : fixture.id === selectedFixtureId}
                   dimmed={!fixtureMatches(fixture)}
+                  identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
                   onSelect={(id, options) => onSelectFixture(id, options)}
                   onPositionCommit={onPositionCommit}
                 />

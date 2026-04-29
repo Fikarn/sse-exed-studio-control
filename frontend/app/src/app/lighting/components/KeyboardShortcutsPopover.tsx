@@ -28,7 +28,13 @@ const SHORTCUTS: ReadonlyArray<{ heading: string; entries: ReadonlyArray<Shortcu
     entries: [
       { keys: ["Esc"], description: "Clear selection" },
       { keys: ["Shift", "Click"], description: "Add fixture to selection (multi-select)" },
+      { keys: ["⌘", "A"], description: "Select all fixtures" },
+      { keys: ["⌘", "F"], description: "Focus toolbar search" },
     ],
+  },
+  {
+    heading: "Quick recall",
+    entries: [{ keys: ["1"], description: "Recall scene 1 · 2-9 for the next 8 scenes" }],
   },
   {
     heading: "Edit",
