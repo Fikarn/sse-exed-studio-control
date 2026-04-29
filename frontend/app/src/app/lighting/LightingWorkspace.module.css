@@ -47,12 +47,12 @@
 }
 
 .feedback[data-tone="error"] {
-  background: linear-gradient(180deg, rgba(213, 106, 101, 0.18), rgba(213, 106, 101, 0.04));
+  background: linear-gradient(180deg, var(--color-danger-soft), var(--color-danger-glow));
   color: var(--color-danger-500);
 }
 
 .feedback[data-tone="ok"] {
-  background: linear-gradient(180deg, var(--color-brand-green-soft), rgba(153, 186, 146, 0.04));
+  background: linear-gradient(180deg, var(--color-brand-green-soft), var(--color-brand-green-glow));
 }
 
 .feedback[data-tone="info"] {

@@ -36,13 +36,13 @@ export interface FixtureMarkerProps {
   onPositionCommit?: (id: string, xMeters: number, yMeters: number) => void;
 }
 
-const SHELL_FILL = "rgba(8, 9, 10, 0.92)";
-const SHELL_STROKE = "rgba(212, 205, 179, 0.4)";
-const SELECTED_STROKE = "#99BA92";
-const GHOST_STROKE = "rgba(153, 186, 146, 0.45)";
+const SHELL_FILL = "var(--color-fixture-shell-fill)";
+const SHELL_STROKE = "var(--color-fixture-shell-stroke)";
+const SELECTED_STROKE = "var(--color-brand-green)";
+const GHOST_STROKE = "var(--color-fixture-ghost-stroke)";
 
-const LABEL_NAME_FILL = "#d4cdb3";
-const LABEL_META_FILL = "#8a8470";
+const LABEL_NAME_FILL = "var(--color-brand-text-secondary)";
+const LABEL_META_FILL = "var(--color-brand-text-muted)";
 
 const MOUNTING_SHORT_LABEL: Record<FixtureMounting, string> = {
   "grid-panel": "grid",
@@ -55,19 +55,40 @@ function shapeForMounting(mounting: FixtureMounting): ReactElement {
   switch (mounting) {
     case "grid-panel":
       return (
-        <rect x={-9} y={-9} width={18} height={18} rx={2} fill={SHELL_FILL} stroke={SHELL_STROKE} strokeWidth={1} />
+        <rect
+          x={-9}
+          y={-9}
+          width={18}
+          height={18}
+          rx={2}
+          style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
+        />
       );
     case "grid-soft":
       return (
-        <rect x={-13} y={-9} width={26} height={18} rx={4} fill={SHELL_FILL} stroke={SHELL_STROKE} strokeWidth={1} />
+        <rect
+          x={-13}
+          y={-9}
+          width={26}
+          height={18}
+          rx={4}
+          style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
+        />
       );
     case "wall-bar":
       return (
-        <rect x={-22} y={-3} width={44} height={6} rx={1} fill={SHELL_FILL} stroke={SHELL_STROKE} strokeWidth={1} />
+        <rect
+          x={-22}
+          y={-3}
+          width={44}
+          height={6}
+          rx={1}
+          style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
+        />
       );
     case "stand":
     default:
-      return <circle r={9} fill={SHELL_FILL} stroke={SHELL_STROKE} strokeWidth={1} />;
+      return <circle r={9} style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }} />;
   }
 }
 
@@ -244,9 +265,8 @@ export function FixtureMarker({
           <circle
             r={mounting === "wall-bar" ? 26 : 14}
             fill="none"
-            stroke={GHOST_STROKE}
-            strokeWidth={1}
             strokeDasharray="3 3"
+            style={{ stroke: GHOST_STROKE, strokeWidth: 1 }}
           />
         </g>
       ) : null}
@@ -257,9 +277,8 @@ export function FixtureMarker({
           <circle
             r={mounting === "wall-bar" ? 26 : 14}
             fill="none"
-            stroke={SELECTED_STROKE}
-            strokeWidth={1.5}
             strokeDasharray="4 3"
+            style={{ stroke: SELECTED_STROKE, strokeWidth: 1.5 }}
           />
         ) : null}
       </g>
@@ -271,21 +290,19 @@ export function FixtureMarker({
           cy={renderY}
           r={mounting === "wall-bar" ? 30 : 18}
           fill="none"
-          stroke={SELECTED_STROKE}
-          strokeWidth={2}
           pointerEvents="none"
+          style={{ stroke: SELECTED_STROKE, strokeWidth: 2 }}
         />
       ) : null}
       <text
         x={renderX}
         y={renderY + nameOffsetY}
         textAnchor="middle"
-        fontFamily="var(--font-family-mono)"
         fontSize={10}
         fontWeight={600}
         letterSpacing={0.8}
-        fill={LABEL_NAME_FILL}
         pointerEvents="none"
+        style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)" }}
       >
         {displayName}
       </text>
@@ -293,11 +310,10 @@ export function FixtureMarker({
         x={renderX}
         y={renderY + metaOffsetY}
         textAnchor="middle"
-        fontFamily="var(--font-family-mono)"
         fontSize={9}
         letterSpacing={0.6}
-        fill={LABEL_META_FILL}
         pointerEvents="none"
+        style={{ fill: LABEL_META_FILL, fontFamily: "var(--font-family-mono)" }}
       >
         {metaLabel}
       </text>

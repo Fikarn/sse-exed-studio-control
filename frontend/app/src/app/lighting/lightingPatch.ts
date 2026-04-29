@@ -42,9 +42,9 @@ export function lightingFixtureMaxStartAddress(fixtureType: string) {
 export function lightingFixturePatchSummary(dmxStartAddress: number, fixtureType: string, universe = 1) {
   const channelCount = lightingFixtureChannelCount(fixtureType);
   if (dmxStartAddress < 1) {
-    return `u${universe} · unpatched (${channelCount} ch needed)`;
+    return `U${universe} · unpatched (${channelCount} ch needed)`;
   }
-  return `u${universe} · ${dmxStartAddress}-${dmxStartAddress + channelCount - 1} (${channelCount} ch)`;
+  return `U${universe} · ${dmxStartAddress}-${dmxStartAddress + channelCount - 1} (${channelCount} ch)`;
 }
 
 export function lightingFixtureModeLabel(fixtureType: string) {

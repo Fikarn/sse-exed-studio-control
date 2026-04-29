@@ -20,18 +20,22 @@ export function PatchAddressTag({ centerX, centerY, dmxStartAddress }: PatchAddr
         width={width}
         height={height}
         rx={3}
-        fill="rgba(7, 12, 22, 0.85)"
-        stroke="rgba(63, 112, 200, 0.55)"
-        strokeWidth={1}
+        style={{
+          fill: "var(--color-glass-bg-blue)",
+          stroke: "var(--color-brand-blue-border)",
+          strokeWidth: 1,
+        }}
       />
       <text
         x={0}
         y={padY - 1}
         fontSize={11}
-        fontFamily="JetBrains Mono Variable, ui-monospace, monospace"
         fontWeight={600}
-        fill="#6A93DC"
         textAnchor="middle"
+        style={{
+          fontFamily: "var(--font-family-mono)",
+          fill: "var(--color-brand-blue-hot)",
+        }}
       >
         {text}
       </text>

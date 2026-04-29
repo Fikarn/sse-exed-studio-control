@@ -17,10 +17,10 @@ export function StagePlotGrid({ layout }: StagePlotGridProps) {
   for (let x = 0; x <= widthCm; x += HALF_M) {
     const stroke =
       x % FIVE_M === 0
-        ? "rgba(212, 205, 179, 0.16)"
+        ? "var(--color-stage-grid-major)"
         : x % ONE_M === 0
-          ? "rgba(212, 205, 179, 0.08)"
-          : "rgba(212, 205, 179, 0.04)";
+          ? "var(--color-stage-grid-minor)"
+          : "var(--color-stage-grid-faint)";
     lines.push(
       <line
         key={`vx-${x}`}
@@ -28,18 +28,18 @@ export function StagePlotGrid({ layout }: StagePlotGridProps) {
         y1={0}
         x2={x}
         y2={depthCm}
-        stroke={stroke}
         strokeWidth={x % FIVE_M === 0 ? 1.4 : 0.6}
+        style={{ stroke }}
       />
     );
   }
   for (let y = 0; y <= depthCm; y += HALF_M) {
     const stroke =
       y % FIVE_M === 0
-        ? "rgba(212, 205, 179, 0.16)"
+        ? "var(--color-stage-grid-major)"
         : y % ONE_M === 0
-          ? "rgba(212, 205, 179, 0.08)"
-          : "rgba(212, 205, 179, 0.04)";
+          ? "var(--color-stage-grid-minor)"
+          : "var(--color-stage-grid-faint)";
     lines.push(
       <line
         key={`hy-${y}`}
@@ -47,8 +47,8 @@ export function StagePlotGrid({ layout }: StagePlotGridProps) {
         y1={y}
         x2={widthCm}
         y2={y}
-        stroke={stroke}
         strokeWidth={y % FIVE_M === 0 ? 1.4 : 0.6}
+        style={{ stroke }}
       />
     );
   }

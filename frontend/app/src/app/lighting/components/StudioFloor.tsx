@@ -4,12 +4,12 @@ export interface StudioFloorProps {
   layout: StudioLayout;
 }
 
-const WALL_COLOR = "#4d5544";
-const WALL_STROKE = "#6b7560";
-const FLOOR_COLOR = "#080a08";
-const TEXT_MUTED = "#5a5547";
-const ELEMENT_FILL = "rgba(108, 116, 96, 0.18)";
-const ELEMENT_STROKE = "rgba(108, 116, 96, 0.5)";
+const WALL_COLOR = "var(--color-studio-wall)";
+const WALL_STROKE = "var(--color-studio-wall-stroke)";
+const FLOOR_COLOR = "var(--color-bg-deep)";
+const TEXT_MUTED = "var(--color-brand-text-faint)";
+const ELEMENT_FILL = "var(--color-studio-element)";
+const ELEMENT_STROKE = "var(--color-studio-element-stroke)";
 
 export function StudioFloor({ layout }: StudioFloorProps) {
   const widthCm = layout.roomWidthMeters * 100;
@@ -17,9 +17,11 @@ export function StudioFloor({ layout }: StudioFloorProps) {
 
   return (
     <g aria-hidden="true">
-      <rect x={0} y={0} width={widthCm} height={depthCm} fill={FLOOR_COLOR} />
-      <rect x={0} y={0} width={widthCm} height={depthCm} fill="none" stroke={WALL_STROKE} strokeWidth={2} />
-      {layout.walls.backdrop ? <rect x={0} y={0} width={widthCm} height={20} fill={WALL_COLOR} opacity={0.5} /> : null}
+      <rect x={0} y={0} width={widthCm} height={depthCm} style={{ fill: FLOOR_COLOR }} />
+      <rect x={0} y={0} width={widthCm} height={depthCm} fill="none" style={{ stroke: WALL_STROKE, strokeWidth: 2 }} />
+      {layout.walls.backdrop ? (
+        <rect x={0} y={0} width={widthCm} height={20} opacity={0.5} style={{ fill: WALL_COLOR }} />
+      ) : null}
       {layout.walls.door ? (
         <rect
           x={layout.walls.door.wall === "east" ? widthCm - 8 : 0}
@@ -34,10 +36,8 @@ export function StudioFloor({ layout }: StudioFloorProps) {
               ? layout.walls.door.widthMeters * 100
               : 8
           }
-          fill={FLOOR_COLOR}
-          stroke="rgba(212, 205, 179, 0.32)"
-          strokeWidth={1}
           strokeDasharray="6 4"
+          style={{ fill: FLOOR_COLOR, stroke: "var(--color-stage-door-stroke)", strokeWidth: 1 }}
         />
       ) : null}
       {layout.walls.controlBoothWindow ? (
@@ -46,9 +46,11 @@ export function StudioFloor({ layout }: StudioFloorProps) {
           y={depthCm - 10}
           width={layout.walls.controlBoothWindow.widthMeters * 100}
           height={10}
-          fill="rgba(63, 112, 200, 0.25)"
-          stroke="rgba(63, 112, 200, 0.55)"
-          strokeWidth={1}
+          style={{
+            fill: "var(--color-brand-blue-soft)",
+            stroke: "var(--color-brand-blue-border)",
+            strokeWidth: 1,
+          }}
         />
       ) : null}
       {layout.setElements.map((element, index) => {
@@ -60,14 +62,13 @@ export function StudioFloor({ layout }: StudioFloorProps) {
               key={`set-${index}`}
               transform={`translate(${element.xMeters * 100 - w / 2}, ${element.yMeters * 100 - d / 2})`}
             >
-              <rect width={w} height={d} fill={ELEMENT_FILL} stroke={ELEMENT_STROKE} rx={4} />
+              <rect width={w} height={d} rx={4} style={{ fill: ELEMENT_FILL, stroke: ELEMENT_STROKE }} />
               <text
                 x={w / 2}
                 y={d / 2 + 4}
                 fontSize={10}
-                fill={TEXT_MUTED}
                 textAnchor="middle"
-                fontFamily="Inter, system-ui, sans-serif"
+                style={{ fill: TEXT_MUTED, fontFamily: "var(--font-family-ui)" }}
               >
                 {element.label}
               </text>
@@ -83,11 +84,15 @@ export function StudioFloor({ layout }: StudioFloorProps) {
             cy={mark.yMeters * 100}
             r={6}
             fill="none"
-            stroke="rgba(232, 213, 97, 0.45)"
-            strokeWidth={1}
             strokeDasharray="3 3"
+            style={{ stroke: "var(--color-studio-talent-ring)", strokeWidth: 1 }}
           />
-          <circle cx={mark.xMeters * 100} cy={mark.yMeters * 100} r={1.5} fill="rgba(232, 213, 97, 0.7)" />
+          <circle
+            cx={mark.xMeters * 100}
+            cy={mark.yMeters * 100}
+            r={1.5}
+            style={{ fill: "var(--color-studio-talent-dot)" }}
+          />
         </g>
       ))}
       {layout.cameras.map((camera) => (
@@ -97,11 +102,18 @@ export function StudioFloor({ layout }: StudioFloorProps) {
         >
           <polygon
             points="-10,8 10,8 0,-12"
-            fill="rgba(108, 169, 209, 0.22)"
-            stroke="rgba(108, 169, 209, 0.6)"
-            strokeWidth={1}
+            style={{
+              fill: "var(--color-studio-camera-fill)",
+              stroke: "var(--color-studio-camera-stroke)",
+              strokeWidth: 1,
+            }}
           />
-          <text y={20} fontSize={10} fill={TEXT_MUTED} textAnchor="middle" fontFamily="Inter, system-ui, sans-serif">
+          <text
+            y={20}
+            fontSize={10}
+            textAnchor="middle"
+            style={{ fill: TEXT_MUTED, fontFamily: "var(--font-family-ui)" }}
+          >
             {camera.label}
           </text>
         </g>

@@ -119,7 +119,7 @@ export function InspectorPatch({
         <dl className={styles.factGrid}>
           <div className={styles.fact}>
             <dt className={styles.factLabel}>Universe</dt>
-            <dd className={styles.factValue}>u{universe}</dd>
+            <dd className={styles.factValue}>U{universe}</dd>
           </div>
           <div className={styles.fact}>
             <dt className={styles.factLabel}>Range</dt>

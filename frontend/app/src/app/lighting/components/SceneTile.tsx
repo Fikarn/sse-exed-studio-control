@@ -52,7 +52,6 @@ export function SceneTile({
       type="button"
       className={stateClass}
       onClick={() => onRecall(id)}
-      aria-pressed={isActive}
       aria-current={isActive ? "true" : undefined}
       aria-label={ariaLabel}
     >
