@@ -481,7 +481,16 @@
 }
 
 .sliderCct {
-  background: linear-gradient(90deg, #f0dfb8 0%, #ebe5d2 50%, #d4dde2 100%);
+  background: linear-gradient(
+    90deg,
+    var(--color-cct-2700) 0%,
+    var(--color-cct-3200) 16%,
+    var(--color-cct-3800) 32%,
+    var(--color-cct-4400) 50%,
+    var(--color-cct-5000) 66%,
+    var(--color-cct-5600) 83%,
+    var(--color-cct-6500) 100%
+  );
 }
 
 .cctScale {
@@ -593,7 +602,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
-  background: linear-gradient(180deg, var(--color-brand-yellow-soft) 0%, rgba(232, 213, 97, 0.04) 100%);
+  background: linear-gradient(180deg, var(--color-brand-yellow-soft) 0%, var(--color-brand-yellow-glow) 100%);
   border: 1px solid var(--color-brand-yellow-border);
   border-radius: var(--radius-tight-sm);
 }

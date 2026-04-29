@@ -24,7 +24,12 @@
       "700": { "$value": "#62835F" }
     },
     "danger": {
-      "500": { "$value": "#D56A65" }
+      "500": { "$value": "#D56A65" },
+      "soft": { "$value": "rgba(213, 106, 101, 0.16)" },
+      "softStrong": { "$value": "rgba(213, 106, 101, 0.28)" },
+      "glow": { "$value": "rgba(213, 106, 101, 0.06)" },
+      "border": { "$value": "rgba(213, 106, 101, 0.5)" },
+      "borderStrong": { "$value": "rgba(213, 106, 101, 0.7)" }
     },
     "warning": {
       "500": { "$value": "#D8A95A" }
@@ -45,8 +50,10 @@
       "darkGreen": { "$value": "#1F4D38" },
       "darkGreenMid": { "$value": "#2C6A4F" },
       "darkGreenSoft": { "$value": "rgba(31, 77, 56, 0.5)" },
+      "darkGreenAmbient": { "$value": "rgba(31, 77, 56, 0.12)" },
       "yellow": { "$value": "#E8D561" },
       "yellowSoft": { "$value": "rgba(232, 213, 97, 0.14)" },
+      "yellowGlow": { "$value": "rgba(232, 213, 97, 0.06)" },
       "yellowBorder": { "$value": "rgba(232, 213, 97, 0.5)" },
       "blue": { "$value": "#3F70C8" },
       "blueHot": { "$value": "#6A93DC" },
@@ -56,6 +63,8 @@
       "burgundySoft": { "$value": "rgba(107, 31, 31, 0.16)" },
       "coral": { "$value": "#ED7C5E" },
       "coralSoft": { "$value": "rgba(237, 124, 94, 0.16)" },
+      "coralBorder": { "$value": "rgba(237, 124, 94, 0.5)" },
+      "coralGlow": { "$value": "rgba(237, 124, 94, 0.06)" },
       "sky": { "$value": "#C8D4DD" },
       "text": {
         "primary": { "$value": "#FAF6E6" },
@@ -86,9 +95,33 @@
       "5600": { "$value": "#D4DDE2" },
       "6500": { "$value": "#C8D4DD" }
     },
+    "fixture": {
+      "shellFill": { "$value": "rgba(8, 9, 10, 0.92)" },
+      "shellStroke": { "$value": "rgba(212, 205, 179, 0.4)" },
+      "ghostStroke": { "$value": "rgba(153, 186, 146, 0.45)" }
+    },
+    "stage": {
+      "gridMajor": { "$value": "rgba(212, 205, 179, 0.20)" },
+      "gridMinor": { "$value": "rgba(212, 205, 179, 0.10)" },
+      "gridFaint": { "$value": "rgba(212, 205, 179, 0.05)" },
+      "beamLine": { "$value": "rgba(212, 205, 179, 0.18)" },
+      "doorStroke": { "$value": "rgba(212, 205, 179, 0.32)" }
+    },
+    "studio": {
+      "wall": { "$value": "#4d5544" },
+      "wallStroke": { "$value": "#6b7560" },
+      "element": { "$value": "rgba(108, 116, 96, 0.18)" },
+      "elementStroke": { "$value": "rgba(108, 116, 96, 0.5)" },
+      "talentRing": { "$value": "rgba(232, 213, 97, 0.45)" },
+      "talentDot": { "$value": "rgba(232, 213, 97, 0.7)" },
+      "cameraFill": { "$value": "rgba(108, 169, 209, 0.22)" },
+      "cameraStroke": { "$value": "rgba(108, 169, 209, 0.6)" }
+    },
     "glass": {
       "bg": { "$value": "rgba(8, 10, 8, 0.78)" },
       "bgBlue": { "$value": "rgba(7, 12, 22, 0.82)" },
+      "bgStrong": { "$value": "rgba(8, 10, 8, 0.85)" },
+      "bgSubtle": { "$value": "rgba(8, 10, 8, 0.65)" },
       "border": { "$value": "rgba(250, 246, 230, 0.08)" }
     }
   },
@@ -157,7 +190,14 @@
     },
     "glowBlue": {
       "$value": "0 0 0 1px {color.brand.blue}, 0 12px 28px rgba(63, 112, 200, 0.20), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
-    }
+    },
+    "glowGreenSm": { "$value": "0 0 12px rgba(153, 186, 146, 0.35)" },
+    "glowGreenDot": { "$value": "0 0 5px rgba(153, 186, 146, 0.55)" },
+    "glowGreenDotSubtle": { "$value": "0 0 6px rgba(153, 186, 146, 0.55)" },
+    "glowYellowSm": { "$value": "0 0 8px rgba(232, 213, 97, 0.35)" },
+    "glowYellowDot": { "$value": "0 0 5px rgba(232, 213, 97, 0.55)" },
+    "glowYellowDotSubtle": { "$value": "0 0 6px rgba(232, 213, 97, 0.55)" },
+    "thumbRing": { "$value": "0 0 0 2px rgba(153, 186, 146, 0.18)" }
   },
   "motion": {
     "duration": {

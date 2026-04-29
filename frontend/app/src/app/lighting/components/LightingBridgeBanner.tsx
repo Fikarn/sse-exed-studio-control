@@ -18,7 +18,7 @@ export interface LightingBridgeBannerProps {
  */
 export function LightingBridgeBanner({ reachable, bridgeIp, universe }: LightingBridgeBannerProps) {
   if (reachable) return null;
-  const target = bridgeIp.trim() ? `${bridgeIp} on universe u${universe}` : `universe u${universe}`;
+  const target = bridgeIp.trim() ? `${bridgeIp} on universe U${universe}` : `universe U${universe}`;
   return (
     <StatusBand
       tone="error"

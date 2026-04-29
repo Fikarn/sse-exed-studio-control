@@ -26,7 +26,7 @@
 .toolbar[data-patch-mode="true"]::before {
   height: 2px;
   background: var(--color-brand-yellow);
-  box-shadow: 0 0 8px rgba(232, 213, 97, 0.35);
+  box-shadow: var(--shadow-glow-yellow-sm);
 }
 
 .title {
@@ -57,7 +57,7 @@
   padding: 0 9px;
   margin-left: 4px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(180deg, var(--color-brand-yellow-soft) 0%, rgba(232, 213, 97, 0.06) 100%);
+  background: linear-gradient(180deg, var(--color-brand-yellow-soft) 0%, var(--color-brand-yellow-glow) 100%);
   border: 1px solid var(--color-brand-yellow-border);
   color: var(--color-brand-yellow);
   font-family: var(--font-family-mono);
@@ -99,13 +99,13 @@
 .chipGreen {
   color: var(--color-brand-green);
   border-color: var(--color-brand-green-border);
-  background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, rgba(153, 186, 146, 0.08) 100%);
+  background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, var(--color-brand-green-glow) 100%);
 }
 
 .chipErr {
   color: var(--color-brand-coral);
-  border-color: rgba(237, 124, 94, 0.5);
-  background: linear-gradient(180deg, var(--color-brand-coral-soft) 0%, rgba(237, 124, 94, 0.06) 100%);
+  border-color: var(--color-brand-coral-border);
+  background: linear-gradient(180deg, var(--color-brand-coral-soft) 0%, var(--color-brand-coral-glow) 100%);
 }
 
 .stats {

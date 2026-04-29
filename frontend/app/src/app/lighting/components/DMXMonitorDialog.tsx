@@ -60,7 +60,7 @@ export function DMXMonitorDialog({ universe, snapshot, reachable, onClose }: DMX
 
   return (
     <Dialog
-      title={`DMX universe u${universe}`}
+      title={`DMX universe U${universe}`}
       body={
         reachable
           ? `${assignedCount} of ${TOTAL_CHANNELS} channels are patched to fixtures. Hover any cell for the fixture name and channel label.`
@@ -84,7 +84,7 @@ export function DMXMonitorDialog({ universe, snapshot, reachable, onClose }: DMX
             Unassigned
           </span>
         </div>
-        <div className={styles.grid} role="grid" aria-label={`DMX universe u${universe} channels`}>
+        <div className={styles.grid} role="grid" aria-label={`DMX universe U${universe} channels`}>
           {cells.map((cell) => {
             const tooltip = cell.assigned
               ? `Ch ${cell.channel} · ${cell.fixtureName} · ${cell.channelLabel}`

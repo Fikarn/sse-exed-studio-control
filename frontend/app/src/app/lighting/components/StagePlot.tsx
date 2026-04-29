@@ -156,9 +156,9 @@ export function StagePlot({
                 y1={yMeters * 100}
                 x2={xMeters * 100}
                 y2={yMeters * 100 + length}
-                stroke="rgba(212, 205, 179, 0.18)"
                 strokeWidth={0.6}
                 strokeDasharray="4 4"
+                style={{ stroke: "var(--color-stage-beam-line)" }}
               />
             );
           })}

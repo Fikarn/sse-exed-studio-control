@@ -1,6 +1,6 @@
 import type { LightingFixtureSnapshot, LightingSceneFixtureSnapshot } from "@sse/engine-client";
 
-import { lightingFixtureColor } from "./lightingHelpers";
+import { lightingFixtureColorHex } from "./lightingHelpers";
 import { STUDIO_LAYOUT } from "./studioLayout";
 
 export const SCENE_THUMB_VIEWBOX_WIDTH = 160;
@@ -72,7 +72,7 @@ export function renderSceneThumbnailSvg({ fixtures, fixtureStates }: SceneThumbC
         )}" r="2" fill="rgba(250, 246, 230, 0.18)" />`;
       }
       const { x, y } = fallbackPosition(fixture, index);
-      const color = lightingFixtureColor(cct, on);
+      const color = lightingFixtureColorHex(cct, on);
       const radius = 2 + (intensity / 100) * 4;
       const opacity = 0.4 + (intensity / 100) * 0.6;
       return `<circle cx="${pos(x, padding, innerW)}" cy="${pos(y, padding, innerH)}" r="${radius.toFixed(2)}" fill="${escapeXml(color)}" fill-opacity="${opacity.toFixed(3)}" />`;

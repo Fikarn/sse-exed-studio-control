@@ -28,18 +28,30 @@ export function lightingStatusTone(status: unknown) {
 
 export function lightingFixtureColor(cct: number, on: boolean) {
   if (!on) {
-    return "color-mix(in srgb, var(--color-surface-500) 88%, black)";
+    return "var(--color-brand-text-faint)";
   }
+  if (cct <= 2900) return "var(--color-cct-2700)";
+  if (cct <= 3500) return "var(--color-cct-3200)";
+  if (cct <= 4100) return "var(--color-cct-3800)";
+  if (cct <= 4700) return "var(--color-cct-4400)";
+  if (cct <= 5300) return "var(--color-cct-5000)";
+  if (cct <= 6000) return "var(--color-cct-5600)";
+  return "var(--color-cct-6500)";
+}
 
-  if (cct <= 3200) {
-    return "#ffb35c";
-  }
-
-  if (cct <= 4400) {
-    return "#ffd38b";
-  }
-
-  return "#eaf0ff";
+// Hex equivalents of the CCT-ramp tokens, for off-DOM contexts (e.g. inline
+// SVG baked into a data URI) where CSS var() can't resolve. Keep in sync
+// with frontend/packages/tokens/src/tokens/core.json color.cct.* + brand
+// text.faint.
+export function lightingFixtureColorHex(cct: number, on: boolean) {
+  if (!on) return "#5A5547";
+  if (cct <= 2900) return "#EF8E5A";
+  if (cct <= 3500) return "#F3A87A";
+  if (cct <= 4100) return "#F6C39A";
+  if (cct <= 4700) return "#F0DFB8";
+  if (cct <= 5300) return "#EBE5D2";
+  if (cct <= 6000) return "#D4DDE2";
+  return "#C8D4DD";
 }
 
 export function defaultLightingBeamAngle(fixtureType: string) {
