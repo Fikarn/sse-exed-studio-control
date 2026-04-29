@@ -36,7 +36,7 @@ A future Claude Code session can pick any of these as a focused initiative. Each
 
 **Industry**: Vectorworks, Capture, Figma, Sketch, AutoCAD all show a small floating chip ("X: 4.5 m, Y: 2.0 m") next to the cursor while a marker / shape is being dragged. The single most useful drag affordance on a stage plot.
 
-**Surface**: extend [useFixtureDrag.ts](frontend/app/src/app/lighting/useFixtureDrag.ts) to expose the in-flight `(xMeters, yMeters)`. Render a small SVG `<text>` overlay in [StagePlot.tsx](frontend/app/src/app/lighting/components/StagePlot.tsx) tracking the cursor while drag is active. ~30 LOC.
+**Surface**: the fixture drag lives inside [FixtureMarker.tsx](frontend/app/src/app/lighting/components/FixtureMarker.tsx) (`handlePointerDown` / `handlePointerMove` / `finishDrag` + the local `ghost` state). Easiest path: render a small SVG `<text>` chip near the cursor _inside_ `FixtureMarker.tsx` while `ghost` is set — keeps the in-flight `(xMeters, yMeters)` colocated with the drag math. Alternative: surface ghost via a new callback prop and render in [StagePlot.tsx](frontend/app/src/app/lighting/components/StagePlot.tsx). ~30 LOC.
 
 ### F5. Drag-reorder for groups (parallel to scenes)
 
