@@ -69,11 +69,15 @@ pub(super) fn default_lighting_editor_state(
         .collect::<Vec<_>>();
     let groups = default_lighting_group_states(inventory, &fixtures);
 
+    let scenes = default_lighting_scene_states(config, inventory, &fixtures);
+    let scene_order = scenes.iter().map(|scene| scene.id.clone()).collect();
     LightingEditorState {
         groups,
         removed_fixture_ids: Vec::new(),
-        scenes: default_lighting_scene_states(config, inventory, &fixtures),
+        scenes,
         fixtures,
+        scene_order,
+        pinned_scene_ids: Vec::new(),
     }
 }
 
@@ -173,11 +177,37 @@ pub(super) fn normalize_lighting_editor_state(
             .collect()
     };
 
+    // Rebuild scene_order to keep it in sync with the live scenes list.
+    // Preserve any ids from the persisted order that still exist, append
+    // any new scenes that aren't yet listed (legacy state pre-#55 won't
+    // have a scene_order at all).
+    let mut scene_order: Vec<String> = existing
+        .scene_order
+        .iter()
+        .filter(|id| scenes.iter().any(|scene| &scene.id == *id))
+        .cloned()
+        .collect();
+    for scene in &scenes {
+        if !scene_order.iter().any(|id| id == &scene.id) {
+            scene_order.push(scene.id.clone());
+        }
+    }
+
+    // Drop pinned ids that no longer correspond to a live scene.
+    let pinned_scene_ids: Vec<String> = existing
+        .pinned_scene_ids
+        .iter()
+        .filter(|id| scenes.iter().any(|scene| &scene.id == *id))
+        .cloned()
+        .collect();
+
     LightingEditorState {
         groups,
         removed_fixture_ids,
         fixtures,
         scenes,
+        scene_order,
+        pinned_scene_ids,
     }
 }
 
@@ -401,6 +431,7 @@ pub(super) fn lighting_scene_snapshot_from_state(
     scene: &LightingEditorSceneState,
     last_recalled_scene_id: Option<&str>,
     last_scene_recall_at: Option<&str>,
+    pinned: bool,
 ) -> LightingSceneSnapshot {
     let last_recalled = last_recalled_scene_id
         .map(|value| value == scene.id)
@@ -425,6 +456,7 @@ pub(super) fn lighting_scene_snapshot_from_state(
         } else {
             None
         },
+        pinned,
     }
 }
 

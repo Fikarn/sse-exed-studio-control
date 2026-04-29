@@ -6,8 +6,8 @@ use super::types::{
     LightingFixtureDeleteRequest, LightingFixtureIdentifyRequest, LightingFixtureUpdateRequest,
     LightingGroupCreateRequest, LightingGroupDeleteRequest, LightingGroupPowerRequest,
     LightingGroupUpdateRequest, LightingSceneCreateRequest, LightingSceneDeleteRequest,
-    LightingSceneRecallRequest, LightingSceneUpdateRequest, LightingSettingsUpdateRequest,
-    LightingSpatialMarker,
+    LightingScenePinRequest, LightingSceneRecallRequest, LightingSceneReorderRequest,
+    LightingSceneUpdateRequest, LightingSettingsUpdateRequest, LightingSpatialMarker,
 };
 
 pub fn parse_lighting_scene_recall_request(
@@ -403,6 +403,57 @@ pub fn parse_lighting_scene_delete_request(
 
     Ok(LightingSceneDeleteRequest {
         scene_id: String::from(scene_id),
+    })
+}
+
+pub fn parse_lighting_scene_reorder_request(
+    params: &Value,
+) -> Result<LightingSceneReorderRequest, String> {
+    let scene_id = params
+        .get("sceneId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("sceneId is required"))?;
+
+    // beforeSceneId is optional — null / missing means "move to end".
+    let before_scene_id = match params.get("beforeSceneId") {
+        Some(Value::Null) | None => None,
+        Some(Value::String(value)) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else if trimmed == scene_id {
+                return Err(String::from("beforeSceneId must differ from sceneId"));
+            } else {
+                Some(String::from(trimmed))
+            }
+        }
+        _ => return Err(String::from("beforeSceneId must be a string or null")),
+    };
+
+    Ok(LightingSceneReorderRequest {
+        scene_id: String::from(scene_id),
+        before_scene_id,
+    })
+}
+
+pub fn parse_lighting_scene_pin_request(params: &Value) -> Result<LightingScenePinRequest, String> {
+    let scene_id = params
+        .get("sceneId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("sceneId is required"))?;
+
+    let pinned = params
+        .get("pinned")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| String::from("pinned must be a boolean"))?;
+
+    Ok(LightingScenePinRequest {
+        scene_id: String::from(scene_id),
+        pinned,
     })
 }
 

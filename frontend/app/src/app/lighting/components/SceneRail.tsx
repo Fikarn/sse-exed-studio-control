@@ -2,6 +2,8 @@ import { Plus } from "lucide-react";
 import { type CSSProperties } from "react";
 import { AutoSizer, type Size } from "react-virtualized-auto-sizer";
 import { Grid } from "react-window";
+import { DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
 import type { LightingSceneSnapshot } from "@sse/engine-client";
 
@@ -26,6 +28,10 @@ export interface SceneRailProps {
   onRecall: (sceneId: string) => void;
   onAddScene?: () => void;
   onClearSearch?: () => void;
+  /** Drag-to-reorder handler. When omitted, tiles aren't sortable. */
+  onReorderScene?: (sceneId: string, beforeSceneId: string | null) => void;
+  /** Pin / unpin handler. When omitted, the inline pin chip isn't rendered. */
+  onPinScene?: (sceneId: string, pinned: boolean) => void;
 }
 
 interface SceneStats {
@@ -52,9 +58,11 @@ interface CellPayload {
   sceneThumbs: Record<string, string>;
   bridgeReachable: boolean;
   onRecall: (sceneId: string) => void;
+  onPin?: (sceneId: string, pinned: boolean) => void;
   onAddScene?: () => void;
   showAddTile: boolean;
   totalCellCount: number;
+  sortable: boolean;
 }
 
 function VirtualizedCell({
@@ -67,9 +75,11 @@ function VirtualizedCell({
   sceneThumbs,
   bridgeReachable,
   onRecall,
+  onPin,
   onAddScene,
   showAddTile,
   totalCellCount,
+  sortable,
 }: { columnIndex: number; rowIndex: number; style: CSSProperties } & CellPayload) {
   const cellIndex = rowIndex * 2 + columnIndex;
   if (cellIndex >= totalCellCount) return null;
@@ -87,7 +97,7 @@ function VirtualizedCell({
     const stats = statsForScene(scene);
     const lastRecalledLabel = scene.lastRecalledAt ? formatLightingRelativeTime(scene.lastRecalledAt) : undefined;
     return (
-      <div role="listitem" style={innerStyle}>
+      <div style={innerStyle}>
         <SceneTile
           id={scene.id}
           name={scene.name}
@@ -98,7 +108,10 @@ function VirtualizedCell({
           bridgeReachable={bridgeReachable}
           lastRecalledLabel={lastRecalledLabel}
           thumbDataUri={sceneThumbs[scene.id]}
+          pinned={scene.pinned}
+          sortable={sortable}
           onRecall={onRecall}
+          onPin={onPin}
         />
       </div>
     );
@@ -133,9 +146,40 @@ export function SceneRail({
   onRecall,
   onAddScene,
   onClearSearch,
+  onReorderScene,
+  onPinScene,
 }: SceneRailProps) {
   const needle = searchQuery.trim().toLowerCase();
   const filteredScenes = needle ? scenes.filter((scene) => scene.name.toLowerCase().includes(needle)) : scenes;
+
+  // dnd-kit sensors:
+  // - PointerSensor for mouse / touch / pen drag, with an 8 px activation
+  //   distance so plain clicks (recall) don't accidentally start a drag.
+  // - KeyboardSensor for accessibility — Tab to the tile, Space to pick up,
+  //   arrow keys to move, Space to drop.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const sortable = Boolean(onReorderScene) && !needle;
+  const sortableIds = filteredScenes.map((scene) => scene.id);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!onReorderScene) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fromIndex = sortableIds.indexOf(String(active.id));
+    const toIndex = sortableIds.indexOf(String(over.id));
+    if (fromIndex < 0 || toIndex < 0) return;
+    // Compute the new order and translate to the engine's
+    // "reorder before id" contract: the dragged scene is inserted such
+    // that the next scene (if any) becomes the anchor.
+    const newOrder = arrayMove(sortableIds, fromIndex, toIndex);
+    const draggedNewIdx = newOrder.indexOf(String(active.id));
+    const beforeId = draggedNewIdx + 1 < newOrder.length ? newOrder[draggedNewIdx + 1]! : null;
+    onReorderScene(String(active.id), beforeId);
+  };
 
   if (scenes.length === 0 && !onAddScene) {
     return (
@@ -161,52 +205,59 @@ export function SceneRail({
 
   const showAddTile = Boolean(onAddScene) && !needle;
 
-  if (filteredScenes.length > VIRTUALIZE_THRESHOLD) {
-    const totalCellCount = filteredScenes.length + (showAddTile ? 1 : 0);
-    const rowCount = Math.ceil(totalCellCount / 2);
-    const cellProps: CellPayload = {
-      filteredScenes,
-      activeSceneId,
-      modifiedSceneId,
-      sceneThumbs,
-      bridgeReachable,
-      onRecall,
-      onAddScene,
-      showAddTile,
-      totalCellCount,
-    };
-    return (
-      <div className={styles.sceneGridVirtualized} role="list" aria-label="Saved scenes">
-        <AutoSizer
-          renderProp={({ width, height }: Partial<Size>) => {
-            if (!width || !height) return null;
-            return (
-              <Grid<CellPayload>
-                cellComponent={VirtualizedCell}
-                cellProps={cellProps}
-                columnCount={2}
-                columnWidth={Math.floor(width / 2)}
-                rowCount={rowCount}
-                rowHeight={ROW_HEIGHT}
-                defaultHeight={height}
-                defaultWidth={width}
-                overscanCount={2}
-              />
-            );
-          }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.sceneGrid} role="list" aria-label="Saved scenes">
-      {filteredScenes.map((scene) => {
-        const stats = statsForScene(scene);
-        const lastRecalledLabel = scene.lastRecalledAt ? formatLightingRelativeTime(scene.lastRecalledAt) : undefined;
+  // dnd-kit context wraps both the flat and virtualized renders. The
+  // SortableContext's strategy is `rectSortingStrategy` which animates
+  // tiles into their previewed positions in a 2-D grid (the standard
+  // Notion / Trello "cards push aside" feel).
+  const railBody =
+    filteredScenes.length > VIRTUALIZE_THRESHOLD ? (
+      (() => {
+        const totalCellCount = filteredScenes.length + (showAddTile ? 1 : 0);
+        const rowCount = Math.ceil(totalCellCount / 2);
+        const cellProps: CellPayload = {
+          filteredScenes,
+          activeSceneId,
+          modifiedSceneId,
+          sceneThumbs,
+          bridgeReachable,
+          onRecall,
+          onPin: onPinScene,
+          onAddScene,
+          showAddTile,
+          totalCellCount,
+          sortable,
+        };
         return (
-          <div key={scene.id} role="listitem">
+          <div className={styles.sceneGridVirtualized} aria-label="Saved scenes">
+            <AutoSizer
+              renderProp={({ width, height }: Partial<Size>) => {
+                if (!width || !height) return null;
+                return (
+                  <Grid<CellPayload>
+                    cellComponent={VirtualizedCell}
+                    cellProps={cellProps}
+                    columnCount={2}
+                    columnWidth={Math.floor(width / 2)}
+                    rowCount={rowCount}
+                    rowHeight={ROW_HEIGHT}
+                    defaultHeight={height}
+                    defaultWidth={width}
+                    overscanCount={2}
+                  />
+                );
+              }}
+            />
+          </div>
+        );
+      })()
+    ) : (
+      <div className={styles.sceneGrid} aria-label="Saved scenes">
+        {filteredScenes.map((scene) => {
+          const stats = statsForScene(scene);
+          const lastRecalledLabel = scene.lastRecalledAt ? formatLightingRelativeTime(scene.lastRecalledAt) : undefined;
+          return (
             <SceneTile
+              key={scene.id}
               id={scene.id}
               name={scene.name}
               onCount={stats.onCount}
@@ -216,22 +267,34 @@ export function SceneRail({
               bridgeReachable={bridgeReachable}
               lastRecalledLabel={lastRecalledLabel}
               thumbDataUri={sceneThumbs[scene.id]}
+              pinned={scene.pinned}
+              sortable={sortable}
               onRecall={onRecall}
+              onPin={onPinScene}
             />
-          </div>
-        );
-      })}
-      {showAddTile ? (
-        <button
-          type="button"
-          className={styles.tileAdd}
-          onClick={onAddScene}
-          aria-label="Save current state as a new scene"
-        >
-          <Plus aria-hidden="true" size={18} strokeWidth={1.75} />
-          <span>New scene</span>
-        </button>
-      ) : null}
-    </div>
+          );
+        })}
+        {showAddTile ? (
+          <button
+            type="button"
+            className={styles.tileAdd}
+            onClick={onAddScene}
+            aria-label="Save current state as a new scene"
+          >
+            <Plus aria-hidden="true" size={18} strokeWidth={1.75} />
+            <span>New scene</span>
+          </button>
+        ) : null}
+      </div>
+    );
+
+  if (!sortable) return railBody;
+
+  return (
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+        {railBody}
+      </SortableContext>
+    </DndContext>
   );
 }

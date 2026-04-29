@@ -366,11 +366,54 @@
   text-align: left;
   font-family: var(--font-family-ui);
   color: var(--color-brand-text-primary);
+  position: relative;
   transition:
     border-color 200ms var(--motion-easing-standard),
     background 200ms var(--motion-easing-standard),
-    transform var(--motion-duration-fast) ease,
-    box-shadow var(--motion-duration-fast) ease;
+    transform 200ms var(--motion-easing-standard),
+    box-shadow var(--motion-duration-fast) ease,
+    opacity var(--motion-duration-fast) ease;
+}
+
+/* Sortable drag visuals are owned by dnd-kit — it sets `transform`,
+   `transition`, and `opacity` inline as the user picks up / moves /
+   drops a tile. The CSS layer here only handles resting visuals and
+   keyboard focus. */
+
+.tilePinned {
+  border-color: var(--color-brand-yellow-border);
+}
+
+.tilePinAction {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-glass-bg-strong);
+  color: var(--color-brand-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-duration-fast) ease;
+}
+
+.tile:hover .tilePinAction,
+.tile:focus-within .tilePinAction,
+.tile[data-pinned="true"] .tilePinAction {
+  opacity: 1;
+}
+
+.tile[data-pinned="true"] .tilePinAction {
+  color: var(--color-brand-yellow);
+}
+
+.tilePinAction:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
 }
 
 .tile:hover {

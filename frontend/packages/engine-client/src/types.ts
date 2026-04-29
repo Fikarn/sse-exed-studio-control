@@ -232,6 +232,8 @@ export interface ShellStore {
   createLightingScene(request: LightingSceneCreateRequest): Promise<JsonValue>;
   updateLightingScene(request: LightingSceneUpdateRequest): Promise<JsonValue>;
   deleteLightingScene(sceneId: string): Promise<JsonValue>;
+  reorderLightingScene(sceneId: string, beforeSceneId: string | null): Promise<JsonValue>;
+  pinLightingScene(sceneId: string, pinned: boolean): Promise<JsonValue>;
   updateLightingFixture(request: LightingFixtureUpdateRequest): Promise<JsonValue>;
   identifyLightingFixture(fixtureId: string, durationMs?: number): Promise<JsonValue>;
   deleteLightingFixture(fixtureId: string): Promise<JsonValue>;

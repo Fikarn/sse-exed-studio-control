@@ -143,6 +143,7 @@ impl LightingBackend for SimulatedLightingBackend {
                     fixture_states: Vec::new(),
                     last_recalled: false,
                     last_recalled_at: None,
+                    pinned: false,
                 },
                 LightingSceneSnapshot {
                     id: String::from("scene-teaching"),
@@ -151,6 +152,7 @@ impl LightingBackend for SimulatedLightingBackend {
                     fixture_states: Vec::new(),
                     last_recalled: false,
                     last_recalled_at: None,
+                    pinned: false,
                 },
                 LightingSceneSnapshot {
                     id: String::from("scene-stream"),
@@ -159,6 +161,7 @@ impl LightingBackend for SimulatedLightingBackend {
                     fixture_states: Vec::new(),
                     last_recalled: false,
                     last_recalled_at: None,
+                    pinned: false,
                 },
             ],
         }

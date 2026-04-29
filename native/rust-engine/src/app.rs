@@ -27,9 +27,10 @@ use crate::lighting::{
     parse_lighting_group_create_request, parse_lighting_group_delete_request,
     parse_lighting_group_power_request, parse_lighting_group_update_request,
     parse_lighting_scene_create_request, parse_lighting_scene_delete_request,
-    parse_lighting_scene_recall_request, parse_lighting_scene_update_request,
-    parse_lighting_settings_update_request, read_lighting_dmx_monitor_snapshot,
-    read_lighting_snapshot, recall_lighting_scene, set_lighting_all_power,
+    parse_lighting_scene_pin_request, parse_lighting_scene_recall_request,
+    parse_lighting_scene_reorder_request, parse_lighting_scene_update_request,
+    parse_lighting_settings_update_request, pin_lighting_scene, read_lighting_dmx_monitor_snapshot,
+    read_lighting_snapshot, recall_lighting_scene, reorder_lighting_scene, set_lighting_all_power,
     set_lighting_group_power, update_lighting_fixture, update_lighting_group,
     update_lighting_scene, update_lighting_settings, LightingCommandError,
 };
@@ -188,6 +189,18 @@ impl EngineApp {
                 parse_lighting_scene_delete_request,
                 delete_lighting_scene,
                 "scene-deleted",
+            ),
+            "lighting.scene.reorder" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_scene_reorder_request,
+                reorder_lighting_scene,
+                "scene-reordered",
+            ),
+            "lighting.scene.pin" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_scene_pin_request,
+                pin_lighting_scene,
+                "scene-pinned",
             ),
             "lighting.group.create" => self.dispatch_lighting_mutate(
                 request,

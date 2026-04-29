@@ -507,6 +507,12 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async deleteLightingScene(sceneId: string) {
       return performRequest("lighting.scene.delete", { sceneId });
     },
+    async reorderLightingScene(sceneId: string, beforeSceneId: string | null) {
+      return performRequest("lighting.scene.reorder", { sceneId, beforeSceneId });
+    },
+    async pinLightingScene(sceneId: string, pinned: boolean) {
+      return performRequest("lighting.scene.pin", { sceneId, pinned });
+    },
     async updateLightingFixture(request: LightingFixtureUpdateRequest) {
       return performRequest("lighting.fixture.update", request as unknown as JsonObject);
     },

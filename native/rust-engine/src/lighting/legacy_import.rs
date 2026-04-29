@@ -255,11 +255,14 @@ pub fn import_legacy_lighting_fixture(
         })
         .collect::<Vec<_>>();
 
+    let scene_order = scene_states.iter().map(|scene| scene.id.clone()).collect();
     let editor_state = LightingEditorState {
         groups: group_states,
         removed_fixture_ids,
         fixtures: fixture_states.clone(),
         scenes: scene_states,
+        scene_order,
+        pinned_scene_ids: Vec::new(),
     };
 
     let selected_fixture_id = wire
