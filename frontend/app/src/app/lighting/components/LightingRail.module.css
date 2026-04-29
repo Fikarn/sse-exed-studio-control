@@ -343,6 +343,16 @@
   gap: 8px;
 }
 
+/* Virtualized variant — react-window's Grid needs a fixed-size container.
+   Activated only when filtered scenes exceed the virtualization threshold
+   (see SceneRail.tsx). The 60vh ceiling matches typical 1080p / 1440p
+   workspace heights so the rail stays usable inside its outer scroll
+   without nested fighting. */
+.sceneGridVirtualized {
+  height: 60vh;
+  max-height: 60vh;
+}
+
 .tile {
   appearance: none;
   background: var(--color-bg-soft);
