@@ -1836,14 +1836,14 @@ Track here as each wave lands. Tick when verified passing the wave validation ga
 
 | #   | Title                                     | Wave                                     | Closed |
 | --- | ----------------------------------------- | ---------------------------------------- | ------ |
-| 1   | CCT slider hardcoded hexes                | 19.B.1                                   |        |
-| 2   | PatchAddressTag SVG hardcodes             | 19.B.2                                   |        |
-| 3   | FixtureMarker constants                   | 19.B.3                                   |        |
-| 4   | StudioFloor hardcodes                     | 19.B.4                                   |        |
-| 5   | StagePlot beam-line stroke                | 19.B.5                                   |        |
-| 6   | StagePlot.module.css fallback drops       | 19.B.7                                   |        |
-| 7   | Universe casing drift                     | 19.B.14                                  |        |
-| 8   | SceneTile aria-pressed + aria-current     | 19.B.15                                  |        |
+| 1   | CCT slider hardcoded hexes                | 19.B.1                                   | ✓      |
+| 2   | PatchAddressTag SVG hardcodes             | 19.B.2                                   | ✓      |
+| 3   | FixtureMarker constants                   | 19.B.3                                   | ✓      |
+| 4   | StudioFloor hardcodes                     | 19.B.4                                   | ✓      |
+| 5   | StagePlot beam-line stroke                | 19.B.5                                   | ✓      |
+| 6   | StagePlot.module.css fallback drops       | 19.B.7                                   | ✓      |
+| 7   | Universe casing drift                     | 19.B.14                                  | ✓      |
+| 8   | SceneTile aria-pressed + aria-current     | 19.B.15                                  | ✓      |
 | 9   | Slider thumb hover/focus rings            | 20.A                                     |        |
 | 10  | Button :active states                     | 20.B + 20.C                              |        |
 | 11  | Scene tile recall transition              | 20.D                                     |        |
@@ -1860,7 +1860,7 @@ Track here as each wave lands. Tick when verified passing the wave validation ga
 | 22  | Fixture marker depth                      | 20.J                                     |        |
 | 23  | Beam length indicator gradient            | 20.K                                     |        |
 | 24  | Plot pill / meta migration + drop-shadow  | 20.L + 20.M                              |        |
-| 25  | Vignette softening                        | 19.B.8                                   |        |
+| 25  | Vignette softening                        | 19.B.8                                   | ✓      |
 | 26  | Inspector tablist arrow-key nav           | 21.A                                     |        |
 | 27  | Plot overlays SR exposure                 | 20.L (region role)                       |        |
 | 28  | CCT scale aria-describedby                | 21.C                                     |        |
@@ -1894,12 +1894,12 @@ Track here as each wave lands. Tick when verified passing the wave validation ga
 | 56  | Favorites / Recents                       | 23.C — gated                             |        |
 | 57  | Dialog keyboard contract                  | Pre-work + 22.H                          |        |
 | 58  | DMX monitor max-height responsive         | 22.F                                     |        |
-| 59  | Stage plot grid contrast                  | 19.A token alpha bumps                   |        |
+| 59  | Stage plot grid contrast                  | 19.A token alpha bumps                   | ✓      |
 | 60  | Skeleton/connecting state                 | 22.E                                     |        |
 | 61  | busyAction parallel-mutation              | 22.G                                     |        |
 | 62  | Identify burst plot pulse                 | 22.D                                     |        |
 | 63  | Title-bar drift indicator                 | 23.D — gated                             |        |
-| 64  | lightingFixtureColor surface-500 dead ref | 19.B.13                                  |        |
+| 64  | lightingFixtureColor surface-500 dead ref | 19.B.13                                  | ✓      |
 
 ## Risk & rollback
 
