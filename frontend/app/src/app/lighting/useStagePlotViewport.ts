@@ -151,7 +151,36 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     setZoomAt(state.zoom / ZOOM_STEP, anchor);
   }, [setZoomAt, state.zoom]);
 
-  const reset = useCallback(() => setState(IDENTITY), []);
+  const reset = useCallback(() => {
+    if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setState(IDENTITY);
+      return;
+    }
+    setState((current) => {
+      const startZoom = current.zoom;
+      const startPanX = current.panX;
+      const startPanY = current.panY;
+      if (startZoom === IDENTITY.zoom && startPanX === IDENTITY.panX && startPanY === IDENTITY.panY) {
+        return current;
+      }
+      const startTime = performance.now();
+      const DURATION_MS = 250;
+      // Approximates cubic-bezier(0.22, 1, 0.36, 1) — same easing token used in the design system.
+      const ease = (t: number) => 1 - Math.pow(1 - t, 4);
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - startTime) / DURATION_MS);
+        const eased = ease(t);
+        setState({
+          zoom: startZoom + (IDENTITY.zoom - startZoom) * eased,
+          panX: startPanX * (1 - eased),
+          panY: startPanY * (1 - eased),
+        });
+        if (t < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      return current;
+    });
+  }, []);
 
   return {
     svgRef,

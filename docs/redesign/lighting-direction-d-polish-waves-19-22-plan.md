@@ -1834,72 +1834,72 @@ Windows target-host (`tauri:smoke:win`) runs in the Windows-Claude session again
 
 Track here as each wave lands. Tick when verified passing the wave validation gate.
 
-| #   | Title                                     | Wave                                     | Closed |
-| --- | ----------------------------------------- | ---------------------------------------- | ------ |
-| 1   | CCT slider hardcoded hexes                | 19.B.1                                   | ✓      |
-| 2   | PatchAddressTag SVG hardcodes             | 19.B.2                                   | ✓      |
-| 3   | FixtureMarker constants                   | 19.B.3                                   | ✓      |
-| 4   | StudioFloor hardcodes                     | 19.B.4                                   | ✓      |
-| 5   | StagePlot beam-line stroke                | 19.B.5                                   | ✓      |
-| 6   | StagePlot.module.css fallback drops       | 19.B.7                                   | ✓      |
-| 7   | Universe casing drift                     | 19.B.14                                  | ✓      |
-| 8   | SceneTile aria-pressed + aria-current     | 19.B.15                                  | ✓      |
-| 9   | Slider thumb hover/focus rings            | 20.A                                     |        |
-| 10  | Button :active states                     | 20.B + 20.C                              |        |
-| 11  | Scene tile recall transition              | 20.D                                     |        |
-| 12  | Plot patch-mode filter                    | 20.H                                     |        |
-| 13  | Master toggle inset shadow                | 20.G                                     |        |
-| 14  | Master card on-state glow                 | 20.G                                     |        |
-| 15  | GroupChip drift triangles                 | 20.E.1                                   |        |
-| 16  | StagePlotControls glyphs                  | 20.E.2                                   |        |
-| 17  | Toast auto-dismiss                        | 20.F                                     |        |
-| 18  | Feedback dismiss × → X icon               | 20.E.3                                   |        |
-| 19  | Scene tile thumb 16/11 → 16/9             | 20.N                                     |        |
-| 20  | Plot reset animation                      | 20.O                                     |        |
-| 21  | Beam pool intensity recalibration         | 20.I                                     |        |
-| 22  | Fixture marker depth                      | 20.J                                     |        |
-| 23  | Beam length indicator gradient            | 20.K                                     |        |
-| 24  | Plot pill / meta migration + drop-shadow  | 20.L + 20.M                              |        |
-| 25  | Vignette softening                        | 19.B.8                                   | ✓      |
-| 26  | Inspector tablist arrow-key nav           | 21.A                                     |        |
-| 27  | Plot overlays SR exposure                 | 20.L (region role)                       |        |
-| 28  | CCT scale aria-describedby                | 21.C                                     |        |
-| 29  | Slider :focus-visible                     | 20.A                                     |        |
-| 30  | FixtureMarker focus simplification        | 21.E                                     |        |
-| 31  | DMX Monitor role="row"                    | 21.B                                     |        |
-| 32  | Native title attrs (3 sites)              | retained per audit-fix-plan #33 — verify |        |
-| 33  | role="application" reconsideration        | 21.H                                     |        |
-| 34  | Long fixture name truncation              | 21.E                                     |        |
-| 35  | name.toUpperCase() → CSS                  | 21.E                                     |        |
-| 36  | Group chip aria trim                      | 21.F                                     |        |
-| 37  | ConfirmDialog autofocus                   | Pre-work + 21.G                          |        |
-| 38  | Select-all affordance                     | 22.A                                     |        |
-| 39  | "Lighting paused" disambiguation          | 21.J                                     |        |
-| 40  | Empty-state verb consistency              | 21.K                                     |        |
-| 41  | "+ Fixture button" → "Add fixture"        | 21.L                                     |        |
-| 42  | Inspector empty mentions search           | 21.K                                     |        |
-| 43  | "Cut all" — locked retain                 | 21.M                                     |        |
-| 44  | "Re-apply scene" → "Recall scene"         | 21.N                                     |        |
-| 45  | "Provenance" → "Last activity"            | 21.O                                     |        |
-| 46  | Group "mixed" suffix removal              | 21.P                                     |        |
-| 47  | Bridge banner copy                        | 21.Q                                     |        |
-| 48  | CreateFixtureDialog autoname gaps         | 21.R                                     |        |
-| 49  | ⌘F focus search                           | 22.C                                     |        |
-| 50  | 1-9 quick recall                          | 22.B                                     |        |
-| 51  | Search result count                       | 21.V                                     |        |
-| 52  | Health bar bridge value/suffix            | 21.W                                     |        |
-| 53  | Plot pill modified text                   | 20.L + 21.S                              |        |
-| 54  | Scene rail virtualization                 | 23.A — gated                             |        |
-| 55  | Drag-to-reorder scenes                    | 23.B — gated                             |        |
-| 56  | Favorites / Recents                       | 23.C — gated                             |        |
-| 57  | Dialog keyboard contract                  | Pre-work + 22.H                          |        |
-| 58  | DMX monitor max-height responsive         | 22.F                                     |        |
-| 59  | Stage plot grid contrast                  | 19.A token alpha bumps                   | ✓      |
-| 60  | Skeleton/connecting state                 | 22.E                                     |        |
-| 61  | busyAction parallel-mutation              | 22.G                                     |        |
-| 62  | Identify burst plot pulse                 | 22.D                                     |        |
-| 63  | Title-bar drift indicator                 | 23.D — gated                             |        |
-| 64  | lightingFixtureColor surface-500 dead ref | 19.B.13                                  | ✓      |
+| #   | Title                                     | Wave                                     | Closed         |
+| --- | ----------------------------------------- | ---------------------------------------- | -------------- |
+| 1   | CCT slider hardcoded hexes                | 19.B.1                                   | ✓              |
+| 2   | PatchAddressTag SVG hardcodes             | 19.B.2                                   | ✓              |
+| 3   | FixtureMarker constants                   | 19.B.3                                   | ✓              |
+| 4   | StudioFloor hardcodes                     | 19.B.4                                   | ✓              |
+| 5   | StagePlot beam-line stroke                | 19.B.5                                   | ✓              |
+| 6   | StagePlot.module.css fallback drops       | 19.B.7                                   | ✓              |
+| 7   | Universe casing drift                     | 19.B.14                                  | ✓              |
+| 8   | SceneTile aria-pressed + aria-current     | 19.B.15                                  | ✓              |
+| 9   | Slider thumb hover/focus rings            | 20.A                                     | ✓              |
+| 10  | Button :active states                     | 20.B + 20.C                              | ✓              |
+| 11  | Scene tile recall transition              | 20.D                                     | ✓              |
+| 12  | Plot patch-mode filter                    | 20.H                                     | ✓              |
+| 13  | Master toggle inset shadow                | 20.G                                     | ✓              |
+| 14  | Master card on-state glow                 | 20.G                                     | ✓              |
+| 15  | GroupChip drift triangles                 | 20.E.1                                   | ✓              |
+| 16  | StagePlotControls glyphs                  | 20.E.2                                   | ✓              |
+| 17  | Toast auto-dismiss                        | 20.F                                     | ✓              |
+| 18  | Feedback dismiss × → X icon               | 20.E.3                                   | ✓              |
+| 19  | Scene tile thumb 16/11 → 16/9             | 20.N                                     | ✓              |
+| 20  | Plot reset animation                      | 20.O                                     | ✓              |
+| 21  | Beam pool intensity recalibration         | 20.I                                     | ✓              |
+| 22  | Fixture marker depth                      | 20.J                                     | ✓              |
+| 23  | Beam length indicator gradient            | 20.K                                     | ✓              |
+| 24  | Plot pill / meta migration + drop-shadow  | 20.L + 20.M                              | ✓              |
+| 25  | Vignette softening                        | 19.B.8                                   | ✓              |
+| 26  | Inspector tablist arrow-key nav           | 21.A                                     |                |
+| 27  | Plot overlays SR exposure                 | 20.L (region role)                       | ✓              |
+| 28  | CCT scale aria-describedby                | 21.C                                     |                |
+| 29  | Slider :focus-visible                     | 20.A                                     | ✓              |
+| 30  | FixtureMarker focus simplification        | 21.E                                     |                |
+| 31  | DMX Monitor role="row"                    | 21.B                                     |                |
+| 32  | Native title attrs (3 sites)              | retained per audit-fix-plan #33 — verify |                |
+| 33  | role="application" reconsideration        | 21.H                                     |                |
+| 34  | Long fixture name truncation              | 21.E                                     |                |
+| 35  | name.toUpperCase() → CSS                  | 21.E                                     |                |
+| 36  | Group chip aria trim                      | 21.F                                     |                |
+| 37  | ConfirmDialog autofocus                   | Pre-work + 21.G                          |                |
+| 38  | Select-all affordance                     | 22.A                                     |                |
+| 39  | "Lighting paused" disambiguation          | 21.J                                     |                |
+| 40  | Empty-state verb consistency              | 21.K                                     |                |
+| 41  | "+ Fixture button" → "Add fixture"        | 21.L                                     |                |
+| 42  | Inspector empty mentions search           | 21.K                                     |                |
+| 43  | "Cut all" — locked retain                 | 21.M                                     |                |
+| 44  | "Re-apply scene" → "Recall scene"         | 21.N                                     |                |
+| 45  | "Provenance" → "Last activity"            | 21.O                                     |                |
+| 46  | Group "mixed" suffix removal              | 21.P                                     |                |
+| 47  | Bridge banner copy                        | 21.Q                                     |                |
+| 48  | CreateFixtureDialog autoname gaps         | 21.R                                     |                |
+| 49  | ⌘F focus search                           | 22.C                                     |                |
+| 50  | 1-9 quick recall                          | 22.B                                     |                |
+| 51  | Search result count                       | 21.V                                     |                |
+| 52  | Health bar bridge value/suffix            | 21.W                                     |                |
+| 53  | Plot pill modified text                   | 20.L + 21.S                              | partial (20.L) |
+| 54  | Scene rail virtualization                 | 23.A — gated                             |                |
+| 55  | Drag-to-reorder scenes                    | 23.B — gated                             |                |
+| 56  | Favorites / Recents                       | 23.C — gated                             |                |
+| 57  | Dialog keyboard contract                  | Pre-work + 22.H                          |                |
+| 58  | DMX monitor max-height responsive         | 22.F                                     |                |
+| 59  | Stage plot grid contrast                  | 19.A token alpha bumps                   | ✓              |
+| 60  | Skeleton/connecting state                 | 22.E                                     |                |
+| 61  | busyAction parallel-mutation              | 22.G                                     |                |
+| 62  | Identify burst plot pulse                 | 22.D                                     |                |
+| 63  | Title-bar drift indicator                 | 23.D — gated                             |                |
+| 64  | lightingFixtureColor surface-500 dead ref | 19.B.13                                  | ✓              |
 
 ## Risk & rollback
 

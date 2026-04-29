@@ -77,6 +77,19 @@
   color: var(--color-brand-green);
 }
 
+.headButton:active,
+.tile:active,
+.tileAdd:active,
+.action:active,
+.emergencyCut:active,
+.masterToggle:active,
+.groupChip:active,
+.groupChipInspect:active,
+.groupChipAdd:active {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 .headButton:focus-visible,
 .tile:focus-visible,
 .tileAdd:focus-visible,
@@ -125,6 +138,7 @@
 .masterOn {
   border-color: var(--color-brand-green-border);
   background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, var(--color-bg-default) 60%);
+  box-shadow: var(--shadow-glow-green);
 }
 
 .masterRow {
@@ -175,11 +189,14 @@
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-pill);
   background: var(--color-bg-soft);
+  box-shadow: var(--shadow-inset-hi);
   cursor: pointer;
   flex-shrink: 0;
   transition:
     background var(--motion-duration-fast) ease,
-    border-color var(--motion-duration-fast) ease;
+    border-color var(--motion-duration-fast) ease,
+    transform var(--motion-duration-fast) ease,
+    box-shadow var(--motion-duration-fast) ease;
 }
 
 .masterToggle:disabled {
@@ -190,7 +207,7 @@
 .masterToggleOn {
   border-color: var(--color-brand-green-border);
   background: linear-gradient(180deg, var(--color-brand-green) 0%, var(--color-brand-green-border) 100%);
-  box-shadow: var(--shadow-glow-green-sm);
+  box-shadow: var(--shadow-glow-green-sm), var(--shadow-inset-hi-strong);
 }
 
 .masterTogglePin {
@@ -256,6 +273,29 @@
   border: 2px solid var(--color-brand-green);
   box-shadow: var(--shadow-thumb-ring);
   cursor: pointer;
+  transition:
+    transform var(--motion-duration-fast) ease,
+    box-shadow var(--motion-duration-fast) ease;
+}
+
+.masterSlider:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow: var(--shadow-thumb-ring);
+}
+
+.masterSlider:focus-visible {
+  outline: none;
+}
+
+.masterSlider:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow:
+    var(--shadow-thumb-ring),
+    0 0 0 2px var(--color-brand-green);
+}
+
+.masterSlider:active::-webkit-slider-thumb {
+  transform: scale(1.05);
 }
 
 .masterSlider::-moz-range-thumb {
@@ -264,6 +304,15 @@
   border-radius: 50%;
   background: var(--color-brand-text-primary);
   border: 2px solid var(--color-brand-green);
+  transition:
+    transform var(--motion-duration-fast) ease,
+    box-shadow var(--motion-duration-fast) ease;
+}
+
+.masterSlider:hover::-moz-range-thumb,
+.masterSlider:focus-visible::-moz-range-thumb {
+  transform: scale(1.15);
+  box-shadow: var(--shadow-thumb-ring);
 }
 
 .emergencyCut {
@@ -308,8 +357,10 @@
   font-family: var(--font-family-ui);
   color: var(--color-brand-text-primary);
   transition:
-    border-color var(--motion-duration-fast) ease,
-    background var(--motion-duration-fast) ease;
+    border-color 200ms var(--motion-easing-standard),
+    background 200ms var(--motion-easing-standard),
+    transform var(--motion-duration-fast) ease,
+    box-shadow var(--motion-duration-fast) ease;
 }
 
 .tile:hover {
@@ -383,6 +434,35 @@
   box-shadow: var(--shadow-glow-yellow-dot);
 }
 
+@keyframes ssePulseGreenDot {
+  0%,
+  100% {
+    box-shadow: var(--shadow-glow-green-dot);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(153, 186, 146, 0.85);
+  }
+}
+
+@keyframes ssePulseYellowDot {
+  0%,
+  100% {
+    box-shadow: var(--shadow-glow-yellow-dot);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(232, 213, 97, 0.85);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tileActive .tileBadgeDot {
+    animation: ssePulseGreenDot 1.6s ease-in-out infinite;
+  }
+  .tileModified .tileBadgeDot {
+    animation: ssePulseYellowDot 1.6s ease-in-out infinite;
+  }
+}
+
 .tileSub {
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
@@ -393,7 +473,7 @@
 
 .thumb {
   width: 100%;
-  aspect-ratio: 16 / 11;
+  aspect-ratio: 16 / 9;
   border-radius: var(--radius-tight-sm);
   background: var(--color-bg-deep);
   border: 1px solid var(--color-bg-stroke);
@@ -402,7 +482,7 @@
 
 .thumbPlaceholder {
   width: 100%;
-  aspect-ratio: 16 / 11;
+  aspect-ratio: 16 / 9;
   border-radius: var(--radius-tight-sm);
   background: var(--color-bg-deep);
   border: 1px dashed var(--color-bg-border);
@@ -429,7 +509,9 @@
   transition:
     border-color var(--motion-duration-fast) ease,
     color var(--motion-duration-fast) ease,
-    background var(--motion-duration-fast) ease;
+    background var(--motion-duration-fast) ease,
+    transform var(--motion-duration-fast) ease,
+    box-shadow var(--motion-duration-fast) ease;
 }
 
 .tileAdd:hover {
@@ -550,13 +632,24 @@
   transition:
     border-color var(--motion-duration-fast) ease,
     color var(--motion-duration-fast) ease,
-    background var(--motion-duration-fast) ease;
+    background var(--motion-duration-fast) ease,
+    transform var(--motion-duration-fast) ease,
+    box-shadow var(--motion-duration-fast) ease;
 }
 
 .groupChipAdd:hover {
   border-color: var(--color-brand-green-border);
   color: var(--color-brand-green);
   background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, var(--color-brand-green-glow) 100%);
+}
+
+.groupChipDelta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
 }
 
 .groupChipName {
