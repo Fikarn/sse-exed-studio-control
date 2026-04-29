@@ -18,12 +18,12 @@ export interface LightingBridgeBannerProps {
  */
 export function LightingBridgeBanner({ reachable, bridgeIp, universe }: LightingBridgeBannerProps) {
   if (reachable) return null;
-  const target = bridgeIp.trim() ? `${bridgeIp} on universe U${universe}` : `universe U${universe}`;
+  const target = bridgeIp.trim() ? `${bridgeIp} · U${universe}` : `U${universe}`;
   return (
     <StatusBand
       tone="error"
       title="DMX bridge unreachable"
-      summary={`Lighting commands won't reach the rig until the bridge at ${target} comes back online. Check the network connection or run the bridge probe in Setup.`}
+      summary={`Lighting commands won't reach the rig until the bridge (${target}) responds. Check the network connection or run the bridge probe in Setup.`}
     />
   );
 }

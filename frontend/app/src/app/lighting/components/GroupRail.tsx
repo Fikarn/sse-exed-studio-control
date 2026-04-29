@@ -50,7 +50,7 @@ export function GroupRail({
       <div className={styles.groupGrid}>
         <p className={styles.empty}>
           No groups yet.
-          {onCreateGroup ? " Tap + New group below." : " Tap a group chip after creating one."}
+          {onCreateGroup ? " Use + New group below to add one." : " Add fixtures to groups via the inspector."}
         </p>
         {createButton}
       </div>

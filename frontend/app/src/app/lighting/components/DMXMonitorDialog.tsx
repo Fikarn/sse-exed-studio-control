@@ -85,24 +85,28 @@ export function DMXMonitorDialog({ universe, snapshot, reachable, onClose }: DMX
           </span>
         </div>
         <div className={styles.grid} role="grid" aria-label={`DMX universe U${universe} channels`}>
-          {cells.map((cell) => {
-            const tooltip = cell.assigned
-              ? `Ch ${cell.channel} · ${cell.fixtureName} · ${cell.channelLabel}`
-              : `Ch ${cell.channel} · unassigned`;
-            const className = cell.assigned ? `${styles.cell} ${styles.cellAssigned}` : styles.cell;
-            const fillPercent = Math.max(0, Math.min(100, (cell.value / 255) * 100));
-            return (
-              <div key={cell.channel} className={className} role="gridcell" title={tooltip}>
-                <span className={styles.cellHeader}>
-                  <span>{String(cell.channel).padStart(3, "0")}</span>
-                </span>
-                <span className={styles.cellValue}>{toHex(cell.value)}</span>
-                <span className={styles.cellBar}>
-                  <span className={styles.cellBarFill} style={{ width: `${fillPercent}%` }} />
-                </span>
-              </div>
-            );
-          })}
+          {Array.from({ length: Math.ceil(cells.length / 16) }, (_, rowIdx) => (
+            <div key={rowIdx} role="row" className={styles.row}>
+              {cells.slice(rowIdx * 16, (rowIdx + 1) * 16).map((cell) => {
+                const tooltip = cell.assigned
+                  ? `Ch ${cell.channel} · ${cell.fixtureName} · ${cell.channelLabel}`
+                  : `Ch ${cell.channel} · unassigned`;
+                const className = cell.assigned ? `${styles.cell} ${styles.cellAssigned}` : styles.cell;
+                const fillPercent = Math.max(0, Math.min(100, (cell.value / 255) * 100));
+                return (
+                  <div key={cell.channel} className={className} role="gridcell" title={tooltip}>
+                    <span className={styles.cellHeader}>
+                      <span>{String(cell.channel).padStart(3, "0")}</span>
+                    </span>
+                    <span className={styles.cellValue}>{toHex(cell.value)}</span>
+                    <span className={styles.cellBar}>
+                      <span className={styles.cellBarFill} style={{ width: `${fillPercent}%` }} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     </Dialog>

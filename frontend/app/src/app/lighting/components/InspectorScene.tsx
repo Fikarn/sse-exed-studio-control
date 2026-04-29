@@ -211,7 +211,7 @@ export function InspectorScene({
       ) : null}
 
       <section className={styles.sceneSection}>
-        <h3 className={styles.sceneSectionHead}>Provenance</h3>
+        <h3 className={styles.sceneSectionHead}>Last activity</h3>
         <p className={styles.sceneProvenance}>
           {scene.lastRecalledAt ? (
             <>
@@ -233,7 +233,7 @@ export function InspectorScene({
             size="compact"
             leadingVisual={<Play aria-hidden="true" size={13} strokeWidth={1.75} />}
           >
-            Re-apply scene
+            Recall scene
           </Button>
         ) : null}
         {onResaveScene ? (

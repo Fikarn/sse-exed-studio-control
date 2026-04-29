@@ -81,6 +81,9 @@ export function StagePlot({
       role="application"
       aria-label="Lighting stage plot"
     >
+      <div className={styles.srOnly}>
+        Stage plot. Use Tab to focus a fixture, then arrow keys to nudge its position. Hold Shift for 0.5 m steps.
+      </div>
       {!patchMode && activeSceneName ? (
         <div className={styles.plotPillSlot}>
           <PlotPill state={isSceneModified && bridgeReachable ? "modified" : "default"}>
@@ -243,7 +246,7 @@ export function StagePlot({
           <EmptyState
             icon={Sun}
             title="No fixtures on the rig yet"
-            message="Add your first fixture with the + Fixture button in the toolbar to start patching DMX addresses and saving scenes."
+            message="Add your first fixture with the Add fixture button in the toolbar to start patching DMX addresses and saving scenes."
           />
         </div>
       ) : null}

@@ -72,7 +72,7 @@ export function IdentifyBurstButton({
       leadingVisual={<Zap aria-hidden="true" size={13} strokeWidth={1.75} />}
       aria-pressed={active}
     >
-      {active ? "Identifying…" : "Identify"}
+      {active ? "Bursting…" : "Identify"}
     </Button>
   );
 

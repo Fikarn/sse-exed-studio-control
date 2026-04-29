@@ -40,7 +40,13 @@ export function MasterCard({
   const sliderDisabled = !enabled || !bridgeReachable;
   const cardClass = anyOn ? `${styles.master} ${styles.masterOn}` : styles.master;
   const resolvedEyebrow = eyebrow ?? `Master · ${fixtureOnCount} / ${fixtureTotal} on`;
-  const stateName = !bridgeReachable ? "Lighting offline" : anyOn ? "Lighting on" : "Lighting paused";
+  const stateName = !bridgeReachable
+    ? "Lighting offline"
+    : anyOn
+      ? "Lighting on"
+      : fixtureTotal === 0
+        ? "No fixtures"
+        : "All fixtures off";
 
   return (
     <section className={cardClass} aria-label="Lighting master controls">
@@ -78,6 +84,7 @@ export function MasterCard({
         <span className={styles.masterFaderValue}>{Math.round(grandMaster)} %</span>
       </div>
 
+      {/* "Cut all" naming retained per audit-fix-plan #43 + Waves 19-22 plan locked decision. */}
       <button
         type="button"
         className={styles.emergencyCut}

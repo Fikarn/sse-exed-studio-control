@@ -122,7 +122,7 @@ export function LightingToolbar({
           onClick={onAddFixture}
           leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={2} />}
         >
-          Fixture
+          Add fixture
         </Button>
 
         <button

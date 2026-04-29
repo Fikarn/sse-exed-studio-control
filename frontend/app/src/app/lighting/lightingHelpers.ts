@@ -54,6 +54,18 @@ export function lightingFixtureColorHex(cct: number, on: boolean) {
   return "#C8D4DD";
 }
 
+export function nextLightingFixtureName(fixtures: ReadonlyArray<{ name: string }>): string {
+  const usedNumbers = new Set<number>();
+  const pattern = /^Fixture (\d+)$/;
+  for (const fixture of fixtures) {
+    const match = pattern.exec(fixture.name);
+    if (match) usedNumbers.add(Number.parseInt(match[1]!, 10));
+  }
+  let candidate = 1;
+  while (usedNumbers.has(candidate)) candidate += 1;
+  return `Fixture ${candidate}`;
+}
+
 export function defaultLightingBeamAngle(fixtureType: string) {
   const normalized = fixtureType.trim().toLowerCase();
   switch (normalized) {

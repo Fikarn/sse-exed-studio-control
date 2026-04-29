@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type KeyboardEvent, type ReactNode } from "react";
 
 import styles from "./LightingInspector.module.css";
 
@@ -33,6 +33,34 @@ export const LIGHTING_TAB_BUTTON_ID: Record<InspectorTab, string> = {
 };
 
 export function LightingInspectorTabs({ active, onChange, visibleTabs, hint }: LightingInspectorTabsProps) {
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const idx = visibleTabs.indexOf(active);
+    if (idx < 0) return;
+    let nextIdx: number | null = null;
+    switch (event.key) {
+      case "ArrowLeft":
+        nextIdx = (idx - 1 + visibleTabs.length) % visibleTabs.length;
+        break;
+      case "ArrowRight":
+        nextIdx = (idx + 1) % visibleTabs.length;
+        break;
+      case "Home":
+        nextIdx = 0;
+        break;
+      case "End":
+        nextIdx = visibleTabs.length - 1;
+        break;
+    }
+    if (nextIdx === null) return;
+    event.preventDefault();
+    const nextTab = visibleTabs[nextIdx]!;
+    onChange(nextTab);
+    const nextEl = event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(
+      `#${LIGHTING_TAB_BUTTON_ID[nextTab]}`
+    );
+    nextEl?.focus();
+  };
+
   return (
     <div className={styles.tabs} role="tablist" aria-label="Inspector tabs">
       {visibleTabs.map((tab) => (
@@ -47,6 +75,7 @@ export function LightingInspectorTabs({ active, onChange, visibleTabs, hint }: L
           className={styles.tab}
           data-active={tab === active}
           onClick={() => onChange(tab)}
+          onKeyDown={handleKeyDown}
         >
           {TAB_LABEL[tab]}
         </button>
