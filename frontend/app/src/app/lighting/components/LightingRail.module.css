@@ -8,6 +8,11 @@
   overflow-y: auto;
   font-family: var(--font-family-ui);
   color: var(--color-brand-text-primary);
+  transition: opacity var(--motion-duration-fast) ease;
+}
+
+.railPaused {
+  opacity: 0.42;
 }
 
 .divider {
@@ -36,6 +41,16 @@
   font-weight: 600;
 }
 
+.headCount {
+  margin-right: auto;
+  margin-left: 8px;
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--color-brand-text-muted);
+}
+
 .headAction {
   display: inline-flex;
   align-items: center;
@@ -52,6 +67,9 @@
   font-size: 10px;
   letter-spacing: 0.08em;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .headButton:hover {
@@ -59,37 +77,160 @@
   color: var(--color-brand-green);
 }
 
+.headButton:focus-visible,
+.tile:focus-visible,
+.tileAdd:focus-visible,
+.action:focus-visible,
+.emergencyCut:focus-visible,
+.masterToggle:focus-visible,
+.groupChip:focus-visible,
+.groupChipInspect:focus-visible,
+.groupChipAdd:focus-visible,
+.emptyAction:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+}
+
+.groupChipRow:focus-within {
+  border-color: var(--color-brand-green);
+  box-shadow: 0 0 0 1px var(--color-brand-green);
+}
+
+.headButtonKbd {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  background: var(--color-bg-default);
+  border: 1px solid var(--color-bg-border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-tight-xs);
+  padding: 1px 5px;
+  color: var(--color-brand-text-secondary);
+  letter-spacing: 0;
+}
+
 .master {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 14px;
   background: var(--color-bg-default);
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-lg);
   box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--motion-duration-fast) ease,
+    background var(--motion-duration-fast) ease;
 }
 
-.masterHeader {
+.masterOn {
+  border-color: var(--color-brand-green-border);
+  background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, var(--color-bg-default) 60%);
+}
+
+.masterRow {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
-.masterLabel {
+.masterInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.masterEyebrow {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.masterName {
   font-family: var(--font-family-display);
   font-variation-settings: "opsz" 24;
   font-weight: 600;
   font-size: 17px;
   color: var(--color-brand-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.masterValue {
+.masterOn .masterName {
+  color: var(--color-brand-green);
+}
+
+.masterToggle {
+  appearance: none;
+  position: relative;
+  width: 52px;
+  height: 28px;
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-soft);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--motion-duration-fast) ease,
+    border-color var(--motion-duration-fast) ease;
+}
+
+.masterToggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.masterToggleOn {
+  border-color: var(--color-brand-green-border);
+  background: linear-gradient(180deg, var(--color-brand-green) 0%, rgba(153, 186, 146, 0.55) 100%);
+  box-shadow: 0 0 12px rgba(153, 186, 146, 0.35);
+}
+
+.masterTogglePin {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-brand-text-primary);
+  transition: transform var(--motion-duration-fast) ease;
+}
+
+.masterToggleOn .masterTogglePin {
+  transform: translateX(24px);
+}
+
+.masterFader {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.masterFaderLabel {
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+}
+
+.masterFaderValue {
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
-  font-size: 13px;
+  font-size: 11px;
   color: var(--color-brand-green);
   font-weight: 600;
+  min-width: 36px;
+  text-align: right;
 }
 
 .masterSlider {
@@ -147,13 +288,10 @@
   background: linear-gradient(180deg, rgba(213, 106, 101, 0.28), rgba(213, 106, 101, 0.1));
 }
 
-.sceneList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.sceneGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .tile {
@@ -162,10 +300,9 @@
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-md);
   padding: 8px;
-  display: grid;
-  grid-template-columns: 64px 1fr auto;
-  gap: 12px;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   cursor: pointer;
   text-align: left;
   font-family: var(--font-family-ui);
@@ -192,6 +329,15 @@
 .tileBody {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tileNameRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -199,41 +345,55 @@
   font-family: var(--font-family-display);
   font-variation-settings: "opsz" 24;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--color-brand-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
-.tileMeta {
-  font-family: var(--font-family-mono);
-  font-size: 10px;
-  color: var(--color-brand-text-muted);
-  letter-spacing: 0.06em;
-  margin-top: 2px;
-}
-
-.tileTag {
+.tileBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-family: var(--font-family-mono);
   font-size: 9px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--color-brand-green);
   font-weight: 600;
-  padding: 2px 7px;
-  border: 1px solid var(--color-brand-green-border);
-  border-radius: var(--radius-tight-sm);
 }
 
-.tileModified .tileTag {
+.tileBadgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-brand-green);
+  box-shadow: 0 0 5px rgba(153, 186, 146, 0.55);
+}
+
+.tileModified .tileBadge {
   color: var(--color-brand-yellow);
-  border-color: var(--color-brand-yellow-border);
+}
+
+.tileModified .tileBadgeDot {
+  background: var(--color-brand-yellow);
+  box-shadow: 0 0 5px rgba(232, 213, 97, 0.55);
+}
+
+.tileSub {
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+  font-size: 10px;
+  color: var(--color-brand-text-muted);
+  letter-spacing: 0.04em;
 }
 
 .thumb {
-  width: 64px;
-  height: 42px;
+  width: 100%;
+  aspect-ratio: 16 / 11;
   border-radius: var(--radius-tight-sm);
   background: var(--color-bg-deep);
   border: 1px solid var(--color-bg-stroke);
@@ -241,22 +401,72 @@
 }
 
 .thumbPlaceholder {
-  width: 64px;
-  height: 42px;
+  width: 100%;
+  aspect-ratio: 16 / 11;
   border-radius: var(--radius-tight-sm);
   background: var(--color-bg-deep);
   border: 1px dashed var(--color-bg-border);
 }
 
+.tileAdd {
+  appearance: none;
+  background: var(--color-bg-soft);
+  border: 1px dashed var(--color-bg-stroke);
+  border-radius: var(--radius-tight-md);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: var(--font-family-ui);
+  font-size: 11px;
+  color: var(--color-brand-text-secondary);
+  width: 100%;
+  min-height: 96px;
+  text-align: center;
+  transition:
+    border-color var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
+    background var(--motion-duration-fast) ease;
+}
+
+.tileAdd:hover {
+  border-color: var(--color-brand-green-border);
+  color: var(--color-brand-green);
+  background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, rgba(153, 186, 146, 0.04) 100%);
+}
+
 .empty {
   margin: 0;
-  padding: 12px;
+  padding: 14px 16px;
   font-family: var(--font-family-ui);
+  font-feature-settings: "ss01", "cv01", "cv02", "cv11";
   font-size: 12px;
-  color: var(--color-brand-text-muted);
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--color-brand-text-secondary);
   background: var(--color-bg-soft);
   border-radius: var(--radius-tight-sm);
   border: 1px dashed var(--color-bg-stroke);
+  text-align: center;
+}
+
+.emptyAction {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-brand-green);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.emptyAction:hover {
+  color: var(--color-brand-green-bright, var(--color-brand-green));
 }
 
 .groupGrid {
@@ -265,15 +475,33 @@
   gap: 6px;
 }
 
+.groupChipRow {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  overflow: hidden;
+  transition: border-color var(--motion-duration-fast) ease;
+}
+
+.groupChipRow:hover {
+  border-color: var(--color-bg-border);
+}
+
+.groupChipRow:has(.groupChipOn) {
+  border-color: var(--color-brand-green-border);
+  background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, rgba(153, 186, 146, 0.05) 100%);
+}
+
 .groupChip {
   appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-pill);
+  background: transparent;
+  border: none;
   color: var(--color-brand-text-secondary);
   font-family: var(--font-family-ui);
   font-size: 12px;
@@ -281,13 +509,53 @@
 }
 
 .groupChip:hover {
-  border-color: var(--color-bg-border);
   color: var(--color-brand-text-primary);
 }
 
 .groupChipOn {
-  border-color: var(--color-brand-green-border);
   color: var(--color-brand-text-primary);
+}
+
+.groupChipInspect {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--color-bg-stroke);
+  color: var(--color-brand-text-muted);
+  cursor: pointer;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.groupChipInspect:hover {
+  color: var(--color-brand-green);
+  background: var(--color-bg-raised);
+}
+
+.groupChipAdd {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--color-bg-soft);
+  border: 1px dashed var(--color-bg-stroke);
+  border-radius: var(--radius-pill);
+  color: var(--color-brand-text-secondary);
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
+    background var(--motion-duration-fast) ease;
+}
+
+.groupChipAdd:hover {
+  border-color: var(--color-brand-green-border);
+  color: var(--color-brand-green);
   background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, rgba(153, 186, 146, 0.05) 100%);
 }
 
@@ -300,4 +568,63 @@
   font-size: 10px;
   color: var(--color-brand-text-muted);
   font-feature-settings: "tnum", "zero";
+}
+
+.groupChipLevel {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--color-brand-green);
+  font-feature-settings: "tnum", "zero";
+  font-weight: 600;
+}
+
+.groupChipLevelDrifted {
+  color: var(--color-brand-yellow);
+}
+
+.actions {
+  display: flex;
+  gap: 16px;
+  padding: 4px 4px 0;
+  margin-top: 4px;
+}
+
+.action {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--color-brand-text-secondary);
+  cursor: pointer;
+}
+
+.action:hover:not(:disabled):not([aria-disabled="true"]) {
+  color: var(--color-brand-text-primary);
+}
+
+.actionDeferred {
+  color: var(--color-brand-text-muted);
+  cursor: default;
+}
+
+.actionYellow {
+  color: var(--color-brand-yellow);
+  font-weight: 600;
+}
+
+.actionYellow:hover:not(:disabled) {
+  color: var(--color-brand-yellow);
+  text-decoration: underline;
+}
+
+.actionAlt {
+  color: var(--color-brand-text-muted);
+  font-weight: 500;
+}
+
+.actionAlt:hover:not(:disabled) {
+  color: var(--color-brand-yellow);
 }

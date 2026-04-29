@@ -1,3 +1,4 @@
+use super::helpers::fixture_cct_range;
 use super::*;
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::commissioning::{LIGHTING_BRIDGE_IP_KEY, LIGHTING_CHECK_ID, LIGHTING_UNIVERSE_KEY};
@@ -743,4 +744,133 @@ fn lighting_fixture_rig_z_and_beam_angle_round_trip() {
     .expect("fixture clear should succeed");
     assert_eq!(cleared.fixture.rig_z, None);
     assert_eq!(cleared.fixture.beam_angle_degrees, None);
+}
+
+#[test]
+fn lighting_identify_overlay_reports_full_white_during_active_burst() {
+    let test_dir = TestDir::new("identify-active");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            ),
+            (String::from(LIGHTING_UNIVERSE_KEY), String::from("1")),
+            (
+                String::from("app.commissioning.check.lighting.status"),
+                String::from("passed"),
+            ),
+        ],
+    )
+    .expect("setup should persist");
+
+    let result = identify_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifyRequest {
+            fixture_id: String::from("fixture-key-left"),
+            duration_ms: Some(2000),
+        },
+    )
+    .expect("identify burst should succeed");
+    assert_eq!(result.fixture_id, "fixture-key-left");
+    assert_eq!(result.duration_ms, 2000);
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_lighting_snapshot(&settings);
+    let fixture = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-left")
+        .expect("fixture should exist in snapshot");
+    assert!(fixture.on, "burst overlay should report fixture on");
+    assert_eq!(
+        fixture.intensity, 100,
+        "burst overlay should drive intensity to 100"
+    );
+    let (_, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
+    assert_eq!(
+        fixture.cct, max_cct,
+        "burst overlay should drive cct to fixture max"
+    );
+}
+
+#[test]
+fn lighting_identify_overlay_clears_when_burst_expires() {
+    let test_dir = TestDir::new("identify-expires");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            ),
+            (String::from(LIGHTING_UNIVERSE_KEY), String::from("1")),
+            (
+                String::from("app.commissioning.check.lighting.status"),
+                String::from("passed"),
+            ),
+            // Pre-seed an already-expired burst entry: started 10s ago,
+            // duration 1.2s.
+            (
+                String::from("app.lighting.identify_bursts"),
+                format!(
+                    "{{\"fixture-key-left\":{{\"startedAtMs\":{},\"durationMs\":1200}}}}",
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_millis() as i64 - 10_000)
+                        .unwrap_or(0)
+                ),
+            ),
+        ],
+    )
+    .expect("setup should persist");
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_lighting_snapshot(&settings);
+    let fixture = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-left")
+        .expect("fixture should exist in snapshot");
+    // Default seeded fixture is off, intensity 100 stored, cct 4500 — confirm
+    // the expired burst is NOT applied as overlay.
+    assert!(
+        !fixture.on,
+        "expired burst must not keep fixture on; default state should win"
+    );
+}
+
+#[test]
+fn lighting_identify_burst_rejects_unknown_fixture() {
+    let test_dir = TestDir::new("identify-unknown");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from(LIGHTING_BRIDGE_IP_KEY),
+            String::from("2.0.0.10"),
+        )],
+    )
+    .expect("setup should persist");
+
+    let error = identify_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifyRequest {
+            fixture_id: String::from("fixture-does-not-exist"),
+            duration_ms: None,
+        },
+    )
+    .expect_err("identify burst on unknown fixture must fail");
+
+    match error {
+        LightingCommandError::Rejected(code, _) => {
+            assert_eq!(code, "LIGHTING_FIXTURE_NOT_FOUND");
+        }
+        other => panic!("expected LIGHTING_FIXTURE_NOT_FOUND, got {:?}", other),
+    }
 }

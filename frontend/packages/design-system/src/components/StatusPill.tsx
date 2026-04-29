@@ -16,9 +16,9 @@ export interface StatusPillProps {
 
 export function StatusPill({ label, status = "info" }: StatusPillProps) {
   return (
-    <div className={styles.pill} style={{ "--tone": toneByStatus[status] } as CSSProperties}>
+    <div className={styles.pill} style={{ "--tone": toneByStatus[status] } as CSSProperties} title={label}>
       <span className={styles.dot} aria-hidden="true" />
-      <span>{label}</span>
+      <span className={styles.label}>{label}</span>
     </div>
   );
 }

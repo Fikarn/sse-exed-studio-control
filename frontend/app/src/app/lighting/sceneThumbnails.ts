@@ -11,10 +11,18 @@ interface SceneThumbContext {
   fixtureStates: readonly LightingSceneFixtureSnapshot[];
 }
 
+// fixture.spatialX / spatialY are METERS (the room is 12 m × 8 m), not
+// normalised 0-1 coordinates. The thumbnail is in normalised space, so
+// divide by the room dimensions before clamping. Fallback for fixtures
+// without a position uses the same 1.5 m step + 4 m depth that
+// StagePlot.meterPositionFor uses, kept in sync visually.
 const fallbackPosition = (fixture: LightingFixtureSnapshot, index: number) => {
-  const x = fixture.spatialX ?? (index + 1) / 8;
-  const y = fixture.spatialY ?? 0.5;
-  return { x: clamp01(x), y: clamp01(y) };
+  const xMeters = fixture.spatialX ?? Math.min(STUDIO_LAYOUT.roomWidthMeters - 1, 1.5 * (index + 1));
+  const yMeters = fixture.spatialY ?? 4.0;
+  return {
+    x: clamp01(xMeters / STUDIO_LAYOUT.roomWidthMeters),
+    y: clamp01(yMeters / STUDIO_LAYOUT.roomDepthMeters),
+  };
 };
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));

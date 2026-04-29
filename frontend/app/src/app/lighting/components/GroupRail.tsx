@@ -1,3 +1,5 @@
+import { Plus } from "lucide-react";
+
 import { GroupChip } from "./GroupChip";
 import styles from "./LightingRail.module.css";
 
@@ -6,31 +8,89 @@ export interface GroupRailEntry {
   name: string;
   fixtureCount: number;
   on: boolean;
+  level: number;
+  drifted: boolean;
+  levelDelta?: number;
 }
 
 export interface GroupRailProps {
   groups: readonly GroupRailEntry[];
+  searchQuery?: string;
   onTogglePower: (id: string, on: boolean) => void;
+  onClearSearch?: () => void;
+  onInspectGroup?: (groupId: string) => void;
+  onCreateGroup?: () => void;
 }
 
-export function GroupRail({ groups, onTogglePower }: GroupRailProps) {
+export function GroupRail({
+  groups,
+  searchQuery = "",
+  onTogglePower,
+  onClearSearch,
+  onInspectGroup,
+  onCreateGroup,
+}: GroupRailProps) {
+  const needle = searchQuery.trim().toLowerCase();
+  const filteredGroups = needle ? groups.filter((group) => group.name.toLowerCase().includes(needle)) : groups;
+
+  const createButton = onCreateGroup ? (
+    <button
+      type="button"
+      className={styles.groupChipAdd}
+      onClick={onCreateGroup}
+      aria-label="Create a new lighting group"
+    >
+      <Plus aria-hidden="true" size={13} strokeWidth={1.75} />
+      <span>New group</span>
+    </button>
+  ) : null;
+
   if (groups.length === 0) {
-    return <p className={styles.empty}>No groups defined. Select multiple fixtures and save as a group.</p>;
+    return (
+      <div className={styles.groupGrid}>
+        <p className={styles.empty}>
+          No groups yet.
+          {onCreateGroup ? " Tap + New group below." : " Tap a group chip after creating one."}
+        </p>
+        {createButton}
+      </div>
+    );
+  }
+
+  if (needle && filteredGroups.length === 0) {
+    return (
+      <p className={styles.empty}>
+        No groups match “{searchQuery}”.
+        {onClearSearch ? (
+          <>
+            {" "}
+            <button type="button" className={styles.emptyAction} onClick={onClearSearch}>
+              Clear search
+            </button>
+          </>
+        ) : null}
+      </p>
+    );
   }
 
   return (
     <div className={styles.groupGrid} role="list" aria-label="Lighting groups">
-      {groups.map((group) => (
+      {filteredGroups.map((group) => (
         <div key={group.id} role="listitem">
           <GroupChip
             id={group.id}
             name={group.name}
             fixtureCount={group.fixtureCount}
             on={group.on}
+            level={group.level}
+            drifted={group.drifted}
+            levelDelta={group.levelDelta}
             onTogglePower={onTogglePower}
+            onInspect={onInspectGroup}
           />
         </div>
       ))}
+      {!needle && createButton ? <div role="listitem">{createButton}</div> : null}
     </div>
   );
 }

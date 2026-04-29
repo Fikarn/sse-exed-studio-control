@@ -13,6 +13,7 @@ import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
 import { useTauriShellTestBridge } from "./tauriShellTestBridge";
 import { AudioWorkspace } from "./audio/AudioWorkspace";
 import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
+import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
 import { PlanningWorkspaceSurface } from "./planning/PlanningWorkspace";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ShortcutOverlay } from "./shared/ShortcutOverlay";
@@ -68,6 +69,14 @@ export function OperatorShell() {
     await environment.store.restart();
   });
 
+  const tryNavigateWorkspace = useEffectEvent(async (target: ShellState["activeWorkspace"]) => {
+    // Same-target clicks shouldn't trigger the prompt.
+    if (target === activeWorkspace) return;
+    const allowed = await attemptLeaveCurrentWorkspace();
+    if (!allowed) return;
+    void environment.store.setWorkspace(target);
+  });
+
   useEffect(() => {
     void environment.store.initialize();
 
@@ -113,7 +122,7 @@ export function OperatorShell() {
 
       if (!event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === "s") {
         if (activeWorkspace !== "setup") {
-          void environment.store.setWorkspace("setup");
+          void tryNavigateWorkspace("setup");
           event.preventDefault();
         }
         return;
@@ -121,7 +130,7 @@ export function OperatorShell() {
 
       if (!event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "a") {
         if (activeWorkspace !== "audio") {
-          void environment.store.setWorkspace("audio");
+          void tryNavigateWorkspace("audio");
           event.preventDefault();
         }
         return;
@@ -156,7 +165,7 @@ export function OperatorShell() {
       if (modifier && ["1", "2", "3", "4"].includes(event.key)) {
         const nextWorkspace = workspaces[Number(event.key) - 1]?.id;
         if (nextWorkspace) {
-          void environment.store.setWorkspace(nextWorkspace);
+          void tryNavigateWorkspace(nextWorkspace);
           event.preventDefault();
         }
         return;
@@ -377,7 +386,7 @@ export function OperatorShell() {
         workspaces={workspaces}
         contextSections={frameContextSections}
         onWorkspaceChange={(workspaceId) => {
-          void environment.store.setWorkspace(workspaceId as ShellState["activeWorkspace"]);
+          void tryNavigateWorkspace(workspaceId as ShellState["activeWorkspace"]);
         }}
       >
         <div className={styles.workspaceStack}>

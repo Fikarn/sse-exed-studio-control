@@ -21,8 +21,9 @@ use crate::legacy_import::{parse_import_request, ImportLegacyError};
 use crate::lighting::{
     build_lighting_health_check, create_lighting_fixture, create_lighting_group,
     create_lighting_scene, delete_lighting_fixture, delete_lighting_group, delete_lighting_scene,
-    parse_lighting_all_power_request, parse_lighting_fixture_create_request,
-    parse_lighting_fixture_delete_request, parse_lighting_fixture_update_request,
+    identify_lighting_fixture, parse_lighting_all_power_request,
+    parse_lighting_fixture_create_request, parse_lighting_fixture_delete_request,
+    parse_lighting_fixture_identify_request, parse_lighting_fixture_update_request,
     parse_lighting_group_create_request, parse_lighting_group_delete_request,
     parse_lighting_group_power_request, parse_lighting_group_update_request,
     parse_lighting_scene_create_request, parse_lighting_scene_delete_request,
@@ -229,6 +230,12 @@ impl EngineApp {
                 parse_lighting_fixture_delete_request,
                 delete_lighting_fixture,
                 "fixture-deleted",
+            ),
+            "lighting.fixture.identify" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_fixture_identify_request,
+                identify_lighting_fixture,
+                "fixture-identified",
             ),
             "lighting.group.power" => self.dispatch_lighting_mutate(
                 request,

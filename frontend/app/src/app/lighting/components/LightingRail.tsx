@@ -11,8 +11,11 @@ export interface LightingRailProps {
   grandMaster: number;
   masterEnabled: boolean;
   bridgeReachable: boolean;
+  fixtureOnCount: number;
+  fixtureTotal: number;
   onGrandMasterChange: (value: number) => void;
   onEmergencyCut: () => void;
+  onToggleAllPower?: (on: boolean) => void;
 
   scenes: readonly LightingSceneSnapshot[];
   activeSceneId: string | null;
@@ -20,46 +23,77 @@ export interface LightingRailProps {
   sceneThumbs: Record<string, string>;
   onRecallScene: (sceneId: string) => void;
   onSaveScene: () => void;
-  lastRecalledLabel?: (scene: LightingSceneSnapshot) => string | undefined;
 
   groups: readonly GroupRailEntry[];
   onToggleGroupPower: (groupId: string, on: boolean) => void;
+
+  searchQuery?: string;
+  patchMode?: boolean;
+  isSceneModified?: boolean;
+  onResaveScene?: () => void;
+  onRevertScene?: () => void;
+  onClearSearch?: () => void;
+  onCreateGroup?: () => void;
+  onInspectGroup?: (groupId: string) => void;
 }
 
 export function LightingRail({
   grandMaster,
   masterEnabled,
   bridgeReachable,
+  fixtureOnCount,
+  fixtureTotal,
   onGrandMasterChange,
   onEmergencyCut,
+  onToggleAllPower,
   scenes,
   activeSceneId,
   modifiedSceneId,
   sceneThumbs,
   onRecallScene,
   onSaveScene,
-  lastRecalledLabel,
   groups,
   onToggleGroupPower,
+  searchQuery = "",
+  patchMode = false,
+  isSceneModified = false,
+  onResaveScene,
+  onRevertScene,
+  onClearSearch,
+  onCreateGroup,
+  onInspectGroup,
 }: LightingRailProps) {
+  const railClass = patchMode ? `${styles.rail} ${styles.railPaused}` : styles.rail;
   return (
-    <aside className={styles.rail} aria-label="Lighting rail">
+    <aside
+      className={railClass}
+      aria-label="Lighting rail"
+      data-paused={patchMode || undefined}
+      aria-disabled={patchMode || undefined}
+    >
       <MasterCard
         grandMaster={grandMaster}
-        enabled={masterEnabled}
+        enabled={masterEnabled && !patchMode}
         bridgeReachable={bridgeReachable}
+        fixtureOnCount={fixtureOnCount}
+        fixtureTotal={fixtureTotal}
         onGrandMasterChange={onGrandMasterChange}
         onEmergencyCut={onEmergencyCut}
+        onToggleAllPower={patchMode ? undefined : onToggleAllPower}
+        eyebrow={patchMode ? "Master · paused · patch mode" : undefined}
       />
 
       <RailDivider />
 
       <RailHead
         label="Scenes"
+        count={patchMode ? "paused" : `${scenes.length} saved`}
         action={
-          <button type="button" className={styles.headButton} onClick={onSaveScene}>
-            Save (S)
-          </button>
+          patchMode ? null : (
+            <button type="button" className={styles.headButton} onClick={onSaveScene}>
+              Save <kbd className={styles.headButtonKbd}>S</kbd>
+            </button>
+          )
         }
       />
       <SceneRail
@@ -67,14 +101,54 @@ export function LightingRail({
         activeSceneId={activeSceneId}
         modifiedSceneId={modifiedSceneId}
         sceneThumbs={sceneThumbs}
-        lastRecalledLabel={lastRecalledLabel}
+        searchQuery={searchQuery}
+        bridgeReachable={bridgeReachable}
         onRecall={onRecallScene}
+        onAddScene={patchMode ? undefined : onSaveScene}
+        onClearSearch={onClearSearch}
       />
 
       <RailDivider />
 
-      <RailHead label="Groups" />
-      <GroupRail groups={groups} onTogglePower={onToggleGroupPower} />
+      <RailHead
+        label="Groups"
+        count={
+          patchMode
+            ? "paused"
+            : groups.length > 0
+              ? `${groups.filter((group) => group.on).length} / ${groups.length} on`
+              : undefined
+        }
+      />
+      <GroupRail
+        groups={groups}
+        onTogglePower={onToggleGroupPower}
+        searchQuery={searchQuery}
+        onClearSearch={onClearSearch}
+        onInspectGroup={patchMode ? undefined : onInspectGroup}
+        onCreateGroup={patchMode ? undefined : onCreateGroup}
+      />
+
+      {!patchMode && isSceneModified ? (
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={`${styles.action} ${styles.actionYellow}`}
+            onClick={onResaveScene}
+            disabled={!onResaveScene}
+          >
+            Save changes
+          </button>
+          <button
+            type="button"
+            className={`${styles.action} ${styles.actionYellow} ${styles.actionAlt}`}
+            onClick={onRevertScene}
+            disabled={!onRevertScene}
+          >
+            Revert
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

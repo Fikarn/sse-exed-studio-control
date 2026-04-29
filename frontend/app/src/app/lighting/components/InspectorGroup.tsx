@@ -1,6 +1,6 @@
-import { Power } from "lucide-react";
+import { Pencil, Power } from "lucide-react";
 
-import { Button, InspectorSection, StatusDot } from "@sse/design-system";
+import { Button, IconButton, InspectorSection, StatusDot } from "@sse/design-system";
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { formatLightingValueRange } from "../lightingHelpers";
@@ -13,7 +13,9 @@ export interface InspectorGroupProps {
   fixtures: readonly LightingFixtureSnapshot[];
   onTogglePower: (groupId: string, on: boolean) => void;
   onSelectFixture: (fixtureId: string) => void;
+  onRenameGroup?: (groupId: string, currentName: string) => void;
   busy?: boolean;
+  renameBusy?: boolean;
 }
 
 export function InspectorGroup({
@@ -22,7 +24,9 @@ export function InspectorGroup({
   fixtures,
   onTogglePower,
   onSelectFixture,
+  onRenameGroup,
   busy = false,
+  renameBusy = false,
 }: InspectorGroupProps) {
   const onCount = fixtures.filter((fixture) => fixture.on).length;
   const allOn = fixtures.length > 0 && onCount === fixtures.length;
@@ -35,14 +39,29 @@ export function InspectorGroup({
   const cctMin = ccts.length > 0 ? Math.min(...ccts) : 0;
   const cctMax = ccts.length > 0 ? Math.max(...ccts) : 0;
 
-  const dotState = allOn ? "ok" : mixed ? "attn" : "info";
+  // "Mixed" is a partial state, not an alert — keep the dot informational so
+  // it doesn't read as a warning. The textual " · mixed" suffix conveys the
+  // distinction.
+  const dotState = allOn ? "ok" : "info";
 
   return (
     <>
       <InspectorSection title="Group">
         <div className={styles.fixtureHeader}>
-          <div>
-            <div className={styles.fixtureName}>{groupName}</div>
+          <div className={styles.fixtureNameStack}>
+            <div className={styles.fixtureNameRow}>
+              <div className={styles.fixtureName}>{groupName}</div>
+              {onRenameGroup ? (
+                <IconButton
+                  tone="ghost"
+                  size="sm"
+                  icon={Pencil}
+                  label={`Rename group ${groupName}`}
+                  onClick={() => onRenameGroup(groupId, groupName)}
+                  disabled={renameBusy}
+                />
+              ) : null}
+            </div>
             <div className={styles.fixtureSubline}>
               <StatusDot state={dotState} size="sm" />
               {onCount}/{fixtures.length} on

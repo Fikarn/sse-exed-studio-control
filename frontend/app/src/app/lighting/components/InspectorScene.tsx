@@ -1,148 +1,297 @@
-import { Camera, Pencil, Save, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Pencil, Play, Plus, Save, Trash2 } from "lucide-react";
 
-import { Button, InspectorSection, StatusDot } from "@sse/design-system";
-import type { LightingSceneSnapshot } from "@sse/engine-client";
+import { Button, ConfirmDialog, IconButton } from "@sse/design-system";
+import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
+
+import { formatLightingRelativeTime, lightingFixtureColor } from "../lightingHelpers";
 
 import styles from "./LightingInspector.module.css";
 
 export interface InspectorSceneProps {
   scene: LightingSceneSnapshot | null;
-  thumbDataUri?: string;
+  fixtures: readonly LightingFixtureSnapshot[];
+  groups: readonly LightingGroupSnapshot[];
   isModified: boolean;
-  fixtureCount: number;
   bridgeReachable: boolean;
   onSaveScene?: () => void;
+  onSaveSceneAs?: () => void;
+  onRecallScene?: (sceneId: string) => void;
   onResaveScene?: () => void;
   onDeleteScene?: () => void;
+  onRenameScene?: (sceneId: string, currentName: string) => void;
   saveBusy?: boolean;
+  recallBusy?: boolean;
   resaveBusy?: boolean;
   deleteBusy?: boolean;
 }
 
+interface SceneStats {
+  onCount: number;
+  totalCount: number;
+  fixturesPatched: number;
+  avgIntensity: number;
+  avgCct: number;
+  groupsOn: number;
+  groupsTotal: number;
+}
+
+function computeSceneStats(
+  scene: LightingSceneSnapshot,
+  fixtures: readonly LightingFixtureSnapshot[],
+  groups: readonly LightingGroupSnapshot[]
+): SceneStats {
+  const onStates = scene.fixtureStates.filter((state) => state.on);
+  const intensitySum = onStates.reduce((sum, state) => sum + state.intensity, 0);
+  const cctSum = onStates.reduce((sum, state) => sum + state.cct, 0);
+  const fixturesPatched = fixtures.filter((fixture) => fixture.dmxStartAddress > 0).length;
+
+  // Groups-on: a group is "on" if any of its fixtures has on=true in the
+  // scene's saved state. Approximate count for the inspector header card.
+  const sceneStateById = new Map(scene.fixtureStates.map((state) => [state.fixtureId, state]));
+  const groupsOn = groups.filter((group) => {
+    const groupFixtures = fixtures.filter((fixture) => fixture.groupId === group.id);
+    return groupFixtures.some((fixture) => sceneStateById.get(fixture.id)?.on === true);
+  }).length;
+
+  return {
+    onCount: onStates.length,
+    totalCount: scene.fixtureStates.length,
+    fixturesPatched,
+    avgIntensity: onStates.length > 0 ? Math.round(intensitySum / onStates.length) : 0,
+    avgCct: onStates.length > 0 ? Math.round(cctSum / onStates.length) : 0,
+    groupsOn,
+    groupsTotal: groups.length,
+  };
+}
+
 export function InspectorScene({
   scene,
-  thumbDataUri,
+  fixtures,
+  groups,
   isModified,
-  fixtureCount,
   bridgeReachable,
   onSaveScene,
+  onSaveSceneAs,
+  onRecallScene,
   onResaveScene,
   onDeleteScene,
+  onRenameScene,
   saveBusy = false,
+  recallBusy = false,
   resaveBusy = false,
   deleteBusy = false,
 }: InspectorSceneProps) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   if (!scene) {
     return (
-      <InspectorSection title="No scene">
-        <p className={styles.empty}>
-          No scene is active. Press <kbd className={styles.kbd}>S</kbd> after editing fixtures to save the current rig
-          state as a new scene.
-        </p>
-        {onSaveScene ? (
-          <div className={styles.actionRow}>
-            <Button
-              onClick={onSaveScene}
-              disabled={saveBusy || fixtureCount === 0}
-              variant="primary"
-              size="compact"
-              leadingVisual={<Save aria-hidden="true" size={13} strokeWidth={1.75} />}
-            >
-              Save scene
-            </Button>
+      <div className={styles.scenePane}>
+        <div className={styles.sceneEmpty}>
+          <span className={styles.sceneEyebrow}>Active scene</span>
+          <h2 className={styles.sceneTitle}>No scene</h2>
+          <p className={styles.sceneSub}>
+            No scene is active. Press <kbd className={styles.kbd}>S</kbd> after editing fixtures to save the current rig
+            state as a new scene, or use <strong>Save as new</strong> to name it explicitly.
+          </p>
+          <div className={styles.sceneActions}>
+            {onSaveScene ? (
+              <Button
+                onClick={onSaveScene}
+                disabled={saveBusy || fixtures.length === 0}
+                variant="primary"
+                size="compact"
+                leadingVisual={<Save aria-hidden="true" size={13} strokeWidth={1.75} />}
+              >
+                Save scene
+              </Button>
+            ) : null}
+            {onSaveSceneAs ? (
+              <Button
+                onClick={onSaveSceneAs}
+                disabled={saveBusy || fixtures.length === 0}
+                variant="ghost"
+                size="compact"
+                leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={1.75} />}
+              >
+                Save as new…
+              </Button>
+            ) : null}
           </div>
-        ) : null}
-      </InspectorSection>
+        </div>
+      </div>
     );
   }
 
+  const stats = computeSceneStats(scene, fixtures, groups);
+  const onStateById = new Map(scene.fixtureStates.filter((state) => state.on).map((state) => [state.fixtureId, state]));
+
   return (
-    <>
-      <InspectorSection title="Active scene">
-        <div className={styles.scenePreview}>
-          {thumbDataUri ? (
-            <img alt="" className={styles.scenePreviewImage} src={thumbDataUri} />
-          ) : (
-            <div className={styles.scenePreviewPlaceholder} aria-hidden="true">
-              <Camera size={20} strokeWidth={1.5} />
+    <div className={styles.scenePane}>
+      <span className={styles.sceneEyebrow}>{isModified ? "Active scene · modified" : "Active scene"}</span>
+      <div className={styles.sceneTitleRow}>
+        <h2 className={styles.sceneTitle}>{scene.name}</h2>
+        {onRenameScene ? (
+          <IconButton
+            tone="ghost"
+            size="sm"
+            icon={Pencil}
+            label={`Rename scene ${scene.name}`}
+            onClick={() => onRenameScene(scene.id, scene.name)}
+          />
+        ) : null}
+      </div>
+      <p className={styles.sceneSub}>
+        {stats.onCount > 0
+          ? `${stats.onCount} of ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} on at ${stats.avgIntensity}% / ${stats.avgCct} K average.`
+          : `All ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} dark in this scene.`}
+      </p>
+
+      <dl className={styles.sceneStatGrid}>
+        <div className={styles.sceneStat}>
+          <dt className={styles.sceneStatLabel}>Fixtures</dt>
+          <dd className={styles.sceneStatValue}>
+            {stats.totalCount}
+            <small> / {stats.fixturesPatched} patched</small>
+          </dd>
+        </div>
+        <div className={styles.sceneStat}>
+          <dt className={styles.sceneStatLabel}>Groups on</dt>
+          <dd className={styles.sceneStatValue}>
+            {stats.groupsOn}
+            <small> / {stats.groupsTotal}</small>
+          </dd>
+        </div>
+        {stats.onCount > 0 ? (
+          <>
+            <div className={styles.sceneStat}>
+              <dt className={styles.sceneStatLabel}>Avg intensity</dt>
+              <dd className={styles.sceneStatValue}>
+                {stats.avgIntensity}
+                <small> %</small>
+              </dd>
             </div>
-          )}
-          <div className={styles.sceneMeta}>
-            <div className={styles.sceneName}>{scene.name}</div>
-            <div className={styles.sceneSubline}>
-              <StatusDot state={isModified ? "attn" : "ok"} size="sm" />
-              {isModified ? "Modified — drift from saved state" : "On scene"}
+            <div className={styles.sceneStat}>
+              <dt className={styles.sceneStatLabel}>CCT mean</dt>
+              <dd className={styles.sceneStatValue}>
+                {stats.avgCct}
+                <small> K</small>
+              </dd>
             </div>
-            <div className={styles.sceneFooter}>
-              {scene.fixtureCount} fixture{scene.fixtureCount === 1 ? "" : "s"}
-              {scene.lastRecalledAt ? ` · recalled ${formatRelativeTime(scene.lastRecalledAt)}` : ""}
-            </div>
+          </>
+        ) : (
+          <div className={`${styles.sceneStat} ${styles.sceneStatSpan}`}>
+            <dt className={styles.sceneStatLabel}>State</dt>
+            <dd className={styles.sceneStatValue}>
+              All dark
+              <small> · no levels</small>
+            </dd>
           </div>
-        </div>
-      </InspectorSection>
+        )}
+      </dl>
 
-      <InspectorSection title="Scene actions">
-        <div className={styles.actionRow}>
-          {onResaveScene ? (
-            <Button
-              onClick={onResaveScene}
-              disabled={resaveBusy || !isModified || !bridgeReachable}
-              variant="secondary"
-              size="compact"
-              leadingVisual={<Pencil aria-hidden="true" size={13} strokeWidth={1.75} />}
-            >
-              Re-save scene
-            </Button>
-          ) : null}
-          {onSaveScene ? (
-            <Button
-              onClick={onSaveScene}
-              disabled={saveBusy || fixtureCount === 0}
-              variant="ghost"
-              size="compact"
-              leadingVisual={<Save aria-hidden="true" size={13} strokeWidth={1.75} />}
-            >
-              Save as new
-            </Button>
-          ) : null}
-          {onDeleteScene ? (
-            <Button
-              onClick={onDeleteScene}
-              disabled={deleteBusy}
-              variant="danger"
-              size="compact"
-              leadingVisual={<Trash2 aria-hidden="true" size={13} strokeWidth={1.75} />}
-            >
-              Delete
-            </Button>
-          ) : null}
-        </div>
-        <p className={styles.helpText}>
-          Re-save updates the active scene to match the current rig. Save as new captures the current state as a new
-          scene without overwriting.
+      {stats.onCount > 0 ? (
+        <section className={styles.sceneSection}>
+          <h3 className={styles.sceneSectionHead}>Fixtures used</h3>
+          <ul className={styles.sceneFixtureChips}>
+            {fixtures.map((fixture) => {
+              const state = onStateById.get(fixture.id);
+              if (!state) return null;
+              const swatch = lightingFixtureColor(state.cct, true);
+              return (
+                <li key={fixture.id} className={styles.sceneFixtureChip}>
+                  <span className={styles.sceneFixtureSwatch} style={{ background: swatch }} aria-hidden="true" />
+                  <span className={styles.sceneFixtureName}>{fixture.name}</span>
+                  <span className={styles.sceneFixtureLevel}>{state.intensity}%</span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      <section className={styles.sceneSection}>
+        <h3 className={styles.sceneSectionHead}>Provenance</h3>
+        <p className={styles.sceneProvenance}>
+          {scene.lastRecalledAt ? (
+            <>
+              Last recalled <b>{formatLightingRelativeTime(scene.lastRecalledAt)}</b>
+            </>
+          ) : (
+            <>Not yet recalled</>
+          )}
         </p>
-      </InspectorSection>
-    </>
-  );
-}
+      </section>
 
-function formatRelativeTime(iso: string): string {
-  const parsed = Date.parse(iso);
-  if (!Number.isFinite(parsed)) {
-    return "—";
-  }
-  const elapsedMs = Date.now() - parsed;
-  if (elapsedMs < 60_000) {
-    return "just now";
-  }
-  const minutes = Math.floor(elapsedMs / 60_000);
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+      <div className={styles.sceneActions}>
+        {onRecallScene ? (
+          <Button
+            onClick={() => onRecallScene(scene.id)}
+            loading={recallBusy}
+            disabled={!bridgeReachable}
+            variant="primary"
+            size="compact"
+            leadingVisual={<Play aria-hidden="true" size={13} strokeWidth={1.75} />}
+          >
+            Re-apply scene
+          </Button>
+        ) : null}
+        {onResaveScene ? (
+          <Button
+            onClick={onResaveScene}
+            loading={resaveBusy}
+            disabled={!isModified || !bridgeReachable}
+            variant="secondary"
+            size="compact"
+            leadingVisual={<Pencil aria-hidden="true" size={13} strokeWidth={1.75} />}
+          >
+            Save changes
+          </Button>
+        ) : null}
+        {onSaveSceneAs ? (
+          <Button
+            onClick={onSaveSceneAs}
+            loading={saveBusy}
+            disabled={fixtures.length === 0}
+            variant="ghost"
+            size="compact"
+            leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={1.75} />}
+          >
+            Save as new
+          </Button>
+        ) : null}
+        {onDeleteScene ? (
+          <Button
+            onClick={() => setConfirmingDelete(true)}
+            loading={deleteBusy}
+            variant="danger"
+            size="compact"
+            leadingVisual={<Trash2 aria-hidden="true" size={13} strokeWidth={1.75} />}
+          >
+            Delete
+          </Button>
+        ) : null}
+      </div>
+
+      {confirmingDelete && onDeleteScene ? (
+        <ConfirmDialog
+          title="Delete scene?"
+          body={
+            <>
+              This permanently removes <strong>{scene.name}</strong>. Other scenes are unaffected and the live rig state
+              stays as it is.
+            </>
+          }
+          confirmLabel="Delete scene"
+          danger
+          busy={deleteBusy}
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            onDeleteScene();
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      ) : null}
+    </div>
+  );
 }

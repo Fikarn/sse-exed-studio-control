@@ -26,6 +26,7 @@ export const REQUEST_METHODS = [
   "lighting.dmxMonitor.snapshot",
   "lighting.fixture.create",
   "lighting.fixture.delete",
+  "lighting.fixture.identify",
   "lighting.fixture.update",
   "lighting.group.create",
   "lighting.group.delete",

@@ -3,10 +3,11 @@ use serde_json::Value;
 use super::helpers::*;
 use super::types::{
     LightingAllPowerRequest, LightingEffect, LightingFixtureCreateRequest,
-    LightingFixtureDeleteRequest, LightingFixtureUpdateRequest, LightingGroupCreateRequest,
-    LightingGroupDeleteRequest, LightingGroupPowerRequest, LightingGroupUpdateRequest,
-    LightingSceneCreateRequest, LightingSceneDeleteRequest, LightingSceneRecallRequest,
-    LightingSceneUpdateRequest, LightingSettingsUpdateRequest, LightingSpatialMarker,
+    LightingFixtureDeleteRequest, LightingFixtureIdentifyRequest, LightingFixtureUpdateRequest,
+    LightingGroupCreateRequest, LightingGroupDeleteRequest, LightingGroupPowerRequest,
+    LightingGroupUpdateRequest, LightingSceneCreateRequest, LightingSceneDeleteRequest,
+    LightingSceneRecallRequest, LightingSceneUpdateRequest, LightingSettingsUpdateRequest,
+    LightingSpatialMarker,
 };
 
 pub fn parse_lighting_scene_recall_request(
@@ -175,6 +176,32 @@ pub fn parse_lighting_fixture_delete_request(
 
     Ok(LightingFixtureDeleteRequest {
         fixture_id: String::from(fixture_id),
+    })
+}
+
+pub fn parse_lighting_fixture_identify_request(
+    params: &Value,
+) -> Result<LightingFixtureIdentifyRequest, String> {
+    let fixture_id = params
+        .get("fixtureId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("fixtureId is required"))?;
+
+    let duration_ms = match params.get("durationMs") {
+        Some(value) if value.is_null() => None,
+        Some(value) => Some(
+            value
+                .as_i64()
+                .ok_or_else(|| String::from("durationMs must be a number"))?,
+        ),
+        None => None,
+    };
+
+    Ok(LightingFixtureIdentifyRequest {
+        fixture_id: String::from(fixture_id),
+        duration_ms,
     })
 }
 

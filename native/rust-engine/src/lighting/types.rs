@@ -342,6 +342,25 @@ pub struct LightingSceneDeleteResult {
     pub summary: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct LightingFixtureIdentifyResult {
+    #[serde(rename = "fixtureId")]
+    pub fixture_id: String,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: i64,
+    pub summary: String,
+}
+
+/// Persistent record of an in-flight identify burst. Stored under
+/// `app.lighting.identify_bursts` as a JSON map keyed by fixture id.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IdentifyBurst {
+    #[serde(rename = "startedAtMs")]
+    pub started_at_ms: i64,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: i64,
+}
+
 #[derive(Debug)]
 pub enum LightingCommandError {
     Rejected(&'static str, String),
@@ -387,6 +406,12 @@ pub struct LightingFixtureUpdateRequest {
     pub spatial_rotation: Option<f64>,
     pub rig_z: Option<Option<f64>>,
     pub beam_angle_degrees: Option<Option<f64>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingFixtureIdentifyRequest {
+    pub fixture_id: String,
+    pub duration_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone)]

@@ -3,14 +3,35 @@ import { useEffect, useState } from "react";
 import { HealthBar, type HealthBarItemData } from "@sse/design-system";
 import type { LightingDmxMonitorSnapshot, LightingSnapshot } from "@sse/engine-client";
 
-// TODO: drive APP_VERSION from frontend/app/package.json via a Vite define
-// once the release flow needs it. Manual bump until then.
-const APP_VERSION = "v2.2.2";
+// Driven by Vite's `define` from frontend/app/package.json. Bump the package
+// version and the health bar tracks it on next dev/build.
+const APP_VERSION = `v${__APP_VERSION__}`;
 
-const SESSION_STARTED_AT =
-  typeof performance !== "undefined" && Number.isFinite(performance.timeOrigin) ? performance.timeOrigin : Date.now();
-
+const SESSION_STORAGE_KEY = "app.session.startedAt";
+const SESSION_FRESHNESS_MS = 24 * 60 * 60 * 1_000;
 const SESSION_TICK_MS = 30_000;
+
+function readSessionStartedAt(): number {
+  const now = Date.now();
+  if (typeof window === "undefined") return now;
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    if (Number.isFinite(parsed) && now - parsed < SESSION_FRESHNESS_MS) {
+      return parsed;
+    }
+  } catch {
+    // localStorage unavailable (e.g. private mode) — fall through.
+  }
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, String(now));
+  } catch {
+    // Best-effort write — duration is still meaningful within this load.
+  }
+  return now;
+}
+
+const SESSION_STARTED_AT = readSessionStartedAt();
 
 const DMX_UNIVERSE_TOTAL_CHANNELS = 512;
 
@@ -67,8 +88,9 @@ export function LightingHealthBar({
     },
     {
       label: "Universe",
-      dot: "ok",
+      dot: reachable ? "ok" : "info",
       value: `${channelCount} / ${DMX_UNIVERSE_TOTAL_CHANNELS} ch`,
+      suffix: reachable ? undefined : "stale",
     },
     {
       label: "Fixtures",
@@ -76,7 +98,7 @@ export function LightingHealthBar({
       value: `${fixturesPatched} / ${fixturesTotal} patched`,
     },
     {
-      label: "Auto-save",
+      label: "Scene state",
       dot: driftDetected ? "attn" : "ok",
       value: driftDetected ? "Unsaved changes" : "Saved",
       suffix: !driftDetected && lastSavedLabel ? `· last ${lastSavedLabel}` : undefined,
@@ -91,5 +113,5 @@ export function LightingHealthBar({
     },
   ];
 
-  return <HealthBar items={items} hint={{ kbd: "?", label: "Shortcuts" }} />;
+  return <HealthBar items={items} hint={{ kbd: "⌘ ⇧ M", label: "full DMX monitor" }} />;
 }
