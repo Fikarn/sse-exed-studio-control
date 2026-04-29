@@ -1867,7 +1867,7 @@ Track here as each wave lands. Tick when verified passing the wave validation ga
 | 29  | Slider :focus-visible                     | 20.A                                     | ✓      |
 | 30  | FixtureMarker focus simplification        | 21.E                                     | ✓      |
 | 31  | DMX Monitor role="row"                    | 21.B                                     | ✓      |
-| 32  | Native title attrs (3 sites)              | retained per audit-fix-plan #33 — verify |        |
+| 32  | Native title attrs (3 sites)              | retained per audit-fix-plan #33 — verify | ✓      |
 | 33  | role="application" reconsideration        | 21.H                                     | ✓      |
 | 34  | Long fixture name truncation              | 21.E                                     | ✓      |
 | 35  | name.toUpperCase() → CSS                  | 21.E                                     | ✓      |
@@ -1889,16 +1889,16 @@ Track here as each wave lands. Tick when verified passing the wave validation ga
 | 51  | Search result count                       | 21.V                                     | ✓      |
 | 52  | Health bar bridge value/suffix            | 21.W                                     | ✓      |
 | 53  | Plot pill modified text                   | 20.L + 21.S                              | ✓      |
-| 54  | Scene rail virtualization                 | 23.A — gated                             |        |
-| 55  | Drag-to-reorder scenes                    | 23.B — gated                             |        |
-| 56  | Favorites / Recents                       | 23.C — gated                             |        |
+| 54  | Scene rail virtualization                 | 23.A                                     | ✓      |
+| 55  | Drag-to-reorder scenes                    | 23.B                                     | ✓      |
+| 56  | Favorites / Recents                       | 23.C                                     | ✓      |
 | 57  | Dialog keyboard contract                  | Pre-work + 22.H                          | ✓      |
 | 58  | DMX monitor max-height responsive         | 22.F                                     | ✓      |
 | 59  | Stage plot grid contrast                  | 19.A token alpha bumps                   | ✓      |
 | 60  | Skeleton/connecting state                 | 22.E                                     | ✓      |
 | 61  | busyAction parallel-mutation              | 22.G                                     | ✓      |
 | 62  | Identify burst plot pulse                 | 22.D                                     | ✓      |
-| 63  | Title-bar drift indicator                 | 23.D — gated                             |        |
+| 63  | Title-bar drift indicator                 | 23.D                                     | ✓      |
 | 64  | lightingFixtureColor surface-500 dead ref | 19.B.13                                  | ✓      |
 
 ## Risk & rollback

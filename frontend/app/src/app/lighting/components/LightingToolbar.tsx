@@ -55,13 +55,12 @@ export function LightingToolbar({
           {patchMode ? <span className={styles.patchEyebrow}>Patch mode</span> : null}
         </div>
 
-        <span
-          className={`${styles.chip} ${bridgeReachable ? styles.chipGreen : styles.chipErr}`}
-          title={bridgeIp ? `${bridgeIp}` : "No bridge configured"}
-        >
-          <StatusDot state={bridgeReachable ? "ok" : "err"} size="sm" />
-          DMX U{bridgeUniverse} · {bridgeReachable ? "reachable" : "unreachable"}
-        </span>
+        <Tooltip content={bridgeIp ? bridgeIp : "No bridge configured"} placement="bottom">
+          <span className={`${styles.chip} ${bridgeReachable ? styles.chipGreen : styles.chipErr}`}>
+            <StatusDot state={bridgeReachable ? "ok" : "err"} size="sm" />
+            DMX U{bridgeUniverse} · {bridgeReachable ? "reachable" : "unreachable"}
+          </span>
+        </Tooltip>
 
         <span className={styles.divider} aria-hidden="true" />
 
