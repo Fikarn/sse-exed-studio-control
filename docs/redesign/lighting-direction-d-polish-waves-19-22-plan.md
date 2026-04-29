@@ -1873,7 +1873,7 @@ Track here as each wave lands. Tick when verified passing the wave validation ga
 | 35  | name.toUpperCase() → CSS                  | 21.E                                     | ✓      |
 | 36  | Group chip aria trim                      | 21.F                                     | ✓      |
 | 37  | ConfirmDialog autofocus                   | Pre-work + 21.G                          | ✓      |
-| 38  | Select-all affordance                     | 22.A                                     |        |
+| 38  | Select-all affordance                     | 22.A                                     | ✓      |
 | 39  | "Lighting paused" disambiguation          | 21.J                                     | ✓      |
 | 40  | Empty-state verb consistency              | 21.K                                     | ✓      |
 | 41  | "+ Fixture button" → "Add fixture"        | 21.L                                     | ✓      |
@@ -1884,20 +1884,20 @@ Track here as each wave lands. Tick when verified passing the wave validation ga
 | 46  | Group "mixed" suffix removal              | 21.P                                     | ✓      |
 | 47  | Bridge banner copy                        | 21.Q                                     | ✓      |
 | 48  | CreateFixtureDialog autoname gaps         | 21.R                                     | ✓      |
-| 49  | ⌘F focus search                           | 22.C                                     |        |
-| 50  | 1-9 quick recall                          | 22.B                                     |        |
+| 49  | ⌘F focus search                           | 22.C                                     | ✓      |
+| 50  | 1-9 quick recall                          | 22.B                                     | ✓      |
 | 51  | Search result count                       | 21.V                                     | ✓      |
 | 52  | Health bar bridge value/suffix            | 21.W                                     | ✓      |
 | 53  | Plot pill modified text                   | 20.L + 21.S                              | ✓      |
 | 54  | Scene rail virtualization                 | 23.A — gated                             |        |
 | 55  | Drag-to-reorder scenes                    | 23.B — gated                             |        |
 | 56  | Favorites / Recents                       | 23.C — gated                             |        |
-| 57  | Dialog keyboard contract                  | Pre-work + 22.H                          |        |
-| 58  | DMX monitor max-height responsive         | 22.F                                     |        |
+| 57  | Dialog keyboard contract                  | Pre-work + 22.H                          | ✓      |
+| 58  | DMX monitor max-height responsive         | 22.F                                     | ✓      |
 | 59  | Stage plot grid contrast                  | 19.A token alpha bumps                   | ✓      |
-| 60  | Skeleton/connecting state                 | 22.E                                     |        |
-| 61  | busyAction parallel-mutation              | 22.G                                     |        |
-| 62  | Identify burst plot pulse                 | 22.D                                     |        |
+| 60  | Skeleton/connecting state                 | 22.E                                     | ✓      |
+| 61  | busyAction parallel-mutation              | 22.G                                     | ✓      |
+| 62  | Identify burst plot pulse                 | 22.D                                     | ✓      |
 | 63  | Title-bar drift indicator                 | 23.D — gated                             |        |
 | 64  | lightingFixtureColor surface-500 dead ref | 19.B.13                                  | ✓      |
 
