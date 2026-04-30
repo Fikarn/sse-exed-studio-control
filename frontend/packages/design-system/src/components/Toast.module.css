@@ -1,0 +1,123 @@
+/* Toast — single bubble. Bottom-right convention; the consumer arranges
+   stacking. Slides in from below; auto-dismiss timing is the consumer's
+   concern (errors typically stay sticky until manual dismiss). */
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 10px 12px;
+  border-radius: var(--radius-tight-md);
+  border: 1px solid var(--color-bg-stroke);
+  background: var(--color-bg-soft);
+  color: var(--color-brand-text-primary);
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .toast {
+    animation: sseToastInBottom 200ms var(--motion-easing-standard);
+  }
+}
+
+@keyframes sseToastInBottom {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast[data-tone="ok"] {
+  background: linear-gradient(180deg, var(--color-brand-green-soft), var(--color-brand-green-glow));
+  border-color: var(--color-brand-green);
+}
+
+.toast[data-tone="error"] {
+  background: linear-gradient(180deg, var(--color-danger-soft), var(--color-danger-glow));
+  color: var(--color-danger-500);
+  border-color: var(--color-danger-500);
+}
+
+.toast[data-tone="info"] {
+  background: var(--color-bg-soft);
+  color: var(--color-brand-text-secondary);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.message {
+  font-size: 12px;
+  word-wrap: break-word;
+}
+
+.action {
+  appearance: none;
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  padding: 2px 8px;
+  border-radius: var(--radius-tight-sm);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: center;
+  transition: background-color 120ms var(--motion-easing-standard);
+}
+
+.action:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+}
+
+.dismiss {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  opacity: 0.6;
+  transition: opacity 120ms var(--motion-easing-standard);
+}
+
+.dismiss:hover {
+  opacity: 1;
+}
+
+.dismiss:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+  border-radius: var(--radius-tight-xs);
+  opacity: 1;
+}

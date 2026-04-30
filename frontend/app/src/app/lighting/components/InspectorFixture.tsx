@@ -1,7 +1,15 @@
-import { type ChangeEvent, useEffect, useId, useState } from "react";
+import { type ChangeEvent, useEffect, useId, useRef, useState } from "react";
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 
-import { Button, ConfirmDialog, IconButton, InspectorSection, StatusDot } from "@sse/design-system";
+import {
+  Button,
+  ConfirmDialog,
+  IconButton,
+  InlineRename,
+  InspectorSection,
+  StatusDot,
+  type InlineRenameHandle,
+} from "@sse/design-system";
 import type { LightingFixtureSnapshot, LightingGroupSnapshot } from "@sse/engine-client";
 
 import { deriveMounting, type FixtureMounting } from "../fixtureMounting";
@@ -34,7 +42,8 @@ export interface InspectorFixtureProps {
       beamAngleDegrees?: number | null;
     }
   ) => void;
-  onRenameFixture?: (fixtureId: string, currentName: string) => void;
+  /** Inline-rename commit handler. Receives the trimmed new name. */
+  onRenameFixture?: (fixtureId: string, newName: string) => void | Promise<void>;
   onAssignFixtureGroup?: (fixtureId: string, groupId: string | null) => void;
   onCreateGroup?: () => void;
   busy?: boolean;
@@ -86,6 +95,7 @@ export function InspectorFixture({
   const [intensityDraft, setIntensityDraft] = useState(fixture.intensity);
   const [cctDraft, setCctDraft] = useState(fixture.cct);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const renameRef = useRef<InlineRenameHandle | null>(null);
 
   // Position-field drafts. Strings (not numbers) so the user can type
   // intermediate values like "5." without the input clobbering them.
@@ -171,14 +181,27 @@ export function InspectorFixture({
         <div className={styles.fixtureHeader}>
           <div className={styles.fixtureNameStack}>
             <div className={styles.fixtureNameRow}>
-              <div className={styles.fixtureName}>{fixture.name}</div>
+              <div className={styles.fixtureName}>
+                {onRenameFixture ? (
+                  <InlineRename
+                    ref={renameRef}
+                    value={fixture.name}
+                    onCommit={(next) => onRenameFixture(fixture.id, next)}
+                    busy={renameBusy}
+                    inputAriaLabel={`Rename fixture ${fixture.name}`}
+                    maxLength={120}
+                  />
+                ) : (
+                  fixture.name
+                )}
+              </div>
               {onRenameFixture ? (
                 <IconButton
                   tone="ghost"
                   size="sm"
                   icon={Pencil}
                   label={`Rename fixture ${fixture.name}`}
-                  onClick={() => onRenameFixture(fixture.id, fixture.name)}
+                  onClick={() => renameRef.current?.beginEdit()}
                   disabled={renameBusy}
                 />
               ) : null}

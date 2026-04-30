@@ -17,6 +17,7 @@ import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
 import { PlanningWorkspaceSurface } from "./planning/PlanningWorkspace";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ShortcutOverlay } from "./shared/ShortcutOverlay";
+import { ToastProvider } from "./shared/toastContext";
 import { RecoverySurface } from "./startup/RecoverySurface";
 import { SetupStartupSurface } from "./startup/SetupStartupSurface";
 import { StartupSurface } from "./startup/StartupSurface";
@@ -43,6 +44,17 @@ function GraphicsWorkspace({ title, subtitle, note }: { title: string; subtitle:
 }
 
 export function OperatorShell() {
+  // Toast portal hosts cross-workspace bottom-right notifications. Mounted at
+  // the shell root so all workspaces (and incidentally any startup/recovery
+  // surface) share one stack.
+  return (
+    <ToastProvider>
+      <OperatorShellInner />
+    </ToastProvider>
+  );
+}
+
+function OperatorShellInner() {
   const environment = useMemo(() => createShellEnvironment(), []);
   const shellState = useShellSnapshot(environment.store);
   useTauriShellTestBridge(shellState, environment.store);
