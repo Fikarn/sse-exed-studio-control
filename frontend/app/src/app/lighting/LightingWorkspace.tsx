@@ -1031,21 +1031,28 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleBulkIntensityCommit = useEffectEvent(async (fixtureIds: readonly string[], intensity: number) => {
-    startBusy("fixture-bulk-intensity");
-    try {
-      await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, intensity })));
-    } catch (error) {
-      reportError(error, "Bulk intensity update failed.");
-    } finally {
-      finishBusy("fixture-bulk-intensity");
+  // Wave 27 — bulk slider drag-shift + delta-input both produce per-fixture
+  // value arrays. The legacy "flatten to one value" handler is gone; callers
+  // map their target value through the array shape.
+  const handleBulkIntensityValues = useEffectEvent(
+    async (values: ReadonlyArray<{ fixtureId: string; value: number }>) => {
+      startBusy("fixture-bulk-intensity");
+      try {
+        await Promise.all(
+          values.map(({ fixtureId, value }) => store.updateLightingFixture({ fixtureId, intensity: value }))
+        );
+      } catch (error) {
+        reportError(error, "Bulk intensity update failed.");
+      } finally {
+        finishBusy("fixture-bulk-intensity");
+      }
     }
-  });
+  );
 
-  const handleBulkCctCommit = useEffectEvent(async (fixtureIds: readonly string[], cct: number) => {
+  const handleBulkCctValues = useEffectEvent(async (values: ReadonlyArray<{ fixtureId: string; value: number }>) => {
     startBusy("fixture-bulk-cct");
     try {
-      await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, cct })));
+      await Promise.all(values.map(({ fixtureId, value }) => store.updateLightingFixture({ fixtureId, cct: value })));
     } catch (error) {
       reportError(error, "Bulk CCT update failed.");
     } finally {
@@ -1430,8 +1437,8 @@ export function LightingWorkspaceSurface({
           selectedFixtures={selectedFixtureSnapshots}
           onClearSelection={() => void handleSelectFixture(null)}
           onBulkTogglePower={(ids, on) => void handleBulkTogglePower(ids, on)}
-          onBulkIntensityCommit={(ids, intensity) => void handleBulkIntensityCommit(ids, intensity)}
-          onBulkCctCommit={(ids, cct) => void handleBulkCctCommit(ids, cct)}
+          onBulkIntensityValues={(values) => void handleBulkIntensityValues(values)}
+          onBulkCctValues={(values) => void handleBulkCctValues(values)}
           busyActions={busyActions}
           pendingInlineRename={pendingInlineRename}
         />

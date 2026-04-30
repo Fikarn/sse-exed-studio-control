@@ -1,20 +1,27 @@
-import { type ChangeEvent, useEffect, useState } from "react";
 import { Power } from "lucide-react";
 
-import { Button, InspectorSection } from "@sse/design-system";
+import { Button, InspectorSection, MultiValueSlider } from "@sse/design-system";
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
 
-import { isLightingRangeCommitKey, lightingFixtureCctRange } from "../lightingHelpers";
+import { lightingFixtureCctRange } from "../lightingHelpers";
 
 import styles from "./LightingInspector.module.css";
 
+export interface BulkFixtureValue {
+  fixtureId: string;
+  value: number;
+}
+
 export interface InspectorFixtureBulkProps {
   fixtures: readonly LightingFixtureSnapshot[];
-  busy?: boolean;
   onClearSelection: () => void;
   onBulkTogglePower: (fixtureIds: readonly string[], on: boolean) => void;
-  onBulkIntensityCommit: (fixtureIds: readonly string[], intensity: number) => void;
-  onBulkCctCommit: (fixtureIds: readonly string[], cct: number) => void;
+  /** Per-fixture intensity update (Wave 27). Drag-shift preserves spread;
+   *  delta-input ("+5", "+10%", "65") applies per-fixture math via
+   *  MultiValueSlider's parser. */
+  onBulkIntensityValues: (values: ReadonlyArray<BulkFixtureValue>) => void;
+  /** Per-fixture CCT update (Wave 27). Same semantics as intensity. */
+  onBulkCctValues: (values: ReadonlyArray<BulkFixtureValue>) => void;
   /**
    * Click → focus this fixture as the single primary selection.
    * Shift-click → toggle the fixture out of the bulk extras (cannot remove
@@ -42,18 +49,12 @@ function intersectCctRange(fixtures: readonly LightingFixtureSnapshot[]): { min:
   return { min, max };
 }
 
-function avg(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  return Math.round(values.reduce((sum, n) => sum + n, 0) / values.length);
-}
-
 export function InspectorFixtureBulk({
   fixtures,
-  busy = false,
   onClearSelection,
   onBulkTogglePower,
-  onBulkIntensityCommit,
-  onBulkCctCommit,
+  onBulkIntensityValues,
+  onBulkCctValues,
   onSelectFixture,
 }: InspectorFixtureBulkProps) {
   const ids = fixtures.map((fixture) => fixture.id);
@@ -61,43 +62,17 @@ export function InspectorFixtureBulk({
   const anyOn = fixtures.some((fixture) => fixture.on);
   const cctRange = intersectCctRange(fixtures);
 
-  const onIntensities = fixtures.filter((fixture) => fixture.on).map((fixture) => fixture.intensity);
-  const intensityAvg = avg(onIntensities);
-  const cctAvg = avg(fixtures.map((fixture) => fixture.cct));
+  // Drag-shift + delta-input both flow through MultiValueSlider; the slider
+  // returns a per-value array which we zip with the fixture id list and
+  // forward to the bulk-IPC handler.
+  const intensityValues = fixtures.map((fixture) => fixture.intensity);
+  const cctValues = fixtures.map((fixture) => fixture.cct);
 
-  const [intensityDraft, setIntensityDraft] = useState(intensityAvg);
-  const [cctDraft, setCctDraft] = useState(cctAvg);
-
-  // Resync when the selection changes or external state updates rotate the
-  // averages; the slider only re-pulls when the user isn't mid-interaction.
-  useEffect(() => {
-    setIntensityDraft(intensityAvg);
-  }, [intensityAvg, ids.length]);
-
-  useEffect(() => {
-    setCctDraft(cctAvg);
-  }, [cctAvg, ids.length]);
-
-  const handleIntensityChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.currentTarget.value);
-    if (Number.isFinite(value)) {
-      setIntensityDraft(Math.max(0, Math.min(100, Math.round(value))));
-    }
+  const handleIntensityValues = (next: number[]) => {
+    onBulkIntensityValues(next.map((value, index) => ({ fixtureId: ids[index]!, value: Math.round(value) })));
   };
-
-  const commitIntensity = () => {
-    onBulkIntensityCommit(ids, intensityDraft);
-  };
-
-  const handleCctChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.currentTarget.value);
-    if (Number.isFinite(value)) {
-      setCctDraft(Math.max(cctRange.min, Math.min(cctRange.max, Math.round(value))));
-    }
-  };
-
-  const commitCct = () => {
-    onBulkCctCommit(ids, cctDraft);
+  const handleCctValues = (next: number[]) => {
+    onBulkCctValues(next.map((value, index) => ({ fixtureId: ids[index]!, value: Math.round(value / 100) * 100 })));
   };
 
   return (
@@ -112,7 +87,6 @@ export function InspectorFixtureBulk({
           </div>
           <Button
             onClick={() => onBulkTogglePower(ids, !anyOn)}
-            disabled={busy}
             variant={allOn ? "secondary" : "primary"}
             size="compact"
             leadingVisual={<Power aria-hidden="true" size={13} strokeWidth={1.75} />}
@@ -155,51 +129,39 @@ export function InspectorFixtureBulk({
       </InspectorSection>
 
       <InspectorSection title="Bulk intensity">
-        <div className={styles.sliderRow}>
-          <input
-            aria-label="Bulk intensity"
-            className={styles.slider}
-            disabled={busy || !anyOn}
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={intensityDraft}
-            onChange={handleIntensityChange}
-            onPointerUp={commitIntensity}
-            onBlur={commitIntensity}
-            onKeyUp={(event) => {
-              if (isLightingRangeCommitKey(event.key)) {
-                commitIntensity();
-              }
-            }}
-          />
-          <span className={styles.sliderValue}>{intensityDraft}%</span>
-        </div>
+        <MultiValueSlider
+          ariaLabel="Bulk intensity"
+          values={intensityValues}
+          min={0}
+          max={100}
+          step={1}
+          // onValuesChange is intentionally a no-op so the slider's internal
+          // draftAvg drives the thumb during drag without firing N IPCs per
+          // pointermove (was 720+ IPCs/sec at 60 Hz × 12 fixtures). The
+          // onValuesCommit handler fires once on pointerup with the final
+          // delta-shifted values; the delta-input field also routes through
+          // onValuesCommit on Enter.
+          onValuesChange={() => undefined}
+          onValuesCommit={handleIntensityValues}
+          // No disable on busy — bulk-IPCs commit in <1ms, so the brief
+          // disabled state was perceived as a release-blink. Slider stays
+          // responsive across back-to-back commits.
+          disabled={!anyOn}
+          unit="%"
+        />
       </InspectorSection>
 
       <InspectorSection title="Bulk colour temperature">
-        <div className={styles.sliderRow}>
-          <input
-            aria-label="Bulk CCT"
-            className={`${styles.slider} ${styles.sliderCct}`}
-            disabled={busy}
-            type="range"
-            min={cctRange.min}
-            max={cctRange.max}
-            step={100}
-            value={cctDraft}
-            onChange={handleCctChange}
-            onPointerUp={commitCct}
-            onBlur={commitCct}
-            onKeyUp={(event) => {
-              if (isLightingRangeCommitKey(event.key)) {
-                commitCct();
-              }
-            }}
-          />
-          <span className={styles.sliderValue}>{cctDraft}K</span>
-        </div>
+        <MultiValueSlider
+          ariaLabel="Bulk CCT"
+          values={cctValues}
+          min={cctRange.min}
+          max={cctRange.max}
+          step={100}
+          onValuesChange={() => undefined}
+          onValuesCommit={handleCctValues}
+          unit="K"
+        />
         <div className={styles.helpText}>
           Range narrowed to {cctRange.min}–{cctRange.max}K — the intersection of every selected fixture's supported
           range.
