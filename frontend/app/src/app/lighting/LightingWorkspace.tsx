@@ -382,6 +382,39 @@ export function LightingWorkspaceSurface({
     });
   });
 
+  // F2 — marquee commit handler. `ids` is the full set inside the released
+  // rectangle. With `additive: true` (Shift+marquee) the existing extras +
+  // primary are preserved and the new ids merge in; otherwise the persisted
+  // single-selection is replaced by the rectangle's first hit (or cleared if
+  // empty) and extras carry the rest.
+  const handleMarqueeSelect = useEffectEvent(async (ids: readonly string[], options: { additive: boolean }) => {
+    if (options.additive) {
+      if (ids.length === 0) return;
+      setExtraSelectedFixtureIds((prev) => {
+        const next = new Set(prev);
+        for (const id of ids) {
+          if (id !== persistedSelectedFixtureId) next.add(id);
+        }
+        return next;
+      });
+      return;
+    }
+    // Replace mode. Empty marquee clears all selections (single + extras).
+    setSelectedGroupId(null);
+    if (ids.length === 0) {
+      setExtraSelectedFixtureIds(new Set());
+      if (persistedSelectedFixtureId !== null) {
+        await store.updateLightingSettings({ selectedFixtureId: null });
+      }
+      return;
+    }
+    const [first, ...rest] = ids;
+    setExtraSelectedFixtureIds(new Set(rest));
+    if (first && first !== persistedSelectedFixtureId) {
+      await store.updateLightingSettings({ selectedFixtureId: first });
+    }
+  });
+
   const handleSelectFixture = useEffectEvent(async (fixtureId: string | null, options: { additive?: boolean } = {}) => {
     const { additive = false } = options;
     setSelectedGroupId(null);
@@ -1353,6 +1386,7 @@ export function LightingWorkspaceSurface({
             }}
             onIdentifyFixture={(id, name) => void handleIdentifyBurst(id, name)}
             onRequestDeleteFixture={(id, name) => setConfirmDeleteFixture({ id, name })}
+            onMarqueeSelect={(ids, options) => void handleMarqueeSelect(ids, options)}
           />
         </main>
 

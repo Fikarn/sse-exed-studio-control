@@ -43,12 +43,18 @@
   width: 100%;
   height: 100%;
   display: block;
-  cursor: grab;
+  /* Default cursor: crosshair signals "drag to marquee-select". Pan moved to
+     middle-mouse-button in Wave 26 so the grab affordance no longer applies. */
+  cursor: crosshair;
   touch-action: none;
 }
 
 .plotSvgPanning {
   cursor: grabbing;
+}
+
+.plotSvgMarqueeing {
+  cursor: crosshair;
 }
 
 .plotEmpty {

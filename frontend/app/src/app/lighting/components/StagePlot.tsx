@@ -1,3 +1,4 @@
+import { useCallback, useMemo, useState } from "react";
 import { Sun } from "lucide-react";
 
 import { EmptyState, PlotMeta, PlotPill } from "@sse/design-system";
@@ -6,6 +7,7 @@ import type { LightingFixtureSnapshot } from "@sse/engine-client";
 import { deriveMounting } from "../fixtureMounting";
 import { lightingFixtureBeamLength, lightingFixtureBeamWidth } from "../lightingHelpers";
 import { STUDIO_LAYOUT, type StudioLayout } from "../studioLayout";
+import { useMarqueeSelection } from "../useMarqueeSelection";
 import { useStagePlotViewport } from "../useStagePlotViewport";
 
 import { FixtureMarker } from "./FixtureMarker";
@@ -45,6 +47,9 @@ export interface StagePlotProps {
   onIdentifyFixture?: (id: string, name: string) => void;
   /** Right-click "Delete" — parent shows the confirm dialog. */
   onRequestDeleteFixture?: (id: string, name: string) => void;
+  /** Marquee result — fixture ids inside the released selection rectangle.
+   *  When `additive`, the parent merges with the existing multi-select. */
+  onMarqueeSelect?: (fixtureIds: readonly string[], options: { additive: boolean }) => void;
 }
 
 const FALLBACK_X_STEP = 1.5;
@@ -72,13 +77,67 @@ export function StagePlot({
   onRequestRenameFixture,
   onIdentifyFixture,
   onRequestDeleteFixture,
+  onMarqueeSelect,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
 
+  // F9 — track in-flight fixture-drag state so we can render alignment
+  // guides against other fixtures' axes. Driven by FixtureMarker's
+  // onDragMove / onDragEnd callbacks. Cleared on commit / cancel.
+  const [dragState, setDragState] = useState<{
+    id: string;
+    xMeters: number;
+    yMeters: number;
+    altKey: boolean;
+  } | null>(null);
+  const handleFixtureDragMove = useCallback((id: string, xMeters: number, yMeters: number, altKey: boolean) => {
+    setDragState({ id, xMeters, yMeters, altKey });
+  }, []);
+  const handleFixtureDragEnd = useCallback((_id: string) => {
+    setDragState(null);
+  }, []);
+
   const viewport = useStagePlotViewport({
     onBackgroundClick: () => onSelectFixture(null),
   });
+
+  // F2 — marquee selection on plain left-drag. Pan is now middle-mouse only.
+  // Hit-test resolves on pointerup against the current fixture positions.
+  const marquee = useMarqueeSelection({
+    svgRef: viewport.svgRef,
+    onCommit: (ids, options) => {
+      onMarqueeSelect?.(ids, options);
+    },
+    onBackgroundClick: () => onSelectFixture(null),
+    resolveTargets: () =>
+      fixtures.map((fixture, index) => {
+        const { xMeters, yMeters } = meterPositionFor(fixture, index);
+        return { id: fixture.id, xCm: xMeters * 100, yCm: yMeters * 100 };
+      }),
+  });
+
+  // F9 — alignment guide derivation. When a drag is in progress and the
+  // user isn't holding Alt (free-positioning), surface horizontal +
+  // vertical lines through any other fixture whose axis falls within 0.1 m
+  // of the dragged fixture. The guides are advisory; the snap-to-0.5 m
+  // semantic in FixtureMarker.finishDrag still wins on commit.
+  const alignmentGuides = useMemo(() => {
+    if (!dragState || dragState.altKey) return { vertical: [], horizontal: [] };
+    const verticalSet = new Set<number>();
+    const horizontalSet = new Set<number>();
+    for (let i = 0; i < fixtures.length; i += 1) {
+      const fixture = fixtures[i]!;
+      if (fixture.id === dragState.id) continue;
+      const { xMeters, yMeters } = meterPositionFor(fixture, i);
+      if (Math.abs(xMeters - dragState.xMeters) < 0.1) verticalSet.add(xMeters);
+      if (Math.abs(yMeters - dragState.yMeters) < 0.1) horizontalSet.add(yMeters);
+    }
+    return {
+      vertical: Array.from(verticalSet),
+      horizontal: Array.from(horizontalSet),
+    };
+  }, [dragState, fixtures]);
 
   const needle = searchQuery.trim().toLowerCase();
   const fixtureMatches = (fixture: LightingFixtureSnapshot) =>
@@ -116,18 +175,33 @@ export function StagePlot({
 
       <svg
         ref={viewport.svgRef}
-        className={`${styles.plotSvg} ${viewport.isPanning ? styles.plotSvgPanning : ""}`}
+        className={`${styles.plotSvg} ${viewport.isPanning ? styles.plotSvgPanning : ""} ${marquee.rect ? styles.plotSvgMarqueeing : ""}`}
         viewBox={`0 0 ${widthCm} ${depthCm}`}
         preserveAspectRatio="xMidYMid meet"
         xmlns="http://www.w3.org/2000/svg"
-        onPointerDown={viewport.onPointerDown}
-        onPointerMove={viewport.onPointerMove}
-        onPointerUp={viewport.onPointerUp}
-        onPointerCancel={viewport.onPointerUp}
+        onPointerDown={(event) => {
+          // Route by mouse button: middle (1) drives pan, left (0) drives
+          // marquee selection. Both hooks no-op for the other button so
+          // co-binding is safe.
+          viewport.onPointerDown(event);
+          marquee.onPointerDown(event);
+        }}
+        onPointerMove={(event) => {
+          viewport.onPointerMove(event);
+          marquee.onPointerMove(event);
+        }}
+        onPointerUp={(event) => {
+          viewport.onPointerUp(event);
+          marquee.onPointerUp(event);
+        }}
+        onPointerCancel={(event) => {
+          viewport.onPointerUp(event);
+          marquee.onPointerUp(event);
+        }}
         onWheel={viewport.onWheel}
         onDoubleClick={viewport.reset}
       >
-        <g transform={viewport.transform}>
+        <g data-inner-content="true" transform={viewport.transform}>
           <defs>
             <filter id="sse-fixture-shadow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur in="SourceAlpha" stdDeviation="1.2" />
@@ -229,10 +303,66 @@ export function StagePlot({
                   onRequestRename={onRequestRenameFixture}
                   onIdentify={onIdentifyFixture}
                   onRequestDelete={onRequestDeleteFixture}
+                  onDragMove={handleFixtureDragMove}
+                  onDragEnd={handleFixtureDragEnd}
                 />
               );
             });
           })()}
+
+          {/* F9 — smart-guide alignment lines. Only render when a fixture
+              drag is in progress and Alt isn't held. Stroke is non-scaling
+              so the guides remain crisp under any zoom level. */}
+          {dragState && !dragState.altKey ? (
+            <g pointerEvents="none">
+              {alignmentGuides.vertical.map((xMeters) => (
+                <line
+                  key={`vguide-${xMeters}`}
+                  x1={xMeters * 100}
+                  y1={0}
+                  x2={xMeters * 100}
+                  y2={depthCm}
+                  style={{ stroke: "var(--color-brand-green)", strokeDasharray: "3 3", opacity: 0.65 }}
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+              {alignmentGuides.horizontal.map((yMeters) => (
+                <line
+                  key={`hguide-${yMeters}`}
+                  x1={0}
+                  y1={yMeters * 100}
+                  x2={widthCm}
+                  y2={yMeters * 100}
+                  style={{ stroke: "var(--color-brand-green)", strokeDasharray: "3 3", opacity: 0.65 }}
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </g>
+          ) : null}
+
+          {/* F2 — marquee selection rectangle. Rendered inside the inner
+              transformed group so the rect coordinates stay aligned with
+              the fixture markers under zoom/pan. */}
+          {marquee.rect ? (
+            <rect
+              pointerEvents="none"
+              x={marquee.rect.x}
+              y={marquee.rect.y}
+              width={marquee.rect.width}
+              height={marquee.rect.height}
+              rx={2}
+              style={{
+                fill: marquee.additive ? "var(--color-brand-green-glow)" : "var(--color-brand-green-soft)",
+                stroke: "var(--color-brand-green)",
+                strokeDasharray: "4 3",
+                opacity: 0.5,
+              }}
+              strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke"
+            />
+          ) : null}
 
           {/* Patch overlay — DMX address tags above each fixture */}
           <PatchOverlay active={patchMode}>

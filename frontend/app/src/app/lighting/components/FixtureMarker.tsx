@@ -47,7 +47,27 @@ export interface FixtureMarkerProps {
   onIdentify?: (id: string, name: string) => void;
   /** Right-click "Delete" — parent shows the confirm dialog. */
   onRequestDelete?: (id: string, name: string) => void;
+  /** Live drag callback for the parent's smart-guide layer. Fires on every
+   *  pointermove past the click threshold with the in-flight (xMeters, yMeters)
+   *  in studio coordinates and whether Alt is held (free-positioning, snap off). */
+  onDragMove?: (id: string, xMeters: number, yMeters: number, altKey: boolean) => void;
+  /** Fires when drag ends (commit or cancel) so the parent can clear its
+   *  drag-tracking state for this fixture. */
+  onDragEnd?: (id: string) => void;
 }
+
+// I1 — intensity bar geometry. Anchored to the bottom edge of the marker
+// shape so all mountings share a consistent visual rhythm. Width / height are
+// in viewBox cm units; the bar doesn't rotate with the marker (lives outside
+// the rotated <g> like the text labels).
+const BAR_WIDTH = 4;
+const BAR_HEIGHT = 24;
+const BAR_ANCHOR_Y: Record<FixtureMounting, number> = {
+  "grid-panel": 11,
+  "grid-soft": 11,
+  "wall-bar": 5,
+  stand: 11,
+};
 
 const SHELL_FILL = "var(--color-fixture-shell-fill)";
 const SHELL_STROKE = "var(--color-fixture-shell-stroke)";
@@ -136,6 +156,8 @@ export function FixtureMarker({
   onRequestRename,
   onIdentify,
   onRequestDelete,
+  onDragMove,
+  onDragEnd,
 }: FixtureMarkerProps) {
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const color = lightingFixtureColor(cct, on);
@@ -212,10 +234,13 @@ export function FixtureMarker({
     const startInner = startPt.matrixTransform(inverse);
     const nowInner = nowPt.matrixTransform(inverse);
 
-    setGhost({
-      x: drag.startCenterX + (nowInner.x - startInner.x),
-      y: drag.startCenterY + (nowInner.y - startInner.y),
-    });
+    const nextX = drag.startCenterX + (nowInner.x - startInner.x);
+    const nextY = drag.startCenterY + (nowInner.y - startInner.y);
+    setGhost({ x: nextX, y: nextY });
+    // F9 — surface live drag position to the parent so the smart-guide layer
+    // can compute alignment lines vs. other fixtures. Pre-snap meters; the
+    // commit handler still applies the 0.5 m snap on pointerup.
+    onDragMove?.(id, nextX / 100, nextY / 100, event.altKey);
   };
 
   const finishDrag = (event: ReactPointerEvent<SVGGElement>, kind: "up" | "cancel") => {
@@ -226,6 +251,7 @@ export function FixtureMarker({
     const ghostNow = ghost;
     dragRef.current = null;
     setGhost(null);
+    onDragEnd?.(id);
 
     if (kind === "cancel") return;
 
@@ -352,6 +378,35 @@ export function FixtureMarker({
             style={{ stroke: SELECTED_STROKE, strokeWidth: 2 }}
           />
         ) : null}
+        {/* I1 — glanceable intensity bar at marker base. Vertical, 4×24 cm,
+            CCT-tinted fill rising from the bottom. When fixture is off the
+            empty outline still renders at low opacity so the bar's presence
+            stays consistent across the rig (fades in cleanly when the
+            fixture comes on). */}
+        {(() => {
+          const barX = renderX - BAR_WIDTH / 2;
+          const barY = renderY + BAR_ANCHOR_Y[mounting];
+          const fillFrac = on ? Math.max(0, Math.min(1, intensity / 100)) : 0;
+          const fillH = BAR_HEIGHT * fillFrac;
+          const fillY = barY + (BAR_HEIGHT - fillH);
+          const fillColor = lightingFixtureColor(cct, true);
+          return (
+            <g pointerEvents="none" opacity={on ? 1 : 0.4}>
+              <rect
+                x={barX}
+                y={barY}
+                width={BAR_WIDTH}
+                height={BAR_HEIGHT}
+                rx={1.2}
+                style={{ fill: "var(--color-bg-soft)", stroke: SHELL_STROKE, strokeWidth: 0.6 }}
+                opacity={0.65}
+              />
+              {fillFrac > 0 ? (
+                <rect x={barX} y={fillY} width={BAR_WIDTH} height={fillH} rx={1.2} style={{ fill: fillColor }} />
+              ) : null}
+            </g>
+          );
+        })()}
         {/* Identify-burst pulse ring — total 1.2 s matches engine
           identify.rs default duration_ms. SVG <animate> runs natively;
           we don't gate on prefers-reduced-motion because the burst is the
@@ -393,6 +448,32 @@ export function FixtureMarker({
         >
           {metaLabel}
         </text>
+        {/* F4 — live position chip during drag. Renders the in-flight meters
+            offset down-right from the ghost so it follows the cursor without
+            occluding the marker. Sits inside the rotated viewport <g> so
+            zoom/pan transforms apply uniformly with the rest of the plot. */}
+        {ghost ? (
+          <g pointerEvents="none">
+            <rect
+              x={ghost.x + 12}
+              y={ghost.y + 4}
+              width={70}
+              height={18}
+              rx={3}
+              style={{ fill: "var(--color-bg-canvas)", stroke: SELECTED_STROKE, strokeWidth: 0.8 }}
+            />
+            <text
+              x={ghost.x + 47}
+              y={ghost.y + 16}
+              textAnchor="middle"
+              fontSize={10}
+              fontWeight={600}
+              style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
+            >
+              {(ghost.x / 100).toFixed(1)} m, {(ghost.y / 100).toFixed(1)} m
+            </text>
+          </g>
+        ) : null}
       </g>
       {menuPos && menuItems.length > 0 ? (
         <ContextMenu
