@@ -39,7 +39,9 @@ export interface StagePlotViewport {
 }
 
 export interface UseStagePlotViewportOptions {
-  /** Called when a pointerup is registered as a click (no drag). Used to clear selection. */
+  /** Called when a middle-mouse pointerup is registered as a click (no drag).
+   *  Plain left-click clearing is owned by the marquee hook; middle-click
+   *  rarely fires this path but is preserved for completeness. */
   onBackgroundClick?: () => void;
 }
 
@@ -48,6 +50,10 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [state, setState] = useState<ViewportState>(IDENTITY);
   const [isPanning, setIsPanning] = useState(false);
+  // Pan is bound to middle-mouse (button 1) only since Wave 26's marquee-
+  // selection took over plain left-drag. Wheel-zoom and double-click-reset
+  // remain on their default gestures.
+  const PAN_BUTTON = 1;
 
   const dragRef = useRef<{
     pointerId: number;
@@ -87,7 +93,7 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<SVGSVGElement>) => {
-      if (event.button !== 0) return;
+      if (event.button !== PAN_BUTTON) return;
       const svg = svgRef.current;
       if (!svg) return;
       dragRef.current = {
