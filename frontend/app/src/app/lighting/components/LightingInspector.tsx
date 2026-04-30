@@ -53,10 +53,15 @@ export interface LightingInspectorProps {
   onResaveScene?: () => void;
   onDeleteScene?: () => void;
   onDeleteFixture?: (fixtureId: string) => void;
-  onRenameScene?: (sceneId: string, currentName: string) => void;
-  onRenameFixture?: (fixtureId: string, currentName: string) => void;
-  onRenameGroup?: (groupId: string, currentName: string) => void;
+  /** Inline-rename commit handlers. The second argument is the trimmed new
+   *  name produced by the InlineRename primitive (NOT the current name). */
+  onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
+  onRenameFixture?: (fixtureId: string, newName: string) => void | Promise<void>;
+  onRenameGroup?: (groupId: string, newName: string) => void | Promise<void>;
   onAssignFixtureGroup?: (fixtureId: string, groupId: string | null) => void;
+  /** Remove a fixture from its current group. Used by the I8 hover-revealed
+   *  "×" affordance on group inspector member rows. */
+  onRemoveFixtureFromGroup?: (fixtureId: string) => void | Promise<void>;
   onCreateGroup?: () => void;
   onSpatialCommit?: (
     fixtureId: string,
@@ -145,6 +150,7 @@ export function LightingInspector({
   onRenameFixture,
   onRenameGroup,
   onAssignFixtureGroup,
+  onRemoveFixtureFromGroup,
   onCreateGroup,
   onSpatialCommit,
   selectedFixtures,
@@ -198,6 +204,7 @@ export function LightingInspector({
             recallBusy={hasBusyPrefix("scene:")}
             resaveBusy={busyActions.has("scene-resave")}
             deleteBusy={busyActions.has("scene-delete")}
+            renameBusy={activeScene ? busyActions.has(`scene-rename:${activeScene.id}`) : false}
           />
         ) : null}
 
@@ -249,8 +256,12 @@ export function LightingInspector({
             onTogglePower={onToggleGroupPower}
             onSelectFixture={onSelectFixture}
             onRenameGroup={onRenameGroup}
+            onRemoveFixtureFromGroup={onRemoveFixtureFromGroup}
             busy={busyActions.has(`group:${selectedGroup.id}`)}
             renameBusy={busyActions.has(`group-rename:${selectedGroup.id}`)}
+            removingFixtureId={
+              groupFixtures.find((fixture) => busyActions.has(`fixture-group:${fixture.id}`))?.id ?? null
+            }
           />
         ) : null}
 

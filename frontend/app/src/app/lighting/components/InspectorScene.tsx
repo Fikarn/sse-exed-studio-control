@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pencil, Play, Plus, Save, Trash2 } from "lucide-react";
 
-import { Button, ConfirmDialog, IconButton } from "@sse/design-system";
+import { Button, ConfirmDialog, IconButton, InlineRename, type InlineRenameHandle } from "@sse/design-system";
 import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
 
 import { formatLightingRelativeTime, lightingFixtureColor } from "../lightingHelpers";
@@ -19,11 +19,13 @@ export interface InspectorSceneProps {
   onRecallScene?: (sceneId: string) => void;
   onResaveScene?: () => void;
   onDeleteScene?: () => void;
-  onRenameScene?: (sceneId: string, currentName: string) => void;
+  /** Inline-rename commit handler. Receives the trimmed new name. */
+  onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
   saveBusy?: boolean;
   recallBusy?: boolean;
   resaveBusy?: boolean;
   deleteBusy?: boolean;
+  renameBusy?: boolean;
 }
 
 interface SceneStats {
@@ -81,8 +83,10 @@ export function InspectorScene({
   recallBusy = false,
   resaveBusy = false,
   deleteBusy = false,
+  renameBusy = false,
 }: InspectorSceneProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const renameRef = useRef<InlineRenameHandle | null>(null);
 
   if (!scene) {
     return (
@@ -130,14 +134,28 @@ export function InspectorScene({
     <div className={styles.scenePane}>
       <span className={styles.sceneEyebrow}>{isModified ? "Active scene · modified" : "Active scene"}</span>
       <div className={styles.sceneTitleRow}>
-        <h2 className={styles.sceneTitle}>{scene.name}</h2>
+        <h2 className={styles.sceneTitle}>
+          {onRenameScene ? (
+            <InlineRename
+              ref={renameRef}
+              value={scene.name}
+              onCommit={(next) => onRenameScene(scene.id, next)}
+              busy={renameBusy}
+              inputAriaLabel={`Rename scene ${scene.name}`}
+              maxLength={120}
+            />
+          ) : (
+            scene.name
+          )}
+        </h2>
         {onRenameScene ? (
           <IconButton
             tone="ghost"
             size="sm"
             icon={Pencil}
             label={`Rename scene ${scene.name}`}
-            onClick={() => onRenameScene(scene.id, scene.name)}
+            onClick={() => renameRef.current?.beginEdit()}
+            disabled={renameBusy}
           />
         ) : null}
       </div>

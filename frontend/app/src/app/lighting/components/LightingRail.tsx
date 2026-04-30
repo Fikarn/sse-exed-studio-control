@@ -31,6 +31,8 @@ export interface LightingRailProps {
   onSaveScene: () => void;
   onReorderScene?: (sceneId: string, beforeSceneId: string | null) => void;
   onPinScene?: (sceneId: string, pinned: boolean) => void;
+  onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
+  renamingSceneIds?: ReadonlySet<string>;
 
   groups: readonly GroupRailEntry[];
   onToggleGroupPower: (groupId: string, on: boolean) => void;
@@ -62,6 +64,8 @@ export function LightingRail({
   onSaveScene,
   onReorderScene,
   onPinScene,
+  onRenameScene,
+  renamingSceneIds,
   groups,
   onToggleGroupPower,
   searchQuery = "",
@@ -124,6 +128,8 @@ export function LightingRail({
         onClearSearch={onClearSearch}
         onReorderScene={patchMode ? undefined : onReorderScene}
         onPinScene={patchMode ? undefined : onPinScene}
+        onRenameScene={patchMode ? undefined : onRenameScene}
+        renamingSceneIds={renamingSceneIds}
       />
 
       <RailDivider />

@@ -565,6 +565,10 @@
   gap: 4px;
 }
 
+.memberItem {
+  position: relative;
+}
+
 .memberRow {
   appearance: none;
   background: var(--color-bg-soft);
@@ -584,6 +588,30 @@
 
 .memberRow:hover {
   border-color: var(--color-brand-green-border);
+}
+
+/* Hover-revealed remove-from-group affordance. Pinned to the right edge of
+   the member row; opacity 0 by default so the row stays clean, opacity 1
+   when the row is hovered or the button itself receives keyboard focus.
+   The button overlays the row's right padding so it doesn't shift the
+   meta column when revealed. */
+.memberRemove {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 120ms var(--motion-easing-standard);
+  background: var(--color-bg-soft);
+  border-radius: var(--radius-tight-xs);
+  padding: 1px;
+  pointer-events: none;
+}
+
+.memberItem:hover .memberRemove,
+.memberRemove:focus-within {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .memberName {

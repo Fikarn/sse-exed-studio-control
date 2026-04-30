@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
-import { X } from "lucide-react";
-
 import { ConfirmDialog } from "@sse/design-system";
 import type {
   LightingDmxMonitorSnapshot,
@@ -9,6 +7,8 @@ import type {
   LightingSnapshot,
   ShellStore,
 } from "@sse/engine-client";
+
+import { useToast, type ToastApi } from "../shared/toastContext";
 
 import {
   asRecord,
@@ -38,11 +38,6 @@ import { UndoRefusedError, useUndoStack, type UndoOutcome } from "./useUndoStack
 import { useUnsavedChangesGuard } from "./useUnsavedScenePrompt";
 import styles from "./LightingWorkspace.module.css";
 
-type RenameTarget =
-  | { kind: "scene"; sceneId: string; currentName: string }
-  | { kind: "fixture"; fixtureId: string; currentName: string }
-  | { kind: "group"; groupId: string; currentName: string };
-
 interface LightingWorkspaceSurfaceProps {
   appSnapshot: SnapshotRecord | null;
   lightingDmxMonitorSnapshot: LightingDmxMonitorSnapshot | null;
@@ -50,9 +45,26 @@ interface LightingWorkspaceSurfaceProps {
   store: ShellStore;
 }
 
-interface ActionFeedback {
-  message: string;
-  tone: "ok" | "error" | "info";
+/** Result-aware toast helper for surfacing UndoOutcome to the operator. The
+ *  undo stack returns a tagged result; this maps every variant to a toast so
+ *  rejections (UndoRefusedError) and errors don't silently disappear. */
+function pushUndoOutcomeToast(toast: ToastApi, outcome: UndoOutcome): void {
+  if (outcome.kind === "noop") return;
+  if (outcome.kind === "ok") {
+    toast.push({ tone: "info", message: `Undid: ${outcome.label}.` });
+    return;
+  }
+  if (outcome.kind === "rejected") {
+    toast.push({
+      tone: "info",
+      message: `Cannot undo "${outcome.label}" — ${outcome.reason}.`,
+    });
+    return;
+  }
+  toast.push({
+    tone: "error",
+    message: `Undo failed for "${outcome.label}". The operation is still applied.`,
+  });
 }
 
 function fixtureStatesEqual(
@@ -106,13 +118,7 @@ export function LightingWorkspaceSurface({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [activeTabOverride, setActiveTabOverride] = useState<InspectorTab | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
-  useEffect(() => {
-    if (!feedback) return;
-    if (feedback.tone === "error") return; // errors are sticky until manual dismiss
-    const timer = window.setTimeout(() => setFeedback(null), 3500);
-    return () => window.clearTimeout(timer);
-  }, [feedback]);
+  const toast = useToast();
   // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
   // while saving Scene A) don't stomp each other. Each handler scopes its
   // own key; the inspector reads via `busyActions.has(key)` /
@@ -146,7 +152,6 @@ export function LightingWorkspaceSurface({
   const [createFixtureOpen, setCreateFixtureOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [saveSceneAsOpen, setSaveSceneAsOpen] = useState(false);
-  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   // Frontend-only "previewed" scene id. Set immediately when a scene tile is
   // clicked so the inspector can show its details even if the engine recall
   // IPC was rejected (e.g. bridge unreachable in dev / pre-probe states).
@@ -351,7 +356,7 @@ export function LightingWorkspaceSurface({
   // ---------------- handlers ----------------
 
   const reportError = useEffectEvent((error: unknown, fallback: string) => {
-    setFeedback({
+    toast.push({
       message: error instanceof Error ? error.message : fallback,
       tone: "error",
     });
@@ -449,7 +454,7 @@ export function LightingWorkspaceSurface({
             },
           });
         }
-        setFeedback({ message: String(result?.summary ?? "Fixture added."), tone: "ok" });
+        toast.push({ message: String(result?.summary ?? "Fixture added."), tone: "ok" });
       } catch (error) {
         reportError(error, "Lighting fixture create failed.");
       } finally {
@@ -462,7 +467,7 @@ export function LightingWorkspaceSurface({
     startBusy("group-create");
     try {
       const result = asRecord(await store.createLightingGroup(name));
-      setFeedback({ message: String(result?.summary ?? `Group '${name}' created.`), tone: "ok" });
+      toast.push({ message: String(result?.summary ?? `Group '${name}' created.`), tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting group create failed.");
     } finally {
@@ -471,14 +476,15 @@ export function LightingWorkspaceSurface({
   });
 
   const handleRenameScene = useEffectEvent(async (sceneId: string, name: string) => {
-    startBusy("scene-rename");
+    const busyKey = `scene-rename:${sceneId}`;
+    startBusy(busyKey);
     try {
       await store.updateLightingScene({ sceneId, name });
-      setFeedback({ message: `Scene renamed to '${name}'.`, tone: "ok" });
+      toast.push({ message: `Scene renamed to '${name}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Scene rename failed.");
     } finally {
-      finishBusy("scene-rename");
+      finishBusy(busyKey);
     }
   });
 
@@ -487,7 +493,7 @@ export function LightingWorkspaceSurface({
     startBusy(busyKey);
     try {
       await store.updateLightingFixture({ fixtureId, name });
-      setFeedback({ message: `Fixture renamed to '${name}'.`, tone: "ok" });
+      toast.push({ message: `Fixture renamed to '${name}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Fixture rename failed.");
     } finally {
@@ -500,7 +506,7 @@ export function LightingWorkspaceSurface({
     startBusy(busyKey);
     try {
       await store.updateLightingGroup({ groupId, name });
-      setFeedback({ message: `Group renamed to '${name}'.`, tone: "ok" });
+      toast.push({ message: `Group renamed to '${name}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Group rename failed.");
     } finally {
@@ -535,7 +541,7 @@ export function LightingWorkspaceSurface({
     startBusy("lighting-blackout");
     try {
       await store.setLightingAllPower(false);
-      setFeedback({ message: "All fixtures cut.", tone: "ok" });
+      toast.push({ message: "All fixtures cut.", tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting blackout failed.");
     } finally {
@@ -551,7 +557,7 @@ export function LightingWorkspaceSurface({
     startBusy("lighting-master-toggle");
     try {
       await store.setLightingAllPower(on);
-      setFeedback({ message: on ? "Lighting resumed." : "Lighting paused.", tone: "ok" });
+      toast.push({ message: on ? "Lighting resumed." : "Lighting paused.", tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting master toggle failed.");
     } finally {
@@ -582,8 +588,41 @@ export function LightingWorkspaceSurface({
         const next = withSceneThumbUpserted(sceneThumbs, createdId, dataUri);
         await store.setLightingSceneThumbs(next);
         setLastSavedAt(new Date());
+        // Push undo: deleting the just-created scene. Engine has no API to
+        // recreate a scene with an explicit fixtureStates snapshot, so this
+        // entry is single-use — once undone it disappears (no redo path).
+        let currentSceneId = createdId;
+        const sceneName = name;
+        const cachedDataUri = dataUri;
+        undoStack.push({
+          label: `Save scene ${sceneName}`,
+          undo: async () => {
+            await store.deleteLightingScene(currentSceneId);
+            const cleared = withSceneThumbRemoved(sceneThumbs, currentSceneId);
+            await store.setLightingSceneThumbs(cleared);
+          },
+          redo: async () => {
+            const redoResult = asRecord(await store.createLightingScene({ name: sceneName }));
+            const redoCreated = asRecord(redoResult?.scene);
+            const newId = typeof redoCreated?.id === "string" ? redoCreated.id : null;
+            if (newId) {
+              currentSceneId = newId;
+              const refreshed = withSceneThumbUpserted(sceneThumbs, newId, cachedDataUri);
+              await store.setLightingSceneThumbs(refreshed);
+            }
+          },
+        });
       }
-      setFeedback({ message: String(result?.summary ?? `Scene '${name}' saved.`), tone: "ok" });
+      toast.push({
+        tone: "ok",
+        message: String(result?.summary ?? `Scene '${name}' saved.`),
+        action: createdId
+          ? {
+              label: "Undo",
+              onClick: () => void undoStack.undo().then((outcome) => pushUndoOutcomeToast(toast, outcome)),
+            }
+          : undefined,
+      });
     } catch (error) {
       reportError(error, "Scene save failed.");
     } finally {
@@ -615,7 +654,7 @@ export function LightingWorkspaceSurface({
       const nextThumbs = withSceneThumbUpserted(sceneThumbs, sceneId, dataUri);
       await store.setLightingSceneThumbs(nextThumbs);
       setLastSavedAt(new Date());
-      setFeedback({ message: `Scene '${sceneName}' updated.`, tone: "ok" });
+      toast.push({ message: `Scene '${sceneName}' updated.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Scene re-save failed.");
     } finally {
@@ -630,7 +669,7 @@ export function LightingWorkspaceSurface({
       await store.deleteLightingScene(activeScene.id);
       const next = withSceneThumbRemoved(sceneThumbs, activeScene.id);
       await store.setLightingSceneThumbs(next);
-      setFeedback({ message: `Scene '${activeScene.name}' deleted.`, tone: "ok" });
+      toast.push({ message: `Scene '${activeScene.name}' deleted.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Scene delete failed.");
     } finally {
@@ -655,7 +694,7 @@ export function LightingWorkspaceSurface({
     startBusy(busyKey);
     try {
       await store.pinLightingScene(sceneId, pinned);
-      setFeedback({ message: pinned ? "Scene pinned." : "Scene unpinned.", tone: "ok" });
+      toast.push({ message: pinned ? "Scene pinned." : "Scene unpinned.", tone: "ok" });
     } catch (error) {
       reportError(error, pinned ? "Scene pin failed." : "Scene unpin failed.");
     } finally {
@@ -665,7 +704,7 @@ export function LightingWorkspaceSurface({
 
   const handleRecallScene = useEffectEvent(async (sceneId: string) => {
     if (uiMode === "patch") {
-      setFeedback({
+      toast.push({
         message: "Patch mode is active. Exit patch mode before recalling a scene.",
         tone: "info",
       });
@@ -679,7 +718,7 @@ export function LightingWorkspaceSurface({
       // Skip the IPC entirely when the bridge is unreachable — the engine
       // would just reject it. Surface a single non-error toast so the
       // operator knows recall is preview-only and not a failed action.
-      setFeedback({
+      toast.push({
         message: "Bridge unreachable — showing scene contents only.",
         tone: "info",
       });
@@ -689,7 +728,7 @@ export function LightingWorkspaceSurface({
     startBusy(busyKey);
     try {
       await store.recallLightingScene(sceneId, 0);
-      setFeedback({ message: "Scene recalled.", tone: "ok" });
+      toast.push({ message: "Scene recalled.", tone: "ok" });
     } catch (error) {
       reportError(error, "Scene recall failed.");
     } finally {
@@ -715,12 +754,23 @@ export function LightingWorkspaceSurface({
     return result;
   }, [scenes, sceneThumbs, fixtures]);
 
+  // Per-id rename-busy set surfaced to the rail so each scene tile shows the
+  // InlineRename busy treatment only for its own in-flight commit (parallel
+  // renames don't dim every tile).
+  const renamingSceneIds = useMemo<ReadonlySet<string>>(() => {
+    const ids = new Set<string>();
+    for (const scene of scenes) {
+      if (busyActions.has(`scene-rename:${scene.id}`)) ids.add(scene.id);
+    }
+    return ids;
+  }, [busyActions, scenes]);
+
   const handleToggleGroupPower = useEffectEvent(async (groupId: string, on: boolean) => {
     const busyKey = `group:${groupId}`;
     startBusy(busyKey);
     try {
       await store.setLightingGroupPower(groupId, on);
-      setFeedback({ message: `Group ${on ? "on" : "off"}.`, tone: "ok" });
+      toast.push({ message: `Group ${on ? "on" : "off"}.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Group power update failed.");
     } finally {
@@ -778,13 +828,13 @@ export function LightingWorkspaceSurface({
         try {
           await store.updateLightingSettings({ selectedFixtureId: next.id });
           setExtraSelectedFixtureIds(new Set());
-          setFeedback({ message: `Patched. Now patching ‘${next.name}’.`, tone: "ok" });
+          toast.push({ message: `Patched. Now patching ‘${next.name}’.`, tone: "ok" });
         } catch (error) {
           reportError(error, "Auto-advance to next fixture failed.");
         }
       } else {
         setUiMode("recall");
-        setFeedback({ message: "All fixtures patched.", tone: "ok" });
+        toast.push({ message: "All fixtures patched.", tone: "ok" });
       }
     } catch (error) {
       reportError(error, "Patch update failed.");
@@ -812,7 +862,7 @@ export function LightingWorkspaceSurface({
     startBusy(busyKey);
     try {
       await store.identifyLightingFixture(fixtureId);
-      setFeedback({ message: `Identify burst sent to '${fixtureName}'.`, tone: "ok" });
+      toast.push({ message: `Identify burst sent to '${fixtureName}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Identify burst failed.");
     } finally {
@@ -872,9 +922,15 @@ export function LightingWorkspaceSurface({
           },
         });
       }
-      setFeedback({
+      toast.push({
         message: target ? `Fixture '${target.name}' deleted.` : "Fixture deleted.",
         tone: "ok",
+        action: target
+          ? {
+              label: "Undo",
+              onClick: () => void undoStack.undo().then((outcome) => pushUndoOutcomeToast(toast, outcome)),
+            }
+          : undefined,
       });
     } catch (error) {
       reportError(error, "Fixture delete failed.");
@@ -887,7 +943,7 @@ export function LightingWorkspaceSurface({
     startBusy("fixture-bulk-power");
     try {
       await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, on })));
-      setFeedback({
+      toast.push({
         message: `Set ${fixtureIds.length} fixtures ${on ? "on" : "off"}.`,
         tone: "ok",
       });
@@ -948,7 +1004,7 @@ export function LightingWorkspaceSurface({
     startBusy(busyKey);
     try {
       await store.updateLightingFixture({ fixtureId, groupId });
-      setFeedback({
+      toast.push({
         message: groupId ? "Fixture moved to group." : "Fixture removed from group.",
         tone: "ok",
       });
@@ -980,13 +1036,13 @@ export function LightingWorkspaceSurface({
   const reportUndoOutcome = useEffectEvent((outcome: UndoOutcome, kind: "Undo" | "Redo") => {
     switch (outcome.kind) {
       case "ok":
-        setFeedback({
+        toast.push({
           message: `${kind === "Undo" ? "Undid" : "Redid"} ‘${outcome.label}’ · ${kind === "Undo" ? "⌘⇧Z to redo" : "⌘Z to undo"}`,
           tone: "ok",
         });
         break;
       case "rejected":
-        setFeedback({
+        toast.push({
           message: `Cannot ${kind.toLowerCase()} ‘${outcome.label}’: ${outcome.reason}.`,
           tone: "info",
         });
@@ -1097,7 +1153,7 @@ export function LightingWorkspaceSurface({
         } else if (isSceneModified && activeScene) {
           void handleResaveScene();
         } else {
-          setFeedback({
+          toast.push({
             message: activeScene ? "Already saved." : "No active scene to save changes to.",
             tone: "info",
           });
@@ -1184,20 +1240,6 @@ export function LightingWorkspaceSurface({
         onAddFixture={requestAddFixture}
       />
 
-      {feedback ? (
-        <div className={styles.feedback} role="status" data-tone={feedback.tone}>
-          <span>{feedback.message}</span>
-          <button
-            type="button"
-            className={styles.feedbackDismiss}
-            onClick={() => setFeedback(null)}
-            aria-label="Dismiss"
-          >
-            <X aria-hidden="true" size={12} strokeWidth={2} />
-          </button>
-        </div>
-      ) : null}
-
       <LightingBridgeBanner reachable={bridgeReachable} bridgeIp={bridgeIp} universe={bridgeUniverse} />
 
       <div
@@ -1224,6 +1266,8 @@ export function LightingWorkspaceSurface({
           onSaveScene={handleSaveScene}
           onReorderScene={handleReorderScene}
           onPinScene={handlePinScene}
+          onRenameScene={handleRenameScene}
+          renamingSceneIds={renamingSceneIds}
           groups={railGroupEntries}
           onToggleGroupPower={handleToggleGroupPower}
           searchQuery={searchQuery}
@@ -1287,10 +1331,11 @@ export function LightingWorkspaceSurface({
           onDeleteScene={handleDeleteScene}
           onDeleteFixture={(id) => void handleDeleteFixture(id)}
           onSpatialCommit={(id, partial) => void handleFixtureSpatialCommit(id, partial)}
-          onRenameScene={(sceneId, currentName) => setRenameTarget({ kind: "scene", sceneId, currentName })}
-          onRenameFixture={(fixtureId, currentName) => setRenameTarget({ kind: "fixture", fixtureId, currentName })}
-          onRenameGroup={(groupId, currentName) => setRenameTarget({ kind: "group", groupId, currentName })}
+          onRenameScene={handleRenameScene}
+          onRenameFixture={handleRenameFixture}
+          onRenameGroup={handleRenameGroup}
           onAssignFixtureGroup={(fixtureId, groupId) => void handleAssignFixtureGroup(fixtureId, groupId)}
+          onRemoveFixtureFromGroup={(fixtureId) => void handleAssignFixtureGroup(fixtureId, null)}
           onCreateGroup={() => setCreateGroupOpen(true)}
           selectedFixtures={selectedFixtureSnapshots}
           onClearSelection={() => void handleSelectFixture(null)}
@@ -1412,35 +1457,6 @@ export function LightingWorkspaceSurface({
             void handleSaveScene(name);
           }}
           onCancel={() => setSaveSceneAsOpen(false)}
-        />
-      ) : null}
-
-      {renameTarget ? (
-        <RenameDialog
-          title={
-            renameTarget.kind === "scene"
-              ? "Rename scene"
-              : renameTarget.kind === "fixture"
-                ? "Rename fixture"
-                : "Rename group"
-          }
-          fieldLabel="Name"
-          initialValue={renameTarget.currentName}
-          busy={
-            renameTarget.kind === "scene"
-              ? busyActions.has("scene-rename")
-              : renameTarget.kind === "fixture"
-                ? busyActions.has(`fixture-rename:${renameTarget.fixtureId}`)
-                : busyActions.has(`group-rename:${renameTarget.groupId}`)
-          }
-          onConfirm={(name) => {
-            const target = renameTarget;
-            setRenameTarget(null);
-            if (target.kind === "scene") void handleRenameScene(target.sceneId, name);
-            else if (target.kind === "fixture") void handleRenameFixture(target.fixtureId, name);
-            else void handleRenameGroup(target.groupId, name);
-          }}
-          onCancel={() => setRenameTarget(null)}
         />
       ) : null}
     </div>

@@ -1,7 +1,9 @@
-import { type CSSProperties, type KeyboardEvent } from "react";
+import { useRef, type CSSProperties, type KeyboardEvent } from "react";
 import { Pin, PinOff } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+import { InlineRename, type InlineRenameHandle } from "@sse/design-system";
 
 import { SceneThumbnail } from "./SceneThumbnail";
 import styles from "./LightingRail.module.css";
@@ -32,6 +34,11 @@ export interface SceneTileProps {
   onRecall: (sceneId: string) => void;
   /** When provided, renders an inline pin / unpin button. */
   onPin?: (sceneId: string, pinned: boolean) => void;
+  /** Inline-rename commit handler. When provided, double-click on the tile
+   *  name (or pressing F2 when the tile is focused) opens an inline editor. */
+  onRename?: (sceneId: string, newName: string) => void | Promise<void>;
+  /** When true, marks this tile's rename action as in-flight. */
+  renameBusy?: boolean;
 }
 
 export function SceneTile({
@@ -48,7 +55,10 @@ export function SceneTile({
   sortable = false,
   onRecall,
   onPin,
+  onRename,
+  renameBusy = false,
 }: SceneTileProps) {
+  const renameRef = useRef<InlineRenameHandle | null>(null);
   // When the bridge is unreachable, "modified" is comparing live state to a
   // preview — downgrade the visual to active to avoid false alarm.
   const showAsModified = isModified && bridgeReachable;
@@ -88,6 +98,15 @@ export function SceneTile({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    // F2 mirrors the desktop convention for "rename selected row" (Linear,
+    // Notion, every file manager). Works when the tile has keyboard focus
+    // and an onRename handler is wired.
+    if (onRename && event.key === "F2") {
+      event.preventDefault();
+      event.stopPropagation();
+      renameRef.current?.beginEdit();
+      return;
+    }
     // Space inside dnd-kit's sortable enters keyboard-drag mode, so don't
     // intercept it here when sortable is enabled.
     if (event.key === "Enter" || (event.key === " " && !sortable)) {
@@ -125,7 +144,20 @@ export function SceneTile({
       <SceneThumbnail src={thumbDataUri} alt={`${name} preview`} />
       <span className={styles.tileBody}>
         <span className={styles.tileNameRow}>
-          <span className={styles.tileName}>{name}</span>
+          <span className={styles.tileName}>
+            {onRename ? (
+              <InlineRename
+                ref={renameRef}
+                value={name}
+                onCommit={(next) => onRename(id, next)}
+                busy={renameBusy}
+                inputAriaLabel={`Rename scene ${name}`}
+                maxLength={120}
+              />
+            ) : (
+              name
+            )}
+          </span>
           {badgeText ? (
             <span className={styles.tileBadge}>
               <span className={styles.tileBadgeDot} aria-hidden="true" />

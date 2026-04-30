@@ -1,0 +1,51 @@
+/* InlineRename — minimal chrome so the swap between span and input doesn't
+   shift layout. The consumer's className wins for font/color; we only set
+   border, padding, and background to make the input legible at parity with
+   the surrounding text. */
+
+.display {
+  cursor: text;
+  border-radius: var(--radius-tight-sm);
+  padding: 1px 2px;
+  margin: -1px -2px;
+  transition: background-color 120ms var(--motion-easing-standard);
+}
+
+.display:hover {
+  background-color: var(--color-bg-soft);
+}
+
+.displayDisabled {
+  cursor: default;
+}
+
+.displayDisabled:hover {
+  background-color: transparent;
+}
+
+.input {
+  appearance: none;
+  background: var(--color-bg-canvas);
+  color: inherit;
+  border: 1px solid var(--color-brand-green);
+  border-radius: var(--radius-tight-sm);
+  padding: 1px 4px;
+  margin: -2px -5px;
+  font: inherit;
+  letter-spacing: inherit;
+  outline: none;
+  min-width: 4ch;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 2px var(--color-brand-green-glow);
+}
+
+.input:disabled {
+  opacity: 0.7;
+}
+
+.input::placeholder {
+  color: var(--color-brand-text-secondary);
+  opacity: 0.6;
+}

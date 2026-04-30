@@ -17,6 +17,7 @@ import styles from "./LightingRail.module.css";
 // scrolling. Threshold per Waves 19-22 plan §23.A.
 const VIRTUALIZE_THRESHOLD = 30;
 const ROW_HEIGHT = 168;
+const EMPTY_RENAME_IDS: ReadonlySet<string> = new Set();
 
 export interface SceneRailProps {
   scenes: readonly LightingSceneSnapshot[];
@@ -32,6 +33,11 @@ export interface SceneRailProps {
   onReorderScene?: (sceneId: string, beforeSceneId: string | null) => void;
   /** Pin / unpin handler. When omitted, the inline pin chip isn't rendered. */
   onPinScene?: (sceneId: string, pinned: boolean) => void;
+  /** Inline-rename commit handler. When omitted, scene tiles aren't renamable. */
+  onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
+  /** Set of scene ids whose rename is currently in flight. Used by tiles to
+   *  show the busy treatment on the inline rename. */
+  renamingSceneIds?: ReadonlySet<string>;
 }
 
 interface SceneStats {
@@ -59,6 +65,8 @@ interface CellPayload {
   bridgeReachable: boolean;
   onRecall: (sceneId: string) => void;
   onPin?: (sceneId: string, pinned: boolean) => void;
+  onRename?: (sceneId: string, newName: string) => void | Promise<void>;
+  renamingSceneIds: ReadonlySet<string>;
   onAddScene?: () => void;
   showAddTile: boolean;
   totalCellCount: number;
@@ -76,6 +84,8 @@ function VirtualizedCell({
   bridgeReachable,
   onRecall,
   onPin,
+  onRename,
+  renamingSceneIds,
   onAddScene,
   showAddTile,
   totalCellCount,
@@ -112,6 +122,8 @@ function VirtualizedCell({
           sortable={sortable}
           onRecall={onRecall}
           onPin={onPin}
+          onRename={onRename}
+          renameBusy={renamingSceneIds.has(scene.id)}
         />
       </div>
     );
@@ -148,7 +160,13 @@ export function SceneRail({
   onClearSearch,
   onReorderScene,
   onPinScene,
+  onRenameScene,
+  renamingSceneIds,
 }: SceneRailProps) {
+  // Default to an empty Set so callers without an in-flight rename tracker
+  // don't have to construct one. Memoized so consumers can stably pass
+  // `undefined` without re-creating it per render.
+  const effectiveRenamingIds = renamingSceneIds ?? EMPTY_RENAME_IDS;
   const needle = searchQuery.trim().toLowerCase();
   const filteredScenes = needle ? scenes.filter((scene) => scene.name.toLowerCase().includes(needle)) : scenes;
 
@@ -222,6 +240,8 @@ export function SceneRail({
           bridgeReachable,
           onRecall,
           onPin: onPinScene,
+          onRename: onRenameScene,
+          renamingSceneIds: effectiveRenamingIds,
           onAddScene,
           showAddTile,
           totalCellCount,
@@ -271,6 +291,8 @@ export function SceneRail({
               sortable={sortable}
               onRecall={onRecall}
               onPin={onPinScene}
+              onRename={onRenameScene}
+              renameBusy={effectiveRenamingIds.has(scene.id)}
             />
           );
         })}
