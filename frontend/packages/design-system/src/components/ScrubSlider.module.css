@@ -1,0 +1,106 @@
+/* ScrubSlider — custom horizontal slider with fine/coarse modifier support
+   and a value chip on the right. Track + thumb are positioned in CSS so
+   the underlying tone (CCT gradient, plain bg) is composable via
+   `trackClassName`. */
+
+.wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.wrapperDisabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  cursor: ew-resize;
+  outline: none;
+  touch-action: none;
+}
+
+.track:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+}
+
+.trackDragging {
+  cursor: grabbing;
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--color-brand-green-soft), var(--color-brand-green));
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-brand-text-primary);
+  border: 1px solid var(--color-bg-canvas);
+  /* Translate3d hints the compositor — keeps the thumb on its own layer so
+     position changes don't repaint the entire track on every drag tick. */
+  transform: translate3d(-50%, -50%, 0);
+  pointer-events: none;
+  box-shadow: var(--shadow-sm);
+  will-change: left;
+  transition:
+    transform 80ms var(--motion-easing-standard),
+    background-color 80ms var(--motion-easing-standard);
+}
+
+.thumb[data-dragging] {
+  transform: translate3d(-50%, -50%, 0) scale(1.15);
+  background: var(--color-brand-green);
+}
+
+.ghost {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 12px;
+  background: var(--color-brand-text-secondary);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.trackLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: var(--color-brand-text-muted);
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.valueText {
+  flex-shrink: 0;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-brand-text-primary);
+  min-width: 4ch;
+  text-align: right;
+}

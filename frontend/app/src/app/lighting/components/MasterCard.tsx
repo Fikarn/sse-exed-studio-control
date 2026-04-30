@@ -1,5 +1,6 @@
-import { type ChangeEvent } from "react";
 import { Power } from "lucide-react";
+
+import { ScrubSlider } from "@sse/design-system";
 
 import styles from "./LightingRail.module.css";
 
@@ -29,13 +30,6 @@ export function MasterCard({
   eyebrow,
   onToggleAllPower,
 }: MasterCardProps) {
-  const handleSlider = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
-    if (Number.isFinite(value)) {
-      onGrandMasterChange(value);
-    }
-  };
-
   const anyOn = fixtureOnCount > 0;
   const sliderDisabled = !enabled || !bridgeReachable;
   const cardClass = anyOn ? `${styles.master} ${styles.masterOn}` : styles.master;
@@ -71,17 +65,17 @@ export function MasterCard({
 
       <div className={styles.masterFader}>
         <span className={styles.masterFaderLabel}>Grand master</span>
-        <input
-          aria-label="Grand master intensity"
-          className={styles.masterSlider}
-          disabled={sliderDisabled}
-          max={100}
+        <ScrubSlider
+          ariaLabel="Grand master intensity"
           min={0}
-          onChange={handleSlider}
-          type="range"
+          max={100}
+          step={1}
           value={grandMaster}
+          onChange={onGrandMasterChange}
+          resetValue={100}
+          disabled={sliderDisabled}
+          formatValue={(v) => `${Math.round(v)} %`}
         />
-        <span className={styles.masterFaderValue}>{Math.round(grandMaster)} %</span>
       </div>
 
       {/* "Cut all" naming retained per audit-fix-plan #43 + Waves 19-22 plan locked decision. */}

@@ -1,5 +1,5 @@
-import { type ChangeEvent, useEffect, useId, useRef, useState } from "react";
-import { Pencil, Plus, Power, Trash2 } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Pencil, Power, Trash2 } from "lucide-react";
 
 import {
   Button,
@@ -7,13 +7,15 @@ import {
   IconButton,
   InlineRename,
   InspectorSection,
+  ScrubLabel,
+  ScrubSlider,
   StatusDot,
   type InlineRenameHandle,
 } from "@sse/design-system";
 import type { LightingFixtureSnapshot, LightingGroupSnapshot } from "@sse/engine-client";
 
 import { deriveMounting, type FixtureMounting } from "../fixtureMounting";
-import { defaultLightingBeamAngle, isLightingRangeCommitKey, lightingFixtureCctRange } from "../lightingHelpers";
+import { defaultLightingBeamAngle, lightingFixtureCctRange } from "../lightingHelpers";
 import { STUDIO_LAYOUT } from "../studioLayout";
 
 import { IdentifyBurstButton } from "./IdentifyBurstButton";
@@ -46,7 +48,10 @@ export interface InspectorFixtureProps {
   onRenameFixture?: (fixtureId: string, newName: string) => void | Promise<void>;
   onAssignFixtureGroup?: (fixtureId: string, groupId: string | null) => void;
   onCreateGroup?: () => void;
-  busy?: boolean;
+  /** Power-toggle in-flight indicator. Drives the loading spinner on the
+   *  Turn on/off button; intentionally narrow so unrelated commits (rename,
+   *  position, identify) don't flicker the button into a loading state. */
+  powerBusy?: boolean;
   deleteBusy?: boolean;
   renameBusy?: boolean;
   assignGroupBusy?: boolean;
@@ -74,6 +79,23 @@ function formatMaybeNumber(value: number | null | undefined): string {
   return String(value);
 }
 
+function parseDraft(draft: string, fallback: number): number {
+  const trimmed = draft.trim();
+  if (!trimmed) return fallback;
+  const parsed = Number.parseFloat(trimmed);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function formatScrubMeters(value: number): string {
+  // ScrubLabel writes back into the draft string. Round to 1 decimal so the
+  // input field doesn't fill with floating-point noise.
+  return (Math.round(value * 10) / 10).toFixed(1);
+}
+
+function formatScrubDegrees(value: number): string {
+  return String(Math.round(value));
+}
+
 export function InspectorFixture({
   fixture,
   groupName,
@@ -88,7 +110,7 @@ export function InspectorFixture({
   onRenameFixture,
   onAssignFixtureGroup,
   onCreateGroup,
-  busy = false,
+  powerBusy = false,
   deleteBusy = false,
   renameBusy = false,
   assignGroupBusy = false,
@@ -132,29 +154,25 @@ export function InspectorFixture({
     renameRef.current?.beginEdit();
   }, [pendingInlineRenameNonce]);
 
-  const handleIntensityChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.currentTarget.value);
-    if (Number.isFinite(value)) {
-      setIntensityDraft(Math.max(0, Math.min(100, Math.round(value))));
+  const handleIntensityChange = (next: number) => {
+    setIntensityDraft(Math.max(0, Math.min(100, Math.round(next))));
+  };
+
+  const commitIntensity = (next?: number) => {
+    const target = next ?? intensityDraft;
+    if (target !== fixture.intensity) {
+      onIntensityCommit(fixture.id, target);
     }
   };
 
-  const commitIntensity = () => {
-    if (intensityDraft !== fixture.intensity) {
-      onIntensityCommit(fixture.id, intensityDraft);
-    }
+  const handleCctChange = (next: number) => {
+    setCctDraft(Math.max(cctRange.min, Math.min(cctRange.max, Math.round(next))));
   };
 
-  const handleCctChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.currentTarget.value);
-    if (Number.isFinite(value)) {
-      setCctDraft(Math.max(cctRange.min, Math.min(cctRange.max, Math.round(value))));
-    }
-  };
-
-  const commitCct = () => {
-    if (cctDraft !== fixture.cct) {
-      onCctCommit(fixture.id, cctDraft);
+  const commitCct = (next?: number) => {
+    const target = next ?? cctDraft;
+    if (target !== fixture.cct) {
+      onCctCommit(fixture.id, target);
     }
   };
 
@@ -225,7 +243,7 @@ export function InspectorFixture({
           </div>
           <Button
             onClick={() => onTogglePower(fixture.id, !fixture.on)}
-            loading={busy}
+            loading={powerBusy}
             variant={fixture.on ? "secondary" : "primary"}
             size="compact"
             leadingVisual={<Power aria-hidden="true" size={13} strokeWidth={1.75} />}
@@ -280,52 +298,35 @@ export function InspectorFixture({
       </InspectorSection>
 
       <InspectorSection title="Intensity">
-        <div className={styles.sliderRow}>
-          <input
-            aria-label="Fixture intensity"
-            className={styles.slider}
-            disabled={busy || !fixture.on}
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={intensityDraft}
-            onChange={handleIntensityChange}
-            onPointerUp={commitIntensity}
-            onBlur={commitIntensity}
-            onKeyUp={(event) => {
-              if (isLightingRangeCommitKey(event.key)) {
-                commitIntensity();
-              }
-            }}
-          />
-          <span className={styles.sliderValue}>{intensityDraft}%</span>
-        </div>
+        <ScrubSlider
+          ariaLabel="Fixture intensity"
+          min={0}
+          max={100}
+          step={1}
+          value={intensityDraft}
+          onChange={handleIntensityChange}
+          onCommit={commitIntensity}
+          resetValue={100}
+          // Only gate on power state — IPC commits are sub-millisecond and
+          // idempotent, so a busy-flag disable would just flicker the slider
+          // chrome on every release without preventing anything real.
+          disabled={!fixture.on}
+          formatValue={(v) => `${Math.round(v)}%`}
+        />
       </InspectorSection>
 
       <InspectorSection title="Colour temperature">
-        <div className={styles.sliderRow}>
-          <input
-            aria-label="Fixture CCT"
-            aria-describedby={cctScaleId}
-            className={`${styles.slider} ${styles.sliderCct}`}
-            disabled={busy}
-            type="range"
-            min={cctRange.min}
-            max={cctRange.max}
-            step={100}
-            value={cctDraft}
-            onChange={handleCctChange}
-            onPointerUp={commitCct}
-            onBlur={commitCct}
-            onKeyUp={(event) => {
-              if (isLightingRangeCommitKey(event.key)) {
-                commitCct();
-              }
-            }}
-          />
-          <span className={styles.sliderValue}>{cctDraft}K</span>
-        </div>
+        <ScrubSlider
+          ariaLabel="Fixture CCT"
+          min={cctRange.min}
+          max={cctRange.max}
+          step={100}
+          value={cctDraft}
+          onChange={handleCctChange}
+          onCommit={commitCct}
+          resetValue={Math.round((cctRange.min + cctRange.max) / 2 / 100) * 100}
+          formatValue={(v) => `${Math.round(v)}K`}
+        />
         <div id={cctScaleId} className={styles.cctScale}>
           <span>{cctRange.min}K · warm</span>
           <span>{cctRange.max}K · cool</span>
@@ -338,7 +339,6 @@ export function InspectorFixture({
             fixtureId={fixture.id}
             fixtureName={fixture.name}
             onTrigger={onIdentifyBurst}
-            disabled={busy}
             bridgeReachable={bridgeReachable}
           />
           <span className={styles.helpText}>
@@ -351,11 +351,21 @@ export function InspectorFixture({
         <InspectorSection title="Position">
           <div className={styles.positionGrid}>
             <label className={styles.positionField}>
-              <span className={styles.positionLabel}>Stage X (m)</span>
+              <ScrubLabel
+                value={parseDraft(spatialXDraft, fixture.spatialX ?? 0)}
+                onChange={(next) => setSpatialXDraft(formatScrubMeters(next))}
+                onCommit={(next) => commitSpatial("spatialX", formatScrubMeters(next))}
+                min={0}
+                max={STUDIO_LAYOUT.roomWidthMeters}
+                pixelsPerStep={0.05}
+                step={0.1}
+                className={styles.positionLabel}
+              >
+                Stage X (m)
+              </ScrubLabel>
               <input
                 aria-label="Stage X position in metres"
                 className={styles.positionInput}
-                disabled={busy}
                 inputMode="decimal"
                 type="text"
                 value={spatialXDraft}
@@ -369,11 +379,21 @@ export function InspectorFixture({
               />
             </label>
             <label className={styles.positionField}>
-              <span className={styles.positionLabel}>Stage Y (m)</span>
+              <ScrubLabel
+                value={parseDraft(spatialYDraft, fixture.spatialY ?? 0)}
+                onChange={(next) => setSpatialYDraft(formatScrubMeters(next))}
+                onCommit={(next) => commitSpatial("spatialY", formatScrubMeters(next))}
+                min={0}
+                max={STUDIO_LAYOUT.roomDepthMeters}
+                pixelsPerStep={0.05}
+                step={0.1}
+                className={styles.positionLabel}
+              >
+                Stage Y (m)
+              </ScrubLabel>
               <input
                 aria-label="Stage Y position in metres"
                 className={styles.positionInput}
-                disabled={busy}
                 inputMode="decimal"
                 type="text"
                 value={spatialYDraft}
@@ -387,11 +407,21 @@ export function InspectorFixture({
               />
             </label>
             <label className={styles.positionField}>
-              <span className={styles.positionLabel}>Rig height (m)</span>
+              <ScrubLabel
+                value={parseDraft(rigZDraft, fixture.rigZ ?? 0)}
+                onChange={(next) => setRigZDraft(formatScrubMeters(next))}
+                onCommit={(next) => commitSpatial("rigZ", formatScrubMeters(next))}
+                min={0}
+                max={RIG_HEIGHT_MAX_METERS}
+                pixelsPerStep={0.05}
+                step={0.1}
+                className={styles.positionLabel}
+              >
+                Rig height (m)
+              </ScrubLabel>
               <input
                 aria-label="Rig height in metres"
                 className={styles.positionInput}
-                disabled={busy}
                 inputMode="decimal"
                 type="text"
                 value={rigZDraft}
@@ -405,11 +435,21 @@ export function InspectorFixture({
               />
             </label>
             <label className={styles.positionField}>
-              <span className={styles.positionLabel}>Beam angle (°)</span>
+              <ScrubLabel
+                value={parseDraft(beamAngleDraft, fixture.beamAngleDegrees ?? defaultLightingBeamAngle(fixture.type))}
+                onChange={(next) => setBeamAngleDraft(formatScrubDegrees(next))}
+                onCommit={(next) => commitSpatial("beamAngleDegrees", formatScrubDegrees(next))}
+                min={BEAM_ANGLE_MIN_DEGREES}
+                max={BEAM_ANGLE_MAX_DEGREES}
+                pixelsPerStep={0.5}
+                step={1}
+                className={styles.positionLabel}
+              >
+                Beam angle (°)
+              </ScrubLabel>
               <input
                 aria-label="Beam angle in degrees"
                 className={styles.positionInput}
-                disabled={busy}
                 inputMode="decimal"
                 type="text"
                 value={beamAngleDraft}

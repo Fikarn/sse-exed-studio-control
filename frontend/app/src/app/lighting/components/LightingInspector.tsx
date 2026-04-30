@@ -78,8 +78,10 @@ export interface LightingInspectorProps {
   selectedFixtures?: readonly LightingFixtureSnapshot[];
   onClearSelection?: () => void;
   onBulkTogglePower?: (fixtureIds: readonly string[], on: boolean) => void;
-  onBulkIntensityCommit?: (fixtureIds: readonly string[], intensity: number) => void;
-  onBulkCctCommit?: (fixtureIds: readonly string[], cct: number) => void;
+  /** Per-fixture bulk update (Wave 27 — replaces flatten-to-one handlers).
+   *  Drag-shift preserves spread; delta-input parses per-value math. */
+  onBulkIntensityValues?: (values: ReadonlyArray<{ fixtureId: string; value: number }>) => void;
+  onBulkCctValues?: (values: ReadonlyArray<{ fixtureId: string; value: number }>) => void;
 
   /** Set of in-flight mutation keys; check with `.has(key)` or
    *  `Array.from(set).some((k) => k.startsWith(prefix))` for prefix queries. */
@@ -160,8 +162,8 @@ export function LightingInspector({
   selectedFixtures,
   onClearSelection,
   onBulkTogglePower,
-  onBulkIntensityCommit,
-  onBulkCctCommit,
+  onBulkIntensityValues,
+  onBulkCctValues,
   busyActions,
   pendingInlineRename,
 }: LightingInspectorProps) {
@@ -216,11 +218,10 @@ export function LightingInspector({
         {activeTab === "fixture" && selectedFixtures && selectedFixtures.length > 1 ? (
           <InspectorFixtureBulk
             fixtures={selectedFixtures}
-            busy={hasBusyPrefix("fixture-bulk-")}
             onClearSelection={onClearSelection ?? (() => undefined)}
             onBulkTogglePower={onBulkTogglePower ?? (() => undefined)}
-            onBulkIntensityCommit={onBulkIntensityCommit ?? (() => undefined)}
-            onBulkCctCommit={onBulkCctCommit ?? (() => undefined)}
+            onBulkIntensityValues={onBulkIntensityValues ?? (() => undefined)}
+            onBulkCctValues={onBulkCctValues ?? (() => undefined)}
             onSelectFixture={onSelectFixture}
           />
         ) : null}
@@ -240,7 +241,7 @@ export function LightingInspector({
             onRenameFixture={onRenameFixture}
             onAssignFixtureGroup={onAssignFixtureGroup}
             onCreateGroup={onCreateGroup}
-            busy={hasBusyPrefix("fixture-")}
+            powerBusy={busyActions.has(`fixture-power:${selectedFixture.id}`)}
             deleteBusy={busyActions.has(`fixture-delete:${selectedFixture.id}`)}
             renameBusy={busyActions.has(`fixture-rename:${selectedFixture.id}`)}
             assignGroupBusy={busyActions.has(`fixture-group:${selectedFixture.id}`)}

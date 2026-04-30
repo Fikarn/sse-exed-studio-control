@@ -1,0 +1,25 @@
+/* ScrubLabel — drag-to-scrub label affordance for paired text inputs.
+   The cursor change + subtle underline signal that the label is interactive
+   while leaving the rest of the form layout untouched. */
+
+.label {
+  cursor: ew-resize;
+  user-select: none;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 120ms var(--motion-easing-standard);
+  touch-action: none;
+}
+
+.label:hover:not(.labelDisabled) {
+  border-bottom-color: var(--color-brand-text-muted);
+}
+
+.labelScrubbing {
+  cursor: grabbing;
+  border-bottom-color: var(--color-brand-green);
+}
+
+.labelDisabled {
+  cursor: default;
+  opacity: 0.6;
+}
