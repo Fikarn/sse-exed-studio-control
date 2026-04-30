@@ -6,3 +6,5 @@ native/**/target/
 native/tauri-shell/gen/
 frontend/packages/tokens/src/generated/
 artifacts/
+.claude/worktrees/
+**/.claude/worktrees/
