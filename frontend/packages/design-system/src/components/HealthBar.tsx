@@ -18,12 +18,18 @@ export interface HealthBarHint {
 
 export interface HealthBarProps {
   items: readonly HealthBarItemData[];
+  /** One or more keyboard-shortcut discoverability hints rendered after the
+   *  health items. Multiple hints separate with thin spacing. */
+  hints?: readonly HealthBarHint[];
+  /** Backward-compat single-hint alias; folded into `hints` if both are
+   *  provided. Prefer `hints` for new call sites. */
   hint?: HealthBarHint;
   className?: string;
 }
 
-export const HealthBar = ({ items, hint, className }: HealthBarProps) => {
+export const HealthBar = ({ items, hints, hint, className }: HealthBarProps) => {
   const classes = [styles.bar, className].filter(Boolean).join(" ");
+  const allHints: readonly HealthBarHint[] = hints ?? (hint ? [hint] : []);
   return (
     <div className={classes} role="status" aria-label="Workspace health">
       {items.map((item, idx) => (
@@ -36,10 +42,14 @@ export const HealthBar = ({ items, hint, className }: HealthBarProps) => {
           last={idx === items.length - 1}
         />
       ))}
-      {hint ? (
-        <div className={styles.hint}>
-          <kbd className={styles.kbd}>{hint.kbd}</kbd>
-          <span>{hint.label}</span>
+      {allHints.length > 0 ? (
+        <div className={styles.hintGroup}>
+          {allHints.map((entry, idx) => (
+            <div key={`${entry.kbd}:${idx}`} className={styles.hint}>
+              <kbd className={styles.kbd}>{entry.kbd}</kbd>
+              <span>{entry.label}</span>
+            </div>
+          ))}
         </div>
       ) : null}
     </div>

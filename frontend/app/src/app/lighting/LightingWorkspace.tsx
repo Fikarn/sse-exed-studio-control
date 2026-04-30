@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
-import { ConfirmDialog } from "@sse/design-system";
+import { ConfirmDialog, type PaletteAction } from "@sse/design-system";
 import type {
   LightingDmxMonitorSnapshot,
   LightingSceneSnapshot,
@@ -8,6 +8,7 @@ import type {
   ShellStore,
 } from "@sse/engine-client";
 
+import { usePalette } from "../shared/paletteContext";
 import { useToast, type ToastApi } from "../shared/toastContext";
 
 import {
@@ -119,6 +120,7 @@ export function LightingWorkspaceSurface({
   const [activeTabOverride, setActiveTabOverride] = useState<InspectorTab | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const toast = useToast();
+  const palette = usePalette();
   // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
   // while saving Scene A) don't stomp each other. Each handler scopes its
   // own key; the inspector reads via `busyActions.has(key)` /
@@ -650,6 +652,9 @@ export function LightingWorkspaceSurface({
       const created = asRecord(result?.scene);
       const createdId = typeof created?.id === "string" ? created.id : null;
       if (createdId) {
+        // I6 — push the newly-saved scene into the palette recents ring so
+        // it surfaces at the top of the empty-query palette immediately.
+        palette.pushRecent(`lighting:recall:${createdId}`);
         // Pull the fresh scene from the result so we render its true saved
         // state (the snapshot may not have updated yet).
         const fixtureStatesRecord = Array.isArray(created?.fixtureStates) ? created!.fixtureStates : [];
@@ -787,6 +792,11 @@ export function LightingWorkspaceSurface({
       });
       return;
     }
+    // Wave 28a / I6 — push the scene into the cross-workspace ⌘K recents
+    // ring so the palette's empty-query view surfaces recent recalls. Done
+    // here (not only when invoked via palette) so rail-driven recalls also
+    // populate recents.
+    palette.pushRecent(`lighting:recall:${sceneId}`);
     // Show the scene in the inspector immediately — even if the recall IPC
     // is rejected by the engine (e.g. pre-probe state), the operator still
     // sees what the scene contains. The recall IPC drives the actual rig.
@@ -841,6 +851,84 @@ export function LightingWorkspaceSurface({
     }
     return ids;
   }, [busyActions, scenes]);
+
+  // Wave 28a — register lighting actions on the cross-workspace ⌘K palette.
+  // Re-registers when the scene list / mode-relevant flags change so per-scene
+  // recall actions stay current and the `when` predicates capture fresh state.
+  // Handlers are useEffectEvent and intentionally not in the dep array.
+  useEffect(() => {
+    const inPatchMode = uiMode === "patch";
+    return palette.register([
+      {
+        id: "lighting:toggle-patch",
+        label: inPatchMode ? "Exit patch mode" : "Enter patch mode",
+        group: "Lighting",
+        keywords: ["patch", "dmx", "address"],
+        shortcut: "P",
+        action: () => handleTogglePatch(),
+      },
+      {
+        id: "lighting:save-changes",
+        label: "Save changes to active scene",
+        group: "Scene",
+        keywords: ["save", "update", "commit"],
+        shortcut: "S",
+        action: () => void handleResaveScene(),
+        when: () => isSceneModified && !inPatchMode,
+      },
+      {
+        id: "lighting:save-as-new",
+        label: "Save as new scene…",
+        group: "Scene",
+        keywords: ["save", "new", "duplicate"],
+        shortcut: "⇧S",
+        action: () => setSaveSceneAsOpen(true),
+        when: () => !inPatchMode,
+      },
+      {
+        id: "lighting:add-fixture",
+        label: "Add fixture…",
+        group: "Lighting",
+        keywords: ["add", "fixture", "create", "new"],
+        action: () => requestAddFixture(),
+      },
+      {
+        id: "lighting:open-dmx-monitor",
+        label: "Open full DMX monitor",
+        group: "Lighting",
+        keywords: ["dmx", "monitor", "channels"],
+        shortcut: "⌘⇧M",
+        action: () => setDmxMonitorOpen(true),
+      },
+      {
+        id: "lighting:cut-all",
+        label: "Cut all fixtures (blackout)",
+        group: "Lighting",
+        keywords: ["cut", "blackout", "off", "kill"],
+        action: () => requestEmergencyCut(),
+        when: () => bridgeReachable,
+      },
+      ...scenes.map<PaletteAction>((scene) => ({
+        id: `lighting:recall:${scene.id}`,
+        label: `Recall scene: ${scene.name}`,
+        group: "Scene",
+        keywords: ["recall", "scene"],
+        action: () => void handleRecallScene(scene.id),
+        when: () => !inPatchMode,
+      })),
+    ]);
+  }, [
+    palette,
+    scenes,
+    uiMode,
+    isSceneModified,
+    bridgeReachable,
+    handleTogglePatch,
+    handleResaveScene,
+    requestAddFixture,
+    requestEmergencyCut,
+    handleRecallScene,
+  ]);
 
   const handleToggleGroupPower = useEffectEvent(async (groupId: string, on: boolean) => {
     const busyKey = `group:${groupId}`;

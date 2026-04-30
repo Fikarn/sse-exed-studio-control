@@ -113,5 +113,13 @@ export function LightingHealthBar({
     },
   ];
 
-  return <HealthBar items={items} hint={{ kbd: "⌘ ⇧ M", label: "full DMX monitor" }} />;
+  return (
+    <HealthBar
+      items={items}
+      hints={[
+        { kbd: "⌘ K", label: "command palette" },
+        { kbd: "⌘ ⇧ M", label: "full DMX monitor" },
+      ]}
+    />
+  );
 }

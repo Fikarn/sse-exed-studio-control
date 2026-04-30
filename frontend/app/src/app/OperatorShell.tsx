@@ -15,6 +15,7 @@ import { AudioWorkspace } from "./audio/AudioWorkspace";
 import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
 import { PlanningWorkspaceSurface } from "./planning/PlanningWorkspace";
+import { PaletteProvider, usePalette } from "./shared/paletteContext";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ShortcutOverlay } from "./shared/ShortcutOverlay";
 import { ToastProvider } from "./shared/toastContext";
@@ -44,18 +45,21 @@ function GraphicsWorkspace({ title, subtitle, note }: { title: string; subtitle:
 }
 
 export function OperatorShell() {
-  // Toast portal hosts cross-workspace bottom-right notifications. Mounted at
-  // the shell root so all workspaces (and incidentally any startup/recovery
-  // surface) share one stack.
+  // Toast portal hosts cross-workspace bottom-right notifications + the ⌘K
+  // command palette. Both mount once at the shell root so every workspace
+  // (and any startup/recovery surface) inherits the same stacks.
   return (
     <ToastProvider>
-      <OperatorShellInner />
+      <PaletteProvider>
+        <OperatorShellInner />
+      </PaletteProvider>
     </ToastProvider>
   );
 }
 
 function OperatorShellInner() {
   const environment = useMemo(() => createShellEnvironment(), []);
+  const palette = usePalette();
   const shellState = useShellSnapshot(environment.store);
   useTauriShellTestBridge(shellState, environment.store);
   const activeWorkspace = shellState.activeWorkspace;
@@ -97,6 +101,63 @@ function OperatorShellInner() {
     };
   }, [environment.store]);
 
+  // Register cross-workspace ⌘K actions. Workspace-specific actions (lighting
+  // recall, save changes, etc.) live in their respective workspaces and
+  // register from there with `when` predicates so they only surface when the
+  // workspace is active.
+  useEffect(() => {
+    return palette.register([
+      {
+        id: "workspace:setup",
+        label: "Switch to Setup / Support",
+        group: "Workspace",
+        keywords: ["setup", "support", "pilot"],
+        shortcut: "⇧S",
+        action: () => void tryNavigateWorkspace("setup"),
+      },
+      {
+        id: "workspace:lighting",
+        label: "Switch to Lighting",
+        group: "Workspace",
+        keywords: ["lighting", "lights", "rig"],
+        shortcut: "⌘1",
+        action: () => void tryNavigateWorkspace("lighting"),
+      },
+      {
+        id: "workspace:audio",
+        label: "Switch to Audio",
+        group: "Workspace",
+        keywords: ["audio", "mixer", "sound"],
+        shortcut: "A",
+        action: () => void tryNavigateWorkspace("audio"),
+      },
+      {
+        id: "workspace:planning",
+        label: "Switch to Planning",
+        group: "Workspace",
+        keywords: ["planning", "tasks", "projects"],
+        shortcut: "⌘4",
+        action: () => void tryNavigateWorkspace("planning"),
+      },
+      {
+        id: "system:restart-engine",
+        label: "Restart engine bridge",
+        group: "System",
+        keywords: ["restart", "reset", "bridge", "recover"],
+        shortcut: "⌘⇧R",
+        action: () => setConfirmIntent("restart-engine"),
+      },
+      {
+        id: "system:show-shortcuts",
+        label: "Show keyboard shortcuts",
+        group: "System",
+        keywords: ["help", "shortcuts", "keys"],
+        shortcut: "?",
+        action: () => setShowShortcutGuide(true),
+      },
+    ]);
+  }, [palette, tryNavigateWorkspace]);
+
   const workspaces = useMemo(
     () =>
       [
@@ -125,6 +186,15 @@ function OperatorShellInner() {
           setShowShortcutGuide(false);
           event.preventDefault();
         }
+        return;
+      }
+
+      // ⌘K / Ctrl+K — open command palette. Active even when an editable
+      // target has focus (Linear / VS Code convention) so operators can
+      // jump from the toolbar search into the palette without re-focusing.
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
+        palette.setOpen(true);
+        event.preventDefault();
         return;
       }
 
@@ -191,7 +261,7 @@ function OperatorShellInner() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeWorkspace, confirmIntent, environment.store, showShortcutGuide, workspaces]);
+  }, [activeWorkspace, confirmIntent, environment.store, palette, showShortcutGuide, workspaces]);
 
   const shellExperience = deriveShellExperience(shellState);
 
