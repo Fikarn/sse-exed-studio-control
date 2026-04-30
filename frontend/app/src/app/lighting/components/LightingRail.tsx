@@ -33,6 +33,7 @@ export interface LightingRailProps {
   onPinScene?: (sceneId: string, pinned: boolean) => void;
   onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
   renamingSceneIds?: ReadonlySet<string>;
+  onRequestDeleteScene?: (sceneId: string, sceneName: string) => void;
 
   groups: readonly GroupRailEntry[];
   onToggleGroupPower: (groupId: string, on: boolean) => void;
@@ -45,6 +46,8 @@ export interface LightingRailProps {
   onClearSearch?: () => void;
   onCreateGroup?: () => void;
   onInspectGroup?: (groupId: string) => void;
+  onRequestRenameGroup?: (groupId: string) => void;
+  onRequestDeleteGroup?: (groupId: string, groupName: string) => void;
 }
 
 export function LightingRail({
@@ -66,6 +69,7 @@ export function LightingRail({
   onPinScene,
   onRenameScene,
   renamingSceneIds,
+  onRequestDeleteScene,
   groups,
   onToggleGroupPower,
   searchQuery = "",
@@ -76,6 +80,8 @@ export function LightingRail({
   onClearSearch,
   onCreateGroup,
   onInspectGroup,
+  onRequestRenameGroup,
+  onRequestDeleteGroup,
 }: LightingRailProps) {
   const railClass = patchMode ? `${styles.rail} ${styles.railPaused}` : styles.rail;
   return (
@@ -130,6 +136,7 @@ export function LightingRail({
         onPinScene={patchMode ? undefined : onPinScene}
         onRenameScene={patchMode ? undefined : onRenameScene}
         renamingSceneIds={renamingSceneIds}
+        onRequestDeleteScene={patchMode ? undefined : onRequestDeleteScene}
       />
 
       <RailDivider />
@@ -153,6 +160,8 @@ export function LightingRail({
         onClearSearch={onClearSearch}
         onInspectGroup={patchMode ? undefined : onInspectGroup}
         onCreateGroup={patchMode ? undefined : onCreateGroup}
+        onRequestRenameGroup={patchMode ? undefined : onRequestRenameGroup}
+        onRequestDeleteGroup={patchMode ? undefined : onRequestDeleteGroup}
       />
 
       {!patchMode && isSceneModified ? (

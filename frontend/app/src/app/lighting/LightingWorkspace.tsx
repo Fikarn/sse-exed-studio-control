@@ -152,6 +152,26 @@ export function LightingWorkspaceSurface({
   const [createFixtureOpen, setCreateFixtureOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [saveSceneAsOpen, setSaveSceneAsOpen] = useState(false);
+  // Right-click "Delete" confirm dialogs raised from the SceneTile / GroupChip
+  // / FixtureMarker context menus. Each surface owns its own slot so opening
+  // a fixture confirm doesn't blow away an in-flight scene confirm. The
+  // Inspector "Danger zone" delete buttons keep their own local dialogs.
+  const [confirmDeleteScene, setConfirmDeleteScene] = useState<{ id: string; name: string } | null>(null);
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<{ id: string; name: string } | null>(null);
+  const [confirmDeleteFixture, setConfirmDeleteFixture] = useState<{ id: string; name: string } | null>(null);
+  // One-shot signal: when a chip / marker context menu's "Rename" fires for
+  // an entity whose InlineRename lives in the inspector (group, fixture), we
+  // (a) select the entity for inspection and (b) bump this nonce so the
+  // inspector's effect triggers `renameRef.current?.beginEdit()` on mount.
+  // The nonce ensures repeat requests for the same id retrigger.
+  const [pendingInlineRename, setPendingInlineRename] = useState<{
+    kind: "fixture" | "group";
+    id: string;
+    nonce: number;
+  } | null>(null);
+  const requestInlineRename = useCallback((kind: "fixture" | "group", id: string) => {
+    setPendingInlineRename((prev) => ({ kind, id, nonce: (prev?.nonce ?? 0) + 1 }));
+  }, []);
   // Frontend-only "previewed" scene id. Set immediately when a scene tile is
   // clicked so the inspector can show its details even if the engine recall
   // IPC was rejected (e.g. bridge unreachable in dev / pre-probe states).
@@ -514,6 +534,25 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const handleDeleteGroup = useEffectEvent(async (groupId: string, groupName: string) => {
+    const busyKey = `group-delete:${groupId}`;
+    startBusy(busyKey);
+    try {
+      await store.deleteLightingGroup(groupId);
+      // If the user was inspecting this group, clear the selection so the
+      // inspector falls back to the scene tab instead of "Choose a group from
+      // the rail".
+      if (selectedGroupId === groupId) {
+        setSelectedGroupId(null);
+      }
+      toast.push({ message: `Group '${groupName}' deleted.`, tone: "ok" });
+    } catch (error) {
+      reportError(error, "Group delete failed.");
+    } finally {
+      finishBusy(busyKey);
+    }
+  });
+
   const commitGrandMaster = useEffectEvent(async (value: number) => {
     grandMasterCommitRef.current = null;
     try {
@@ -662,14 +701,19 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleDeleteScene = useEffectEvent(async () => {
-    if (!activeScene) return;
+  const handleDeleteScene = useEffectEvent(async (overrideSceneId?: string) => {
+    // Default to the active scene (Inspector → Delete path); right-click
+    // delete from a non-active tile passes the tile's id explicitly.
+    const sceneId = overrideSceneId ?? activeScene?.id ?? null;
+    if (!sceneId) return;
+    const target = scenes.find((scene) => scene.id === sceneId) ?? null;
+    const sceneName = target?.name ?? "Scene";
     startBusy("scene-delete");
     try {
-      await store.deleteLightingScene(activeScene.id);
-      const next = withSceneThumbRemoved(sceneThumbs, activeScene.id);
+      await store.deleteLightingScene(sceneId);
+      const next = withSceneThumbRemoved(sceneThumbs, sceneId);
       await store.setLightingSceneThumbs(next);
-      toast.push({ message: `Scene '${activeScene.name}' deleted.`, tone: "ok" });
+      toast.push({ message: `Scene '${sceneName}' deleted.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Scene delete failed.");
     } finally {
@@ -1268,6 +1312,7 @@ export function LightingWorkspaceSurface({
           onPinScene={handlePinScene}
           onRenameScene={handleRenameScene}
           renamingSceneIds={renamingSceneIds}
+          onRequestDeleteScene={(id, name) => setConfirmDeleteScene({ id, name })}
           groups={railGroupEntries}
           onToggleGroupPower={handleToggleGroupPower}
           searchQuery={searchQuery}
@@ -1278,6 +1323,11 @@ export function LightingWorkspaceSurface({
           onClearSearch={() => setSearchQuery("")}
           onCreateGroup={() => setCreateGroupOpen(true)}
           onInspectGroup={handleInspectGroup}
+          onRequestRenameGroup={(groupId) => {
+            handleInspectGroup(groupId);
+            requestInlineRename("group", groupId);
+          }}
+          onRequestDeleteGroup={(groupId, groupName) => setConfirmDeleteGroup({ id: groupId, name: groupName })}
         />
 
         <ColumnResizer ariaLabel="Resize scene rail" onPointerDown={columns.startResize("rail")} />
@@ -1297,6 +1347,12 @@ export function LightingWorkspaceSurface({
             onPositionCommit={(id, xMeters, yMeters) =>
               void handleFixtureSpatialCommit(id, { spatialX: xMeters, spatialY: yMeters })
             }
+            onRequestRenameFixture={(id) => {
+              void handleSelectFixture(id, {});
+              requestInlineRename("fixture", id);
+            }}
+            onIdentifyFixture={(id, name) => void handleIdentifyBurst(id, name)}
+            onRequestDeleteFixture={(id, name) => setConfirmDeleteFixture({ id, name })}
           />
         </main>
 
@@ -1343,6 +1399,7 @@ export function LightingWorkspaceSurface({
           onBulkIntensityCommit={(ids, intensity) => void handleBulkIntensityCommit(ids, intensity)}
           onBulkCctCommit={(ids, cct) => void handleBulkCctCommit(ids, cct)}
           busyActions={busyActions}
+          pendingInlineRename={pendingInlineRename}
         />
       </div>
 
@@ -1412,6 +1469,69 @@ export function LightingWorkspaceSurface({
             void handleEmergencyCut();
           }}
           onCancel={() => setConfirmCutAllOpen(false)}
+        />
+      ) : null}
+
+      {confirmDeleteScene ? (
+        <ConfirmDialog
+          title="Delete scene?"
+          body={
+            <>
+              This permanently removes <strong>{confirmDeleteScene.name}</strong>. Other scenes are unaffected and the
+              live rig state stays as it is.
+            </>
+          }
+          confirmLabel="Delete scene"
+          danger
+          busy={busyActions.has("scene-delete")}
+          onConfirm={() => {
+            const target = confirmDeleteScene;
+            setConfirmDeleteScene(null);
+            void handleDeleteScene(target.id);
+          }}
+          onCancel={() => setConfirmDeleteScene(null)}
+        />
+      ) : null}
+
+      {confirmDeleteGroup ? (
+        <ConfirmDialog
+          title="Delete group?"
+          body={
+            <>
+              This removes <strong>{confirmDeleteGroup.name}</strong>. Member fixtures stay in the rig — only the group
+              is deleted.
+            </>
+          }
+          confirmLabel="Delete group"
+          danger
+          busy={busyActions.has(`group-delete:${confirmDeleteGroup.id}`)}
+          onConfirm={() => {
+            const target = confirmDeleteGroup;
+            setConfirmDeleteGroup(null);
+            void handleDeleteGroup(target.id, target.name);
+          }}
+          onCancel={() => setConfirmDeleteGroup(null)}
+        />
+      ) : null}
+
+      {confirmDeleteFixture ? (
+        <ConfirmDialog
+          title="Delete fixture?"
+          body={
+            <>
+              This permanently removes <strong>{confirmDeleteFixture.name}</strong> from the rig. Saved scenes that
+              referenced it lose this fixture's saved state.
+            </>
+          }
+          confirmLabel="Delete fixture"
+          danger
+          busy={busyActions.has(`fixture-delete:${confirmDeleteFixture.id}`)}
+          onConfirm={() => {
+            const target = confirmDeleteFixture;
+            setConfirmDeleteFixture(null);
+            void handleDeleteFixture(target.id);
+          }}
+          onCancel={() => setConfirmDeleteFixture(null)}
         />
       ) : null}
 

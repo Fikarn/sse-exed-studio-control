@@ -495,6 +495,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async updateLightingGroup(request: LightingGroupUpdateRequest) {
       return performRequest("lighting.group.update", request as unknown as JsonObject);
     },
+    async deleteLightingGroup(groupId: string) {
+      return performRequest("lighting.group.delete", { groupId });
+    },
     async createLightingFixture(request: LightingFixtureCreateRequest) {
       return performRequest("lighting.fixture.create", request as unknown as JsonObject);
     },

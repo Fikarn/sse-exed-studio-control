@@ -38,6 +38,13 @@ export interface StagePlotProps {
   identifyingFixtureIds?: ReadonlySet<string>;
   onSelectFixture: (id: string | null, options?: { additive?: boolean }) => void;
   onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
+  /** Right-click "Rename" — selects the fixture for inspection and triggers
+   *  the inspector's inline rename. */
+  onRequestRenameFixture?: (id: string) => void;
+  /** Right-click "Identify" — fires an identify burst on the fixture. */
+  onIdentifyFixture?: (id: string, name: string) => void;
+  /** Right-click "Delete" — parent shows the confirm dialog. */
+  onRequestDeleteFixture?: (id: string, name: string) => void;
 }
 
 const FALLBACK_X_STEP = 1.5;
@@ -62,6 +69,9 @@ export function StagePlot({
   identifyingFixtureIds,
   onSelectFixture,
   onPositionCommit,
+  onRequestRenameFixture,
+  onIdentifyFixture,
+  onRequestDeleteFixture,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
@@ -216,6 +226,9 @@ export function StagePlot({
                   identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
                   onSelect={(id, options) => onSelectFixture(id, options)}
                   onPositionCommit={onPositionCommit}
+                  onRequestRename={onRequestRenameFixture}
+                  onIdentify={onIdentifyFixture}
+                  onRequestDelete={onRequestDeleteFixture}
                 />
               );
             });
