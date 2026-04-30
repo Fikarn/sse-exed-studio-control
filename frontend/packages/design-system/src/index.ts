@@ -15,6 +15,8 @@ export type {
 } from "./components/DenseRows";
 export { Dialog } from "./components/Dialog";
 export type { DialogProps } from "./components/Dialog";
+export { CommandPalette } from "./components/CommandPalette";
+export type { CommandPaletteProps, PaletteAction } from "./components/CommandPalette";
 export { ConfirmDialog } from "./components/ConfirmDialog";
 export type { ConfirmDialogProps } from "./components/ConfirmDialog";
 export { ContextMenu } from "./components/ContextMenu";
