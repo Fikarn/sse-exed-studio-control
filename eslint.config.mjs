@@ -25,6 +25,8 @@ export default [
       "**/test-results/**",
       "**/node_modules/**",
       ".tools/**",
+      ".claude/worktrees/**",
+      "**/.claude/worktrees/**",
       "frontend/packages/engine-client/src/generated/**",
       "frontend/packages/tokens/src/generated/**",
       "native/target/**",
