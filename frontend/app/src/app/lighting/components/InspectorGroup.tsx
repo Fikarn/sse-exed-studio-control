@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pencil, Power, X } from "lucide-react";
 
 import {
@@ -32,6 +32,9 @@ export interface InspectorGroupProps {
   renameBusy?: boolean;
   /** Marks a fixture id as currently being removed. Disables the × button. */
   removingFixtureId?: string | null;
+  /** When this nonce changes (and is non-null), the inspector triggers
+   *  beginEdit() on the inline rename. Driven by chip context-menu "Rename". */
+  pendingInlineRenameNonce?: number | null;
 }
 
 export function InspectorGroup({
@@ -45,11 +48,20 @@ export function InspectorGroup({
   busy = false,
   renameBusy = false,
   removingFixtureId = null,
+  pendingInlineRenameNonce = null,
 }: InspectorGroupProps) {
   const onCount = fixtures.filter((fixture) => fixture.on).length;
   const allOn = fixtures.length > 0 && onCount === fixtures.length;
   const renameRef = useRef<InlineRenameHandle | null>(null);
   const [confirmingRemove, setConfirmingRemove] = useState<{ id: string; name: string } | null>(null);
+
+  // Open the inline rename when the parent signals a one-shot request (chip
+  // context-menu "Rename"). Effect runs after mount, so the renameRef is
+  // wired before beginEdit fires.
+  useEffect(() => {
+    if (pendingInlineRenameNonce === null) return;
+    renameRef.current?.beginEdit();
+  }, [pendingInlineRenameNonce]);
 
   const intensities = fixtures.map((fixture) => fixture.intensity);
   const ccts = fixtures.map((fixture) => fixture.cct);

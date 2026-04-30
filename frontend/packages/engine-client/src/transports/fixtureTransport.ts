@@ -2748,6 +2748,45 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           summary,
         };
       }
+      case "lighting.group.delete": {
+        const groupId = asString(params.groupId).trim();
+        if (!groupId) {
+          throw new Error("groupId is required");
+        }
+
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+        const groups = asArray(lightingSnapshot.groups)
+          .map((group) => asRecord(group))
+          .filter((group): group is JsonObject => group !== null);
+        const targetGroup = groups.find((group) => asString(group.id) === groupId);
+        if (!targetGroup) {
+          throw new Error(`Lighting group '${groupId}' is not present in the group list.`);
+        }
+        const groupName = asString(targetGroup.name, groupId);
+
+        // Engine semantics: deleting a group clears its members' groupId
+        // assignments but leaves the fixtures themselves in the rig.
+        const fixtures = asArray(lightingSnapshot.fixtures)
+          .map((fixture) => asRecord(fixture))
+          .filter((fixture): fixture is JsonObject => fixture !== null)
+          .map((fixture) => (asString(fixture.groupId) === groupId ? { ...fixture, groupId: null } : fixture));
+
+        lightingSnapshot.groups = groups.filter((group) => asString(group.id) !== groupId);
+        lightingSnapshot.fixtures = fixtures;
+        const summary = `Lighting group '${groupName}' was deleted.`;
+        lightingSnapshot.lastActionStatus = "succeeded";
+        lightingSnapshot.lastActionCode = null;
+        lightingSnapshot.lastActionMessage = summary;
+        lightingSnapshot.summary = summary;
+        state.lightingSnapshot = lightingSnapshot;
+        synchronizeFixtureState(state);
+        emit("lighting.changed", { reason: "group-deleted" });
+        return {
+          groupId,
+          groupName,
+          summary,
+        };
+      }
       case "lighting.power.all": {
         const on = typeof params.on === "boolean" ? params.on : null;
         if (on === null) {

@@ -50,6 +50,9 @@ export interface InspectorFixtureProps {
   deleteBusy?: boolean;
   renameBusy?: boolean;
   assignGroupBusy?: boolean;
+  /** When this nonce changes (and is non-null), the inspector triggers
+   *  beginEdit() on the inline rename. Driven by marker context-menu "Rename". */
+  pendingInlineRenameNonce?: number | null;
 }
 
 const ASSIGN_NEW_GROUP_VALUE = "__create_group__";
@@ -89,6 +92,7 @@ export function InspectorFixture({
   deleteBusy = false,
   renameBusy = false,
   assignGroupBusy = false,
+  pendingInlineRenameNonce = null,
 }: InspectorFixtureProps) {
   const cctRange = lightingFixtureCctRange(fixture.type);
   const cctScaleId = useId();
@@ -119,6 +123,14 @@ export function InspectorFixture({
   useEffect(() => {
     setCctDraft(fixture.cct);
   }, [fixture.id, fixture.cct]);
+
+  // Open the inline rename when the parent signals a one-shot request (marker
+  // context-menu "Rename"). Effect runs after mount, so the renameRef is
+  // wired before beginEdit fires.
+  useEffect(() => {
+    if (pendingInlineRenameNonce === null) return;
+    renameRef.current?.beginEdit();
+  }, [pendingInlineRenameNonce]);
 
   const handleIntensityChange = (event: ChangeEvent<HTMLInputElement>) => {
     const value = Number(event.currentTarget.value);

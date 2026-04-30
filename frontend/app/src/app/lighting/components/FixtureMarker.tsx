@@ -2,9 +2,13 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
 } from "react";
+import { Pencil, Sparkles, Trash2 } from "lucide-react";
+
+import { ContextMenu, type ContextMenuItem } from "@sse/design-system";
 
 import type { FixtureMounting } from "../fixtureMounting";
 import { lightingFixtureColor } from "../lightingHelpers";
@@ -36,6 +40,13 @@ export interface FixtureMarkerProps {
    * propagation so a click selects the fixture.
    */
   onPositionCommit?: (id: string, xMeters: number, yMeters: number) => void;
+  /** Right-click "Rename" — selects the fixture for inspection and triggers
+   *  the inspector's inline rename. Parent owns the signal plumbing. */
+  onRequestRename?: (id: string) => void;
+  /** Right-click "Identify" — fires an identify burst on the fixture. */
+  onIdentify?: (id: string, name: string) => void;
+  /** Right-click "Delete" — parent shows the confirm dialog. */
+  onRequestDelete?: (id: string, name: string) => void;
 }
 
 const SHELL_FILL = "var(--color-fixture-shell-fill)";
@@ -122,7 +133,11 @@ export function FixtureMarker({
   identifying = false,
   onSelect,
   onPositionCommit,
+  onRequestRename,
+  onIdentify,
+  onRequestDelete,
 }: FixtureMarkerProps) {
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const color = lightingFixtureColor(cct, on);
   const dotOpacity = on ? Math.max(0.3, intensity / 100) : 0.18;
 
@@ -238,110 +253,156 @@ export function FixtureMarker({
     }
   };
 
+  const handleContextMenu = (event: ReactMouseEvent<SVGGElement>) => {
+    if (!onRequestRename && !onIdentify && !onRequestDelete) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setMenuPos({ x: event.clientX, y: event.clientY });
+  };
+
+  const menuItems: ContextMenuItem[] = [];
+  if (onRequestRename) {
+    menuItems.push({
+      id: "rename",
+      label: "Rename",
+      icon: Pencil,
+      onSelect: () => onRequestRename(id),
+    });
+  }
+  if (onIdentify) {
+    menuItems.push({
+      id: "identify",
+      label: "Identify (1.2 s burst)",
+      icon: Sparkles,
+      onSelect: () => onIdentify(id, name),
+    });
+  }
+  if (onRequestDelete) {
+    menuItems.push({
+      id: "delete",
+      label: "Delete fixture…",
+      icon: Trash2,
+      tone: "danger",
+      onSelect: () => onRequestDelete(id, name),
+    });
+  }
+
   return (
-    <g
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={(event) => finishDrag(event, "up")}
-      onPointerCancel={(event) => finishDrag(event, "cancel")}
-      onKeyDown={handleKeyDown}
-      onFocus={(event) => {
-        // Only treat focus as keyboard-driven when :focus-visible matches —
-        // pointer-driven focus shouldn't surface the keyboard ring. Browsers
-        // without :focus-visible on SVG nodes fall back to always showing
-        // the ring on focus, which is still accessible if a touch noisier.
-        try {
-          if (typeof event.currentTarget.matches === "function" && !event.currentTarget.matches(":focus-visible")) {
-            return;
+    <>
+      <g
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={(event) => finishDrag(event, "up")}
+        onPointerCancel={(event) => finishDrag(event, "cancel")}
+        onContextMenu={handleContextMenu}
+        onKeyDown={handleKeyDown}
+        onFocus={(event) => {
+          // Only treat focus as keyboard-driven when :focus-visible matches —
+          // pointer-driven focus shouldn't surface the keyboard ring. Browsers
+          // without :focus-visible on SVG nodes fall back to always showing
+          // the ring on focus, which is still accessible if a touch noisier.
+          try {
+            if (typeof event.currentTarget.matches === "function" && !event.currentTarget.matches(":focus-visible")) {
+              return;
+            }
+          } catch {
+            // Ignore — show the ring anyway.
           }
-        } catch {
-          // Ignore — show the ring anyway.
-        }
-        setKeyboardFocused(true);
-      }}
-      onBlur={() => setKeyboardFocused(false)}
-      tabIndex={0}
-      role="button"
-      aria-label={ariaLabel}
-      aria-pressed={selected}
-      style={{ cursor: cursorStyle, opacity: dimmed ? 0.35 : 1, outline: "none" }}
-      data-fixture-id={id}
-    >
-      {ghost ? (
-        <g transform={`translate(${centerX}, ${centerY}) rotate(${rotationDegrees})`} opacity={0.35}>
-          <circle
-            r={mounting === "wall-bar" ? 26 : 14}
-            fill="none"
-            strokeDasharray="3 3"
-            style={{ stroke: GHOST_STROKE, strokeWidth: 1 }}
-          />
+          setKeyboardFocused(true);
+        }}
+        onBlur={() => setKeyboardFocused(false)}
+        tabIndex={0}
+        role="button"
+        aria-label={ariaLabel}
+        aria-pressed={selected}
+        style={{ cursor: cursorStyle, opacity: dimmed ? 0.35 : 1, outline: "none" }}
+        data-fixture-id={id}
+      >
+        {ghost ? (
+          <g transform={`translate(${centerX}, ${centerY}) rotate(${rotationDegrees})`} opacity={0.35}>
+            <circle
+              r={mounting === "wall-bar" ? 26 : 14}
+              fill="none"
+              strokeDasharray="3 3"
+              style={{ stroke: GHOST_STROKE, strokeWidth: 1 }}
+            />
+          </g>
+        ) : null}
+        <g transform={`translate(${renderX}, ${renderY}) rotate(${rotationDegrees})`} filter="url(#sse-fixture-shadow)">
+          {shapeForMounting(mounting)}
+          <circle r={3.6} fill={color} fillOpacity={dotOpacity} />
+          {selected ? (
+            <circle
+              r={mounting === "wall-bar" ? 26 : 14}
+              fill="none"
+              strokeDasharray="4 3"
+              style={{ stroke: SELECTED_STROKE, strokeWidth: 1.5 }}
+            />
+          ) : null}
         </g>
-      ) : null}
-      <g transform={`translate(${renderX}, ${renderY}) rotate(${rotationDegrees})`} filter="url(#sse-fixture-shadow)">
-        {shapeForMounting(mounting)}
-        <circle r={3.6} fill={color} fillOpacity={dotOpacity} />
-        {selected ? (
+        {/* Focus ring — only visible on keyboard focus, mirrors SELECTED_STROKE
+          in green so screen-magnifier users can spot the focused marker. */}
+        {keyboardFocused ? (
           <circle
-            r={mounting === "wall-bar" ? 26 : 14}
+            cx={renderX}
+            cy={renderY}
+            r={mounting === "wall-bar" ? 30 : 18}
             fill="none"
-            strokeDasharray="4 3"
-            style={{ stroke: SELECTED_STROKE, strokeWidth: 1.5 }}
+            pointerEvents="none"
+            style={{ stroke: SELECTED_STROKE, strokeWidth: 2 }}
           />
         ) : null}
-      </g>
-      {/* Focus ring — only visible on keyboard focus, mirrors SELECTED_STROKE
-          in green so screen-magnifier users can spot the focused marker. */}
-      {keyboardFocused ? (
-        <circle
-          cx={renderX}
-          cy={renderY}
-          r={mounting === "wall-bar" ? 30 : 18}
-          fill="none"
-          pointerEvents="none"
-          style={{ stroke: SELECTED_STROKE, strokeWidth: 2 }}
-        />
-      ) : null}
-      {/* Identify-burst pulse ring — total 1.2 s matches engine
+        {/* Identify-burst pulse ring — total 1.2 s matches engine
           identify.rs default duration_ms. SVG <animate> runs natively;
           we don't gate on prefers-reduced-motion because the burst is the
           point of the gesture (user-initiated, opt-in). */}
-      {identifying ? (
-        <circle
-          cx={renderX}
-          cy={renderY}
-          r={mounting === "wall-bar" ? 36 : 22}
-          fill="none"
-          strokeWidth={2}
+        {identifying ? (
+          <circle
+            cx={renderX}
+            cy={renderY}
+            r={mounting === "wall-bar" ? 36 : 22}
+            fill="none"
+            strokeWidth={2}
+            pointerEvents="none"
+            style={{ stroke: SELECTED_STROKE }}
+          >
+            <animate attributeName="r" values="14;28;14" dur="0.4s" repeatCount="3" />
+            <animate attributeName="opacity" values="1;0.3;1" dur="0.4s" repeatCount="3" />
+          </circle>
+        ) : null}
+        <text
+          x={renderX}
+          y={renderY + nameOffsetY}
+          textAnchor="middle"
+          fontSize={10}
+          fontWeight={600}
+          letterSpacing={0.8}
           pointerEvents="none"
-          style={{ stroke: SELECTED_STROKE }}
+          style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)", textTransform: "uppercase" }}
         >
-          <animate attributeName="r" values="14;28;14" dur="0.4s" repeatCount="3" />
-          <animate attributeName="opacity" values="1;0.3;1" dur="0.4s" repeatCount="3" />
-        </circle>
+          {displayName}
+        </text>
+        <text
+          x={renderX}
+          y={renderY + metaOffsetY}
+          textAnchor="middle"
+          fontSize={9}
+          letterSpacing={0.6}
+          pointerEvents="none"
+          style={{ fill: LABEL_META_FILL, fontFamily: "var(--font-family-mono)" }}
+        >
+          {metaLabel}
+        </text>
+      </g>
+      {menuPos && menuItems.length > 0 ? (
+        <ContextMenu
+          x={menuPos.x}
+          y={menuPos.y}
+          items={menuItems}
+          onClose={() => setMenuPos(null)}
+          ariaLabel={`Fixture ${name} actions`}
+        />
       ) : null}
-      <text
-        x={renderX}
-        y={renderY + nameOffsetY}
-        textAnchor="middle"
-        fontSize={10}
-        fontWeight={600}
-        letterSpacing={0.8}
-        pointerEvents="none"
-        style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)", textTransform: "uppercase" }}
-      >
-        {displayName}
-      </text>
-      <text
-        x={renderX}
-        y={renderY + metaOffsetY}
-        textAnchor="middle"
-        fontSize={9}
-        letterSpacing={0.6}
-        pointerEvents="none"
-        style={{ fill: LABEL_META_FILL, fontFamily: "var(--font-family-mono)" }}
-      >
-        {metaLabel}
-      </text>
-    </g>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from "react";
-import { MoreVertical, Pencil, Plus, Search, Sun } from "lucide-react";
+import { MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
 
 import { Button, StatusDot, Tooltip } from "@sse/design-system";
 
@@ -52,7 +52,21 @@ export function LightingToolbar({
         <div className={styles.title}>
           <Sun aria-hidden="true" className={styles.titleIcon} size={17} strokeWidth={1.75} />
           <span>Lighting</span>
-          {patchMode ? <span className={styles.patchEyebrow}>Patch mode</span> : null}
+          {patchMode ? (
+            // F11 — persistent on-screen exit affordance. Replaces the static
+            // "Patch mode" eyebrow with a clickable pill so the keyboard
+            // shortcut isn't the only way out. Click toggles patch off
+            // (handlers in LightingWorkspace already cover the toggle).
+            <Button
+              size="compact"
+              variant="primary"
+              onClick={onTogglePatch}
+              leadingVisual={<X aria-hidden="true" size={13} strokeWidth={2} />}
+              aria-pressed={patchMode}
+            >
+              Exit patch mode <kbd className={styles.kbd}>P</kbd>
+            </Button>
+          ) : null}
         </div>
 
         <Tooltip content={bridgeIp ? bridgeIp : "No bridge configured"} placement="bottom">

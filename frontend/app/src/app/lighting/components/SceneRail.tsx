@@ -38,6 +38,8 @@ export interface SceneRailProps {
   /** Set of scene ids whose rename is currently in flight. Used by tiles to
    *  show the busy treatment on the inline rename. */
   renamingSceneIds?: ReadonlySet<string>;
+  /** Right-click delete request. Parent owns the confirm dialog + IPC call. */
+  onRequestDeleteScene?: (sceneId: string, sceneName: string) => void;
 }
 
 interface SceneStats {
@@ -67,6 +69,7 @@ interface CellPayload {
   onPin?: (sceneId: string, pinned: boolean) => void;
   onRename?: (sceneId: string, newName: string) => void | Promise<void>;
   renamingSceneIds: ReadonlySet<string>;
+  onRequestDelete?: (sceneId: string, sceneName: string) => void;
   onAddScene?: () => void;
   showAddTile: boolean;
   totalCellCount: number;
@@ -86,6 +89,7 @@ function VirtualizedCell({
   onPin,
   onRename,
   renamingSceneIds,
+  onRequestDelete,
   onAddScene,
   showAddTile,
   totalCellCount,
@@ -124,6 +128,7 @@ function VirtualizedCell({
           onPin={onPin}
           onRename={onRename}
           renameBusy={renamingSceneIds.has(scene.id)}
+          onRequestDelete={onRequestDelete}
         />
       </div>
     );
@@ -162,6 +167,7 @@ export function SceneRail({
   onPinScene,
   onRenameScene,
   renamingSceneIds,
+  onRequestDeleteScene,
 }: SceneRailProps) {
   // Default to an empty Set so callers without an in-flight rename tracker
   // don't have to construct one. Memoized so consumers can stably pass
@@ -242,6 +248,7 @@ export function SceneRail({
           onPin: onPinScene,
           onRename: onRenameScene,
           renamingSceneIds: effectiveRenamingIds,
+          onRequestDelete: onRequestDeleteScene,
           onAddScene,
           showAddTile,
           totalCellCount,
@@ -293,6 +300,7 @@ export function SceneRail({
               onPin={onPinScene}
               onRename={onRenameScene}
               renameBusy={effectiveRenamingIds.has(scene.id)}
+              onRequestDelete={onRequestDeleteScene}
             />
           );
         })}

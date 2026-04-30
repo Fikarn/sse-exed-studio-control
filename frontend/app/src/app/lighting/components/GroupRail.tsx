@@ -20,6 +20,8 @@ export interface GroupRailProps {
   onClearSearch?: () => void;
   onInspectGroup?: (groupId: string) => void;
   onCreateGroup?: () => void;
+  onRequestRenameGroup?: (groupId: string) => void;
+  onRequestDeleteGroup?: (groupId: string, groupName: string) => void;
 }
 
 export function GroupRail({
@@ -29,6 +31,8 @@ export function GroupRail({
   onClearSearch,
   onInspectGroup,
   onCreateGroup,
+  onRequestRenameGroup,
+  onRequestDeleteGroup,
 }: GroupRailProps) {
   const needle = searchQuery.trim().toLowerCase();
   const filteredGroups = needle ? groups.filter((group) => group.name.toLowerCase().includes(needle)) : groups;
@@ -87,6 +91,8 @@ export function GroupRail({
             levelDelta={group.levelDelta}
             onTogglePower={onTogglePower}
             onInspect={onInspectGroup}
+            onRequestRename={onRequestRenameGroup}
+            onRequestDelete={onRequestDeleteGroup}
           />
         </div>
       ))}

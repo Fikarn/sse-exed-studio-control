@@ -84,6 +84,10 @@ export interface LightingInspectorProps {
   /** Set of in-flight mutation keys; check with `.has(key)` or
    *  `Array.from(set).some((k) => k.startsWith(prefix))` for prefix queries. */
   busyActions: ReadonlySet<string>;
+  /** One-shot signal from chip / marker context menus to open the inspector's
+   *  inline rename for the matching entity. Bumped nonce retriggers when the
+   *  same id is requested twice. */
+  pendingInlineRename?: { kind: "fixture" | "group"; id: string; nonce: number } | null;
 }
 
 export function deriveInspectorTab(opts: {
@@ -159,6 +163,7 @@ export function LightingInspector({
   onBulkIntensityCommit,
   onBulkCctCommit,
   busyActions,
+  pendingInlineRename,
 }: LightingInspectorProps) {
   const hasBusyPrefix = (prefix: string) => Array.from(busyActions).some((key) => key.startsWith(prefix));
   const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
@@ -239,6 +244,11 @@ export function LightingInspector({
             deleteBusy={busyActions.has(`fixture-delete:${selectedFixture.id}`)}
             renameBusy={busyActions.has(`fixture-rename:${selectedFixture.id}`)}
             assignGroupBusy={busyActions.has(`fixture-group:${selectedFixture.id}`)}
+            pendingInlineRenameNonce={
+              pendingInlineRename?.kind === "fixture" && pendingInlineRename.id === selectedFixture.id
+                ? pendingInlineRename.nonce
+                : null
+            }
           />
         ) : null}
 
@@ -261,6 +271,11 @@ export function LightingInspector({
             renameBusy={busyActions.has(`group-rename:${selectedGroup.id}`)}
             removingFixtureId={
               groupFixtures.find((fixture) => busyActions.has(`fixture-group:${fixture.id}`))?.id ?? null
+            }
+            pendingInlineRenameNonce={
+              pendingInlineRename?.kind === "group" && pendingInlineRename.id === selectedGroup.id
+                ? pendingInlineRename.nonce
+                : null
             }
           />
         ) : null}

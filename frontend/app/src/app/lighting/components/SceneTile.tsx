@@ -1,9 +1,9 @@
-import { useRef, type CSSProperties, type KeyboardEvent } from "react";
-import { Pin, PinOff } from "lucide-react";
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
+import { Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { InlineRename, type InlineRenameHandle } from "@sse/design-system";
+import { ContextMenu, InlineRename, type ContextMenuItem, type InlineRenameHandle } from "@sse/design-system";
 
 import { SceneThumbnail } from "./SceneThumbnail";
 import styles from "./LightingRail.module.css";
@@ -39,6 +39,9 @@ export interface SceneTileProps {
   onRename?: (sceneId: string, newName: string) => void | Promise<void>;
   /** When true, marks this tile's rename action as in-flight. */
   renameBusy?: boolean;
+  /** Right-click delete handler. When provided, the context menu surfaces a
+   *  Delete item that fires this callback (parent owns the confirm dialog). */
+  onRequestDelete?: (sceneId: string, sceneName: string) => void;
 }
 
 export function SceneTile({
@@ -57,8 +60,10 @@ export function SceneTile({
   onPin,
   onRename,
   renameBusy = false,
+  onRequestDelete,
 }: SceneTileProps) {
   const renameRef = useRef<InlineRenameHandle | null>(null);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   // When the bridge is unreachable, "modified" is comparing live state to a
   // preview — downgrade the visual to active to avoid false alarm.
   const showAsModified = isModified && bridgeReachable;
@@ -97,6 +102,40 @@ export function SceneTile({
     cursor: sortable ? (isDragging ? "grabbing" : "grab") : "pointer",
   };
 
+  const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
+    if (!onRename && !onPin && !onRequestDelete) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setMenuPos({ x: event.clientX, y: event.clientY });
+  };
+
+  const menuItems: ContextMenuItem[] = [];
+  if (onRename) {
+    menuItems.push({
+      id: "rename",
+      label: "Rename",
+      icon: Pencil,
+      onSelect: () => renameRef.current?.beginEdit(),
+    });
+  }
+  if (onPin) {
+    menuItems.push({
+      id: "pin",
+      label: pinned ? "Unpin" : "Pin",
+      icon: pinned ? PinOff : Pin,
+      onSelect: () => onPin(id, !pinned),
+    });
+  }
+  if (onRequestDelete) {
+    menuItems.push({
+      id: "delete",
+      label: "Delete scene…",
+      icon: Trash2,
+      tone: "danger",
+      onSelect: () => onRequestDelete(id, name),
+    });
+  }
+
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     // F2 mirrors the desktop convention for "rename selected row" (Linear,
     // Notion, every file manager). Works when the tile has keyboard focus
@@ -126,6 +165,7 @@ export function SceneTile({
       className={stateClass}
       style={tileStyle}
       onClick={() => onRecall(id)}
+      onContextMenu={handleContextMenu}
       onKeyDown={handleKeyDown}
       aria-current={isActive ? "true" : undefined}
       aria-label={ariaLabel}
@@ -199,6 +239,15 @@ export function SceneTile({
             <Pin aria-hidden="true" size={12} strokeWidth={2} />
           )}
         </span>
+      ) : null}
+      {menuPos && menuItems.length > 0 ? (
+        <ContextMenu
+          x={menuPos.x}
+          y={menuPos.y}
+          items={menuItems}
+          onClose={() => setMenuPos(null)}
+          ariaLabel={`Scene ${name} actions`}
+        />
       ) : null}
     </div>
   );

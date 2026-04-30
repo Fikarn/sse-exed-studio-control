@@ -17,6 +17,8 @@ export { Dialog } from "./components/Dialog";
 export type { DialogProps } from "./components/Dialog";
 export { ConfirmDialog } from "./components/ConfirmDialog";
 export type { ConfirmDialogProps } from "./components/ConfirmDialog";
+export { ContextMenu } from "./components/ContextMenu";
+export type { ContextMenuItem, ContextMenuItemTone, ContextMenuProps } from "./components/ContextMenu";
 export { Tooltip } from "./components/Tooltip";
 export type { TooltipPlacement, TooltipProps } from "./components/Tooltip";
 export { EmptyState, DegradedState } from "./components/OperationalState";
