@@ -3,7 +3,7 @@ import { MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
 
 import { Button, StatusDot, Tooltip } from "@sse/design-system";
 
-import { KeyboardShortcutsPopover } from "./KeyboardShortcutsPopover";
+import { ShortcutOverlay } from "../../shared/ShortcutOverlay";
 import styles from "./LightingToolbar.module.css";
 
 export interface LightingToolbarProps {
@@ -150,7 +150,7 @@ export function LightingToolbar({
         </button>
       </div>
 
-      {shortcutsOpen ? <KeyboardShortcutsPopover onClose={() => setShortcutsOpen(false)} /> : null}
+      {shortcutsOpen ? <ShortcutOverlay onClose={() => setShortcutsOpen(false)} /> : null}
     </>
   );
 }

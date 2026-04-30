@@ -1,93 +1,243 @@
-import { Button, Surface } from "@sse/design-system";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
+import { Search, X } from "lucide-react";
 
-import styles from "../OperatorShell.module.css";
+import styles from "./ShortcutOverlay.module.css";
 
-export function ShortcutOverlay({ onClose }: { onClose: () => void }) {
-  return (
-    <div className={styles.overlay} role="presentation">
-      <Surface
-        aria-labelledby="shortcut-dialog-title"
-        aria-modal="true"
-        className={styles.dialog}
-        padding="lg"
+interface ShortcutEntry {
+  keys: readonly string[];
+  description: string;
+}
+
+interface ShortcutSection {
+  heading: string;
+  entries: readonly ShortcutEntry[];
+}
+
+// Static shortcut catalogue. New shortcuts added to the app should land here
+// so the `?` overlay stays comprehensive. Sections grouped by surface; the
+// search field substring-matches across every entry's description + keys.
+const SHORTCUTS: readonly ShortcutSection[] = [
+  {
+    heading: "Shell",
+    entries: [
+      { keys: ["⌘", "K"], description: "Open command palette (Ctrl+K on Windows)" },
+      { keys: ["?"], description: "Toggle this shortcuts overlay" },
+      { keys: ["Esc"], description: "Close current overlay / clear selection" },
+      { keys: ["⌘/Ctrl", "1–4"], description: "Switch workspaces (Setup, Lighting, Audio, Planning)" },
+      { keys: ["Shift", "S"], description: "Open Setup / Support" },
+      { keys: ["A"], description: "Open Audio workspace" },
+      { keys: ["⌘/Ctrl", "Shift", "R"], description: "Restart the engine bridge" },
+    ],
+  },
+  {
+    heading: "Lighting · scenes",
+    entries: [
+      {
+        keys: ["S"],
+        description: "Smart save — save changes if active scene is drifted, else create a new scene",
+      },
+      { keys: ["⌘", "S"], description: "Save changes to the active scene (no-op if no drift)" },
+      { keys: ["⌘", "Shift", "S"], description: "Save as new scene (opens a name dialog)" },
+      { keys: ["1–9"], description: "Recall scene 1–9 (numbered slots)" },
+    ],
+  },
+  {
+    heading: "Lighting · selection + edit",
+    entries: [
+      { keys: ["Esc"], description: "Clear fixture selection" },
+      { keys: ["Shift", "Click"], description: "Add fixture to selection (multi-select)" },
+      { keys: ["⌘", "A"], description: "Select all fixtures" },
+      { keys: ["⌘", "F"], description: "Focus toolbar search" },
+      { keys: ["⌘", "Z"], description: "Undo last fixture create / delete" },
+      { keys: ["⌘", "Shift", "Z"], description: "Redo" },
+      { keys: ["F2"], description: "Rename focused scene tile (inline)" },
+    ],
+  },
+  {
+    heading: "Lighting · patch",
+    entries: [{ keys: ["P"], description: "Toggle patch mode" }],
+  },
+  {
+    heading: "Lighting · stage plot",
+    entries: [
+      { keys: ["←", "→", "↑", "↓"], description: "Nudge selected fixture by 0.1 m" },
+      { keys: ["Shift", "←", "→", "↑", "↓"], description: "Nudge selected fixture by 0.5 m" },
+      { keys: ["Wheel"], description: "Zoom · drag to pan (middle mouse) · double-click to reset" },
+      { keys: ["Drag"], description: "Marquee-select fixtures (Shift+drag adds to selection)" },
+      { keys: ["⌥", "Drag"], description: "Drop a fixture without 0.5 m snap (free positioning)" },
+    ],
+  },
+  {
+    heading: "Lighting · sliders",
+    entries: [
+      { keys: ["Shift", "Drag"], description: "Fine adjust (×0.1) on intensity / CCT / scrub-labels" },
+      { keys: ["⌘", "Drag"], description: "Coarse adjust (×10) on intensity / CCT / scrub-labels" },
+      { keys: ["Double-click"], description: "Reset slider to its default value" },
+    ],
+  },
+  {
+    heading: "Lighting · monitor",
+    entries: [{ keys: ["⌘", "Shift", "M"], description: "Open the full DMX monitor" }],
+  },
+  {
+    heading: "Audio",
+    entries: [
+      { keys: ["[", "]"], description: "Page through fader banks" },
+      { keys: ["1–8"], description: "Select a strip in the active bank" },
+      { keys: ["Shift", "1–8"], description: "Recall an audio snapshot" },
+      { keys: ["←", "→"], description: "Move between mix targets" },
+      { keys: ["M", "S"], description: "Mute / solo the selected strip" },
+      { keys: ["V"], description: "Cycle Audio density (compact / regular / spacious)" },
+    ],
+  },
+  {
+    heading: "Planning",
+    entries: [
+      { keys: ["Shift", "B"], description: "Toggle Board view" },
+      { keys: ["Shift", "T"], description: "Toggle Timeline view" },
+      { keys: ["[", "]"], description: "Move the time window" },
+      { keys: ["0"], description: "Snap timeline view back to now" },
+      { keys: ["Shift", "[", "]"], description: "Change the Planning day" },
+      { keys: ["Shift", "←", "→"], description: "Nudge the selected schedule block" },
+      { keys: ["0–4"], description: "Filter Planning board columns" },
+    ],
+  },
+  {
+    heading: "Setup · runner",
+    entries: [
+      { keys: ["Tab"], description: "Move forward through runner steps" },
+      { keys: ["Shift", "Tab"], description: "Move back through runner steps" },
+      { keys: ["Enter"], description: "Invoke the runner footer primary action" },
+      { keys: ["J", "K"], description: "Move through binding details in Map and Verify" },
+      { keys: ["1–4"], description: "Jump to a page in the Setup Map" },
+    ],
+  },
+];
+
+function matches(query: string, section: ShortcutSection, entry: ShortcutEntry): boolean {
+  if (!query) return true;
+  const haystack = `${section.heading} ${entry.description} ${entry.keys.join(" ")}`.toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((token) => haystack.includes(token));
+}
+
+export interface ShortcutOverlayProps {
+  onClose: () => void;
+}
+
+/**
+ * Searchable, `?`-bound keyboard shortcuts overlay (Linear pattern). Renders
+ * a centered modal via portal at document.body. Search box auto-focused;
+ * substring-filters across every entry's description + keys live as the
+ * operator types. Esc / `?` / backdrop click / Close button all dismiss.
+ *
+ * Sections cover every workspace (Shell, Lighting, Audio, Planning, Setup)
+ * so the operator can browse cross-workspace shortcuts without switching
+ * away from their current view.
+ */
+export function ShortcutOverlay({ onClose }: ShortcutOverlayProps) {
+  const inputId = useId();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const id = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  const filtered = useMemo(() => {
+    return SHORTCUTS.map((section) => ({
+      heading: section.heading,
+      entries: section.entries.filter((entry) => matches(query, section, entry)),
+    })).filter((section) => section.entries.length > 0);
+  }, [query]);
+
+  const totalEntries = filtered.reduce((sum, s) => sum + s.entries.length, 0);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    }
+  };
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className={styles.backdrop}
+      onMouseDown={(event) => {
+        if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={panelRef}
+        className={styles.panel}
         role="dialog"
-        tone="raised"
+        aria-modal="true"
+        aria-labelledby={`${inputId}-title`}
+        onKeyDown={handleKeyDown}
       >
-        <div className={styles.dialogTitle} id="shortcut-dialog-title">
-          Keyboard model
+        <div className={styles.header}>
+          <span id={`${inputId}-title`} className={styles.title}>
+            Keyboard shortcuts
+          </span>
+          <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close shortcuts overlay">
+            <X size={14} strokeWidth={1.75} aria-hidden="true" />
+          </button>
         </div>
-        <div className={styles.shortcutList}>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Shift + S</span>
-            <span>Enter Setup, or toggle Runner and Support inside Setup</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Cmd/Ctrl + 1-4</span>
-            <span>Switch workspaces</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Tab / Shift + Tab</span>
-            <span>Move between runner steps</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Enter</span>
-            <span>Invoke the runner footer primary action</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>J / K</span>
-            <span>Move through binding details in Map and Verify</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Space</span>
-            <span>Fire the next lighting cue from the cue rail</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>A / [ ] / 1-8 / Shift + 1-8</span>
-            <span>Open Audio, page banks, select strips, and recall snapshots</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>← / → / M / S / V</span>
-            <span>Move mix targets, mute or solo the selected strip, and change Audio density</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Shift + B / Shift + T</span>
-            <span>Toggle Planning between Board and Timeline</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>[ / ] / 0</span>
-            <span>Move the Planning time window or snap the view back to now</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Shift + [ / ] / ← / →</span>
-            <span>Change the Planning day or nudge the selected schedule block</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>0-4</span>
-            <span>Filter Planning board columns, or jump pages while mapping Setup bindings</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>1-4 (Setup Map)</span>
-            <span>Jump to a page in Map</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Cmd/Ctrl + Shift + R</span>
-            <span>Open restart confirmation</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>?</span>
-            <span>Toggle shortcut guide</span>
-          </div>
-          <div className={styles.shortcutItem}>
-            <span className={styles.shortcutKeys}>Esc</span>
-            <span>Close the current shell overlay</span>
-          </div>
+
+        <label className={styles.search} htmlFor={inputId}>
+          <Search size={14} strokeWidth={1.75} aria-hidden="true" />
+          <input
+            ref={inputRef}
+            id={inputId}
+            type="text"
+            placeholder="Filter shortcuts — try: scene, recall, save, monitor"
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+
+        <div className={styles.body}>
+          {totalEntries === 0 ? (
+            <div className={styles.empty}>No shortcuts match “{query}”.</div>
+          ) : (
+            filtered.map((section) => (
+              <section key={section.heading} className={styles.section}>
+                <h3 className={styles.heading}>{section.heading}</h3>
+                <ul className={styles.list}>
+                  {section.entries.map((entry, index) => (
+                    <li key={`${section.heading}-${index}`} className={styles.row}>
+                      <span className={styles.keys}>
+                        {entry.keys.map((key, keyIndex) => (
+                          <kbd key={keyIndex} className={styles.kbd}>
+                            {key}
+                          </kbd>
+                        ))}
+                      </span>
+                      <span className={styles.description}>{entry.description}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))
+          )}
         </div>
-        <div className={styles.dialogActions}>
-          <Button variant="primary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-      </Surface>
-    </div>
+
+        <div className={styles.footer}>On Windows, Ctrl substitutes for ⌘.</div>
+      </div>
+    </div>,
+    document.body
   );
 }

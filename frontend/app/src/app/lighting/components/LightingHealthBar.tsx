@@ -118,6 +118,7 @@ export function LightingHealthBar({
       items={items}
       hints={[
         { kbd: "⌘ K", label: "command palette" },
+        { kbd: "?", label: "shortcuts" },
         { kbd: "⌘ ⇧ M", label: "full DMX monitor" },
       ]}
     />
