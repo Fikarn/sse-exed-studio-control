@@ -1,0 +1,85 @@
+@layer components {
+  .picker {
+    background: var(--color-surface-default);
+    border: 1px solid var(--color-surface-border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    position: fixed;
+    z-index: 1000;
+    min-width: 180px;
+  }
+
+  .picker:focus {
+    outline: none;
+  }
+
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(8, 18px);
+    gap: 4px;
+  }
+
+  .swatch {
+    align-items: center;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    height: 18px;
+    justify-content: center;
+    padding: 0;
+    width: 18px;
+    transition:
+      transform 80ms ease,
+      box-shadow 80ms ease,
+      border-color 80ms ease;
+  }
+
+  .swatch:hover {
+    transform: scale(1.08);
+  }
+
+  .swatchFocused {
+    box-shadow: 0 0 0 2px var(--color-accent-primary);
+    border-color: var(--color-accent-primary);
+  }
+
+  .swatchSelected {
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.5);
+  }
+
+  .checkIcon {
+    color: rgba(0, 0, 0, 0.85);
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.6));
+  }
+
+  .clear {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--color-surface-border);
+    border-radius: 4px;
+    color: var(--color-studio-300);
+    cursor: pointer;
+    display: inline-flex;
+    font: var(--font-weight-regular) var(--font-size-xs) / 1 var(--font-family-sans);
+    gap: 6px;
+    justify-content: center;
+    padding: 4px 8px;
+  }
+
+  .clear:hover {
+    background: var(--color-surface-hover, rgba(255, 255, 255, 0.04));
+    color: var(--color-studio-100);
+  }
+
+  .clearFocused {
+    box-shadow: 0 0 0 2px var(--color-accent-primary);
+    border-color: var(--color-accent-primary);
+    color: var(--color-studio-100);
+  }
+}

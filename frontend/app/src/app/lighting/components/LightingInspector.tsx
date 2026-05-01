@@ -36,6 +36,12 @@ export interface LightingInspectorProps {
   selectedFixtureId: string | null;
   selectedGroupId: string | null;
   activeSceneId: string | null;
+  /** Wave 30b — when set, the scene tab displays this scene's contents
+   *  instead of `activeSceneId`. Used for X1 hover preview so the inspector
+   *  can show a peek without disturbing activeSceneId-driven UI (rail tile
+   *  green border, drift detection, plot pill). When null, falls back to
+   *  activeSceneId. */
+  inspectorSceneId?: string | null;
 
   isSceneModified: boolean;
   bridgeReachable: boolean;
@@ -58,6 +64,10 @@ export interface LightingInspectorProps {
   onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
   onRenameFixture?: (fixtureId: string, newName: string) => void | Promise<void>;
   onRenameGroup?: (groupId: string, newName: string) => void | Promise<void>;
+  /** Set scene color tag. `null` clears, `0..7` sets. */
+  onSetSceneColor?: (sceneId: string, colorIndex: number | null) => void;
+  /** Set group color tag. `null` clears, `0..7` sets. */
+  onSetGroupColor?: (groupId: string, colorIndex: number | null) => void;
   onAssignFixtureGroup?: (fixtureId: string, groupId: string | null) => void;
   /** Remove a fixture from its current group. Used by the I8 hover-revealed
    *  "×" affordance on group inspector member rows. */
@@ -137,6 +147,7 @@ export function LightingInspector({
   selectedFixtureId,
   selectedGroupId,
   activeSceneId,
+  inspectorSceneId,
   isSceneModified,
   bridgeReachable,
   onTogglePower,
@@ -155,6 +166,8 @@ export function LightingInspector({
   onRenameScene,
   onRenameFixture,
   onRenameGroup,
+  onSetSceneColor,
+  onSetGroupColor,
   onAssignFixtureGroup,
   onRemoveFixtureFromGroup,
   onCreateGroup,
@@ -170,7 +183,16 @@ export function LightingInspector({
   const hasBusyPrefix = (prefix: string) => Array.from(busyActions).some((key) => key.startsWith(prefix));
   const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
-  const activeScene = scenes.find((scene) => scene.id === activeSceneId) ?? null;
+  // Wave 30b — inspector picks up the hover-preview scene id when set so
+  // the tab content tracks the operator's hover. Falls back to the active
+  // scene id (the engine's recalled / persisted truth) otherwise. The
+  // displayed-scene id is only equal to activeSceneId when not previewing,
+  // which lets us suppress the modified treatment in preview mode (drift
+  // is computed against activeSceneId, not the previewed one).
+  const displayedSceneId =
+    inspectorSceneId !== null && inspectorSceneId !== undefined ? inspectorSceneId : activeSceneId;
+  const inspectorScene = scenes.find((scene) => scene.id === displayedSceneId) ?? null;
+  const isHoverPreview = inspectorScene !== null && inspectorScene.id !== activeSceneId;
 
   const groupFixtures = useMemo(
     () => (selectedGroup ? fixtures.filter((fixture) => fixture.groupId === selectedGroup.id) : []),
@@ -196,10 +218,11 @@ export function LightingInspector({
       >
         {activeTab === "scene" ? (
           <InspectorScene
-            scene={activeScene}
+            scene={inspectorScene}
             fixtures={fixtures}
             groups={groups}
-            isModified={isSceneModified}
+            isModified={isHoverPreview ? false : isSceneModified}
+            isHoverPreview={isHoverPreview}
             bridgeReachable={bridgeReachable}
             onSaveScene={onSaveScene}
             onSaveSceneAs={onSaveSceneAs}
@@ -207,11 +230,13 @@ export function LightingInspector({
             onResaveScene={onResaveScene}
             onDeleteScene={onDeleteScene}
             onRenameScene={onRenameScene}
+            onSetSceneColor={onSetSceneColor}
             saveBusy={busyActions.has("scene-create")}
             recallBusy={hasBusyPrefix("scene:")}
             resaveBusy={busyActions.has("scene-resave")}
             deleteBusy={busyActions.has("scene-delete")}
-            renameBusy={activeScene ? busyActions.has(`scene-rename:${activeScene.id}`) : false}
+            renameBusy={inspectorScene ? busyActions.has(`scene-rename:${inspectorScene.id}`) : false}
+            colorBusy={inspectorScene ? busyActions.has(`scene-color:${inspectorScene.id}`) : false}
           />
         ) : null}
 
@@ -263,13 +288,16 @@ export function LightingInspector({
           <InspectorGroup
             groupId={selectedGroup.id}
             groupName={selectedGroup.name}
+            colorIndex={selectedGroup.colorIndex}
             fixtures={groupFixtures}
             onTogglePower={onToggleGroupPower}
             onSelectFixture={onSelectFixture}
             onRenameGroup={onRenameGroup}
+            onSetGroupColor={onSetGroupColor}
             onRemoveFixtureFromGroup={onRemoveFixtureFromGroup}
             busy={busyActions.has(`group:${selectedGroup.id}`)}
             renameBusy={busyActions.has(`group-rename:${selectedGroup.id}`)}
+            colorBusy={busyActions.has(`group-color:${selectedGroup.id}`)}
             removingFixtureId={
               groupFixtures.find((fixture) => busyActions.has(`fixture-group:${fixture.id}`))?.id ?? null
             }
