@@ -40,6 +40,7 @@ const SHORTCUTS: readonly ShortcutSection[] = [
       { keys: ["⌘", "S"], description: "Save changes to the active scene (no-op if no drift)" },
       { keys: ["⌘", "Shift", "S"], description: "Save as new scene (opens a name dialog)" },
       { keys: ["1–9"], description: "Recall scene 1–9 (numbered slots)" },
+      { keys: ["T"], description: "Cycle scene recall fade time" },
     ],
   },
   {
@@ -69,6 +70,8 @@ const SHORTCUTS: readonly ShortcutSection[] = [
       { keys: ["Wheel"], description: "Zoom · drag to pan (middle mouse) · double-click to reset" },
       { keys: ["Drag"], description: "Marquee-select fixtures (Shift+drag adds to selection)" },
       { keys: ["⌥", "Drag"], description: "Drop a fixture without 0.5 m snap (free positioning)" },
+      { keys: ["Shift", "1", "2", "3"], description: "Recall view bookmark slot 1 / 2 / 3" },
+      { keys: ["⌘", "Shift", "1", "2", "3"], description: "Save current view to bookmark slot 1 / 2 / 3" },
     ],
   },
   {

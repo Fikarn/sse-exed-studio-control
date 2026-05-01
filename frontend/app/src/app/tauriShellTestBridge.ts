@@ -104,7 +104,11 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
       }
       return store.recallLightingScene(
         command.sceneId,
-        typeof command.fadeDurationSeconds === "number" ? command.fadeDurationSeconds : undefined
+        typeof command.fadeMs === "number"
+          ? command.fadeMs
+          : typeof command.fadeDurationSeconds === "number"
+            ? Math.round(command.fadeDurationSeconds * 1000)
+            : undefined
       );
     case "reschedulePlanningTask":
       if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {

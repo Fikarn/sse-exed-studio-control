@@ -33,6 +33,8 @@ export interface SceneTileProps {
   bridgeReachable?: boolean;
   /** Optional last-recalled timestamp surfaced as a third subline. */
   lastRecalledLabel?: string;
+  /** 0..1 progress for a manual recall fade targeting this scene. */
+  fadeProgress?: number | null;
   thumbDataUri?: string;
   pinned?: boolean;
   /** When true, dnd-kit sortable hooks are wired in. The parent
@@ -73,6 +75,7 @@ export function SceneTile({
   isModified,
   bridgeReachable = true,
   lastRecalledLabel,
+  fadeProgress = null,
   thumbDataUri,
   pinned = false,
   sortable = false,
@@ -93,6 +96,10 @@ export function SceneTile({
   // When the bridge is unreachable, "modified" is comparing live state to a
   // preview — downgrade the visual to active to avoid false alarm.
   const showAsModified = isModified && bridgeReachable;
+  const normalizedFadeProgress =
+    typeof fadeProgress === "number" && fadeProgress > 0 && fadeProgress < 1
+      ? Math.max(0, Math.min(1, fadeProgress))
+      : null;
   const baseClass = isActive
     ? showAsModified
       ? `${styles.tile} ${styles.tileActive} ${styles.tileModified}`
@@ -217,6 +224,7 @@ export function SceneTile({
       aria-label={ariaLabel}
       data-pinned={pinned || undefined}
       data-dragging={isDragging || undefined}
+      data-fading={normalizedFadeProgress !== null || undefined}
       {...attributes}
       {...listeners}
       // dnd-kit's `attributes` already provides role="button" and
@@ -285,6 +293,11 @@ export function SceneTile({
           ) : (
             <Pin aria-hidden="true" size={12} strokeWidth={2} />
           )}
+        </span>
+      ) : null}
+      {normalizedFadeProgress !== null ? (
+        <span className={styles.tileFadeTrack} aria-hidden="true">
+          <span className={styles.tileFadeBar} style={{ width: `${Math.round(normalizedFadeProgress * 100)}%` }} />
         </span>
       ) : null}
       {menuPos && menuItems.length > 0 ? (

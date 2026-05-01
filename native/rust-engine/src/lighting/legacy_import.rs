@@ -267,6 +267,7 @@ pub fn import_legacy_lighting_fixture(
         scene_order,
         pinned_scene_ids: Vec::new(),
         group_order,
+        active_fade: None,
     };
 
     let selected_fixture_id = wire

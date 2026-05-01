@@ -1,7 +1,9 @@
 use std::path::Path;
 
 use super::editor_state::*;
+use super::fade::{apply_active_fade_sample, remove_fixture_from_active_fade};
 use super::helpers::*;
+use super::identify::current_unix_ms;
 use super::types::*;
 use super::*;
 
@@ -196,11 +198,14 @@ pub fn set_lighting_group_power(
             )
         })?;
     let mut editor_state = load_lighting_editor_state(&app_settings);
+    apply_active_fade_sample(&mut editor_state, current_unix_ms());
     let mut affected_fixtures = 0usize;
+    let mut affected_fixture_ids = Vec::new();
     for fixture in &mut editor_state.fixtures {
         if fixture.group_id.as_deref() == Some(group.id.as_str()) {
             fixture.on = request.on;
             affected_fixtures += 1;
+            affected_fixture_ids.push(fixture.id.clone());
         }
     }
 
@@ -212,6 +217,9 @@ pub fn set_lighting_group_power(
                 group.name
             ),
         ));
+    }
+    for fixture_id in &affected_fixture_ids {
+        remove_fixture_from_active_fade(&mut editor_state, fixture_id);
     }
 
     let mut updates = lighting_editor_state_updates(&editor_state)?;

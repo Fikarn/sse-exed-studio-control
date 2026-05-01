@@ -3,7 +3,11 @@ use std::path::Path;
 use crate::lighting_backend::read_default_lighting_inventory;
 
 use super::editor_state::*;
+use super::fade::{
+    apply_active_fade_sample, fade_duration_ms_from_seconds, start_lighting_fade,
+};
 use super::helpers::*;
+use super::identify::current_unix_ms;
 use super::types::*;
 use super::*;
 
@@ -18,6 +22,8 @@ pub fn recall_lighting_scene(
     let inventory = read_default_lighting_inventory(&config);
     let mut editor_state =
         load_lighting_editor_state_with_inventory(&app_settings, &config, &inventory);
+    let now_ms = current_unix_ms();
+    apply_active_fade_sample(&mut editor_state, now_ms);
     let scene = editor_state
         .scenes
         .iter()
@@ -32,15 +38,27 @@ pub fn recall_lighting_scene(
             LightingCommandError::Rejected("LIGHTING_SCENE_NOT_FOUND", message)
         })?;
     let recalled_at = current_timestamp(db_path)?;
-    for fixture in &mut editor_state.fixtures {
-        if let Some(scene_fixture_state) = scene
-            .fixture_states
-            .iter()
-            .find(|fixture_state| fixture_state.fixture_id == fixture.id)
-        {
-            fixture.on = scene_fixture_state.on;
-            fixture.intensity = scene_fixture_state.intensity;
-            fixture.cct = scene_fixture_state.cct;
+    let fade_duration_ms = fade_duration_ms_from_seconds(request.fade_duration_seconds);
+    if fade_duration_ms > 0 {
+        start_lighting_fade(
+            &mut editor_state,
+            scene.id.clone(),
+            now_ms,
+            fade_duration_ms,
+            scene.fixture_states.clone(),
+        );
+    } else {
+        editor_state.active_fade = None;
+        for fixture in &mut editor_state.fixtures {
+            if let Some(scene_fixture_state) = scene
+                .fixture_states
+                .iter()
+                .find(|fixture_state| fixture_state.fixture_id == fixture.id)
+            {
+                fixture.on = scene_fixture_state.on;
+                fixture.intensity = scene_fixture_state.intensity;
+                fixture.cct = scene_fixture_state.cct;
+            }
         }
     }
 
@@ -81,6 +99,7 @@ pub fn recall_lighting_scene(
         scene_name: scene.name,
         recalled_at,
         fade_duration_seconds: request.fade_duration_seconds,
+        fade_ms: fade_duration_ms,
         summary,
     })
 }
@@ -91,6 +110,7 @@ pub fn create_lighting_scene(
 ) -> Result<LightingSceneCreateResult, LightingCommandError> {
     let app_settings = load_lighting_settings(db_path)?;
     let mut editor_state = load_lighting_editor_state(&app_settings);
+    apply_active_fade_sample(&mut editor_state, current_unix_ms());
     if editor_state.fixtures.is_empty() {
         return Err(LightingCommandError::Rejected(
             "LIGHTING_NO_FIXTURES",
@@ -135,6 +155,7 @@ pub fn create_lighting_scene(
             read_optional_setting(&app_settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY).as_deref(),
             read_optional_setting(&app_settings, LIGHTING_LAST_SCENE_RECALL_AT_KEY).as_deref(),
             false,
+            None,
         ),
         summary,
     })
@@ -146,6 +167,7 @@ pub fn update_lighting_scene(
 ) -> Result<LightingSceneUpdateResult, LightingCommandError> {
     let app_settings = load_lighting_settings(db_path)?;
     let mut editor_state = load_lighting_editor_state(&app_settings);
+    apply_active_fade_sample(&mut editor_state, current_unix_ms());
     let captured_fixture_states = request
         .capture_current_state
         .then(|| capture_scene_fixture_states(&editor_state.fixtures));
@@ -201,6 +223,7 @@ pub fn update_lighting_scene(
             read_optional_setting(&app_settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY).as_deref(),
             read_optional_setting(&app_settings, LIGHTING_LAST_SCENE_RECALL_AT_KEY).as_deref(),
             pinned,
+            None,
         ),
         summary,
     })
@@ -422,6 +445,7 @@ pub fn pin_lighting_scene(
             read_optional_setting(&app_settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY).as_deref(),
             read_optional_setting(&app_settings, LIGHTING_LAST_SCENE_RECALL_AT_KEY).as_deref(),
             request.pinned,
+            None,
         ),
         summary,
     })

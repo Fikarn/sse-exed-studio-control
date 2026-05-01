@@ -140,6 +140,56 @@
   flex: 1;
 }
 
+.fadeControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border-radius: var(--radius-tight-md);
+  background: var(--color-bg-default);
+  border: 1px solid var(--color-bg-border);
+  color: var(--color-brand-text-secondary);
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+  flex: 0 0 auto;
+}
+
+.fadeControl:focus-within {
+  border-color: var(--color-brand-blue-border);
+  box-shadow: 0 0 0 2px rgba(63, 112, 200, 0.2);
+}
+
+.fadeLabel,
+.fadeUnit {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+}
+
+.fadeInput {
+  appearance: textfield;
+  width: 38px;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-brand-text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  outline: none;
+  text-align: right;
+}
+
+.fadeInput::-webkit-outer-spin-button,
+.fadeInput::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
 .search {
   display: inline-flex;
   align-items: center;

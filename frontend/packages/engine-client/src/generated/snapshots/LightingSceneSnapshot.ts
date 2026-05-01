@@ -9,6 +9,13 @@ export type LightingSceneSnapshot = {
   lastRecalled: boolean;
   lastRecalledAt: string | null;
   /**
+   * Progress for an active manual recall fade targeting this scene.
+   * `None` when no fade is active; `0.0..=1.0` while the engine is
+   * sampling between the previous live state and this scene.
+   */
+  fadeProgress: number | null;
+  fadeDurationMs: number | null;
+  /**
    * True when the scene is in the operator's pinned set. Pinned
    * scenes sort to the top of the rail (snapshot ordering already
    * reflects this, but the flag drives the rail's visual treatment).

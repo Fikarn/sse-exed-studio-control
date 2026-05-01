@@ -1,7 +1,11 @@
 use std::path::Path;
 
 use super::editor_state::*;
+use super::fade::{
+    apply_active_fade_sample, clear_active_fade, remove_fixture_from_active_fade,
+};
 use super::helpers::*;
+use super::identify::current_unix_ms;
 use super::types::*;
 use super::*;
 
@@ -73,6 +77,7 @@ pub fn update_lighting_fixture(
 ) -> Result<LightingFixtureUpdateResult, LightingCommandError> {
     let app_settings = load_lighting_settings(db_path)?;
     let mut editor_state = load_lighting_editor_state(&app_settings);
+    apply_active_fade_sample(&mut editor_state, current_unix_ms());
     validate_group_exists(
         editor_state.groups.as_slice(),
         request
@@ -163,6 +168,7 @@ pub fn update_lighting_fixture(
 
         fixture.clone()
     };
+    remove_fixture_from_active_fade(&mut editor_state, request.fixture_id.as_str());
     let summary = lighting_fixture_update_summary(&updated_fixture);
     let mut updates = lighting_editor_state_updates(&editor_state)?;
     updates.extend_from_slice(&[
@@ -190,6 +196,7 @@ pub fn set_lighting_all_power(
 ) -> Result<LightingAllPowerResult, LightingCommandError> {
     let app_settings = load_lighting_settings(db_path)?;
     let mut editor_state = load_lighting_editor_state(&app_settings);
+    apply_active_fade_sample(&mut editor_state, current_unix_ms());
     let affected_fixtures = editor_state.fixtures.len();
 
     if affected_fixtures == 0 {
@@ -202,6 +209,7 @@ pub fn set_lighting_all_power(
     for fixture in &mut editor_state.fixtures {
         fixture.on = request.on;
     }
+    clear_active_fade(&mut editor_state);
 
     let summary = format!(
         "All native lighting fixtures set {} across {} fixtures.",

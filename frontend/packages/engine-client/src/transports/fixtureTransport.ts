@@ -2132,7 +2132,14 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const recalledAt = new Date().toISOString();
-        const fadeDurationSeconds = typeof params.fadeDurationSeconds === "number" ? params.fadeDurationSeconds : 0;
+        const rawFadeMs =
+          typeof params.fadeMs === "number"
+            ? params.fadeMs
+            : typeof params.fadeDurationSeconds === "number"
+              ? params.fadeDurationSeconds * 1000
+              : 0;
+        const fadeMs = Math.max(0, Math.min(10_000, Math.round(rawFadeMs)));
+        const fadeDurationSeconds = fadeMs / 1000;
         const fixtureStates = asArray(targetScene.fixtureStates)
           .map((fixtureState) => asRecord(fixtureState))
           .filter((fixtureState): fixtureState is JsonObject => fixtureState !== null);
@@ -2147,6 +2154,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           ...scene,
           lastRecalled: asString(scene.id) === sceneId,
           lastRecalledAt: asString(scene.id) === sceneId ? recalledAt : (scene.lastRecalledAt ?? null),
+          fadeDurationMs: asString(scene.id) === sceneId && fadeMs > 0 ? fadeMs : null,
+          fadeProgress: asString(scene.id) === sceneId && fadeMs > 0 ? 1 : null,
         }));
         lightingSnapshot.fixtures = fixtures.map((fixture) => {
           const nextState = fixtureStates.find(
@@ -2164,7 +2173,11 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           };
         });
 
-        const summary = `Fixture lighting scene '${asString(targetScene.name, sceneId)}' was recalled via immediate transition on ${asString(lightingSnapshot.bridgeIp, "unconfigured")} universe ${asNumber(lightingSnapshot.universe, 1)}.`;
+        const transitionLabel =
+          fadeMs > 0
+            ? `${Number.isInteger(fadeDurationSeconds) ? fadeDurationSeconds.toFixed(0) : fadeDurationSeconds.toFixed(1)} s fade`
+            : "immediate transition";
+        const summary = `Fixture lighting scene '${asString(targetScene.name, sceneId)}' was recalled via ${transitionLabel} on ${asString(lightingSnapshot.bridgeIp, "unconfigured")} universe ${asNumber(lightingSnapshot.universe, 1)}.`;
         lightingSnapshot.lastActionStatus = "succeeded";
         lightingSnapshot.lastActionCode = null;
         lightingSnapshot.lastActionMessage = summary;
@@ -2178,6 +2191,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           sceneName: asString(targetScene.name, sceneId),
           recalledAt,
           fadeDurationSeconds,
+          fadeMs,
           summary,
         };
       }

@@ -553,11 +553,8 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async setLightingAllPower(on: boolean) {
       return performRequest("lighting.power.all", { on });
     },
-    async recallLightingScene(sceneId: string, fadeDurationSeconds?: number) {
-      return performRequest(
-        "lighting.scene.recall",
-        fadeDurationSeconds === undefined ? { sceneId } : { sceneId, fadeDurationSeconds }
-      );
+    async recallLightingScene(sceneId: string, fadeMs?: number) {
+      return performRequest("lighting.scene.recall", fadeMs === undefined ? { sceneId } : { sceneId, fadeMs });
     },
     async seedPlanningDemo(replaceExistingData = false) {
       return performRequest("commissioning.seedPlanningDemo", { replaceExistingData });
