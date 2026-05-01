@@ -2,8 +2,10 @@ use serde_json::Value;
 
 use super::helpers::*;
 use super::types::{
-    LightingAllPowerRequest, LightingEffect, LightingFixtureCreateRequest,
-    LightingFixtureDeleteRequest, LightingFixtureIdentifyRequest, LightingFixtureUpdateRequest,
+    FixtureHighlightMode, LightingAllPowerRequest, LightingEffect, LightingFixtureCreateRequest,
+    LightingFixtureDeleteRequest, LightingFixtureHighlightRequest,
+    LightingFixtureIdentifyClearAllRequest, LightingFixtureIdentifyRequest,
+    LightingFixtureIdentifySequenceRequest, LightingFixtureUpdateRequest,
     LightingGroupCreateRequest, LightingGroupDeleteRequest, LightingGroupPowerRequest,
     LightingGroupUpdateRequest, LightingSceneCreateRequest, LightingSceneDeleteRequest,
     LightingScenePinRequest, LightingSceneRecallRequest, LightingSceneReorderRequest,
@@ -203,6 +205,78 @@ pub fn parse_lighting_fixture_identify_request(
         fixture_id: String::from(fixture_id),
         duration_ms,
     })
+}
+
+pub fn parse_lighting_fixture_highlight_request(
+    params: &Value,
+) -> Result<LightingFixtureHighlightRequest, String> {
+    let mode = params
+        .get("mode")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .ok_or_else(|| String::from("mode is required"))?;
+    let mode = match mode {
+        "highlight" => FixtureHighlightMode::Highlight,
+        "solo" => FixtureHighlightMode::Solo,
+        "off" => FixtureHighlightMode::Off,
+        _ => {
+            return Err(String::from(
+                "mode must be one of \"highlight\", \"solo\", or \"off\"",
+            ))
+        }
+    };
+
+    let fixture_ids = parse_fixture_id_array(params.get("fixtureIds"), "fixtureIds")?;
+
+    Ok(LightingFixtureHighlightRequest { fixture_ids, mode })
+}
+
+pub fn parse_lighting_fixture_identify_sequence_request(
+    params: &Value,
+) -> Result<LightingFixtureIdentifySequenceRequest, String> {
+    let fixture_ids = parse_fixture_id_array(params.get("fixtureIds"), "fixtureIds")?;
+    if fixture_ids.is_empty() {
+        return Err(String::from("fixtureIds must contain at least one id"));
+    }
+
+    let step_ms = params
+        .get("stepMs")
+        .map(parse_i64_value)
+        .transpose()?
+        .ok_or_else(|| String::from("stepMs is required"))?;
+    let duration_ms = params
+        .get("durationMs")
+        .map(parse_i64_value)
+        .transpose()?
+        .ok_or_else(|| String::from("durationMs is required"))?;
+
+    Ok(LightingFixtureIdentifySequenceRequest {
+        fixture_ids,
+        step_ms,
+        duration_ms,
+    })
+}
+
+pub fn parse_lighting_fixture_identify_clear_all_request(
+    _params: &Value,
+) -> Result<LightingFixtureIdentifyClearAllRequest, String> {
+    Ok(LightingFixtureIdentifyClearAllRequest)
+}
+
+fn parse_fixture_id_array(value: Option<&Value>, field: &str) -> Result<Vec<String>, String> {
+    let array = value
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{field} must be an array of strings"))?;
+    let mut ids = Vec::with_capacity(array.len());
+    for entry in array {
+        let id = entry
+            .as_str()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| format!("{field} entries must be non-empty strings"))?;
+        ids.push(String::from(id));
+    }
+    Ok(ids)
 }
 
 pub fn parse_lighting_group_power_request(

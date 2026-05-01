@@ -876,6 +876,382 @@ fn lighting_identify_burst_rejects_unknown_fixture() {
 }
 
 #[test]
+fn output_override_highlight_overlays_intensity_and_neutral_cct() {
+    let test_dir = TestDir::new("override-highlight");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            ),
+            (String::from(LIGHTING_UNIVERSE_KEY), String::from("1")),
+            (
+                String::from("app.commissioning.check.lighting.status"),
+                String::from("passed"),
+            ),
+        ],
+    )
+    .expect("setup should persist");
+
+    let result = set_lighting_fixture_highlight(
+        test_dir.db_path().as_path(),
+        &LightingFixtureHighlightRequest {
+            fixture_ids: vec![String::from("fixture-key-left")],
+            mode: FixtureHighlightMode::Highlight,
+        },
+    )
+    .expect("highlight should succeed");
+    assert_eq!(result.mode, "highlight");
+    assert_eq!(result.fixture_count, 1);
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_lighting_snapshot(&settings);
+
+    let highlighted = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-left")
+        .expect("highlighted fixture should exist in snapshot");
+    assert!(highlighted.on, "highlight overlay must drive fixture on");
+    assert_eq!(
+        highlighted.intensity, 100,
+        "highlight overlay must drive intensity to 100"
+    );
+    assert_eq!(
+        highlighted.cct, 4500,
+        "highlight overlay must drive cct to neutral 4500 K"
+    );
+
+    // Sibling fixture not in the highlight set keeps its stored state
+    // (default seeded fixtures are off).
+    let untouched = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-right")
+        .expect("sibling fixture should exist in snapshot");
+    assert!(!untouched.on, "non-highlighted fixture stays at stored on");
+}
+
+#[test]
+fn output_override_solo_dims_unselected() {
+    let test_dir = TestDir::new("override-solo");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            ),
+            (String::from(LIGHTING_UNIVERSE_KEY), String::from("1")),
+            (
+                String::from("app.commissioning.check.lighting.status"),
+                String::from("passed"),
+            ),
+        ],
+    )
+    .expect("setup should persist");
+
+    // Power both key fixtures on so we have something for solo to dim.
+    set_lighting_all_power(
+        test_dir.db_path().as_path(),
+        &LightingAllPowerRequest { on: true },
+    )
+    .expect("all-on should succeed");
+
+    let result = set_lighting_fixture_highlight(
+        test_dir.db_path().as_path(),
+        &LightingFixtureHighlightRequest {
+            fixture_ids: vec![String::from("fixture-key-left")],
+            mode: FixtureHighlightMode::Solo,
+        },
+    )
+    .expect("solo should succeed");
+    assert_eq!(result.mode, "solo");
+    assert_eq!(result.fixture_count, 1);
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_lighting_snapshot(&settings);
+
+    let soloed = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-left")
+        .expect("solo-selected fixture should exist in snapshot");
+    assert!(soloed.on, "solo-selected fixture keeps stored on=true");
+    assert_eq!(
+        soloed.intensity, 100,
+        "solo-selected fixture keeps stored intensity"
+    );
+
+    let masked = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-right")
+        .expect("non-soloed fixture should exist in snapshot");
+    assert!(!masked.on, "solo mask must drive non-selected fixtures off");
+    assert_eq!(
+        masked.intensity, 0,
+        "solo mask must zero intensity for non-selected fixtures"
+    );
+
+    let backline = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-backline-wash")
+        .expect("backline fixture should exist in snapshot");
+    assert!(
+        !backline.on && backline.intensity == 0,
+        "all non-selected fixtures must be dimmed by solo mask"
+    );
+}
+
+#[test]
+fn output_override_off_clears_overlay() {
+    let test_dir = TestDir::new("override-off");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            ),
+            (String::from(LIGHTING_UNIVERSE_KEY), String::from("1")),
+            (
+                String::from("app.commissioning.check.lighting.status"),
+                String::from("passed"),
+            ),
+        ],
+    )
+    .expect("setup should persist");
+
+    // Start with highlight active.
+    set_lighting_fixture_highlight(
+        test_dir.db_path().as_path(),
+        &LightingFixtureHighlightRequest {
+            fixture_ids: vec![String::from("fixture-key-left")],
+            mode: FixtureHighlightMode::Highlight,
+        },
+    )
+    .expect("highlight setup should succeed");
+
+    let mid_snapshot = read_lighting_snapshot(
+        &list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+            .expect("settings should load"),
+    );
+    let mid_fixture = mid_snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-left")
+        .expect("fixture in mid snapshot");
+    assert!(
+        mid_fixture.on && mid_fixture.intensity == 100,
+        "highlight should be visible before clear"
+    );
+
+    // Clear via mode: off — fixture_ids ignored.
+    let result = set_lighting_fixture_highlight(
+        test_dir.db_path().as_path(),
+        &LightingFixtureHighlightRequest {
+            fixture_ids: Vec::new(),
+            mode: FixtureHighlightMode::Off,
+        },
+    )
+    .expect("clear should succeed");
+    assert_eq!(result.mode, "off");
+    assert_eq!(result.fixture_count, 0);
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    assert_eq!(
+        settings
+            .get("app.lighting.highlight_ids")
+            .map(String::as_str),
+        Some("[]"),
+        "highlight_ids should be cleared to empty array"
+    );
+    assert_eq!(
+        settings.get("app.lighting.solo_ids").map(String::as_str),
+        Some("[]"),
+        "solo_ids should be cleared to empty array"
+    );
+
+    let snapshot = read_lighting_snapshot(&settings);
+    let cleared = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-left")
+        .expect("fixture should exist in snapshot");
+    assert!(
+        !cleared.on,
+        "after clear, fixture returns to stored on=false"
+    );
+}
+
+#[test]
+fn identify_sequence_steps_through_in_order() {
+    let test_dir = TestDir::new("identify-sequence");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            ),
+            (String::from(LIGHTING_UNIVERSE_KEY), String::from("1")),
+            (
+                String::from("app.commissioning.check.lighting.status"),
+                String::from("passed"),
+            ),
+        ],
+    )
+    .expect("setup should persist");
+
+    let result = start_lighting_identify_sequence(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifySequenceRequest {
+            fixture_ids: vec![
+                String::from("fixture-key-left"),
+                String::from("fixture-key-right"),
+                String::from("fixture-backline-wash"),
+            ],
+            step_ms: 500,
+            duration_ms: 400,
+        },
+    )
+    .expect("sequence start should succeed");
+    assert_eq!(result.fixture_count, 3);
+    assert_eq!(result.step_ms, 500);
+    assert_eq!(result.duration_ms, 400);
+    assert_eq!(result.total_duration_ms, 1400); // (3-1)*500 + 400
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let raw = settings
+        .get("app.lighting.identify_bursts")
+        .expect("bursts persisted")
+        .clone();
+    let bursts: HashMap<String, IdentifyBurst> =
+        serde_json::from_str(&raw).expect("bursts blob parses");
+    assert_eq!(bursts.len(), 3);
+
+    let started_left = bursts
+        .get("fixture-key-left")
+        .expect("first slot persisted")
+        .started_at_ms;
+    let started_right = bursts
+        .get("fixture-key-right")
+        .expect("second slot persisted")
+        .started_at_ms;
+    let started_back = bursts
+        .get("fixture-backline-wash")
+        .expect("third slot persisted")
+        .started_at_ms;
+    assert_eq!(started_right - started_left, 500);
+    assert_eq!(started_back - started_left, 1000);
+
+    // Step through virtual time relative to the first slot's started_at_ms.
+    // Window 1: 100 ms after first slot starts → only first fixture active.
+    let active_t1 = active_identify_burst_ids(&settings, started_left + 100);
+    assert!(
+        active_t1.contains("fixture-key-left") && active_t1.len() == 1,
+        "at t1 only fixture-key-left should be active, got {:?}",
+        active_t1
+    );
+
+    // Window 2: 600 ms after start → first slot has ended (400 ms duration),
+    // second slot has started (500 ms offset, 100 ms into its 400 ms window).
+    let active_t2 = active_identify_burst_ids(&settings, started_left + 600);
+    assert!(
+        active_t2.contains("fixture-key-right") && active_t2.len() == 1,
+        "at t2 only fixture-key-right should be active, got {:?}",
+        active_t2
+    );
+
+    // Window 3: 1100 ms after start → third slot active alone.
+    let active_t3 = active_identify_burst_ids(&settings, started_left + 1100);
+    assert!(
+        active_t3.contains("fixture-backline-wash") && active_t3.len() == 1,
+        "at t3 only fixture-backline-wash should be active, got {:?}",
+        active_t3
+    );
+
+    // Beyond the sequence: no active bursts.
+    let active_t4 = active_identify_burst_ids(&settings, started_left + 2000);
+    assert!(
+        active_t4.is_empty(),
+        "after the sequence ends the active set should be empty, got {:?}",
+        active_t4
+    );
+}
+
+#[test]
+fn identify_sequence_respects_unreachable_bridge() {
+    let test_dir = TestDir::new("identify-sequence-unreachable");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    // Seed bridge ip but NOT the commissioning passed status — bridge
+    // remains unreachable, mirroring an in-the-field "DMX unplugged" state.
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            ),
+            (String::from(LIGHTING_UNIVERSE_KEY), String::from("1")),
+        ],
+    )
+    .expect("setup should persist");
+
+    let result = start_lighting_identify_sequence(
+        test_dir.db_path().as_path(),
+        &LightingFixtureIdentifySequenceRequest {
+            fixture_ids: vec![
+                String::from("fixture-key-left"),
+                String::from("fixture-key-right"),
+            ],
+            step_ms: 500,
+            duration_ms: 400,
+        },
+    )
+    .expect("sequence should still succeed when bridge is unreachable");
+    assert_eq!(result.fixture_count, 2);
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_lighting_snapshot(&settings);
+    assert!(
+        !snapshot.reachable,
+        "bridge should remain unreachable after sequence starts"
+    );
+
+    // Bursts are persisted so the snapshot overlay still flashes the
+    // first fixture in the sequence — operator sees the find indicator
+    // even when DMX isn't being driven to the rig.
+    let raw = settings
+        .get("app.lighting.identify_bursts")
+        .expect("bursts persisted even when bridge unreachable");
+    let bursts: HashMap<String, IdentifyBurst> =
+        serde_json::from_str(raw).expect("bursts blob parses");
+    assert_eq!(bursts.len(), 2);
+    let first_fixture = snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == "fixture-key-left")
+        .expect("first fixture in snapshot");
+    assert!(
+        first_fixture.on,
+        "first scheduled burst should overlay snapshot regardless of reachability"
+    );
+}
+
+#[test]
 fn lighting_scene_reorder_parser_accepts_valid_payloads() {
     let with_anchor = parse_lighting_scene_reorder_request(&serde_json::json!({
         "sceneId": "scene-stream",

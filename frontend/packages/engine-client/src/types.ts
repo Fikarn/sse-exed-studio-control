@@ -237,6 +237,9 @@ export interface ShellStore {
   pinLightingScene(sceneId: string, pinned: boolean): Promise<JsonValue>;
   updateLightingFixture(request: LightingFixtureUpdateRequest): Promise<JsonValue>;
   identifyLightingFixture(fixtureId: string, durationMs?: number): Promise<JsonValue>;
+  highlightLightingFixtures(fixtureIds: readonly string[], mode: "highlight" | "solo" | "off"): Promise<JsonValue>;
+  startLightingIdentifySequence(fixtureIds: readonly string[], stepMs: number, durationMs: number): Promise<JsonValue>;
+  clearLightingIdentifyBursts(): Promise<JsonValue>;
   deleteLightingFixture(fixtureId: string): Promise<JsonValue>;
   setLightingGroupPower(groupId: string, on: boolean): Promise<JsonValue>;
   setLightingAllPower(on: boolean): Promise<JsonValue>;

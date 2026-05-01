@@ -26,4 +26,16 @@ export type LightingSnapshot = {
   fixtures: Array<LightingFixtureSnapshot>;
   groups: Array<LightingGroupSnapshot>;
   scenes: Array<LightingSceneSnapshot>;
+  /**
+   * Fixture ids the operator has placed under the Highlight overlay.
+   * Empty when Highlight is not active. Surfaced so the frontend can
+   * reflect overlay state in the toolbar after a page reload — the
+   * engine is the source of truth.
+   */
+  highlightFixtureIds: Array<string>;
+  /**
+   * Fixture ids the operator has placed under the Solo overlay.
+   * Empty when Solo is not active. See `highlight_fixture_ids`.
+   */
+  soloFixtureIds: Array<string>;
 };

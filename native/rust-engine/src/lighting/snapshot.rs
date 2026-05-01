@@ -19,21 +19,36 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     let last_action_message = read_optional_setting(settings, LIGHTING_LAST_ACTION_MESSAGE_KEY);
     let grand_master = read_lighting_grand_master(settings);
     let editor_state = load_lighting_editor_state_with_inventory(settings, &config, &inventory);
-    let active_burst_ids = active_identify_burst_ids(settings, current_unix_ms());
+    let now_ms = current_unix_ms();
+    let active_burst_ids = active_identify_burst_ids(settings, now_ms);
+    let overrides = read_output_overrides(settings);
+    let solo_active = overrides.solo_active();
     let fixtures = editor_state
         .fixtures
         .iter()
         .cloned()
         .map(lighting_fixture_snapshot_from_state)
         .map(|mut fixture| {
-            // Identify burst overlay: while a burst is active, the snapshot
-            // reports the fixture as full white so downstream DMX rendering +
-            // UI both reflect the flash without mutating the stored state.
+            // Output-overrides overlay. Three modes compose with strict
+            // precedence so the operator can never see a fixture in two
+            // overlay states at once: burst (transient flash) > highlight
+            // (sustained 100 % at neutral CCT) > solo-mask (everything
+            // else dimmed). Stored state is never mutated — the overlay
+            // is applied at snapshot read time so downstream DMX
+            // rendering and UI both reflect the override consistently.
             if active_burst_ids.contains(&fixture.id) {
                 let (_, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
                 fixture.intensity = 100;
                 fixture.on = true;
                 fixture.cct = max_cct;
+            } else if overrides.highlight_ids.contains(&fixture.id) {
+                let (min_cct, max_cct) = fixture_cct_range(fixture.fixture_type.as_str());
+                fixture.intensity = 100;
+                fixture.on = true;
+                fixture.cct = NEUTRAL_HIGHLIGHT_CCT.clamp(min_cct, max_cct);
+            } else if solo_active && !overrides.solo_ids.contains(&fixture.id) {
+                fixture.intensity = 0;
+                fixture.on = false;
             }
             fixture
         })
@@ -113,6 +128,11 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         String::from("not-verified")
     };
 
+    let mut highlight_fixture_ids: Vec<String> = overrides.highlight_ids.iter().cloned().collect();
+    highlight_fixture_ids.sort();
+    let mut solo_fixture_ids: Vec<String> = overrides.solo_ids.iter().cloned().collect();
+    solo_fixture_ids.sort();
+
     LightingSnapshot {
         summary: lighting_summary(
             &status,
@@ -147,6 +167,8 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         fixtures,
         groups,
         scenes,
+        highlight_fixture_ids,
+        solo_fixture_ids,
     }
 }
 

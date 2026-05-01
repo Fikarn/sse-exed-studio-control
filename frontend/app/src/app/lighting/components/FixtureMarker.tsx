@@ -32,6 +32,13 @@ export interface FixtureMarkerProps {
   dimmed?: boolean;
   /** Render an animated pulse ring while the engine identify burst is live. */
   identifying?: boolean;
+  /** Wave 29 — operator-selected target of the active Highlight or Solo
+   *  overlay. Renders a sustained orange outline ring distinct from the
+   *  green selection ring. Engine-driven brightness changes (snapshot
+   *  on/intensity/cct) handle the actual fixture rendering; this prop
+   *  marks "this is what I picked" so the selection is unambiguous when
+   *  the operator's eye scans the plot. */
+  highlightOverlay?: boolean;
   onSelect: (id: string, options: { additive: boolean }) => void;
   /**
    * Optional commit callback when the marker is dragged. xMeters / yMeters
@@ -72,6 +79,7 @@ const BAR_ANCHOR_Y: Record<FixtureMounting, number> = {
 const SHELL_FILL = "var(--color-fixture-shell-fill)";
 const SHELL_STROKE = "var(--color-fixture-shell-stroke)";
 const SELECTED_STROKE = "var(--color-brand-green)";
+const HIGHLIGHT_OVERLAY_STROKE = "var(--color-status-warning, #ff6b35)";
 const GHOST_STROKE = "var(--color-fixture-ghost-stroke)";
 
 const LABEL_NAME_FILL = "var(--color-brand-text-secondary)";
@@ -151,6 +159,7 @@ export function FixtureMarker({
   selected,
   dimmed = false,
   identifying = false,
+  highlightOverlay = false,
   onSelect,
   onPositionCommit,
   onRequestRename,
@@ -363,6 +372,18 @@ export function FixtureMarker({
               fill="none"
               strokeDasharray="4 3"
               style={{ stroke: SELECTED_STROKE, strokeWidth: 1.5 }}
+            />
+          ) : null}
+          {/* Wave 29 — Highlight / Solo target ring. Sustained (not
+              dashed) orange outline so it reads at a glance even on
+              fixtures that are also `selected`. Sits at a slightly
+              larger radius than the selection ring so both can render
+              without overlap when both prop are set. */}
+          {highlightOverlay ? (
+            <circle
+              r={mounting === "wall-bar" ? 30 : 17}
+              fill="none"
+              style={{ stroke: HIGHLIGHT_OVERLAY_STROKE, strokeWidth: 2 }}
             />
           ) : null}
         </g>

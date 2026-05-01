@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from "react";
-import { MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
+import { Crosshair, Lightbulb, Locate, MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
 
 import { Button, StatusDot, Tooltip } from "@sse/design-system";
 
@@ -19,6 +19,15 @@ export interface LightingToolbarProps {
   patchMode: boolean;
   onTogglePatch: () => void;
   onAddFixture: () => void;
+  /** I2 — Highlight/Solo overlay states + Find sequence trigger.
+   *  Selection-driven: buttons gate on hasSelection so operators don't
+   *  fire IPCs against an empty target. */
+  hasSelection: boolean;
+  highlightActive: boolean;
+  soloActive: boolean;
+  onToggleHighlight: () => void;
+  onToggleSolo: () => void;
+  onIdentifyFind: () => void;
 }
 
 export function LightingToolbar({
@@ -34,6 +43,12 @@ export function LightingToolbar({
   patchMode,
   onTogglePatch,
   onAddFixture,
+  hasSelection,
+  highlightActive,
+  soloActive,
+  onToggleHighlight,
+  onToggleSolo,
+  onIdentifyFind,
 }: LightingToolbarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -128,6 +143,62 @@ export function LightingToolbar({
         >
           Patch <kbd className={styles.kbd}>P</kbd>
         </Button>
+
+        {/* I2 + F12 — Highlight, Solo, Find. Selection-gated so the
+            operator can't fire them against an empty target. Highlight
+            and Solo are mutually exclusive at the engine layer; the
+            toolbar reflects that by showing only one as `primary` at a
+            time. */}
+        <Tooltip
+          content={hasSelection ? "Hold selection at full white at neutral CCT" : "Select fixtures to enable Highlight"}
+          placement="bottom"
+        >
+          <Button
+            size="compact"
+            variant={highlightActive ? "primary" : "secondary"}
+            onClick={onToggleHighlight}
+            leadingVisual={<Lightbulb aria-hidden="true" size={13} strokeWidth={1.75} />}
+            aria-pressed={highlightActive}
+            disabled={!hasSelection && !highlightActive}
+          >
+            Highlight <kbd className={styles.kbd}>H</kbd>
+          </Button>
+        </Tooltip>
+
+        <Tooltip
+          content={hasSelection ? "Dim every fixture except the selection" : "Select fixtures to enable Solo"}
+          placement="bottom"
+        >
+          <Button
+            size="compact"
+            variant={soloActive ? "primary" : "secondary"}
+            onClick={onToggleSolo}
+            leadingVisual={<Crosshair aria-hidden="true" size={13} strokeWidth={1.75} />}
+            aria-pressed={soloActive}
+            disabled={!hasSelection && !soloActive}
+          >
+            Solo <kbd className={styles.kbd}>⇧H</kbd>
+          </Button>
+        </Tooltip>
+
+        <Tooltip
+          content={
+            hasSelection
+              ? "Pulse the selection in turn so you can locate each fixture"
+              : "Select fixtures to enable Find"
+          }
+          placement="bottom"
+        >
+          <Button
+            size="compact"
+            variant="secondary"
+            onClick={onIdentifyFind}
+            leadingVisual={<Locate aria-hidden="true" size={13} strokeWidth={1.75} />}
+            disabled={!hasSelection}
+          >
+            Find <kbd className={styles.kbd}>⇧I</kbd>
+          </Button>
+        </Tooltip>
 
         <Button
           size="compact"
