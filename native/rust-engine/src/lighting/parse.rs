@@ -7,9 +7,10 @@ use super::types::{
     LightingFixtureIdentifyClearAllRequest, LightingFixtureIdentifyRequest,
     LightingFixtureIdentifySequenceRequest, LightingFixtureUpdateRequest,
     LightingGroupCreateRequest, LightingGroupDeleteRequest, LightingGroupPowerRequest,
-    LightingGroupUpdateRequest, LightingSceneCreateRequest, LightingSceneDeleteRequest,
-    LightingScenePinRequest, LightingSceneRecallRequest, LightingSceneReorderRequest,
-    LightingSceneUpdateRequest, LightingSettingsUpdateRequest, LightingSpatialMarker,
+    LightingGroupReorderRequest, LightingGroupUpdateRequest, LightingSceneCreateRequest,
+    LightingSceneDeleteRequest, LightingScenePinRequest, LightingSceneRecallRequest,
+    LightingSceneReorderRequest, LightingSceneUpdateRequest, LightingSettingsUpdateRequest,
+    LightingSpatialMarker,
 };
 
 pub fn parse_lighting_scene_recall_request(
@@ -325,11 +326,25 @@ pub fn parse_lighting_group_update_request(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| String::from("groupId is required"))?;
-    let name = parse_required_group_name(params.get("name"))?;
+    let name = params
+        .get("name")
+        .map(|value| parse_required_group_name(Some(value)))
+        .transpose()?;
+    let color_index = params
+        .get("colorIndex")
+        .map(parse_optional_color_index)
+        .transpose()?;
+
+    if name.is_none() && color_index.is_none() {
+        return Err(String::from(
+            "lighting.group.update requires a name or colorIndex",
+        ));
+    }
 
     Ok(LightingGroupUpdateRequest {
         group_id: String::from(group_id),
         name,
+        color_index,
     })
 }
 
@@ -451,10 +466,14 @@ pub fn parse_lighting_scene_update_request(
         })
         .transpose()?
         .unwrap_or(false);
+    let color_index = params
+        .get("colorIndex")
+        .map(parse_optional_color_index)
+        .transpose()?;
 
-    if name.is_none() && !capture_current_state {
+    if name.is_none() && !capture_current_state && color_index.is_none() {
         return Err(String::from(
-            "lighting.scene.update requires a name and/or captureCurrentState",
+            "lighting.scene.update requires a name, captureCurrentState, or colorIndex",
         ));
     }
 
@@ -462,6 +481,7 @@ pub fn parse_lighting_scene_update_request(
         scene_id: String::from(scene_id),
         name,
         capture_current_state,
+        color_index,
     })
 }
 
@@ -509,6 +529,38 @@ pub fn parse_lighting_scene_reorder_request(
     Ok(LightingSceneReorderRequest {
         scene_id: String::from(scene_id),
         before_scene_id,
+    })
+}
+
+pub fn parse_lighting_group_reorder_request(
+    params: &Value,
+) -> Result<LightingGroupReorderRequest, String> {
+    let group_id = params
+        .get("groupId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("groupId is required"))?;
+
+    // beforeGroupId is optional — null / missing means "move to end".
+    let before_group_id = match params.get("beforeGroupId") {
+        Some(Value::Null) | None => None,
+        Some(Value::String(value)) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else if trimmed == group_id {
+                return Err(String::from("beforeGroupId must differ from groupId"));
+            } else {
+                Some(String::from(trimmed))
+            }
+        }
+        _ => return Err(String::from("beforeGroupId must be a string or null")),
+    };
+
+    Ok(LightingGroupReorderRequest {
+        group_id: String::from(group_id),
+        before_group_id,
     })
 }
 
@@ -692,6 +744,19 @@ pub(super) fn parse_optional_rig_z(value: &Value) -> Result<Option<f64>, String>
         return Err(String::from("rigZ must be a finite number or null"));
     }
     Ok(Some(clamp_f64(meters, 0.0, 20.0)))
+}
+
+pub(super) fn parse_optional_color_index(value: &Value) -> Result<Option<u8>, String> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    let raw = value
+        .as_i64()
+        .ok_or_else(|| String::from("colorIndex must be an integer 0..7 or null"))?;
+    if !(0..=7).contains(&raw) {
+        return Err(String::from("colorIndex must be an integer 0..7 or null"));
+    }
+    Ok(Some(raw as u8))
 }
 
 pub(super) fn parse_optional_beam_angle_degrees(value: &Value) -> Result<Option<f64>, String> {

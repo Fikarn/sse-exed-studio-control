@@ -2233,8 +2233,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
         const hasName = typeof params.name === "string";
         const hasCapture = params.captureCurrentState === true;
-        if (!hasName && !hasCapture) {
-          throw new Error("lighting.scene.update requires a name and/or captureCurrentState");
+        const hasColor = Object.prototype.hasOwnProperty.call(params, "colorIndex");
+        if (!hasName && !hasCapture && !hasColor) {
+          throw new Error("lighting.scene.update requires a name, captureCurrentState, or colorIndex");
         }
 
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
@@ -2262,18 +2263,32 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
               on: asBoolean(fixture.on, false),
             }))
           : asArray(targetScene.fixtureStates);
+        let nextColorIndex: number | null = (targetScene.colorIndex as number | null | undefined) ?? null;
+        if (hasColor) {
+          if (params.colorIndex === null) {
+            nextColorIndex = null;
+          } else {
+            const raw = asNumber(params.colorIndex, NaN);
+            if (!Number.isInteger(raw) || raw < 0 || raw > 7) {
+              throw new Error("colorIndex must be an integer 0..7 or null");
+            }
+            nextColorIndex = raw;
+          }
+        }
 
         const updatedScene: JsonObject = {
           ...targetScene,
           name: nextName,
           fixtureStates: nextFixtureStates,
           fixtureCount: hasCapture ? fixtures.length : asNumber(targetScene.fixtureCount, fixtures.length),
+          colorIndex: nextColorIndex,
         };
 
         lightingSnapshot.scenes = scenes.map((scene) => (asString(scene.id) === sceneId ? updatedScene : scene));
         const summaryParts: string[] = [];
         if (hasName) summaryParts.push(`renamed to '${nextName}'`);
         if (hasCapture) summaryParts.push("captured current rig state");
+        if (hasColor) summaryParts.push(nextColorIndex === null ? "color cleared" : "recolored");
         const summary = `Lighting scene '${nextName}' ${summaryParts.join(" + ")}.`;
         lightingSnapshot.lastActionStatus = "succeeded";
         lightingSnapshot.lastActionCode = null;
@@ -2719,9 +2734,14 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         if (!groupId) {
           throw new Error("groupId is required");
         }
-        const name = asString(params.name).trim();
-        if (!name) {
-          throw new Error("name is required");
+        const hasName = typeof params.name === "string";
+        const hasColor = Object.prototype.hasOwnProperty.call(params, "colorIndex");
+        if (!hasName && !hasColor) {
+          throw new Error("lighting.group.update requires a name or colorIndex");
+        }
+        const nextName = hasName ? asString(params.name).trim() : null;
+        if (hasName && !nextName) {
+          throw new Error("name must not be empty");
         }
 
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
@@ -2733,9 +2753,30 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error(`Lighting group '${groupId}' is not present in the group list.`);
         }
 
-        const updatedGroup: JsonObject = { ...targetGroup, name };
+        let nextColorIndex: number | null = (targetGroup.colorIndex as number | null | undefined) ?? null;
+        if (hasColor) {
+          if (params.colorIndex === null) {
+            nextColorIndex = null;
+          } else {
+            const raw = asNumber(params.colorIndex, NaN);
+            if (!Number.isInteger(raw) || raw < 0 || raw > 7) {
+              throw new Error("colorIndex must be an integer 0..7 or null");
+            }
+            nextColorIndex = raw;
+          }
+        }
+
+        const updatedGroup: JsonObject = {
+          ...targetGroup,
+          ...(hasName && nextName ? { name: nextName } : {}),
+          colorIndex: nextColorIndex,
+        };
         lightingSnapshot.groups = groups.map((group) => (asString(group.id) === groupId ? updatedGroup : group));
-        const summary = `Lighting group renamed to '${name}'.`;
+        const summaryParts: string[] = [];
+        if (hasName && nextName) summaryParts.push(`renamed to '${nextName}'`);
+        if (hasColor) summaryParts.push(nextColorIndex === null ? "color cleared" : "recolored");
+        const groupName = asString(updatedGroup.name, groupId);
+        const summary = `Lighting group '${groupName}' ${summaryParts.join(" + ")}.`;
         lightingSnapshot.lastActionStatus = "succeeded";
         lightingSnapshot.lastActionCode = null;
         lightingSnapshot.lastActionMessage = summary;

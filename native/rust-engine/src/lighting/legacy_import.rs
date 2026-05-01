@@ -214,6 +214,7 @@ pub fn import_legacy_lighting_fixture(
             } else {
                 group.name.clone()
             },
+            color_index: None,
         })
         .collect::<Vec<_>>();
 
@@ -252,10 +253,12 @@ pub fn import_legacy_lighting_fixture(
                     }
                 })
                 .collect(),
+            color_index: None,
         })
         .collect::<Vec<_>>();
 
     let scene_order = scene_states.iter().map(|scene| scene.id.clone()).collect();
+    let group_order = group_states.iter().map(|group| group.id.clone()).collect();
     let editor_state = LightingEditorState {
         groups: group_states,
         removed_fixture_ids,
@@ -263,6 +266,7 @@ pub fn import_legacy_lighting_fixture(
         scenes: scene_states,
         scene_order,
         pinned_scene_ids: Vec::new(),
+        group_order,
     };
 
     let selected_fixture_id = wire

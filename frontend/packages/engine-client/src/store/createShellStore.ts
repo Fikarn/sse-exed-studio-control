@@ -513,6 +513,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async reorderLightingScene(sceneId: string, beforeSceneId: string | null) {
       return performRequest("lighting.scene.reorder", { sceneId, beforeSceneId });
     },
+    async reorderLightingGroup(groupId: string, beforeGroupId: string | null) {
+      return performRequest("lighting.group.reorder", { groupId, beforeGroupId });
+    },
     async pinLightingScene(sceneId: string, pinned: boolean) {
       return performRequest("lighting.scene.pin", { sceneId, pinned });
     },

@@ -100,6 +100,10 @@ pub struct LightingGroupSnapshot {
     pub name: String,
     #[serde(rename = "fixtureCount")]
     pub fixture_count: usize,
+    /// Operator-assigned color tag (Ableton-style). Palette index 0..=7
+    /// or `None` for no tag. Drives the GroupChip color accent.
+    #[serde(default, rename = "colorIndex")]
+    pub color_index: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -121,6 +125,10 @@ pub struct LightingSceneSnapshot {
     /// reflects this, but the flag drives the rail's visual treatment).
     #[serde(default)]
     pub pinned: bool,
+    /// Operator-assigned color tag (Ableton-style). Palette index 0..=7
+    /// or `None` for no tag. Frontend renders as a 4 px left accent bar.
+    #[serde(default, rename = "colorIndex")]
+    pub color_index: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -155,6 +163,12 @@ pub struct LightingEditorState {
     /// so deletes remove stale ids and creates leave new scenes unpinned.
     #[serde(default, rename = "pinnedSceneIds")]
     pub pinned_scene_ids: Vec<String>,
+    /// Display order for groups. Mirrors `scene_order`. Empty on legacy
+    /// state — populated from groups insertion order at load time (see
+    /// `normalize_lighting_editor_state`). Reordered via the
+    /// `lighting.group.reorder` IPC; create / delete keep the vec in sync.
+    #[serde(default, rename = "groupOrder")]
+    pub group_order: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -170,6 +184,8 @@ pub struct LightingSpatialMarker {
 pub struct LightingEditorGroupState {
     pub id: String,
     pub name: String,
+    #[serde(default, rename = "colorIndex")]
+    pub color_index: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,6 +234,8 @@ pub struct LightingEditorSceneState {
     pub name: String,
     #[serde(rename = "fixtureStates")]
     pub fixture_states: Vec<LightingEditorSceneFixtureState>,
+    #[serde(default, rename = "colorIndex")]
+    pub color_index: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -378,6 +396,13 @@ pub struct LightingSceneReorderResult {
 }
 
 #[derive(Debug, Serialize)]
+pub struct LightingGroupReorderResult {
+    #[serde(rename = "groupId")]
+    pub group_id: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct LightingScenePinResult {
     pub scene: LightingSceneSnapshot,
     pub summary: String,
@@ -532,7 +557,20 @@ pub struct LightingGroupCreateRequest {
 #[derive(Debug, Clone)]
 pub struct LightingGroupUpdateRequest {
     pub group_id: String,
-    pub name: String,
+    pub name: Option<String>,
+    /// Outer `Option`: was the field supplied. Inner `Option<u8>`: the
+    /// new value (None = clear, Some(idx) = set to palette index 0..=7).
+    pub color_index: Option<Option<u8>>,
+}
+
+/// Reorder a group by moving it before another group id, or to the end
+/// of the list when `before_group_id` is `None`. Mirrors the scene
+/// reorder shape so the GroupRail dnd-kit consumer can lift the
+/// SceneRail pattern verbatim.
+#[derive(Debug, Clone)]
+pub struct LightingGroupReorderRequest {
+    pub group_id: String,
+    pub before_group_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -567,6 +605,9 @@ pub struct LightingSceneUpdateRequest {
     pub scene_id: String,
     pub name: Option<String>,
     pub capture_current_state: bool,
+    /// Outer `Option`: was the field supplied. Inner `Option<u8>`: the
+    /// new value (None = clear, Some(idx) = set to palette index 0..=7).
+    pub color_index: Option<Option<u8>>,
 }
 
 #[derive(Debug, Clone)]
