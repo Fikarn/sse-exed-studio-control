@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use super::fade::apply_active_fade_sample;
 use super::editor_state::*;
 use super::helpers::*;
 use super::*;
@@ -18,8 +19,9 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     let last_action_code = read_optional_setting(settings, LIGHTING_LAST_ACTION_CODE_KEY);
     let last_action_message = read_optional_setting(settings, LIGHTING_LAST_ACTION_MESSAGE_KEY);
     let grand_master = read_lighting_grand_master(settings);
-    let editor_state = load_lighting_editor_state_with_inventory(settings, &config, &inventory);
     let now_ms = current_unix_ms();
+    let mut editor_state = load_lighting_editor_state_with_inventory(settings, &config, &inventory);
+    let fade_status = apply_active_fade_sample(&mut editor_state, now_ms);
     let active_burst_ids = active_identify_burst_ids(settings, now_ms);
     let overrides = read_output_overrides(settings);
     let solo_active = overrides.solo_active();
@@ -134,6 +136,7 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
                 last_recalled_scene_id.as_deref(),
                 last_scene_recall_at.as_deref(),
                 pinned_set.contains(scene.id.as_str()),
+                fade_status.as_ref(),
             )
         })
         .collect::<Vec<_>>();

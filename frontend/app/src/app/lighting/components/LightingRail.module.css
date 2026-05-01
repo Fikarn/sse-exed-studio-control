@@ -384,6 +384,10 @@
   border-color: var(--color-brand-yellow-border);
 }
 
+.tile[data-fading="true"] {
+  border-color: var(--color-brand-blue-border);
+}
+
 /* Wave 30b — F10 empty-state CTA wrapper. Pads the rail's empty-state
    card so it doesn't crowd the rail's horizontal edges. */
 .sceneEmptyShell {
@@ -402,6 +406,26 @@
   width: 4px;
   border-radius: var(--radius-tight-md) 0 0 var(--radius-tight-md);
   pointer-events: none;
+}
+
+.tileFadeTrack {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 5px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: rgba(139, 176, 205, 0.18);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tileFadeBar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-brand-blue);
+  box-shadow: var(--shadow-glow-blue);
 }
 
 .tilePinAction {

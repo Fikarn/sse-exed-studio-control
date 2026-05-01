@@ -23,19 +23,26 @@ pub fn parse_lighting_scene_recall_request(
         .filter(|value| !value.is_empty())
         .ok_or_else(|| String::from("sceneId is required"))?;
 
-    let fade_duration_seconds = params
-        .get("fadeDurationSeconds")
-        .map(|value| {
-            value
-                .as_f64()
-                .ok_or_else(|| String::from("fadeDurationSeconds must be a number"))
-        })
-        .transpose()?
-        .unwrap_or(0.0);
+    let fade_duration_seconds = if let Some(value) = params.get("fadeMs") {
+        let fade_ms = value
+            .as_f64()
+            .ok_or_else(|| String::from("fadeMs must be a number"))?;
+        fade_ms / 1000.0
+    } else {
+        params
+            .get("fadeDurationSeconds")
+            .map(|value| {
+                value
+                    .as_f64()
+                    .ok_or_else(|| String::from("fadeDurationSeconds must be a number"))
+            })
+            .transpose()?
+            .unwrap_or(0.0)
+    };
 
     if !(0.0..=10.0).contains(&fade_duration_seconds) {
         return Err(String::from(
-            "fadeDurationSeconds must be between 0 and 10 seconds",
+            "fadeDurationSeconds/fadeMs must be between 0 and 10 seconds",
         ));
     }
 

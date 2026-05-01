@@ -48,6 +48,14 @@ interface LightingWorkspaceSurfaceProps {
   store: ShellStore;
 }
 
+const RECALL_FADE_PRESETS_MS = [0, 1000, 2000, 5000] as const;
+
+function formatRecallFade(ms: number): string {
+  if (ms <= 0) return "snap";
+  const seconds = ms / 1000;
+  return `${Number.isInteger(seconds) ? seconds.toFixed(0) : seconds.toFixed(1)} s`;
+}
+
 /** Result-aware toast helper for surfacing UndoOutcome to the operator. The
  *  undo stack returns a tagged result; this maps every variant to a toast so
  *  rejections (UndoRefusedError) and errors don't silently disappear. */
@@ -120,6 +128,7 @@ export function LightingWorkspaceSurface({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [activeTabOverride, setActiveTabOverride] = useState<InspectorTab | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [recallFadeMs, setRecallFadeMs] = useState(0);
   const toast = useToast();
   const palette = usePalette();
   // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
@@ -1035,8 +1044,11 @@ export function LightingWorkspaceSurface({
     const busyKey = `scene:${sceneId}`;
     startBusy(busyKey);
     try {
-      await store.recallLightingScene(sceneId, 0);
-      toast.push({ message: "Scene recalled.", tone: "ok" });
+      await store.recallLightingScene(sceneId, recallFadeMs);
+      toast.push({
+        message: recallFadeMs > 0 ? `Scene recalled with ${formatRecallFade(recallFadeMs)} fade.` : "Scene recalled.",
+        tone: "ok",
+      });
     } catch (error) {
       reportError(error, "Scene recall failed.");
     } finally {
@@ -1755,6 +1767,21 @@ export function LightingWorkspaceSurface({
       if (event.key.toLowerCase() === "p") {
         setUiMode((current) => (current === "patch" ? "recall" : "patch"));
         event.preventDefault();
+      } else if (event.key.toLowerCase() === "t") {
+        setRecallFadeMs((current) => {
+          const next = RECALL_FADE_PRESETS_MS.find((preset) => preset > current) ?? RECALL_FADE_PRESETS_MS[0];
+          const previewSceneName = hoverPreviewSceneId
+            ? (scenes.find((scene) => scene.id === hoverPreviewSceneId)?.name ?? null)
+            : null;
+          toast.push({
+            message: previewSceneName
+              ? `Recall fade ${formatRecallFade(next)} for ${previewSceneName}.`
+              : `Recall fade ${formatRecallFade(next)}.`,
+            tone: "info",
+          });
+          return next;
+        });
+        event.preventDefault();
       } else if (event.key.toLowerCase() === "h") {
         // Wave 29 — H toggles Highlight on the current selection.
         event.preventDefault();
@@ -1797,6 +1824,7 @@ export function LightingWorkspaceSurface({
     handleResaveScene,
     handleSaveScene,
     handleSelectFixture,
+    hoverPreviewSceneId,
     isSceneModified,
     persistedSelectedFixtureId,
     scenes,
@@ -1833,8 +1861,10 @@ export function LightingWorkspaceSurface({
         fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}
         groupCount={groups.length}
         sceneCount={scenes.length}
+        recallFadeMs={recallFadeMs}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onRecallFadeMsChange={setRecallFadeMs}
         patchMode={uiMode === "patch"}
         onTogglePatch={handleTogglePatch}
         onAddFixture={requestAddFixture}

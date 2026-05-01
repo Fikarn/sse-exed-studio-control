@@ -25,6 +25,7 @@ const LIGHTING_CUSTOM_SCENE_ID_PREFIX: &str = "scene-custom-";
 const DEFAULT_LIGHTING_FIXTURE_TYPE: &str = "astra-bicolor";
 
 mod editor_state;
+mod fade;
 mod fixtures;
 mod groups;
 mod helpers;

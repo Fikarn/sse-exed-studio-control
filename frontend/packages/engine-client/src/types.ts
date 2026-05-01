@@ -255,7 +255,7 @@ export interface ShellStore {
   deleteLightingFixture(fixtureId: string): Promise<JsonValue>;
   setLightingGroupPower(groupId: string, on: boolean): Promise<JsonValue>;
   setLightingAllPower(on: boolean): Promise<JsonValue>;
-  recallLightingScene(sceneId: string, fadeDurationSeconds?: number): Promise<JsonValue>;
+  recallLightingScene(sceneId: string, fadeMs?: number): Promise<JsonValue>;
   seedPlanningDemo(replaceExistingData?: boolean): Promise<JsonValue>;
   createPlanningProject(request: PlanningProjectCreateRequest): Promise<JsonValue>;
   reorderPlanningProject(request: PlanningProjectReorderRequest): Promise<JsonValue>;

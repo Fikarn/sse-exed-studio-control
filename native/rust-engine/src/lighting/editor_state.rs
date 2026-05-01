@@ -5,6 +5,7 @@ use crate::lighting_backend::{
     recall_default_lighting_scene, LightingBackendConfig, LightingBackendInventory,
 };
 
+use super::fade::LightingFadeRuntimeStatus;
 use super::helpers::*;
 use super::types::*;
 use super::*;
@@ -80,6 +81,7 @@ pub(super) fn default_lighting_editor_state(
         scene_order,
         pinned_scene_ids: Vec::new(),
         group_order,
+        active_fade: None,
     }
 }
 
@@ -228,6 +230,7 @@ pub(super) fn normalize_lighting_editor_state(
         scene_order,
         pinned_scene_ids,
         group_order,
+        active_fade: existing.active_fade,
     }
 }
 
@@ -463,6 +466,7 @@ pub(super) fn lighting_scene_snapshot_from_state(
     last_recalled_scene_id: Option<&str>,
     last_scene_recall_at: Option<&str>,
     pinned: bool,
+    fade_status: Option<&LightingFadeRuntimeStatus>,
 ) -> LightingSceneSnapshot {
     let last_recalled = last_recalled_scene_id
         .map(|value| value == scene.id)
@@ -487,6 +491,12 @@ pub(super) fn lighting_scene_snapshot_from_state(
         } else {
             None
         },
+        fade_progress: fade_status
+            .filter(|status| status.scene_id == scene.id)
+            .map(|status| status.progress),
+        fade_duration_ms: fade_status
+            .filter(|status| status.scene_id == scene.id)
+            .map(|status| status.duration_ms),
         pinned,
         color_index: scene.color_index,
     }

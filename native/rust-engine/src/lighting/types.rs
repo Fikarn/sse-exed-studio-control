@@ -120,6 +120,13 @@ pub struct LightingSceneSnapshot {
     pub last_recalled: bool,
     #[serde(rename = "lastRecalledAt")]
     pub last_recalled_at: Option<String>,
+    /// Progress for an active manual recall fade targeting this scene.
+    /// `None` when no fade is active; `0.0..=1.0` while the engine is
+    /// sampling between the previous live state and this scene.
+    #[serde(default, rename = "fadeProgress")]
+    pub fade_progress: Option<f64>,
+    #[serde(default, rename = "fadeDurationMs")]
+    pub fade_duration_ms: Option<i64>,
     /// True when the scene is in the operator's pinned set. Pinned
     /// scenes sort to the top of the rail (snapshot ordering already
     /// reflects this, but the flag drives the rail's visual treatment).
@@ -169,6 +176,24 @@ pub struct LightingEditorState {
     /// `lighting.group.reorder` IPC; create / delete keep the vec in sync.
     #[serde(default, rename = "groupOrder")]
     pub group_order: Vec<String>,
+    /// Runtime fade state for manual scene recalls. Persisted so the next
+    /// snapshot or command can sample/cancel the fade from the same origin.
+    #[serde(default, rename = "activeFade")]
+    pub active_fade: Option<LightingEditorFadeState>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LightingEditorFadeState {
+    #[serde(rename = "sceneId")]
+    pub scene_id: String,
+    #[serde(rename = "startedAtMs")]
+    pub started_at_ms: i64,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: i64,
+    #[serde(rename = "originFixtureStates")]
+    pub origin_fixture_states: Vec<LightingEditorSceneFixtureState>,
+    #[serde(rename = "targetFixtureStates")]
+    pub target_fixture_states: Vec<LightingEditorSceneFixtureState>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -287,6 +312,8 @@ pub struct LightingSceneRecallResult {
     pub recalled_at: String,
     #[serde(rename = "fadeDurationSeconds")]
     pub fade_duration_seconds: f64,
+    #[serde(rename = "fadeMs")]
+    pub fade_ms: i64,
     pub summary: String,
 }
 

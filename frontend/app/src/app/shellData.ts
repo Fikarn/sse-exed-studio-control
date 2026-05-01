@@ -79,6 +79,8 @@ export interface LightingSceneEntry {
   id: string;
   lastRecalled: boolean;
   lastRecalledAt?: string;
+  fadeDurationMs?: number;
+  fadeProgress?: number;
   name: string;
 }
 
@@ -363,6 +365,8 @@ export function getLightingScenes(snapshot: LightingSnapshot | null): LightingSc
     id: s.id,
     lastRecalled: s.lastRecalled,
     lastRecalledAt: s.lastRecalledAt ?? undefined,
+    fadeDurationMs: s.fadeDurationMs ?? undefined,
+    fadeProgress: s.fadeProgress ?? undefined,
     name: s.name,
   }));
 }

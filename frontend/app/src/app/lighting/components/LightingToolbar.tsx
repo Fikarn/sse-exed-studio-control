@@ -14,8 +14,10 @@ export interface LightingToolbarProps {
   fixtureOnCount: number;
   groupCount: number;
   sceneCount: number;
+  recallFadeMs: number;
   searchQuery: string;
   onSearchChange: (next: string) => void;
+  onRecallFadeMsChange: (nextMs: number) => void;
   patchMode: boolean;
   onTogglePatch: () => void;
   onAddFixture: () => void;
@@ -38,8 +40,10 @@ export function LightingToolbar({
   fixtureOnCount,
   groupCount,
   sceneCount,
+  recallFadeMs,
   searchQuery,
   onSearchChange,
+  onRecallFadeMsChange,
   patchMode,
   onTogglePatch,
   onAddFixture,
@@ -55,6 +59,14 @@ export function LightingToolbar({
   const handleSearch = (event: ChangeEvent<HTMLInputElement>) => {
     onSearchChange(event.target.value);
   };
+
+  const handleFadeChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const seconds = Number(event.target.value);
+    if (!Number.isFinite(seconds)) return;
+    onRecallFadeMsChange(Math.round(Math.max(0, Math.min(10, seconds)) * 1000));
+  };
+
+  const recallFadeSeconds = Math.round((recallFadeMs / 1000) * 10) / 10;
 
   return (
     <>
@@ -121,6 +133,21 @@ export function LightingToolbar({
         </div>
 
         <span className={styles.spacer} />
+
+        <label className={styles.fadeControl}>
+          <span className={styles.fadeLabel}>Fade</span>
+          <input
+            aria-label="Scene recall fade seconds"
+            className={styles.fadeInput}
+            min={0}
+            max={10}
+            onChange={handleFadeChange}
+            step={0.5}
+            type="number"
+            value={recallFadeSeconds}
+          />
+          <span className={styles.fadeUnit}>s</span>
+        </label>
 
         <label className={styles.search}>
           <Search aria-hidden="true" size={12} strokeWidth={1.75} />
