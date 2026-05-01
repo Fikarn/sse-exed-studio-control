@@ -1,9 +1,17 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
-import { Pencil, Pin, PinOff, Trash2 } from "lucide-react";
+import { Palette, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { ContextMenu, InlineRename, type ContextMenuItem, type InlineRenameHandle } from "@sse/design-system";
+import {
+  ColorPicker,
+  ContextMenu,
+  InlineRename,
+  type ContextMenuItem,
+  type InlineRenameHandle,
+} from "@sse/design-system";
+
+import { LIGHTING_COLOR_TAG_PALETTE, lightingColorTagHex } from "../lightingColorTags";
 
 import { SceneThumbnail } from "./SceneThumbnail";
 import styles from "./LightingRail.module.css";
@@ -42,6 +50,18 @@ export interface SceneTileProps {
   /** Right-click delete handler. When provided, the context menu surfaces a
    *  Delete item that fires this callback (parent owns the confirm dialog). */
   onRequestDelete?: (sceneId: string, sceneName: string) => void;
+  /** Operator-assigned color tag index (0..7) or null for no tag.
+   *  Renders a 4 px left accent bar when set. */
+  colorIndex?: number | null;
+  /** Set color tag handler. When provided, the context menu surfaces a
+   *  Color… item that opens a `<ColorPicker>` popover. */
+  onSetColor?: (sceneId: string, colorIndex: number | null) => void;
+  /** Hover preview signal. When provided, hovering the tile for ~300 ms
+   *  fires this callback so the inspector can preview the scene contents
+   *  without recall. Cleared by mouseout / click via the parent. */
+  onHoverPreview?: (sceneId: string) => void;
+  /** Hover preview cleanup signal. Fires on mouseout / leave. */
+  onHoverPreviewClear?: (sceneId: string) => void;
 }
 
 export function SceneTile({
@@ -61,9 +81,15 @@ export function SceneTile({
   onRename,
   renameBusy = false,
   onRequestDelete,
+  colorIndex = null,
+  onSetColor,
+  onHoverPreview,
+  onHoverPreviewClear,
 }: SceneTileProps) {
   const renameRef = useRef<InlineRenameHandle | null>(null);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [colorPickerPos, setColorPickerPos] = useState<{ x: number; y: number } | null>(null);
+  const colorHex = lightingColorTagHex(colorIndex);
   // When the bridge is unreachable, "modified" is comparing live state to a
   // preview — downgrade the visual to active to avoid false alarm.
   const showAsModified = isModified && bridgeReachable;
@@ -103,7 +129,7 @@ export function SceneTile({
   };
 
   const handleContextMenu = (event: MouseEvent<HTMLDivElement>) => {
-    if (!onRename && !onPin && !onRequestDelete) return;
+    if (!onRename && !onPin && !onRequestDelete && !onSetColor) return;
     event.preventDefault();
     event.stopPropagation();
     setMenuPos({ x: event.clientX, y: event.clientY });
@@ -124,6 +150,19 @@ export function SceneTile({
       label: pinned ? "Unpin" : "Pin",
       icon: pinned ? PinOff : Pin,
       onSelect: () => onPin(id, !pinned),
+    });
+  }
+  if (onSetColor) {
+    menuItems.push({
+      id: "color",
+      label: "Color…",
+      icon: Palette,
+      onSelect: () => {
+        // Re-open at the same position the context menu sat at — the
+        // ContextMenu portal mounts at (menuPos.x, menuPos.y), so the
+        // ColorPicker continues that anchor.
+        if (menuPos) setColorPickerPos(menuPos);
+      },
     });
   }
   if (onRequestDelete) {
@@ -164,9 +203,16 @@ export function SceneTile({
       ref={setNodeRef}
       className={stateClass}
       style={tileStyle}
-      onClick={() => onRecall(id)}
+      onClick={() => {
+        // Click cancels any pending hover preview (the timer is owned by the
+        // parent — the clear callback is the contract).
+        onHoverPreviewClear?.(id);
+        onRecall(id);
+      }}
       onContextMenu={handleContextMenu}
       onKeyDown={handleKeyDown}
+      onMouseEnter={onHoverPreview ? () => onHoverPreview(id) : undefined}
+      onMouseLeave={onHoverPreviewClear ? () => onHoverPreviewClear(id) : undefined}
       aria-current={isActive ? "true" : undefined}
       aria-label={ariaLabel}
       data-pinned={pinned || undefined}
@@ -181,6 +227,7 @@ export function SceneTile({
       role="button"
       tabIndex={0}
     >
+      {colorHex ? <span aria-hidden="true" className={styles.tileColorBar} style={{ background: colorHex }} /> : null}
       <SceneThumbnail src={thumbDataUri} alt={`${name} preview`} />
       <span className={styles.tileBody}>
         <span className={styles.tileNameRow}>
@@ -247,6 +294,17 @@ export function SceneTile({
           items={menuItems}
           onClose={() => setMenuPos(null)}
           ariaLabel={`Scene ${name} actions`}
+        />
+      ) : null}
+      {colorPickerPos && onSetColor ? (
+        <ColorPicker
+          x={colorPickerPos.x}
+          y={colorPickerPos.y}
+          swatches={LIGHTING_COLOR_TAG_PALETTE}
+          selectedIndex={colorIndex}
+          onSelect={(next) => onSetColor(id, next)}
+          onClose={() => setColorPickerPos(null)}
+          ariaLabel={`Pick a color tag for scene ${name}`}
         />
       ) : null}
     </div>

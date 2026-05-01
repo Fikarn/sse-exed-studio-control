@@ -34,9 +34,14 @@ export interface LightingRailProps {
   onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
   renamingSceneIds?: ReadonlySet<string>;
   onRequestDeleteScene?: (sceneId: string, sceneName: string) => void;
+  onSetSceneColor?: (sceneId: string, colorIndex: number | null) => void;
+  onHoverPreviewScene?: (sceneId: string) => void;
+  onHoverPreviewSceneClear?: (sceneId: string) => void;
 
   groups: readonly GroupRailEntry[];
   onToggleGroupPower: (groupId: string, on: boolean) => void;
+  onReorderGroup?: (groupId: string, beforeGroupId: string | null) => void;
+  onSetGroupColor?: (groupId: string, colorIndex: number | null) => void;
 
   searchQuery?: string;
   patchMode?: boolean;
@@ -70,8 +75,13 @@ export function LightingRail({
   onRenameScene,
   renamingSceneIds,
   onRequestDeleteScene,
+  onSetSceneColor,
+  onHoverPreviewScene,
+  onHoverPreviewSceneClear,
   groups,
   onToggleGroupPower,
+  onReorderGroup,
+  onSetGroupColor,
   searchQuery = "",
   patchMode = false,
   isSceneModified = false,
@@ -137,6 +147,9 @@ export function LightingRail({
         onRenameScene={patchMode ? undefined : onRenameScene}
         renamingSceneIds={renamingSceneIds}
         onRequestDeleteScene={patchMode ? undefined : onRequestDeleteScene}
+        onSetSceneColor={patchMode ? undefined : onSetSceneColor}
+        onHoverPreview={patchMode ? undefined : onHoverPreviewScene}
+        onHoverPreviewClear={patchMode ? undefined : onHoverPreviewSceneClear}
       />
 
       <RailDivider />
@@ -162,6 +175,8 @@ export function LightingRail({
         onCreateGroup={patchMode ? undefined : onCreateGroup}
         onRequestRenameGroup={patchMode ? undefined : onRequestRenameGroup}
         onRequestDeleteGroup={patchMode ? undefined : onRequestDeleteGroup}
+        onReorderGroup={patchMode ? undefined : onReorderGroup}
+        onSetGroupColor={patchMode ? undefined : onSetGroupColor}
       />
 
       {!patchMode && isSceneModified ? (

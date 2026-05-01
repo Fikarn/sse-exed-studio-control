@@ -15,7 +15,6 @@ import {
   asRecord,
   getLightingDmxChannels,
   getLightingFixtures,
-  getLightingGroups,
   getLightingScenes,
   getSceneThumbs,
   isEditableTarget,
@@ -105,7 +104,6 @@ export function LightingWorkspaceSurface({
   // -> entry has the null-safe shape the helpers expect).
   const fixtureEntries = useMemo(() => getLightingFixtures(lightingSnapshot), [lightingSnapshot]);
   // Surface group + scene entries via shellData for parity with rail props.
-  const groupEntries = useMemo(() => getLightingGroups(lightingSnapshot), [lightingSnapshot]);
   const sceneEntries = useMemo(() => getLightingScenes(lightingSnapshot), [lightingSnapshot]);
 
   const sceneThumbs = useMemo(() => getSceneThumbs(appSnapshot), [appSnapshot]);
@@ -190,6 +188,66 @@ export function LightingWorkspaceSurface({
   // Takes priority over snapshot-derived recalled / persisted selection so
   // the inspector tracks the user's intent rather than the engine's truth.
   const [previewSceneId, setPreviewSceneId] = useState<string | null>(null);
+
+  // Wave 30b — X1 hover preview. Distinct from `previewSceneId` because
+  // hover should ONLY update the inspector's displayed scene, NOT the
+  // workspace's active-scene semantics (drift detection, plot pill, tile
+  // green-border treatment, group chip deltas). previewSceneId is for the
+  // click-confirmed selection path and feeds activeSceneId; hover stays
+  // strictly contained to the inspector. Mouseleave schedules a 200 ms
+  // grace clear so a wandering cursor between tiles doesn't make the
+  // inspector jump back to baseline; click cancels timers and clears
+  // immediately via handleRecallScene below.
+  const [hoverPreviewSceneId, setHoverPreviewSceneId] = useState<string | null>(null);
+  const hoverActivateTimerRef = useRef<number | null>(null);
+  const hoverClearTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (hoverActivateTimerRef.current !== null) window.clearTimeout(hoverActivateTimerRef.current);
+      if (hoverClearTimerRef.current !== null) window.clearTimeout(hoverClearTimerRef.current);
+    };
+  }, []);
+  const handleHoverPreview = useCallback((sceneId: string) => {
+    if (hoverClearTimerRef.current !== null) {
+      window.clearTimeout(hoverClearTimerRef.current);
+      hoverClearTimerRef.current = null;
+    }
+    if (hoverActivateTimerRef.current !== null) {
+      window.clearTimeout(hoverActivateTimerRef.current);
+    }
+    hoverActivateTimerRef.current = window.setTimeout(() => {
+      setHoverPreviewSceneId(sceneId);
+      hoverActivateTimerRef.current = null;
+    }, 300);
+  }, []);
+  const handleHoverPreviewClear = useCallback(() => {
+    if (hoverActivateTimerRef.current !== null) {
+      window.clearTimeout(hoverActivateTimerRef.current);
+      hoverActivateTimerRef.current = null;
+    }
+    if (hoverClearTimerRef.current !== null) {
+      window.clearTimeout(hoverClearTimerRef.current);
+    }
+    hoverClearTimerRef.current = window.setTimeout(() => {
+      setHoverPreviewSceneId(null);
+      hoverClearTimerRef.current = null;
+    }, 200);
+  }, []);
+  // Click → cancel hover preview synchronously. Called by handleRecallScene
+  // below before previewSceneId flips, so the inspector goes straight to
+  // the clicked scene without a 200 ms intermediate showing the previously-
+  // hovered one.
+  const cancelHoverPreviewSync = useCallback(() => {
+    if (hoverActivateTimerRef.current !== null) {
+      window.clearTimeout(hoverActivateTimerRef.current);
+      hoverActivateTimerRef.current = null;
+    }
+    if (hoverClearTimerRef.current !== null) {
+      window.clearTimeout(hoverClearTimerRef.current);
+      hoverClearTimerRef.current = null;
+    }
+    setHoverPreviewSceneId(null);
+  }, []);
 
   const snapshotGrandMaster = lightingSnapshot?.grandMaster ?? 100;
   const [grandMasterDraft, setGrandMasterDraft] = useState(snapshotGrandMaster);
@@ -337,7 +395,7 @@ export function LightingWorkspaceSurface({
   //   active scene's saved state (intensity/cct/on). Yellow signal in the chip.
   const railGroupEntries = useMemo(() => {
     const sceneStateById = new Map(activeScene?.fixtureStates.map((state) => [state.fixtureId, state]) ?? []);
-    return groupEntries.map((group) => {
+    return groups.map((group) => {
       const groupFixtures = fixtureEntries.filter((fixture) => fixture.groupId === group.id);
       const onFixtures = groupFixtures.filter((fixture) => fixture.on === true);
       const allOn = groupFixtures.length > 0 && onFixtures.length === groupFixtures.length;
@@ -375,9 +433,10 @@ export function LightingWorkspaceSurface({
         level,
         drifted,
         levelDelta,
+        colorIndex: group.colorIndex,
       };
     });
-  }, [groupEntries, fixtureEntries, activeScene]);
+  }, [groups, fixtureEntries, activeScene]);
 
   const fixturesPatched = fixtureEntries.filter((fixture) => fixture.dmxStartAddress > 0).length;
 
@@ -580,6 +639,50 @@ export function LightingWorkspaceSurface({
       toast.push({ message: `Fixture renamed to '${name}'.`, tone: "ok" });
     } catch (error) {
       reportError(error, "Fixture rename failed.");
+    } finally {
+      finishBusy(busyKey);
+    }
+  });
+
+  // Wave 30b — F5 group reorder. Mirrors handleReorderScene shape; the engine
+  // owns the persisted `group_order` (Wave 30a / `9ca8e5c`) and the snapshot
+  // emits groups in that order, so we just hand the contract through and trust
+  // the next snapshot tick to refresh the rail.
+  const handleReorderGroup = useEffectEvent(async (groupId: string, beforeGroupId: string | null) => {
+    const busyKey = `group-reorder:${groupId}`;
+    startBusy(busyKey);
+    try {
+      await store.reorderLightingGroup(groupId, beforeGroupId);
+    } catch (error) {
+      reportError(error, "Group reorder failed.");
+    } finally {
+      finishBusy(busyKey);
+    }
+  });
+
+  // Wave 30b — I4 set scene color tag. `null` clears, `0..7` sets. The IPC
+  // contract from Wave 30a treats omit / null / index distinctly; we always
+  // send the field so the engine knows the operator's intent.
+  const handleSetSceneColor = useEffectEvent(async (sceneId: string, colorIndex: number | null) => {
+    const busyKey = `scene-color:${sceneId}`;
+    startBusy(busyKey);
+    try {
+      await store.updateLightingScene({ sceneId, colorIndex });
+    } catch (error) {
+      reportError(error, "Scene color update failed.");
+    } finally {
+      finishBusy(busyKey);
+    }
+  });
+
+  // Wave 30b — I4 set group color tag. Mirrors scene shape.
+  const handleSetGroupColor = useEffectEvent(async (groupId: string, colorIndex: number | null) => {
+    const busyKey = `group-color:${groupId}`;
+    startBusy(busyKey);
+    try {
+      await store.updateLightingGroup({ groupId, colorIndex });
+    } catch (error) {
+      reportError(error, "Group color update failed.");
     } finally {
       finishBusy(busyKey);
     }
@@ -826,6 +929,11 @@ export function LightingWorkspaceSurface({
     // here (not only when invoked via palette) so rail-driven recalls also
     // populate recents.
     palette.pushRecent(`lighting:recall:${sceneId}`);
+    // Wave 30b — click is the user's commitment to a scene; cancel any
+    // hover preview synchronously so the inspector doesn't show a stale
+    // hovered scene during the 200 ms mouseleave grace window after the
+    // recall flips activeSceneId.
+    cancelHoverPreviewSync();
     // Show the scene in the inspector immediately — even if the recall IPC
     // is rejected by the engine (e.g. pre-probe state), the operator still
     // sees what the scene contains. The recall IPC drives the actual rig.
@@ -1657,8 +1765,13 @@ export function LightingWorkspaceSurface({
           onRenameScene={handleRenameScene}
           renamingSceneIds={renamingSceneIds}
           onRequestDeleteScene={(id, name) => setConfirmDeleteScene({ id, name })}
+          onSetSceneColor={(sceneId, colorIndex) => void handleSetSceneColor(sceneId, colorIndex)}
+          onHoverPreviewScene={handleHoverPreview}
+          onHoverPreviewSceneClear={handleHoverPreviewClear}
           groups={railGroupEntries}
           onToggleGroupPower={handleToggleGroupPower}
+          onReorderGroup={handleReorderGroup}
+          onSetGroupColor={(groupId, colorIndex) => void handleSetGroupColor(groupId, colorIndex)}
           searchQuery={searchQuery}
           patchMode={uiMode === "patch"}
           isSceneModified={isSceneModified}
@@ -1699,6 +1812,7 @@ export function LightingWorkspaceSurface({
             onIdentifyFixture={(id, name) => void handleIdentifyBurst(id, name)}
             onRequestDeleteFixture={(id, name) => setConfirmDeleteFixture({ id, name })}
             onMarqueeSelect={(ids, options) => void handleMarqueeSelect(ids, options)}
+            onAddFixture={requestAddFixture}
           />
         </main>
 
@@ -1717,6 +1831,7 @@ export function LightingWorkspaceSurface({
           selectedFixtureId={selectedFixture?.id ?? null}
           selectedGroupId={selectedGroupId}
           activeSceneId={activeSceneId}
+          inspectorSceneId={hoverPreviewSceneId}
           isSceneModified={isSceneModified}
           bridgeReachable={bridgeReachable}
           onTogglePower={handleToggleFixturePower}
@@ -1736,6 +1851,8 @@ export function LightingWorkspaceSurface({
           onRenameScene={handleRenameScene}
           onRenameFixture={handleRenameFixture}
           onRenameGroup={handleRenameGroup}
+          onSetSceneColor={(sceneId, colorIndex) => void handleSetSceneColor(sceneId, colorIndex)}
+          onSetGroupColor={(groupId, colorIndex) => void handleSetGroupColor(groupId, colorIndex)}
           onAssignFixtureGroup={(fixtureId, groupId) => void handleAssignFixtureGroup(fixtureId, groupId)}
           onRemoveFixtureFromGroup={(fixtureId) => void handleAssignFixtureGroup(fixtureId, null)}
           onCreateGroup={() => setCreateGroupOpen(true)}

@@ -384,6 +384,26 @@
   border-color: var(--color-brand-yellow-border);
 }
 
+/* Wave 30b — F10 empty-state CTA wrapper. Pads the rail's empty-state
+   card so it doesn't crowd the rail's horizontal edges. */
+.sceneEmptyShell {
+  padding: 8px 4px;
+}
+
+/* Wave 30b — operator-assigned color tag (I4). The 4 px left accent bar
+   reads `colorIndex` from the snapshot via inline `background` on the
+   span; no `colorIndex` means the span isn't rendered. The bar sits
+   over the tile's left edge inside the rounded corner radius. */
+.tileColorBar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: var(--radius-tight-md) 0 0 var(--radius-tight-md);
+  pointer-events: none;
+}
+
 .tilePinAction {
   position: absolute;
   top: 6px;
@@ -641,6 +661,20 @@
   font-family: var(--font-family-ui);
   font-size: 12px;
   cursor: pointer;
+  position: relative;
+}
+
+/* Wave 30b — operator-assigned color tag (I4). Mirrors SceneTile's accent;
+   a 3 px-wide vertical bar at the chip's left edge keeps the chip's pill
+   silhouette intact and reads cleanly against both off / on backgrounds. */
+.groupChipColorBar {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 .groupChip:hover {

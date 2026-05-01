@@ -1,8 +1,20 @@
 import { useState } from "react";
-import { Bell, Calendar, Check, Download, Mic, Sliders, SlidersHorizontal, Sun, WandSparkles } from "lucide-react";
+import {
+  Bell,
+  Calendar,
+  Check,
+  Download,
+  Mic,
+  Plus,
+  Sliders,
+  SlidersHorizontal,
+  Sun,
+  WandSparkles,
+} from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Button } from "../components/Button";
+import { ColorPicker, type ColorPickerSwatch } from "../components/ColorPicker";
 import { Crest } from "../components/Crest";
 import { DenseList, DenseListRow, DenseTable } from "../components/DenseRows";
 import { EmptyState, DegradedState } from "../components/OperationalState";
@@ -368,6 +380,77 @@ export const DirectionDPlotMeta: StoryObj<typeof meta> = {
         <PlotMeta label="Floor" value="12 m × 8 m" />
         <PlotMeta label="Grid" value="0.5 / 1 / 5 m" />
         <PlotMeta label="Universe" value="U1 · 512 ch" tone="blue" />
+      </div>
+    </div>
+  ),
+};
+
+const colorPickerSwatches: readonly ColorPickerSwatch[] = [
+  { index: 0, name: "Rose", hex: "#fb7185" },
+  { index: 1, name: "Orange", hex: "#fb923c" },
+  { index: 2, name: "Yellow", hex: "#facc15" },
+  { index: 3, name: "Lime", hex: "#a3e635" },
+  { index: 4, name: "Emerald", hex: "#34d399" },
+  { index: 5, name: "Cyan", hex: "#22d3ee" },
+  { index: 6, name: "Violet", hex: "#a78bfa" },
+  { index: 7, name: "Pink", hex: "#f472b6" },
+];
+
+function ColorPickerStoryHarness({ initial }: { initial: number | null }) {
+  const [selected, setSelected] = useState<number | null>(initial);
+  const [open, setOpen] = useState(true);
+  return (
+    <div style={{ ...dStage, paddingTop: 80 }}>
+      <p style={{ color: "var(--color-brand-text-muted)", marginBottom: 16 }}>
+        Selected:{" "}
+        <strong style={{ color: "var(--color-brand-text-primary)" }}>
+          {selected === null ? "none" : `index ${selected} (${colorPickerSwatches[selected]?.name ?? "?"})`}
+        </strong>
+      </p>
+      <Button onClick={() => setOpen(true)} size="compact">
+        Reopen picker
+      </Button>
+      {open ? (
+        <ColorPicker
+          x={120}
+          y={160}
+          swatches={colorPickerSwatches}
+          selectedIndex={selected}
+          onSelect={(idx) => setSelected(idx)}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export const DirectionDColorPicker: StoryObj<typeof meta> = {
+  name: "Direction D · ColorPicker (selected)",
+  render: () => <ColorPickerStoryHarness initial={2} />,
+};
+
+export const DirectionDColorPickerCleared: StoryObj<typeof meta> = {
+  name: "Direction D · ColorPicker (cleared)",
+  render: () => <ColorPickerStoryHarness initial={null} />,
+};
+
+export const DirectionDEmptyStateAction: StoryObj<typeof meta> = {
+  name: "Direction D · EmptyState (hasAction)",
+  render: () => (
+    <div style={dStage}>
+      <div style={dColumn}>
+        <EmptyState
+          icon={Sun}
+          title="No fixtures on the rig yet"
+          message="Add your first fixture to start patching DMX addresses."
+          action={{ label: "Add fixture", onClick: () => undefined, icon: Plus }}
+        />
+        <EmptyState
+          icon={Sun}
+          title="No scenes saved yet"
+          message="Adjust fixtures, then save the current rig state as a scene."
+          action={{ label: "Save first scene", onClick: () => undefined, variant: "primary" }}
+        />
       </div>
     </div>
   ),

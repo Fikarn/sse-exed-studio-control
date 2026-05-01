@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Sun } from "lucide-react";
+import { Plus, Sun } from "lucide-react";
 
 import { EmptyState, PlotMeta, PlotPill } from "@sse/design-system";
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
@@ -55,6 +55,9 @@ export interface StagePlotProps {
   /** Marquee result — fixture ids inside the released selection rectangle.
    *  When `additive`, the parent merges with the existing multi-select. */
   onMarqueeSelect?: (fixtureIds: readonly string[], options: { additive: boolean }) => void;
+  /** F10 — empty-state CTA. When provided and `fixtures.length === 0`, the
+   *  empty state renders a primary "Add fixture" button that fires this. */
+  onAddFixture?: () => void;
 }
 
 const FALLBACK_X_STEP = 1.5;
@@ -84,6 +87,7 @@ export function StagePlot({
   onIdentifyFixture,
   onRequestDeleteFixture,
   onMarqueeSelect,
+  onAddFixture,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
@@ -401,6 +405,7 @@ export function StagePlot({
             icon={Sun}
             title="No fixtures on the rig yet"
             message="Add your first fixture with the Add fixture button in the toolbar to start patching DMX addresses and saving scenes."
+            action={onAddFixture ? { label: "Add fixture", onClick: onAddFixture, icon: Plus } : undefined}
           />
         </div>
       ) : null}

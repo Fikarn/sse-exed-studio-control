@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Pencil, Power, X } from "lucide-react";
+import { Palette, Pencil, Power, X } from "lucide-react";
 
 import {
   Button,
+  ColorPicker,
   ConfirmDialog,
   IconButton,
   InlineRename,
@@ -13,23 +14,29 @@ import {
 import type { LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { formatLightingValueRange } from "../lightingHelpers";
+import { LIGHTING_COLOR_TAG_PALETTE, lightingColorTagHex, lightingColorTagName } from "../lightingColorTags";
 
 import styles from "./LightingInspector.module.css";
 
 export interface InspectorGroupProps {
   groupId: string;
   groupName: string;
+  /** Operator-assigned color tag index (0..7) or null for no tag. */
+  colorIndex?: number | null;
   fixtures: readonly LightingFixtureSnapshot[];
   onTogglePower: (groupId: string, on: boolean) => void;
   onSelectFixture: (fixtureId: string) => void;
   /** Inline-rename commit handler. Receives the trimmed new name. */
   onRenameGroup?: (groupId: string, newName: string) => void | Promise<void>;
+  /** Set color tag handler. Receives `null` (clear) or `0..7` (set). */
+  onSetGroupColor?: (groupId: string, colorIndex: number | null) => void;
   /** Removes a fixture from this group (sets its groupId to null). When
    *  provided, member rows render a hover-revealed × button gated by a
    *  confirmation dialog. */
   onRemoveFixtureFromGroup?: (fixtureId: string) => void | Promise<void>;
   busy?: boolean;
   renameBusy?: boolean;
+  colorBusy?: boolean;
   /** Marks a fixture id as currently being removed. Disables the × button. */
   removingFixtureId?: string | null;
   /** When this nonce changes (and is non-null), the inspector triggers
@@ -40,13 +47,16 @@ export interface InspectorGroupProps {
 export function InspectorGroup({
   groupId,
   groupName,
+  colorIndex = null,
   fixtures,
   onTogglePower,
   onSelectFixture,
   onRenameGroup,
+  onSetGroupColor,
   onRemoveFixtureFromGroup,
   busy = false,
   renameBusy = false,
+  colorBusy = false,
   removingFixtureId = null,
   pendingInlineRenameNonce = null,
 }: InspectorGroupProps) {
@@ -54,6 +64,7 @@ export function InspectorGroup({
   const allOn = fixtures.length > 0 && onCount === fixtures.length;
   const renameRef = useRef<InlineRenameHandle | null>(null);
   const [confirmingRemove, setConfirmingRemove] = useState<{ id: string; name: string } | null>(null);
+  const [colorPickerPos, setColorPickerPos] = useState<{ x: number; y: number } | null>(null);
 
   // Open the inline rename when the parent signals a one-shot request (chip
   // context-menu "Rename"). Effect runs after mount, so the renameRef is
@@ -131,6 +142,47 @@ export function InspectorGroup({
               {fixtures.length > 0 ? formatLightingValueRange(cctMin, cctMax, "K") : "—"}
             </dd>
           </div>
+          {onSetGroupColor ? (
+            <div className={`${styles.fact} ${styles.factSpan}`}>
+              <dt className={styles.factLabel}>Color tag</dt>
+              <dd className={styles.factValue}>
+                <div className={styles.colorRow}>
+                  <button
+                    type="button"
+                    className={styles.colorPickerTrigger}
+                    onClick={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setColorPickerPos({ x: rect.left, y: rect.bottom + 6 });
+                    }}
+                    disabled={colorBusy}
+                    aria-label={
+                      lightingColorTagName(colorIndex)
+                        ? `Change color tag (currently ${lightingColorTagName(colorIndex)})`
+                        : "Set a color tag"
+                    }
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={styles.colorSwatch}
+                      style={{ background: lightingColorTagHex(colorIndex) ?? "transparent" }}
+                    />
+                    <span className={styles.colorLabel}>{lightingColorTagName(colorIndex) ?? "None"}</span>
+                    <Palette aria-hidden="true" size={12} strokeWidth={1.75} />
+                  </button>
+                  {colorIndex !== null ? (
+                    <IconButton
+                      tone="ghost"
+                      size="sm"
+                      icon={X}
+                      label="Clear color tag"
+                      onClick={() => onSetGroupColor(groupId, null)}
+                      disabled={colorBusy}
+                    />
+                  ) : null}
+                </div>
+              </dd>
+            </div>
+          ) : null}
         </dl>
       </InspectorSection>
 
@@ -182,6 +234,17 @@ export function InspectorGroup({
             void onRemoveFixtureFromGroup(target.id);
           }}
           onCancel={() => setConfirmingRemove(null)}
+        />
+      ) : null}
+      {colorPickerPos && onSetGroupColor ? (
+        <ColorPicker
+          x={colorPickerPos.x}
+          y={colorPickerPos.y}
+          swatches={LIGHTING_COLOR_TAG_PALETTE}
+          selectedIndex={colorIndex}
+          onSelect={(next) => onSetGroupColor(groupId, next)}
+          onClose={() => setColorPickerPos(null)}
+          ariaLabel={`Pick a color tag for group ${groupName}`}
         />
       ) : null}
     </>

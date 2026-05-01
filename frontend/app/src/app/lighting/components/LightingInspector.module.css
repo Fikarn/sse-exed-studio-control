@@ -379,6 +379,66 @@
   margin: 0;
 }
 
+/* Wave 30b — span a fact across both grid columns. Used by the inspector
+   color-tag row on group + (potentially future) full-width facts. */
+.factSpan {
+  grid-column: 1 / -1;
+}
+
+/* Wave 30b — color-tag row in scene + group inspector. Compact horizontal
+   layout: trigger button on the left, optional Clear icon on the right. */
+.colorRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.colorPickerTrigger {
+  align-items: center;
+  appearance: none;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  color: var(--color-brand-text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: var(--font-family-ui);
+  font-size: 12px;
+  gap: 8px;
+  padding: 4px 8px;
+  transition:
+    border-color var(--motion-duration-fast) ease,
+    background var(--motion-duration-fast) ease;
+}
+
+.colorPickerTrigger:hover {
+  border-color: var(--color-bg-border);
+  background: var(--color-bg-default);
+}
+
+.colorPickerTrigger:focus-visible {
+  outline: none;
+  border-color: var(--color-brand-green-border);
+}
+
+.colorPickerTrigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.colorSwatch {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  display: inline-block;
+  flex-shrink: 0;
+  height: 12px;
+  width: 12px;
+}
+
+.colorLabel {
+  font-feature-settings: normal;
+}
+
 .positionGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

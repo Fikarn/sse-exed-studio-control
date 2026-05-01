@@ -1,10 +1,11 @@
-import { Plus } from "lucide-react";
+import { Plus, Save } from "lucide-react";
 import { type CSSProperties } from "react";
 import { AutoSizer, type Size } from "react-virtualized-auto-sizer";
 import { Grid } from "react-window";
 import { DndContext, type DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
+import { EmptyState } from "@sse/design-system";
 import type { LightingSceneSnapshot } from "@sse/engine-client";
 
 import { formatLightingRelativeTime } from "../lightingHelpers";
@@ -40,6 +41,13 @@ export interface SceneRailProps {
   renamingSceneIds?: ReadonlySet<string>;
   /** Right-click delete request. Parent owns the confirm dialog + IPC call. */
   onRequestDeleteScene?: (sceneId: string, sceneName: string) => void;
+  /** Set color tag handler. When omitted, the rail's tiles don't surface a
+   *  Color… context-menu item. Receives `null` (clear) or `0..7` (set). */
+  onSetSceneColor?: (sceneId: string, colorIndex: number | null) => void;
+  /** Hover-preview wiring. Tile fires onHoverPreview after 300 ms (the timer
+   *  is owned by the parent so it can be cancelled on click / unmount). */
+  onHoverPreview?: (sceneId: string) => void;
+  onHoverPreviewClear?: (sceneId: string) => void;
 }
 
 interface SceneStats {
@@ -70,6 +78,9 @@ interface CellPayload {
   onRename?: (sceneId: string, newName: string) => void | Promise<void>;
   renamingSceneIds: ReadonlySet<string>;
   onRequestDelete?: (sceneId: string, sceneName: string) => void;
+  onSetColor?: (sceneId: string, colorIndex: number | null) => void;
+  onHoverPreview?: (sceneId: string) => void;
+  onHoverPreviewClear?: (sceneId: string) => void;
   onAddScene?: () => void;
   showAddTile: boolean;
   totalCellCount: number;
@@ -90,6 +101,9 @@ function VirtualizedCell({
   onRename,
   renamingSceneIds,
   onRequestDelete,
+  onSetColor,
+  onHoverPreview,
+  onHoverPreviewClear,
   onAddScene,
   showAddTile,
   totalCellCount,
@@ -123,12 +137,16 @@ function VirtualizedCell({
           lastRecalledLabel={lastRecalledLabel}
           thumbDataUri={sceneThumbs[scene.id]}
           pinned={scene.pinned}
+          colorIndex={scene.colorIndex}
           sortable={sortable}
           onRecall={onRecall}
           onPin={onPin}
           onRename={onRename}
           renameBusy={renamingSceneIds.has(scene.id)}
           onRequestDelete={onRequestDelete}
+          onSetColor={onSetColor}
+          onHoverPreview={onHoverPreview}
+          onHoverPreviewClear={onHoverPreviewClear}
         />
       </div>
     );
@@ -168,6 +186,9 @@ export function SceneRail({
   onRenameScene,
   renamingSceneIds,
   onRequestDeleteScene,
+  onSetSceneColor,
+  onHoverPreview,
+  onHoverPreviewClear,
 }: SceneRailProps) {
   // Default to an empty Set so callers without an in-flight rename tracker
   // don't have to construct one. Memoized so consumers can stably pass
@@ -205,7 +226,21 @@ export function SceneRail({
     onReorderScene(String(active.id), beforeId);
   };
 
-  if (scenes.length === 0 && !onAddScene) {
+  if (scenes.length === 0) {
+    // F10 — empty state CTA. Use EmptyState's structured `action` prop so
+    // the primary "Save first scene" affordance is consistent across rails.
+    if (onAddScene) {
+      return (
+        <div className={styles.sceneEmptyShell}>
+          <EmptyState
+            icon={Save}
+            title="No scenes saved yet"
+            message="Adjust fixtures, then save the current rig state as a scene to recall later."
+            action={{ label: "Save first scene", onClick: onAddScene, icon: Save }}
+          />
+        </div>
+      );
+    }
     return (
       <p className={styles.empty}>No scenes saved yet. Press S after editing fixtures to save the current state.</p>
     );
@@ -249,6 +284,9 @@ export function SceneRail({
           onRename: onRenameScene,
           renamingSceneIds: effectiveRenamingIds,
           onRequestDelete: onRequestDeleteScene,
+          onSetColor: onSetSceneColor,
+          onHoverPreview,
+          onHoverPreviewClear,
           onAddScene,
           showAddTile,
           totalCellCount,
@@ -295,12 +333,16 @@ export function SceneRail({
               lastRecalledLabel={lastRecalledLabel}
               thumbDataUri={sceneThumbs[scene.id]}
               pinned={scene.pinned}
+              colorIndex={scene.colorIndex}
               sortable={sortable}
               onRecall={onRecall}
               onPin={onPinScene}
               onRename={onRenameScene}
               renameBusy={effectiveRenamingIds.has(scene.id)}
               onRequestDelete={onRequestDeleteScene}
+              onSetColor={onSetSceneColor}
+              onHoverPreview={onHoverPreview}
+              onHoverPreviewClear={onHoverPreviewClear}
             />
           );
         })}

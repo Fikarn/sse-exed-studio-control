@@ -1,10 +1,18 @@
 import { useRef, useState } from "react";
-import { Pencil, Play, Plus, Save, Trash2 } from "lucide-react";
+import { Palette, Pencil, Play, Plus, Save, Trash2, X } from "lucide-react";
 
-import { Button, ConfirmDialog, IconButton, InlineRename, type InlineRenameHandle } from "@sse/design-system";
+import {
+  Button,
+  ColorPicker,
+  ConfirmDialog,
+  IconButton,
+  InlineRename,
+  type InlineRenameHandle,
+} from "@sse/design-system";
 import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
 
 import { formatLightingRelativeTime, lightingFixtureColor } from "../lightingHelpers";
+import { LIGHTING_COLOR_TAG_PALETTE, lightingColorTagHex, lightingColorTagName } from "../lightingColorTags";
 
 import styles from "./LightingInspector.module.css";
 
@@ -13,6 +21,11 @@ export interface InspectorSceneProps {
   fixtures: readonly LightingFixtureSnapshot[];
   groups: readonly LightingGroupSnapshot[];
   isModified: boolean;
+  /** Wave 30b — when true, the displayed scene is a hover-preview, not the
+   *  active recalled scene. Eyebrow flips to "Hover preview" to make the
+   *  transient state explicit; modified treatment is suppressed (the parent
+   *  passes `isModified={false}` in this mode anyway). */
+  isHoverPreview?: boolean;
   bridgeReachable: boolean;
   onSaveScene?: () => void;
   onSaveSceneAs?: () => void;
@@ -21,11 +34,15 @@ export interface InspectorSceneProps {
   onDeleteScene?: () => void;
   /** Inline-rename commit handler. Receives the trimmed new name. */
   onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
+  /** Set color tag handler. Receives `null` (clear) or `0..7` (set). */
+  onSetSceneColor?: (sceneId: string, colorIndex: number | null) => void;
   saveBusy?: boolean;
   recallBusy?: boolean;
   resaveBusy?: boolean;
   deleteBusy?: boolean;
   renameBusy?: boolean;
+  /** When true, marks the scene's color update as in-flight. */
+  colorBusy?: boolean;
 }
 
 interface SceneStats {
@@ -72,6 +89,7 @@ export function InspectorScene({
   fixtures,
   groups,
   isModified,
+  isHoverPreview = false,
   bridgeReachable,
   onSaveScene,
   onSaveSceneAs,
@@ -79,13 +97,16 @@ export function InspectorScene({
   onResaveScene,
   onDeleteScene,
   onRenameScene,
+  onSetSceneColor,
   saveBusy = false,
   recallBusy = false,
   resaveBusy = false,
   deleteBusy = false,
   renameBusy = false,
+  colorBusy = false,
 }: InspectorSceneProps) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [colorPickerPos, setColorPickerPos] = useState<{ x: number; y: number } | null>(null);
   const renameRef = useRef<InlineRenameHandle | null>(null);
 
   if (!scene) {
@@ -132,7 +153,9 @@ export function InspectorScene({
 
   return (
     <div className={styles.scenePane}>
-      <span className={styles.sceneEyebrow}>{isModified ? "Active scene · modified" : "Active scene"}</span>
+      <span className={styles.sceneEyebrow}>
+        {isHoverPreview ? "Hover preview" : isModified ? "Active scene · modified" : "Active scene"}
+      </span>
       <div className={styles.sceneTitleRow}>
         <h2 className={styles.sceneTitle}>
           {onRenameScene ? (
@@ -228,6 +251,46 @@ export function InspectorScene({
         </section>
       ) : null}
 
+      {onSetSceneColor ? (
+        <section className={styles.sceneSection}>
+          <h3 className={styles.sceneSectionHead}>Color tag</h3>
+          <div className={styles.colorRow}>
+            <button
+              type="button"
+              className={styles.colorPickerTrigger}
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                setColorPickerPos({ x: rect.left, y: rect.bottom + 6 });
+              }}
+              disabled={colorBusy}
+              aria-label={
+                lightingColorTagName(scene.colorIndex)
+                  ? `Change color tag (currently ${lightingColorTagName(scene.colorIndex)})`
+                  : "Set a color tag"
+              }
+            >
+              <span
+                aria-hidden="true"
+                className={styles.colorSwatch}
+                style={{ background: lightingColorTagHex(scene.colorIndex) ?? "transparent" }}
+              />
+              <span className={styles.colorLabel}>{lightingColorTagName(scene.colorIndex) ?? "None"}</span>
+              <Palette aria-hidden="true" size={12} strokeWidth={1.75} />
+            </button>
+            {scene.colorIndex !== null ? (
+              <IconButton
+                tone="ghost"
+                size="sm"
+                icon={X}
+                label="Clear color tag"
+                onClick={() => onSetSceneColor(scene.id, null)}
+                disabled={colorBusy}
+              />
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       <section className={styles.sceneSection}>
         <h3 className={styles.sceneSectionHead}>Last activity</h3>
         <p className={styles.sceneProvenance}>
@@ -308,6 +371,17 @@ export function InspectorScene({
             onDeleteScene();
           }}
           onCancel={() => setConfirmingDelete(false)}
+        />
+      ) : null}
+      {colorPickerPos && onSetSceneColor ? (
+        <ColorPicker
+          x={colorPickerPos.x}
+          y={colorPickerPos.y}
+          swatches={LIGHTING_COLOR_TAG_PALETTE}
+          selectedIndex={scene.colorIndex}
+          onSelect={(next) => onSetSceneColor(scene.id, next)}
+          onClose={() => setColorPickerPos(null)}
+          ariaLabel={`Pick a color tag for scene ${scene.name}`}
         />
       ) : null}
     </div>
