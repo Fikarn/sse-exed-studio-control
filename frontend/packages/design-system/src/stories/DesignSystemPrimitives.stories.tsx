@@ -14,6 +14,7 @@ import {
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Button } from "../components/Button";
+import { ChipStrip, type ChipStripChip } from "../components/ChipStrip";
 import { ColorPicker, type ColorPickerSwatch } from "../components/ColorPicker";
 import { Crest } from "../components/Crest";
 import { DenseList, DenseListRow, DenseTable } from "../components/DenseRows";
@@ -432,6 +433,53 @@ export const DirectionDColorPicker: StoryObj<typeof meta> = {
 export const DirectionDColorPickerCleared: StoryObj<typeof meta> = {
   name: "Direction D · ColorPicker (cleared)",
   render: () => <ColorPickerStoryHarness initial={null} />,
+};
+
+const chipStripDemoChips: readonly ChipStripChip[] = [
+  { id: "a", label: "Astra L", accentColor: "#fbbf6f", leadingBadge: 1 },
+  { id: "b", label: "Astra R", accentColor: "#fbbf6f", leadingBadge: 2 },
+  { id: "c", label: "Infinibar PB12", accentColor: "#a3e635", leadingBadge: 3 },
+  { id: "d", label: "Apollo Bridge", accentColor: "#22d3ee", leadingBadge: 4 },
+  { id: "e", label: "Infinimat", accentColor: "#fb923c", leadingBadge: 5 },
+];
+
+export const DirectionDChipStrip: StoryObj<typeof meta> = {
+  name: "Direction D · ChipStrip (selection-style)",
+  render: () => (
+    <div style={dStage}>
+      <div style={{ ...dColumn, maxWidth: 720 }}>
+        <ChipStrip chips={chipStripDemoChips} ariaLabel="Selected fixtures sample" />
+      </div>
+    </div>
+  ),
+};
+
+export const DirectionDHealthBarActions: StoryObj<typeof meta> = {
+  name: "Direction D · HealthBar (with actions slot)",
+  render: () => (
+    <div style={{ ...dStage, padding: 0 }}>
+      <div style={{ height: "320px" }} />
+      <HealthBar
+        items={[
+          { label: "Bridge", dot: "ok", value: "DMX U1 · reachable" },
+          { label: "Universe", dot: "ok", value: "12 / 512 ch" },
+          { label: "Fixtures", dot: "ok", value: "6 / 6 patched" },
+          { label: "Auto-save", dot: "ok", value: "Saved", suffix: "· last 19:38 UTC" },
+          { label: "Session", value: "2h 47m" },
+          { label: "App", value: "v2.2.2" },
+        ]}
+        hints={[
+          { kbd: "⌘ K", label: "command palette" },
+          { kbd: "⌘ ⇧ M", label: "full DMX monitor" },
+        ]}
+        actions={
+          <Button size="compact" variant="ghost">
+            DMX strip
+          </Button>
+        }
+      />
+    </div>
+  ),
 };
 
 export const DirectionDEmptyStateAction: StoryObj<typeof meta> = {

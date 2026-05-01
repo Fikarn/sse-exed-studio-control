@@ -29,11 +29,14 @@ import { LightingInspector, deriveInspectorTab, type LightingUiMode } from "./co
 import type { InspectorTab } from "./components/LightingInspectorTabs";
 import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
+import { DMXCompactStrip } from "./components/DMXCompactStrip";
 import { RenameDialog } from "./components/RenameDialog";
+import { SelectionChipStrip } from "./components/SelectionChipStrip";
 import { StagePlot } from "./components/StagePlot";
 import { nextLightingFixtureName } from "./lightingHelpers";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
 import { useResizableColumns } from "./useResizableColumns";
+import { useStagePlotViewport, type ViewBookmarkSlot } from "./useStagePlotViewport";
 import { UndoRefusedError, useUndoStack, type UndoOutcome } from "./useUndoStack";
 import { useUnsavedChangesGuard } from "./useUnsavedScenePrompt";
 import styles from "./LightingWorkspace.module.css";
@@ -555,6 +558,87 @@ export function LightingWorkspaceSurface({
   const handleTogglePatch = useEffectEvent(() => {
     setUiMode((current) => (current === "patch" ? "recall" : "patch"));
   });
+
+  // Wave 31 — stage plot viewport hook lifted to the workspace level so
+  // keyboard shortcuts (Shift+1/2/3 recall, ⌘⇧1/2/3 save) and other
+  // workspace-level affordances can reach the bookmark API. StagePlot
+  // consumes the same instance via its `viewport` prop. handleSelectFixture
+  // is `useEffectEvent`-stable so closing over it is safe.
+  const stagePlotViewport = useStagePlotViewport({
+    onBackgroundClick: () => void handleSelectFixture(null),
+  });
+
+  // Wave 31 — I9 chip-hover signal. SelectionChipStrip writes the hovered
+  // fixture id here; StagePlot reads it to mark the matching FixtureMarker
+  // for the soft pulse ring. Null when no chip is hovered or the strip
+  // isn't mounted (selection empty).
+  const [chipHoverFixtureId, setChipHoverFixtureId] = useState<string | null>(null);
+
+  // Wave 31 — I9 remove-from-selection. Distinct from `handleSelectFixture`'s
+  // additive-toggle path (which preserves the persisted primary by design
+  // for the bulk inspector). Here the operator's intent is unambiguous: the
+  // chip's × means "take this fixture out of the selection". When removing
+  // the primary we promote the first extra so the inspector still has a
+  // focused fixture; if no extras remain, primary clears to null.
+  const handleRemoveFromSelection = useEffectEvent(async (fixtureId: string) => {
+    if (fixtureId === persistedSelectedFixtureId) {
+      const promoted = Array.from(extraSelectedFixtureIds).find((id) => id !== fixtureId) ?? null;
+      if (promoted !== null) {
+        setExtraSelectedFixtureIds((prev) => {
+          const next = new Set(prev);
+          next.delete(promoted);
+          return next;
+        });
+      }
+      try {
+        await store.updateLightingSettings({ selectedFixtureId: promoted });
+      } catch (error) {
+        reportError(error, "Selection update failed.");
+      }
+      return;
+    }
+    setExtraSelectedFixtureIds((prev) => {
+      const next = new Set(prev);
+      next.delete(fixtureId);
+      return next;
+    });
+  });
+
+  // Wave 31 — P4 persistent compact DMX strip toggle. Default OFF (operator
+  // opts in) with persistence to localStorage so the choice survives
+  // reloads. The strip overlays the bottom of the body when on (does NOT
+  // push body height — the workspace keeps its full vertical extent and
+  // the strip floats just above the health bar via .bottomOverlays).
+  const [dmxStripOn, setDmxStripOn] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("app.lighting.dmxStripOn") === "true";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem("app.lighting.dmxStripOn", String(dmxStripOn));
+    } catch {
+      // best-effort; in-session toggle still works
+    }
+  }, [dmxStripOn]);
+
+  // Wave 31 — delayed unmount for the DMX strip's close animation. Keep the
+  // strip mounted for the full 180 ms slide-out before tearing down its
+  // canvas + rAF loop. Mount happens immediately on toggle-on so the open
+  // animation starts on the next frame.
+  const [renderDmxStrip, setRenderDmxStrip] = useState(dmxStripOn);
+  useEffect(() => {
+    if (dmxStripOn) {
+      setRenderDmxStrip(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setRenderDmxStrip(false), 180);
+    return () => window.clearTimeout(timer);
+  }, [dmxStripOn]);
 
   const requestAddFixture = useCallback(() => {
     setCreateFixtureOpen(true);
@@ -1568,6 +1652,21 @@ export function LightingWorkspaceSurface({
         return;
       }
 
+      // Wave 31 — I7 view bookmarks. ⌘⇧1/2/3 saves the current viewport to
+      // the matching slot; Shift+1/2/3 recalls. Use `event.code` instead of
+      // `event.key` because Shift+digit produces "!@#" on standard layouts.
+      // Modifier+Shift+digit lands here BEFORE ⌘+digit-only collisions
+      // because we explicitly require Shift on the save path.
+      if (modifier && event.shiftKey && !event.altKey) {
+        const slot = event.code === "Digit1" ? 0 : event.code === "Digit2" ? 1 : event.code === "Digit3" ? 2 : null;
+        if (slot !== null) {
+          stagePlotViewport.saveViewBookmark(slot as ViewBookmarkSlot);
+          toast.push({ message: `Saved view ${slot + 1}.`, tone: "ok" });
+          event.preventDefault();
+          return;
+        }
+      }
+
       // Arrow-key nudge: requires a selected fixture; default ±0.1 m, hold
       // Shift for ±0.5 m (matching the snap grid). Modifier-free arrows are
       // commonly used by browsers/forms — gating on a fixture being selected
@@ -1627,6 +1726,9 @@ export function LightingWorkspaceSurface({
       }
 
       // Wave 29 — Shift+H toggles Solo, Shift+I starts the Find sequence.
+      // Wave 31 — Shift+1/2/3 recalls the matching view bookmark (silently
+      // no-ops on empty slots). Use `event.code` for digits because Shift
+      // produces "!@#" with the default key.
       // These need to run before the modifier-shortcircuit below since they
       // depend on the Shift modifier.
       if (!event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey) {
@@ -1638,6 +1740,13 @@ export function LightingWorkspaceSurface({
         if (event.key.toLowerCase() === "i") {
           event.preventDefault();
           void handleIdentifyFind();
+          return;
+        }
+        const bookmarkSlot =
+          event.code === "Digit1" ? 0 : event.code === "Digit2" ? 1 : event.code === "Digit3" ? 2 : null;
+        if (bookmarkSlot !== null) {
+          stagePlotViewport.recallViewBookmark(bookmarkSlot as ViewBookmarkSlot);
+          event.preventDefault();
           return;
         }
       }
@@ -1691,6 +1800,7 @@ export function LightingWorkspaceSurface({
     isSceneModified,
     persistedSelectedFixtureId,
     scenes,
+    stagePlotViewport,
     store,
     triggerRedo,
     triggerUndo,
@@ -1813,6 +1923,8 @@ export function LightingWorkspaceSurface({
             onRequestDeleteFixture={(id, name) => setConfirmDeleteFixture({ id, name })}
             onMarqueeSelect={(ids, options) => void handleMarqueeSelect(ids, options)}
             onAddFixture={requestAddFixture}
+            viewport={stagePlotViewport}
+            chipHoverFixtureId={chipHoverFixtureId}
           />
         </main>
 
@@ -1866,6 +1978,30 @@ export function LightingWorkspaceSurface({
         />
       </div>
 
+      <div className={styles.bottomStripStack}>
+        <SelectionChipStrip
+          selectedFixtures={selectedFixtureSnapshots}
+          onRemoveFromSelection={(fixtureId) => void handleRemoveFromSelection(fixtureId)}
+          onClearAll={() => void handleSelectFixture(null)}
+          onChipHover={setChipHoverFixtureId}
+        />
+        <div
+          className={`${styles.dmxStripWrapper} ${dmxStripOn ? styles.dmxStripWrapperOpen : ""}`}
+          aria-hidden={!dmxStripOn}
+        >
+          {renderDmxStrip ? (
+            <DMXCompactStrip
+              snapshot={lightingDmxMonitorSnapshot}
+              fixtures={fixtures}
+              bridgeReachable={bridgeReachable}
+              universe={bridgeUniverse}
+              onOpenMonitor={() => setDmxMonitorOpen(true)}
+              onClose={() => setDmxStripOn(false)}
+            />
+          ) : null}
+        </div>
+      </div>
+
       <LightingHealthBar
         lightingSnapshot={lightingSnapshot}
         lightingDmxMonitorSnapshot={lightingDmxMonitorSnapshot}
@@ -1873,6 +2009,10 @@ export function LightingWorkspaceSurface({
         fixturesTotal={fixtureEntries.length}
         driftDetected={isSceneModified}
         lastSavedLabel={lastSavedLabel}
+        dmxStripOn={dmxStripOn}
+        onToggleDmxStrip={() => setDmxStripOn((current) => !current)}
+        bridgeReachable={bridgeReachable}
+        bridgeUniverse={bridgeUniverse}
       />
 
       {dmxMonitorOpen ? (

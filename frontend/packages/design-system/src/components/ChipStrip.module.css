@@ -1,0 +1,95 @@
+@layer components {
+  .strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-bg-stroke) transparent;
+  }
+
+  .strip::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .strip::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .strip::-webkit-scrollbar-thumb {
+    background: var(--color-bg-stroke);
+    border-radius: 3px;
+  }
+
+  .chip {
+    align-items: center;
+    background: var(--color-bg-soft);
+    border: 1px solid var(--color-bg-stroke);
+    border-radius: var(--radius-pill);
+    color: var(--color-brand-text-primary);
+    display: inline-flex;
+    flex-shrink: 0;
+    height: 24px;
+    padding: 0 4px 0 10px;
+    transition:
+      border-color var(--motion-duration-fast) ease,
+      background var(--motion-duration-fast) ease;
+  }
+
+  .chip:hover {
+    border-color: var(--color-bg-border);
+    background: var(--color-bg-default);
+  }
+
+  .chipBody {
+    align-items: center;
+    appearance: none;
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    font-family: var(--font-family-ui);
+    font-size: 11px;
+    gap: 6px;
+    padding: 0;
+    height: 100%;
+  }
+
+  .chipBody:focus-visible {
+    outline: 2px solid var(--color-brand-green);
+    outline-offset: 2px;
+    border-radius: var(--radius-pill);
+  }
+
+  .chipBadge {
+    color: var(--color-brand-text-muted);
+    font-family: var(--font-family-mono);
+    font-feature-settings: "tnum", "zero";
+    font-size: 10px;
+  }
+
+  .chipAccent {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    height: 8px;
+    width: 8px;
+  }
+
+  .chipLabel {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chipTrailing {
+    align-items: center;
+    display: inline-flex;
+    margin-left: 4px;
+  }
+}

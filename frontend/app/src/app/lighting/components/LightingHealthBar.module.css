@@ -1,0 +1,50 @@
+.toggle {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  color: var(--color-brand-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  gap: 6px;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  transition:
+    color var(--motion-duration-fast) ease,
+    border-color var(--motion-duration-fast) ease,
+    background var(--motion-duration-fast) ease;
+}
+
+.toggle:hover {
+  border-color: var(--color-bg-border);
+  color: var(--color-brand-text-primary);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+}
+
+.toggleOn {
+  background: var(--color-brand-green-soft);
+  border-color: var(--color-brand-green-border);
+  color: var(--color-brand-green);
+}
+
+.toggleDot {
+  background: var(--color-brand-text-muted);
+  border-radius: 50%;
+  display: inline-block;
+  height: 6px;
+  width: 6px;
+  transition: background var(--motion-duration-fast) ease;
+}
+
+.toggleOn .toggleDot {
+  background: var(--color-brand-green);
+  box-shadow: 0 0 6px var(--color-brand-green);
+}

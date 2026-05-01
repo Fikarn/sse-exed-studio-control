@@ -1,0 +1,137 @@
+.shell {
+  align-items: center;
+  background: var(--color-bg-deep);
+  border-top: 1px solid var(--color-bg-stroke);
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  height: 60px;
+  padding: 0 12px;
+  position: relative;
+}
+
+.label {
+  color: var(--color-brand-text-muted);
+  flex-shrink: 0;
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.label strong {
+  color: var(--color-brand-text-primary);
+  font-weight: 600;
+}
+
+.count {
+  color: var(--color-brand-text-secondary);
+  margin-left: 4px;
+}
+
+.stale {
+  color: var(--color-brand-yellow);
+}
+
+.empty {
+  color: var(--color-brand-text-muted);
+  flex: 1 1 auto;
+  font-family: var(--font-family-ui);
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+}
+
+.canvas {
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  cursor: pointer;
+  display: block;
+  flex: 1 1 0;
+  height: 36px;
+  min-width: 0;
+  width: 100%;
+}
+
+.canvas:hover {
+  border-color: var(--color-bg-border);
+}
+
+.expandButton,
+.closeButton {
+  appearance: none;
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-tight-sm);
+  color: var(--color-brand-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 22px;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
+    border-color var(--motion-duration-fast) ease;
+  width: 22px;
+}
+
+.expandButton:hover,
+.closeButton:hover {
+  background: var(--color-bg-strong);
+  border-color: var(--color-bg-stroke);
+  color: var(--color-brand-text-primary);
+}
+
+.expandButton:focus-visible,
+.closeButton:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 2px;
+}
+
+/* Tooltip — fixed position over the strip; its anchor is the cursor x/y
+   so it tracks the hovered channel naturally. Z-index sits above the
+   strip but below dialogs / portals. */
+.tooltip {
+  background: var(--color-bg-deep);
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  box-shadow: var(--shadow-md);
+  color: var(--color-brand-text-primary);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-family-ui);
+  font-size: 11px;
+  gap: 2px;
+  padding: 6px 8px;
+  pointer-events: none;
+  position: fixed;
+  white-space: nowrap;
+  z-index: 100;
+}
+
+.tooltipChannel {
+  color: var(--color-brand-green);
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.tooltipLight {
+  font-weight: 500;
+}
+
+.tooltipLabel {
+  color: var(--color-brand-text-muted);
+}
+
+.tooltipValue {
+  color: var(--color-brand-text-secondary);
+  font-family: var(--font-family-mono);
+  font-feature-settings: "tnum", "zero";
+}

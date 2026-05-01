@@ -35,9 +35,18 @@
       "startupPhase": "waiting-for-app-snapshot",
       "summary": "Storage healthy. Operator mode locked pending setup.",
       "checks": {
-        "lighting": { "status": "attention", "summary": "Bridge not commissioned." },
-        "audio": { "status": "attention", "summary": "Console not commissioned." },
-        "controlSurface": { "status": "ok", "summary": "Bridge reachable." }
+        "lighting": {
+          "status": "attention",
+          "summary": "Bridge not commissioned."
+        },
+        "audio": {
+          "status": "attention",
+          "summary": "Console not commissioned."
+        },
+        "controlSurface": {
+          "status": "ok",
+          "summary": "Bridge reachable."
+        }
       }
     },
     "commissioningSnapshot": {
@@ -46,9 +55,21 @@
       "stage": "setup-required",
       "summary": "Complete commissioning to unlock operator mode.",
       "checks": [
-        { "label": "Lighting bridge", "status": "attention", "detail": "Universe not confirmed." },
-        { "label": "Audio console", "status": "attention", "detail": "Connection not verified." },
-        { "label": "Control surface", "status": "ok", "detail": "Companion bridge available." }
+        {
+          "label": "Lighting bridge",
+          "status": "attention",
+          "detail": "Universe not confirmed."
+        },
+        {
+          "label": "Audio console",
+          "status": "attention",
+          "detail": "Connection not verified."
+        },
+        {
+          "label": "Control surface",
+          "status": "ok",
+          "detail": "Companion bridge available."
+        }
       ]
     },
     "supportSnapshot": {
@@ -97,9 +118,18 @@
       "startupPhase": "ready",
       "summary": "System healthy and ready.",
       "checks": {
-        "lighting": { "status": "ok", "summary": "DMX bridge online." },
-        "audio": { "status": "ok", "summary": "OSC connection synchronized." },
-        "controlSurface": { "status": "ok", "summary": "Companion bridge responding." }
+        "lighting": {
+          "status": "ok",
+          "summary": "DMX bridge online."
+        },
+        "audio": {
+          "status": "ok",
+          "summary": "OSC connection synchronized."
+        },
+        "controlSurface": {
+          "status": "ok",
+          "summary": "Companion bridge responding."
+        }
       }
     },
     "commissioningSnapshot": {
@@ -108,9 +138,21 @@
       "stage": "ready",
       "summary": "Commissioning complete and operator mode unlocked.",
       "checks": [
-        { "label": "Lighting bridge", "status": "ok", "detail": "Universe 1 responding." },
-        { "label": "Audio console", "status": "ok", "detail": "OSC sync healthy." },
-        { "label": "Control surface", "status": "ok", "detail": "Profile export current." }
+        {
+          "label": "Lighting bridge",
+          "status": "ok",
+          "detail": "Universe 1 responding."
+        },
+        {
+          "label": "Audio console",
+          "status": "ok",
+          "detail": "OSC sync healthy."
+        },
+        {
+          "label": "Control surface",
+          "status": "ok",
+          "detail": "Profile export current."
+        }
       ]
     },
     "supportSnapshot": {
@@ -174,9 +216,18 @@
         "[WARN] Companion profile export is older than the current planning data."
       ],
       "checks": {
-        "lighting": { "status": "attention", "summary": "DMX bridge needs re-verification." },
-        "audio": { "status": "ok", "summary": "OSC connection synchronized." },
-        "controlSurface": { "status": "attention", "summary": "Companion export stale." }
+        "lighting": {
+          "status": "attention",
+          "summary": "DMX bridge needs re-verification."
+        },
+        "audio": {
+          "status": "ok",
+          "summary": "OSC connection synchronized."
+        },
+        "controlSurface": {
+          "status": "attention",
+          "summary": "Companion export stale."
+        }
       }
     },
     "commissioningSnapshot": {
@@ -185,9 +236,21 @@
       "stage": "ready",
       "summary": "Commissioning complete and operator mode unlocked.",
       "checks": [
-        { "label": "Lighting bridge", "status": "attention", "detail": "Universe changed after verification." },
-        { "label": "Audio console", "status": "ok", "detail": "OSC sync healthy." },
-        { "label": "Control surface", "status": "attention", "detail": "Companion export is stale." }
+        {
+          "label": "Lighting bridge",
+          "status": "attention",
+          "detail": "Universe changed after verification."
+        },
+        {
+          "label": "Audio console",
+          "status": "ok",
+          "detail": "OSC sync healthy."
+        },
+        {
+          "label": "Control surface",
+          "status": "attention",
+          "detail": "Companion export is stale."
+        }
       ]
     },
     "supportSnapshot": {
@@ -210,7 +273,9 @@
   "startup-loading": {
     "startupDelayMs": 600000,
     "appSnapshot": {
-      "shell": { "workspace": "setup" },
+      "shell": {
+        "workspace": "setup"
+      },
       "summary": "Starting replacement shell."
     }
   },
@@ -292,8 +357,16 @@
       "selectedFixtureId": "fixture-key",
       "selectedSceneId": "scene-warm-wash",
       "activeCueId": "cue-opening",
-      "cameraMarker": { "x": 0.16, "y": 0.84, "rotation": 12 },
-      "subjectMarker": { "x": 0.5, "y": 0.54, "rotation": 180 },
+      "cameraMarker": {
+        "x": 0.16,
+        "y": 0.84,
+        "rotation": 12
+      },
+      "subjectMarker": {
+        "x": 0.5,
+        "y": 0.54,
+        "rotation": 180
+      },
       "fixtures": [
         {
           "id": "fixture-key",
@@ -361,8 +434,16 @@
         }
       ],
       "groups": [
-        { "id": "group-front", "name": "Front", "fixtureCount": 2 },
-        { "id": "group-back", "name": "Back", "fixtureCount": 2 }
+        {
+          "id": "group-front",
+          "name": "Front",
+          "fixtureCount": 2
+        },
+        {
+          "id": "group-back",
+          "name": "Back",
+          "fixtureCount": 2
+        }
       ],
       "scenes": [
         {
@@ -370,10 +451,30 @@
           "name": "Warm wash",
           "fixtureCount": 4,
           "fixtureStates": [
-            { "fixtureId": "fixture-key", "intensity": 76, "cct": 3200, "on": true },
-            { "fixtureId": "fixture-fill", "intensity": 58, "cct": 4300, "on": true },
-            { "fixtureId": "fixture-back", "intensity": 0, "cct": 5600, "on": false },
-            { "fixtureId": "fixture-kicker", "intensity": 64, "cct": 3000, "on": true }
+            {
+              "fixtureId": "fixture-key",
+              "intensity": 76,
+              "cct": 3200,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-fill",
+              "intensity": 58,
+              "cct": 4300,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-back",
+              "intensity": 0,
+              "cct": 5600,
+              "on": false
+            },
+            {
+              "fixtureId": "fixture-kicker",
+              "intensity": 64,
+              "cct": 3000,
+              "on": true
+            }
           ],
           "lastRecalled": true,
           "lastRecalledAt": "2026-04-22T11:42:00.000Z"
@@ -383,10 +484,30 @@
           "name": "Interview",
           "fixtureCount": 4,
           "fixtureStates": [
-            { "fixtureId": "fixture-key", "intensity": 92, "cct": 4400, "on": true },
-            { "fixtureId": "fixture-fill", "intensity": 46, "cct": 4300, "on": true },
-            { "fixtureId": "fixture-back", "intensity": 18, "cct": 5600, "on": true },
-            { "fixtureId": "fixture-kicker", "intensity": 52, "cct": 3200, "on": true }
+            {
+              "fixtureId": "fixture-key",
+              "intensity": 92,
+              "cct": 4400,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-fill",
+              "intensity": 46,
+              "cct": 4300,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-back",
+              "intensity": 18,
+              "cct": 5600,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-kicker",
+              "intensity": 52,
+              "cct": 3200,
+              "on": true
+            }
           ],
           "lastRecalled": false,
           "lastRecalledAt": null
@@ -511,8 +632,16 @@
         }
       ],
       "groups": [
-        { "id": "group-front", "name": "Front", "fixtureCount": 2 },
-        { "id": "group-back", "name": "Back", "fixtureCount": 2 }
+        {
+          "id": "group-front",
+          "name": "Front",
+          "fixtureCount": 2
+        },
+        {
+          "id": "group-back",
+          "name": "Back",
+          "fixtureCount": 2
+        }
       ],
       "scenes": [
         {
@@ -520,10 +649,30 @@
           "name": "Warm wash",
           "fixtureCount": 4,
           "fixtureStates": [
-            { "fixtureId": "fixture-key", "intensity": 76, "cct": 3200, "on": true },
-            { "fixtureId": "fixture-fill", "intensity": 58, "cct": 4300, "on": true },
-            { "fixtureId": "fixture-back", "intensity": 0, "cct": 5600, "on": false },
-            { "fixtureId": "fixture-kicker", "intensity": 64, "cct": 3000, "on": true }
+            {
+              "fixtureId": "fixture-key",
+              "intensity": 76,
+              "cct": 3200,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-fill",
+              "intensity": 58,
+              "cct": 4300,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-back",
+              "intensity": 0,
+              "cct": 5600,
+              "on": false
+            },
+            {
+              "fixtureId": "fixture-kicker",
+              "intensity": 64,
+              "cct": 3000,
+              "on": true
+            }
           ],
           "lastRecalled": true,
           "lastRecalledAt": "2026-04-22T11:42:00.000Z"
@@ -533,10 +682,30 @@
           "name": "Interview",
           "fixtureCount": 4,
           "fixtureStates": [
-            { "fixtureId": "fixture-key", "intensity": 92, "cct": 4400, "on": true },
-            { "fixtureId": "fixture-fill", "intensity": 46, "cct": 4300, "on": true },
-            { "fixtureId": "fixture-back", "intensity": 18, "cct": 5600, "on": true },
-            { "fixtureId": "fixture-kicker", "intensity": 52, "cct": 3200, "on": true }
+            {
+              "fixtureId": "fixture-key",
+              "intensity": 92,
+              "cct": 4400,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-fill",
+              "intensity": 46,
+              "cct": 4300,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-back",
+              "intensity": 18,
+              "cct": 5600,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-kicker",
+              "intensity": 52,
+              "cct": 3200,
+              "on": true
+            }
           ],
           "lastRecalled": false,
           "lastRecalledAt": null
@@ -606,7 +775,9 @@
   },
   "lighting-empty": {
     "appSnapshot": {
-      "shell": { "workspace": "lighting" },
+      "shell": {
+        "workspace": "lighting"
+      },
       "summary": "Lighting workspace active."
     },
     "commissioningSnapshot": {
@@ -640,7 +811,9 @@
   },
   "lighting-dmx-unreachable": {
     "appSnapshot": {
-      "shell": { "workspace": "lighting" },
+      "shell": {
+        "workspace": "lighting"
+      },
       "summary": "Lighting workspace active."
     },
     "commissioningSnapshot": {
@@ -725,8 +898,16 @@
         }
       ],
       "groups": [
-        { "id": "group-front", "name": "Front", "fixtureCount": 2 },
-        { "id": "group-back", "name": "Back", "fixtureCount": 2 }
+        {
+          "id": "group-front",
+          "name": "Front",
+          "fixtureCount": 2
+        },
+        {
+          "id": "group-back",
+          "name": "Back",
+          "fixtureCount": 2
+        }
       ],
       "scenes": [
         {
@@ -734,10 +915,30 @@
           "name": "Warm wash",
           "fixtureCount": 4,
           "fixtureStates": [
-            { "fixtureId": "fixture-key", "intensity": 76, "cct": 3200, "on": true },
-            { "fixtureId": "fixture-fill", "intensity": 58, "cct": 4300, "on": true },
-            { "fixtureId": "fixture-back", "intensity": 0, "cct": 5600, "on": false },
-            { "fixtureId": "fixture-kicker", "intensity": 64, "cct": 3000, "on": true }
+            {
+              "fixtureId": "fixture-key",
+              "intensity": 76,
+              "cct": 3200,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-fill",
+              "intensity": 58,
+              "cct": 4300,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-back",
+              "intensity": 0,
+              "cct": 5600,
+              "on": false
+            },
+            {
+              "fixtureId": "fixture-kicker",
+              "intensity": 64,
+              "cct": 3000,
+              "on": true
+            }
           ],
           "lastRecalled": true,
           "lastRecalledAt": "2026-04-22T11:42:00.000Z"
@@ -747,10 +948,30 @@
           "name": "Interview",
           "fixtureCount": 4,
           "fixtureStates": [
-            { "fixtureId": "fixture-key", "intensity": 92, "cct": 4400, "on": true },
-            { "fixtureId": "fixture-fill", "intensity": 46, "cct": 4300, "on": true },
-            { "fixtureId": "fixture-back", "intensity": 18, "cct": 5600, "on": true },
-            { "fixtureId": "fixture-kicker", "intensity": 52, "cct": 3200, "on": true }
+            {
+              "fixtureId": "fixture-key",
+              "intensity": 92,
+              "cct": 4400,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-fill",
+              "intensity": 46,
+              "cct": 4300,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-back",
+              "intensity": 18,
+              "cct": 5600,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-kicker",
+              "intensity": 52,
+              "cct": 3200,
+              "on": true
+            }
           ],
           "lastRecalled": false,
           "lastRecalledAt": null
@@ -784,7 +1005,9 @@
   },
   "audio-populated": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -820,7 +1043,9 @@
   },
   "audio-ready-overview": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -856,7 +1081,9 @@
   },
   "audio-state-assumed": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -892,7 +1119,9 @@
   },
   "audio-not-verified": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -930,7 +1159,9 @@
   },
   "audio-osc-disabled": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -969,7 +1200,9 @@
   },
   "audio-offline": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -1006,7 +1239,9 @@
   },
   "audio-action-failed": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -1043,7 +1278,9 @@
   },
   "audio-selected-channel": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -1080,7 +1317,9 @@
   },
   "audio-loading": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -1112,7 +1351,9 @@
   },
   "audio-1920-fallback": {
     "appSnapshot": {
-      "shell": { "workspace": "audio" },
+      "shell": {
+        "workspace": "audio"
+      },
       "summary": "Audio workspace active."
     },
     "commissioningSnapshot": {
@@ -1148,7 +1389,9 @@
   },
   "planning-populated": {
     "appSnapshot": {
-      "shell": { "workspace": "planning" },
+      "shell": {
+        "workspace": "planning"
+      },
       "summary": "Planning timeline active."
     },
     "commissioningSnapshot": {
@@ -1235,7 +1478,7 @@
         {
           "id": "task-probe-hardware",
           "projectId": "proj-evening-service",
-          "title": "Probe hardware · DMX/OSC",
+          "title": "Probe hardware \u00b7 DMX/OSC",
           "description": "",
           "priority": "p1",
           "dueDate": null,
@@ -1271,7 +1514,7 @@
         {
           "id": "task-draft-run-of-show",
           "projectId": "proj-evening-service",
-          "title": "Draft run-of-show · Tue",
+          "title": "Draft run-of-show \u00b7 Tue",
           "description": "",
           "priority": "p0",
           "dueDate": null,
@@ -1307,14 +1550,22 @@
         {
           "id": "task-commission-streamdeck",
           "projectId": "proj-booth-2",
-          "title": "Commission Stream Deck+ · Booth 2",
+          "title": "Commission Stream Deck+ \u00b7 Booth 2",
           "description": "",
           "priority": "p0",
           "dueDate": null,
           "labels": ["control-surface"],
           "checklist": [
-            { "id": "chk-streamdeck-page", "text": "Pair Booth 2 page", "done": true },
-            { "id": "chk-streamdeck-handoff", "text": "Verify companion trigger handoff", "done": false }
+            {
+              "id": "chk-streamdeck-page",
+              "text": "Pair Booth 2 page",
+              "done": true
+            },
+            {
+              "id": "chk-streamdeck-handoff",
+              "text": "Verify companion trigger handoff",
+              "done": false
+            }
           ],
           "isRunning": true,
           "totalSeconds": 4680,
@@ -1346,7 +1597,7 @@
         {
           "id": "task-dmx-splitter",
           "projectId": "proj-lighting",
-          "title": "DMX splitter · stage right",
+          "title": "DMX splitter \u00b7 stage right",
           "description": "",
           "priority": "p0",
           "dueDate": null,
@@ -1364,7 +1615,7 @@
         {
           "id": "task-save-backup",
           "projectId": "proj-ops",
-          "title": "Save backup · pre-service",
+          "title": "Save backup \u00b7 pre-service",
           "description": "",
           "priority": "p2",
           "dueDate": null,
@@ -1431,7 +1682,9 @@
   },
   "planning-all-unscheduled": {
     "appSnapshot": {
-      "shell": { "workspace": "planning" },
+      "shell": {
+        "workspace": "planning"
+      },
       "summary": "Planning timeline active. All tasks start unscheduled."
     },
     "commissioningSnapshot": {
@@ -1518,7 +1771,7 @@
         {
           "id": "task-probe-hardware",
           "projectId": "proj-evening-service",
-          "title": "Probe hardware · DMX/OSC",
+          "title": "Probe hardware \u00b7 DMX/OSC",
           "description": "",
           "priority": "p1",
           "dueDate": null,
@@ -1554,7 +1807,7 @@
         {
           "id": "task-draft-run-of-show",
           "projectId": "proj-evening-service",
-          "title": "Draft run-of-show · Tue",
+          "title": "Draft run-of-show \u00b7 Tue",
           "description": "",
           "priority": "p0",
           "dueDate": null,
@@ -1590,14 +1843,22 @@
         {
           "id": "task-commission-streamdeck",
           "projectId": "proj-booth-2",
-          "title": "Commission Stream Deck+ · Booth 2",
+          "title": "Commission Stream Deck+ \u00b7 Booth 2",
           "description": "",
           "priority": "p0",
           "dueDate": null,
           "labels": ["control-surface"],
           "checklist": [
-            { "id": "chk-streamdeck-page", "text": "Pair Booth 2 page", "done": true },
-            { "id": "chk-streamdeck-handoff", "text": "Verify companion trigger handoff", "done": false }
+            {
+              "id": "chk-streamdeck-page",
+              "text": "Pair Booth 2 page",
+              "done": true
+            },
+            {
+              "id": "chk-streamdeck-handoff",
+              "text": "Verify companion trigger handoff",
+              "done": false
+            }
           ],
           "isRunning": true,
           "totalSeconds": 4680,
@@ -1629,7 +1890,7 @@
         {
           "id": "task-dmx-splitter",
           "projectId": "proj-lighting",
-          "title": "DMX splitter · stage right",
+          "title": "DMX splitter \u00b7 stage right",
           "description": "",
           "priority": "p0",
           "dueDate": null,
@@ -1647,7 +1908,7 @@
         {
           "id": "task-save-backup",
           "projectId": "proj-ops",
-          "title": "Save backup · pre-service",
+          "title": "Save backup \u00b7 pre-service",
           "description": "",
           "priority": "p2",
           "dueDate": null,
@@ -1714,7 +1975,9 @@
   },
   "planning-empty": {
     "appSnapshot": {
-      "shell": { "workspace": "planning" },
+      "shell": {
+        "workspace": "planning"
+      },
       "summary": "Planning ready for new work."
     },
     "commissioningSnapshot": {
@@ -1745,7 +2008,9 @@
   },
   "planning-loading-board": {
     "appSnapshot": {
-      "shell": { "workspace": "planning" },
+      "shell": {
+        "workspace": "planning"
+      },
       "planning": {
         "modeSection": "board",
         "timelineStartHour": 9,
@@ -1766,7 +2031,9 @@
   },
   "planning-overlap": {
     "appSnapshot": {
-      "shell": { "workspace": "planning" },
+      "shell": {
+        "workspace": "planning"
+      },
       "summary": "Planning timeline ready for overlap verification."
     },
     "commissioningSnapshot": {
@@ -1841,6 +2108,222 @@
         "selectedProjectId": "proj-overlap",
         "selectedTaskId": "task-overlap-primary"
       }
+    }
+  },
+  "lighting-populated-noselect": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "lighting",
+        "lighting": {
+          "currentSectionId": null,
+          "selectedCueId": "cue-opening"
+        }
+      },
+      "summary": "Lighting workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish"
+    },
+    "healthSnapshot": {
+      "status": "ok",
+      "summary": "Lighting bridge online."
+    },
+    "lightingSnapshot": {
+      "status": "ready",
+      "summary": "Lighting snapshot active.",
+      "adapterMode": "simulated-dmx",
+      "bridgeIp": "192.168.1.80",
+      "universe": 1,
+      "enabled": true,
+      "grandMaster": 100,
+      "connected": true,
+      "reachable": true,
+      "lastActionStatus": "ok",
+      "selectedFixtureId": null,
+      "selectedSceneId": "scene-warm-wash",
+      "activeCueId": "cue-opening",
+      "cameraMarker": {
+        "x": 0.16,
+        "y": 0.84,
+        "rotation": 12
+      },
+      "subjectMarker": {
+        "x": 0.5,
+        "y": 0.54,
+        "rotation": 180
+      },
+      "fixtures": [
+        {
+          "id": "fixture-key",
+          "name": "Key",
+          "type": "Astra",
+          "dmxStartAddress": 1,
+          "kind": "area",
+          "groupId": "group-front",
+          "spatialX": 0.24,
+          "spatialY": 0.26,
+          "spatialRotation": 0,
+          "rigZ": 4.2,
+          "beamAngleDegrees": 38,
+          "on": true,
+          "intensity": 76,
+          "cct": 3200
+        },
+        {
+          "id": "fixture-fill",
+          "name": "Fill",
+          "type": "Astra",
+          "dmxStartAddress": 21,
+          "kind": "area",
+          "groupId": "group-front",
+          "spatialX": 0.74,
+          "spatialY": 0.28,
+          "spatialRotation": 0,
+          "rigZ": null,
+          "beamAngleDegrees": null,
+          "on": true,
+          "intensity": 58,
+          "cct": 4300
+        },
+        {
+          "id": "fixture-back",
+          "name": "Back",
+          "type": "Infinibar",
+          "dmxStartAddress": 41,
+          "kind": "beam",
+          "groupId": "group-back",
+          "spatialX": 0.5,
+          "spatialY": 0.62,
+          "spatialRotation": 180,
+          "rigZ": null,
+          "beamAngleDegrees": null,
+          "on": false,
+          "intensity": 0,
+          "cct": 5600
+        },
+        {
+          "id": "fixture-kicker",
+          "name": "Warm wash",
+          "type": "Apollo Bridge",
+          "dmxStartAddress": 61,
+          "kind": "wash",
+          "groupId": "group-back",
+          "spatialX": 0.82,
+          "spatialY": 0.62,
+          "spatialRotation": 215,
+          "rigZ": null,
+          "beamAngleDegrees": null,
+          "on": true,
+          "intensity": 64,
+          "cct": 3000
+        }
+      ],
+      "groups": [
+        {
+          "id": "group-front",
+          "name": "Front",
+          "fixtureCount": 2
+        },
+        {
+          "id": "group-back",
+          "name": "Back",
+          "fixtureCount": 2
+        }
+      ],
+      "scenes": [
+        {
+          "id": "scene-warm-wash",
+          "name": "Warm wash",
+          "fixtureCount": 4,
+          "fixtureStates": [
+            {
+              "fixtureId": "fixture-key",
+              "intensity": 76,
+              "cct": 3200,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-fill",
+              "intensity": 58,
+              "cct": 4300,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-back",
+              "intensity": 0,
+              "cct": 5600,
+              "on": false
+            },
+            {
+              "fixtureId": "fixture-kicker",
+              "intensity": 64,
+              "cct": 3000,
+              "on": true
+            }
+          ],
+          "lastRecalled": true,
+          "lastRecalledAt": "2026-04-22T11:42:00.000Z"
+        },
+        {
+          "id": "scene-interview",
+          "name": "Interview",
+          "fixtureCount": 4,
+          "fixtureStates": [
+            {
+              "fixtureId": "fixture-key",
+              "intensity": 92,
+              "cct": 4400,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-fill",
+              "intensity": 46,
+              "cct": 4300,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-back",
+              "intensity": 18,
+              "cct": 5600,
+              "on": true
+            },
+            {
+              "fixtureId": "fixture-kicker",
+              "intensity": 52,
+              "cct": 3200,
+              "on": true
+            }
+          ],
+          "lastRecalled": false,
+          "lastRecalledAt": null
+        }
+      ],
+      "cues": [
+        {
+          "id": "cue-opening",
+          "ordinal": 1,
+          "label": "Opening look",
+          "sceneId": "scene-warm-wash",
+          "fadeInMs": 1200,
+          "fadeOutMs": 600,
+          "followSeconds": null,
+          "notes": "Hold for mic check.",
+          "state": "active"
+        },
+        {
+          "id": "cue-interview",
+          "ordinal": 2,
+          "label": "Interview look",
+          "sceneId": "scene-interview",
+          "fadeInMs": 1500,
+          "fadeOutMs": 800,
+          "followSeconds": null,
+          "notes": null,
+          "state": "pending"
+        }
+      ]
     }
   }
 }

@@ -67,3 +67,58 @@
   color: var(--color-brand-text-muted);
   font-feature-settings: "tnum", "zero";
 }
+
+/* Wave 31 — view bookmark slots (I7). Three numbered buttons after the
+   reset button. Filled state borrows the green accent so the operator
+   sees at a glance which slots have a view stored. */
+.bookmarkGroup {
+  align-items: stretch;
+  border-left: 1px solid var(--color-bg-stroke);
+  display: inline-flex;
+  gap: 1px;
+  margin-left: 2px;
+  padding-left: 2px;
+}
+
+.bookmarkButton {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-tight-sm);
+  color: var(--color-brand-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-feature-settings: "tnum", "zero";
+  font-size: 10px;
+  font-weight: 600;
+  height: 26px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 0;
+  width: 22px;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.bookmarkButton:hover {
+  background: var(--color-bg-strong);
+  color: var(--color-brand-text-primary);
+}
+
+.bookmarkButton:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 1px;
+}
+
+.bookmarkButtonFilled {
+  background: var(--color-brand-green-soft);
+  border-color: var(--color-brand-green-border);
+  color: var(--color-brand-green);
+}
+
+.bookmarkButtonFilled:hover {
+  background: var(--color-brand-green-glow);
+  color: var(--color-brand-text-primary);
+}

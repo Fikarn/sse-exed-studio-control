@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, RefObject, WheelEvent as ReactWheelEvent } from "react";
 
 const MIN_ZOOM = 0.4;
@@ -6,6 +6,13 @@ const MAX_ZOOM = 5;
 const ZOOM_STEP = 1.2;
 const WHEEL_ZOOM_STEP = 1.0015;
 const CLICK_PX_THRESHOLD = 4;
+
+// Wave 31 — saved view bookmarks (I7). Three numbered slots persisted to
+// localStorage. Empty slots stay null so consumers can render a "save" hint.
+// Animation easing matches `reset()` so recall feels familiar.
+export const VIEW_BOOKMARK_SLOT_COUNT = 3;
+const BOOKMARK_STORAGE_KEY = "app.lighting.stagePlotViewBookmarks";
+const BOOKMARK_ANIMATION_MS = 200;
 
 interface ViewportState {
   zoom: number;
@@ -24,6 +31,9 @@ function clientToSvg(svg: SVGSVGElement, clientX: number, clientY: number) {
   return pt.matrixTransform(ctm.inverse());
 }
 
+export type ViewBookmarkSlot = 0 | 1 | 2;
+export type ViewBookmarks = readonly (ViewportState | null)[];
+
 export interface StagePlotViewport {
   svgRef: RefObject<SVGSVGElement | null>;
   transform: string;
@@ -36,6 +46,15 @@ export interface StagePlotViewport {
   zoomIn: () => void;
   zoomOut: () => void;
   reset: () => void;
+  /** Wave 31 — view bookmarks (I7). Three numbered slots; null when empty. */
+  viewBookmarks: ViewBookmarks;
+  /** Save current zoom + pan to slot. Persists to localStorage. */
+  saveViewBookmark: (slot: ViewBookmarkSlot) => void;
+  /** Recall slot. Animates from current viewport to the slot's stored state
+   *  over 200 ms (matching `reset()` easing). No-op if slot is empty. */
+  recallViewBookmark: (slot: ViewBookmarkSlot) => void;
+  /** Clear a slot. Persists to localStorage. */
+  clearViewBookmark: (slot: ViewBookmarkSlot) => void;
 }
 
 export interface UseStagePlotViewportOptions {
@@ -45,11 +64,51 @@ export interface UseStagePlotViewportOptions {
   onBackgroundClick?: () => void;
 }
 
+function readBookmarks(): ViewBookmarks {
+  if (typeof window === "undefined") return EMPTY_BOOKMARKS;
+  try {
+    const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
+    if (!raw) return EMPTY_BOOKMARKS;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return EMPTY_BOOKMARKS;
+    return parsed.slice(0, VIEW_BOOKMARK_SLOT_COUNT).map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const candidate = entry as { zoom?: unknown; panX?: unknown; panY?: unknown };
+      const zoom = typeof candidate.zoom === "number" ? candidate.zoom : null;
+      const panX = typeof candidate.panX === "number" ? candidate.panX : null;
+      const panY = typeof candidate.panY === "number" ? candidate.panY : null;
+      if (zoom === null || panX === null || panY === null) return null;
+      // Defensive clamp so a corrupted blob can't drive the viewport out of bounds.
+      const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+      return { zoom: clampedZoom, panX, panY };
+    }) as ViewBookmarks;
+  } catch {
+    return EMPTY_BOOKMARKS;
+  }
+}
+
+function writeBookmarks(next: ViewBookmarks): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Best-effort write — operator can re-save in this session.
+  }
+}
+
+const EMPTY_BOOKMARKS: ViewBookmarks = Object.freeze([null, null, null]);
+
 export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}): StagePlotViewport {
   const { onBackgroundClick } = options;
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [state, setState] = useState<ViewportState>(IDENTITY);
   const [isPanning, setIsPanning] = useState(false);
+  const [viewBookmarks, setViewBookmarks] = useState<ViewBookmarks>(EMPTY_BOOKMARKS);
+  // Hydrate from localStorage on mount only — avoids SSR-time storage access
+  // and keeps the initial render deterministic.
+  useEffect(() => {
+    setViewBookmarks(readBookmarks());
+  }, []);
   // Pan is bound to middle-mouse (button 1) only since Wave 26's marquee-
   // selection took over plain left-drag. Wheel-zoom and double-click-reset
   // remain on their default gestures.
@@ -157,34 +216,72 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     setZoomAt(state.zoom / ZOOM_STEP, anchor);
   }, [setZoomAt, state.zoom]);
 
-  const reset = useCallback(() => {
+  // Tween the viewport from its current state to a target ViewportState.
+  // Shared by `reset()` (target = IDENTITY) and `recallViewBookmark()` (target =
+  // the stored slot). Honors prefers-reduced-motion by snapping immediately.
+  const animateTo = useCallback((target: ViewportState, durationMs: number) => {
     if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setState(IDENTITY);
+      setState(target);
       return;
     }
     setState((current) => {
       const startZoom = current.zoom;
       const startPanX = current.panX;
       const startPanY = current.panY;
-      if (startZoom === IDENTITY.zoom && startPanX === IDENTITY.panX && startPanY === IDENTITY.panY) {
+      if (startZoom === target.zoom && startPanX === target.panX && startPanY === target.panY) {
         return current;
       }
       const startTime = performance.now();
-      const DURATION_MS = 250;
       // Approximates cubic-bezier(0.22, 1, 0.36, 1) — same easing token used in the design system.
       const ease = (t: number) => 1 - Math.pow(1 - t, 4);
       const tick = (now: number) => {
-        const t = Math.min(1, (now - startTime) / DURATION_MS);
+        const t = Math.min(1, (now - startTime) / durationMs);
         const eased = ease(t);
         setState({
-          zoom: startZoom + (IDENTITY.zoom - startZoom) * eased,
-          panX: startPanX * (1 - eased),
-          panY: startPanY * (1 - eased),
+          zoom: startZoom + (target.zoom - startZoom) * eased,
+          panX: startPanX + (target.panX - startPanX) * eased,
+          panY: startPanY + (target.panY - startPanY) * eased,
         });
         if (t < 1) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
       return current;
+    });
+  }, []);
+
+  const reset = useCallback(() => {
+    animateTo(IDENTITY, 250);
+  }, [animateTo]);
+
+  const saveViewBookmark = useCallback(
+    (slot: ViewBookmarkSlot) => {
+      setViewBookmarks((prev) => {
+        const next = [...prev] as (ViewportState | null)[];
+        next[slot] = { zoom: state.zoom, panX: state.panX, panY: state.panY };
+        const frozen = next as ViewBookmarks;
+        writeBookmarks(frozen);
+        return frozen;
+      });
+    },
+    [state.zoom, state.panX, state.panY]
+  );
+
+  const recallViewBookmark = useCallback(
+    (slot: ViewBookmarkSlot) => {
+      const target = viewBookmarks[slot];
+      if (!target) return;
+      animateTo(target, BOOKMARK_ANIMATION_MS);
+    },
+    [animateTo, viewBookmarks]
+  );
+
+  const clearViewBookmark = useCallback((slot: ViewBookmarkSlot) => {
+    setViewBookmarks((prev) => {
+      const next = [...prev] as (ViewportState | null)[];
+      next[slot] = null;
+      const frozen = next as ViewBookmarks;
+      writeBookmarks(frozen);
+      return frozen;
     });
   }, []);
 
@@ -200,6 +297,10 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     zoomIn,
     zoomOut,
     reset,
+    viewBookmarks,
+    saveViewBookmark,
+    recallViewBookmark,
+    clearViewBookmark,
   };
 }
 

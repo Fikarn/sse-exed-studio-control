@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { HealthBar, type HealthBarItemData } from "@sse/design-system";
 import type { LightingDmxMonitorSnapshot, LightingSnapshot } from "@sse/engine-client";
 
+import styles from "./LightingHealthBar.module.css";
+
 // Driven by Vite's `define` from frontend/app/package.json. Bump the package
 // version and the health bar tracks it on next dev/build.
 const APP_VERSION = `v${__APP_VERSION__}`;
@@ -55,6 +57,14 @@ export interface LightingHealthBarProps {
   fixturesTotal: number;
   driftDetected: boolean;
   lastSavedLabel?: string;
+  /** Wave 31 — P4 toggle button rendered in the actions slot. The actual
+   *  DMX strip is rendered separately in `<LightingWorkspace>`'s overlay
+   *  container so it can float over the body without forcing layout
+   *  shifts. The toggle just flips the parent's `dmxStripOn` state. */
+  dmxStripOn?: boolean;
+  onToggleDmxStrip?: () => void;
+  bridgeReachable?: boolean;
+  bridgeUniverse?: number;
 }
 
 export function LightingHealthBar({
@@ -64,6 +74,10 @@ export function LightingHealthBar({
   fixturesTotal,
   driftDetected,
   lastSavedLabel,
+  dmxStripOn = false,
+  onToggleDmxStrip,
+  bridgeReachable: bridgeReachableOverride,
+  bridgeUniverse,
 }: LightingHealthBarProps) {
   const [sessionMs, setSessionMs] = useState(() => Date.now() - SESSION_STARTED_AT);
 
@@ -74,8 +88,8 @@ export function LightingHealthBar({
     return () => window.clearInterval(interval);
   }, []);
 
-  const reachable = lightingSnapshot?.reachable ?? false;
-  const universe = lightingSnapshot?.universe ?? 1;
+  const reachable = bridgeReachableOverride ?? lightingSnapshot?.reachable ?? false;
+  const universe = bridgeUniverse ?? lightingSnapshot?.universe ?? 1;
   const bridgeIp = lightingSnapshot?.bridgeIp ?? "";
   const channelCount = lightingDmxMonitorSnapshot?.channels.length ?? 0;
 
@@ -113,6 +127,22 @@ export function LightingHealthBar({
     },
   ];
 
+  // Wave 31 — DMX strip toggle action. Renders only when the consumer
+  // wires the toggle; otherwise the actions slot stays empty and the bar
+  // matches its pre-31 look.
+  const dmxToggleAction = onToggleDmxStrip ? (
+    <button
+      type="button"
+      className={`${styles.toggle} ${dmxStripOn ? styles.toggleOn : ""}`}
+      onClick={onToggleDmxStrip}
+      aria-pressed={dmxStripOn}
+      aria-label={dmxStripOn ? "Hide DMX strip" : "Show DMX strip"}
+    >
+      DMX strip
+      <span className={styles.toggleDot} aria-hidden="true" />
+    </button>
+  ) : null;
+
   return (
     <HealthBar
       items={items}
@@ -121,6 +151,7 @@ export function LightingHealthBar({
         { kbd: "?", label: "shortcuts" },
         { kbd: "⌘ ⇧ M", label: "full DMX monitor" },
       ]}
+      actions={dmxToggleAction}
     />
   );
 }

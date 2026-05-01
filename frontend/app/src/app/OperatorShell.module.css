@@ -1,8 +1,13 @@
 .workspaceStack {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
-  grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
+  min-height: 0;
+}
+
+.workspaceStack > :last-child {
+  flex: 1 1 auto;
   min-height: 0;
 }
 

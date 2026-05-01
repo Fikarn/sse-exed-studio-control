@@ -23,6 +23,8 @@ export { ContextMenu } from "./components/ContextMenu";
 export type { ContextMenuItem, ContextMenuItemTone, ContextMenuProps } from "./components/ContextMenu";
 export { ColorPicker } from "./components/ColorPicker";
 export type { ColorPickerProps, ColorPickerSwatch } from "./components/ColorPicker";
+export { ChipStrip } from "./components/ChipStrip";
+export type { ChipStripChip, ChipStripProps } from "./components/ChipStrip";
 export { Tooltip } from "./components/Tooltip";
 export type { TooltipPlacement, TooltipProps } from "./components/Tooltip";
 export { EmptyState, DegradedState } from "./components/OperationalState";
