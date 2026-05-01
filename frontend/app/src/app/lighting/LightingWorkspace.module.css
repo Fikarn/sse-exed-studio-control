@@ -8,6 +8,38 @@
   min-height: 0;
 }
 
+/* Wave 31 — docked strip stack between body and health bar. Each strip
+   handles its own height transition (collapsed = 0 px, open = its own
+   height). The body's `flex: 1 1 auto` reclaims any space the stack
+   gives back, so when both strips are collapsed the body grows to fill
+   the full window minus toolbar + health bar — no empty bar at the
+   bottom. */
+.bottomStripStack {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Wave 31 — DMX strip wrapper (collapsible). Same 0 ↔ 60 px transition
+   pattern as the SelectionChipStrip's shell so the layout slides
+   smoothly when the toggle flips. */
+.dmxStripWrapper {
+  flex-shrink: 0;
+  height: 0;
+  overflow: hidden;
+  transition: height 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dmxStripWrapperOpen {
+  height: 60px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dmxStripWrapper {
+    transition: none;
+  }
+}
+
 .body {
   flex: 1 1 auto;
   display: grid;

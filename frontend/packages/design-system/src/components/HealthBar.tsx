@@ -24,10 +24,14 @@ export interface HealthBarProps {
   /** Backward-compat single-hint alias; folded into `hints` if both are
    *  provided. Prefer `hints` for new call sites. */
   hint?: HealthBarHint;
+  /** Optional trailing slot for clickable controls (e.g. visibility toggles).
+   *  Hints are read-only by design; use `actions` when an interactive control
+   *  belongs in the bar. Renders right of the hint group. */
+  actions?: ReactNode;
   className?: string;
 }
 
-export const HealthBar = ({ items, hints, hint, className }: HealthBarProps) => {
+export const HealthBar = ({ items, hints, hint, actions, className }: HealthBarProps) => {
   const classes = [styles.bar, className].filter(Boolean).join(" ");
   const allHints: readonly HealthBarHint[] = hints ?? (hint ? [hint] : []);
   return (
@@ -52,6 +56,7 @@ export const HealthBar = ({ items, hints, hint, className }: HealthBarProps) => 
           ))}
         </div>
       ) : null}
+      {actions ? <div className={styles.actions}>{actions}</div> : null}
     </div>
   );
 };

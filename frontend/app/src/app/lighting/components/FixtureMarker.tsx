@@ -39,6 +39,10 @@ export interface FixtureMarkerProps {
    *  marks "this is what I picked" so the selection is unambiguous when
    *  the operator's eye scans the plot. */
   highlightOverlay?: boolean;
+  /** Wave 31 — I9 chip-hover signal. When the operator hovers the
+   *  matching chip in the SelectionChipStrip, this fixture's marker
+   *  gets a single-pulse ring so the chip ↔ marker pairing is clear. */
+  chipHovered?: boolean;
   onSelect: (id: string, options: { additive: boolean }) => void;
   /**
    * Optional commit callback when the marker is dragged. xMeters / yMeters
@@ -160,6 +164,7 @@ export function FixtureMarker({
   dimmed = false,
   identifying = false,
   highlightOverlay = false,
+  chipHovered = false,
   onSelect,
   onPositionCommit,
   onRequestRename,
@@ -178,6 +183,7 @@ export function FixtureMarker({
   // visual follows the cursor; the original (centerX, centerY) gets a
   // dashed shadow to anchor the move.
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+  const ghostRef = useRef<{ x: number; y: number } | null>(null);
   // Show a green focus ring around the marker when keyboard focus lands on
   // it (and only on keyboard focus — pointer interactions don't trigger).
   // The :focus-visible CSS pseudo-class is unreliable on SVG <g> in Chromium
@@ -245,7 +251,9 @@ export function FixtureMarker({
 
     const nextX = drag.startCenterX + (nowInner.x - startInner.x);
     const nextY = drag.startCenterY + (nowInner.y - startInner.y);
-    setGhost({ x: nextX, y: nextY });
+    const nextGhost = { x: nextX, y: nextY };
+    ghostRef.current = nextGhost;
+    setGhost(nextGhost);
     // F9 — surface live drag position to the parent so the smart-guide layer
     // can compute alignment lines vs. other fixtures. Pre-snap meters; the
     // commit handler still applies the 0.5 m snap on pointerup.
@@ -257,8 +265,9 @@ export function FixtureMarker({
     if (!drag || drag.pointerId !== event.pointerId) return;
     event.currentTarget.releasePointerCapture(event.pointerId);
     const wasDrag = drag.movedPx >= CLICK_PX_THRESHOLD;
-    const ghostNow = ghost;
+    const ghostNow = ghostRef.current;
     dragRef.current = null;
+    ghostRef.current = null;
     setGhost(null);
     onDragEnd?.(id);
 
@@ -428,6 +437,25 @@ export function FixtureMarker({
             </g>
           );
         })()}
+        {/* Wave 31 — I9 chip-hover ring. A single soft pulse echoes the
+            ChipStrip's hover signal so the chip ↔ marker pairing is
+            unambiguous. Distinct from `selected` (dashed green ring) and
+            `highlightOverlay` (sustained orange) because hover is a
+            transient, non-committing gesture. */}
+        {chipHovered ? (
+          <circle
+            cx={renderX}
+            cy={renderY}
+            r={mounting === "wall-bar" ? 32 : 19}
+            fill="none"
+            strokeWidth={1.6}
+            pointerEvents="none"
+            style={{ stroke: SELECTED_STROKE, opacity: 0.85 }}
+          >
+            <animate attributeName="r" values="16;22;16" dur="0.6s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.85;0.35;0.85" dur="0.6s" repeatCount="indefinite" />
+          </circle>
+        ) : null}
         {/* Identify-burst pulse ring — total 1.2 s matches engine
           identify.rs default duration_ms. SVG <animate> runs natively;
           we don't gate on prefers-reduced-motion because the burst is the

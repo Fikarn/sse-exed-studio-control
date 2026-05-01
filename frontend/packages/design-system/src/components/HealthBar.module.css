@@ -78,6 +78,21 @@
     gap: 18px;
   }
 
+  /* Wave 31 — trailing actions slot for clickable controls in the bar.
+     Sits right of the hint group; padding mirrors the hint group's
+     trailing inset so the bar's right edge keeps a consistent gutter. */
+  .actions {
+    padding: 0 24px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .hintGroup ~ .actions {
+    margin-left: 0;
+  }
+
   .hint {
     display: flex;
     align-items: center;

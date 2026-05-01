@@ -8,7 +8,7 @@ import { deriveMounting } from "../fixtureMounting";
 import { lightingFixtureBeamLength, lightingFixtureBeamWidth } from "../lightingHelpers";
 import { STUDIO_LAYOUT, type StudioLayout } from "../studioLayout";
 import { useMarqueeSelection } from "../useMarqueeSelection";
-import { useStagePlotViewport } from "../useStagePlotViewport";
+import type { StagePlotViewport } from "../useStagePlotViewport";
 
 import { FixtureMarker } from "./FixtureMarker";
 import { LightPool } from "./LightPool";
@@ -58,6 +58,13 @@ export interface StagePlotProps {
   /** F10 — empty-state CTA. When provided and `fixtures.length === 0`, the
    *  empty state renders a primary "Add fixture" button that fires this. */
   onAddFixture?: () => void;
+  /** Wave 31 — viewport hook lifted to the workspace so keyboard shortcuts
+   *  can reach the bookmark API. Required. */
+  viewport: StagePlotViewport;
+  /** Wave 31 — I9 chip-hover signal. When set, the matching marker
+   *  renders a soft pulse so the chip ↔ marker pairing reads at a
+   *  glance. Null when no chip is hovered. */
+  chipHoverFixtureId?: string | null;
 }
 
 const FALLBACK_X_STEP = 1.5;
@@ -88,6 +95,8 @@ export function StagePlot({
   onRequestDeleteFixture,
   onMarqueeSelect,
   onAddFixture,
+  viewport,
+  chipHoverFixtureId,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
@@ -107,10 +116,6 @@ export function StagePlot({
   const handleFixtureDragEnd = useCallback((_id: string) => {
     setDragState(null);
   }, []);
-
-  const viewport = useStagePlotViewport({
-    onBackgroundClick: () => onSelectFixture(null),
-  });
 
   // F2 — marquee selection on plain left-drag. Pan is now middle-mouse only.
   // Hit-test resolves on pointerup against the current fixture positions.
@@ -187,7 +192,14 @@ export function StagePlot({
         ref={viewport.svgRef}
         className={`${styles.plotSvg} ${viewport.isPanning ? styles.plotSvgPanning : ""} ${marquee.rect ? styles.plotSvgMarqueeing : ""}`}
         viewBox={`0 0 ${widthCm} ${depthCm}`}
-        preserveAspectRatio="xMidYMid meet"
+        // Wave 31 — fill the container instead of letterboxing. The studio
+        // is 12×8 m (ratio 1.5); the body on the operator's 2560×1440
+        // monitor lands at ~1.52, so the non-uniform scaling is < 2 % off
+        // — invisible in practice. Trade-off accepted to use the screen
+        // real estate fully (operator's permanent second monitor doesn't
+        // need a precisely scaled architectural drawing; it needs a
+        // glanceable fixture-position read).
+        preserveAspectRatio="none"
         xmlns="http://www.w3.org/2000/svg"
         onPointerDown={(event) => {
           // Route by mouse button: middle (1) drives pan, left (0) drives
@@ -309,6 +321,7 @@ export function StagePlot({
                   dimmed={!fixtureMatches(fixture)}
                   identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
                   highlightOverlay={highlightOverlayFixtureIds?.has(fixture.id) ?? false}
+                  chipHovered={chipHoverFixtureId === fixture.id}
                   onSelect={(id, options) => onSelectFixture(id, options)}
                   onPositionCommit={onPositionCommit}
                   onRequestRename={onRequestRenameFixture}
@@ -397,6 +410,10 @@ export function StagePlot({
         onZoomIn={viewport.zoomIn}
         onZoomOut={viewport.zoomOut}
         onReset={viewport.reset}
+        viewBookmarks={viewport.viewBookmarks}
+        onSaveViewBookmark={viewport.saveViewBookmark}
+        onRecallViewBookmark={viewport.recallViewBookmark}
+        onClearViewBookmark={viewport.clearViewBookmark}
       />
 
       {fixtures.length === 0 ? (
