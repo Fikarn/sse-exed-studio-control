@@ -40,6 +40,7 @@ import type {
   LightingFixtureCreateRequest,
   LightingFixtureUpdateRequest,
   LightingGroupUpdateRequest,
+  LightingPreviewModeRequest,
   LightingSceneCreateRequest,
   LightingSceneUpdateRequest,
   PlanningProjectCreateRequest,
@@ -506,6 +507,12 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     },
     async updateLightingScene(request: LightingSceneUpdateRequest) {
       return performRequest("lighting.scene.update", request as unknown as JsonObject);
+    },
+    async setLightingPreviewMode(request: LightingPreviewModeRequest) {
+      return performRequest("lighting.editor.previewMode", request as unknown as JsonObject);
+    },
+    async discardLightingPreview() {
+      return performRequest("lighting.editor.previewDiscard");
     },
     async deleteLightingScene(sceneId: string) {
       return performRequest("lighting.scene.delete", { sceneId });

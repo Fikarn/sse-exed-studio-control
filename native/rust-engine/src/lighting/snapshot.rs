@@ -192,6 +192,10 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         fixtures,
         groups,
         scenes,
+        preview_mode: false,
+        preview_dirty: false,
+        preview_scene_id: None,
+        preview_fixtures: Vec::new(),
         highlight_fixture_ids,
         solo_fixture_ids,
     }

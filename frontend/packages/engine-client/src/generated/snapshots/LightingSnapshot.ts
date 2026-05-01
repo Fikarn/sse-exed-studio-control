@@ -26,6 +26,10 @@ export type LightingSnapshot = {
   fixtures: Array<LightingFixtureSnapshot>;
   groups: Array<LightingGroupSnapshot>;
   scenes: Array<LightingSceneSnapshot>;
+  previewMode: boolean;
+  previewDirty: boolean;
+  previewSceneId: string | null;
+  previewFixtures: Array<LightingFixtureSnapshot>;
   /**
    * Fixture ids the operator has placed under the Highlight overlay.
    * Empty when Highlight is not active. Surfaced so the frontend can

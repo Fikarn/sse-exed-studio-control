@@ -157,6 +157,11 @@ export interface LightingSceneUpdateRequest {
   colorIndex?: number | null;
 }
 
+export interface LightingPreviewModeRequest {
+  enabled: boolean;
+  patchModeActive?: boolean;
+}
+
 export interface LightingGroupUpdateRequest {
   groupId: string;
   /** New name. Optional — at least one of name / colorIndex is required. */
@@ -243,6 +248,8 @@ export interface ShellStore {
   createLightingFixture(request: LightingFixtureCreateRequest): Promise<JsonValue>;
   createLightingScene(request: LightingSceneCreateRequest): Promise<JsonValue>;
   updateLightingScene(request: LightingSceneUpdateRequest): Promise<JsonValue>;
+  setLightingPreviewMode(request: LightingPreviewModeRequest): Promise<JsonValue>;
+  discardLightingPreview(): Promise<JsonValue>;
   deleteLightingScene(sceneId: string): Promise<JsonValue>;
   reorderLightingScene(sceneId: string, beforeSceneId: string | null): Promise<JsonValue>;
   reorderLightingGroup(groupId: string, beforeGroupId: string | null): Promise<JsonValue>;
