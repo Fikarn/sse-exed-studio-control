@@ -1,9 +1,7 @@
 use std::path::Path;
 
 use super::editor_state::*;
-use super::fade::{
-    apply_active_fade_sample, clear_active_fade, remove_fixture_from_active_fade,
-};
+use super::fade::{apply_active_fade_sample, clear_active_fade, remove_fixture_from_active_fade};
 use super::helpers::*;
 use super::identify::current_unix_ms;
 use super::types::*;

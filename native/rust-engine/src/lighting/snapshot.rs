@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use super::fade::apply_active_fade_sample;
 use super::editor_state::*;
+use super::fade::apply_active_fade_sample;
 use super::helpers::*;
 use super::*;
 

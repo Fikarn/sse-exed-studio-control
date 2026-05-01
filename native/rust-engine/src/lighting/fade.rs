@@ -86,8 +86,14 @@ pub(super) fn apply_active_fade_sample(
             cct: fixture.cct,
             on: fixture.on,
         };
-        let origin = origin_by_id.get(fixture.id.as_str()).copied().unwrap_or(&fallback);
-        let target = target_by_id.get(fixture.id.as_str()).copied().unwrap_or(origin);
+        let origin = origin_by_id
+            .get(fixture.id.as_str())
+            .copied()
+            .unwrap_or(&fallback);
+        let target = target_by_id
+            .get(fixture.id.as_str())
+            .copied()
+            .unwrap_or(origin);
         let sampled = sample_lighting_fade_state(origin, target, progress);
         fixture.intensity = sampled.intensity;
         fixture.cct = sampled.cct;
@@ -145,8 +151,7 @@ fn states_by_fixture_id(
 }
 
 fn lerp_i64(origin: i64, target: i64, progress: f64) -> i64 {
-    (origin as f64 + (target - origin) as f64 * progress)
-        .round() as i64
+    (origin as f64 + (target - origin) as f64 * progress).round() as i64
 }
 
 #[cfg(test)]
@@ -195,11 +200,8 @@ mod tests {
             &state("fixture-key", 100, 5600, true),
             0.25,
         );
-        let restarted = sample_lighting_fade_state(
-            &first_sample,
-            &state("fixture-key", 40, 4000, true),
-            0.5,
-        );
+        let restarted =
+            sample_lighting_fade_state(&first_sample, &state("fixture-key", 40, 4000, true), 0.5);
 
         assert_eq!(first_sample.intensity, 25);
         assert_eq!(first_sample.cct, 3800);
