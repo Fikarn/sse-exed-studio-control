@@ -51,6 +51,14 @@ pub struct LightingSnapshot {
     pub fixtures: Vec<LightingFixtureSnapshot>,
     pub groups: Vec<LightingGroupSnapshot>,
     pub scenes: Vec<LightingSceneSnapshot>,
+    #[serde(rename = "previewMode")]
+    pub preview_mode: bool,
+    #[serde(rename = "previewDirty")]
+    pub preview_dirty: bool,
+    #[serde(rename = "previewSceneId")]
+    pub preview_scene_id: Option<String>,
+    #[serde(rename = "previewFixtures")]
+    pub preview_fixtures: Vec<LightingFixtureSnapshot>,
     /// Fixture ids the operator has placed under the Highlight overlay.
     /// Empty when Highlight is not active. Surfaced so the frontend can
     /// reflect overlay state in the toolbar after a page reload — the
@@ -314,6 +322,8 @@ pub struct LightingSceneRecallResult {
     pub fade_duration_seconds: f64,
     #[serde(rename = "fadeMs")]
     pub fade_ms: i64,
+    #[serde(rename = "previewMode")]
+    pub preview_mode: bool,
     pub summary: String,
 }
 
@@ -326,6 +336,7 @@ pub struct LightingFixtureCreateResult {
 #[derive(Debug, Serialize)]
 pub struct LightingFixtureUpdateResult {
     pub fixture: LightingFixtureSnapshot,
+    pub source: String,
     pub summary: String,
 }
 
@@ -509,6 +520,30 @@ pub struct LightingFixtureIdentifyClearAllRequest;
 pub struct LightingFixtureIdentifyClearAllResult {
     #[serde(rename = "clearedCount")]
     pub cleared_count: usize,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingPreviewModeRequest {
+    pub enabled: bool,
+    pub patch_mode_active: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingPreviewModeResult {
+    pub enabled: bool,
+    pub dirty: bool,
+    #[serde(rename = "previewSceneId")]
+    pub preview_scene_id: Option<String>,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingPreviewDiscardRequest;
+
+#[derive(Debug, Serialize)]
+pub struct LightingPreviewDiscardResult {
+    pub discarded: bool,
     pub summary: String,
 }
 

@@ -191,6 +191,10 @@ function buildDefaultLightingSnapshot(): JsonObject {
     fixtures: [],
     groups: [],
     scenes: [],
+    previewMode: false,
+    previewDirty: false,
+    previewSceneId: null,
+    previewFixtures: [],
     selectedSceneId: null,
     selectedFixtureId: null,
   };
@@ -1735,6 +1739,39 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         return cloneJson(state.lightingSnapshot);
       case "lighting.dmxMonitor.snapshot":
         return buildLightingDmxMonitorSnapshot(asRecord(state.lightingSnapshot));
+      case "lighting.editor.previewMode": {
+        const enabled = asBoolean(params.enabled, false);
+        const patchModeActive = asBoolean(params.patchModeActive, asBoolean(params.patchMode, false));
+        if (enabled && patchModeActive) {
+          throw new Error("Exit patch mode before enabling lighting preview mode.");
+        }
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? buildDefaultLightingSnapshot();
+        lightingSnapshot.previewMode = enabled;
+        lightingSnapshot.previewDirty = false;
+        lightingSnapshot.previewSceneId = enabled ? asString(lightingSnapshot.lastRecalledSceneId) || null : null;
+        lightingSnapshot.previewFixtures = enabled ? cloneJson(asArray(lightingSnapshot.fixtures)) : [];
+        state.lightingSnapshot = lightingSnapshot;
+        emit("lighting.changed", { reason: "preview-mode-updated" });
+        return {
+          enabled,
+          dirty: false,
+          previewSceneId: lightingSnapshot.previewSceneId,
+          summary: enabled ? "Lighting preview mode enabled." : "Lighting preview mode disabled.",
+        };
+      }
+      case "lighting.editor.previewDiscard": {
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? buildDefaultLightingSnapshot();
+        lightingSnapshot.previewMode = false;
+        lightingSnapshot.previewDirty = false;
+        lightingSnapshot.previewSceneId = null;
+        lightingSnapshot.previewFixtures = [];
+        state.lightingSnapshot = lightingSnapshot;
+        emit("lighting.changed", { reason: "preview-discarded" });
+        return {
+          discarded: true,
+          summary: "Lighting preview edits discarded.",
+        };
+      }
       case "audio.snapshot":
         return cloneJson(state.audioSnapshot);
       case "planning.snapshot":

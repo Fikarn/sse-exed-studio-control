@@ -98,6 +98,7 @@ pub fn recall_lighting_scene(
         recalled_at,
         fade_duration_seconds: request.fade_duration_seconds,
         fade_ms: fade_duration_ms,
+        preview_mode: false,
         summary,
     })
 }

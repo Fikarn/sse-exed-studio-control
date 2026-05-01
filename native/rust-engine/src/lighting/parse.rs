@@ -7,10 +7,10 @@ use super::types::{
     LightingFixtureIdentifyClearAllRequest, LightingFixtureIdentifyRequest,
     LightingFixtureIdentifySequenceRequest, LightingFixtureUpdateRequest,
     LightingGroupCreateRequest, LightingGroupDeleteRequest, LightingGroupPowerRequest,
-    LightingGroupReorderRequest, LightingGroupUpdateRequest, LightingSceneCreateRequest,
-    LightingSceneDeleteRequest, LightingScenePinRequest, LightingSceneRecallRequest,
-    LightingSceneReorderRequest, LightingSceneUpdateRequest, LightingSettingsUpdateRequest,
-    LightingSpatialMarker,
+    LightingGroupReorderRequest, LightingGroupUpdateRequest, LightingPreviewDiscardRequest,
+    LightingPreviewModeRequest, LightingSceneCreateRequest, LightingSceneDeleteRequest,
+    LightingScenePinRequest, LightingSceneRecallRequest, LightingSceneReorderRequest,
+    LightingSceneUpdateRequest, LightingSettingsUpdateRequest, LightingSpatialMarker,
 };
 
 pub fn parse_lighting_scene_recall_request(
@@ -50,6 +50,31 @@ pub fn parse_lighting_scene_recall_request(
         scene_id: String::from(scene_id),
         fade_duration_seconds,
     })
+}
+
+pub fn parse_lighting_preview_mode_request(
+    params: &Value,
+) -> Result<LightingPreviewModeRequest, String> {
+    let enabled = params
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| String::from("enabled must be a boolean"))?;
+    let patch_mode_active = params
+        .get("patchModeActive")
+        .or_else(|| params.get("patchMode"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    Ok(LightingPreviewModeRequest {
+        enabled,
+        patch_mode_active,
+    })
+}
+
+pub fn parse_lighting_preview_discard_request(
+    _params: &Value,
+) -> Result<LightingPreviewDiscardRequest, String> {
+    Ok(LightingPreviewDiscardRequest)
 }
 
 pub fn parse_lighting_fixture_create_request(

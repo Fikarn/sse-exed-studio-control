@@ -184,6 +184,7 @@ pub fn update_lighting_fixture(
 
     Ok(LightingFixtureUpdateResult {
         fixture: lighting_fixture_snapshot_from_state(updated_fixture),
+        source: String::from("live"),
         summary,
     })
 }

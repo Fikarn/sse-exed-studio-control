@@ -20,22 +20,27 @@ use crate::exports::{build_control_surface_snapshot, export_companion_config, Ex
 use crate::legacy_import::{parse_import_request, ImportLegacyError};
 use crate::lighting::{
     build_lighting_health_check, clear_lighting_identify_bursts, create_lighting_fixture,
-    create_lighting_group, create_lighting_scene, delete_lighting_fixture, delete_lighting_group,
-    delete_lighting_scene, identify_lighting_fixture, parse_lighting_all_power_request,
+    create_lighting_group, create_lighting_scene_with_preview, delete_lighting_fixture,
+    delete_lighting_group, delete_lighting_scene, discard_lighting_preview,
+    identify_lighting_fixture, parse_lighting_all_power_request,
     parse_lighting_fixture_create_request, parse_lighting_fixture_delete_request,
     parse_lighting_fixture_highlight_request, parse_lighting_fixture_identify_clear_all_request,
     parse_lighting_fixture_identify_request, parse_lighting_fixture_identify_sequence_request,
     parse_lighting_fixture_update_request, parse_lighting_group_create_request,
     parse_lighting_group_delete_request, parse_lighting_group_power_request,
     parse_lighting_group_reorder_request, parse_lighting_group_update_request,
+    parse_lighting_preview_discard_request, parse_lighting_preview_mode_request,
     parse_lighting_scene_create_request, parse_lighting_scene_delete_request,
     parse_lighting_scene_pin_request, parse_lighting_scene_recall_request,
     parse_lighting_scene_reorder_request, parse_lighting_scene_update_request,
     parse_lighting_settings_update_request, pin_lighting_scene, read_lighting_dmx_monitor_snapshot,
-    read_lighting_snapshot, recall_lighting_scene, reorder_lighting_group, reorder_lighting_scene,
-    set_lighting_all_power, set_lighting_fixture_highlight, set_lighting_group_power,
-    start_lighting_identify_sequence, update_lighting_fixture, update_lighting_group,
-    update_lighting_scene, update_lighting_settings, LightingCommandError,
+    read_lighting_snapshot_with_preview, recall_lighting_scene_with_preview,
+    reorder_lighting_group, reorder_lighting_scene, set_lighting_all_power_with_preview,
+    set_lighting_fixture_highlight, set_lighting_group_power_with_preview,
+    set_lighting_preview_mode, start_lighting_identify_sequence,
+    update_lighting_fixture_with_preview, update_lighting_group,
+    update_lighting_scene_with_preview, update_lighting_settings, LightingCommandError,
+    LightingPreviewRuntimeState,
 };
 use crate::parity_fixtures::{
     load_parity_fixture, parse_parity_fixture_request, ParityFixtureError,
@@ -72,9 +77,11 @@ use crate::support::{
     restore_support_backup, SupportCommandError,
 };
 use serde_json::json;
+use std::sync::{Mutex, MutexGuard};
 
 pub struct EngineApp {
     runtime: RuntimeContext,
+    lighting_preview: Mutex<LightingPreviewRuntimeState>,
 }
 
 pub struct EngineReply {
@@ -99,7 +106,10 @@ impl EngineApp {
     pub fn bootstrap() -> EngineResult<Self> {
         let runtime = bootstrap_runtime()?;
         append_log(&runtime.log_file_path, "INFO", "Engine bootstrap completed")?;
-        Ok(Self { runtime })
+        Ok(Self {
+            runtime,
+            lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
+        })
     }
 
     pub fn ready_event(&self) -> serde_json::Value {
@@ -169,23 +179,41 @@ impl EngineApp {
             // -------------------------------------------------------------
             // Lighting mutations (M-1event)
             // -------------------------------------------------------------
-            "lighting.scene.recall" => self.dispatch_lighting_mutate(
+            "lighting.editor.previewMode" => self.dispatch_lighting_preview_mutate(
+                request,
+                parse_lighting_preview_mode_request,
+                set_lighting_preview_mode,
+                |_| "preview-mode-updated",
+            ),
+            "lighting.editor.previewDiscard" => self.dispatch_lighting_preview_mutate(
+                request,
+                parse_lighting_preview_discard_request,
+                discard_lighting_preview,
+                |_| "preview-discarded",
+            ),
+            "lighting.scene.recall" => self.dispatch_lighting_preview_mutate(
                 request,
                 parse_lighting_scene_recall_request,
-                recall_lighting_scene,
-                "scene-recalled",
+                recall_lighting_scene_with_preview,
+                |result| {
+                    if result.preview_mode {
+                        "scene-preview-recalled"
+                    } else {
+                        "scene-recalled"
+                    }
+                },
             ),
-            "lighting.scene.create" => self.dispatch_lighting_mutate(
+            "lighting.scene.create" => self.dispatch_lighting_preview_mutate(
                 request,
                 parse_lighting_scene_create_request,
-                create_lighting_scene,
-                "scene-created",
+                create_lighting_scene_with_preview,
+                |_| "scene-created",
             ),
-            "lighting.scene.update" => self.dispatch_lighting_mutate(
+            "lighting.scene.update" => self.dispatch_lighting_preview_mutate(
                 request,
                 parse_lighting_scene_update_request,
-                update_lighting_scene,
-                "scene-updated",
+                update_lighting_scene_with_preview,
+                |_| "scene-updated",
             ),
             "lighting.scene.delete" => self.dispatch_lighting_mutate(
                 request,
@@ -241,11 +269,11 @@ impl EngineApp {
                 create_lighting_fixture,
                 "fixture-created",
             ),
-            "lighting.fixture.update" => self.dispatch_lighting_mutate(
+            "lighting.fixture.update" => self.dispatch_lighting_preview_mutate(
                 request,
                 parse_lighting_fixture_update_request,
-                update_lighting_fixture,
-                "fixture-updated",
+                update_lighting_fixture_with_preview,
+                |_| "fixture-updated",
             ),
             "lighting.fixture.delete" => self.dispatch_lighting_mutate(
                 request,
@@ -277,17 +305,17 @@ impl EngineApp {
                 clear_lighting_identify_bursts,
                 "identify-cleared",
             ),
-            "lighting.group.power" => self.dispatch_lighting_mutate(
+            "lighting.group.power" => self.dispatch_lighting_preview_mutate(
                 request,
                 parse_lighting_group_power_request,
-                set_lighting_group_power,
-                "group-powered",
+                set_lighting_group_power_with_preview,
+                |_| "group-powered",
             ),
-            "lighting.power.all" => self.dispatch_lighting_mutate(
+            "lighting.power.all" => self.dispatch_lighting_preview_mutate(
                 request,
                 parse_lighting_all_power_request,
-                set_lighting_all_power,
-                "all-powered",
+                set_lighting_all_power_with_preview,
+                |_| "all-powered",
             ),
             // -------------------------------------------------------------
             // Audio mutations (M-1event)
@@ -768,7 +796,11 @@ impl EngineApp {
 
     fn read_lighting_snapshot(&self) -> EngineResult<serde_json::Value> {
         let app_settings = list_settings_by_prefix(&self.runtime.db_path, APP_SETTINGS_PREFIX)?;
-        Ok(serde_json::to_value(read_lighting_snapshot(&app_settings))?)
+        let preview = self.lighting_preview();
+        Ok(serde_json::to_value(read_lighting_snapshot_with_preview(
+            &app_settings,
+            &preview,
+        ))?)
     }
 
     fn read_lighting_dmx_monitor_snapshot(&self) -> EngineResult<serde_json::Value> {
@@ -924,6 +956,52 @@ impl EngineApp {
                     error.to_string(),
                 )),
             },
+            Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    fn lighting_preview(&self) -> MutexGuard<'_, LightingPreviewRuntimeState> {
+        self.lighting_preview
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn dispatch_lighting_preview_mutate<P, R, F, H, K>(
+        &self,
+        request: RequestEnvelope,
+        parse: F,
+        handler: H,
+        reason: K,
+    ) -> EngineReply
+    where
+        R: serde::Serialize,
+        F: FnOnce(&serde_json::Value) -> Result<P, String>,
+        H: FnOnce(
+            &std::path::Path,
+            &P,
+            &mut LightingPreviewRuntimeState,
+        ) -> Result<R, LightingCommandError>,
+        K: FnOnce(&R) -> &'static str,
+    {
+        match parse(&request.params) {
+            Ok(parsed) => {
+                let mut preview = self.lighting_preview();
+                match handler(&self.runtime.db_path, &parsed, &mut preview) {
+                    Ok(result) => Self::reply_with_lighting_change(
+                        ok_response(
+                            request.id,
+                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                        ),
+                        reason(&result),
+                    ),
+                    Err(LightingCommandError::Rejected(code, message)) => {
+                        Self::reply(error_response(request.id, code, message))
+                    }
+                    Err(LightingCommandError::Storage(message)) => {
+                        Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                    }
+                }
+            }
             Err(message) => Self::reply(invalid_params(request.id, message)),
         }
     }

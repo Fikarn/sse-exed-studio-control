@@ -38,6 +38,61 @@ impl Drop for TestDir {
     }
 }
 
+fn initialize_ready_lighting(label: &str) -> TestDir {
+    let test_dir = TestDir::new(label);
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("2.0.0.10"),
+            ),
+            (
+                format!("app.commissioning.check.{LIGHTING_CHECK_ID}.status"),
+                String::from("passed"),
+            ),
+        ],
+    )
+    .expect("lighting state should persist");
+    test_dir
+}
+
+fn load_test_app_settings(test_dir: &TestDir) -> HashMap<String, String> {
+    list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load")
+}
+
+fn fixture_snapshot<'a>(
+    snapshot: &'a LightingSnapshot,
+    fixture_id: &str,
+) -> &'a LightingFixtureSnapshot {
+    snapshot
+        .fixtures
+        .iter()
+        .find(|fixture| fixture.id == fixture_id)
+        .expect("fixture should be present")
+}
+
+fn preview_fixture_snapshot<'a>(
+    snapshot: &'a LightingSnapshot,
+    fixture_id: &str,
+) -> &'a LightingFixtureSnapshot {
+    snapshot
+        .preview_fixtures
+        .iter()
+        .find(|fixture| fixture.id == fixture_id)
+        .expect("preview fixture should be present")
+}
+
+fn scene_snapshot<'a>(snapshot: &'a LightingSnapshot, scene_id: &str) -> &'a LightingSceneSnapshot {
+    snapshot
+        .scenes
+        .iter()
+        .find(|scene| scene.id == scene_id)
+        .expect("scene should be present")
+}
+
 #[test]
 fn lighting_snapshot_reports_unconfigured_when_no_bridge_exists() {
     let snapshot = read_lighting_snapshot(&HashMap::new());
@@ -188,6 +243,432 @@ fn lighting_scene_recall_updates_last_recalled_scene() {
         .expect("key-left fixture should be present");
     assert!(key_left.on);
     assert!(key_left.intensity <= 90);
+}
+
+#[test]
+fn lighting_preview_enable_seeds_from_live_state() {
+    let test_dir = initialize_ready_lighting("preview-enable");
+    let mut preview = LightingPreviewRuntimeState::default();
+
+    let result = set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+
+    assert!(result.enabled);
+    assert!(!result.dirty);
+    assert!(preview.enabled);
+    let settings = load_test_app_settings(&test_dir);
+    let snapshot = read_lighting_snapshot_with_preview(&settings, &preview);
+    assert!(snapshot.preview_mode);
+    assert!(!snapshot.preview_dirty);
+    assert_eq!(snapshot.preview_fixtures.len(), snapshot.fixtures.len());
+    assert_eq!(
+        preview_fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        fixture_snapshot(&snapshot, "fixture-key-left").intensity
+    );
+
+    let restarted_snapshot =
+        read_lighting_snapshot_with_preview(&settings, &LightingPreviewRuntimeState::default());
+    assert!(!restarted_snapshot.preview_mode);
+    assert!(restarted_snapshot.preview_fixtures.is_empty());
+}
+
+#[test]
+fn lighting_preview_fixture_update_changes_preview_only() {
+    let test_dir = initialize_ready_lighting("preview-fixture-update");
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+
+    let result = update_lighting_fixture_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-left"),
+            name: None,
+            fixture_type: None,
+            dmx_start_address: None,
+            effect: None,
+            on: Some(true),
+            intensity: Some(42),
+            cct: Some(4100),
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+        &mut preview,
+    )
+    .expect("preview fixture update should succeed");
+
+    assert_eq!(result.source, "preview");
+    assert_eq!(result.fixture.intensity, 42);
+    assert!(preview.dirty);
+    let snapshot =
+        read_lighting_snapshot_with_preview(&load_test_app_settings(&test_dir), &preview);
+    assert_eq!(
+        preview_fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        42
+    );
+    assert_ne!(
+        fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        42
+    );
+}
+
+#[test]
+fn lighting_preview_power_commands_change_preview_only() {
+    let test_dir = initialize_ready_lighting("preview-power");
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+
+    let group = set_lighting_group_power_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingGroupPowerRequest {
+            group_id: String::from("group-stage"),
+            on: true,
+        },
+        &mut preview,
+    )
+    .expect("preview group power should succeed");
+    assert_eq!(group.affected_fixtures, 3);
+    let snapshot =
+        read_lighting_snapshot_with_preview(&load_test_app_settings(&test_dir), &preview);
+    assert!(preview_fixture_snapshot(&snapshot, "fixture-key-left").on);
+    assert!(!fixture_snapshot(&snapshot, "fixture-key-left").on);
+
+    set_lighting_all_power_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingAllPowerRequest { on: false },
+        &mut preview,
+    )
+    .expect("preview all power should succeed");
+    let snapshot =
+        read_lighting_snapshot_with_preview(&load_test_app_settings(&test_dir), &preview);
+    assert!(snapshot.preview_fixtures.iter().all(|fixture| !fixture.on));
+    assert!(snapshot.fixtures.iter().all(|fixture| !fixture.on));
+}
+
+#[test]
+fn lighting_preview_scene_recall_leaves_live_recall_state_unchanged() {
+    let test_dir = initialize_ready_lighting("preview-scene-recall");
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+
+    let result = recall_lighting_scene_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingSceneRecallRequest {
+            scene_id: String::from("scene-stream"),
+            fade_duration_seconds: 1.5,
+        },
+        &mut preview,
+    )
+    .expect("preview scene recall should succeed");
+
+    assert!(result.preview_mode);
+    assert_eq!(result.fade_ms, 0);
+    assert!(!preview.dirty);
+    assert_eq!(preview.target_scene_id.as_deref(), Some("scene-stream"));
+    let snapshot =
+        read_lighting_snapshot_with_preview(&load_test_app_settings(&test_dir), &preview);
+    assert_eq!(snapshot.last_recalled_scene_id, None);
+    assert!(!scene_snapshot(&snapshot, "scene-stream").last_recalled);
+    assert_eq!(
+        preview_fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        90
+    );
+    assert_ne!(
+        fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        90
+    );
+}
+
+#[test]
+fn lighting_preview_save_commits_preview_scene_without_live_output() {
+    let test_dir = initialize_ready_lighting("preview-save");
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+    recall_lighting_scene_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingSceneRecallRequest {
+            scene_id: String::from("scene-stream"),
+            fade_duration_seconds: 0.0,
+        },
+        &mut preview,
+    )
+    .expect("preview scene recall should succeed");
+    update_lighting_fixture_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-left"),
+            name: None,
+            fixture_type: None,
+            dmx_start_address: None,
+            effect: None,
+            on: Some(true),
+            intensity: Some(44),
+            cct: None,
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+        &mut preview,
+    )
+    .expect("preview fixture update should succeed");
+
+    update_lighting_scene_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingSceneUpdateRequest {
+            scene_id: String::from("scene-stream"),
+            name: None,
+            capture_current_state: true,
+            color_index: None,
+        },
+        &mut preview,
+    )
+    .expect("preview scene save should succeed");
+
+    assert!(!preview.enabled);
+    let settings = load_test_app_settings(&test_dir);
+    let state = load_lighting_editor_state(&settings);
+    let scene = state
+        .scenes
+        .iter()
+        .find(|scene| scene.id == "scene-stream")
+        .expect("stream scene should exist");
+    assert_eq!(
+        scene
+            .fixture_states
+            .iter()
+            .find(|fixture| fixture.fixture_id == "fixture-key-left")
+            .map(|fixture| fixture.intensity),
+        Some(44)
+    );
+    assert_ne!(
+        state
+            .fixtures
+            .iter()
+            .find(|fixture| fixture.id == "fixture-key-left")
+            .map(|fixture| fixture.intensity),
+        Some(44)
+    );
+}
+
+#[test]
+fn lighting_preview_save_as_creates_scene_and_selects_it() {
+    let test_dir = initialize_ready_lighting("preview-save-as");
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+    update_lighting_fixture_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-left"),
+            name: None,
+            fixture_type: None,
+            dmx_start_address: None,
+            effect: None,
+            on: Some(true),
+            intensity: Some(33),
+            cct: None,
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+        &mut preview,
+    )
+    .expect("preview fixture update should succeed");
+
+    let created = create_lighting_scene_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingSceneCreateRequest {
+            name: String::from("Preview Look"),
+        },
+        &mut preview,
+    )
+    .expect("preview save as should succeed");
+
+    assert!(!preview.enabled);
+    assert_eq!(created.scene.name, "Preview Look");
+    let settings = load_test_app_settings(&test_dir);
+    let snapshot = read_lighting_snapshot(&settings);
+    assert_eq!(
+        snapshot.selected_scene_id.as_deref(),
+        Some(created.scene.id.as_str())
+    );
+    let scene = scene_snapshot(&snapshot, created.scene.id.as_str());
+    assert_eq!(
+        scene
+            .fixture_states
+            .iter()
+            .find(|fixture| fixture.fixture_id == "fixture-key-left")
+            .map(|fixture| fixture.intensity),
+        Some(33)
+    );
+}
+
+#[test]
+fn lighting_preview_discard_and_patch_conflict_are_engine_owned() {
+    let test_dir = initialize_ready_lighting("preview-discard");
+    let mut preview = LightingPreviewRuntimeState::default();
+    let conflict = set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: true,
+        },
+        &mut preview,
+    )
+    .expect_err("patch conflict should reject");
+    match conflict {
+        LightingCommandError::Rejected(code, _) => {
+            assert_eq!(code, "LIGHTING_PREVIEW_PATCH_MODE_CONFLICT")
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+    update_lighting_fixture_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-left"),
+            name: None,
+            fixture_type: None,
+            dmx_start_address: None,
+            effect: None,
+            on: Some(true),
+            intensity: Some(22),
+            cct: None,
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+        &mut preview,
+    )
+    .expect("preview fixture update should succeed");
+    assert!(preview.dirty);
+
+    discard_lighting_preview(
+        test_dir.db_path().as_path(),
+        &LightingPreviewDiscardRequest,
+        &mut preview,
+    )
+    .expect("discard should succeed");
+
+    assert!(!preview.enabled);
+    let snapshot =
+        read_lighting_snapshot_with_preview(&load_test_app_settings(&test_dir), &preview);
+    assert!(!snapshot.preview_mode);
+    assert_ne!(
+        fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        22
+    );
+}
+
+#[test]
+fn lighting_preview_rejects_structural_fixture_updates() {
+    let test_dir = initialize_ready_lighting("preview-structural-reject");
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+
+    let error = update_lighting_fixture_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-left"),
+            name: None,
+            fixture_type: None,
+            dmx_start_address: Some(21),
+            effect: None,
+            on: None,
+            intensity: None,
+            cct: None,
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+        &mut preview,
+    )
+    .expect_err("structural preview update should reject");
+
+    match error {
+        LightingCommandError::Rejected(code, _) => {
+            assert_eq!(code, "LIGHTING_PREVIEW_UNSUPPORTED_UPDATE")
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
 }
 
 #[test]
@@ -462,9 +943,7 @@ fn lighting_settings_update_persists_transport_scene_focus_and_grand_master() {
                 String::from("2.0.0.10"),
             ),
             (
-                String::from(format!(
-                    "app.commissioning.check.{LIGHTING_CHECK_ID}.status"
-                )),
+                format!("app.commissioning.check.{LIGHTING_CHECK_ID}.status"),
                 String::from("passed"),
             ),
         ],
