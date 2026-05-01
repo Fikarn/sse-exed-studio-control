@@ -3,9 +3,7 @@ use std::path::Path;
 use crate::lighting_backend::read_default_lighting_inventory;
 
 use super::editor_state::*;
-use super::fade::{
-    apply_active_fade_sample, fade_duration_ms_from_seconds, start_lighting_fade,
-};
+use super::fade::{apply_active_fade_sample, fade_duration_ms_from_seconds, start_lighting_fade};
 use super::helpers::*;
 use super::identify::current_unix_ms;
 use super::types::*;

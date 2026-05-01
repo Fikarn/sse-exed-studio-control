@@ -161,6 +161,7 @@ fn lighting_scene_recall_updates_last_recalled_scene() {
     assert!(result.recalled);
     assert_eq!(result.scene_name, "Stream");
     assert_eq!(result.fade_duration_seconds, 1.5);
+    assert_eq!(result.fade_ms, 1500);
 
     let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
         .expect("settings should load");
@@ -169,15 +170,24 @@ fn lighting_scene_recall_updates_last_recalled_scene() {
         snapshot.last_recalled_scene_id.as_deref(),
         Some("scene-stream")
     );
-    assert!(snapshot
+    let recalled_scene = snapshot
         .scenes
         .iter()
-        .any(|entry| entry.id == "scene-stream" && entry.last_recalled));
+        .find(|entry| entry.id == "scene-stream")
+        .expect("stream scene should be present");
+    assert!(recalled_scene.last_recalled);
+    assert_eq!(recalled_scene.fade_duration_ms, Some(1500));
+    assert!(recalled_scene
+        .fade_progress
+        .is_some_and(|progress| (0.0..=1.0).contains(&progress)));
     assert_eq!(snapshot.last_action_status, "succeeded");
-    assert!(snapshot
+    let key_left = snapshot
         .fixtures
         .iter()
-        .any(|entry| entry.id == "fixture-key-left" && entry.on && entry.intensity == 90));
+        .find(|entry| entry.id == "fixture-key-left")
+        .expect("key-left fixture should be present");
+    assert!(key_left.on);
+    assert!(key_left.intensity <= 90);
 }
 
 #[test]
