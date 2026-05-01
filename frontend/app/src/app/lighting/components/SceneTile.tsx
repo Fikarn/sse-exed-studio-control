@@ -25,6 +25,7 @@ export interface SceneTileProps {
   avgCct: number;
   isActive: boolean;
   isModified: boolean;
+  isPreviewTarget?: boolean;
   /**
    * When false, drift detection is comparing live state to a preview-only
    * recall, not a scene actually driving the rig. Modified state is shown as
@@ -73,6 +74,7 @@ export function SceneTile({
   avgCct,
   isActive,
   isModified,
+  isPreviewTarget = false,
   bridgeReachable = true,
   lastRecalledLabel,
   fadeProgress = null,
@@ -105,10 +107,19 @@ export function SceneTile({
       ? `${styles.tile} ${styles.tileActive} ${styles.tileModified}`
       : `${styles.tile} ${styles.tileActive}`
     : styles.tile;
-  const stateClass = pinned ? `${baseClass} ${styles.tilePinned}` : baseClass;
+  const previewClass = isPreviewTarget ? `${baseClass} ${styles.tilePreview}` : baseClass;
+  const stateClass = pinned ? `${previewClass} ${styles.tilePinned}` : previewClass;
 
   const subLine = onCount > 0 ? `${onCount} on · ${Math.round(avgCct)} K` : `${onCount} on`;
-  const badgeText = isActive ? (showAsModified ? "Modified" : isModified ? "Preview" : "Active") : null;
+  const badgeText = isPreviewTarget
+    ? "Preview"
+    : isActive
+      ? showAsModified
+        ? "Modified"
+        : isModified
+          ? "Preview"
+          : "Active"
+      : null;
   const ariaLabel = `Recall scene ${name}${badgeText ? ` (${badgeText.toLowerCase()})` : ""}${pinned ? ", pinned" : ""}`;
 
   // dnd-kit sortable hook. Provides setNodeRef, transform/transition that

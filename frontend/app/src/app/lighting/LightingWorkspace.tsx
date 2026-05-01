@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
-import { ConfirmDialog, type PaletteAction } from "@sse/design-system";
+import { Button, ConfirmDialog, Dialog, type PaletteAction } from "@sse/design-system";
 import type {
   LightingDmxMonitorSnapshot,
+  LightingFixtureSnapshot,
   LightingSceneSnapshot,
   LightingSnapshot,
   ShellStore,
@@ -30,6 +31,7 @@ import type { InspectorTab } from "./components/LightingInspectorTabs";
 import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
 import { DMXCompactStrip } from "./components/DMXCompactStrip";
+import { PreviewBanner } from "./components/PreviewBanner";
 import { RenameDialog } from "./components/RenameDialog";
 import { SelectionChipStrip } from "./components/SelectionChipStrip";
 import { StagePlot } from "./components/StagePlot";
@@ -98,13 +100,28 @@ function fixtureStatesEqual(
   return true;
 }
 
+function snapshotWithFixtures(
+  snapshot: LightingSnapshot | null,
+  fixtures: readonly LightingFixtureSnapshot[]
+): LightingSnapshot | null {
+  return snapshot ? { ...snapshot, fixtures: [...fixtures] } : null;
+}
+
 export function LightingWorkspaceSurface({
   appSnapshot,
   lightingDmxMonitorSnapshot,
   lightingSnapshot,
   store,
 }: LightingWorkspaceSurfaceProps) {
-  const fixtures = useMemo(() => lightingSnapshot?.fixtures ?? [], [lightingSnapshot]);
+  const liveFixtures = useMemo(() => lightingSnapshot?.fixtures ?? [], [lightingSnapshot]);
+  const previewMode = lightingSnapshot?.previewMode === true;
+  const previewSnapshotFixtures = useMemo(() => lightingSnapshot?.previewFixtures ?? [], [lightingSnapshot]);
+  const previewTargetSceneId =
+    typeof lightingSnapshot?.previewSceneId === "string" ? lightingSnapshot.previewSceneId : null;
+  const fixtures = useMemo(
+    () => (previewMode && previewSnapshotFixtures.length > 0 ? previewSnapshotFixtures : liveFixtures),
+    [liveFixtures, previewMode, previewSnapshotFixtures]
+  );
   const groups = useMemo(() => lightingSnapshot?.groups ?? [], [lightingSnapshot]);
   const scenes = useMemo(() => lightingSnapshot?.scenes ?? [], [lightingSnapshot]);
   const dmxChannelsRaw = useMemo(
@@ -113,7 +130,11 @@ export function LightingWorkspaceSurface({
   );
   // Re-derive fixtures from shellData accessor for drift comparisons (snapshot
   // -> entry has the null-safe shape the helpers expect).
-  const fixtureEntries = useMemo(() => getLightingFixtures(lightingSnapshot), [lightingSnapshot]);
+  const fixtureEntries = useMemo(
+    () => getLightingFixtures(snapshotWithFixtures(lightingSnapshot, fixtures)),
+    [fixtures, lightingSnapshot]
+  );
+  const liveFixtureEntries = useMemo(() => getLightingFixtures(lightingSnapshot), [lightingSnapshot]);
   // Surface group + scene entries via shellData for parity with rail props.
   const sceneEntries = useMemo(() => getLightingScenes(lightingSnapshot), [lightingSnapshot]);
 
@@ -194,17 +215,17 @@ export function LightingWorkspaceSurface({
   const requestInlineRename = useCallback((kind: "fixture" | "group", id: string) => {
     setPendingInlineRename((prev) => ({ kind, id, nonce: (prev?.nonce ?? 0) + 1 }));
   }, []);
-  // Frontend-only "previewed" scene id. Set immediately when a scene tile is
+  // Frontend-only clicked scene id. Set immediately when a scene tile is
   // clicked so the inspector can show its details even if the engine recall
   // IPC was rejected (e.g. bridge unreachable in dev / pre-probe states).
   // Takes priority over snapshot-derived recalled / persisted selection so
   // the inspector tracks the user's intent rather than the engine's truth.
-  const [previewSceneId, setPreviewSceneId] = useState<string | null>(null);
+  const [inspectorSelectedSceneId, setInspectorSelectedSceneId] = useState<string | null>(null);
 
-  // Wave 30b — X1 hover preview. Distinct from `previewSceneId` because
+  // Wave 30b — X1 hover preview. Distinct from the clicked scene id because
   // hover should ONLY update the inspector's displayed scene, NOT the
   // workspace's active-scene semantics (drift detection, plot pill, tile
-  // green-border treatment, group chip deltas). previewSceneId is for the
+  // green-border treatment, group chip deltas). inspectorSelectedSceneId is for the
   // click-confirmed selection path and feeds activeSceneId; hover stays
   // strictly contained to the inspector. Mouseleave schedules a 200 ms
   // grace clear so a wandering cursor between tiles doesn't make the
@@ -246,7 +267,7 @@ export function LightingWorkspaceSurface({
     }, 200);
   }, []);
   // Click → cancel hover preview synchronously. Called by handleRecallScene
-  // below before previewSceneId flips, so the inspector goes straight to
+  // below before the clicked scene flips, so the inspector goes straight to
   // the clicked scene without a 200 ms intermediate showing the previously-
   // hovered one.
   const cancelHoverPreviewSync = useCallback(() => {
@@ -292,20 +313,31 @@ export function LightingWorkspaceSurface({
     scenesRef.current = scenes;
   }, [scenes]);
 
-  // Active scene = the most recently recalled scene (engine-tracked) falling
-  // back to the persisted selectedSceneId. Kept lean — no persisted "active
-  // cue" anywhere because the cue model is gone in Direction D.
-  const activeSceneId = useMemo(() => {
-    if (previewSceneId && sceneEntries.some((scene) => scene.id === previewSceneId)) {
-      return previewSceneId;
-    }
+  // Live active scene = the most recently recalled scene (engine-tracked)
+  // falling back to the persisted selectedSceneId. Kept separate from the
+  // preview target so the rail can keep showing the live recalled scene while
+  // the plot/inspector display the offline edit buffer.
+  const liveActiveSceneId = useMemo(() => {
     const recalled = sceneEntries.find((scene) => scene.lastRecalled);
     if (recalled) return recalled.id;
     if (persistedSelectedSceneId && sceneEntries.some((scene) => scene.id === persistedSelectedSceneId)) {
       return persistedSelectedSceneId;
     }
     return null;
-  }, [previewSceneId, sceneEntries, persistedSelectedSceneId]);
+  }, [sceneEntries, persistedSelectedSceneId]);
+
+  const activeSceneId = useMemo(() => {
+    if (previewMode) {
+      if (previewTargetSceneId && sceneEntries.some((scene) => scene.id === previewTargetSceneId)) {
+        return previewTargetSceneId;
+      }
+      return liveActiveSceneId;
+    }
+    if (inspectorSelectedSceneId && sceneEntries.some((scene) => scene.id === inspectorSelectedSceneId)) {
+      return inspectorSelectedSceneId;
+    }
+    return liveActiveSceneId;
+  }, [inspectorSelectedSceneId, liveActiveSceneId, previewMode, previewTargetSceneId, sceneEntries]);
 
   const activeScene = useMemo(
     () => scenes.find((scene) => scene.id === activeSceneId) ?? null,
@@ -332,7 +364,9 @@ export function LightingWorkspaceSurface({
     );
   }, [activeScene, fixtureEntries]);
 
-  const modifiedSceneId = isSceneModified && activeSceneId ? activeSceneId : null;
+  const previewDirty = previewMode && ((lightingSnapshot?.previewDirty ?? false) || isSceneModified);
+  const effectiveSceneModified = previewMode ? previewDirty : isSceneModified;
+  const modifiedSceneId = !previewMode && isSceneModified && activeSceneId ? activeSceneId : null;
 
   // Unsaved-changes guard. When the active scene is drifted, intercept any
   // workspace switch (including ⌘1-4, A, ⇧S keyboard shortcuts) with a
@@ -346,7 +380,7 @@ export function LightingWorkspaceSurface({
       setShowLeavePrompt(true);
     });
   }, []);
-  useUnsavedChangesGuard(isSceneModified ? promptForLeave : null);
+  useUnsavedChangesGuard(effectiveSceneModified ? promptForLeave : null);
   // Belt-and-braces: if the workspace unmounts while a prompt is open (e.g.
   // hot reload mid-prompt), resolve the awaiter so the navigation pipeline
   // doesn't deadlock.
@@ -370,7 +404,7 @@ export function LightingWorkspaceSurface({
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       if (cancelled) return;
       const win = getCurrentWindow();
-      void win.setTitle(isSceneModified ? `${baseTitle} · ●` : baseTitle);
+      void win.setTitle(effectiveSceneModified ? `${baseTitle} · ●` : baseTitle);
     })();
     return () => {
       cancelled = true;
@@ -380,7 +414,7 @@ export function LightingWorkspaceSurface({
         void win.setTitle(baseTitle);
       })();
     };
-  }, [isSceneModified]);
+  }, [effectiveSceneModified]);
 
   const selectedFixture = useMemo(
     () => fixtures.find((fixture) => fixture.id === persistedSelectedFixtureId) ?? null,
@@ -450,7 +484,7 @@ export function LightingWorkspaceSurface({
     });
   }, [groups, fixtureEntries, activeScene]);
 
-  const fixturesPatched = fixtureEntries.filter((fixture) => fixture.dmxStartAddress > 0).length;
+  const fixturesPatched = liveFixtureEntries.filter((fixture) => fixture.dmxStartAddress > 0).length;
 
   const bridgeReachable = lightingSnapshot?.reachable === true;
   const bridgeUniverse = lightingSnapshot?.universe ?? 1;
@@ -564,7 +598,66 @@ export function LightingWorkspaceSurface({
     [fixtures, selectedFixtureIds]
   );
 
+  const [showPreviewExitPrompt, setShowPreviewExitPrompt] = useState(false);
+
+  const disablePreviewMode = useEffectEvent(async () => {
+    startBusy("preview-mode");
+    try {
+      await store.setLightingPreviewMode({ enabled: false });
+      toast.push({ message: "Preview mode exited. Live rig stayed unchanged.", tone: "info" });
+    } catch (error) {
+      reportError(error, "Preview mode update failed.");
+    } finally {
+      finishBusy("preview-mode");
+    }
+  });
+
+  const handleDiscardPreview = useEffectEvent(async () => {
+    startBusy("preview-discard");
+    try {
+      await store.discardLightingPreview();
+      setShowPreviewExitPrompt(false);
+      toast.push({ message: "Preview edits discarded.", tone: "info" });
+    } catch (error) {
+      reportError(error, "Preview discard failed.");
+    } finally {
+      finishBusy("preview-discard");
+    }
+  });
+
+  const requestExitPreview = useCallback(() => {
+    if (previewDirty) {
+      setShowPreviewExitPrompt(true);
+      return;
+    }
+    void disablePreviewMode();
+  }, [disablePreviewMode, previewDirty]);
+
+  const handleTogglePreview = useEffectEvent(async () => {
+    if (previewMode) {
+      requestExitPreview();
+      return;
+    }
+    if (uiMode === "patch") {
+      toast.push({ message: "Exit patch mode before preview editing.", tone: "info" });
+      return;
+    }
+    startBusy("preview-mode");
+    try {
+      await store.setLightingPreviewMode({ enabled: true, patchModeActive: false });
+      toast.push({ message: "Preview mode enabled. Live rig is unchanged.", tone: "ok" });
+    } catch (error) {
+      reportError(error, "Preview mode update failed.");
+    } finally {
+      finishBusy("preview-mode");
+    }
+  });
+
   const handleTogglePatch = useEffectEvent(() => {
+    if (previewMode) {
+      toast.push({ message: "Exit preview before entering patch mode.", tone: "info" });
+      return;
+    }
     setUiMode((current) => (current === "patch" ? "recall" : "patch"));
   });
 
@@ -650,8 +743,12 @@ export function LightingWorkspaceSurface({
   }, [dmxStripOn]);
 
   const requestAddFixture = useCallback(() => {
+    if (previewMode) {
+      toast.push({ message: "Exit preview before adding fixtures.", tone: "info" });
+      return;
+    }
     setCreateFixtureOpen(true);
-  }, []);
+  }, [previewMode, toast]);
 
   const handleAddFixture = useEffectEvent(
     async (fixtureSpec: { name: string; type: string; dmxStartAddress: number }) => {
@@ -840,7 +937,7 @@ export function LightingWorkspaceSurface({
     startBusy("lighting-blackout");
     try {
       await store.setLightingAllPower(false);
-      toast.push({ message: "All fixtures cut.", tone: "ok" });
+      toast.push({ message: previewMode ? "Preview fixtures cut." : "All fixtures cut.", tone: "ok" });
     } catch (error) {
       reportError(error, "Lighting blackout failed.");
     } finally {
@@ -856,7 +953,10 @@ export function LightingWorkspaceSurface({
     startBusy("lighting-master-toggle");
     try {
       await store.setLightingAllPower(on);
-      toast.push({ message: on ? "Lighting resumed." : "Lighting paused.", tone: "ok" });
+      toast.push({
+        message: previewMode ? `Preview fixtures ${on ? "on" : "off"}.` : on ? "Lighting resumed." : "Lighting paused.",
+        tone: "ok",
+      });
     } catch (error) {
       reportError(error, "Lighting master toggle failed.");
     } finally {
@@ -1030,8 +1130,8 @@ export function LightingWorkspaceSurface({
     // Show the scene in the inspector immediately — even if the recall IPC
     // is rejected by the engine (e.g. pre-probe state), the operator still
     // sees what the scene contains. The recall IPC drives the actual rig.
-    setPreviewSceneId(sceneId);
-    if (!bridgeReachable) {
+    setInspectorSelectedSceneId(sceneId);
+    if (!bridgeReachable && !previewMode) {
       // Skip the IPC entirely when the bridge is unreachable — the engine
       // would just reject it. Surface a single non-error toast so the
       // operator knows recall is preview-only and not a failed action.
@@ -1044,9 +1144,13 @@ export function LightingWorkspaceSurface({
     const busyKey = `scene:${sceneId}`;
     startBusy(busyKey);
     try {
-      await store.recallLightingScene(sceneId, recallFadeMs);
+      await store.recallLightingScene(sceneId, previewMode ? 0 : recallFadeMs);
       toast.push({
-        message: recallFadeMs > 0 ? `Scene recalled with ${formatRecallFade(recallFadeMs)} fade.` : "Scene recalled.",
+        message: previewMode
+          ? "Scene loaded into preview."
+          : recallFadeMs > 0
+            ? `Scene recalled with ${formatRecallFade(recallFadeMs)} fade.`
+            : "Scene recalled.",
         tone: "ok",
       });
     } catch (error) {
@@ -1067,12 +1171,12 @@ export function LightingWorkspaceSurface({
     for (const scene of scenes) {
       if (result[scene.id]) continue;
       result[scene.id] = renderSceneThumbnailDataUri({
-        fixtures,
+        fixtures: liveFixtures,
         fixtureStates: scene.fixtureStates,
       });
     }
     return result;
-  }, [scenes, sceneThumbs, fixtures]);
+  }, [scenes, sceneThumbs, liveFixtures]);
 
   // Per-id rename-busy set surfaced to the rail so each scene tile shows the
   // InlineRename busy treatment only for its own in-flight commit (parallel
@@ -1099,6 +1203,16 @@ export function LightingWorkspaceSurface({
         keywords: ["patch", "dmx", "address"],
         shortcut: "P",
         action: () => handleTogglePatch(),
+        when: () => !previewMode,
+      },
+      {
+        id: "lighting:toggle-preview",
+        label: previewMode ? (previewDirty ? "Exit preview mode..." : "Exit preview mode") : "Enter preview mode",
+        group: "Lighting",
+        keywords: ["preview", "blind", "offline", "edit"],
+        shortcut: "B",
+        action: () => void handleTogglePreview(),
+        when: () => !inPatchMode,
       },
       {
         id: "lighting:save-changes",
@@ -1107,7 +1221,7 @@ export function LightingWorkspaceSurface({
         keywords: ["save", "update", "commit"],
         shortcut: "S",
         action: () => void handleResaveScene(),
-        when: () => isSceneModified && !inPatchMode,
+        when: () => effectiveSceneModified && !inPatchMode,
       },
       {
         id: "lighting:save-as-new",
@@ -1124,6 +1238,7 @@ export function LightingWorkspaceSurface({
         group: "Lighting",
         keywords: ["add", "fixture", "create", "new"],
         action: () => requestAddFixture(),
+        when: () => !previewMode,
       },
       {
         id: "lighting:open-dmx-monitor",
@@ -1154,13 +1269,16 @@ export function LightingWorkspaceSurface({
     palette,
     scenes,
     uiMode,
-    isSceneModified,
+    effectiveSceneModified,
     bridgeReachable,
     handleTogglePatch,
+    handleTogglePreview,
     handleResaveScene,
     requestAddFixture,
     requestEmergencyCut,
     handleRecallScene,
+    previewDirty,
+    previewMode,
   ]);
 
   const handleToggleGroupPower = useEffectEvent(async (groupId: string, on: boolean) => {
@@ -1272,6 +1390,10 @@ export function LightingWorkspaceSurface({
   // Solo so the engine's mutual-exclusion guard doesn't reject the request.
   // Operator press while highlight is active = clear (toggle).
   const handleToggleHighlight = useEffectEvent(async () => {
+    if (previewMode) {
+      toast.push({ message: "Exit preview to use live Highlight.", tone: "info" });
+      return;
+    }
     if (highlightActive) {
       startBusy("highlight");
       try {
@@ -1307,6 +1429,10 @@ export function LightingWorkspaceSurface({
 
   // Wave 29 — Solo toggle. Symmetric to Highlight.
   const handleToggleSolo = useEffectEvent(async () => {
+    if (previewMode) {
+      toast.push({ message: "Exit preview to use live Solo.", tone: "info" });
+      return;
+    }
     if (soloActive) {
       startBusy("solo");
       try {
@@ -1345,6 +1471,10 @@ export function LightingWorkspaceSurface({
   // offset so the operator's eye tracks the active fixture. Step / duration
   // chosen to clear in <2 s for a typical 3-fixture key triangle.
   const handleIdentifyFind = useEffectEvent(async () => {
+    if (previewMode) {
+      toast.push({ message: "Exit preview to use live Find.", tone: "info" });
+      return;
+    }
     if (selectedFixtureIds.size === 0) {
       toast.push({ message: "Select fixtures to enable Find.", tone: "info" });
       return;
@@ -1581,6 +1711,10 @@ export function LightingWorkspaceSurface({
   }, []);
 
   const handleFixtureNudge = useEffectEvent(async (deltaXMeters: number, deltaYMeters: number) => {
+    if (previewMode) {
+      toast.push({ message: "Exit preview to move fixtures on the plot.", tone: "info" });
+      return;
+    }
     const fixture = persistedSelectedFixtureId
       ? fixtures.find((candidate) => candidate.id === persistedSelectedFixtureId)
       : null;
@@ -1725,7 +1859,7 @@ export function LightingWorkspaceSurface({
       if (modifier && !event.altKey && event.key.toLowerCase() === "s") {
         if (event.shiftKey) {
           setSaveSceneAsOpen(true);
-        } else if (isSceneModified && activeScene) {
+        } else if (effectiveSceneModified && activeScene) {
           void handleResaveScene();
         } else {
           toast.push({
@@ -1765,7 +1899,10 @@ export function LightingWorkspaceSurface({
 
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (event.key.toLowerCase() === "p") {
-        setUiMode((current) => (current === "patch" ? "recall" : "patch"));
+        handleTogglePatch();
+        event.preventDefault();
+      } else if (event.key.toLowerCase() === "b") {
+        void handleTogglePreview();
         event.preventDefault();
       } else if (event.key.toLowerCase() === "t") {
         setRecallFadeMs((current) => {
@@ -1789,7 +1926,7 @@ export function LightingWorkspaceSurface({
       } else if (event.key.toLowerCase() === "s") {
         // Smart S: when drift exists on the active scene, save changes.
         // Otherwise create a new scene with the autoname for fast capture.
-        if (isSceneModified && activeScene) {
+        if (effectiveSceneModified && activeScene) {
           void handleResaveScene();
         } else {
           void handleSaveScene();
@@ -1820,12 +1957,14 @@ export function LightingWorkspaceSurface({
     activeScene,
     fixtures,
     handleFixtureNudge,
+    handleTogglePatch,
+    handleTogglePreview,
     handleRecallScene,
     handleResaveScene,
     handleSaveScene,
     handleSelectFixture,
     hoverPreviewSceneId,
-    isSceneModified,
+    effectiveSceneModified,
     persistedSelectedFixtureId,
     scenes,
     stagePlotViewport,
@@ -1867,6 +2006,9 @@ export function LightingWorkspaceSurface({
         onRecallFadeMsChange={setRecallFadeMs}
         patchMode={uiMode === "patch"}
         onTogglePatch={handleTogglePatch}
+        previewMode={previewMode}
+        previewDirty={previewDirty}
+        onTogglePreview={() => void handleTogglePreview()}
         onAddFixture={requestAddFixture}
         hasSelection={selectedFixtureIds.size > 0}
         highlightActive={highlightActive}
@@ -1877,6 +2019,19 @@ export function LightingWorkspaceSurface({
       />
 
       <LightingBridgeBanner reachable={bridgeReachable} bridgeIp={bridgeIp} universe={bridgeUniverse} />
+
+      {previewMode ? (
+        <PreviewBanner
+          dirty={previewDirty}
+          targetSceneName={activeScene?.name ?? null}
+          busy={
+            busyActions.has("preview-mode") || busyActions.has("preview-discard") || busyActions.has("scene-resave")
+          }
+          onSave={() => void handleResaveScene()}
+          onDiscard={() => void handleDiscardPreview()}
+          onExit={requestExitPreview}
+        />
+      ) : null}
 
       <div
         className={`${styles.body} ${columns.isResizing ? styles.bodyResizing : ""}`}
@@ -1895,8 +2050,10 @@ export function LightingWorkspaceSurface({
           onEmergencyCut={requestEmergencyCut}
           onToggleAllPower={handleToggleAllPower}
           scenes={scenes}
-          activeSceneId={activeSceneId}
+          activeSceneId={liveActiveSceneId}
           modifiedSceneId={modifiedSceneId}
+          previewSceneId={previewMode ? previewTargetSceneId : null}
+          previewMode={previewMode}
           sceneThumbs={displayedSceneThumbs}
           onRecallScene={handleRecallScene}
           onSaveScene={handleSaveScene}
@@ -1914,7 +2071,7 @@ export function LightingWorkspaceSurface({
           onSetGroupColor={(groupId, colorIndex) => void handleSetGroupColor(groupId, colorIndex)}
           searchQuery={searchQuery}
           patchMode={uiMode === "patch"}
-          isSceneModified={isSceneModified}
+          isSceneModified={!previewMode && isSceneModified}
           onResaveScene={handleResaveScene}
           onRevertScene={activeSceneId ? () => void handleRecallScene(activeSceneId) : undefined}
           onClearSearch={() => setSearchQuery("")}
@@ -1932,18 +2089,23 @@ export function LightingWorkspaceSurface({
         <main className={styles.stage}>
           <StagePlot
             fixtures={fixtures}
+            liveFixtures={liveFixtures}
             selectedFixtureId={selectedFixture?.id ?? null}
             selectedFixtureIds={selectedFixtureIds}
             patchMode={uiMode === "patch"}
+            previewMode={previewMode}
             activeSceneName={activeScene?.name}
-            isSceneModified={isSceneModified}
+            isSceneModified={effectiveSceneModified}
             bridgeReachable={bridgeReachable}
             searchQuery={searchQuery}
             identifyingFixtureIds={identifyingIds}
             highlightOverlayFixtureIds={overlayFixtureIds}
             onSelectFixture={(id, options) => void handleSelectFixture(id, options ?? {})}
-            onPositionCommit={(id, xMeters, yMeters) =>
-              void handleFixtureSpatialCommit(id, { spatialX: xMeters, spatialY: yMeters })
+            onPositionCommit={
+              previewMode
+                ? undefined
+                : (id, xMeters, yMeters) =>
+                    void handleFixtureSpatialCommit(id, { spatialX: xMeters, spatialY: yMeters })
             }
             onRequestRenameFixture={(id) => {
               void handleSelectFixture(id, {});
@@ -1974,8 +2136,10 @@ export function LightingWorkspaceSurface({
           selectedGroupId={selectedGroupId}
           activeSceneId={activeSceneId}
           inspectorSceneId={hoverPreviewSceneId}
-          isSceneModified={isSceneModified}
+          isSceneModified={effectiveSceneModified}
           bridgeReachable={bridgeReachable}
+          previewMode={previewMode}
+          previewDirty={previewDirty}
           onTogglePower={handleToggleFixturePower}
           onIntensityCommit={handleIntensityCommit}
           onCctCommit={handleCctCommit}
@@ -1989,7 +2153,7 @@ export function LightingWorkspaceSurface({
           onResaveScene={handleResaveScene}
           onDeleteScene={handleDeleteScene}
           onDeleteFixture={(id) => void handleDeleteFixture(id)}
-          onSpatialCommit={(id, partial) => void handleFixtureSpatialCommit(id, partial)}
+          onSpatialCommit={previewMode ? undefined : (id, partial) => void handleFixtureSpatialCommit(id, partial)}
           onRenameScene={handleRenameScene}
           onRenameFixture={handleRenameFixture}
           onRenameGroup={handleRenameGroup}
@@ -2022,7 +2186,7 @@ export function LightingWorkspaceSurface({
           {renderDmxStrip ? (
             <DMXCompactStrip
               snapshot={lightingDmxMonitorSnapshot}
-              fixtures={fixtures}
+              fixtures={liveFixtures}
               bridgeReachable={bridgeReachable}
               universe={bridgeUniverse}
               onOpenMonitor={() => setDmxMonitorOpen(true)}
@@ -2036,8 +2200,9 @@ export function LightingWorkspaceSurface({
         lightingSnapshot={lightingSnapshot}
         lightingDmxMonitorSnapshot={lightingDmxMonitorSnapshot}
         fixturesPatched={fixturesPatched}
-        fixturesTotal={fixtureEntries.length}
-        driftDetected={isSceneModified}
+        fixturesTotal={liveFixtureEntries.length}
+        driftDetected={effectiveSceneModified}
+        previewMode={previewMode}
         lastSavedLabel={lastSavedLabel}
         dmxStripOn={dmxStripOn}
         onToggleDmxStrip={() => setDmxStripOn((current) => !current)}
@@ -2058,7 +2223,12 @@ export function LightingWorkspaceSurface({
         <ConfirmDialog
           title="Leave with unsaved changes?"
           body={
-            activeScene ? (
+            previewMode && activeScene ? (
+              <>
+                Preview scene <strong>{activeScene.name}</strong> has offline edits. Save or discard the preview before
+                switching workspaces; the live rig is unchanged.
+              </>
+            ) : activeScene ? (
               <>
                 Scene <strong>{activeScene.name}</strong> has live changes that aren't saved. You can save them with{" "}
                 <strong>Save changes</strong> in the rail, or come back later — the live rig state stays as it is either
@@ -2081,6 +2251,54 @@ export function LightingWorkspaceSurface({
             pendingLeaveResolveRef.current?.(false);
             pendingLeaveResolveRef.current = null;
           }}
+        />
+      ) : null}
+
+      {showPreviewExitPrompt ? (
+        <Dialog
+          title="Exit preview with offline edits?"
+          body={
+            activeScene ? (
+              <>
+                Preview scene <strong>{activeScene.name}</strong> has edits that are not committed. Save writes the
+                preview buffer to the scene and leaves live output unchanged.
+              </>
+            ) : (
+              <>The preview buffer has edits that are not committed. Save as new or discard before exiting preview.</>
+            )
+          }
+          onClose={() => setShowPreviewExitPrompt(false)}
+          actions={
+            <>
+              <Button
+                size="compact"
+                variant="ghost"
+                disabled={busyActions.has("preview-discard") || busyActions.has("scene-resave")}
+                onClick={() => setShowPreviewExitPrompt(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="compact"
+                variant="secondary"
+                disabled={busyActions.has("preview-discard") || busyActions.has("scene-resave")}
+                onClick={() => void handleDiscardPreview()}
+              >
+                Discard
+              </Button>
+              <Button
+                size="compact"
+                variant="primary"
+                disabled={!activeScene || busyActions.has("preview-discard") || busyActions.has("scene-resave")}
+                onClick={() => {
+                  setShowPreviewExitPrompt(false);
+                  void handleResaveScene();
+                }}
+              >
+                Save
+              </Button>
+            </>
+          }
         />
       ) : null}
 
@@ -2199,7 +2417,7 @@ export function LightingWorkspaceSurface({
 
       {saveSceneAsOpen ? (
         <RenameDialog
-          title="Save as new scene"
+          title={previewMode ? "Save preview as new scene" : "Save as new scene"}
           fieldLabel="Scene name"
           initialValue={`Scene ${scenes.length + 1}`}
           placeholder="e.g. Talking head, Wide, Backlit"

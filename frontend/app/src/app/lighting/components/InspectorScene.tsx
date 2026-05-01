@@ -21,6 +21,7 @@ export interface InspectorSceneProps {
   fixtures: readonly LightingFixtureSnapshot[];
   groups: readonly LightingGroupSnapshot[];
   isModified: boolean;
+  isPreviewMode?: boolean;
   /** Wave 30b — when true, the displayed scene is a hover-preview, not the
    *  active recalled scene. Eyebrow flips to "Hover preview" to make the
    *  transient state explicit; modified treatment is suppressed (the parent
@@ -89,6 +90,7 @@ export function InspectorScene({
   fixtures,
   groups,
   isModified,
+  isPreviewMode = false,
   isHoverPreview = false,
   bridgeReachable,
   onSaveScene,
@@ -154,7 +156,15 @@ export function InspectorScene({
   return (
     <div className={styles.scenePane}>
       <span className={styles.sceneEyebrow}>
-        {isHoverPreview ? "Hover preview" : isModified ? "Active scene · modified" : "Active scene"}
+        {isPreviewMode
+          ? isModified
+            ? "Preview target · offline edits"
+            : "Preview target"
+          : isHoverPreview
+            ? "Hover preview"
+            : isModified
+              ? "Active scene · modified"
+              : "Active scene"}
       </span>
       <div className={styles.sceneTitleRow}>
         <h2 className={styles.sceneTitle}>
@@ -309,24 +319,24 @@ export function InspectorScene({
           <Button
             onClick={() => onRecallScene(scene.id)}
             loading={recallBusy}
-            disabled={!bridgeReachable}
+            disabled={!bridgeReachable && !isPreviewMode}
             variant="primary"
             size="compact"
             leadingVisual={<Play aria-hidden="true" size={13} strokeWidth={1.75} />}
           >
-            Recall scene
+            {isPreviewMode ? "Load into preview" : "Recall scene"}
           </Button>
         ) : null}
         {onResaveScene ? (
           <Button
             onClick={onResaveScene}
             loading={resaveBusy}
-            disabled={!isModified || !bridgeReachable}
+            disabled={!isModified || (!bridgeReachable && !isPreviewMode)}
             variant="secondary"
             size="compact"
             leadingVisual={<Pencil aria-hidden="true" size={13} strokeWidth={1.75} />}
           >
-            Save changes
+            {isPreviewMode ? "Save preview" : "Save changes"}
           </Button>
         ) : null}
         {onSaveSceneAs ? (

@@ -29,6 +29,12 @@
   box-shadow: var(--shadow-glow-yellow-sm);
 }
 
+.toolbar[data-preview-mode="true"]::before {
+  height: 2px;
+  background: var(--color-brand-blue);
+  box-shadow: var(--shadow-glow-blue);
+}
+
 .title {
   display: inline-flex;
   align-items: center;
@@ -50,6 +56,10 @@
   color: var(--color-brand-yellow);
 }
 
+.toolbar[data-preview-mode="true"] .titleIcon {
+  color: var(--color-brand-blue-hot);
+}
+
 .patchEyebrow {
   display: inline-flex;
   align-items: center;
@@ -65,6 +75,24 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.previewEyebrow {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  margin-left: 4px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(180deg, var(--color-brand-blue-soft) 0%, rgba(63, 112, 200, 0.06) 100%);
+  border: 1px solid var(--color-brand-blue-border);
+  color: var(--color-brand-blue-hot);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -188,6 +216,11 @@
 .fadeInput::-webkit-inner-spin-button {
   appearance: none;
   margin: 0;
+}
+
+.fadeInput:disabled {
+  color: var(--color-brand-text-muted);
+  cursor: not-allowed;
 }
 
 .search {

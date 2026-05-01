@@ -45,6 +45,8 @@ export interface LightingInspectorProps {
 
   isSceneModified: boolean;
   bridgeReachable: boolean;
+  previewMode?: boolean;
+  previewDirty?: boolean;
 
   onTogglePower: (fixtureId: string, on: boolean) => void;
   onIntensityCommit: (fixtureId: string, intensity: number) => void;
@@ -150,6 +152,8 @@ export function LightingInspector({
   inspectorSceneId,
   isSceneModified,
   bridgeReachable,
+  previewMode = false,
+  previewDirty = false,
   onTogglePower,
   onIntensityCommit,
   onCctCommit,
@@ -209,6 +213,12 @@ export function LightingInspector({
   return (
     <aside className={styles.inspector} aria-label={`Lighting inspector — ${TAB_TITLE[activeTab]}`}>
       <LightingInspectorTabs active={activeTab} onChange={onTabChange} visibleTabs={visibleTabs} />
+      {previewMode && activeTab !== "patch" ? (
+        <div className={styles.previewSource}>
+          <span className={styles.previewSourceEyebrow}>Preview values</span>
+          <span>{previewDirty ? "Offline edits are pending." : "Editing buffer is clean."}</span>
+        </div>
+      ) : null}
 
       <section
         role="tabpanel"
@@ -223,6 +233,7 @@ export function LightingInspector({
             groups={groups}
             isModified={isHoverPreview ? false : isSceneModified}
             isHoverPreview={isHoverPreview}
+            isPreviewMode={previewMode}
             bridgeReachable={bridgeReachable}
             onSaveScene={onSaveScene}
             onSaveSceneAs={onSaveSceneAs}

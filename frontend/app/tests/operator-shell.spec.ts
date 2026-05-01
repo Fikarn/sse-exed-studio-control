@@ -555,6 +555,38 @@ test("keeps the full lighting workspace visible at the 1920x1080 fallback size",
   expect(layoutMetrics.scrollWidth).toBeLessThanOrEqual(layoutMetrics.viewportWidth + 1);
 });
 
+test("supports lighting preview mode without driving live scene state", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const workspace = page.getByRole("main").first();
+  await page.getByRole("button", { name: /Preview/ }).click();
+  await expect(page.getByLabel("Lighting preview mode")).toBeVisible();
+  await expect(page.getByText("Editing offline")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Patch/ })).toBeDisabled();
+  await expect(page.getByText("Preview values")).toBeVisible();
+
+  await page.getByLabel("Fixture intensity").focus();
+  await page.getByLabel("Fixture intensity").press("End");
+  await expect(workspace.getByText("Offline edits", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Fixture Key, 100 percent,/ })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+
+  await page.getByRole("button", { name: /Exit preview/ }).click();
+  await expect(page.getByRole("dialog", { name: "Exit preview with offline edits?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await page.getByRole("button", { name: "Recall scene Interview" }).click();
+  await expect(page.getByText("Scene loaded into preview.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (preview)" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Discard" }).click();
+  await expect(page.getByLabel("Lighting preview mode")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Fixture Key, 76 percent,/ })).toHaveAttribute("aria-pressed", "true");
+});
+
 test("supports lighting toolbar search, patch mode, and empty-state fixture create", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
@@ -628,7 +660,6 @@ test("persists lighting view bookmark slots through workspace changes", async ({
 test("supports lighting drag-lasso multi-select and group save", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
-  const workspace = page.getByRole("main").first();
   await page.getByRole("button", { name: /^Fixture Fill,/ }).focus();
   await page.keyboard.down("Shift");
   await page.keyboard.press("Enter");

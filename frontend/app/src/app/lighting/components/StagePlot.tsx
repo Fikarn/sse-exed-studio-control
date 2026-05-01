@@ -27,6 +27,8 @@ export interface StagePlotProps {
   /** Frontend-only multi-select. Includes selectedFixtureId when present. */
   selectedFixtureIds?: ReadonlySet<string>;
   patchMode: boolean;
+  previewMode?: boolean;
+  liveFixtures?: readonly LightingFixtureSnapshot[];
   activeSceneName?: string;
   isSceneModified?: boolean;
   /**
@@ -76,12 +78,22 @@ function meterPositionFor(fixture: LightingFixtureSnapshot, index: number) {
   return { xMeters: x, yMeters: y };
 }
 
+function previewDiffersFromLive(preview: LightingFixtureSnapshot, live: LightingFixtureSnapshot | null): boolean {
+  if (!live) return false;
+  if (preview.on !== live.on) return true;
+  if (Math.abs(preview.intensity - live.intensity) > 0.5) return true;
+  if (Math.abs(preview.cct - live.cct) > 25) return true;
+  return false;
+}
+
 export function StagePlot({
   fixtures,
   layout = STUDIO_LAYOUT,
   selectedFixtureId,
   selectedFixtureIds,
   patchMode,
+  previewMode = false,
+  liveFixtures = [],
   activeSceneName,
   isSceneModified = false,
   bridgeReachable = true,
@@ -164,7 +176,7 @@ export function StagePlot({
 
   return (
     <div
-      className={`${styles.plotShell} ${patchMode ? styles.plotShellPatch : ""}`}
+      className={`${styles.plotShell} ${patchMode ? styles.plotShellPatch : ""} ${previewMode ? styles.plotShellPreview : ""}`}
       role="application"
       aria-label="Lighting stage plot"
     >
@@ -173,9 +185,25 @@ export function StagePlot({
       </div>
       {!patchMode && activeSceneName ? (
         <div className={styles.plotPillSlot}>
-          <PlotPill state={isSceneModified && bridgeReachable ? "modified" : "default"}>
+          <PlotPill
+            state={
+              previewMode
+                ? isSceneModified
+                  ? "modified"
+                  : "patch"
+                : isSceneModified && bridgeReachable
+                  ? "modified"
+                  : "default"
+            }
+          >
             <span className={styles.plotPillLabel}>
-              {isSceneModified && bridgeReachable ? "Active scene · modified" : "Active scene"}
+              {previewMode
+                ? isSceneModified
+                  ? "Preview · offline edits"
+                  : "Preview"
+                : isSceneModified && bridgeReachable
+                  ? "Active scene · modified"
+                  : "Active scene"}
             </span>
             <span className={styles.plotPillName}>{activeSceneName}</span>
           </PlotPill>
@@ -290,6 +318,40 @@ export function StagePlot({
               </g>
             );
           })}
+
+          {previewMode ? (
+            <g className={styles.liveGhostLayer} pointerEvents="none" aria-hidden="true">
+              {liveFixtures.map((liveFixture, index) => {
+                const previewFixture = fixtures.find((fixture) => fixture.id === liveFixture.id) ?? null;
+                if (!previewFixture || !previewDiffersFromLive(previewFixture, liveFixture)) return null;
+                const { xMeters, yMeters } = meterPositionFor(liveFixture, index);
+                const mounting = deriveMounting(liveFixture.type);
+                if (mounting === "wall-bar") {
+                  return (
+                    <rect
+                      key={`live-ghost-${liveFixture.id}`}
+                      x={xMeters * 100 - 18}
+                      y={yMeters * 100 - 5}
+                      width={36}
+                      height={10}
+                      rx={3}
+                      className={styles.liveGhostShape}
+                      transform={`rotate(${liveFixture.spatialRotation ?? 0} ${xMeters * 100} ${yMeters * 100})`}
+                    />
+                  );
+                }
+                return (
+                  <circle
+                    key={`live-ghost-${liveFixture.id}`}
+                    cx={xMeters * 100}
+                    cy={yMeters * 100}
+                    r={mounting === "grid-soft" ? 15 : 12}
+                    className={styles.liveGhostShape}
+                  />
+                );
+              })}
+            </g>
+          ) : null}
 
           {/* Fixture markers — reorder so the selected fixture paints last
               (above its siblings), giving the in-flight drag a clear z-stack

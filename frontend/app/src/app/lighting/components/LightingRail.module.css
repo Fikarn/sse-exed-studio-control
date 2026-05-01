@@ -474,6 +474,14 @@
   background: linear-gradient(180deg, var(--color-brand-yellow-soft) 0%, rgba(232, 213, 97, 0.05) 100%);
 }
 
+.tilePreview {
+  border-color: var(--color-brand-blue-border);
+  background: linear-gradient(180deg, var(--color-brand-blue-soft) 0%, rgba(63, 112, 200, 0.06) 100%);
+  box-shadow:
+    0 0 0 1px rgba(63, 112, 200, 0.22),
+    var(--shadow-inset-hi);
+}
+
 .tileBody {
   display: flex;
   flex-direction: column;
@@ -529,6 +537,15 @@
 .tileModified .tileBadgeDot {
   background: var(--color-brand-yellow);
   box-shadow: var(--shadow-glow-yellow-dot);
+}
+
+.tilePreview .tileBadge {
+  color: var(--color-brand-blue-hot);
+}
+
+.tilePreview .tileBadgeDot {
+  background: var(--color-brand-blue-hot);
+  box-shadow: var(--shadow-glow-blue);
 }
 
 @keyframes ssePulseGreenDot {

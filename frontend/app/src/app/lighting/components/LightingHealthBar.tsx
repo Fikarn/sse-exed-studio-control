@@ -56,6 +56,7 @@ export interface LightingHealthBarProps {
   fixturesPatched: number;
   fixturesTotal: number;
   driftDetected: boolean;
+  previewMode?: boolean;
   lastSavedLabel?: string;
   /** Wave 31 — P4 toggle button rendered in the actions slot. The actual
    *  DMX strip is rendered separately in `<LightingWorkspace>`'s overlay
@@ -73,6 +74,7 @@ export function LightingHealthBar({
   fixturesPatched,
   fixturesTotal,
   driftDetected,
+  previewMode = false,
   lastSavedLabel,
   dmxStripOn = false,
   onToggleDmxStrip,
@@ -112,10 +114,16 @@ export function LightingHealthBar({
       value: `${fixturesPatched} / ${fixturesTotal} patched`,
     },
     {
-      label: "Scene state",
+      label: previewMode ? "Preview" : "Scene state",
       dot: driftDetected ? "attn" : "ok",
-      value: driftDetected ? "Unsaved changes" : "Saved",
-      suffix: !driftDetected && lastSavedLabel ? `· last ${lastSavedLabel}` : undefined,
+      value: previewMode
+        ? driftDetected
+          ? "Offline edits"
+          : "Clean buffer"
+        : driftDetected
+          ? "Unsaved changes"
+          : "Saved",
+      suffix: !previewMode && !driftDetected && lastSavedLabel ? `· last ${lastSavedLabel}` : undefined,
     },
     {
       label: "Session",

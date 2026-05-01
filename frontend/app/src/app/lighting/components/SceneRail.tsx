@@ -24,6 +24,8 @@ export interface SceneRailProps {
   scenes: readonly LightingSceneSnapshot[];
   activeSceneId: string | null;
   modifiedSceneId: string | null;
+  previewSceneId?: string | null;
+  previewMode?: boolean;
   sceneThumbs: Record<string, string>;
   searchQuery?: string;
   bridgeReachable?: boolean;
@@ -71,6 +73,8 @@ interface CellPayload {
   filteredScenes: readonly LightingSceneSnapshot[];
   activeSceneId: string | null;
   modifiedSceneId: string | null;
+  previewSceneId: string | null;
+  previewMode: boolean;
   sceneThumbs: Record<string, string>;
   bridgeReachable: boolean;
   onRecall: (sceneId: string) => void;
@@ -94,6 +98,8 @@ function VirtualizedCell({
   filteredScenes,
   activeSceneId,
   modifiedSceneId,
+  previewSceneId,
+  previewMode,
   sceneThumbs,
   bridgeReachable,
   onRecall,
@@ -133,6 +139,7 @@ function VirtualizedCell({
           avgCct={stats.avgCct}
           isActive={scene.id === activeSceneId}
           isModified={scene.id === modifiedSceneId}
+          isPreviewTarget={previewMode && scene.id === previewSceneId}
           bridgeReachable={bridgeReachable}
           lastRecalledLabel={lastRecalledLabel}
           fadeProgress={scene.fadeProgress}
@@ -176,6 +183,8 @@ export function SceneRail({
   scenes,
   activeSceneId,
   modifiedSceneId,
+  previewSceneId = null,
+  previewMode = false,
   sceneThumbs,
   searchQuery = "",
   bridgeReachable = true,
@@ -278,6 +287,8 @@ export function SceneRail({
           filteredScenes,
           activeSceneId,
           modifiedSceneId,
+          previewSceneId,
+          previewMode,
           sceneThumbs,
           bridgeReachable,
           onRecall,
@@ -330,6 +341,7 @@ export function SceneRail({
               avgCct={stats.avgCct}
               isActive={scene.id === activeSceneId}
               isModified={scene.id === modifiedSceneId}
+              isPreviewTarget={previewMode && scene.id === previewSceneId}
               bridgeReachable={bridgeReachable}
               lastRecalledLabel={lastRecalledLabel}
               fadeProgress={scene.fadeProgress}

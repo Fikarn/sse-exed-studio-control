@@ -26,6 +26,8 @@ export interface LightingRailProps {
   scenes: readonly LightingSceneSnapshot[];
   activeSceneId: string | null;
   modifiedSceneId: string | null;
+  previewSceneId?: string | null;
+  previewMode?: boolean;
   sceneThumbs: Record<string, string>;
   onRecallScene: (sceneId: string) => void;
   onSaveScene: () => void;
@@ -67,6 +69,8 @@ export function LightingRail({
   scenes,
   activeSceneId,
   modifiedSceneId,
+  previewSceneId = null,
+  previewMode = false,
   sceneThumbs,
   onRecallScene,
   onSaveScene,
@@ -136,6 +140,8 @@ export function LightingRail({
         scenes={scenes}
         activeSceneId={activeSceneId}
         modifiedSceneId={modifiedSceneId}
+        previewSceneId={previewSceneId}
+        previewMode={previewMode}
         sceneThumbs={sceneThumbs}
         searchQuery={searchQuery}
         bridgeReachable={bridgeReachable}
