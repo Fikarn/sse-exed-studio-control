@@ -51,6 +51,16 @@ pub struct LightingSnapshot {
     pub fixtures: Vec<LightingFixtureSnapshot>,
     pub groups: Vec<LightingGroupSnapshot>,
     pub scenes: Vec<LightingSceneSnapshot>,
+    /// Fixture ids the operator has placed under the Highlight overlay.
+    /// Empty when Highlight is not active. Surfaced so the frontend can
+    /// reflect overlay state in the toolbar after a page reload — the
+    /// engine is the source of truth.
+    #[serde(rename = "highlightFixtureIds")]
+    pub highlight_fixture_ids: Vec<String>,
+    /// Fixture ids the operator has placed under the Solo overlay.
+    /// Empty when Solo is not active. See `highlight_fixture_ids`.
+    #[serde(rename = "soloFixtureIds")]
+    pub solo_fixture_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -384,12 +394,70 @@ pub struct LightingFixtureIdentifyResult {
 
 /// Persistent record of an in-flight identify burst. Stored under
 /// `app.lighting.identify_bursts` as a JSON map keyed by fixture id.
+/// Bursts may be scheduled into the future via `started_at_ms` so the
+/// `lighting.fixture.identifySequence` IPC can pre-write a staggered
+/// run that the snapshot reader activates as time advances.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentifyBurst {
     #[serde(rename = "startedAtMs")]
     pub started_at_ms: i64,
     #[serde(rename = "durationMs")]
     pub duration_ms: i64,
+}
+
+/// Highlight / Solo overlay mode. `Off` clears whichever state is
+/// currently active (highlight or solo); setting `Highlight` or `Solo`
+/// while the opposite is active is rejected by the engine with
+/// `LIGHTING_HIGHLIGHT_SOLO_CONFLICT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FixtureHighlightMode {
+    Highlight,
+    Solo,
+    Off,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingFixtureHighlightRequest {
+    pub fixture_ids: Vec<String>,
+    pub mode: FixtureHighlightMode,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingFixtureHighlightResult {
+    pub mode: String,
+    #[serde(rename = "fixtureCount")]
+    pub fixture_count: usize,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingFixtureIdentifySequenceRequest {
+    pub fixture_ids: Vec<String>,
+    pub step_ms: i64,
+    pub duration_ms: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingFixtureIdentifySequenceResult {
+    #[serde(rename = "fixtureCount")]
+    pub fixture_count: usize,
+    #[serde(rename = "stepMs")]
+    pub step_ms: i64,
+    #[serde(rename = "durationMs")]
+    pub duration_ms: i64,
+    #[serde(rename = "totalDurationMs")]
+    pub total_duration_ms: i64,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingFixtureIdentifyClearAllRequest;
+
+#[derive(Debug, Serialize)]
+pub struct LightingFixtureIdentifyClearAllResult {
+    #[serde(rename = "clearedCount")]
+    pub cleared_count: usize,
+    pub summary: String,
 }
 
 #[derive(Debug)]

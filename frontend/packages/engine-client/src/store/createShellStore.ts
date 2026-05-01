@@ -525,6 +525,22 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         durationMs === undefined ? { fixtureId } : { fixtureId, durationMs }
       );
     },
+    async highlightLightingFixtures(fixtureIds: readonly string[], mode: "highlight" | "solo" | "off") {
+      return performRequest("lighting.fixture.highlight", {
+        fixtureIds: [...fixtureIds],
+        mode,
+      });
+    },
+    async startLightingIdentifySequence(fixtureIds: readonly string[], stepMs: number, durationMs: number) {
+      return performRequest("lighting.fixture.identifySequence", {
+        fixtureIds: [...fixtureIds],
+        stepMs,
+        durationMs,
+      });
+    },
+    async clearLightingIdentifyBursts() {
+      return performRequest("lighting.fixture.identify.clearAll");
+    },
     async deleteLightingFixture(fixtureId: string) {
       return performRequest("lighting.fixture.delete", { fixtureId });
     },

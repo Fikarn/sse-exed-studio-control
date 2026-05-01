@@ -38,6 +38,11 @@ export interface StagePlotProps {
   searchQuery?: string;
   /** Fixture ids currently mid-identify-burst — markers animate a pulse ring. */
   identifyingFixtureIds?: ReadonlySet<string>;
+  /** Fixture ids the operator has placed under Highlight or Solo overlay —
+   *  markers render a sustained orange ring so the selection is unambiguous
+   *  even when the engine snapshot's intensity overlay coincidentally matches
+   *  another fixture's stored values. */
+  highlightOverlayFixtureIds?: ReadonlySet<string>;
   onSelectFixture: (id: string | null, options?: { additive?: boolean }) => void;
   onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
   /** Right-click "Rename" — selects the fixture for inspection and triggers
@@ -72,6 +77,7 @@ export function StagePlot({
   bridgeReachable = true,
   searchQuery = "",
   identifyingFixtureIds,
+  highlightOverlayFixtureIds,
   onSelectFixture,
   onPositionCommit,
   onRequestRenameFixture,
@@ -298,6 +304,7 @@ export function StagePlot({
                   selected={selectedFixtureIds ? selectedFixtureIds.has(fixture.id) : fixture.id === selectedFixtureId}
                   dimmed={!fixtureMatches(fixture)}
                   identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
+                  highlightOverlay={highlightOverlayFixtureIds?.has(fixture.id) ?? false}
                   onSelect={(id, options) => onSelectFixture(id, options)}
                   onPositionCommit={onPositionCommit}
                   onRequestRename={onRequestRenameFixture}

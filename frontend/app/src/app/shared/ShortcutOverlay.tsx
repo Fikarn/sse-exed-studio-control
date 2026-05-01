@@ -45,13 +45,16 @@ const SHORTCUTS: readonly ShortcutSection[] = [
   {
     heading: "Lighting · selection + edit",
     entries: [
-      { keys: ["Esc"], description: "Clear fixture selection" },
+      { keys: ["Esc"], description: "Clear fixture selection (also clears Highlight / Solo / Find)" },
       { keys: ["Shift", "Click"], description: "Add fixture to selection (multi-select)" },
       { keys: ["⌘", "A"], description: "Select all fixtures" },
       { keys: ["⌘", "F"], description: "Focus toolbar search" },
       { keys: ["⌘", "Z"], description: "Undo last fixture create / delete" },
       { keys: ["⌘", "Shift", "Z"], description: "Redo" },
       { keys: ["F2"], description: "Rename focused scene tile (inline)" },
+      { keys: ["H"], description: "Toggle Highlight on the current selection" },
+      { keys: ["Shift", "H"], description: "Toggle Solo on the current selection (dim everything else)" },
+      { keys: ["Shift", "I"], description: "Find — pulse the selection in turn so you can locate each fixture" },
     ],
   },
   {

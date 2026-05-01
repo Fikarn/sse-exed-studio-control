@@ -149,6 +149,16 @@ export function LightingWorkspaceSurface({
   // Mirror identify-burst pulses on the plot marker. 1.2 s window matches
   // engine identify.rs default. Cleared by setTimeout in handleIdentifyBurst.
   const [identifyingIds, setIdentifyingIds] = useState<ReadonlySet<string>>(() => new Set());
+  // Wave 29 — Find sequence pulse timers. Each call to handleIdentifyFind
+  // schedules 2N timers (start + stop per fixture); cleared on Esc /
+  // workspace switch / new sequence start so prior runs don't leak through.
+  const findSequenceTimersRef = useRef<number[]>([]);
+  const clearFindSequenceTimers = useCallback(() => {
+    for (const handle of findSequenceTimersRef.current) {
+      window.clearTimeout(handle);
+    }
+    findSequenceTimersRef.current = [];
+  }, []);
   const [dmxMonitorOpen, setDmxMonitorOpen] = useState(false);
   const [confirmCutAllOpen, setConfirmCutAllOpen] = useState(false);
   const [createFixtureOpen, setCreateFixtureOpen] = useState(false);
@@ -458,6 +468,25 @@ export function LightingWorkspaceSurface({
     if (persistedSelectedFixtureId) set.add(persistedSelectedFixtureId);
     return set;
   }, [extraSelectedFixtureIds, persistedSelectedFixtureId]);
+
+  // Wave 29 — overlay-id sets read straight from the snapshot. The engine
+  // is the source of truth so a page reload mid-overlay still surfaces the
+  // active state in the toolbar. Empty sets when no overlay is active.
+  const lightingHighlightFixtureIds = useMemo<ReadonlySet<string>>(
+    () => new Set(lightingSnapshot?.highlightFixtureIds ?? []),
+    [lightingSnapshot?.highlightFixtureIds]
+  );
+  const lightingSoloFixtureIds = useMemo<ReadonlySet<string>>(
+    () => new Set(lightingSnapshot?.soloFixtureIds ?? []),
+    [lightingSnapshot?.soloFixtureIds]
+  );
+  const overlayFixtureIds = useMemo<ReadonlySet<string>>(() => {
+    const next = new Set(lightingHighlightFixtureIds);
+    for (const id of lightingSoloFixtureIds) next.add(id);
+    return next;
+  }, [lightingHighlightFixtureIds, lightingSoloFixtureIds]);
+  const highlightActive = lightingHighlightFixtureIds.size > 0;
+  const soloActive = lightingSoloFixtureIds.size > 0;
 
   const selectedFixtureSnapshots = useMemo(
     () => fixtures.filter((fixture) => selectedFixtureIds.has(fixture.id)),
@@ -1035,6 +1064,161 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  // Wave 29 — Highlight toggle. Selection-driven; pre-clears any active
+  // Solo so the engine's mutual-exclusion guard doesn't reject the request.
+  // Operator press while highlight is active = clear (toggle).
+  const handleToggleHighlight = useEffectEvent(async () => {
+    if (highlightActive) {
+      startBusy("highlight");
+      try {
+        await store.highlightLightingFixtures([], "off");
+      } catch (error) {
+        reportError(error, "Failed to clear highlight.");
+      } finally {
+        finishBusy("highlight");
+      }
+      return;
+    }
+    if (selectedFixtureIds.size === 0) {
+      toast.push({ message: "Select fixtures to enable Highlight.", tone: "info" });
+      return;
+    }
+    startBusy("highlight");
+    try {
+      if (soloActive) {
+        await store.highlightLightingFixtures([], "off");
+      }
+      const ids = Array.from(selectedFixtureIds);
+      await store.highlightLightingFixtures(ids, "highlight");
+      toast.push({
+        message: `Highlight on ${ids.length} fixture${ids.length === 1 ? "" : "s"}.`,
+        tone: "ok",
+      });
+    } catch (error) {
+      reportError(error, "Highlight failed.");
+    } finally {
+      finishBusy("highlight");
+    }
+  });
+
+  // Wave 29 — Solo toggle. Symmetric to Highlight.
+  const handleToggleSolo = useEffectEvent(async () => {
+    if (soloActive) {
+      startBusy("solo");
+      try {
+        await store.highlightLightingFixtures([], "off");
+      } catch (error) {
+        reportError(error, "Failed to clear solo.");
+      } finally {
+        finishBusy("solo");
+      }
+      return;
+    }
+    if (selectedFixtureIds.size === 0) {
+      toast.push({ message: "Select fixtures to enable Solo.", tone: "info" });
+      return;
+    }
+    startBusy("solo");
+    try {
+      if (highlightActive) {
+        await store.highlightLightingFixtures([], "off");
+      }
+      const ids = Array.from(selectedFixtureIds);
+      await store.highlightLightingFixtures(ids, "solo");
+      toast.push({
+        message: `Solo on ${ids.length} fixture${ids.length === 1 ? "" : "s"}.`,
+        tone: "ok",
+      });
+    } catch (error) {
+      reportError(error, "Solo failed.");
+    } finally {
+      finishBusy("solo");
+    }
+  });
+
+  // Wave 29 — Find sequence. Engine pre-schedules N staggered bursts; the
+  // frontend mirrors each slot on the plot marker pulse-ring at the same
+  // offset so the operator's eye tracks the active fixture. Step / duration
+  // chosen to clear in <2 s for a typical 3-fixture key triangle.
+  const handleIdentifyFind = useEffectEvent(async () => {
+    if (selectedFixtureIds.size === 0) {
+      toast.push({ message: "Select fixtures to enable Find.", tone: "info" });
+      return;
+    }
+    const ids = Array.from(selectedFixtureIds);
+    const stepMs = 500;
+    const durationMs = 400;
+    clearFindSequenceTimers();
+    startBusy("identify-find");
+    try {
+      await store.startLightingIdentifySequence(ids, stepMs, durationMs);
+      toast.push({
+        message: `Finding ${ids.length} fixture${ids.length === 1 ? "" : "s"}…`,
+        tone: "ok",
+      });
+      ids.forEach((id, idx) => {
+        const startHandle = window.setTimeout(() => {
+          setIdentifyingIds((prev) => {
+            const next = new Set(prev);
+            next.add(id);
+            return next;
+          });
+        }, idx * stepMs);
+        const stopHandle = window.setTimeout(
+          () => {
+            setIdentifyingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
+          },
+          idx * stepMs + durationMs
+        );
+        findSequenceTimersRef.current.push(startHandle, stopHandle);
+      });
+    } catch (error) {
+      reportError(error, "Identify sequence failed.");
+    } finally {
+      finishBusy("identify-find");
+    }
+  });
+
+  // Wave 29 — Esc / workspace-switch cleanup. Clears highlight + solo
+  // overlays in the engine and cancels any in-flight Find sequence pulse
+  // timers. Each IPC is gated on whether there's anything to clear so
+  // a quiet Esc doesn't burn round-trips. useEffectEvent semantics keep
+  // the gate readings fresh.
+  const clearOverlaysAndSequence = useEffectEvent(async () => {
+    const hadTimers = findSequenceTimersRef.current.length > 0;
+    clearFindSequenceTimers();
+    if (identifyingIds.size > 0) {
+      setIdentifyingIds(() => new Set());
+    }
+    if (highlightActive || soloActive) {
+      try {
+        await store.highlightLightingFixtures([], "off");
+      } catch (error) {
+        reportError(error, "Failed to clear overlay.");
+      }
+    }
+    if (hadTimers) {
+      try {
+        await store.clearLightingIdentifyBursts();
+      } catch (error) {
+        reportError(error, "Failed to clear identify bursts.");
+      }
+    }
+  });
+
+  // Workspace unmount = the operator switched workspaces. Fire-and-forget
+  // overlay clear so the engine doesn't carry highlight / solo / find
+  // state into the next session.
+  useEffect(() => {
+    return () => {
+      void clearOverlaysAndSequence();
+    };
+  }, []);
+
   const handleDeleteFixture = useEffectEvent(async (fixtureId: string) => {
     // Snapshot the live fixture before deletion so undo can recreate it.
     // groupId / spatial / beam-angle are restored via a follow-up update IPC
@@ -1334,10 +1518,30 @@ export function LightingWorkspaceSurface({
         return;
       }
 
+      // Wave 29 — Shift+H toggles Solo, Shift+I starts the Find sequence.
+      // These need to run before the modifier-shortcircuit below since they
+      // depend on the Shift modifier.
+      if (!event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey) {
+        if (event.key.toLowerCase() === "h") {
+          event.preventDefault();
+          void handleToggleSolo();
+          return;
+        }
+        if (event.key.toLowerCase() === "i") {
+          event.preventDefault();
+          void handleIdentifyFind();
+          return;
+        }
+      }
+
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (event.key.toLowerCase() === "p") {
         setUiMode((current) => (current === "patch" ? "recall" : "patch"));
         event.preventDefault();
+      } else if (event.key.toLowerCase() === "h") {
+        // Wave 29 — H toggles Highlight on the current selection.
+        event.preventDefault();
+        void handleToggleHighlight();
       } else if (event.key.toLowerCase() === "s") {
         // Smart S: when drift exists on the active scene, save changes.
         // Otherwise create a new scene with the autoname for fast capture.
@@ -1358,6 +1562,12 @@ export function LightingWorkspaceSurface({
       } else if (event.key === "Escape") {
         setSelectedGroupId(null);
         void handleSelectFixture(null);
+        // Wave 29 — Esc also clears any active Highlight / Solo overlay
+        // and cancels an in-flight Find sequence. The cleanup function
+        // reads latest overlay state via useEffectEvent semantics so
+        // calling it unconditionally avoids stale-closure traps; the
+        // engine no-ops when there's nothing to clear.
+        void clearOverlaysAndSequence();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -1410,6 +1620,12 @@ export function LightingWorkspaceSurface({
         patchMode={uiMode === "patch"}
         onTogglePatch={handleTogglePatch}
         onAddFixture={requestAddFixture}
+        hasSelection={selectedFixtureIds.size > 0}
+        highlightActive={highlightActive}
+        soloActive={soloActive}
+        onToggleHighlight={() => void handleToggleHighlight()}
+        onToggleSolo={() => void handleToggleSolo()}
+        onIdentifyFind={() => void handleIdentifyFind()}
       />
 
       <LightingBridgeBanner reachable={bridgeReachable} bridgeIp={bridgeIp} universe={bridgeUniverse} />
@@ -1471,6 +1687,7 @@ export function LightingWorkspaceSurface({
             bridgeReachable={bridgeReachable}
             searchQuery={searchQuery}
             identifyingFixtureIds={identifyingIds}
+            highlightOverlayFixtureIds={overlayFixtureIds}
             onSelectFixture={(id, options) => void handleSelectFixture(id, options ?? {})}
             onPositionCommit={(id, xMeters, yMeters) =>
               void handleFixtureSpatialCommit(id, { spatialX: xMeters, spatialY: yMeters })
