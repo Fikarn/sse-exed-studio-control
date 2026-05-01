@@ -279,6 +279,13 @@ pub(super) fn lighting_scene_update_summary(
     if request.capture_current_state {
         parts.push(String::from("captured current fixture state"));
     }
+    if let Some(color_index) = request.color_index {
+        parts.push(if color_index.is_some() {
+            String::from("recolored")
+        } else {
+            String::from("color cleared")
+        });
+    }
 
     if parts.is_empty() {
         format!("Lighting scene '{}' was updated.", scene.name)

@@ -143,18 +143,29 @@ export interface LightingSceneCreateRequest {
 
 export interface LightingSceneUpdateRequest {
   sceneId: string;
-  /** New name. Optional — at least one of name / captureCurrentState is required. */
+  /** New name. Optional — at least one of name / captureCurrentState / colorIndex is required. */
   name?: string;
   /**
    * When true, the scene's saved fixtureStates are overwritten with the live
    * rig state. Used for "Save changes" without delete+recreate.
    */
   captureCurrentState?: boolean;
+  /**
+   * Operator-assigned color tag (Ableton-style). Palette index 0..7 to
+   * set, `null` to clear, or omit to leave unchanged.
+   */
+  colorIndex?: number | null;
 }
 
 export interface LightingGroupUpdateRequest {
   groupId: string;
-  name: string;
+  /** New name. Optional — at least one of name / colorIndex is required. */
+  name?: string;
+  /**
+   * Operator-assigned color tag (Ableton-style). Palette index 0..7 to
+   * set, `null` to clear, or omit to leave unchanged.
+   */
+  colorIndex?: number | null;
 }
 
 export interface StartupFailure {
@@ -234,6 +245,7 @@ export interface ShellStore {
   updateLightingScene(request: LightingSceneUpdateRequest): Promise<JsonValue>;
   deleteLightingScene(sceneId: string): Promise<JsonValue>;
   reorderLightingScene(sceneId: string, beforeSceneId: string | null): Promise<JsonValue>;
+  reorderLightingGroup(groupId: string, beforeGroupId: string | null): Promise<JsonValue>;
   pinLightingScene(sceneId: string, pinned: boolean): Promise<JsonValue>;
   updateLightingFixture(request: LightingFixtureUpdateRequest): Promise<JsonValue>;
   identifyLightingFixture(fixtureId: string, durationMs?: number): Promise<JsonValue>;

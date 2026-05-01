@@ -71,6 +71,7 @@ pub(super) fn default_lighting_editor_state(
 
     let scenes = default_lighting_scene_states(config, inventory, &fixtures);
     let scene_order = scenes.iter().map(|scene| scene.id.clone()).collect();
+    let group_order = groups.iter().map(|group| group.id.clone()).collect();
     LightingEditorState {
         groups,
         removed_fixture_ids: Vec::new(),
@@ -78,6 +79,7 @@ pub(super) fn default_lighting_editor_state(
         fixtures,
         scene_order,
         pinned_scene_ids: Vec::new(),
+        group_order,
     }
 }
 
@@ -173,6 +175,7 @@ pub(super) fn normalize_lighting_editor_state(
                         }
                     })
                     .collect(),
+                color_index: scene.color_index.filter(|index| *index < 8),
             })
             .collect()
     };
@@ -201,6 +204,22 @@ pub(super) fn normalize_lighting_editor_state(
         .cloned()
         .collect();
 
+    // Rebuild group_order in the same shape as scene_order: preserve
+    // any persisted ids that still point to a live group, then append
+    // any group not yet listed (legacy state pre-30a has empty
+    // group_order and rebuilds from groups insertion order).
+    let mut group_order: Vec<String> = existing
+        .group_order
+        .iter()
+        .filter(|id| groups.iter().any(|group| &group.id == *id))
+        .cloned()
+        .collect();
+    for group in &groups {
+        if !group_order.iter().any(|id| id == &group.id) {
+            group_order.push(group.id.clone());
+        }
+    }
+
     LightingEditorState {
         groups,
         removed_fixture_ids,
@@ -208,6 +227,7 @@ pub(super) fn normalize_lighting_editor_state(
         scenes,
         scene_order,
         pinned_scene_ids,
+        group_order,
     }
 }
 
@@ -221,6 +241,7 @@ pub(super) fn default_lighting_group_states(
         .map(|group| LightingEditorGroupState {
             id: group.id.clone(),
             name: group.name.clone(),
+            color_index: None,
         })
         .collect::<Vec<_>>();
     append_missing_group_states(&mut groups, fixtures, inventory);
@@ -236,7 +257,14 @@ pub(super) fn normalize_lighting_group_states(
         return default_lighting_group_states(inventory, fixtures);
     }
 
-    let mut groups = existing_groups.to_vec();
+    let mut groups: Vec<LightingEditorGroupState> = existing_groups
+        .iter()
+        .map(|group| LightingEditorGroupState {
+            id: group.id.clone(),
+            name: group.name.clone(),
+            color_index: group.color_index.filter(|index| *index < 8),
+        })
+        .collect();
     append_missing_group_states(&mut groups, fixtures, inventory);
     groups
 }
@@ -267,6 +295,7 @@ pub(super) fn append_missing_group_states(
                     .get(group_id)
                     .map(|name| String::from(*name))
                     .unwrap_or_else(|| String::from(group_id)),
+                color_index: None,
             });
             known_ids.push(String::from(group_id));
         }
@@ -336,6 +365,7 @@ pub(super) fn default_lighting_scene_states(
             fixture_states: default_lighting_scene_fixture_states(
                 config, inventory, &scene.id, fixtures,
             ),
+            color_index: None,
         })
         .collect()
 }
@@ -392,6 +422,7 @@ pub(super) fn lighting_group_snapshot_from_state(
             .iter()
             .filter(|fixture| fixture.group_id.as_deref() == Some(group.id.as_str()))
             .count(),
+        color_index: group.color_index,
     }
 }
 
@@ -457,6 +488,7 @@ pub(super) fn lighting_scene_snapshot_from_state(
             None
         },
         pinned,
+        color_index: scene.color_index,
     }
 }
 

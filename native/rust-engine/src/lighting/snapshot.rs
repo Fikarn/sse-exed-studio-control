@@ -53,9 +53,30 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
             fixture
         })
         .collect::<Vec<_>>();
-    let groups = editor_state
+    // Emit groups in display order following group_order; orphans (groups
+    // that exist on the editor state but not in group_order, e.g. legacy
+    // state mid-migration) tail-pad in editor_state.groups order.
+    let group_by_id: std::collections::HashMap<&str, &LightingEditorGroupState> = editor_state
         .groups
         .iter()
+        .map(|group| (group.id.as_str(), group))
+        .collect();
+    let mut ordered_groups: Vec<&LightingEditorGroupState> =
+        Vec::with_capacity(editor_state.groups.len());
+    for id in &editor_state.group_order {
+        if let Some(group) = group_by_id.get(id.as_str()).copied() {
+            if !ordered_groups.iter().any(|other| other.id == group.id) {
+                ordered_groups.push(group);
+            }
+        }
+    }
+    for group in &editor_state.groups {
+        if !ordered_groups.iter().any(|other| other.id == group.id) {
+            ordered_groups.push(group);
+        }
+    }
+    let groups = ordered_groups
+        .into_iter()
         .map(|group| {
             let fixture_count = fixtures
                 .iter()
@@ -65,6 +86,7 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
                 id: group.id.clone(),
                 name: group.name.clone(),
                 fixture_count,
+                color_index: group.color_index,
             }
         })
         .collect::<Vec<_>>();

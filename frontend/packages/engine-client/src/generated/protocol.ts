@@ -34,6 +34,7 @@ export const REQUEST_METHODS = [
   "lighting.group.create",
   "lighting.group.delete",
   "lighting.group.power",
+  "lighting.group.reorder",
   "lighting.group.update",
   "lighting.power.all",
   "lighting.scene.create",

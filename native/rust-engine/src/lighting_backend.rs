@@ -128,11 +128,13 @@ impl LightingBackend for SimulatedLightingBackend {
                     id: String::from("group-stage"),
                     name: String::from("Stage"),
                     fixture_count: 3,
+                    color_index: None,
                 },
                 LightingGroupSnapshot {
                     id: String::from("group-room"),
                     name: String::from("Room"),
                     fixture_count: 1,
+                    color_index: None,
                 },
             ],
             scenes: vec![
@@ -144,6 +146,7 @@ impl LightingBackend for SimulatedLightingBackend {
                     last_recalled: false,
                     last_recalled_at: None,
                     pinned: false,
+                    color_index: None,
                 },
                 LightingSceneSnapshot {
                     id: String::from("scene-teaching"),
@@ -153,6 +156,7 @@ impl LightingBackend for SimulatedLightingBackend {
                     last_recalled: false,
                     last_recalled_at: None,
                     pinned: false,
+                    color_index: None,
                 },
                 LightingSceneSnapshot {
                     id: String::from("scene-stream"),
@@ -162,6 +166,7 @@ impl LightingBackend for SimulatedLightingBackend {
                     last_recalled: false,
                     last_recalled_at: None,
                     pinned: false,
+                    color_index: None,
                 },
             ],
         }

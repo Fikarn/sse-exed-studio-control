@@ -102,6 +102,7 @@ pub fn create_lighting_scene(
         id: next_custom_scene_id(&editor_state.scenes),
         name: request.name.clone(),
         fixture_states: capture_scene_fixture_states(&editor_state.fixtures),
+        color_index: None,
     };
     editor_state.scenes.push(scene.clone());
     // New scenes append to the display order. Pinned scenes float to
@@ -168,6 +169,9 @@ pub fn update_lighting_scene(
         }
         if let Some(fixture_states) = captured_fixture_states {
             scene.fixture_states = fixture_states;
+        }
+        if let Some(color_index) = request.color_index {
+            scene.color_index = color_index;
         }
 
         scene.clone()

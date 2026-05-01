@@ -14,4 +14,9 @@ export type LightingSceneSnapshot = {
    * reflects this, but the flag drives the rail's visual treatment).
    */
   pinned: boolean;
+  /**
+   * Operator-assigned color tag (Ableton-style). Palette index 0..=7
+   * or `None` for no tag. Frontend renders as a 4 px left accent bar.
+   */
+  colorIndex: number | null;
 };

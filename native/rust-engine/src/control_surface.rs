@@ -937,6 +937,7 @@ fn handle_light_action(
                                 on: fixture.on,
                             })
                             .collect(),
+                        color_index: None,
                     });
                     save_lighting_deck_state(db_path, &lighting_state)?;
                     persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, Some(&scene_id))?;
