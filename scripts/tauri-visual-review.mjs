@@ -9,7 +9,7 @@ import { chromium } from "playwright";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const viteCommand = path.join(rootDir, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite");
+const viteScript = path.join(rootDir, "node_modules", "vite", "bin", "vite.js");
 const args = process.argv.slice(2);
 const previewPort = Number(readFlag("--port") ?? "4173");
 const outputRoot = path.resolve(rootDir, readFlag("--out") ?? "artifacts/visual/tauri-cutover");
@@ -24,6 +24,10 @@ const sizes = readSizeFlag("--sizes", [
   { height: 1080, label: "1920x1080", width: 1920 },
   { height: 1440, label: "2560x1440", width: 2560 },
 ]);
+
+function needsCommandShell(command) {
+  return process.platform === "win32" && /\.(bat|cmd)$/i.test(command);
+}
 
 function readFlag(name) {
   const prefix = `${name}=`;
@@ -74,6 +78,7 @@ function resolveGitSha() {
 function run(command, commandArgs) {
   const result = spawnSync(command, commandArgs, {
     cwd: rootDir,
+    shell: needsCommandShell(command),
     stdio: "inherit",
   });
 
@@ -103,11 +108,15 @@ async function assertTcpPortAvailable(port) {
 }
 
 function launchPreview(port) {
-  const child = spawn(viteCommand, ["preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-    cwd: path.join(rootDir, "frontend/app"),
-    detached: process.platform !== "win32",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const child = spawn(
+    process.execPath,
+    [viteScript, "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    {
+      cwd: path.join(rootDir, "frontend/app"),
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+    }
+  );
 
   child.stdout.setEncoding("utf8");
   child.stderr.setEncoding("utf8");

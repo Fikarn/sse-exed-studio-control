@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from "react";
-import { Crosshair, Lightbulb, Locate, MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
+import { Crosshair, EyeOff, Lightbulb, Locate, MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
 
 import { Button, StatusDot, Tooltip } from "@sse/design-system";
 
@@ -20,6 +20,9 @@ export interface LightingToolbarProps {
   onRecallFadeMsChange: (nextMs: number) => void;
   patchMode: boolean;
   onTogglePatch: () => void;
+  previewMode: boolean;
+  previewDirty: boolean;
+  onTogglePreview: () => void;
   onAddFixture: () => void;
   /** I2 — Highlight/Solo overlay states + Find sequence trigger.
    *  Selection-driven: buttons gate on hasSelection so operators don't
@@ -46,6 +49,9 @@ export function LightingToolbar({
   onRecallFadeMsChange,
   patchMode,
   onTogglePatch,
+  previewMode,
+  previewDirty,
+  onTogglePreview,
   onAddFixture,
   hasSelection,
   highlightActive,
@@ -75,6 +81,7 @@ export function LightingToolbar({
         role="toolbar"
         aria-label="Lighting workspace toolbar"
         data-patch-mode={patchMode || undefined}
+        data-preview-mode={previewMode || undefined}
       >
         <div className={styles.title}>
           <Sun aria-hidden="true" className={styles.titleIcon} size={17} strokeWidth={1.75} />
@@ -93,6 +100,9 @@ export function LightingToolbar({
             >
               Exit patch mode <kbd className={styles.kbd}>P</kbd>
             </Button>
+          ) : null}
+          {previewMode ? (
+            <span className={styles.previewEyebrow}>Preview {previewDirty ? "dirty" : "clean"}</span>
           ) : null}
         </div>
 
@@ -139,6 +149,7 @@ export function LightingToolbar({
           <input
             aria-label="Scene recall fade seconds"
             className={styles.fadeInput}
+            disabled={previewMode}
             min={0}
             max={10}
             onChange={handleFadeChange}
@@ -167,6 +178,7 @@ export function LightingToolbar({
           onClick={onTogglePatch}
           leadingVisual={<Pencil aria-hidden="true" size={13} strokeWidth={1.75} />}
           aria-pressed={patchMode}
+          disabled={previewMode}
         >
           Patch <kbd className={styles.kbd}>P</kbd>
         </Button>
@@ -186,7 +198,7 @@ export function LightingToolbar({
             onClick={onToggleHighlight}
             leadingVisual={<Lightbulb aria-hidden="true" size={13} strokeWidth={1.75} />}
             aria-pressed={highlightActive}
-            disabled={!hasSelection && !highlightActive}
+            disabled={previewMode || (!hasSelection && !highlightActive)}
           >
             Highlight <kbd className={styles.kbd}>H</kbd>
           </Button>
@@ -202,7 +214,7 @@ export function LightingToolbar({
             onClick={onToggleSolo}
             leadingVisual={<Crosshair aria-hidden="true" size={13} strokeWidth={1.75} />}
             aria-pressed={soloActive}
-            disabled={!hasSelection && !soloActive}
+            disabled={previewMode || (!hasSelection && !soloActive)}
           >
             Solo <kbd className={styles.kbd}>⇧H</kbd>
           </Button>
@@ -221,9 +233,25 @@ export function LightingToolbar({
             variant="secondary"
             onClick={onIdentifyFind}
             leadingVisual={<Locate aria-hidden="true" size={13} strokeWidth={1.75} />}
-            disabled={!hasSelection}
+            disabled={previewMode || !hasSelection}
           >
             Find <kbd className={styles.kbd}>⇧I</kbd>
+          </Button>
+        </Tooltip>
+
+        <Tooltip
+          content={patchMode ? "Exit patch mode before preview editing." : "Edit scene levels offline"}
+          placement="bottom"
+        >
+          <Button
+            size="compact"
+            variant={previewMode ? "primary" : "secondary"}
+            onClick={onTogglePreview}
+            leadingVisual={<EyeOff aria-hidden="true" size={13} strokeWidth={1.75} />}
+            aria-pressed={previewMode}
+            disabled={patchMode}
+          >
+            Preview <kbd className={styles.kbd}>B</kbd>
           </Button>
         </Tooltip>
 
@@ -232,6 +260,7 @@ export function LightingToolbar({
           variant="primary"
           onClick={onAddFixture}
           leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={2} />}
+          disabled={previewMode}
         >
           Add fixture
         </Button>

@@ -54,6 +54,46 @@ function asBoolean(value: unknown, fallback = false) {
   return typeof value === "boolean" ? value : fallback;
 }
 
+function lightingFixtures(snapshot: JsonObject, key: "fixtures" | "previewFixtures" = "fixtures"): JsonObject[] {
+  return asArray(snapshot[key])
+    .map((fixture) => asRecord(fixture))
+    .filter((fixture): fixture is JsonObject => fixture !== null);
+}
+
+function lightingScenes(snapshot: JsonObject): JsonObject[] {
+  return asArray(snapshot.scenes)
+    .map((scene) => asRecord(scene))
+    .filter((scene): scene is JsonObject => scene !== null);
+}
+
+function lightingPreviewActive(snapshot: JsonObject): boolean {
+  return asBoolean(snapshot.previewMode, false);
+}
+
+function previewFixturesFromScene(liveFixtures: readonly JsonObject[], scene: JsonObject): JsonObject[] {
+  const fixtureStates = asArray(scene.fixtureStates)
+    .map((fixtureState) => asRecord(fixtureState))
+    .filter((fixtureState): fixtureState is JsonObject => fixtureState !== null);
+
+  return liveFixtures.map((fixture) => {
+    const nextState = fixtureStates.find((fixtureState) => asString(fixtureState.fixtureId) === asString(fixture.id));
+    if (!nextState) return fixture;
+    return {
+      ...fixture,
+      cct: asNumber(nextState.cct, asNumber(fixture.cct, 3200)),
+      intensity: asNumber(nextState.intensity, asNumber(fixture.intensity, 0)),
+      on: asBoolean(nextState.on, asBoolean(fixture.on, false)),
+    };
+  });
+}
+
+function clearLightingPreview(snapshot: JsonObject) {
+  snapshot.previewMode = false;
+  snapshot.previewDirty = false;
+  snapshot.previewSceneId = null;
+  snapshot.previewFixtures = [];
+}
+
 function normalizeRunnerStage(stage: unknown, legacyStage: unknown): RunnerStage {
   if (stage === "import" || stage === "probe" || stage === "map" || stage === "verify" || stage === "publish") {
     return stage;
@@ -1748,8 +1788,10 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? buildDefaultLightingSnapshot();
         lightingSnapshot.previewMode = enabled;
         lightingSnapshot.previewDirty = false;
-        lightingSnapshot.previewSceneId = enabled ? asString(lightingSnapshot.lastRecalledSceneId) || null : null;
-        lightingSnapshot.previewFixtures = enabled ? cloneJson(asArray(lightingSnapshot.fixtures)) : [];
+        lightingSnapshot.previewSceneId = enabled
+          ? asString(lightingSnapshot.lastRecalledSceneId) || asString(lightingSnapshot.selectedSceneId) || null
+          : null;
+        lightingSnapshot.previewFixtures = enabled ? cloneJson(lightingFixtures(lightingSnapshot)) : [];
         state.lightingSnapshot = lightingSnapshot;
         emit("lighting.changed", { reason: "preview-mode-updated" });
         return {
@@ -2156,16 +2198,34 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        if (!asBoolean(lightingSnapshot.reachable, false)) {
-          throw new Error("Lighting scene recall requires a reachable lighting transport.");
-        }
-
-        const scenes = asArray(lightingSnapshot.scenes)
-          .map((scene) => asRecord(scene))
-          .filter((scene): scene is JsonObject => scene !== null);
+        const scenes = lightingScenes(lightingSnapshot);
         const targetScene = scenes.find((scene) => asString(scene.id) === sceneId);
         if (!targetScene) {
           throw new Error(`Lighting scene '${sceneId}' is not present in the scene list.`);
+        }
+
+        if (lightingPreviewActive(lightingSnapshot)) {
+          const liveFixtures = lightingFixtures(lightingSnapshot);
+          lightingSnapshot.previewSceneId = sceneId;
+          lightingSnapshot.previewDirty = false;
+          lightingSnapshot.previewFixtures = previewFixturesFromScene(liveFixtures, targetScene);
+          state.lightingSnapshot = lightingSnapshot;
+          synchronizeFixtureState(state);
+          emit("lighting.changed", { reason: "scene-preview-recalled" });
+          return {
+            recalled: true,
+            sceneId,
+            sceneName: asString(targetScene.name, sceneId),
+            recalledAt: null,
+            fadeDurationSeconds: 0,
+            fadeMs: 0,
+            previewMode: true,
+            summary: `Lighting scene '${asString(targetScene.name, sceneId)}' loaded into preview.`,
+          };
+        }
+
+        if (!asBoolean(lightingSnapshot.reachable, false)) {
+          throw new Error("Lighting scene recall requires a reachable lighting transport.");
         }
 
         const recalledAt = new Date().toISOString();
@@ -2180,9 +2240,10 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const fixtureStates = asArray(targetScene.fixtureStates)
           .map((fixtureState) => asRecord(fixtureState))
           .filter((fixtureState): fixtureState is JsonObject => fixtureState !== null);
-        const fixtures = asArray(lightingSnapshot.fixtures)
-          .map((fixture) => asRecord(fixture))
-          .filter((fixture): fixture is JsonObject => fixture !== null);
+        const previewActive = lightingPreviewActive(lightingSnapshot);
+        const fixtures = previewActive
+          ? lightingFixtures(lightingSnapshot, "previewFixtures")
+          : lightingFixtures(lightingSnapshot);
 
         lightingSnapshot.selectedSceneId = sceneId;
         lightingSnapshot.lastRecalledSceneId = sceneId;
@@ -2239,9 +2300,10 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        const fixtures = asArray(lightingSnapshot.fixtures)
-          .map((fixture) => asRecord(fixture))
-          .filter((fixture): fixture is JsonObject => fixture !== null);
+        const previewActive = lightingPreviewActive(lightingSnapshot);
+        const fixtures = previewActive
+          ? lightingFixtures(lightingSnapshot, "previewFixtures")
+          : lightingFixtures(lightingSnapshot);
         if (fixtures.length === 0) {
           throw new Error("No lighting fixtures are available for scene creation.");
         }
@@ -2264,7 +2326,13 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         };
 
         lightingSnapshot.scenes = [...scenes, createdScene];
-        const summary = `Lighting scene '${name}' was saved from the current fixture state.`;
+        if (previewActive) {
+          lightingSnapshot.selectedSceneId = createdScene.id;
+          clearLightingPreview(lightingSnapshot);
+        }
+        const summary = previewActive
+          ? `Lighting scene '${name}' was saved from preview.`
+          : `Lighting scene '${name}' was saved from the current fixture state.`;
         lightingSnapshot.lastActionStatus = "succeeded";
         lightingSnapshot.lastActionCode = null;
         lightingSnapshot.lastActionMessage = summary;
@@ -2298,9 +2366,10 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error(`Lighting scene '${sceneId}' is not present in the scene list.`);
         }
 
-        const fixtures = asArray(lightingSnapshot.fixtures)
-          .map((fixture) => asRecord(fixture))
-          .filter((fixture): fixture is JsonObject => fixture !== null);
+        const previewActive = lightingPreviewActive(lightingSnapshot);
+        const fixtures = previewActive
+          ? lightingFixtures(lightingSnapshot, "previewFixtures")
+          : lightingFixtures(lightingSnapshot);
 
         const nextName = hasName ? asString(params.name).trim() : asString(targetScene.name);
         if (hasName && !nextName) {
@@ -2336,6 +2405,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         };
 
         lightingSnapshot.scenes = scenes.map((scene) => (asString(scene.id) === sceneId ? updatedScene : scene));
+        if (hasCapture && previewActive) {
+          clearLightingPreview(lightingSnapshot);
+        }
         const summaryParts: string[] = [];
         if (hasName) summaryParts.push(`renamed to '${nextName}'`);
         if (hasCapture) summaryParts.push("captured current rig state");
@@ -2558,19 +2630,81 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        if (!asBoolean(lightingSnapshot.reachable, false)) {
-          throw new Error("Lighting fixture update requires a reachable lighting transport.");
-        }
-
-        const fixtures = asArray(lightingSnapshot.fixtures)
-          .map((fixture) => asRecord(fixture))
-          .filter((fixture): fixture is JsonObject => fixture !== null);
+        const previewActive = lightingPreviewActive(lightingSnapshot);
+        const fixtures = lightingFixtures(lightingSnapshot);
         const groups = asArray(lightingSnapshot.groups)
           .map((group) => asRecord(group))
           .filter((group): group is JsonObject => group !== null);
         const targetFixture = fixtures.find((fixture) => asString(fixture.id) === fixtureId);
         if (!targetFixture) {
           throw new Error(`Lighting fixture '${fixtureId}' is not present in the fixture inventory.`);
+        }
+
+        if (previewActive) {
+          if (
+            hasName ||
+            hasType ||
+            hasDmxStartAddress ||
+            hasGroupId ||
+            hasSpatialX ||
+            hasSpatialY ||
+            hasRigZ ||
+            hasBeamAngleDegrees
+          ) {
+            throw new Error("Preview mode only supports fixture power, intensity, and CCT updates.");
+          }
+          const previewFixtures = lightingFixtures(lightingSnapshot, "previewFixtures");
+          const editableFixtures =
+            previewFixtures.length > 0 ? previewFixtures : fixtures.map((fixture) => ({ ...fixture }));
+          const previewTarget = editableFixtures.find((fixture) => asString(fixture.id) === fixtureId) ?? targetFixture;
+          const normalizedFixtureType = normalizeFixtureType(targetFixture.type);
+          const cctRange = lightingFixtureCctRange(normalizedFixtureType);
+          const defaultCct = defaultLightingFixtureCct(normalizedFixtureType);
+          const updatedFixture: JsonObject = {
+            ...previewTarget,
+            ...(hasOn ? { on: params.on } : {}),
+            ...(hasIntensity
+              ? {
+                  intensity: Math.max(
+                    0,
+                    Math.min(100, Math.round(asNumber(params.intensity, asNumber(previewTarget.intensity, 0))))
+                  ),
+                }
+              : {}),
+            ...(hasCct
+              ? {
+                  cct: clampNumber(
+                    (() => {
+                      const requested = Math.round(asNumber(params.cct, asNumber(previewTarget.cct, defaultCct)));
+                      return requested === 0 ? defaultCct : requested;
+                    })(),
+                    cctRange.min,
+                    cctRange.max
+                  ),
+                }
+              : {}),
+          };
+          lightingSnapshot.previewFixtures = editableFixtures.map((fixture) =>
+            asString(fixture.id) === fixtureId ? updatedFixture : fixture
+          );
+          lightingSnapshot.previewDirty = true;
+          const summary = `Preview fixture '${asString(updatedFixture.name, fixtureId)}' updated.`;
+          lightingSnapshot.lastActionStatus = "succeeded";
+          lightingSnapshot.lastActionCode = null;
+          lightingSnapshot.lastActionMessage = summary;
+          lightingSnapshot.summary = summary;
+          state.lightingSnapshot = lightingSnapshot;
+          synchronizeFixtureState(state);
+          emit("lighting.changed", { reason: "fixture-preview-updated" });
+          return {
+            fixture: cloneJson(updatedFixture),
+            source: "preview",
+            summary,
+          };
+        }
+
+        if (!asBoolean(lightingSnapshot.reachable, false)) {
+          throw new Error("Lighting fixture update requires a reachable lighting transport.");
         }
 
         const requestedType = hasType ? normalizeFixtureType(params.type) : null;
@@ -2709,10 +2843,6 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        if (!asBoolean(lightingSnapshot.reachable, false)) {
-          throw new Error("Lighting group power requires a reachable lighting transport.");
-        }
-
         const groups = asArray(lightingSnapshot.groups)
           .map((group) => asRecord(group))
           .filter((group): group is JsonObject => group !== null);
@@ -2721,9 +2851,10 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error(`Lighting group '${groupId}' is not present in the group list.`);
         }
 
-        const fixtures = asArray(lightingSnapshot.fixtures)
-          .map((fixture) => asRecord(fixture))
-          .filter((fixture): fixture is JsonObject => fixture !== null);
+        const previewActive = lightingPreviewActive(lightingSnapshot);
+        const fixtures = previewActive
+          ? lightingFixtures(lightingSnapshot, "previewFixtures")
+          : lightingFixtures(lightingSnapshot);
         const affectedFixtures = fixtures.filter((fixture) => asString(fixture.groupId) === groupId).length;
         if (affectedFixtures === 0) {
           throw new Error(
@@ -2731,18 +2862,28 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           );
         }
 
-        lightingSnapshot.fixtures = fixtures.map((fixture) =>
+        if (!previewActive && !asBoolean(lightingSnapshot.reachable, false)) {
+          throw new Error("Lighting group power requires a reachable lighting transport.");
+        }
+
+        const nextFixtures = fixtures.map((fixture) =>
           asString(fixture.groupId) === groupId ? { ...fixture, on } : fixture
         );
+        if (previewActive) {
+          lightingSnapshot.previewFixtures = nextFixtures;
+          lightingSnapshot.previewDirty = true;
+        } else {
+          lightingSnapshot.fixtures = nextFixtures;
+        }
 
-        const summary = `Lighting group '${asString(targetGroup.name, groupId)}' set ${on ? "on" : "off"} across ${affectedFixtures} fixtures.`;
+        const summary = `Lighting group '${asString(targetGroup.name, groupId)}' set ${on ? "on" : "off"} across ${affectedFixtures} fixtures${previewActive ? " in preview" : ""}.`;
         lightingSnapshot.lastActionStatus = "succeeded";
         lightingSnapshot.lastActionCode = null;
         lightingSnapshot.lastActionMessage = summary;
         lightingSnapshot.summary = summary;
         state.lightingSnapshot = lightingSnapshot;
         synchronizeFixtureState(state);
-        emit("lighting.changed", { reason: "group-powered" });
+        emit("lighting.changed", { reason: previewActive ? "group-preview-powered" : "group-powered" });
         return {
           affectedFixtures,
           groupId,
@@ -2886,23 +3027,30 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
-        const fixtures = asArray(lightingSnapshot.fixtures)
-          .map((fixture) => asRecord(fixture))
-          .filter((fixture): fixture is JsonObject => fixture !== null);
+        const previewActive = lightingPreviewActive(lightingSnapshot);
+        const fixtures = previewActive
+          ? lightingFixtures(lightingSnapshot, "previewFixtures")
+          : lightingFixtures(lightingSnapshot);
         if (fixtures.length === 0) {
           throw new Error("No lighting fixtures are exposed by the fixture transport.");
         }
 
-        lightingSnapshot.fixtures = fixtures.map((fixture) => ({ ...fixture, on }));
+        const nextFixtures = fixtures.map((fixture) => ({ ...fixture, on }));
+        if (previewActive) {
+          lightingSnapshot.previewFixtures = nextFixtures;
+          lightingSnapshot.previewDirty = true;
+        } else {
+          lightingSnapshot.fixtures = nextFixtures;
+        }
 
-        const summary = `All native lighting fixtures set ${on ? "on" : "off"} across ${fixtures.length} fixtures.`;
+        const summary = `All native lighting fixtures set ${on ? "on" : "off"} across ${fixtures.length} fixtures${previewActive ? " in preview" : ""}.`;
         lightingSnapshot.lastActionStatus = "succeeded";
         lightingSnapshot.lastActionCode = null;
         lightingSnapshot.lastActionMessage = summary;
         lightingSnapshot.summary = summary;
         state.lightingSnapshot = lightingSnapshot;
         synchronizeFixtureState(state);
-        emit("lighting.changed", { reason: "all-powered" });
+        emit("lighting.changed", { reason: previewActive ? "all-preview-powered" : "all-powered" });
         return {
           affectedFixtures: fixtures.length,
           summary,

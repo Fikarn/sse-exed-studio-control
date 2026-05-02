@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import dgram from "node:dgram";
@@ -13,6 +13,10 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const devServerPort = 4173;
 const evidence = createQualificationEvidence({ lane: "workspaces", rootDir });
+
+function needsCommandShell(command) {
+  return process.platform === "win32" && /\.(bat|cmd)$/i.test(command);
+}
 
 function assert(condition, message) {
   if (!condition) {
@@ -55,6 +59,33 @@ async function reserveUdpPort() {
       const address = socket.address();
       socket.close(() => resolve(address.port));
     });
+  });
+}
+
+async function createLightingProbeServer() {
+  return new Promise((resolve) => {
+    const server = net.createServer((socket) => {
+      socket.end();
+    });
+    server.once("error", (error) => {
+      console.warn(
+        `Tauri workspace qualification: could not bind temporary lighting probe server on 127.0.0.1:80 (${error.code ?? "unknown"}: ${error.message}); continuing with the host's existing port state.`
+      );
+      resolve(null);
+    });
+    server.listen(80, "127.0.0.1", () => {
+      resolve(server);
+    });
+  });
+}
+
+async function closeLightingProbeServer(server) {
+  if (!server) {
+    return;
+  }
+
+  await new Promise((resolve) => {
+    server.close(resolve);
   });
 }
 
@@ -116,6 +147,7 @@ function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath, update
       SSE_TAURI_TEST_STATUS_PATH: statusPath,
       SSE_UPDATE_REPOSITORY_PATH: updateRepoDir ?? "",
     },
+    shell: needsCommandShell(npmCommand),
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -188,7 +220,11 @@ async function closeTauriShell(child) {
 
   try {
     if (process.platform === "win32") {
-      child.kill("SIGTERM");
+      if (child.pid) {
+        spawnSync("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+      } else {
+        child.kill("SIGTERM");
+      }
     } else if (child.pid) {
       process.kill(-child.pid, "SIGTERM");
     }
@@ -207,7 +243,11 @@ async function closeTauriShell(child) {
   if (child.exitCode === null) {
     try {
       if (process.platform === "win32") {
-        child.kill("SIGKILL");
+        if (child.pid) {
+          spawnSync("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+        } else {
+          child.kill("SIGKILL");
+        }
       } else if (child.pid) {
         process.kill(-child.pid, "SIGKILL");
       }
@@ -314,13 +354,18 @@ async function runWorkspaceQualification() {
         target: "audio",
       },
     });
-    await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
-      request: {
-        bridgeIp: "127.0.0.1",
-        target: "lighting",
-        universe: 1,
-      },
-    });
+    const lightingProbeServer = await createLightingProbeServer();
+    try {
+      await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
+        request: {
+          bridgeIp: "127.0.0.1",
+          target: "lighting",
+          universe: 1,
+        },
+      });
+    } finally {
+      await closeLightingProbeServer(lightingProbeServer);
+    }
     await dispatchCommand(firstSession, firstRun, "updateCommissioning", {
       request: {
         runnerStage: "publish",

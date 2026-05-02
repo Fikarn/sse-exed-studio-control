@@ -35,6 +35,23 @@
   filter: brightness(0.78) saturate(0.85);
 }
 
+.plotShellPreview {
+  background:
+    radial-gradient(circle at top, rgba(63, 112, 200, 0.2), transparent 50%),
+    radial-gradient(circle at top, var(--color-brand-dark-green-ambient), transparent 55%), var(--color-bg-deep);
+}
+
+.plotShellPreview::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--color-brand-blue);
+  box-shadow: var(--shadow-glow-blue);
+  pointer-events: none;
+  z-index: 2;
+}
+
 .plotShellPatch::after {
   background: linear-gradient(180deg, rgba(7, 12, 22, 0.35), rgba(7, 12, 22, 0.5));
 }
@@ -97,6 +114,18 @@
   font-variation-settings: "opsz" 24;
   font-weight: 600;
   font-size: 13px;
+}
+
+.liveGhostLayer {
+  opacity: 0.42;
+}
+
+.liveGhostShape {
+  fill: none;
+  stroke: var(--color-brand-text-secondary);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
 }
 
 /* Slot positioning for the design-system PlotMeta column (top-right). */
