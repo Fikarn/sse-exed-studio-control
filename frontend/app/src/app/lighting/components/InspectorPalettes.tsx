@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Pencil, Play, Plus, Save, Trash2, X } from "lucide-react";
 
 import { Button, IconButton } from "@sse/design-system";
@@ -89,6 +89,11 @@ export function InspectorPalettes({
   const cctPalettes = useMemo(() => palettes.filter((palette) => palette.kind === "cct"), [palettes]);
   const selectedCount = selectedFixtureIds.length;
   const applyDisabled = patchMode || selectedCount === 0;
+  const editDisabled = patchMode;
+
+  useEffect(() => {
+    if (patchMode) setDraft(null);
+  }, [patchMode]);
 
   const saveDraft = () => {
     if (!draft) return;
@@ -132,14 +137,28 @@ export function InspectorPalettes({
     <div className={styles.palettePane}>
       <div className={styles.paletteStatus} data-preview-mode={previewMode || undefined}>
         <span>{selectedCount} selected</span>
-        <span>{previewMode ? "Preview" : "Live"}</span>
+        <span>{patchMode ? "Patch locked" : previewMode ? "Preview" : "Live"}</span>
       </div>
-      {renderPool("intensity", intensityPalettes, draft, setDraft, saveDraft, applyDisabled, busyActions, {
-        movePalette,
-        onApplyPalette,
-        onDeletePalette,
-      })}
-      {renderPool("cct", cctPalettes, draft, setDraft, saveDraft, applyDisabled, busyActions, {
+      {patchMode ? <p className={styles.paletteNotice}>Exit patch mode to edit or apply palettes.</p> : null}
+      {selectedCount === 0 && !patchMode ? (
+        <p className={styles.paletteNotice}>Select fixtures to apply palettes.</p>
+      ) : null}
+      {renderPool(
+        "intensity",
+        intensityPalettes,
+        draft,
+        setDraft,
+        saveDraft,
+        applyDisabled,
+        editDisabled,
+        busyActions,
+        {
+          movePalette,
+          onApplyPalette,
+          onDeletePalette,
+        }
+      )}
+      {renderPool("cct", cctPalettes, draft, setDraft, saveDraft, applyDisabled, editDisabled, busyActions, {
         movePalette,
         onApplyPalette,
         onDeletePalette,
@@ -155,6 +174,7 @@ function renderPool(
   setDraft: (draft: PaletteDraft | null) => void,
   saveDraft: () => void,
   applyDisabled: boolean,
+  editDisabled: boolean,
   busyActions: ReadonlySet<string>,
   handlers: {
     movePalette: (pool: readonly LightingPaletteSnapshot[], index: number, direction: -1 | 1) => void;
@@ -171,6 +191,7 @@ function renderPool(
           size="sm"
           icon={Plus}
           label={`Create ${KIND_LABEL[kind]} palette`}
+          disabled={editDisabled}
           onClick={() => setDraft(defaultDraft(kind))}
         />
       </div>
@@ -200,7 +221,7 @@ function renderPool(
                 size="sm"
                 icon={Pencil}
                 label={`Edit ${palette.name}`}
-                disabled={busyActions.has(`palette-update:${palette.id}`)}
+                disabled={editDisabled || busyActions.has(`palette-update:${palette.id}`)}
                 onClick={() => setDraft(draftFromPalette(palette))}
               />
               <IconButton
@@ -208,7 +229,7 @@ function renderPool(
                 size="sm"
                 icon={ArrowUp}
                 label={`Move ${palette.name} earlier`}
-                disabled={index === 0 || busyActions.has(`palette-update:${palette.id}`)}
+                disabled={editDisabled || index === 0 || busyActions.has(`palette-update:${palette.id}`)}
                 onClick={() => handlers.movePalette(pool, index, -1)}
               />
               <IconButton
@@ -216,7 +237,7 @@ function renderPool(
                 size="sm"
                 icon={ArrowDown}
                 label={`Move ${palette.name} later`}
-                disabled={index === pool.length - 1 || busyActions.has(`palette-update:${palette.id}`)}
+                disabled={editDisabled || index === pool.length - 1 || busyActions.has(`palette-update:${palette.id}`)}
                 onClick={() => handlers.movePalette(pool, index, 1)}
               />
               <IconButton
@@ -224,7 +245,7 @@ function renderPool(
                 size="sm"
                 icon={Trash2}
                 label={`Delete ${palette.name}`}
-                disabled={busyActions.has(`palette-delete:${palette.id}`)}
+                disabled={editDisabled || busyActions.has(`palette-delete:${palette.id}`)}
                 onClick={() => {
                   if (window.confirm(`Delete palette "${palette.name}"?`)) handlers.onDeletePalette(palette.id);
                 }}

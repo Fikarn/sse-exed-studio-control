@@ -168,6 +168,12 @@
   background: var(--color-brand-blue-soft);
 }
 
+.paletteNotice {
+  margin: -4px 0 0;
+  color: var(--color-brand-text-secondary);
+  font-size: 12px;
+}
+
 .palettePool {
   display: flex;
   flex-direction: column;

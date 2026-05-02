@@ -171,6 +171,8 @@ The Mac side does NOT run these — keep the lanes separate.
 - After **Wave 32**: all Tier 1 + 8/10 Tier 2 + 8/8 Tier 3 closed → workspace at premium feel.
 - After **Wave 34**: all 28 items closed → premium production-ready bar fully reached.
 
+**Completion record (2026-05-03):** Waves 24-34 are implemented and no longer form an active execution queue. All 28 findings in the mapping below are closed, Wave 34 PR #65 landed with macOS and Windows target-host validation, and the post-merge closeout pass tightened palette quick-popover search/recents, patch-mode palette locks, shortcut discoverability, and visual-review coverage for preview-active palettes. Future Lighting work should start from new issues or a new plan, not by appending to this wave sequence.
+
 ---
 
 ## Wave 24 — Row-action discovery foundation

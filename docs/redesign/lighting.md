@@ -1,18 +1,19 @@
 ---
 workspace: lighting
-phase: D (locked, executing)
-status: implementing
+phase: D (locked, implemented)
+status: premium-complete
 chosen_direction: D — Scene desk
 supersedes: Cr — Spatial desk
 prototype: docs/redesign/assets/lighting/Lighting-D-Scene-Desk.html
 implementation_plan: docs/redesign/lighting-direction-d-implementation-plan.md
+premium_plan: docs/redesign/lighting-d-premium-plan.md
 audit_refs:
   - docs/archive/UX_AUDIT.md §Lighting workspace
 ---
 
 # Lighting — Direction D delta spec
 
-> Direction **D — Scene desk** supersedes the locked **Cr — Spatial desk** direction. The visual proposal is the v6 prototype at [Lighting-D-Scene-Desk.html](./assets/lighting/Lighting-D-Scene-Desk.html); render at 2560×1440 on the BetterDisplay review surface for operator-size review. The 4-PR implementation sequence + Phase 0 findings live in [lighting-direction-d-implementation-plan.md](./lighting-direction-d-implementation-plan.md). This file is the design-spec record — what the workspace _is_ for two operator personas, not how to build it.
+> Direction **D — Scene desk** supersedes the locked **Cr — Spatial desk** direction. The visual proposal is the v6 prototype at [Lighting-D-Scene-Desk.html](./assets/lighting/Lighting-D-Scene-Desk.html); render at 2560×1440 on the BetterDisplay review surface for operator-size review. The base 4-PR implementation sequence lives in [lighting-direction-d-implementation-plan.md](./lighting-direction-d-implementation-plan.md), and the completed premium pass lives in [lighting-d-premium-plan.md](./lighting-d-premium-plan.md). This file is the design-spec record — what the workspace _is_ for two operator personas, not how to build it.
 
 ## Why D supersedes Cr
 
@@ -153,29 +154,34 @@ Two engine-side observations from Phase 0 are baked into D's design rather than 
 
 ## 5. Persistence
 
-**No on-disk format change.** D is additive on the same `appSnapshot` shape Cr used.
+**Base D shipped without an on-disk format change.** The later premium palette wave introduced storage schema v6 for per-attribute palette pools. Direction D's scene desk shape remains additive on the same `appSnapshot` ownership boundary Cr used.
 
 - `app.lighting.fixtures`, `app.lighting.groups`, `app.lighting.scenes` — unchanged.
 - `app.shell.lighting.currentSectionId` — preserved (sections still useful even without cues).
 - `app.shell.lighting.selectedCueId` — orphaned by D, ignored by the frontend, deleted by a one-shot startup migration in [PR 4](./lighting-direction-d-implementation-plan.md#pr-4--cue-cleanup-deferred).
 - `app.lighting.cues`, `app.lighting.active_cue_id` — orphaned by D, ignored by the frontend, deleted by the same PR 4 migration.
 - **New** `app.shell.lighting.sceneThumbs: Record<sceneId, string>` — frontend-only blob holding cached SVG-as-data-URI thumbnails for scene tiles. `LightingSceneSnapshot` is ts-rs-generated and strict (Phase 0 V5), so the thumb cache cannot live on the engine snapshot — the blob path is the only viable placement. Written through the existing `appSnapshot.shell.lighting` plumbing in `frontend/app/src/app/shellData.ts` (same channel as `currentSectionId`).
+- **New in premium Wave 34** `app.lighting.palettes` + `app.lighting.paletteOrder` — engine-owned intensity/CCT palette pools seeded by the v5 -> v6 migration. Palette application writes concrete fixture values and does not create scene palette references.
 
-A v2.2.1 operator launching v2.2.2 (with PR 1 + PR 3 landed but PR 4 deferred) sees their fixtures / groups / scenes intact. The orphaned cue keys sit unread in the blob; the next save preserves them. No migration needed for forward-compat. Backward-compat (downgrade from D to Cr) is unsupported by policy — operators do not roll back releases on the fixed studio host.
+A v2.2.1 operator launching the completed Direction D / premium build sees their fixtures, groups, scenes, orders, pins, color tags, and preview-independent live state preserved. Cue keys are migrated away by the Direction D cleanup, and palette defaults are seeded once during the v5 -> v6 migration. Backward-compat downgrade from v6 to pre-palette code is unsupported by policy — operators do not roll back releases on the fixed studio host.
 
 ## 6. Keyboard shortcuts
 
-| Key                | Action                                            |
-| ------------------ | ------------------------------------------------- |
-| `P`                | Toggle patch overlay                              |
-| `S`                | Save current fixture state as a new scene         |
-| `F`                | Open the **Add Fixture** dialog                   |
-| `Esc`              | Clear selection / exit patch overlay              |
-| `Cmd+M` / `Ctrl+M` | Open the full DMX universe monitor                |
-| `Cmd+1..4`         | Workspace switch (inherited from `OperatorShell`) |
-| `?`                | Toggle the shortcut overlay (inherited)           |
+| Key                      | Action                                            |
+| ------------------------ | ------------------------------------------------- |
+| `P`                      | Toggle patch overlay                              |
+| `S`                      | Smart-save current scene state                    |
+| `Cmd/Ctrl+Shift+S`       | Save current fixture state as a new scene         |
+| `F`                      | Open the **Add Fixture** dialog                   |
+| `Esc`                    | Clear selection / exit patch overlay              |
+| `H` / `Shift+H`          | Toggle Highlight / Solo on the current selection  |
+| `Shift+I`                | Find selected fixtures with sequential pulses     |
+| `Cmd/Ctrl+Shift+P`       | Open palette quick apply                          |
+| `Cmd+M` / `Ctrl+M`       | Open the full DMX universe monitor                |
+| `Cmd+1..4` / `Ctrl+1..4` | Workspace switch (inherited from `OperatorShell`) |
+| `?`                      | Toggle the shortcut overlay (inherited)           |
 
-**De-listed from Cr** (cue-related; gone): `Space` (GO), `Backspace` (back-step), `C` (add cue), `E` (edit cue), `1`–`9` (section recall — re-purposed for the cmd modifier above; pure-digit section recall is a follow-up tied to the deferred sections UI).
+**De-listed from Cr** (cue-related; gone): `Space` (GO), `Backspace` (back-step), `C` (add cue), `E` (edit cue), and Cr-style section recall on `1`-`9`. Pure digits now recall scene slots; view bookmarks use `Shift+1`-`3` / `Cmd+Shift+1`-`3`.
 
 ## 7. What is explicitly **not** in scope
 

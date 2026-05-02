@@ -63,6 +63,10 @@ const SHORTCUTS: readonly ShortcutSection[] = [
     entries: [{ keys: ["P"], description: "Toggle patch mode" }],
   },
   {
+    heading: "Lighting · palettes",
+    entries: [{ keys: ["⌘/Ctrl", "Shift", "P"], description: "Open palette quick apply" }],
+  },
+  {
     heading: "Lighting · stage plot",
     entries: [
       { keys: ["←", "→", "↑", "↓"], description: "Nudge selected fixture by 0.1 m" },

@@ -2,7 +2,17 @@
 
 Authored 2026-05-01 against `claude/wave-31-cross-cutting-refinements` after Wave 32 fade recall work. Companion docs: [lighting-d-premium-plan.md Wave 34](lighting-d-premium-plan.md#wave-34--per-attribute-palette-pools-architectural), [lighting-d-industry-audit.md#p3](lighting-d-industry-audit.md#p3-per-attribute-palette-pools--cct-and-intensity-presets-hog-4-palettes--grandma3-preset-pools).
 
-This is an approval-gated design doc. Do not implement Wave 34 code until this doc is reviewed and accepted. Wave 34 adds a new persisted lighting concept and a storage migration, so it must land deliberately.
+This was the approval-gated design doc for Wave 34. Wave 34 added a persisted lighting concept and a storage migration, so the implementation was deliberately reviewed before code landed.
+
+## Implementation Status
+
+Implemented and validated through PR #65 on `codex/wave-34-palettes`, then tightened by the closeout branch:
+
+- schema v6 palette migration, CRUD, ordering, application, patch conflict, and preview-buffer application are implemented in the Rust engine and engine-client fixture transport.
+- the inspector Palettes tab ships as a compact in-workspace implementation in `InspectorPalettes.tsx`; the expected `PaletteTile` / `PalettePool` abstractions were not split into separate files for v1 because the first consumer did not need cross-surface reuse.
+- patch mode now locks palette create, edit, reorder, delete, and apply, with explicit copy telling the operator to exit patch mode before editing or applying palettes.
+- `Cmd/Ctrl+Shift+P` opens a dedicated palette quick popover with focused search, recent palette applications, intensity and CCT sections, and read-only no-selection / patch-mode states.
+- visual-review coverage now includes `lighting-palettes-preview-active` in addition to selected, empty, and patch-disabled palette fixtures.
 
 ## Goal
 
@@ -297,6 +307,8 @@ Files expected:
 - `frontend/app/src/app/lighting/LightingWorkspace.tsx`
 - `frontend/app/src/app/shared/paletteContext.tsx` for quick-popover recents registration only.
 
+Implementation note: v1 kept palette tile and pool rendering inside `InspectorPalettes.tsx` to avoid a premature abstraction. Split `PaletteTile` / `PalettePool` only when a second consumer or Storybook primitive review makes that reuse valuable.
+
 Workspace handlers:
 
 - `handleApplyPalette(paletteId, fixtureIds)`
@@ -312,7 +324,7 @@ Command palette / quick popover:
 
 ## Interaction With Other Modes
 
-- Patch mode: palette tab is visible but disabled with `Exit patch mode to apply palettes`.
+- Patch mode: palette tab is visible but editing and application are disabled with `Exit patch mode to edit or apply palettes`.
 - Preview mode: palette apply writes to preview buffer and marks preview dirty.
 - Highlight/Solo/Find overlays: palette apply is allowed; overlays remain visual overrides and do not change saved palette semantics.
 - Scene fade recall: independent. Palettes set current fixture values; they do not fade unless a later recall uses fade.
@@ -371,9 +383,9 @@ Frontend minimum:
 - `npm run protocol:generate`
 - `npm run frontend:foundation`
 - `npm run native:check`
-- `npm run tauri:visual:review -- --fixtures=lighting-palettes-selected,lighting-palettes-empty,lighting-palettes-patch-disabled --sizes=2560x1440,1920x1080`
+- `npm run tauri:visual:review -- --fixtures=lighting-palettes-selected,lighting-palettes-empty,lighting-palettes-patch-disabled,lighting-palettes-preview-active --sizes=2560x1440,1920x1080`
 - Windows target-host pass because of the schema bump.
 
 ## Approval Checkpoint
 
-Implementation should not start until this doc is approved. The critical decisions are: apply to current selection only, no auto-save, no scene palette references, defaults seed once on v5 -> v6, and patch mode disables palette application.
+Approved before implementation. The critical decisions were: apply to current selection only, no auto-save, no scene palette references, defaults seed once on v5 -> v6, and patch mode disables palette editing and application.
