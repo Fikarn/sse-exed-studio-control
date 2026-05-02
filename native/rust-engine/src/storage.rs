@@ -11,15 +11,15 @@ use crate::planning_settings::{
     DECK_MODE_KEY, SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY, SORT_BY_KEY, VIEW_FILTER_KEY,
 };
 use crate::shell_settings::{default_settings_entries, WORKSPACE_KEY};
-use rusqlite::{params, Connection, Transaction};
-use serde_json::to_string;
+use rusqlite::{params, Connection, OptionalExtension, Transaction};
+use serde_json::{json, to_string, Value};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const STORAGE_SCHEMA_VERSION: i64 = 5;
+const STORAGE_SCHEMA_VERSION: i64 = 6;
 const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
 const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 
@@ -487,8 +487,8 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
         schema_version = 4;
     }
 
-    if schema_version < STORAGE_SCHEMA_VERSION {
-        // v4 → v5 (PR 4 — Direction D cue cleanup).
+    if schema_version < 5 {
+        // v4 -> v5 (PR 4 -- Direction D cue cleanup).
         //
         // Direction D dropped the cue model entirely. The frontend has no
         // cue call sites (verified post-PR-3 merge); the engine cue IPCs are
@@ -507,6 +507,16 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
             [],
         )?;
 
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (?1)", [5])?;
+        transaction.commit()?;
+        schema_version = 5;
+    }
+
+    if schema_version < STORAGE_SCHEMA_VERSION {
+        // v5 -> v6 (Wave 34). Seed editable lighting palettes once for
+        // existing editor-state rows that predate the palette pool.
+        let transaction = connection.transaction()?;
+        seed_lighting_palettes_v6(&transaction)?;
         transaction.execute(
             "INSERT INTO schema_migrations(version) VALUES (?1)",
             [STORAGE_SCHEMA_VERSION],
@@ -516,6 +526,98 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
     }
 
     Ok(schema_version)
+}
+
+fn seed_lighting_palettes_v6(transaction: &Transaction<'_>) -> EngineResult<()> {
+    let existing_value: Option<String> = transaction
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'app.lighting.editor.state'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    let Some(existing_value) = existing_value else {
+        return Ok(());
+    };
+    let Ok(mut parsed) = serde_json::from_str::<Value>(&existing_value) else {
+        return Ok(());
+    };
+    let Some(object) = parsed.as_object_mut() else {
+        return Ok(());
+    };
+
+    let should_seed_palettes = match object.get("palettes") {
+        Some(Value::Array(palettes)) => palettes.is_empty(),
+        Some(_) => true,
+        None => true,
+    };
+    if should_seed_palettes {
+        object.insert(String::from("palettes"), default_lighting_palettes_json());
+        object.insert(
+            String::from("paletteOrder"),
+            default_lighting_palette_order_json(),
+        );
+    } else {
+        let should_build_order = match object.get("paletteOrder") {
+            Some(Value::Array(order)) => order.is_empty(),
+            _ => true,
+        };
+        if should_build_order {
+            let palette_order = object
+                .get("palettes")
+                .map(lighting_palette_order_from_json)
+                .unwrap_or_default();
+            object.insert(String::from("paletteOrder"), Value::Array(palette_order));
+        }
+    }
+
+    let serialized = serde_json::to_string(&parsed)?;
+    transaction.execute(
+        "UPDATE app_settings SET value = ?1, updated_at = CURRENT_TIMESTAMP WHERE key = 'app.lighting.editor.state'",
+        [serialized],
+    )?;
+    Ok(())
+}
+
+fn default_lighting_palettes_json() -> Value {
+    json!([
+        { "id": "palette-intensity-low", "name": "Low", "kind": "intensity", "value": 10.0, "colorIndex": 5 },
+        { "id": "palette-intensity-quarter", "name": "Quarter", "kind": "intensity", "value": 25.0, "colorIndex": 4 },
+        { "id": "palette-intensity-half", "name": "Half", "kind": "intensity", "value": 50.0, "colorIndex": 2 },
+        { "id": "palette-intensity-full", "name": "Full", "kind": "intensity", "value": 100.0, "colorIndex": 0 },
+        { "id": "palette-cct-warm", "name": "Warm", "kind": "cct", "value": 2700.0, "colorIndex": 0 },
+        { "id": "palette-cct-studio", "name": "Studio", "kind": "cct", "value": 4000.0, "colorIndex": 4 },
+        { "id": "palette-cct-daylight", "name": "Daylight", "kind": "cct", "value": 5600.0, "colorIndex": 5 },
+        { "id": "palette-cct-cool", "name": "Cool", "kind": "cct", "value": 6500.0, "colorIndex": 5 }
+    ])
+}
+
+fn default_lighting_palette_order_json() -> Value {
+    Value::Array(vec![
+        Value::String(String::from("palette-intensity-low")),
+        Value::String(String::from("palette-intensity-quarter")),
+        Value::String(String::from("palette-intensity-half")),
+        Value::String(String::from("palette-intensity-full")),
+        Value::String(String::from("palette-cct-warm")),
+        Value::String(String::from("palette-cct-studio")),
+        Value::String(String::from("palette-cct-daylight")),
+        Value::String(String::from("palette-cct-cool")),
+    ])
+}
+
+fn lighting_palette_order_from_json(palettes: &Value) -> Vec<Value> {
+    palettes
+        .as_array()
+        .into_iter()
+        .flat_map(|palettes| palettes.iter())
+        .filter_map(|palette| {
+            palette
+                .get("id")
+                .and_then(Value::as_str)
+                .map(|id| Value::String(String::from(id)))
+        })
+        .collect()
 }
 
 fn current_schema_version(connection: &Connection) -> Result<i64, rusqlite::Error> {
@@ -960,7 +1062,7 @@ mod tests {
         let db_path = test_dir.path().join("native.sqlite3");
 
         {
-            let mut connection = open_connection(&db_path).expect("connection should open");
+            let connection = open_connection(&db_path).expect("connection should open");
             connection
                 .execute_batch(
                     r#"
@@ -1111,12 +1213,26 @@ mod tests {
         initialize_database(&db_path).expect("v4 migration should succeed");
 
         let settings = list_settings_by_prefix(&db_path, "app.").expect("settings should load");
-        assert_eq!(
+        let migrated_state: Value = serde_json::from_str(
             settings
                 .get("app.lighting.editor.state")
-                .map(String::as_str),
-            Some(canonical_value.as_str()),
+                .expect("canonical lighting key should exist"),
+        )
+        .expect("canonical lighting state should parse");
+        assert_eq!(
+            migrated_state
+                .pointer("/groups/0/id")
+                .and_then(Value::as_str),
+            Some("g1"),
             "canonical lighting key should win over legacy"
+        );
+        assert_eq!(
+            migrated_state
+                .get("palettes")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(8),
+            "v6 palette seed should still apply after canonical wins"
         );
         assert!(
             !settings.contains_key("app.control_surface.lighting.state"),
@@ -1254,8 +1370,150 @@ mod tests {
         assert_eq!(version_5_count, 1);
     }
 
+    #[test]
+    fn migrate_schema_v5_to_v6_seeds_lighting_palettes() {
+        let test_dir = TestDir::new("storage-v6-palette-seed");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        seed_v3_database(&db_path);
+        let legacy_state = json!({
+            "groups": [{ "id": "group-stage", "name": "Stage", "colorIndex": 4 }],
+            "groupOrder": ["group-stage"],
+            "removed_fixture_ids": [],
+            "fixtures": [],
+            "scenes": [{ "id": "scene-prep", "name": "Prep", "fixtureStates": [], "colorIndex": 3 }],
+            "sceneOrder": ["scene-prep"],
+            "pinnedSceneIds": ["scene-prep"]
+        });
+        set_settings_owned(
+            &db_path,
+            &[(
+                String::from("app.lighting.editor.state"),
+                serde_json::to_string(&legacy_state).expect("state should serialize"),
+            )],
+        )
+        .expect("lighting seed should write");
+
+        initialize_database(&db_path).expect("v6 migration should succeed");
+
+        let settings = list_settings_by_prefix(&db_path, "app.lighting.")
+            .expect("lighting settings should load");
+        let state: serde_json::Value = serde_json::from_str(
+            settings
+                .get("app.lighting.editor.state")
+                .expect("editor state should exist"),
+        )
+        .expect("editor state should parse");
+        assert_eq!(
+            state
+                .get("palettes")
+                .and_then(serde_json::Value::as_array)
+                .map(Vec::len),
+            Some(8)
+        );
+        assert_eq!(
+            state
+                .get("paletteOrder")
+                .and_then(serde_json::Value::as_array)
+                .map(Vec::len),
+            Some(8)
+        );
+        assert_eq!(
+            state
+                .pointer("/groups/0/colorIndex")
+                .and_then(serde_json::Value::as_i64),
+            Some(4)
+        );
+        assert_eq!(
+            state
+                .pointer("/scenes/0/colorIndex")
+                .and_then(serde_json::Value::as_i64),
+            Some(3)
+        );
+
+        let connection = open_connection(&db_path).expect("connection should open");
+        let version_6_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 6",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count should query");
+        assert_eq!(version_6_count, 1);
+    }
+
+    #[test]
+    fn migrate_schema_v5_to_v6_preserves_existing_lighting_palettes() {
+        let test_dir = TestDir::new("storage-v6-palette-preserve");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        seed_v3_database(&db_path);
+        let existing_state = json!({
+            "groups": [{ "id": "group-stage", "name": "Stage", "colorIndex": 4 }],
+            "groupOrder": ["group-stage"],
+            "removed_fixture_ids": [],
+            "fixtures": [],
+            "scenes": [{ "id": "scene-prep", "name": "Prep", "fixtureStates": [], "colorIndex": 3 }],
+            "sceneOrder": ["scene-prep"],
+            "pinnedSceneIds": ["scene-prep"],
+            "palettes": [{
+                "id": "palette-custom-9",
+                "name": "Interview",
+                "kind": "cct",
+                "value": 4300.0,
+                "colorIndex": 1
+            }]
+        });
+        set_settings_owned(
+            &db_path,
+            &[(
+                String::from("app.lighting.editor.state"),
+                serde_json::to_string(&existing_state).expect("state should serialize"),
+            )],
+        )
+        .expect("lighting seed should write");
+
+        initialize_database(&db_path).expect("v6 migration should succeed");
+
+        let settings = list_settings_by_prefix(&db_path, "app.lighting.")
+            .expect("lighting settings should load");
+        let state: serde_json::Value = serde_json::from_str(
+            settings
+                .get("app.lighting.editor.state")
+                .expect("editor state should exist"),
+        )
+        .expect("editor state should parse");
+        let palettes = state
+            .get("palettes")
+            .and_then(serde_json::Value::as_array)
+            .expect("palettes should be an array");
+        assert_eq!(palettes.len(), 1);
+        assert_eq!(
+            palettes[0].get("id").and_then(serde_json::Value::as_str),
+            Some("palette-custom-9")
+        );
+        assert_eq!(
+            state
+                .pointer("/paletteOrder/0")
+                .and_then(serde_json::Value::as_str),
+            Some("palette-custom-9")
+        );
+        assert_eq!(
+            state
+                .pointer("/pinnedSceneIds/0")
+                .and_then(serde_json::Value::as_str),
+            Some("scene-prep")
+        );
+        assert_eq!(
+            state
+                .pointer("/groups/0/colorIndex")
+                .and_then(serde_json::Value::as_i64),
+            Some(4)
+        );
+    }
+
     fn seed_v3_database(db_path: &Path) {
-        let mut connection = open_connection(db_path).expect("connection should open");
+        let connection = open_connection(db_path).expect("connection should open");
         connection
             .execute_batch(
                 r#"

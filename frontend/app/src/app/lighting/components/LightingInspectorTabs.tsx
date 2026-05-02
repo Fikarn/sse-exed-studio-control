@@ -2,7 +2,7 @@ import { type KeyboardEvent, type ReactNode } from "react";
 
 import styles from "./LightingInspector.module.css";
 
-export type InspectorTab = "scene" | "fixture" | "group" | "patch";
+export type InspectorTab = "scene" | "fixture" | "group" | "palettes" | "patch";
 
 export interface LightingInspectorTabsProps {
   active: InspectorTab;
@@ -15,6 +15,7 @@ const TAB_LABEL: Record<InspectorTab, string> = {
   scene: "Scene",
   fixture: "Fixture",
   group: "Group",
+  palettes: "Palettes",
   patch: "Patch",
 };
 
@@ -22,6 +23,7 @@ export const LIGHTING_TAB_PANEL_ID: Record<InspectorTab, string> = {
   scene: "lighting-tabpanel-scene",
   fixture: "lighting-tabpanel-fixture",
   group: "lighting-tabpanel-group",
+  palettes: "lighting-tabpanel-palettes",
   patch: "lighting-tabpanel-patch",
 };
 
@@ -29,6 +31,7 @@ export const LIGHTING_TAB_BUTTON_ID: Record<InspectorTab, string> = {
   scene: "lighting-tab-scene",
   fixture: "lighting-tab-fixture",
   group: "lighting-tab-group",
+  palettes: "lighting-tab-palettes",
   patch: "lighting-tab-patch",
 };
 

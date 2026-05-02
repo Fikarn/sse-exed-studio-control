@@ -141,6 +141,170 @@
   color: var(--color-brand-text-secondary);
 }
 
+.palettePane {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.paletteStatus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  background: var(--color-bg-soft);
+  color: var(--color-brand-text-secondary);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.paletteStatus[data-preview-mode="true"] {
+  border-color: var(--color-brand-blue-border);
+  background: var(--color-brand-blue-soft);
+}
+
+.palettePool {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.palettePoolHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.palettePoolHeader h3 {
+  margin: 0;
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--color-brand-text-muted);
+}
+
+.paletteGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.paletteTile {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr) auto;
+  align-items: stretch;
+  min-height: 54px;
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.paletteAccent {
+  background: transparent;
+}
+
+.paletteTileMain {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.paletteTileMain strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-brand-text-primary);
+  font-size: 13px;
+}
+
+.paletteTileMain span {
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--color-brand-text-secondary);
+}
+
+.paletteTileActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px;
+}
+
+.paletteForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 86px;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-brand-green-border);
+  border-radius: var(--radius-tight-sm);
+  background: var(--color-brand-green-soft);
+}
+
+.paletteForm input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  background: var(--color-bg-default);
+  color: var(--color-brand-text-primary);
+  font: inherit;
+  padding: 7px 8px;
+}
+
+.paletteValueInput {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.paletteValueInput span {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--color-brand-text-muted);
+}
+
+.paletteSwatches {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
+}
+
+.paletteSwatchButton {
+  appearance: none;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-tight-sm);
+  cursor: pointer;
+}
+
+.paletteSwatchButton[data-active="true"] {
+  outline: 2px solid var(--color-brand-text-primary);
+  outline-offset: 1px;
+}
+
+.paletteFormActions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* Scene tab — rebuilt to match the v6 prototype */
 
 .scenePane {

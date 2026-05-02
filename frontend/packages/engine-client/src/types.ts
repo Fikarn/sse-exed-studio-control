@@ -8,6 +8,7 @@ import type {
 } from "./generated/protocol";
 import type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
 import type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingDmxMonitorSnapshot";
+import type { LightingPaletteKind } from "./generated/snapshots/LightingPaletteKind";
 import type { LightingSnapshot } from "./generated/snapshots/LightingSnapshot";
 import type { PlanningSnapshot } from "./generated/snapshots/PlanningSnapshot";
 
@@ -162,6 +163,27 @@ export interface LightingPreviewModeRequest {
   patchModeActive?: boolean;
 }
 
+export interface LightingPaletteCreateRequest {
+  name: string;
+  kind: LightingPaletteKind;
+  value: number;
+  colorIndex?: number | null;
+}
+
+export interface LightingPaletteUpdateRequest {
+  paletteId: string;
+  name?: string;
+  value?: number;
+  colorIndex?: number | null;
+  beforePaletteId?: string | null;
+}
+
+export interface LightingPaletteApplyRequest {
+  paletteId: string;
+  fixtureIds: readonly string[];
+  patchModeActive?: boolean;
+}
+
 export interface LightingGroupUpdateRequest {
   groupId: string;
   /** New name. Optional — at least one of name / colorIndex is required. */
@@ -250,6 +272,11 @@ export interface ShellStore {
   updateLightingScene(request: LightingSceneUpdateRequest): Promise<JsonValue>;
   setLightingPreviewMode(request: LightingPreviewModeRequest): Promise<JsonValue>;
   discardLightingPreview(): Promise<JsonValue>;
+  listLightingPalettes(): Promise<JsonValue>;
+  createLightingPalette(request: LightingPaletteCreateRequest): Promise<JsonValue>;
+  updateLightingPalette(request: LightingPaletteUpdateRequest): Promise<JsonValue>;
+  deleteLightingPalette(paletteId: string): Promise<JsonValue>;
+  applyLightingPalette(request: LightingPaletteApplyRequest): Promise<JsonValue>;
   deleteLightingScene(sceneId: string): Promise<JsonValue>;
   reorderLightingScene(sceneId: string, beforeSceneId: string | null): Promise<JsonValue>;
   reorderLightingGroup(groupId: string, beforeGroupId: string | null): Promise<JsonValue>;

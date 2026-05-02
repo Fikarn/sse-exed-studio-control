@@ -259,6 +259,8 @@ pub fn import_legacy_lighting_fixture(
 
     let scene_order = scene_states.iter().map(|scene| scene.id.clone()).collect();
     let group_order = group_states.iter().map(|group| group.id.clone()).collect();
+    let palettes = default_lighting_palette_states();
+    let palette_order = palettes.iter().map(|palette| palette.id.clone()).collect();
     let editor_state = LightingEditorState {
         groups: group_states,
         removed_fixture_ids,
@@ -267,6 +269,8 @@ pub fn import_legacy_lighting_fixture(
         scene_order,
         pinned_scene_ids: Vec::new(),
         group_order,
+        palettes,
+        palette_order,
         active_fade: None,
     };
 

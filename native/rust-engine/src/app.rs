@@ -19,28 +19,31 @@ use crate::diagnostics::{append_log, read_log_excerpt};
 use crate::exports::{build_control_surface_snapshot, export_companion_config, ExportCommandError};
 use crate::legacy_import::{parse_import_request, ImportLegacyError};
 use crate::lighting::{
-    build_lighting_health_check, clear_lighting_identify_bursts, create_lighting_fixture,
-    create_lighting_group, create_lighting_scene_with_preview, delete_lighting_fixture,
-    delete_lighting_group, delete_lighting_scene, discard_lighting_preview,
-    identify_lighting_fixture, parse_lighting_all_power_request,
-    parse_lighting_fixture_create_request, parse_lighting_fixture_delete_request,
-    parse_lighting_fixture_highlight_request, parse_lighting_fixture_identify_clear_all_request,
-    parse_lighting_fixture_identify_request, parse_lighting_fixture_identify_sequence_request,
-    parse_lighting_fixture_update_request, parse_lighting_group_create_request,
-    parse_lighting_group_delete_request, parse_lighting_group_power_request,
-    parse_lighting_group_reorder_request, parse_lighting_group_update_request,
-    parse_lighting_preview_discard_request, parse_lighting_preview_mode_request,
-    parse_lighting_scene_create_request, parse_lighting_scene_delete_request,
-    parse_lighting_scene_pin_request, parse_lighting_scene_recall_request,
-    parse_lighting_scene_reorder_request, parse_lighting_scene_update_request,
-    parse_lighting_settings_update_request, pin_lighting_scene, read_lighting_dmx_monitor_snapshot,
-    read_lighting_snapshot_with_preview, recall_lighting_scene_with_preview,
-    reorder_lighting_group, reorder_lighting_scene, set_lighting_all_power_with_preview,
-    set_lighting_fixture_highlight, set_lighting_group_power_with_preview,
-    set_lighting_preview_mode, start_lighting_identify_sequence,
-    update_lighting_fixture_with_preview, update_lighting_group,
-    update_lighting_scene_with_preview, update_lighting_settings, LightingCommandError,
-    LightingPreviewRuntimeState,
+    apply_lighting_palette_with_preview, build_lighting_health_check,
+    clear_lighting_identify_bursts, create_lighting_fixture, create_lighting_group,
+    create_lighting_palette, create_lighting_scene_with_preview, delete_lighting_fixture,
+    delete_lighting_group, delete_lighting_palette, delete_lighting_scene,
+    discard_lighting_preview, identify_lighting_fixture, list_lighting_palettes,
+    parse_lighting_all_power_request, parse_lighting_fixture_create_request,
+    parse_lighting_fixture_delete_request, parse_lighting_fixture_highlight_request,
+    parse_lighting_fixture_identify_clear_all_request, parse_lighting_fixture_identify_request,
+    parse_lighting_fixture_identify_sequence_request, parse_lighting_fixture_update_request,
+    parse_lighting_group_create_request, parse_lighting_group_delete_request,
+    parse_lighting_group_power_request, parse_lighting_group_reorder_request,
+    parse_lighting_group_update_request, parse_lighting_palette_apply_request,
+    parse_lighting_palette_create_request, parse_lighting_palette_delete_request,
+    parse_lighting_palette_update_request, parse_lighting_preview_discard_request,
+    parse_lighting_preview_mode_request, parse_lighting_scene_create_request,
+    parse_lighting_scene_delete_request, parse_lighting_scene_pin_request,
+    parse_lighting_scene_recall_request, parse_lighting_scene_reorder_request,
+    parse_lighting_scene_update_request, parse_lighting_settings_update_request,
+    pin_lighting_scene, read_lighting_dmx_monitor_snapshot, read_lighting_snapshot_with_preview,
+    recall_lighting_scene_with_preview, reorder_lighting_group, reorder_lighting_scene,
+    set_lighting_all_power_with_preview, set_lighting_fixture_highlight,
+    set_lighting_group_power_with_preview, set_lighting_preview_mode,
+    start_lighting_identify_sequence, update_lighting_fixture_with_preview, update_lighting_group,
+    update_lighting_palette, update_lighting_scene_with_preview, update_lighting_settings,
+    LightingCommandError, LightingPreviewRuntimeState,
 };
 use crate::parity_fixtures::{
     load_parity_fixture, parse_parity_fixture_request, ParityFixtureError,
@@ -158,6 +161,9 @@ impl EngineApp {
             "lighting.dmxMonitor.snapshot" => {
                 self.dispatch_read(request.id, Self::read_lighting_dmx_monitor_snapshot)
             }
+            "lighting.palette.list" => {
+                self.dispatch_read(request.id, Self::read_lighting_palette_list)
+            }
             "audio.snapshot" => self.dispatch_read(request.id, Self::read_audio_snapshot),
             "support.snapshot" => self.dispatch_read(request.id, Self::read_support_snapshot),
             "controlSurface.snapshot" => {
@@ -232,6 +238,30 @@ impl EngineApp {
                 parse_lighting_scene_pin_request,
                 pin_lighting_scene,
                 "scene-pinned",
+            ),
+            "lighting.palette.create" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_palette_create_request,
+                create_lighting_palette,
+                "palette-created",
+            ),
+            "lighting.palette.update" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_palette_update_request,
+                update_lighting_palette,
+                "palette-updated",
+            ),
+            "lighting.palette.delete" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_palette_delete_request,
+                delete_lighting_palette,
+                "palette-deleted",
+            ),
+            "lighting.palette.apply" => self.dispatch_lighting_preview_mutate(
+                request,
+                parse_lighting_palette_apply_request,
+                apply_lighting_palette_with_preview,
+                |_| "palette-applied",
             ),
             "lighting.group.create" => self.dispatch_lighting_mutate(
                 request,
@@ -808,6 +838,12 @@ impl EngineApp {
         Ok(serde_json::to_value(read_lighting_dmx_monitor_snapshot(
             &app_settings,
         ))?)
+    }
+
+    fn read_lighting_palette_list(&self) -> EngineResult<serde_json::Value> {
+        let result = list_lighting_palettes(&self.runtime.db_path)
+            .map_err(|error| std::io::Error::other(error.to_string()))?;
+        Ok(serde_json::to_value(result)?)
     }
 
     fn read_audio_snapshot(&self) -> EngineResult<serde_json::Value> {

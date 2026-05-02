@@ -7,6 +7,19 @@ function cloneFixture<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function defaultLightingPalettes() {
+  return [
+    { id: "palette-intensity-low", name: "Low", kind: "intensity", value: 10, colorIndex: 5 },
+    { id: "palette-intensity-quarter", name: "Quarter", kind: "intensity", value: 25, colorIndex: 4 },
+    { id: "palette-intensity-half", name: "Half", kind: "intensity", value: 50, colorIndex: 2 },
+    { id: "palette-intensity-full", name: "Full", kind: "intensity", value: 100, colorIndex: 0 },
+    { id: "palette-cct-warm", name: "Warm", kind: "cct", value: 2700, colorIndex: 0 },
+    { id: "palette-cct-studio", name: "Studio", kind: "cct", value: 4000, colorIndex: 4 },
+    { id: "palette-cct-daylight", name: "Daylight", kind: "cct", value: 5600, colorIndex: 5 },
+    { id: "palette-cct-cool", name: "Cool", kind: "cct", value: 6500, colorIndex: 5 },
+  ];
+}
+
 function buildLightingPreviewFixture(kind: "clean" | "dirty" | "patch-conflict"): FixtureScenarioRecord {
   const scenario = cloneFixture(fixtureMap["lighting-populated"]) as FixtureScenarioRecord & {
     lightingSnapshot: Record<string, unknown>;
@@ -33,8 +46,30 @@ function buildLightingPreviewFixture(kind: "clean" | "dirty" | "patch-conflict")
   return scenario;
 }
 
+function buildLightingPaletteFixture(kind: "selected" | "empty" | "patch-disabled"): FixtureScenarioRecord {
+  const scenario = cloneFixture(fixtureMap["lighting-populated"]) as FixtureScenarioRecord & {
+    appSnapshot: Record<string, unknown>;
+    lightingSnapshot: Record<string, unknown>;
+  };
+  scenario.appSnapshot.shell = {
+    ...((scenario.appSnapshot.shell as Record<string, unknown> | undefined) ?? {}),
+    workspace: "lighting",
+    lighting: {
+      currentSectionId: kind === "patch-disabled" ? "palettes-patch" : "palettes",
+    },
+  };
+  scenario.lightingSnapshot.palettes = defaultLightingPalettes();
+  if (kind === "empty") {
+    scenario.lightingSnapshot.selectedFixtureId = null;
+  }
+  return scenario;
+}
+
 const derivedFixtureMap: FixtureMap = {
   ...fixtureMap,
+  "lighting-palettes-empty": buildLightingPaletteFixture("empty"),
+  "lighting-palettes-patch-disabled": buildLightingPaletteFixture("patch-disabled"),
+  "lighting-palettes-selected": buildLightingPaletteFixture("selected"),
   "lighting-preview-clean": buildLightingPreviewFixture("clean"),
   "lighting-preview-dirty": buildLightingPreviewFixture("dirty"),
   "lighting-preview-patch-conflict": buildLightingPreviewFixture("patch-conflict"),
