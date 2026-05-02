@@ -65,10 +65,27 @@ function buildLightingPaletteFixture(kind: "selected" | "empty" | "patch-disable
   return scenario;
 }
 
+function buildLightingPalettePreviewFixture(): FixtureScenarioRecord {
+  const scenario = buildLightingPreviewFixture("dirty") as FixtureScenarioRecord & {
+    appSnapshot: Record<string, unknown>;
+    lightingSnapshot: Record<string, unknown>;
+  };
+  scenario.appSnapshot.shell = {
+    ...((scenario.appSnapshot.shell as Record<string, unknown> | undefined) ?? {}),
+    workspace: "lighting",
+    lighting: {
+      currentSectionId: "palettes",
+    },
+  };
+  scenario.lightingSnapshot.palettes = defaultLightingPalettes();
+  return scenario;
+}
+
 const derivedFixtureMap: FixtureMap = {
   ...fixtureMap,
   "lighting-palettes-empty": buildLightingPaletteFixture("empty"),
   "lighting-palettes-patch-disabled": buildLightingPaletteFixture("patch-disabled"),
+  "lighting-palettes-preview-active": buildLightingPalettePreviewFixture(),
   "lighting-palettes-selected": buildLightingPaletteFixture("selected"),
   "lighting-preview-clean": buildLightingPreviewFixture("clean"),
   "lighting-preview-dirty": buildLightingPreviewFixture("dirty"),

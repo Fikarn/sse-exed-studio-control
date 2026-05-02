@@ -10,6 +10,8 @@ interface RegistrationEntry {
 export interface PaletteApi {
   /** Whether the palette is currently visible. */
   open: boolean;
+  /** Most recently activated action ids, newest first. */
+  recentActionIds: readonly string[];
   /** Toggle / set the palette's visibility. */
   setOpen: (next: boolean) => void;
   /** Register a list of actions. Returns an unregister function — the caller
@@ -76,7 +78,10 @@ export function PaletteProvider({ children }: { children: ReactNode }) {
     [flatActions, pushRecent]
   );
 
-  const api = useMemo<PaletteApi>(() => ({ open, setOpen, register, pushRecent }), [open, register, pushRecent]);
+  const api = useMemo<PaletteApi>(
+    () => ({ open, recentActionIds: recentIds, setOpen, register, pushRecent }),
+    [open, recentIds, register, pushRecent]
+  );
 
   return (
     <PaletteContext.Provider value={api}>

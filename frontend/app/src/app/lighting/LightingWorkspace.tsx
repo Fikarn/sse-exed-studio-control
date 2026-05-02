@@ -5,6 +5,7 @@ import type {
   LightingDmxMonitorSnapshot,
   LightingFixtureSnapshot,
   LightingPaletteKind,
+  LightingPaletteSnapshot,
   LightingSceneSnapshot,
   LightingSnapshot,
   ShellStore,
@@ -58,6 +59,15 @@ function formatRecallFade(ms: number): string {
   if (ms <= 0) return "snap";
   const seconds = ms / 1000;
   return `${Number.isInteger(seconds) ? seconds.toFixed(0) : seconds.toFixed(1)} s`;
+}
+
+function formatLightingPaletteQuickValue(palette: LightingPaletteSnapshot): string {
+  return palette.kind === "intensity" ? `${Math.round(palette.value)}%` : `${Math.round(palette.value)}K`;
+}
+
+function lightingPaletteMatchesQuery(palette: LightingPaletteSnapshot, query: string): boolean {
+  if (!query) return true;
+  return `${palette.name} ${palette.kind} ${formatLightingPaletteQuickValue(palette)}`.toLowerCase().includes(query);
 }
 
 /** Result-aware toast helper for surfacing UndoOutcome to the operator. The
@@ -157,6 +167,7 @@ export function LightingWorkspaceSurface({
   const [activeTabOverride, setActiveTabOverride] = useState<InspectorTab | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [paletteQuickOpen, setPaletteQuickOpen] = useState(false);
+  const [paletteQuickQuery, setPaletteQuickQuery] = useState("");
   const [recallFadeMs, setRecallFadeMs] = useState(0);
   const toast = useToast();
   const palette = usePalette();
@@ -606,6 +617,31 @@ export function LightingWorkspaceSurface({
   const selectedFixtureSnapshots = useMemo(
     () => fixtures.filter((fixture) => selectedFixtureIds.has(fixture.id)),
     [fixtures, selectedFixtureIds]
+  );
+  const paletteQuickQueryNormalized = paletteQuickQuery.trim().toLowerCase();
+  const paletteById = useMemo(() => new Map(palettes.map((entry) => [entry.id, entry])), [palettes]);
+  const recentQuickPalettes = useMemo(
+    () =>
+      palette.recentActionIds
+        .filter((id) => id.startsWith("lighting:palette:"))
+        .map((id) => paletteById.get(id.slice("lighting:palette:".length)))
+        .filter((entry): entry is LightingPaletteSnapshot => Boolean(entry))
+        .filter((entry, index, entries) => entries.findIndex((candidate) => candidate.id === entry.id) === index)
+        .filter((entry) => lightingPaletteMatchesQuery(entry, paletteQuickQueryNormalized))
+        .slice(0, 6),
+    [palette.recentActionIds, paletteById, paletteQuickQueryNormalized]
+  );
+  const filteredQuickPalettes = useMemo(
+    () => palettes.filter((entry) => lightingPaletteMatchesQuery(entry, paletteQuickQueryNormalized)),
+    [palettes, paletteQuickQueryNormalized]
+  );
+  const quickIntensityPalettes = useMemo(
+    () => filteredQuickPalettes.filter((entry) => entry.kind === "intensity"),
+    [filteredQuickPalettes]
+  );
+  const quickCctPalettes = useMemo(
+    () => filteredQuickPalettes.filter((entry) => entry.kind === "cct"),
+    [filteredQuickPalettes]
   );
 
   const [showPreviewExitPrompt, setShowPreviewExitPrompt] = useState(false);
@@ -1377,18 +1413,26 @@ export function LightingWorkspaceSurface({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && paletteQuickOpen) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setPaletteQuickOpen(false);
+        return;
+      }
+      if (event.defaultPrevented || isEditableTarget(event.target)) return;
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
         setPaletteQuickOpen(true);
         return;
       }
-      if (event.key === "Escape") {
-        setPaletteQuickOpen(false);
-      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [paletteQuickOpen]);
+
+  useEffect(() => {
+    if (!paletteQuickOpen) setPaletteQuickQuery("");
+  }, [paletteQuickOpen]);
 
   const handleToggleGroupPower = useEffectEvent(async (groupId: string, on: boolean) => {
     const busyKey = `group:${groupId}`;
@@ -2085,6 +2129,44 @@ export function LightingWorkspaceSurface({
   const lastSavedLabel = lastSavedAt
     ? lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : undefined;
+  const paletteQuickDisabled = uiMode === "patch" || selectedFixtureIds.size === 0;
+  const paletteQuickStatus =
+    uiMode === "patch"
+      ? "Exit patch mode to apply"
+      : selectedFixtureIds.size === 0
+        ? "Select fixtures to apply"
+        : `${selectedFixtureIds.size} selected`;
+  const renderQuickPaletteButton = (entry: LightingPaletteSnapshot) => {
+    const valueLabel = formatLightingPaletteQuickValue(entry);
+    return (
+      <button
+        key={entry.id}
+        type="button"
+        className={styles.paletteQuickTile}
+        aria-label={`Apply palette ${entry.name} ${valueLabel}`}
+        disabled={paletteQuickDisabled || busyActions.has(`palette-apply:${entry.id}`)}
+        onClick={() => {
+          setPaletteQuickOpen(false);
+          void handleApplyPalette(entry.id, Array.from(selectedFixtureIds));
+        }}
+      >
+        <span
+          className={styles.paletteQuickAccent}
+          style={{ background: lightingColorTagHex(entry.colorIndex) ?? "transparent" }}
+          aria-hidden="true"
+        />
+        <span>{entry.name}</span>
+        <small>{valueLabel}</small>
+      </button>
+    );
+  };
+  const renderQuickPaletteSection = (label: string, entries: readonly LightingPaletteSnapshot[]) =>
+    entries.length > 0 ? (
+      <section className={styles.paletteQuickSection} aria-label={`${label} palettes`}>
+        <h3 className={styles.paletteQuickSectionTitle}>{label}</h3>
+        <div className={styles.paletteQuickGrid}>{entries.map(renderQuickPaletteButton)}</div>
+      </section>
+    ) : null;
 
   if (!lightingSnapshot) {
     return (
@@ -2297,34 +2379,25 @@ export function LightingWorkspaceSurface({
           >
             <div className={styles.paletteQuickHeader}>
               <strong>Palettes</strong>
-              <span>{selectedFixtureIds.size} selected</span>
+              <span>{paletteQuickStatus}</span>
             </div>
-            <div className={styles.paletteQuickGrid}>
-              {palettes.map((entry) => (
-                <button
-                  key={entry.id}
-                  type="button"
-                  className={styles.paletteQuickTile}
-                  disabled={
-                    uiMode === "patch" || selectedFixtureIds.size === 0 || busyActions.has(`palette-apply:${entry.id}`)
-                  }
-                  onClick={() => {
-                    setPaletteQuickOpen(false);
-                    void handleApplyPalette(entry.id, Array.from(selectedFixtureIds));
-                  }}
-                >
-                  <span
-                    className={styles.paletteQuickAccent}
-                    style={{ background: lightingColorTagHex(entry.colorIndex) ?? "transparent" }}
-                    aria-hidden="true"
-                  />
-                  <span>{entry.name}</span>
-                  <small>
-                    {entry.kind === "intensity" ? `${Math.round(entry.value)}%` : `${Math.round(entry.value)}K`}
-                  </small>
-                </button>
-              ))}
+            <div className={styles.paletteQuickSearch}>
+              <input
+                type="search"
+                autoFocus
+                aria-label="Search palettes"
+                placeholder="Search palettes"
+                value={paletteQuickQuery}
+                onChange={(event) => setPaletteQuickQuery(event.currentTarget.value)}
+              />
             </div>
+            {paletteQuickDisabled ? <p className={styles.paletteQuickHint}>{paletteQuickStatus}.</p> : null}
+            {recentQuickPalettes.length > 0 ? renderQuickPaletteSection("Recent", recentQuickPalettes) : null}
+            {renderQuickPaletteSection("Intensity", quickIntensityPalettes)}
+            {renderQuickPaletteSection("CCT", quickCctPalettes)}
+            {filteredQuickPalettes.length === 0 ? (
+              <p className={styles.paletteQuickEmpty}>No palettes match the search.</p>
+            ) : null}
           </div>
         </div>
       ) : null}

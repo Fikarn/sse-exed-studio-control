@@ -603,7 +603,10 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
   await page.keyboard.press(modifierShortcut("Shift+KeyP"));
   const quickPicker = page.getByRole("dialog", { name: "Lighting palettes" });
   await expect(quickPicker).toBeVisible();
-  await quickPicker.getByRole("button", { name: /Studio.*4000K/ }).click();
+  await expect(quickPicker.getByLabel("Search palettes")).toBeFocused();
+  await expect(quickPicker.getByRole("button", { name: "Apply palette Low 10%" }).first()).toBeVisible();
+  await quickPicker.getByLabel("Search palettes").fill("studio");
+  await quickPicker.getByRole("button", { name: "Apply palette Studio 4000K" }).click();
   await expect(page.getByRole("button", { name: /^Fixture Key, 10 percent, 4000 kelvin/i })).toHaveAttribute(
     "aria-pressed",
     "true"
@@ -620,15 +623,21 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
   await expect(emptyInspector.getByText("0 selected")).toBeVisible();
   await expect(emptyInspector.getByRole("button", { name: "Apply Low" })).toBeDisabled();
   await page.keyboard.press(modifierShortcut("Shift+KeyP"));
+  await expect(page.getByText("Select fixtures to apply.")).toBeVisible();
   await expect(
-    page.getByRole("dialog", { name: "Lighting palettes" }).getByRole("button", { name: /Low.*10%/ })
+    page.getByRole("dialog", { name: "Lighting palettes" }).getByRole("button", { name: "Apply palette Low 10%" })
   ).toBeDisabled();
   await page.keyboard.press("Escape");
 
   await openFixture(page, "lighting-palettes-patch-disabled");
   const patchInspector = page.getByLabel(/Lighting inspector.*Palettes/);
   await expect(patchInspector.getByText("1 selected")).toBeVisible();
+  await expect(patchInspector.getByText("Patch locked")).toBeVisible();
+  await expect(patchInspector.getByRole("button", { name: "Create Intensity palette" })).toBeDisabled();
   await expect(patchInspector.getByRole("button", { name: "Apply Low" })).toBeDisabled();
+  await expect(patchInspector.getByRole("button", { name: "Edit Low" })).toBeDisabled();
+  await expect(patchInspector.getByRole("button", { name: "Move Low later" })).toBeDisabled();
+  await expect(patchInspector.getByRole("button", { name: "Delete Low" })).toBeDisabled();
 });
 
 test("supports lighting toolbar search, patch mode, and empty-state fixture create", async ({ page }) => {
