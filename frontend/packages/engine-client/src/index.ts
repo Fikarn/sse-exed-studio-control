@@ -8,6 +8,9 @@ export type {
   CommissioningUpdateRequest,
   EngineTransport,
   FixtureScenario,
+  LightingPaletteApplyRequest,
+  LightingPaletteCreateRequest,
+  LightingPaletteUpdateRequest,
   PlanningProjectReorderRequest,
   PlanningTaskCreateRequest,
   RecoveryState,
@@ -47,6 +50,8 @@ export type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingD
 export type { LightingEffect } from "./generated/snapshots/LightingEffect";
 export type { LightingFixtureSnapshot } from "./generated/snapshots/LightingFixtureSnapshot";
 export type { LightingGroupSnapshot } from "./generated/snapshots/LightingGroupSnapshot";
+export type { LightingPaletteKind } from "./generated/snapshots/LightingPaletteKind";
+export type { LightingPaletteSnapshot } from "./generated/snapshots/LightingPaletteSnapshot";
 export type { LightingSceneFixtureSnapshot } from "./generated/snapshots/LightingSceneFixtureSnapshot";
 export type { LightingSceneSnapshot } from "./generated/snapshots/LightingSceneSnapshot";
 export type { LightingSnapshot } from "./generated/snapshots/LightingSnapshot";

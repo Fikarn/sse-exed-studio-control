@@ -1,6 +1,12 @@
 import { useMemo } from "react";
 
-import type { LightingFixtureSnapshot, LightingGroupSnapshot, LightingSceneSnapshot } from "@sse/engine-client";
+import type {
+  LightingFixtureSnapshot,
+  LightingGroupSnapshot,
+  LightingPaletteKind,
+  LightingPaletteSnapshot,
+  LightingSceneSnapshot,
+} from "@sse/engine-client";
 
 import type { LightingDmxChannelEntry } from "../../shellData";
 import { buildLightingPatchOverlapMap } from "../lightingPatch";
@@ -8,6 +14,7 @@ import { buildLightingPatchOverlapMap } from "../lightingPatch";
 import { InspectorFixture } from "./InspectorFixture";
 import { InspectorFixtureBulk } from "./InspectorFixtureBulk";
 import { InspectorGroup } from "./InspectorGroup";
+import { InspectorPalettes } from "./InspectorPalettes";
 import { InspectorPatch } from "./InspectorPatch";
 import { InspectorScene } from "./InspectorScene";
 import {
@@ -29,6 +36,7 @@ export interface LightingInspectorProps {
   fixtures: readonly LightingFixtureSnapshot[];
   groups: readonly LightingGroupSnapshot[];
   scenes: readonly LightingSceneSnapshot[];
+  palettes: readonly LightingPaletteSnapshot[];
   dmxChannels: readonly LightingDmxChannelEntry[];
   dmxStale: boolean;
   universe: number;
@@ -94,6 +102,21 @@ export interface LightingInspectorProps {
    *  Drag-shift preserves spread; delta-input parses per-value math. */
   onBulkIntensityValues?: (values: ReadonlyArray<{ fixtureId: string; value: number }>) => void;
   onBulkCctValues?: (values: ReadonlyArray<{ fixtureId: string; value: number }>) => void;
+  onApplyPalette?: (paletteId: string, fixtureIds: readonly string[]) => void;
+  onCreatePalette?: (request: {
+    name: string;
+    kind: LightingPaletteKind;
+    value: number;
+    colorIndex: number | null;
+  }) => void;
+  onUpdatePalette?: (request: {
+    paletteId: string;
+    name?: string;
+    value?: number;
+    colorIndex?: number | null;
+    beforePaletteId?: string | null;
+  }) => void;
+  onDeletePalette?: (paletteId: string) => void;
 
   /** Set of in-flight mutation keys; check with `.has(key)` or
    *  `Array.from(set).some((k) => k.startsWith(prefix))` for prefix queries. */
@@ -120,19 +143,22 @@ function buildVisibleTabs(opts: {
   selectedGroupId: string | null;
   activeTab: InspectorTab;
 }): readonly InspectorTab[] {
-  if (opts.uiMode === "patch") return ["patch"];
+  if (opts.uiMode === "patch") return ["patch", "palettes"];
   // Group tab is only present when there's a group to inspect — the empty
   // "Select a group from the rail" state is unreachable from any UI path
   // (group chips toggle power, not select for inspection in this build),
   // so hiding the tab when no group is selected avoids a dead-end.
   const groupVisible = opts.selectedGroupId !== null || opts.activeTab === "group";
-  return groupVisible ? (["scene", "fixture", "group"] as const) : (["scene", "fixture"] as const);
+  return groupVisible
+    ? (["scene", "fixture", "group", "palettes"] as const)
+    : (["scene", "fixture", "palettes"] as const);
 }
 
 const TAB_TITLE: Record<InspectorTab, string> = {
   scene: "Scene",
   fixture: "Fixture",
   group: "Group",
+  palettes: "Palettes",
   patch: "Patch",
 };
 
@@ -143,6 +169,7 @@ export function LightingInspector({
   fixtures,
   groups,
   scenes,
+  palettes,
   dmxChannels,
   dmxStale,
   universe,
@@ -181,6 +208,10 @@ export function LightingInspector({
   onBulkTogglePower,
   onBulkIntensityValues,
   onBulkCctValues,
+  onApplyPalette,
+  onCreatePalette,
+  onUpdatePalette,
+  onDeletePalette,
   busyActions,
   pendingInlineRename,
 }: LightingInspectorProps) {
@@ -205,6 +236,12 @@ export function LightingInspector({
 
   const patchOverlapMap = useMemo(() => buildLightingPatchOverlapMap([...fixtures]), [fixtures]);
   const patchOverlap = selectedFixture ? (patchOverlapMap.get(selectedFixture.id) ?? null) : null;
+  const paletteFixtureIds =
+    selectedFixtures && selectedFixtures.length > 0
+      ? selectedFixtures.map((fixture) => fixture.id)
+      : selectedFixture
+        ? [selectedFixture.id]
+        : [];
 
   const visibleTabs = buildVisibleTabs({ uiMode, selectedGroupId, activeTab });
 
@@ -322,6 +359,20 @@ export function LightingInspector({
 
         {activeTab === "group" && !selectedGroup ? (
           <p className={styles.empty}>Choose a group from the rail (chevron icon) to see its members.</p>
+        ) : null}
+
+        {activeTab === "palettes" ? (
+          <InspectorPalettes
+            palettes={palettes}
+            selectedFixtureIds={paletteFixtureIds}
+            patchMode={uiMode === "patch"}
+            previewMode={previewMode}
+            busyActions={busyActions}
+            onApplyPalette={(paletteId) => onApplyPalette?.(paletteId, paletteFixtureIds)}
+            onCreatePalette={onCreatePalette ?? (() => undefined)}
+            onUpdatePalette={onUpdatePalette ?? (() => undefined)}
+            onDeletePalette={onDeletePalette ?? (() => undefined)}
+          />
         ) : null}
 
         {activeTab === "patch" ? (

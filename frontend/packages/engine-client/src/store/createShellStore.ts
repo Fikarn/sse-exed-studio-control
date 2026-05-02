@@ -40,6 +40,9 @@ import type {
   LightingFixtureCreateRequest,
   LightingFixtureUpdateRequest,
   LightingGroupUpdateRequest,
+  LightingPaletteApplyRequest,
+  LightingPaletteCreateRequest,
+  LightingPaletteUpdateRequest,
   LightingPreviewModeRequest,
   LightingSceneCreateRequest,
   LightingSceneUpdateRequest,
@@ -513,6 +516,24 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     },
     async discardLightingPreview() {
       return performRequest("lighting.editor.previewDiscard");
+    },
+    async listLightingPalettes() {
+      return performRequest("lighting.palette.list");
+    },
+    async createLightingPalette(request: LightingPaletteCreateRequest) {
+      return performRequest("lighting.palette.create", request as unknown as JsonObject);
+    },
+    async updateLightingPalette(request: LightingPaletteUpdateRequest) {
+      return performRequest("lighting.palette.update", request as unknown as JsonObject);
+    },
+    async deleteLightingPalette(paletteId: string) {
+      return performRequest("lighting.palette.delete", { paletteId });
+    },
+    async applyLightingPalette(request: LightingPaletteApplyRequest) {
+      return performRequest("lighting.palette.apply", {
+        ...request,
+        fixtureIds: [...request.fixtureIds],
+      } as unknown as JsonObject);
     },
     async deleteLightingScene(sceneId: string) {
       return performRequest("lighting.scene.delete", { sceneId });

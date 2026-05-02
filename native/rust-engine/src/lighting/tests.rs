@@ -93,6 +93,17 @@ fn scene_snapshot<'a>(snapshot: &'a LightingSnapshot, scene_id: &str) -> &'a Lig
         .expect("scene should be present")
 }
 
+fn palette_snapshot<'a>(
+    snapshot: &'a LightingSnapshot,
+    palette_id: &str,
+) -> &'a LightingPaletteSnapshot {
+    snapshot
+        .palettes
+        .iter()
+        .find(|palette| palette.id == palette_id)
+        .expect("palette should be present")
+}
+
 #[test]
 fn lighting_snapshot_reports_unconfigured_when_no_bridge_exists() {
     let snapshot = read_lighting_snapshot(&HashMap::new());
@@ -155,6 +166,78 @@ fn lighting_dmx_monitor_matches_legacy_channel_shape() {
         .channels
         .iter()
         .any(|channel| channel.light_name == "House Practicals" && channel.label == "FX"));
+}
+
+#[test]
+fn lighting_palette_defaults_are_exposed_in_snapshot_and_list() {
+    let test_dir = initialize_ready_lighting("palette-defaults");
+    let snapshot = read_lighting_snapshot(&load_test_app_settings(&test_dir));
+
+    assert_eq!(snapshot.palettes.len(), 8);
+    assert_eq!(snapshot.palettes[0].id, "palette-intensity-low");
+    assert_eq!(snapshot.palettes[0].kind, LightingPaletteKind::Intensity);
+    assert_eq!(snapshot.palettes[4].id, "palette-cct-warm");
+    assert_eq!(snapshot.palettes[4].kind, LightingPaletteKind::Cct);
+    assert_eq!(
+        palette_snapshot(&snapshot, "palette-intensity-half").value,
+        50.0
+    );
+
+    let list = list_lighting_palettes(test_dir.db_path().as_path())
+        .expect("palette list should load from editor state");
+    assert_eq!(list.palettes.len(), 8);
+    assert_eq!(list.palettes[2].name, "Half");
+    assert_eq!(list.palettes[6].value, 5600.0);
+}
+
+#[test]
+fn lighting_palette_crud_round_trips_and_reorders_within_kind() {
+    let test_dir = initialize_ready_lighting("palette-crud");
+
+    let created = create_lighting_palette(
+        test_dir.db_path().as_path(),
+        &LightingPaletteCreateRequest {
+            name: String::from("Interview"),
+            kind: LightingPaletteKind::Intensity,
+            value: 35.0,
+            color_index: Some(6),
+        },
+    )
+    .expect("palette should create");
+    assert_eq!(created.palette.name, "Interview");
+    assert_eq!(created.palette.kind, LightingPaletteKind::Intensity);
+
+    let updated = update_lighting_palette(
+        test_dir.db_path().as_path(),
+        &LightingPaletteUpdateRequest {
+            palette_id: created.palette.id.clone(),
+            name: Some(String::from("Interview Half")),
+            value: Some(40.0),
+            color_index: Some(None),
+            before_palette_id: Some(Some(String::from("palette-intensity-low"))),
+        },
+    )
+    .expect("palette should update");
+    assert_eq!(updated.palette.name, "Interview Half");
+    assert_eq!(updated.palette.value, 40.0);
+    assert_eq!(updated.palette.color_index, None);
+
+    let snapshot = read_lighting_snapshot(&load_test_app_settings(&test_dir));
+    assert_eq!(snapshot.palettes[0].id, created.palette.id);
+    assert_eq!(snapshot.palettes[1].id, "palette-intensity-low");
+
+    delete_lighting_palette(
+        test_dir.db_path().as_path(),
+        &LightingPaletteDeleteRequest {
+            palette_id: created.palette.id.clone(),
+        },
+    )
+    .expect("palette should delete");
+    let snapshot = read_lighting_snapshot(&load_test_app_settings(&test_dir));
+    assert!(!snapshot
+        .palettes
+        .iter()
+        .any(|palette| palette.id == created.palette.id));
 }
 
 #[test]
@@ -669,6 +752,232 @@ fn lighting_preview_rejects_structural_fixture_updates() {
         }
         other => panic!("unexpected error: {other:?}"),
     }
+}
+
+#[test]
+fn lighting_palette_apply_intensity_updates_selected_live_fixtures() {
+    let test_dir = initialize_ready_lighting("palette-apply-intensity");
+
+    let result = apply_lighting_palette_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingPaletteApplyRequest {
+            palette_id: String::from("palette-intensity-low"),
+            fixture_ids: vec![
+                String::from("fixture-key-left"),
+                String::from("fixture-key-right"),
+            ],
+            patch_mode_active: false,
+        },
+        &mut LightingPreviewRuntimeState::default(),
+    )
+    .expect("palette should apply live");
+
+    assert_eq!(result.affected_fixtures, 2);
+    assert!(!result.preview_mode);
+    let snapshot = read_lighting_snapshot(&load_test_app_settings(&test_dir));
+    assert_eq!(
+        fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        10
+    );
+    assert!(fixture_snapshot(&snapshot, "fixture-key-left").on);
+    assert_eq!(
+        fixture_snapshot(&snapshot, "fixture-key-right").intensity,
+        10
+    );
+    assert!(fixture_snapshot(&snapshot, "fixture-key-right").on);
+    assert_ne!(
+        fixture_snapshot(&snapshot, "fixture-house-practicals").intensity,
+        10
+    );
+}
+
+#[test]
+fn lighting_palette_apply_cct_clamps_per_fixture_and_preserves_power() {
+    let test_dir = initialize_ready_lighting("palette-apply-cct");
+
+    apply_lighting_palette_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingPaletteApplyRequest {
+            palette_id: String::from("palette-cct-cool"),
+            fixture_ids: vec![String::from("fixture-key-left")],
+            patch_mode_active: false,
+        },
+        &mut LightingPreviewRuntimeState::default(),
+    )
+    .expect("cct palette should apply");
+
+    let snapshot = read_lighting_snapshot(&load_test_app_settings(&test_dir));
+    let key_left = fixture_snapshot(&snapshot, "fixture-key-left");
+    assert_eq!(key_left.cct, 5600);
+    assert!(!key_left.on);
+    assert_eq!(key_left.intensity, 100);
+}
+
+#[test]
+fn lighting_palette_apply_zero_intensity_turns_fixture_off() {
+    let test_dir = initialize_ready_lighting("palette-apply-zero");
+    let zero = create_lighting_palette(
+        test_dir.db_path().as_path(),
+        &LightingPaletteCreateRequest {
+            name: String::from("Blackout"),
+            kind: LightingPaletteKind::Intensity,
+            value: 0.0,
+            color_index: None,
+        },
+    )
+    .expect("zero palette should create");
+
+    update_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-left"),
+            name: None,
+            fixture_type: None,
+            dmx_start_address: None,
+            effect: None,
+            on: Some(true),
+            intensity: Some(44),
+            cct: None,
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+    )
+    .expect("fixture should turn on");
+
+    apply_lighting_palette_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingPaletteApplyRequest {
+            palette_id: zero.palette.id,
+            fixture_ids: vec![String::from("fixture-key-left")],
+            patch_mode_active: false,
+        },
+        &mut LightingPreviewRuntimeState::default(),
+    )
+    .expect("zero palette should apply");
+
+    let snapshot = read_lighting_snapshot(&load_test_app_settings(&test_dir));
+    let key_left = fixture_snapshot(&snapshot, "fixture-key-left");
+    assert_eq!(key_left.intensity, 0);
+    assert!(!key_left.on);
+}
+
+#[test]
+fn lighting_palette_apply_preview_changes_preview_only() {
+    let test_dir = initialize_ready_lighting("palette-preview");
+    let mut preview = LightingPreviewRuntimeState::default();
+    set_lighting_preview_mode(
+        test_dir.db_path().as_path(),
+        &LightingPreviewModeRequest {
+            enabled: true,
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("preview mode should enable");
+
+    let result = apply_lighting_palette_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingPaletteApplyRequest {
+            palette_id: String::from("palette-intensity-low"),
+            fixture_ids: vec![String::from("fixture-key-left")],
+            patch_mode_active: false,
+        },
+        &mut preview,
+    )
+    .expect("palette should apply to preview");
+
+    assert!(result.preview_mode);
+    assert!(preview.dirty);
+    let snapshot =
+        read_lighting_snapshot_with_preview(&load_test_app_settings(&test_dir), &preview);
+    assert_eq!(
+        preview_fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        10
+    );
+    assert!(preview_fixture_snapshot(&snapshot, "fixture-key-left").on);
+    assert_ne!(
+        fixture_snapshot(&snapshot, "fixture-key-left").intensity,
+        10
+    );
+}
+
+#[test]
+fn lighting_palette_apply_rejects_patch_mode_and_unknown_fixture() {
+    let test_dir = initialize_ready_lighting("palette-apply-rejects");
+
+    let patch_error = apply_lighting_palette_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingPaletteApplyRequest {
+            palette_id: String::from("palette-intensity-low"),
+            fixture_ids: vec![String::from("fixture-key-left")],
+            patch_mode_active: true,
+        },
+        &mut LightingPreviewRuntimeState::default(),
+    )
+    .expect_err("patch mode should reject");
+    match patch_error {
+        LightingCommandError::Rejected(code, _) => {
+            assert_eq!(code, "LIGHTING_PALETTE_PATCH_MODE_CONFLICT")
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+
+    let missing_error = apply_lighting_palette_with_preview(
+        test_dir.db_path().as_path(),
+        &LightingPaletteApplyRequest {
+            palette_id: String::from("palette-intensity-low"),
+            fixture_ids: vec![String::from("fixture-missing")],
+            patch_mode_active: false,
+        },
+        &mut LightingPreviewRuntimeState::default(),
+    )
+    .expect_err("unknown fixture should reject");
+    match missing_error {
+        LightingCommandError::Rejected(code, _) => assert_eq!(code, "LIGHTING_FIXTURE_NOT_FOUND"),
+        other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[test]
+fn lighting_palette_parsers_validate_shapes() {
+    let create = parse_lighting_palette_create_request(&serde_json::json!({
+        "name": "Interview",
+        "kind": "cct",
+        "value": 4300,
+        "colorIndex": 1
+    }))
+    .expect("create payload should parse");
+    assert_eq!(create.kind, LightingPaletteKind::Cct);
+    assert_eq!(create.color_index, Some(1));
+
+    let update = parse_lighting_palette_update_request(&serde_json::json!({
+        "paletteId": "palette-cct-studio",
+        "colorIndex": serde_json::Value::Null,
+        "beforePaletteId": serde_json::Value::Null
+    }))
+    .expect("update payload should parse");
+    assert_eq!(update.color_index, Some(None));
+    assert_eq!(update.before_palette_id, Some(None));
+
+    let apply = parse_lighting_palette_apply_request(&serde_json::json!({
+        "paletteId": "palette-intensity-low",
+        "fixtureIds": ["fixture-key-left", "fixture-key-left"],
+        "patchModeActive": true
+    }))
+    .expect("apply payload should parse");
+    assert_eq!(apply.fixture_ids, vec![String::from("fixture-key-left")]);
+    assert!(apply.patch_mode_active);
+
+    parse_lighting_palette_create_request(&serde_json::json!({
+        "name": "Bad",
+        "kind": "cct",
+        "value": 1200
+    }))
+    .expect_err("invalid cct value should reject");
 }
 
 #[test]

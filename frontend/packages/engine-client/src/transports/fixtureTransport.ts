@@ -66,6 +66,12 @@ function lightingScenes(snapshot: JsonObject): JsonObject[] {
     .filter((scene): scene is JsonObject => scene !== null);
 }
 
+function lightingPalettes(snapshot: JsonObject): JsonObject[] {
+  return asArray(snapshot.palettes)
+    .map((palette) => asRecord(palette))
+    .filter((palette): palette is JsonObject => palette !== null);
+}
+
 function lightingPreviewActive(snapshot: JsonObject): boolean {
   return asBoolean(snapshot.previewMode, false);
 }
@@ -231,6 +237,7 @@ function buildDefaultLightingSnapshot(): JsonObject {
     fixtures: [],
     groups: [],
     scenes: [],
+    palettes: defaultLightingPalettes(),
     previewMode: false,
     previewDirty: false,
     previewSceneId: null,
@@ -1027,6 +1034,74 @@ function defaultLightingFixtureCct(fixtureType: string) {
   }
 }
 
+function defaultLightingPalettes(): JsonObject[] {
+  return [
+    { id: "palette-intensity-low", name: "Low", kind: "intensity", value: 10, colorIndex: 5 },
+    { id: "palette-intensity-quarter", name: "Quarter", kind: "intensity", value: 25, colorIndex: 4 },
+    { id: "palette-intensity-half", name: "Half", kind: "intensity", value: 50, colorIndex: 2 },
+    { id: "palette-intensity-full", name: "Full", kind: "intensity", value: 100, colorIndex: 0 },
+    { id: "palette-cct-warm", name: "Warm", kind: "cct", value: 2700, colorIndex: 0 },
+    { id: "palette-cct-studio", name: "Studio", kind: "cct", value: 4000, colorIndex: 4 },
+    { id: "palette-cct-daylight", name: "Daylight", kind: "cct", value: 5600, colorIndex: 5 },
+    { id: "palette-cct-cool", name: "Cool", kind: "cct", value: 6500, colorIndex: 5 },
+  ];
+}
+
+function normalizePaletteKind(value: unknown): "intensity" | "cct" | null {
+  const kind = asString(value).trim();
+  return kind === "intensity" || kind === "cct" ? kind : null;
+}
+
+function normalizePaletteValue(kind: "intensity" | "cct", value: unknown) {
+  const raw = asNumber(value, kind === "intensity" ? 50 : 4000);
+  return kind === "intensity" ? clampNumber(raw, 0, 100) : clampNumber(raw, 2000, 10000);
+}
+
+function validatePaletteValue(kind: "intensity" | "cct", value: unknown) {
+  const raw = asNumber(value, NaN);
+  const min = kind === "intensity" ? 0 : 2000;
+  const max = kind === "intensity" ? 100 : 10000;
+  if (!Number.isFinite(raw) || raw < min || raw > max) {
+    throw new Error(`Palette value must be between ${min} and ${max}.`);
+  }
+  return raw;
+}
+
+function parseLightingColorIndex(value: unknown): number | null {
+  if (value === null) return null;
+  const raw = asNumber(value, NaN);
+  if (!Number.isInteger(raw) || raw < 0 || raw > 7) {
+    throw new Error("colorIndex must be an integer 0..7 or null");
+  }
+  return raw;
+}
+
+function formatLightingPaletteValue(kind: "intensity" | "cct", value: unknown) {
+  const normalized = normalizePaletteValue(kind, value);
+  return kind === "intensity" ? `${Math.round(normalized)}%` : `${Math.round(normalized)}K`;
+}
+
+function applyLightingPaletteToFixture(fixture: JsonObject, palette: JsonObject): JsonObject {
+  const kind = normalizePaletteKind(palette.kind);
+  if (kind === "intensity") {
+    const intensity = Math.round(normalizePaletteValue(kind, palette.value));
+    return {
+      ...fixture,
+      intensity,
+      on: intensity > 0,
+    };
+  }
+  if (kind === "cct") {
+    const fixtureType = normalizeFixtureType(fixture.type);
+    const cctRange = lightingFixtureCctRange(fixtureType);
+    return {
+      ...fixture,
+      cct: clampNumber(Math.round(normalizePaletteValue(kind, palette.value)), cctRange.min, cctRange.max),
+    };
+  }
+  return fixture;
+}
+
 function defaultLightingBeamAngle(fixtureType: string) {
   switch (fixtureType) {
     case "infinibar-pb12":
@@ -1147,6 +1222,15 @@ function nextCustomSceneId(scenes: JsonObject[]) {
     index += 1;
   }
   return `scene-custom-${index}`;
+}
+
+function nextCustomPaletteId(palettes: JsonObject[]) {
+  const usedIds = new Set(palettes.map((palette) => asString(palette.id)));
+  let index = 1;
+  while (usedIds.has(`palette-custom-${index}`)) {
+    index += 1;
+  }
+  return `palette-custom-${index}`;
 }
 
 function synchronizeLightingGroupCounts(lightingSnapshot: JsonObject) {
@@ -1545,6 +1629,31 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   lightingSnapshot.fixtures = asArray(lightingSnapshot.fixtures);
   lightingSnapshot.groups = asArray(lightingSnapshot.groups);
   lightingSnapshot.scenes = asArray(lightingSnapshot.scenes);
+  lightingSnapshot.palettes = Object.prototype.hasOwnProperty.call(lightingSnapshot, "palettes")
+    ? lightingPalettes(lightingSnapshot)
+        .flatMap((palette): JsonObject[] => {
+          const kind = normalizePaletteKind(palette.kind);
+          const id = asString(palette.id).trim();
+          const name = asString(palette.name).trim();
+          if (!kind || !id || !name) return [];
+          return [
+            {
+              id,
+              name,
+              kind,
+              value: normalizePaletteValue(kind, palette.value),
+              colorIndex:
+                typeof palette.colorIndex === "number" && Number.isInteger(palette.colorIndex)
+                  ? clampNumber(palette.colorIndex, 0, 7)
+                  : null,
+            },
+          ];
+        })
+        .sort((left, right) => {
+          if (left.kind === right.kind) return 0;
+          return left.kind === "intensity" ? -1 : 1;
+        })
+    : defaultLightingPalettes();
   lightingSnapshot.selectedSceneId =
     typeof lightingSnapshot.selectedSceneId === "string" ? lightingSnapshot.selectedSceneId : null;
   lightingSnapshot.selectedFixtureId =
@@ -1812,6 +1921,228 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         return {
           discarded: true,
           summary: "Lighting preview edits discarded.",
+        };
+      }
+      case "lighting.palette.list": {
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? buildDefaultLightingSnapshot();
+        return {
+          palettes: cloneJson(lightingPalettes(lightingSnapshot)),
+        };
+      }
+      case "lighting.palette.create": {
+        const name = asString(params.name).trim();
+        if (!name) {
+          throw new Error("name is required");
+        }
+        const kind = normalizePaletteKind(params.kind);
+        if (!kind) {
+          throw new Error("kind must be one of intensity or cct");
+        }
+        const value = validatePaletteValue(kind, params.value);
+        const colorIndex = Object.prototype.hasOwnProperty.call(params, "colorIndex")
+          ? parseLightingColorIndex(params.colorIndex)
+          : null;
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? buildDefaultLightingSnapshot();
+        const palettes = lightingPalettes(lightingSnapshot);
+        const createdPalette: JsonObject = {
+          id: nextCustomPaletteId(palettes),
+          name,
+          kind,
+          value,
+          colorIndex,
+        };
+        const insertIndex =
+          kind === "intensity" ? palettes.findIndex((palette) => normalizePaletteKind(palette.kind) === "cct") : -1;
+        lightingSnapshot.palettes =
+          insertIndex >= 0
+            ? [...palettes.slice(0, insertIndex), createdPalette, ...palettes.slice(insertIndex)]
+            : [...palettes, createdPalette];
+        const summary = `Lighting ${kind === "cct" ? "CCT" : "intensity"} palette '${name}' was created at ${formatLightingPaletteValue(kind, value)}.`;
+        lightingSnapshot.lastActionStatus = "succeeded";
+        lightingSnapshot.lastActionCode = null;
+        lightingSnapshot.lastActionMessage = summary;
+        lightingSnapshot.summary = summary;
+        state.lightingSnapshot = lightingSnapshot;
+        synchronizeFixtureState(state);
+        emit("lighting.changed", { reason: "palette-created" });
+        return {
+          palette: cloneJson(createdPalette),
+          summary,
+        };
+      }
+      case "lighting.palette.update": {
+        const paletteId = asString(params.paletteId).trim();
+        if (!paletteId) {
+          throw new Error("paletteId is required");
+        }
+        if (Object.prototype.hasOwnProperty.call(params, "kind")) {
+          throw new Error("lighting.palette.update cannot change kind");
+        }
+        const hasName = typeof params.name === "string";
+        const hasValue = typeof params.value === "number";
+        const hasColor = Object.prototype.hasOwnProperty.call(params, "colorIndex");
+        const hasBefore = Object.prototype.hasOwnProperty.call(params, "beforePaletteId");
+        if (!hasName && !hasValue && !hasColor && !hasBefore) {
+          throw new Error("lighting.palette.update requires a name, value, colorIndex, or beforePaletteId");
+        }
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? buildDefaultLightingSnapshot();
+        let palettes = lightingPalettes(lightingSnapshot);
+        const targetPalette = palettes.find((palette) => asString(palette.id) === paletteId);
+        if (!targetPalette) {
+          throw new Error(`Lighting palette '${paletteId}' is not present in the palette list.`);
+        }
+        const kind = normalizePaletteKind(targetPalette.kind);
+        if (!kind) {
+          throw new Error(`Lighting palette '${paletteId}' has an unsupported kind.`);
+        }
+        const nextName = hasName ? asString(params.name).trim() : asString(targetPalette.name);
+        if (hasName && !nextName) {
+          throw new Error("name must not be empty");
+        }
+        const nextValue = hasValue
+          ? validatePaletteValue(kind, params.value)
+          : normalizePaletteValue(kind, targetPalette.value);
+        const nextColorIndex = hasColor
+          ? parseLightingColorIndex(params.colorIndex)
+          : ((targetPalette.colorIndex as number | null | undefined) ?? null);
+        const updatedPalette: JsonObject = {
+          ...targetPalette,
+          name: nextName,
+          value: nextValue,
+          colorIndex: nextColorIndex,
+        };
+        palettes = palettes.map((palette) => (asString(palette.id) === paletteId ? updatedPalette : palette));
+        if (hasBefore) {
+          const beforePaletteId = params.beforePaletteId === null ? null : asString(params.beforePaletteId).trim();
+          if (beforePaletteId === paletteId) {
+            throw new Error("beforePaletteId must differ from paletteId");
+          }
+          if (beforePaletteId) {
+            const beforePalette = palettes.find((palette) => asString(palette.id) === beforePaletteId);
+            if (!beforePalette) {
+              throw new Error(`Lighting palette '${beforePaletteId}' is not present in the palette list.`);
+            }
+            if (normalizePaletteKind(beforePalette.kind) !== kind) {
+              throw new Error("Palettes can only be reordered within the same attribute pool.");
+            }
+          }
+          const withoutTarget = palettes.filter((palette) => asString(palette.id) !== paletteId);
+          if (beforePaletteId) {
+            const beforeIndex = withoutTarget.findIndex((palette) => asString(palette.id) === beforePaletteId);
+            palettes = [...withoutTarget.slice(0, beforeIndex), updatedPalette, ...withoutTarget.slice(beforeIndex)];
+          } else {
+            const sameKindEntries = withoutTarget
+              .map((palette, index) => ({ index, palette }))
+              .filter((entry) => normalizePaletteKind(entry.palette.kind) === kind);
+            const lastSameKind = sameKindEntries[sameKindEntries.length - 1];
+            const insertIndex = lastSameKind ? lastSameKind.index + 1 : withoutTarget.length;
+            palettes = [...withoutTarget.slice(0, insertIndex), updatedPalette, ...withoutTarget.slice(insertIndex)];
+          }
+        }
+        lightingSnapshot.palettes = palettes;
+        const summaryParts: string[] = [];
+        if (hasName) summaryParts.push(`renamed to '${nextName}'`);
+        if (hasValue) summaryParts.push(`set to ${formatLightingPaletteValue(kind, nextValue)}`);
+        if (hasColor) summaryParts.push(nextColorIndex === null ? "color cleared" : "recolored");
+        if (hasBefore) summaryParts.push("reordered");
+        const summary = `Lighting palette '${nextName}' ${summaryParts.join(" + ")}.`;
+        lightingSnapshot.lastActionStatus = "succeeded";
+        lightingSnapshot.lastActionCode = null;
+        lightingSnapshot.lastActionMessage = summary;
+        lightingSnapshot.summary = summary;
+        state.lightingSnapshot = lightingSnapshot;
+        synchronizeFixtureState(state);
+        emit("lighting.changed", { reason: "palette-updated" });
+        return {
+          palette: cloneJson(updatedPalette),
+          summary,
+        };
+      }
+      case "lighting.palette.delete": {
+        const paletteId = asString(params.paletteId).trim();
+        if (!paletteId) {
+          throw new Error("paletteId is required");
+        }
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? buildDefaultLightingSnapshot();
+        const palettes = lightingPalettes(lightingSnapshot);
+        const targetPalette = palettes.find((palette) => asString(palette.id) === paletteId);
+        if (!targetPalette) {
+          throw new Error(`Lighting palette '${paletteId}' is not present in the palette list.`);
+        }
+        lightingSnapshot.palettes = palettes.filter((palette) => asString(palette.id) !== paletteId);
+        const summary = `Lighting palette '${asString(targetPalette.name, paletteId)}' was deleted.`;
+        lightingSnapshot.lastActionStatus = "succeeded";
+        lightingSnapshot.lastActionCode = null;
+        lightingSnapshot.lastActionMessage = summary;
+        lightingSnapshot.summary = summary;
+        state.lightingSnapshot = lightingSnapshot;
+        synchronizeFixtureState(state);
+        emit("lighting.changed", { reason: "palette-deleted" });
+        return {
+          deleted: true,
+          paletteId,
+          summary,
+        };
+      }
+      case "lighting.palette.apply": {
+        const paletteId = asString(params.paletteId).trim();
+        if (!paletteId) {
+          throw new Error("paletteId is required");
+        }
+        if (asBoolean(params.patchModeActive, false) || asBoolean(params.patchMode, false)) {
+          throw new Error("Exit patch mode before applying lighting palettes.");
+        }
+        const fixtureIds = asArray(params.fixtureIds)
+          .map((id) => asString(id).trim())
+          .filter(Boolean)
+          .filter((id, index, ids) => ids.indexOf(id) === index);
+        if (fixtureIds.length === 0) {
+          throw new Error("fixtureIds must contain at least one id");
+        }
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? buildDefaultLightingSnapshot();
+        const palettes = lightingPalettes(lightingSnapshot);
+        const palette = palettes.find((entry) => asString(entry.id) === paletteId);
+        if (!palette) {
+          throw new Error(`Lighting palette '${paletteId}' is not present in the palette list.`);
+        }
+        const kind = normalizePaletteKind(palette.kind);
+        if (!kind) {
+          throw new Error(`Lighting palette '${paletteId}' has an unsupported kind.`);
+        }
+        const previewActive = lightingPreviewActive(lightingSnapshot);
+        const fixtures = previewActive
+          ? lightingFixtures(lightingSnapshot, "previewFixtures")
+          : lightingFixtures(lightingSnapshot);
+        const missingFixtureId = fixtureIds.find(
+          (fixtureId) => !fixtures.some((fixture) => asString(fixture.id) === fixtureId)
+        );
+        if (missingFixtureId) {
+          throw new Error(`Lighting fixture '${missingFixtureId}' is not present in the fixture inventory.`);
+        }
+        const nextFixtures = fixtures.map((fixture) =>
+          fixtureIds.includes(asString(fixture.id)) ? applyLightingPaletteToFixture(fixture, palette) : fixture
+        );
+        if (previewActive) {
+          lightingSnapshot.previewFixtures = nextFixtures;
+          lightingSnapshot.previewDirty = true;
+        } else {
+          lightingSnapshot.fixtures = nextFixtures;
+        }
+        const summary = `Lighting ${kind === "cct" ? "CCT" : "intensity"} palette '${asString(palette.name, paletteId)}' applied to ${fixtureIds.length} fixture${fixtureIds.length === 1 ? "" : "s"}${previewActive ? " in preview" : ""}.`;
+        lightingSnapshot.lastActionStatus = "succeeded";
+        lightingSnapshot.lastActionCode = null;
+        lightingSnapshot.lastActionMessage = summary;
+        lightingSnapshot.summary = summary;
+        state.lightingSnapshot = lightingSnapshot;
+        synchronizeFixtureState(state);
+        emit("lighting.changed", { reason: "palette-applied" });
+        return {
+          paletteId,
+          paletteName: asString(palette.name, paletteId),
+          kind,
+          affectedFixtures: fixtureIds.length,
+          previewMode: previewActive,
+          summary,
         };
       }
       case "audio.snapshot":

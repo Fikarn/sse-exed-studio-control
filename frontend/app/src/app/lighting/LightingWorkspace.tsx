@@ -4,6 +4,7 @@ import { Button, ConfirmDialog, Dialog, type PaletteAction } from "@sse/design-s
 import type {
   LightingDmxMonitorSnapshot,
   LightingFixtureSnapshot,
+  LightingPaletteKind,
   LightingSceneSnapshot,
   LightingSnapshot,
   ShellStore,
@@ -35,6 +36,7 @@ import { PreviewBanner } from "./components/PreviewBanner";
 import { RenameDialog } from "./components/RenameDialog";
 import { SelectionChipStrip } from "./components/SelectionChipStrip";
 import { StagePlot } from "./components/StagePlot";
+import { lightingColorTagHex } from "./lightingColorTags";
 import { nextLightingFixtureName } from "./lightingHelpers";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
 import { useResizableColumns } from "./useResizableColumns";
@@ -124,6 +126,7 @@ export function LightingWorkspaceSurface({
   );
   const groups = useMemo(() => lightingSnapshot?.groups ?? [], [lightingSnapshot]);
   const scenes = useMemo(() => lightingSnapshot?.scenes ?? [], [lightingSnapshot]);
+  const palettes = useMemo(() => lightingSnapshot?.palettes ?? [], [lightingSnapshot]);
   const dmxChannelsRaw = useMemo(
     () => getLightingDmxChannels(lightingDmxMonitorSnapshot),
     [lightingDmxMonitorSnapshot]
@@ -144,11 +147,16 @@ export function LightingWorkspaceSurface({
     typeof lightingSnapshot?.selectedFixtureId === "string" ? lightingSnapshot.selectedFixtureId : null;
   const persistedSelectedSceneId =
     typeof lightingSnapshot?.selectedSceneId === "string" ? lightingSnapshot.selectedSceneId : null;
+  const persistedLightingSectionId = asRecord(asRecord(appSnapshot?.shell)?.lighting)?.currentSectionId;
 
-  const [uiMode, setUiMode] = useState<LightingUiMode>("recall");
+  const [uiMode, setUiMode] = useState<LightingUiMode>(() => {
+    const initialSectionId = asRecord(asRecord(appSnapshot?.shell)?.lighting)?.currentSectionId;
+    return initialSectionId === "palettes-patch" ? "patch" : "recall";
+  });
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [activeTabOverride, setActiveTabOverride] = useState<InspectorTab | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [paletteQuickOpen, setPaletteQuickOpen] = useState(false);
   const [recallFadeMs, setRecallFadeMs] = useState(0);
   const toast = useToast();
   const palette = usePalette();
@@ -423,11 +431,13 @@ export function LightingWorkspaceSurface({
 
   const activeTab =
     activeTabOverride ??
-    deriveInspectorTab({
-      uiMode,
-      selectedFixtureId: selectedFixture?.id ?? null,
-      selectedGroupId,
-    });
+    (persistedLightingSectionId === "palettes" || persistedLightingSectionId === "palettes-patch"
+      ? "palettes"
+      : deriveInspectorTab({
+          uiMode,
+          selectedFixtureId: selectedFixture?.id ?? null,
+          selectedGroupId,
+        }));
 
   // Reset tab override when uiMode flips so patch ↔ recall behaves naturally.
   useEffect(() => {
@@ -878,6 +888,79 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const handleApplyPalette = useEffectEvent(async (paletteId: string, fixtureIds: readonly string[]) => {
+    if (fixtureIds.length === 0) {
+      toast.push({ message: "Select a fixture before applying a palette.", tone: "info" });
+      return;
+    }
+    const busyKey = `palette-apply:${paletteId}`;
+    startBusy(busyKey);
+    try {
+      const result = asRecord(
+        await store.applyLightingPalette({
+          paletteId,
+          fixtureIds,
+          patchModeActive: uiMode === "patch",
+        })
+      );
+      palette.pushRecent(`lighting:palette:${paletteId}`);
+      toast.push({ message: String(result?.summary ?? "Palette applied."), tone: "ok" });
+    } catch (error) {
+      reportError(error, "Palette apply failed.");
+    } finally {
+      finishBusy(busyKey);
+    }
+  });
+
+  const handleCreatePalette = useEffectEvent(
+    async (request: { name: string; kind: LightingPaletteKind; value: number; colorIndex: number | null }) => {
+      const busyKey = `palette-create:${request.kind}`;
+      startBusy(busyKey);
+      try {
+        const result = asRecord(await store.createLightingPalette(request));
+        toast.push({ message: String(result?.summary ?? "Palette created."), tone: "ok" });
+      } catch (error) {
+        reportError(error, "Palette create failed.");
+      } finally {
+        finishBusy(busyKey);
+      }
+    }
+  );
+
+  const handleUpdatePalette = useEffectEvent(
+    async (request: {
+      paletteId: string;
+      name?: string;
+      value?: number;
+      colorIndex?: number | null;
+      beforePaletteId?: string | null;
+    }) => {
+      const busyKey = `palette-update:${request.paletteId}`;
+      startBusy(busyKey);
+      try {
+        const result = asRecord(await store.updateLightingPalette(request));
+        if (result?.summary) toast.push({ message: String(result.summary), tone: "ok" });
+      } catch (error) {
+        reportError(error, "Palette update failed.");
+      } finally {
+        finishBusy(busyKey);
+      }
+    }
+  );
+
+  const handleDeletePalette = useEffectEvent(async (paletteId: string) => {
+    const busyKey = `palette-delete:${paletteId}`;
+    startBusy(busyKey);
+    try {
+      const result = asRecord(await store.deleteLightingPalette(paletteId));
+      toast.push({ message: String(result?.summary ?? "Palette deleted."), tone: "ok" });
+    } catch (error) {
+      reportError(error, "Palette delete failed.");
+    } finally {
+      finishBusy(busyKey);
+    }
+  });
+
   const handleRenameGroup = useEffectEvent(async (groupId: string, name: string) => {
     const busyKey = `group-rename:${groupId}`;
     startBusy(busyKey);
@@ -1256,6 +1339,14 @@ export function LightingWorkspaceSurface({
         action: () => requestEmergencyCut(),
         when: () => bridgeReachable,
       },
+      ...palettes.map<PaletteAction>((entry) => ({
+        id: `lighting:palette:${entry.id}`,
+        label: `Apply palette: ${entry.name}`,
+        group: "Palettes",
+        keywords: [entry.kind, "palette", entry.name],
+        action: () => void handleApplyPalette(entry.id, Array.from(selectedFixtureIds)),
+        when: () => !inPatchMode && selectedFixtureIds.size > 0,
+      })),
       ...scenes.map<PaletteAction>((scene) => ({
         id: `lighting:recall:${scene.id}`,
         label: `Recall scene: ${scene.name}`,
@@ -1268,6 +1359,8 @@ export function LightingWorkspaceSurface({
   }, [
     palette,
     scenes,
+    palettes,
+    selectedFixtureIds,
     uiMode,
     effectiveSceneModified,
     bridgeReachable,
@@ -1277,9 +1370,25 @@ export function LightingWorkspaceSurface({
     requestAddFixture,
     requestEmergencyCut,
     handleRecallScene,
+    handleApplyPalette,
     previewDirty,
     previewMode,
   ]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setPaletteQuickOpen(true);
+        return;
+      }
+      if (event.key === "Escape") {
+        setPaletteQuickOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const handleToggleGroupPower = useEffectEvent(async (groupId: string, on: boolean) => {
     const busyKey = `group:${groupId}`;
@@ -2129,6 +2238,7 @@ export function LightingWorkspaceSurface({
           fixtures={fixtures}
           groups={groups}
           scenes={scenes}
+          palettes={palettes}
           dmxChannels={dmxChannelsRaw}
           dmxStale={!bridgeReachable}
           universe={bridgeUniverse}
@@ -2167,10 +2277,57 @@ export function LightingWorkspaceSurface({
           onBulkTogglePower={(ids, on) => void handleBulkTogglePower(ids, on)}
           onBulkIntensityValues={(values) => void handleBulkIntensityValues(values)}
           onBulkCctValues={(values) => void handleBulkCctValues(values)}
+          onApplyPalette={(paletteId, ids) => void handleApplyPalette(paletteId, ids)}
+          onCreatePalette={(request) => void handleCreatePalette(request)}
+          onUpdatePalette={(request) => void handleUpdatePalette(request)}
+          onDeletePalette={(paletteId) => void handleDeletePalette(paletteId)}
           busyActions={busyActions}
           pendingInlineRename={pendingInlineRename}
         />
       </div>
+
+      {paletteQuickOpen ? (
+        <div className={styles.paletteQuickOverlay} role="presentation" onMouseDown={() => setPaletteQuickOpen(false)}>
+          <div
+            className={styles.paletteQuickPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Lighting palettes"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className={styles.paletteQuickHeader}>
+              <strong>Palettes</strong>
+              <span>{selectedFixtureIds.size} selected</span>
+            </div>
+            <div className={styles.paletteQuickGrid}>
+              {palettes.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className={styles.paletteQuickTile}
+                  disabled={
+                    uiMode === "patch" || selectedFixtureIds.size === 0 || busyActions.has(`palette-apply:${entry.id}`)
+                  }
+                  onClick={() => {
+                    setPaletteQuickOpen(false);
+                    void handleApplyPalette(entry.id, Array.from(selectedFixtureIds));
+                  }}
+                >
+                  <span
+                    className={styles.paletteQuickAccent}
+                    style={{ background: lightingColorTagHex(entry.colorIndex) ?? "transparent" }}
+                    aria-hidden="true"
+                  />
+                  <span>{entry.name}</span>
+                  <small>
+                    {entry.kind === "intensity" ? `${Math.round(entry.value)}%` : `${Math.round(entry.value)}K`}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className={styles.bottomStripStack}>
         <SelectionChipStrip

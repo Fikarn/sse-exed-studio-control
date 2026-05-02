@@ -140,6 +140,7 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
             )
         })
         .collect::<Vec<_>>();
+    let palettes = ordered_lighting_palette_snapshots(&editor_state);
     let selected_scene_id = read_selected_scene_id(settings, &scenes);
     let status = if !enabled && config.bridge_ip.trim().is_empty() {
         String::from("unconfigured")
@@ -192,6 +193,7 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         fixtures,
         groups,
         scenes,
+        palettes,
         preview_mode: false,
         preview_dirty: false,
         preview_scene_id: None,

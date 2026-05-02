@@ -73,6 +73,8 @@ pub(super) fn default_lighting_editor_state(
     let scenes = default_lighting_scene_states(config, inventory, &fixtures);
     let scene_order = scenes.iter().map(|scene| scene.id.clone()).collect();
     let group_order = groups.iter().map(|group| group.id.clone()).collect();
+    let palettes = default_lighting_palette_states();
+    let palette_order = palettes.iter().map(|palette| palette.id.clone()).collect();
     LightingEditorState {
         groups,
         removed_fixture_ids: Vec::new(),
@@ -81,6 +83,8 @@ pub(super) fn default_lighting_editor_state(
         scene_order,
         pinned_scene_ids: Vec::new(),
         group_order,
+        palettes,
+        palette_order,
         active_fade: None,
     }
 }
@@ -222,6 +226,9 @@ pub(super) fn normalize_lighting_editor_state(
         }
     }
 
+    let palettes = normalize_lighting_palette_states(&existing.palettes);
+    let palette_order = normalize_lighting_palette_order(&palettes, &existing.palette_order);
+
     LightingEditorState {
         groups,
         removed_fixture_ids,
@@ -230,7 +237,163 @@ pub(super) fn normalize_lighting_editor_state(
         scene_order,
         pinned_scene_ids,
         group_order,
+        palettes,
+        palette_order,
         active_fade: existing.active_fade,
+    }
+}
+
+pub(super) fn default_lighting_palette_states() -> Vec<LightingEditorPaletteState> {
+    vec![
+        LightingEditorPaletteState {
+            id: String::from("palette-intensity-low"),
+            name: String::from("Low"),
+            kind: LightingPaletteKind::Intensity,
+            value: 10.0,
+            color_index: Some(5),
+        },
+        LightingEditorPaletteState {
+            id: String::from("palette-intensity-quarter"),
+            name: String::from("Quarter"),
+            kind: LightingPaletteKind::Intensity,
+            value: 25.0,
+            color_index: Some(4),
+        },
+        LightingEditorPaletteState {
+            id: String::from("palette-intensity-half"),
+            name: String::from("Half"),
+            kind: LightingPaletteKind::Intensity,
+            value: 50.0,
+            color_index: Some(2),
+        },
+        LightingEditorPaletteState {
+            id: String::from("palette-intensity-full"),
+            name: String::from("Full"),
+            kind: LightingPaletteKind::Intensity,
+            value: 100.0,
+            color_index: Some(0),
+        },
+        LightingEditorPaletteState {
+            id: String::from("palette-cct-warm"),
+            name: String::from("Warm"),
+            kind: LightingPaletteKind::Cct,
+            value: 2700.0,
+            color_index: Some(0),
+        },
+        LightingEditorPaletteState {
+            id: String::from("palette-cct-studio"),
+            name: String::from("Studio"),
+            kind: LightingPaletteKind::Cct,
+            value: 4000.0,
+            color_index: Some(4),
+        },
+        LightingEditorPaletteState {
+            id: String::from("palette-cct-daylight"),
+            name: String::from("Daylight"),
+            kind: LightingPaletteKind::Cct,
+            value: 5600.0,
+            color_index: Some(5),
+        },
+        LightingEditorPaletteState {
+            id: String::from("palette-cct-cool"),
+            name: String::from("Cool"),
+            kind: LightingPaletteKind::Cct,
+            value: 6500.0,
+            color_index: Some(5),
+        },
+    ]
+}
+
+pub(super) fn normalize_lighting_palette_states(
+    existing_palettes: &[LightingEditorPaletteState],
+) -> Vec<LightingEditorPaletteState> {
+    let mut palettes = Vec::with_capacity(existing_palettes.len());
+    for palette in existing_palettes {
+        if palette.id.trim().is_empty()
+            || palette.name.trim().is_empty()
+            || palettes
+                .iter()
+                .any(|entry: &LightingEditorPaletteState| entry.id == palette.id)
+        {
+            continue;
+        }
+        palettes.push(LightingEditorPaletteState {
+            id: palette.id.trim().to_string(),
+            name: palette.name.trim().to_string(),
+            kind: palette.kind,
+            value: normalize_palette_value(palette.kind, palette.value),
+            color_index: palette.color_index.filter(|index| *index < 8),
+        });
+    }
+    palettes
+}
+
+pub(super) fn normalize_lighting_palette_order(
+    palettes: &[LightingEditorPaletteState],
+    existing_order: &[String],
+) -> Vec<String> {
+    let mut ordered_ids: Vec<String> = Vec::with_capacity(palettes.len());
+    for id in existing_order {
+        if id.trim().is_empty()
+            || ordered_ids.iter().any(|existing_id| existing_id == id)
+            || !palettes.iter().any(|palette| &palette.id == id)
+        {
+            continue;
+        }
+        ordered_ids.push(id.clone());
+    }
+    for palette in palettes {
+        if !ordered_ids.iter().any(|id| id == &palette.id) {
+            ordered_ids.push(palette.id.clone());
+        }
+    }
+
+    [LightingPaletteKind::Intensity, LightingPaletteKind::Cct]
+        .into_iter()
+        .flat_map(|kind| {
+            ordered_ids
+                .iter()
+                .filter(move |id| {
+                    palettes
+                        .iter()
+                        .find(|palette| palette.id == **id)
+                        .is_some_and(|palette| palette.kind == kind)
+                })
+                .cloned()
+        })
+        .collect()
+}
+
+pub(super) fn ordered_lighting_palette_snapshots(
+    state: &LightingEditorState,
+) -> Vec<LightingPaletteSnapshot> {
+    let order = normalize_lighting_palette_order(&state.palettes, &state.palette_order);
+    order
+        .iter()
+        .filter_map(|id| state.palettes.iter().find(|palette| palette.id == *id))
+        .map(lighting_palette_snapshot_from_state)
+        .collect()
+}
+
+pub(super) fn lighting_palette_snapshot_from_state(
+    palette: &LightingEditorPaletteState,
+) -> LightingPaletteSnapshot {
+    LightingPaletteSnapshot {
+        id: palette.id.clone(),
+        name: palette.name.clone(),
+        kind: palette.kind,
+        value: normalize_palette_value(palette.kind, palette.value),
+        color_index: palette.color_index,
+    }
+}
+
+pub(super) fn normalize_palette_value(kind: LightingPaletteKind, value: f64) -> f64 {
+    let finite_value = if value.is_finite() { value } else { 0.0 };
+    match kind {
+        LightingPaletteKind::Intensity => clamp_f64(finite_value, 0.0, 100.0),
+        LightingPaletteKind::Cct => {
+            clamp_f64(finite_value, MIN_FIXTURE_CCT as f64, MAX_FIXTURE_CCT as f64)
+        }
     }
 }
 
@@ -562,4 +725,20 @@ pub(super) fn next_custom_fixture_id(fixtures: &[LightingEditorFixtureState]) ->
         + 1;
 
     format!("{LIGHTING_CUSTOM_FIXTURE_ID_PREFIX}{next_index}")
+}
+
+pub(super) fn next_custom_palette_id(palettes: &[LightingEditorPaletteState]) -> String {
+    let next_index = palettes
+        .iter()
+        .filter_map(|palette| {
+            palette
+                .id
+                .strip_prefix(LIGHTING_CUSTOM_PALETTE_ID_PREFIX)
+                .and_then(|value| value.parse::<usize>().ok())
+        })
+        .max()
+        .unwrap_or(0)
+        + 1;
+
+    format!("{LIGHTING_CUSTOM_PALETTE_ID_PREFIX}{next_index}")
 }

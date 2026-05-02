@@ -51,6 +51,7 @@ pub struct LightingSnapshot {
     pub fixtures: Vec<LightingFixtureSnapshot>,
     pub groups: Vec<LightingGroupSnapshot>,
     pub scenes: Vec<LightingSceneSnapshot>,
+    pub palettes: Vec<LightingPaletteSnapshot>,
     #[serde(rename = "previewMode")]
     pub preview_mode: bool,
     #[serde(rename = "previewDirty")]
@@ -157,6 +158,27 @@ pub struct LightingSceneFixtureSnapshot {
     pub on: bool,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub enum LightingPaletteKind {
+    Intensity,
+    Cct,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct LightingPaletteSnapshot {
+    pub id: String,
+    pub name: String,
+    pub kind: LightingPaletteKind,
+    pub value: f64,
+    #[serde(default, rename = "colorIndex")]
+    pub color_index: Option<u8>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LightingEditorState {
     #[serde(default)]
@@ -184,6 +206,15 @@ pub struct LightingEditorState {
     /// `lighting.group.reorder` IPC; create / delete keep the vec in sync.
     #[serde(default, rename = "groupOrder")]
     pub group_order: Vec<String>,
+    /// Per-attribute operator palettes. Defaults are seeded by the v6
+    /// storage migration or by fresh default state creation; an explicit
+    /// empty vec is preserved so deleted defaults do not reappear.
+    #[serde(default)]
+    pub palettes: Vec<LightingEditorPaletteState>,
+    /// Display order for palette pools. The normalizer groups intensity
+    /// before CCT while preserving order inside each kind.
+    #[serde(default, rename = "paletteOrder")]
+    pub palette_order: Vec<String>,
     /// Runtime fade state for manual scene recalls. Persisted so the next
     /// snapshot or command can sample/cancel the fade from the same origin.
     #[serde(default, rename = "activeFade")]
@@ -278,6 +309,16 @@ pub struct LightingEditorSceneFixtureState {
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LightingEditorPaletteState {
+    pub id: String,
+    pub name: String,
+    pub kind: LightingPaletteKind,
+    pub value: f64,
+    #[serde(default, rename = "colorIndex")]
+    pub color_index: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -547,6 +588,45 @@ pub struct LightingPreviewDiscardResult {
     pub summary: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct LightingPaletteListResult {
+    pub palettes: Vec<LightingPaletteSnapshot>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingPaletteCreateResult {
+    pub palette: LightingPaletteSnapshot,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingPaletteUpdateResult {
+    pub palette: LightingPaletteSnapshot,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingPaletteDeleteResult {
+    pub deleted: bool,
+    #[serde(rename = "paletteId")]
+    pub palette_id: String,
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LightingPaletteApplyResult {
+    #[serde(rename = "paletteId")]
+    pub palette_id: String,
+    #[serde(rename = "paletteName")]
+    pub palette_name: String,
+    pub kind: LightingPaletteKind,
+    #[serde(rename = "affectedFixtures")]
+    pub affected_fixtures: usize,
+    #[serde(rename = "previewMode")]
+    pub preview_mode: bool,
+    pub summary: String,
+}
+
 #[derive(Debug)]
 pub enum LightingCommandError {
     Rejected(&'static str, String),
@@ -694,4 +774,37 @@ pub struct LightingSceneReorderRequest {
 pub struct LightingScenePinRequest {
     pub scene_id: String,
     pub pinned: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingPaletteCreateRequest {
+    pub name: String,
+    pub kind: LightingPaletteKind,
+    pub value: f64,
+    pub color_index: Option<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingPaletteUpdateRequest {
+    pub palette_id: String,
+    pub name: Option<String>,
+    pub value: Option<f64>,
+    /// Outer `Option`: was the field supplied. Inner `Option<u8>`:
+    /// the new value (None = clear, Some(idx) = set to palette index).
+    pub color_index: Option<Option<u8>>,
+    /// Outer `Option`: was the reorder field supplied. Inner option:
+    /// target palette id, or None to move to the end of the same kind.
+    pub before_palette_id: Option<Option<String>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingPaletteDeleteRequest {
+    pub palette_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LightingPaletteApplyRequest {
+    pub palette_id: String,
+    pub fixture_ids: Vec<String>,
+    pub patch_mode_active: bool,
 }

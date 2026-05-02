@@ -7,11 +7,14 @@ use super::types::{
     LightingFixtureIdentifyClearAllRequest, LightingFixtureIdentifyRequest,
     LightingFixtureIdentifySequenceRequest, LightingFixtureUpdateRequest,
     LightingGroupCreateRequest, LightingGroupDeleteRequest, LightingGroupPowerRequest,
-    LightingGroupReorderRequest, LightingGroupUpdateRequest, LightingPreviewDiscardRequest,
-    LightingPreviewModeRequest, LightingSceneCreateRequest, LightingSceneDeleteRequest,
-    LightingScenePinRequest, LightingSceneRecallRequest, LightingSceneReorderRequest,
-    LightingSceneUpdateRequest, LightingSettingsUpdateRequest, LightingSpatialMarker,
+    LightingGroupReorderRequest, LightingGroupUpdateRequest, LightingPaletteApplyRequest,
+    LightingPaletteCreateRequest, LightingPaletteDeleteRequest, LightingPaletteKind,
+    LightingPaletteUpdateRequest, LightingPreviewDiscardRequest, LightingPreviewModeRequest,
+    LightingSceneCreateRequest, LightingSceneDeleteRequest, LightingScenePinRequest,
+    LightingSceneRecallRequest, LightingSceneReorderRequest, LightingSceneUpdateRequest,
+    LightingSettingsUpdateRequest, LightingSpatialMarker,
 };
+use super::{MAX_FIXTURE_CCT, MIN_FIXTURE_CCT};
 
 pub fn parse_lighting_scene_recall_request(
     params: &Value,
@@ -312,6 +315,18 @@ fn parse_fixture_id_array(value: Option<&Value>, field: &str) -> Result<Vec<Stri
     Ok(ids)
 }
 
+fn dedupe_string_ids(ids: &mut Vec<String>) {
+    let mut seen = Vec::with_capacity(ids.len());
+    ids.retain(|id| {
+        if seen.iter().any(|seen_id| seen_id == id) {
+            false
+        } else {
+            seen.push(id.clone());
+            true
+        }
+    });
+}
+
 pub fn parse_lighting_group_power_request(
     params: &Value,
 ) -> Result<LightingGroupPowerRequest, String> {
@@ -377,6 +392,123 @@ pub fn parse_lighting_group_update_request(
         group_id: String::from(group_id),
         name,
         color_index,
+    })
+}
+
+pub fn parse_lighting_palette_create_request(
+    params: &Value,
+) -> Result<LightingPaletteCreateRequest, String> {
+    let name = parse_required_palette_name(params.get("name"))?;
+    let kind = parse_required_palette_kind(params.get("kind"))?;
+    let value = parse_required_palette_value(params.get("value"), kind)?;
+    let color_index = params
+        .get("colorIndex")
+        .map(parse_optional_color_index)
+        .transpose()?
+        .unwrap_or(None);
+
+    Ok(LightingPaletteCreateRequest {
+        name,
+        kind,
+        value,
+        color_index,
+    })
+}
+
+pub fn parse_lighting_palette_update_request(
+    params: &Value,
+) -> Result<LightingPaletteUpdateRequest, String> {
+    let palette_id = params
+        .get("paletteId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("paletteId is required"))?;
+    if params.get("kind").is_some() {
+        return Err(String::from("lighting.palette.update cannot change kind"));
+    }
+    let name = params
+        .get("name")
+        .map(|value| parse_required_palette_name(Some(value)))
+        .transpose()?;
+    let value = params
+        .get("value")
+        .map(parse_finite_palette_value)
+        .transpose()?;
+    let color_index = params
+        .get("colorIndex")
+        .map(parse_optional_color_index)
+        .transpose()?;
+    let before_palette_id = match params.get("beforePaletteId") {
+        None => None,
+        Some(Value::Null) => Some(None),
+        Some(Value::String(value)) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                Some(None)
+            } else if trimmed == palette_id {
+                return Err(String::from("beforePaletteId must differ from paletteId"));
+            } else {
+                Some(Some(String::from(trimmed)))
+            }
+        }
+        Some(_) => return Err(String::from("beforePaletteId must be a string or null")),
+    };
+
+    if name.is_none() && value.is_none() && color_index.is_none() && before_palette_id.is_none() {
+        return Err(String::from(
+            "lighting.palette.update requires a name, value, colorIndex, or beforePaletteId",
+        ));
+    }
+
+    Ok(LightingPaletteUpdateRequest {
+        palette_id: String::from(palette_id),
+        name,
+        value,
+        color_index,
+        before_palette_id,
+    })
+}
+
+pub fn parse_lighting_palette_delete_request(
+    params: &Value,
+) -> Result<LightingPaletteDeleteRequest, String> {
+    let palette_id = params
+        .get("paletteId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("paletteId is required"))?;
+
+    Ok(LightingPaletteDeleteRequest {
+        palette_id: String::from(palette_id),
+    })
+}
+
+pub fn parse_lighting_palette_apply_request(
+    params: &Value,
+) -> Result<LightingPaletteApplyRequest, String> {
+    let palette_id = params
+        .get("paletteId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("paletteId is required"))?;
+    let mut fixture_ids = parse_fixture_id_array(params.get("fixtureIds"), "fixtureIds")?;
+    dedupe_string_ids(&mut fixture_ids);
+    if fixture_ids.is_empty() {
+        return Err(String::from("fixtureIds must contain at least one id"));
+    }
+    let patch_mode_active = params
+        .get("patchModeActive")
+        .or_else(|| params.get("patchMode"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    Ok(LightingPaletteApplyRequest {
+        palette_id: String::from(palette_id),
+        fixture_ids,
+        patch_mode_active,
     })
 }
 
@@ -644,6 +776,58 @@ pub(super) fn parse_required_fixture_name(value: Option<&Value>) -> Result<Strin
         return Err(String::from("name must be 50 characters or fewer"));
     }
     Ok(name)
+}
+
+pub(super) fn parse_required_palette_name(value: Option<&Value>) -> Result<String, String> {
+    let name = value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+        .ok_or_else(|| String::from("name is required"))?;
+    if name.len() > 50 {
+        return Err(String::from("name must be 50 characters or fewer"));
+    }
+    Ok(name)
+}
+
+pub(super) fn parse_required_palette_kind(
+    value: Option<&Value>,
+) -> Result<LightingPaletteKind, String> {
+    match value.and_then(Value::as_str).map(str::trim) {
+        Some("intensity") => Ok(LightingPaletteKind::Intensity),
+        Some("cct") => Ok(LightingPaletteKind::Cct),
+        _ => Err(String::from("kind must be one of intensity or cct")),
+    }
+}
+
+pub(super) fn parse_required_palette_value(
+    value: Option<&Value>,
+    kind: LightingPaletteKind,
+) -> Result<f64, String> {
+    let parsed = value
+        .ok_or_else(|| String::from("value is required"))
+        .and_then(parse_finite_palette_value)?;
+    let (min, max, label) = match kind {
+        LightingPaletteKind::Intensity => (0.0, 100.0, "intensity"),
+        LightingPaletteKind::Cct => (MIN_FIXTURE_CCT as f64, MAX_FIXTURE_CCT as f64, "CCT"),
+    };
+    if !(min..=max).contains(&parsed) {
+        return Err(format!(
+            "value for {label} palettes must be between {min:.0} and {max:.0}"
+        ));
+    }
+    Ok(parsed)
+}
+
+pub(super) fn parse_finite_palette_value(value: &Value) -> Result<f64, String> {
+    let parsed = value
+        .as_f64()
+        .ok_or_else(|| String::from("value must be a finite number"))?;
+    if !parsed.is_finite() {
+        return Err(String::from("value must be a finite number"));
+    }
+    Ok(parsed)
 }
 
 pub(super) fn parse_required_fixture_type(value: Option<&Value>) -> Result<String, String> {
