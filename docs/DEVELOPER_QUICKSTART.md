@@ -30,7 +30,7 @@ Read [ARCHITECTURE.md](./ARCHITECTURE.md) before changing runtime boundaries.
 Required for normal development:
 
 - Git
-- Node.js 20 LTS recommended (`.nvmrc` is `20`; Node >=20 is accepted by the local doctor)
+- Node.js 24 LTS recommended (`.nvmrc` is `24`; Node >=24 is accepted by the local doctor)
 - npm
 - Rust stable toolchain with `cargo` and `rustc`
 
@@ -47,12 +47,12 @@ Public signing, notarization, and GitHub Actions are intentionally out of scope 
 ```bash
 git clone https://github.com/Fikarn/sse-exed-studio-control.git
 cd sse-exed-studio-control
-nvm use 20
+nvm use 24
 npm install
 npm run doctor
 ```
 
-If you do not use `nvm`, install Node 20 through your normal toolchain. `npm run doctor` will warn when the local Node version differs from the target-host Node 20 baseline.
+If you do not use `nvm`, install Node 24 through your normal toolchain. `npm run doctor` will warn when the local Node major version differs from the target-host Node 24 baseline.
 
 ## Daily Development Loop
 
@@ -224,7 +224,7 @@ npm run clean:local
 
 ## Dependency Policy
 
-The active baseline is Node 20 LTS and TypeScript 5.9. Dependabot is allowed to propose routine npm and Cargo maintenance updates, but major TypeScript and `@types/node` upgrades are intentional engineering tasks, not background merges.
+The active baseline is Node 24 LTS and TypeScript 5.9. Dependabot is allowed to propose routine npm and Cargo maintenance updates, but major TypeScript and `@types/node` upgrades are intentional engineering tasks, not background merges.
 
 For major upgrades:
 
@@ -237,7 +237,7 @@ For major upgrades:
 ## Troubleshooting
 
 - `tauri:visual:review` or Playwright reports port conflicts: stop frontend dev/preview servers and rerun the lane serially.
-- `doctor` warns about Node: use `nvm use 20` for target-host alignment.
+- `doctor` warns about Node: use `nvm use 24` for target-host alignment.
 - `doctor:release` fails on QtIFW: set `SSE_QT_IFW_BINARYCREATOR` and `SSE_QT_IFW_REPOGEN`.
 - Windows evidence says the worktree is dirty: remove generated evidence or rerun only after committing/stashing source changes.
 - The app looks compressed on a Retina MacBook: do not judge layout until the BetterDisplay `2560x1440` review surface is active.

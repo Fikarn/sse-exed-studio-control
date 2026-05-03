@@ -12,13 +12,13 @@ default = []
 test-bridge = []
 
 [build-dependencies]
-tauri-build.workspace = true
+tauri-build = { version = "2.6.0", features = [] }
 
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
 studio-control-protocol.workspace = true
-tauri.workspace = true
+tauri = { version = "2.11.0", features = [] }
 
 [lints]
 workspace = true

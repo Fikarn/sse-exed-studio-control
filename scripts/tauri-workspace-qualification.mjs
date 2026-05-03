@@ -320,11 +320,11 @@ async function runWorkspaceQualification() {
   const audioReceivePort = await reserveUdpPort();
   const audioSendPort = audioReceivePort === 65535 ? 65534 : audioReceivePort + 1;
 
-  let lightingFixtureId = null;
-  let lightingRecalledSceneId = null;
-  let audioChannelId = null;
-  let audioMixTargetId = null;
-  let audioSnapshotId = null;
+  let lightingFixtureId;
+  let lightingRecalledSceneId;
+  let audioChannelId;
+  let audioMixTargetId;
+  let audioSnapshotId;
   let planningProjectTitle = null;
 
   console.log("Tauri workspace qualification: step 1/2 live migrated workspace flows.");

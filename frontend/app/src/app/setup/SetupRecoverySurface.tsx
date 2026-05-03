@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button, StatusBadge, Surface } from "@sse/design-system";
 import type { JsonValue, ShellStore, StartupFailure } from "@sse/engine-client";
@@ -12,6 +12,7 @@ import {
   type SnapshotRecord,
 } from "../shellData";
 import { exportShellDiagnostics, openShellPath } from "../shellCommands";
+import { useLiveCallback } from "../shared/useLiveCallback";
 import styles from "../OperatorShell.module.css";
 import {
   type ActionFeedback,
@@ -90,24 +91,26 @@ export function SetupRecoverySurface({
     setRestorePath((current) => current || lastBackup.path);
   }, [lastBackup?.path]);
 
-  const performAction = useEffectEvent(async (actionId: string, onRun: () => Promise<ActionFeedback | null | void>) => {
-    setBusyAction(actionId);
-    setFeedback(null);
+  const performAction = useLiveCallback(
+    async (actionId: string, onRun: () => Promise<ActionFeedback | null | void>) => {
+      setBusyAction(actionId);
+      setFeedback(null);
 
-    try {
-      const result = await onRun();
-      if (result) {
-        setFeedback(result);
+      try {
+        const result = await onRun();
+        if (result) {
+          setFeedback(result);
+        }
+      } catch (error) {
+        setFeedback({
+          message: error instanceof Error ? error.message : "The incident recovery action failed.",
+          tone: "error",
+        });
+      } finally {
+        setBusyAction(null);
       }
-    } catch (error) {
-      setFeedback({
-        message: error instanceof Error ? error.message : "The incident recovery action failed.",
-        tone: "error",
-      });
-    } finally {
-      setBusyAction(null);
     }
-  });
+  );
 
   const openReferencePath = async (label: string, path: string) => {
     const openedPath = await openShellPath(path);

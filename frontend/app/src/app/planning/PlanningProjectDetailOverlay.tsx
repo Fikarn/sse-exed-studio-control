@@ -1,9 +1,10 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button, StatusBadge, Surface } from "@sse/design-system";
 import type { JsonValue } from "@sse/engine-client";
 
 import type { PlanningActivityEntry, PlanningProjectEntry, PlanningTaskEntry } from "../shellData";
+import { useLiveCallback } from "../shared/useLiveCallback";
 import shellStyles from "../OperatorShell.module.css";
 import planningStyles from "./PlanningWorkspace.module.css";
 import {
@@ -71,7 +72,7 @@ export function PlanningProjectDetailOverlay({
     dialogRef.current?.focus();
   }, [project.id]);
 
-  const submitNewTask = useEffectEvent(async () => {
+  const submitNewTask = useLiveCallback(async () => {
     const title = newTaskTitle.trim();
     if (!title) {
       return;
@@ -90,7 +91,7 @@ export function PlanningProjectDetailOverlay({
     }
   });
 
-  const submitChecklistItem = useEffectEvent(async (taskId: string) => {
+  const submitChecklistItem = useLiveCallback(async (taskId: string) => {
     const text = (checklistDrafts[taskId] ?? "").trim();
     if (!text) {
       return;

@@ -34,7 +34,7 @@ Purpose:
   evidence bundle for the active release/evidence issue.
 
 Required host:
-  Windows 11 x64 with Node 20, Rust stable, npm dependencies, and QtIFW
+  Windows 11 x64 with Node 24 LTS, Rust stable, npm dependencies, and QtIFW
   binarycreator/repogen available on PATH or through:
     SSE_QT_IFW_BINARYCREATOR
     SSE_QT_IFW_REPOGEN

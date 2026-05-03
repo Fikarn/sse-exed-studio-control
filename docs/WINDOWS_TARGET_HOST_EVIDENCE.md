@@ -13,7 +13,7 @@ Use a Windows 11 `x64` machine that can build and run the selected native releas
 Required tools:
 
 - Git
-- Node.js 20 and npm
+- Node.js 24 LTS and npm
 - Rust stable toolchain
 - Windows build tools required by Tauri/Rust
 - Qt Installer Framework 4.x with `binarycreator.exe` and `repogen.exe` (any 4.x minor version; the `binarycreator`/`repogen` CLIs have been stable across the series and the release scripts are version-agnostic — they resolve the binaries via env var or `PATH` without checking the installed version)
@@ -26,6 +26,8 @@ $env:SSE_QT_IFW_REPOGEN = "C:\Qt\Tools\QtInstallerFramework\4.11\bin\repogen.exe
 ```
 
 Match the QtIFW major.minor across hosts (Windows + macOS) when feasible to keep installer/repository artifact bytes comparable in cross-host evidence reviews. A minor mismatch (e.g., 4.7 on macOS vs 4.11 on Windows) is acceptable for branch validation; revisit the version policy explicitly only if a release-blocking artifact difference shows up.
+
+Git must be able to read the host user's global ignore file. If Git prints `unable to access C:\Users\<user>/.config/git/ignore: permission denied`, fix that file's permissions or remove the unreadable file before collecting evidence; the repository evidence scripts intentionally do not mask host Git configuration warnings.
 
 ## Procedure
 

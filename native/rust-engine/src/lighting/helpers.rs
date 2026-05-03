@@ -555,19 +555,35 @@ pub(super) fn clamp_i64(value: i64, min: i64, max: i64) -> i64 {
     value.max(min).min(max)
 }
 
-pub(super) fn lighting_summary(
-    status: &str,
-    bridge_ip: &str,
-    universe: i64,
-    fixture_count: usize,
-    group_count: usize,
-    scene_count: usize,
-    last_recalled_scene_id: Option<&str>,
-    last_scene_recall_at: Option<&str>,
-    last_action_status: &str,
-    last_action_code: Option<&str>,
-    last_action_message: Option<&str>,
-) -> String {
+pub(super) struct LightingSummaryContext<'a> {
+    pub(super) status: &'a str,
+    pub(super) bridge_ip: &'a str,
+    pub(super) universe: i64,
+    pub(super) fixture_count: usize,
+    pub(super) group_count: usize,
+    pub(super) scene_count: usize,
+    pub(super) last_recalled_scene_id: Option<&'a str>,
+    pub(super) last_scene_recall_at: Option<&'a str>,
+    pub(super) last_action_status: &'a str,
+    pub(super) last_action_code: Option<&'a str>,
+    pub(super) last_action_message: Option<&'a str>,
+}
+
+pub(super) fn lighting_summary(context: LightingSummaryContext<'_>) -> String {
+    let LightingSummaryContext {
+        status,
+        bridge_ip,
+        universe,
+        fixture_count,
+        group_count,
+        scene_count,
+        last_recalled_scene_id,
+        last_scene_recall_at,
+        last_action_status,
+        last_action_code,
+        last_action_message,
+    } = context;
+
     let transport_summary = match status {
         "ready" => format!(
             "Bridge {} responded on universe {}. Native lighting state currently tracks {} fixtures, {} groups, and {} scenes.",

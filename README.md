@@ -125,7 +125,7 @@ Start with the cold-start guide:
 
 Prerequisites:
 
-- Node.js 20
+- Node.js 24 LTS
 - npm
 - Rust stable toolchain
 - Qt Installer Framework for local installer/update generation and release evidence

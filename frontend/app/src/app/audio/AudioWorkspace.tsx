@@ -1,9 +1,10 @@
-import { useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { Button, StatusBadge, Surface } from "@sse/design-system";
 import type { AudioSnapshot, ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioWorkspace.module.css";
+import { useLiveCallback } from "../shared/useLiveCallback";
 import {
   formatBackupTimestamp,
   getAudioChannels,
@@ -252,7 +253,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     };
   }, []);
 
-  const performAction = useEffectEvent(async (actionId: string, runner: () => Promise<void>) => {
+  const performAction = useLiveCallback(async (actionId: string, runner: () => Promise<void>) => {
     setBusyAction(actionId);
     setFeedback(null);
     try {
@@ -267,7 +268,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     }
   });
 
-  const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+  const handleKeyDown = useLiveCallback((event: KeyboardEvent) => {
     if (event.defaultPrevented || isEditableTarget(event.target)) {
       return;
     }

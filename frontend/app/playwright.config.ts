@@ -1,5 +1,9 @@
 import { defineConfig } from "@playwright/test";
 
+if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
+  delete process.env.NO_COLOR;
+}
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,

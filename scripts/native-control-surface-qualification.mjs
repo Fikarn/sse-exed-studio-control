@@ -103,7 +103,8 @@ async function fetchJson(url, options = {}) {
       return JSON.parse(text);
     } catch (error) {
       throw new Error(
-        `Packaged control-surface bridge qualification failed: ${method} ${url} did not return JSON: ${error.message}`
+        `Packaged control-surface bridge qualification failed: ${method} ${url} did not return JSON: ${error.message}`,
+        { cause: error }
       );
     }
   } finally {

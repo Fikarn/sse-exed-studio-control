@@ -36,7 +36,7 @@ export function SegmentedControl({ label, onChange, options, size = "regular", v
       0,
       enabled.findIndex((option) => option.value === value)
     );
-    let nextIndex = currentIndex;
+    let nextIndex: number;
 
     if (direction === "next") {
       nextIndex = (currentIndex + 1) % enabled.length;

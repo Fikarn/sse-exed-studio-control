@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Calendar, Mic, Sliders, Sun } from "lucide-react";
 
 import { AppShellFrame, Button } from "@sse/design-system";
@@ -19,6 +19,7 @@ import { PaletteProvider, usePalette } from "./shared/paletteContext";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ShortcutOverlay } from "./shared/ShortcutOverlay";
 import { ToastProvider } from "./shared/toastContext";
+import { useLiveCallback } from "./shared/useLiveCallback";
 import { RecoverySurface } from "./startup/RecoverySurface";
 import { SetupStartupSurface } from "./startup/SetupStartupSurface";
 import { StartupSurface } from "./startup/StartupSurface";
@@ -72,20 +73,20 @@ function OperatorShellInner() {
   const deferredPlanningSnapshot = useDeferredValue(shellState.planningSnapshot);
   const deferredSupportSnapshot = useDeferredValue(shellState.supportSnapshot);
 
-  const requestRestart = useEffectEvent(() => {
+  const requestRestart = useLiveCallback(() => {
     setConfirmIntent("restart-engine");
   });
 
-  const showShortcuts = useEffectEvent(() => {
+  const showShortcuts = useLiveCallback(() => {
     setShowShortcutGuide(true);
   });
 
-  const performRestart = useEffectEvent(async () => {
+  const performRestart = useLiveCallback(async () => {
     setConfirmIntent(null);
     await environment.store.restart();
   });
 
-  const tryNavigateWorkspace = useEffectEvent(async (target: ShellState["activeWorkspace"]) => {
+  const tryNavigateWorkspace = useLiveCallback(async (target: ShellState["activeWorkspace"]) => {
     // Same-target clicks shouldn't trigger the prompt.
     if (target === activeWorkspace) return;
     const allowed = await attemptLeaveCurrentWorkspace();
@@ -261,7 +262,7 @@ function OperatorShellInner() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeWorkspace, confirmIntent, environment.store, palette, showShortcutGuide, workspaces]);
+  }, [activeWorkspace, confirmIntent, environment.store, palette, showShortcutGuide, tryNavigateWorkspace, workspaces]);
 
   const shellExperience = deriveShellExperience(shellState);
 

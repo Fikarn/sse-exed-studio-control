@@ -38,7 +38,7 @@ export function Toolbar({ children, className, density = "regular", label, onKey
           return;
         }
 
-        let nextIndex = currentIndex;
+        let nextIndex: number;
         if (event.key === "ArrowRight") {
           nextIndex = (currentIndex + 1) % controls.length;
         } else if (event.key === "ArrowLeft") {

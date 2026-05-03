@@ -10,6 +10,9 @@ const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("./package.json", impo
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    chunkSizeWarningLimit: 900,
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },

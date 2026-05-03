@@ -535,21 +535,39 @@ pub(super) fn channel_supports_auto_set_from_role(
         .unwrap_or(false)
 }
 
-pub(super) fn audio_summary(
-    status: &str,
-    config: &AudioBackendConfig,
-    osc_enabled: bool,
-    channel_count: usize,
-    mix_target_count: usize,
-    snapshot_count: usize,
-    last_console_sync_at: Option<&str>,
-    last_console_sync_reason: Option<&str>,
-    last_recalled_snapshot_id: Option<&str>,
-    last_snapshot_recall_at: Option<&str>,
-    last_action_status: &str,
-    last_action_code: Option<&str>,
-    last_action_message: Option<&str>,
-) -> String {
+pub(super) struct AudioSummaryContext<'a> {
+    pub(super) status: &'a str,
+    pub(super) config: &'a AudioBackendConfig,
+    pub(super) osc_enabled: bool,
+    pub(super) channel_count: usize,
+    pub(super) mix_target_count: usize,
+    pub(super) snapshot_count: usize,
+    pub(super) last_console_sync_at: Option<&'a str>,
+    pub(super) last_console_sync_reason: Option<&'a str>,
+    pub(super) last_recalled_snapshot_id: Option<&'a str>,
+    pub(super) last_snapshot_recall_at: Option<&'a str>,
+    pub(super) last_action_status: &'a str,
+    pub(super) last_action_code: Option<&'a str>,
+    pub(super) last_action_message: Option<&'a str>,
+}
+
+pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
+    let AudioSummaryContext {
+        status,
+        config,
+        osc_enabled,
+        channel_count,
+        mix_target_count,
+        snapshot_count,
+        last_console_sync_at,
+        last_console_sync_reason,
+        last_recalled_snapshot_id,
+        last_snapshot_recall_at,
+        last_action_status,
+        last_action_code,
+        last_action_message,
+    } = context;
+
     let transport_summary = if !osc_enabled {
         format!(
             "OSC transport is disabled in native audio settings. Last configured endpoint is {}:{} with receive port {}. Simulated inventory still exposes {} channels, {} mix targets, and {} snapshots.",
