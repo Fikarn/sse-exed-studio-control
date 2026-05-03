@@ -140,6 +140,13 @@ export interface LightingFixtureCreateRequest {
 
 export interface LightingSceneCreateRequest {
   name: string;
+  fixtureStates?: Array<{
+    fixtureId: string;
+    intensity: number;
+    cct: number;
+    on: boolean;
+  }>;
+  colorIndex?: number | null;
 }
 
 export interface LightingSceneUpdateRequest {

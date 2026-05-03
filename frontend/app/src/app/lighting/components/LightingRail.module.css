@@ -585,6 +585,38 @@
   letter-spacing: 0.04em;
 }
 
+.sceneVisual {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-tight-sm);
+  overflow: hidden;
+}
+
+.sceneShapeMiniGraph {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  height: 14px;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-tight-xs);
+  background: rgba(3, 5, 4, 0.62);
+  border: 1px solid rgba(250, 246, 230, 0.08);
+  pointer-events: none;
+}
+
+.sceneShapeBar {
+  display: block;
+  min-height: 2px;
+  border-radius: var(--radius-tight-xs) var(--radius-tight-xs) 1px 1px;
+  box-shadow: 0 0 5px rgba(250, 246, 230, 0.16);
+}
+
 .thumb {
   width: 100%;
   aspect-ratio: 16 / 9;

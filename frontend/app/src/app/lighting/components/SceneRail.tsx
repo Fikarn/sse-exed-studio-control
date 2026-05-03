@@ -143,6 +143,7 @@ function VirtualizedCell({
           bridgeReachable={bridgeReachable}
           lastRecalledLabel={lastRecalledLabel}
           fadeProgress={scene.fadeProgress}
+          fixtureStates={scene.fixtureStates}
           thumbDataUri={sceneThumbs[scene.id]}
           pinned={scene.pinned}
           colorIndex={scene.colorIndex}
@@ -345,6 +346,7 @@ export function SceneRail({
               bridgeReachable={bridgeReachable}
               lastRecalledLabel={lastRecalledLabel}
               fadeProgress={scene.fadeProgress}
+              fixtureStates={scene.fixtureStates}
               thumbDataUri={sceneThumbs[scene.id]}
               pinned={scene.pinned}
               colorIndex={scene.colorIndex}

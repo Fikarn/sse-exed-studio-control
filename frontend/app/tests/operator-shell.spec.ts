@@ -504,6 +504,7 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await expect(workspace.getByText("1 fixture selected")).toBeVisible();
   await expect(workspace.getByText("Scene state")).toBeVisible();
   await expect(workspace.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Scene intensity shape for Warm wash" })).toBeVisible();
 
   await page.keyboard.press("KeyS");
   await expect(page.getByRole("button", { name: "Recall scene Scene 3" })).toBeVisible();
@@ -644,6 +645,28 @@ test("supports lighting toolbar search, patch mode, and empty-state fixture crea
   await openFixture(page, "lighting-populated");
 
   const workspace = page.getByRole("main").first();
+  await page.getByRole("button", { name: "Recall scene Interview" }).click();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
+  await page.getByRole("button", { name: "Recall scene Warm wash" }).click();
+  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toBeVisible();
+  await page.keyboard.press(modifierShortcut("KeyF"));
+  await expect(page.getByLabel("Search fixtures, scenes and groups")).toBeFocused();
+  const recentScenes = page.getByRole("listbox", { name: "Recent scenes" });
+  await expect(recentScenes).toBeVisible();
+  await expect(recentScenes.getByRole("option", { name: /Warm wash/ })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowDown");
+  await expect(recentScenes.getByRole("option", { name: /Interview/ })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Recall scene Interview (active)" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Delete scene/ }).click();
+  await page.getByRole("button", { name: "Delete scene" }).click();
+  await expect(page.getByText("Scene 'Interview' deleted.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toBeVisible();
+
   await page.getByLabel("Search fixtures, scenes and groups").fill("zzz");
   await expect(workspace.getByText(/No scenes match .zzz./)).toBeVisible();
   await expect(workspace.getByText(/No groups match .zzz./)).toBeVisible();

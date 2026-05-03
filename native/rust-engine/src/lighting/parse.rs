@@ -2,8 +2,8 @@ use serde_json::Value;
 
 use super::helpers::*;
 use super::types::{
-    FixtureHighlightMode, LightingAllPowerRequest, LightingEffect, LightingFixtureCreateRequest,
-    LightingFixtureDeleteRequest, LightingFixtureHighlightRequest,
+    FixtureHighlightMode, LightingAllPowerRequest, LightingEditorSceneFixtureState, LightingEffect,
+    LightingFixtureCreateRequest, LightingFixtureDeleteRequest, LightingFixtureHighlightRequest,
     LightingFixtureIdentifyClearAllRequest, LightingFixtureIdentifyRequest,
     LightingFixtureIdentifySequenceRequest, LightingFixtureUpdateRequest,
     LightingGroupCreateRequest, LightingGroupDeleteRequest, LightingGroupPowerRequest,
@@ -604,7 +604,71 @@ pub fn parse_lighting_scene_create_request(
     params: &Value,
 ) -> Result<LightingSceneCreateRequest, String> {
     let name = parse_required_scene_name(params.get("name"))?;
-    Ok(LightingSceneCreateRequest { name })
+    let fixture_states = params
+        .get("fixtureStates")
+        .map(parse_lighting_scene_fixture_states)
+        .transpose()?;
+    let color_index = params
+        .get("colorIndex")
+        .map(parse_optional_color_index)
+        .transpose()?
+        .unwrap_or(None);
+    Ok(LightingSceneCreateRequest {
+        name,
+        fixture_states,
+        color_index,
+    })
+}
+
+fn parse_lighting_scene_fixture_states(
+    value: &Value,
+) -> Result<Vec<LightingEditorSceneFixtureState>, String> {
+    let entries = value
+        .as_array()
+        .ok_or_else(|| String::from("fixtureStates must be an array"))?;
+    let mut fixture_states = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let object = entry
+            .as_object()
+            .ok_or_else(|| String::from("fixtureStates entries must be objects"))?;
+        let fixture_id = object
+            .get("fixtureId")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| String::from("fixtureStates.fixtureId is required"))?;
+        let intensity = parse_i64_value(
+            object
+                .get("intensity")
+                .ok_or_else(|| String::from("fixtureStates.intensity is required"))?,
+        )?;
+        if !(0..=100).contains(&intensity) {
+            return Err(String::from(
+                "fixtureStates.intensity must be between 0 and 100",
+            ));
+        }
+        let cct = parse_i64_value(
+            object
+                .get("cct")
+                .ok_or_else(|| String::from("fixtureStates.cct is required"))?,
+        )?;
+        if !(MIN_FIXTURE_CCT..=MAX_FIXTURE_CCT).contains(&cct) {
+            return Err(format!(
+                "fixtureStates.cct must be between {MIN_FIXTURE_CCT} and {MAX_FIXTURE_CCT}"
+            ));
+        }
+        let on = object
+            .get("on")
+            .and_then(Value::as_bool)
+            .ok_or_else(|| String::from("fixtureStates.on must be a boolean"))?;
+        fixture_states.push(LightingEditorSceneFixtureState {
+            fixture_id: String::from(fixture_id),
+            intensity,
+            cct,
+            on,
+        });
+    }
+    Ok(fixture_states)
 }
 
 pub fn parse_lighting_scene_update_request(
