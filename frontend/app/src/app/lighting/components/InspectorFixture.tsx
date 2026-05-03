@@ -207,7 +207,7 @@ export function InspectorFixture({
 
   return (
     <>
-      <InspectorSection title="Fixture">
+      <InspectorSection title="Fixture" className={styles.compactSection}>
         <div className={styles.fixtureHeader}>
           <div className={styles.fixtureNameStack}>
             <div className={styles.fixtureNameRow}>
@@ -241,15 +241,23 @@ export function InspectorFixture({
               {fixture.on ? "Live" : "Standby"} · {MOUNTING_LABEL[deriveMounting(fixture.type)]}
             </div>
           </div>
-          <Button
-            onClick={() => onTogglePower(fixture.id, !fixture.on)}
-            loading={powerBusy}
-            variant={fixture.on ? "secondary" : "primary"}
-            size="compact"
-            leadingVisual={<Power aria-hidden="true" size={13} strokeWidth={1.75} />}
-          >
-            {fixture.on ? "Turn off" : "Turn on"}
-          </Button>
+          <div className={styles.fixtureHeaderActions}>
+            <IdentifyBurstButton
+              fixtureId={fixture.id}
+              fixtureName={fixture.name}
+              onTrigger={onIdentifyBurst}
+              bridgeReachable={bridgeReachable}
+            />
+            <Button
+              onClick={() => onTogglePower(fixture.id, !fixture.on)}
+              loading={powerBusy}
+              variant={fixture.on ? "secondary" : "primary"}
+              size="compact"
+              leadingVisual={<Power aria-hidden="true" size={13} strokeWidth={1.75} />}
+            >
+              {fixture.on ? "Turn off" : "Turn on"}
+            </Button>
+          </div>
         </div>
         <dl className={styles.factGrid}>
           <div className={styles.fact}>
@@ -297,58 +305,55 @@ export function InspectorFixture({
         )}
       </InspectorSection>
 
-      <InspectorSection title="Intensity">
-        <ScrubSlider
-          ariaLabel="Fixture intensity"
-          min={0}
-          max={100}
-          step={1}
-          value={intensityDraft}
-          onChange={handleIntensityChange}
-          onCommit={commitIntensity}
-          resetValue={100}
-          // Only gate on power state — IPC commits are sub-millisecond and
-          // idempotent, so a busy-flag disable would just flicker the slider
-          // chrome on every release without preventing anything real.
-          disabled={!fixture.on}
-          formatValue={(v) => `${Math.round(v)}%`}
-        />
-      </InspectorSection>
-
-      <InspectorSection title="Colour temperature">
-        <ScrubSlider
-          ariaLabel="Fixture CCT"
-          min={cctRange.min}
-          max={cctRange.max}
-          step={100}
-          value={cctDraft}
-          onChange={handleCctChange}
-          onCommit={commitCct}
-          resetValue={Math.round((cctRange.min + cctRange.max) / 2 / 100) * 100}
-          formatValue={(v) => `${Math.round(v)}K`}
-        />
-        <div id={cctScaleId} className={styles.cctScale}>
-          <span>{cctRange.min}K · warm</span>
-          <span>{cctRange.max}K · cool</span>
-        </div>
-      </InspectorSection>
-
-      <InspectorSection title="Identify">
-        <div className={styles.actionRow}>
-          <IdentifyBurstButton
-            fixtureId={fixture.id}
-            fixtureName={fixture.name}
-            onTrigger={onIdentifyBurst}
-            bridgeReachable={bridgeReachable}
-          />
-          <span className={styles.helpText}>
-            Sends a 1.2 s burst of full intensity through the bridge so you can spot the fixture on stage.
-          </span>
+      <InspectorSection title="Levels" className={styles.compactSection}>
+        <div className={styles.levelStack}>
+          <div className={styles.levelBlock}>
+            <div className={styles.levelHeader}>
+              <span className={styles.levelLabel}>Intensity</span>
+              <span className={styles.levelValue}>{Math.round(intensityDraft)}%</span>
+            </div>
+            <ScrubSlider
+              ariaLabel="Fixture intensity"
+              min={0}
+              max={100}
+              step={1}
+              value={intensityDraft}
+              onChange={handleIntensityChange}
+              onCommit={commitIntensity}
+              resetValue={100}
+              // Only gate on power state — IPC commits are sub-millisecond and
+              // idempotent, so a busy-flag disable would just flicker the slider
+              // chrome on every release without preventing anything real.
+              disabled={!fixture.on}
+              formatValue={(v) => `${Math.round(v)}%`}
+            />
+          </div>
+          <div className={styles.levelBlock}>
+            <div className={styles.levelHeader}>
+              <span className={styles.levelLabel}>Colour temperature</span>
+              <span className={styles.levelValue}>{Math.round(cctDraft)}K</span>
+            </div>
+            <ScrubSlider
+              ariaLabel="Fixture CCT"
+              min={cctRange.min}
+              max={cctRange.max}
+              step={100}
+              value={cctDraft}
+              onChange={handleCctChange}
+              onCommit={commitCct}
+              resetValue={Math.round((cctRange.min + cctRange.max) / 2 / 100) * 100}
+              formatValue={(v) => `${Math.round(v)}K`}
+            />
+            <div id={cctScaleId} className={styles.cctScale}>
+              <span>{cctRange.min}K · warm</span>
+              <span>{cctRange.max}K · cool</span>
+            </div>
+          </div>
         </div>
       </InspectorSection>
 
       {onSpatialCommit ? (
-        <InspectorSection title="Position">
+        <InspectorSection title="Position" className={styles.compactSection}>
           <div className={styles.positionGrid}>
             <label className={styles.positionField}>
               <ScrubLabel
@@ -463,18 +468,11 @@ export function InspectorFixture({
               />
             </label>
           </div>
-          <span className={styles.helpText}>
-            Drag the marker on the plot, hold ⌥ to free-position, or use the arrow keys (Shift = 0.5 m steps) when the
-            fixture is selected. Stage X clamps to 0–{STUDIO_LAYOUT.roomWidthMeters} m, Y to 0–
-            {STUDIO_LAYOUT.roomDepthMeters} m, rig height to 0–{RIG_HEIGHT_MAX_METERS} m, beam angle to{" "}
-            {BEAM_ANGLE_MIN_DEGREES}°–{BEAM_ANGLE_MAX_DEGREES}° (default for {fixture.type}:{" "}
-            {defaultLightingBeamAngle(fixture.type)}°).
-          </span>
         </InspectorSection>
       ) : null}
 
       {onDeleteFixture ? (
-        <InspectorSection title="Danger zone">
+        <InspectorSection title="Danger zone" className={styles.compactSection}>
           <div className={styles.actionRow}>
             <Button
               onClick={() => setConfirmingDelete(true)}
@@ -485,9 +483,6 @@ export function InspectorFixture({
             >
               Delete fixture
             </Button>
-            <span className={styles.helpText}>
-              Removes the fixture from the rig. Saved scenes that referenced it lose this fixture's saved state.
-            </span>
           </div>
         </InspectorSection>
       ) : null}

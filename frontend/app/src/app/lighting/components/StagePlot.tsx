@@ -71,6 +71,7 @@ export interface StagePlotProps {
 
 const FALLBACK_X_STEP = 1.5;
 const FALLBACK_Y = 4.0;
+const PLOT_TOP_GUTTER_CM = 56;
 
 function meterPositionFor(fixture: LightingFixtureSnapshot, index: number) {
   const x = fixture.spatialX ?? Math.min(11, FALLBACK_X_STEP * (index + 1));
@@ -186,6 +187,7 @@ export function StagePlot({
       <div className={styles.srOnly}>
         Stage plot. Use Tab to focus a fixture, then arrow keys to nudge its position. Hold Shift for 0.5 m steps.
       </div>
+      <div className={styles.plotToneOverlay} aria-hidden="true" />
       {!patchMode && activeSceneName ? (
         <div className={styles.plotPillSlot}>
           <PlotPill
@@ -222,14 +224,10 @@ export function StagePlot({
       <svg
         ref={viewport.svgRef}
         className={`${styles.plotSvg} ${viewport.isPanning ? styles.plotSvgPanning : ""} ${marquee.rect ? styles.plotSvgMarqueeing : ""}`}
-        viewBox={`0 0 ${widthCm} ${depthCm}`}
-        // Wave 31 — fill the container instead of letterboxing. The studio
-        // is 12×8 m (ratio 1.5); the body on the operator's 2560×1440
-        // monitor lands at ~1.52, so the non-uniform scaling is < 2 % off
-        // — invisible in practice. Trade-off accepted to use the screen
-        // real estate fully (operator's permanent second monitor doesn't
-        // need a precisely scaled architectural drawing; it needs a
-        // glanceable fixture-position read).
+        viewBox={`0 -${PLOT_TOP_GUTTER_CM} ${widthCm} ${depthCm + PLOT_TOP_GUTTER_CM}`}
+        // Fill the container instead of letterboxing. The top gutter keeps
+        // fixture labels and marker rings out from under the fixed chrome
+        // while preserving a full-room glanceable plot.
         preserveAspectRatio="none"
         xmlns="http://www.w3.org/2000/svg"
         onPointerDown={(event) => {

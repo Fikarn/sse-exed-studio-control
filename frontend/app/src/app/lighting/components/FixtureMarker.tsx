@@ -184,6 +184,7 @@ export function FixtureMarker({
   // dashed shadow to anchor the move.
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
   const ghostRef = useRef<{ x: number; y: number } | null>(null);
+  const [pointerHovered, setPointerHovered] = useState(false);
   // Show a green focus ring around the marker when keyboard focus lands on
   // it (and only on keyboard focus — pointer interactions don't trigger).
   // The :focus-visible CSS pseudo-class is unreliable on SVG <g> in Chromium
@@ -295,6 +296,8 @@ export function FixtureMarker({
 
   const intensityWord = on ? `${Math.round(intensity)} percent` : "off";
   const ariaLabel = `Fixture ${name}, ${intensityWord}, ${Math.round(cct)} kelvin, ${MOUNTING_SHORT_LABEL[mounting]} mount`;
+  const labelVisible =
+    selected || pointerHovered || keyboardFocused || identifying || highlightOverlay || chipHovered || ghost !== null;
 
   const handleKeyDown = (event: ReactKeyboardEvent<SVGGElement>) => {
     if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
@@ -346,6 +349,8 @@ export function FixtureMarker({
         onPointerCancel={(event) => finishDrag(event, "cancel")}
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
+        onPointerEnter={() => setPointerHovered(true)}
+        onPointerLeave={() => setPointerHovered(false)}
         onFocus={(event) => {
           // Only treat focus as keyboard-driven when :focus-visible matches —
           // pointer-driven focus shouldn't surface the keyboard ring. Browsers
@@ -477,29 +482,33 @@ export function FixtureMarker({
             <animate attributeName="opacity" values="1;0.3;1" dur="0.4s" repeatCount="3" />
           </circle>
         ) : null}
-        <text
-          x={renderX}
-          y={renderY + nameOffsetY}
-          textAnchor="middle"
-          fontSize={10}
-          fontWeight={600}
-          letterSpacing={0.8}
-          pointerEvents="none"
-          style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)", textTransform: "uppercase" }}
-        >
-          {displayName}
-        </text>
-        <text
-          x={renderX}
-          y={renderY + metaOffsetY}
-          textAnchor="middle"
-          fontSize={9}
-          letterSpacing={0.6}
-          pointerEvents="none"
-          style={{ fill: LABEL_META_FILL, fontFamily: "var(--font-family-mono)" }}
-        >
-          {metaLabel}
-        </text>
+        {labelVisible ? (
+          <>
+            <text
+              x={renderX}
+              y={renderY + nameOffsetY}
+              textAnchor="middle"
+              fontSize={10}
+              fontWeight={600}
+              letterSpacing={0}
+              pointerEvents="none"
+              style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)", textTransform: "uppercase" }}
+            >
+              {displayName}
+            </text>
+            <text
+              x={renderX}
+              y={renderY + metaOffsetY}
+              textAnchor="middle"
+              fontSize={9}
+              letterSpacing={0}
+              pointerEvents="none"
+              style={{ fill: LABEL_META_FILL, fontFamily: "var(--font-family-mono)" }}
+            >
+              {metaLabel}
+            </text>
+          </>
+        ) : null}
         {/* F4 — live position chip during drag. Renders the in-flight meters
             offset down-right from the ghost so it follows the cursor without
             occluding the marker. Sits inside the rotated viewport <g> so

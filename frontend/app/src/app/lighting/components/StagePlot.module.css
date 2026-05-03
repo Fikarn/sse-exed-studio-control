@@ -8,7 +8,6 @@
   display: flex;
   align-items: stretch;
   justify-content: stretch;
-  transition: filter var(--motion-duration-normal) ease;
 }
 
 .srOnly {
@@ -29,10 +28,12 @@
   inset: 0;
   pointer-events: none;
   background: radial-gradient(ellipse at center, transparent 65%, rgba(0, 0, 0, 0.25) 100%);
+  z-index: 1;
 }
 
 .plotShellPatch {
-  filter: brightness(0.78) saturate(0.85);
+  /* Visual dimming is handled by .plotToneOverlay so patch entry avoids
+     animating a full-surface CSS filter over the SVG scene. */
 }
 
 .plotShellPreview {
@@ -49,17 +50,29 @@
   background: var(--color-brand-blue);
   box-shadow: var(--shadow-glow-blue);
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
 }
 
-.plotShellPatch::after {
-  background: linear-gradient(180deg, rgba(7, 12, 22, 0.35), rgba(7, 12, 22, 0.5));
+.plotToneOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(180deg, rgba(7, 12, 22, 0.28), rgba(7, 12, 22, 0.46));
+  transition: opacity var(--motion-duration-normal) var(--motion-easing-standard);
+}
+
+.plotShellPatch .plotToneOverlay {
+  opacity: 1;
 }
 
 .plotSvg {
   width: 100%;
   height: 100%;
   display: block;
+  position: relative;
+  z-index: 0;
   /* Default cursor: crosshair signals "drag to marquee-select". Pan moved to
      middle-mouse-button in Wave 26 so the grab affordance no longer applies. */
   cursor: crosshair;
@@ -96,9 +109,10 @@
 .plotPillSlot {
   position: absolute;
   top: 16px;
-  left: 16px;
+  left: 50%;
   z-index: 2;
   pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .plotPillLabel {

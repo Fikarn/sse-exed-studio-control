@@ -12,7 +12,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shell {
+  .shell,
+  .inner {
     transition: none;
   }
 }
@@ -22,7 +23,17 @@
   display: flex;
   gap: 12px;
   height: 32px;
+  opacity: 0;
   padding: 0 12px;
+  transform: translateY(5px);
+  transition:
+    opacity var(--motion-duration-normal) var(--motion-easing-standard),
+    transform var(--motion-duration-normal) var(--motion-easing-standard);
+}
+
+.shellOpen .inner {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .summary {
