@@ -977,6 +977,73 @@ fn shell_reset_window_layout(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+fn main() {
+    let args = env::args().collect::<Vec<_>>();
+    if args.iter().any(|value| value == "--smoke-test") {
+        std::process::exit(run_smoke_test(&args));
+    }
+
+    let builder = tauri::Builder::default()
+        .manage(EngineState {
+            bridge: EngineBridge::default(),
+        })
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let app_handle = app.handle().clone();
+                restore_or_route_initial_window(&app_handle, &window);
+                let window_for_events = window.clone();
+                window.on_window_event(move |event| {
+                    if !matches!(
+                        event,
+                        tauri::WindowEvent::Resized(_)
+                            | tauri::WindowEvent::Moved(_)
+                            | tauri::WindowEvent::ScaleFactorChanged { .. }
+                            | tauri::WindowEvent::Focused(false)
+                            | tauri::WindowEvent::CloseRequested { .. }
+                    ) {
+                        return;
+                    }
+                    persist_current_window_preferences(&app_handle, &window_for_events, None);
+                });
+            }
+            Ok(())
+        });
+
+    #[cfg(feature = "test-bridge")]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        engine_start,
+        engine_request,
+        engine_stop,
+        engine_summary,
+        shell_open_path,
+        shell_export_diagnostics,
+        shell_enter_studio_fullscreen,
+        shell_use_windowed_layout,
+        shell_reset_window_layout,
+        shell_test_bridge_config,
+        shell_test_bridge_write_status,
+        shell_test_bridge_read_command
+    ]);
+
+    #[cfg(not(feature = "test-bridge"))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        engine_start,
+        engine_request,
+        engine_stop,
+        engine_summary,
+        shell_open_path,
+        shell_export_diagnostics,
+        shell_enter_studio_fullscreen,
+        shell_use_windowed_layout,
+        shell_reset_window_layout
+    ]);
+
+    builder
+        .run(tauri::generate_context!())
+        .expect("failed to run tauri shell");
+}
+
 #[cfg(test)]
 mod shell_window_preferences_tests {
     use super::*;
@@ -1133,71 +1200,4 @@ mod shell_window_preferences_tests {
         );
         assert!(!saved_monitor_is_unavailable(&available, &preferences));
     }
-}
-
-fn main() {
-    let args = env::args().collect::<Vec<_>>();
-    if args.iter().any(|value| value == "--smoke-test") {
-        std::process::exit(run_smoke_test(&args));
-    }
-
-    let builder = tauri::Builder::default()
-        .manage(EngineState {
-            bridge: EngineBridge::default(),
-        })
-        .setup(|app| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let app_handle = app.handle().clone();
-                restore_or_route_initial_window(&app_handle, &window);
-                let window_for_events = window.clone();
-                window.on_window_event(move |event| {
-                    if !matches!(
-                        event,
-                        tauri::WindowEvent::Resized(_)
-                            | tauri::WindowEvent::Moved(_)
-                            | tauri::WindowEvent::ScaleFactorChanged { .. }
-                            | tauri::WindowEvent::Focused(false)
-                            | tauri::WindowEvent::CloseRequested { .. }
-                    ) {
-                        return;
-                    }
-                    persist_current_window_preferences(&app_handle, &window_for_events, None);
-                });
-            }
-            Ok(())
-        });
-
-    #[cfg(feature = "test-bridge")]
-    let builder = builder.invoke_handler(tauri::generate_handler![
-        engine_start,
-        engine_request,
-        engine_stop,
-        engine_summary,
-        shell_open_path,
-        shell_export_diagnostics,
-        shell_enter_studio_fullscreen,
-        shell_use_windowed_layout,
-        shell_reset_window_layout,
-        shell_test_bridge_config,
-        shell_test_bridge_write_status,
-        shell_test_bridge_read_command
-    ]);
-
-    #[cfg(not(feature = "test-bridge"))]
-    let builder = builder.invoke_handler(tauri::generate_handler![
-        engine_start,
-        engine_request,
-        engine_stop,
-        engine_summary,
-        shell_open_path,
-        shell_export_diagnostics,
-        shell_enter_studio_fullscreen,
-        shell_use_windowed_layout,
-        shell_reset_window_layout
-    ]);
-
-    builder
-        .run(tauri::generate_context!())
-        .expect("failed to run tauri shell");
 }

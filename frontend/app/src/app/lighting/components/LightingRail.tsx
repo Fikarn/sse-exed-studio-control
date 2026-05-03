@@ -25,6 +25,7 @@ export interface LightingRailProps {
 
   scenes: readonly LightingSceneSnapshot[];
   activeSceneId: string | null;
+  selectedSceneId?: string | null;
   modifiedSceneId: string | null;
   previewSceneId?: string | null;
   previewMode?: boolean;
@@ -68,6 +69,7 @@ export function LightingRail({
   onToggleAllPower,
   scenes,
   activeSceneId,
+  selectedSceneId = null,
   modifiedSceneId,
   previewSceneId = null,
   previewMode = false,
@@ -139,6 +141,7 @@ export function LightingRail({
       <SceneRail
         scenes={scenes}
         activeSceneId={activeSceneId}
+        selectedSceneId={selectedSceneId}
         modifiedSceneId={modifiedSceneId}
         previewSceneId={previewSceneId}
         previewMode={previewMode}

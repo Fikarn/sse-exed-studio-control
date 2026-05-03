@@ -23,6 +23,7 @@ const EMPTY_RENAME_IDS: ReadonlySet<string> = new Set();
 export interface SceneRailProps {
   scenes: readonly LightingSceneSnapshot[];
   activeSceneId: string | null;
+  selectedSceneId?: string | null;
   modifiedSceneId: string | null;
   previewSceneId?: string | null;
   previewMode?: boolean;
@@ -72,6 +73,7 @@ function statsForScene(scene: LightingSceneSnapshot): SceneStats {
 interface CellPayload {
   filteredScenes: readonly LightingSceneSnapshot[];
   activeSceneId: string | null;
+  selectedSceneId: string | null;
   modifiedSceneId: string | null;
   previewSceneId: string | null;
   previewMode: boolean;
@@ -97,6 +99,7 @@ function VirtualizedCell({
   style,
   filteredScenes,
   activeSceneId,
+  selectedSceneId,
   modifiedSceneId,
   previewSceneId,
   previewMode,
@@ -138,6 +141,7 @@ function VirtualizedCell({
           onCount={stats.onCount}
           avgCct={stats.avgCct}
           isActive={scene.id === activeSceneId}
+          isSelected={scene.id === selectedSceneId}
           isModified={scene.id === modifiedSceneId}
           isPreviewTarget={previewMode && scene.id === previewSceneId}
           bridgeReachable={bridgeReachable}
@@ -183,6 +187,7 @@ function VirtualizedCell({
 export function SceneRail({
   scenes,
   activeSceneId,
+  selectedSceneId = null,
   modifiedSceneId,
   previewSceneId = null,
   previewMode = false,
@@ -287,6 +292,7 @@ export function SceneRail({
         const cellProps: CellPayload = {
           filteredScenes,
           activeSceneId,
+          selectedSceneId,
           modifiedSceneId,
           previewSceneId,
           previewMode,
@@ -341,6 +347,7 @@ export function SceneRail({
               onCount={stats.onCount}
               avgCct={stats.avgCct}
               isActive={scene.id === activeSceneId}
+              isSelected={scene.id === selectedSceneId}
               isModified={scene.id === modifiedSceneId}
               isPreviewTarget={previewMode && scene.id === previewSceneId}
               bridgeReachable={bridgeReachable}

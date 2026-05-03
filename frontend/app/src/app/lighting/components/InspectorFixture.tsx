@@ -29,6 +29,8 @@ import styles from "./LightingInspector.module.css";
 const RIG_HEIGHT_MAX_METERS = 8;
 const BEAM_ANGLE_MIN_DEGREES = 1;
 const BEAM_ANGLE_MAX_DEGREES = 180;
+const ROTATION_MAX_DEGREES = 359;
+type FixtureValuePreviewPhase = "editing" | "committing";
 
 export interface InspectorFixtureProps {
   fixture: LightingFixtureSnapshot;
@@ -38,7 +40,9 @@ export interface InspectorFixtureProps {
   bridgeReachable?: boolean;
   onTogglePower: (fixtureId: string, on: boolean) => void;
   onIntensityCommit: (fixtureId: string, intensity: number) => void;
+  onIntensityPreview?: (fixtureId: string, intensity: number, phase: FixtureValuePreviewPhase) => void;
   onCctCommit: (fixtureId: string, cct: number) => void;
+  onCctPreview?: (fixtureId: string, cct: number, phase: FixtureValuePreviewPhase) => void;
   onControlValuesCommit?: (fixtureId: string, controlValues: Record<string, number>) => void;
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   onDeleteFixture?: (fixtureId: string) => void;
@@ -49,6 +53,7 @@ export interface InspectorFixtureProps {
       spatialY?: number | null;
       rigZ?: number | null;
       beamAngleDegrees?: number | null;
+      spatialRotation?: number;
     }
   ) => void;
   /** Inline-rename commit handler. Receives the trimmed new name. */
@@ -104,6 +109,10 @@ function formatScrubDegrees(value: number): string {
   return String(Math.round(value));
 }
 
+function normalizeDegrees(value: number): number {
+  return ((Math.round(value) % 360) + 360) % 360;
+}
+
 export function InspectorFixture({
   fixture,
   catalog = null,
@@ -112,7 +121,9 @@ export function InspectorFixture({
   bridgeReachable = true,
   onTogglePower,
   onIntensityCommit,
+  onIntensityPreview,
   onCctCommit,
+  onCctPreview,
   onControlValuesCommit,
   onIdentifyBurst,
   onDeleteFixture,
@@ -141,6 +152,9 @@ export function InspectorFixture({
   const [spatialXDraft, setSpatialXDraft] = useState(() => formatMaybeMeters(fixture.spatialX));
   const [spatialYDraft, setSpatialYDraft] = useState(() => formatMaybeMeters(fixture.spatialY));
   const [rigZDraft, setRigZDraft] = useState(() => formatMaybeMeters(fixture.rigZ));
+  const [rotationDraft, setRotationDraft] = useState(() =>
+    formatScrubDegrees(normalizeDegrees(fixture.spatialRotation))
+  );
   const [beamAngleDraft, setBeamAngleDraft] = useState(() => formatMaybeNumber(fixture.beamAngleDegrees));
 
   useEffect(() => {
@@ -148,8 +162,9 @@ export function InspectorFixture({
     setSpatialXDraft(formatMaybeMeters(fixture.spatialX));
     setSpatialYDraft(formatMaybeMeters(fixture.spatialY));
     setRigZDraft(formatMaybeMeters(fixture.rigZ));
+    setRotationDraft(formatScrubDegrees(normalizeDegrees(fixture.spatialRotation)));
     setBeamAngleDraft(formatMaybeNumber(fixture.beamAngleDegrees));
-  }, [fixture.id, fixture.spatialX, fixture.spatialY, fixture.rigZ, fixture.beamAngleDegrees]);
+  }, [fixture.id, fixture.spatialX, fixture.spatialY, fixture.rigZ, fixture.spatialRotation, fixture.beamAngleDegrees]);
 
   useEffect(() => {
     setIntensityDraft(fixture.intensity);
@@ -172,28 +187,37 @@ export function InspectorFixture({
   }, [pendingInlineRenameNonce]);
 
   const handleIntensityChange = (next: number) => {
-    setIntensityDraft(Math.max(0, Math.min(100, Math.round(next))));
+    const target = Math.max(0, Math.min(100, Math.round(next)));
+    setIntensityDraft(target);
+    onIntensityPreview?.(fixture.id, target, "editing");
   };
 
   const commitIntensity = (next?: number) => {
-    const target = next ?? intensityDraft;
+    const target = Math.max(0, Math.min(100, Math.round(next ?? intensityDraft)));
+    onIntensityPreview?.(fixture.id, target, "committing");
     if (target !== fixture.intensity) {
       onIntensityCommit(fixture.id, target);
     }
   };
 
   const handleCctChange = (next: number) => {
-    setCctDraft(Math.max(cctRange.min, Math.min(cctRange.max, Math.round(next))));
+    const target = Math.max(cctRange.min, Math.min(cctRange.max, Math.round(next)));
+    setCctDraft(target);
+    onCctPreview?.(fixture.id, target, "editing");
   };
 
   const commitCct = (next?: number) => {
-    const target = next ?? cctDraft;
+    const target = Math.max(cctRange.min, Math.min(cctRange.max, Math.round(next ?? cctDraft)));
+    onCctPreview?.(fixture.id, target, "committing");
     if (target !== fixture.cct) {
       onCctCommit(fixture.id, target);
     }
   };
 
-  const clampSpatial = (field: "spatialX" | "spatialY" | "rigZ" | "beamAngleDegrees", raw: number): number => {
+  const clampSpatial = (
+    field: "spatialX" | "spatialY" | "rigZ" | "spatialRotation" | "beamAngleDegrees",
+    raw: number
+  ): number => {
     switch (field) {
       case "spatialX":
         return Math.max(0, Math.min(STUDIO_LAYOUT.roomWidthMeters, raw));
@@ -201,15 +225,24 @@ export function InspectorFixture({
         return Math.max(0, Math.min(STUDIO_LAYOUT.roomDepthMeters, raw));
       case "rigZ":
         return Math.max(0, Math.min(RIG_HEIGHT_MAX_METERS, raw));
+      case "spatialRotation":
+        return normalizeDegrees(raw);
       case "beamAngleDegrees":
         return Math.max(BEAM_ANGLE_MIN_DEGREES, Math.min(BEAM_ANGLE_MAX_DEGREES, raw));
     }
   };
 
-  const commitSpatial = (field: "spatialX" | "spatialY" | "rigZ" | "beamAngleDegrees", rawDraft: string) => {
+  const commitSpatial = (
+    field: "spatialX" | "spatialY" | "rigZ" | "spatialRotation" | "beamAngleDegrees",
+    rawDraft: string
+  ) => {
     if (!onSpatialCommit) return;
     const trimmed = rawDraft.trim();
     if (trimmed === "") {
+      if (field === "spatialRotation") {
+        onSpatialCommit(fixture.id, { spatialRotation: 0 });
+        return;
+      }
       // Clearing a field maps to null on nullable engine fields.
       onSpatialCommit(fixture.id, { [field]: null });
       return;
@@ -490,6 +523,34 @@ export function InspectorFixture({
                 value={rigZDraft}
                 onChange={(event) => setRigZDraft(event.currentTarget.value)}
                 onBlur={() => commitSpatial("rigZ", rigZDraft)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            </label>
+            <label className={styles.positionField}>
+              <ScrubLabel
+                value={parseDraft(rotationDraft, normalizeDegrees(fixture.spatialRotation))}
+                onChange={(next) => setRotationDraft(formatScrubDegrees(normalizeDegrees(next)))}
+                onCommit={(next) => commitSpatial("spatialRotation", formatScrubDegrees(next))}
+                min={0}
+                max={ROTATION_MAX_DEGREES}
+                pixelsPerStep={0.5}
+                step={1}
+                className={styles.positionLabel}
+              >
+                Rotation (°)
+              </ScrubLabel>
+              <input
+                aria-label="Fixture rotation in degrees"
+                className={styles.positionInput}
+                inputMode="decimal"
+                type="text"
+                value={rotationDraft}
+                onChange={(event) => setRotationDraft(event.currentTarget.value)}
+                onBlur={() => commitSpatial("spatialRotation", rotationDraft)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.currentTarget.blur();

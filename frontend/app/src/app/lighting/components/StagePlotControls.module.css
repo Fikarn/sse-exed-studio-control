@@ -23,6 +23,31 @@
   border-right: 1px solid var(--color-bg-stroke);
 }
 
+.renderModeGroup {
+  display: inline-flex;
+  align-items: center;
+  padding-right: 2px;
+  margin-right: 2px;
+  border-right: 1px solid var(--color-bg-stroke);
+}
+
+.renderModeGroup :global([role="radiogroup"]) {
+  min-height: var(--operator-stage-control-height, 26px);
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--radius-tight-sm);
+  padding: 0;
+}
+
+.renderModeGroup :global(button) {
+  min-width: var(--operator-stage-control-render-mode-width, 68px);
+  min-height: var(--operator-stage-control-height, 26px);
+  padding: 0 calc(7px * var(--operator-ui-scale-factor, 1));
+  font-family: var(--font-family-mono);
+  font-size: var(--operator-font-size-xs, 10px);
+  font-weight: 700;
+}
+
 .modeButton {
   appearance: none;
   min-width: var(--operator-stage-control-mode-width, 62px);
@@ -178,5 +203,11 @@
   .modeButton {
     min-width: var(--operator-stage-control-mode-width, 44px);
     padding: 0 calc(6px * var(--operator-ui-scale-factor, 1));
+  }
+
+  .renderModeGroup :global(button) {
+    min-width: var(--operator-stage-control-render-mode-width, 56px);
+    padding: 0 calc(5px * var(--operator-ui-scale-factor, 1));
+    font-size: var(--operator-font-size-xxs, 9px);
   }
 }

@@ -1127,7 +1127,7 @@ pub(super) fn parse_optional_spatial_coordinate(
         return Err(format!("{field} must be a finite number or null"));
     }
 
-    Ok(Some(clamp_f64(coordinate, 0.0, 1.0)))
+    Ok(Some(clamp_f64(coordinate, 0.0, 20.0)))
 }
 
 pub(super) fn parse_spatial_rotation_value(value: &Value, field: &str) -> Result<f64, String> {

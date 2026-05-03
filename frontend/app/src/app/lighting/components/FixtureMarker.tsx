@@ -1,17 +1,20 @@
 import {
+  useEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
-  type ReactElement,
 } from "react";
 import { Pencil, Sparkles, Trash2 } from "lucide-react";
 
 import { ContextMenu, type ContextMenuItem } from "@sse/design-system";
 
 import type { FixtureMounting } from "../fixtureMounting";
+import type { FixtureVisualModel, StagePlotRenderMode } from "../fixtureVisuals";
 import { lightingFixtureColor } from "../lightingHelpers";
+
+import { FixtureSymbol } from "./FixtureSymbol";
 
 const SNAP_METERS = 0.5;
 const CLICK_PX_THRESHOLD = 4;
@@ -25,7 +28,8 @@ export interface FixtureMarkerProps {
   centerY: number;
   rotationDegrees: number;
   mounting: FixtureMounting;
-  pixelLayout?: { pixelCount: number; rows: number; columns: number; segments: number; order: string } | null;
+  renderMode: StagePlotRenderMode;
+  visual: FixtureVisualModel;
   intensity: number;
   cct: number;
   on: boolean;
@@ -52,6 +56,8 @@ export interface FixtureMarkerProps {
    * propagation so a click selects the fixture.
    */
   onPositionCommit?: (id: string, xMeters: number, yMeters: number) => void;
+  /** Optional commit callback when the selected marker's rotate handle is dragged. */
+  onRotationCommit?: (id: string, rotationDegrees: number) => void;
   /** Right-click "Rename" — selects the fixture for inspection and triggers
    *  the inspector's inline rename. Parent owns the signal plumbing. */
   onRequestRename?: (id: string) => void;
@@ -63,9 +69,14 @@ export interface FixtureMarkerProps {
    *  pointermove past the click threshold with the in-flight (xMeters, yMeters)
    *  in studio coordinates and whether Alt is held (free-positioning, snap off). */
   onDragMove?: (id: string, xMeters: number, yMeters: number, altKey: boolean) => void;
-  /** Fires when drag ends (commit or cancel) so the parent can clear its
-   *  drag-tracking state for this fixture. */
-  onDragEnd?: (id: string) => void;
+  /** Fires when drag ends (commit or cancel) so the parent can hold the
+   *  snapped drop position until the engine snapshot refresh catches up. */
+  onDragEnd?: (id: string, committedPosition: { xMeters: number; yMeters: number } | null) => void;
+  /** Live rotation callback for render-only layers such as beam footprints. */
+  onRotationMove?: (id: string, rotationDegrees: number) => void;
+  /** Fires when rotation ends so the parent can hold the snapped angle until
+   *  the engine snapshot refresh catches up. */
+  onRotationEnd?: (id: string, committedRotationDegrees: number | null) => void;
 }
 
 // I1 — intensity bar geometry. Anchored to the bottom edge of the marker
@@ -74,15 +85,7 @@ export interface FixtureMarkerProps {
 // the rotated <g> like the text labels).
 const BAR_WIDTH = 4;
 const BAR_HEIGHT = 24;
-const BAR_ANCHOR_Y: Record<FixtureMounting, number> = {
-  bar: 5,
-  "control-node": 11,
-  fresnel: 11,
-  mat: 11,
-  panel: 11,
-};
 
-const SHELL_FILL = "var(--color-fixture-shell-fill)";
 const SHELL_STROKE = "var(--color-fixture-shell-stroke)";
 const SELECTED_STROKE = "var(--color-brand-green)";
 const HIGHLIGHT_OVERLAY_STROKE = "var(--color-status-warning, #ff6b35)";
@@ -99,110 +102,20 @@ const MOUNTING_SHORT_LABEL: Record<FixtureMounting, string> = {
   panel: "panel",
 };
 
-function shapeForMounting(
-  mounting: FixtureMounting,
-  pixelLayout?: { pixelCount: number; rows: number; columns: number; segments: number; order: string } | null
-): ReactElement {
-  const segments = Math.max(0, Math.min(64, Math.round(pixelLayout?.segments ?? 0)));
-  switch (mounting) {
-    case "panel":
-      return (
-        <g>
-          <rect
-            x={-9}
-            y={-9}
-            width={18}
-            height={18}
-            rx={2}
-            style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
-          />
-          {segments > 1
-            ? Array.from({ length: Math.min(segments, 8) - 1 }, (_, index) => (
-                <line
-                  key={`panel-segment-${index}`}
-                  x1={-9 + ((index + 1) * 18) / Math.min(segments, 8)}
-                  x2={-9 + ((index + 1) * 18) / Math.min(segments, 8)}
-                  y1={-8}
-                  y2={8}
-                  style={{ stroke: SHELL_STROKE, strokeWidth: 0.45, opacity: 0.65 }}
-                />
-              ))
-            : null}
-        </g>
-      );
-    case "mat":
-      return (
-        <g>
-          <rect
-            x={-13}
-            y={-9}
-            width={26}
-            height={18}
-            rx={3}
-            style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
-          />
-          {segments > 1
-            ? Array.from({ length: Math.min(segments, 8) - 1 }, (_, index) => (
-                <line
-                  key={`mat-segment-${index}`}
-                  x1={-13 + ((index + 1) * 26) / Math.min(segments, 8)}
-                  x2={-13 + ((index + 1) * 26) / Math.min(segments, 8)}
-                  y1={-8}
-                  y2={8}
-                  style={{ stroke: SHELL_STROKE, strokeWidth: 0.45, opacity: 0.7 }}
-                />
-              ))
-            : null}
-        </g>
-      );
-    case "bar":
-      return (
-        <g>
-          <rect
-            x={-22}
-            y={-3}
-            width={44}
-            height={6}
-            rx={1}
-            style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
-          />
-          {segments > 1
-            ? Array.from({ length: Math.min(segments, 16) - 1 }, (_, index) => (
-                <line
-                  key={`bar-segment-${index}`}
-                  x1={-22 + ((index + 1) * 44) / Math.min(segments, 16)}
-                  x2={-22 + ((index + 1) * 44) / Math.min(segments, 16)}
-                  y1={-2.6}
-                  y2={2.6}
-                  style={{ stroke: SHELL_STROKE, strokeWidth: 0.4, opacity: 0.75 }}
-                />
-              ))
-            : null}
-        </g>
-      );
-    case "control-node":
-      return (
-        <rect
-          x={-8}
-          y={-8}
-          width={16}
-          height={16}
-          rx={2}
-          style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
-        />
-      );
-    case "fresnel":
-    default:
-      return <circle r={9} style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }} />;
-  }
-}
-
-function ringRadius(mounting: FixtureMounting, base: number, wide: number) {
-  return mounting === "bar" ? wide : base;
+function ringRadius(visual: FixtureVisualModel, padding: number) {
+  return Math.max(14, Math.min(40, Math.max(visual.body.width, visual.body.height) / 2 + padding));
 }
 
 function snapMeter(value: number): number {
   return Math.round(value / SNAP_METERS) * SNAP_METERS;
+}
+
+function normalizeDegrees(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+function roundedDegrees(value: number): number {
+  return Math.round(normalizeDegrees(value)) % 360;
 }
 
 interface DragState {
@@ -214,6 +127,14 @@ interface DragState {
   movedPx: number;
 }
 
+interface RotationDragState {
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
+  movedPx: number;
+  latestDegrees: number;
+}
+
 export function FixtureMarker({
   id,
   name,
@@ -221,7 +142,8 @@ export function FixtureMarker({
   centerY,
   rotationDegrees,
   mounting,
-  pixelLayout = null,
+  renderMode,
+  visual,
   intensity,
   cct,
   on,
@@ -232,23 +154,32 @@ export function FixtureMarker({
   chipHovered = false,
   onSelect,
   onPositionCommit,
+  onRotationCommit,
   onRequestRename,
   onIdentify,
   onRequestDelete,
   onDragMove,
   onDragEnd,
+  onRotationMove,
+  onRotationEnd,
 }: FixtureMarkerProps) {
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const color = lightingFixtureColor(cct, on);
   const dotOpacity = on ? Math.max(0.3, intensity / 100) : 0.18;
 
   const dragRef = useRef<DragState | null>(null);
+  const rotationDragRef = useRef<RotationDragState | null>(null);
+  const markerRef = useRef<SVGGElement | null>(null);
+  const rotateHandleRef = useRef<SVGCircleElement | null>(null);
+  const globalDragCleanupRef = useRef<(() => void) | null>(null);
   // Ghost position in cm — set during an active drag once the threshold is
   // crossed, cleared on pointerup. Rendered at the new position so the
   // visual follows the cursor; the original (centerX, centerY) gets a
   // dashed shadow to anchor the move.
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
   const ghostRef = useRef<{ x: number; y: number } | null>(null);
+  const [rotationGhost, setRotationGhost] = useState<number | null>(null);
+  const rotationGhostRef = useRef<number | null>(null);
   const [pointerHovered, setPointerHovered] = useState(false);
   // Show a green focus ring around the marker when keyboard focus lands on
   // it (and only on keyboard focus — pointer interactions don't trigger).
@@ -265,48 +196,53 @@ export function FixtureMarker({
   const intensityLabel = on ? `${Math.round(intensity)}%` : "OFF";
   const metaLabel = `${intensityLabel} · ${Math.round(cct)} K · ${MOUNTING_SHORT_LABEL[mounting]}`;
 
-  // Bar markers are wide; lift labels slightly to clear the bar.
-  const nameOffsetY = mounting === "bar" ? -16 : -32;
-  const metaOffsetY = mounting === "bar" ? -28 : -46;
+  const nameOffsetY = -Math.max(16, visual.body.height / 2 + 14);
+  const metaOffsetY = nameOffsetY - 14;
 
   const draggable = Boolean(onPositionCommit);
   const renderX = ghost?.x ?? centerX;
   const renderY = ghost?.y ?? centerY;
+  const rotationRenderDegrees = rotationGhost ?? rotationDegrees;
+  const canRotate = Boolean(onRotationCommit);
   const cursorStyle = draggable ? (ghost ? "grabbing" : "grab") : "pointer";
   const intensityBarX = renderX - BAR_WIDTH / 2;
-  const intensityBarY = renderY + BAR_ANCHOR_Y[mounting];
+  const intensityBarY = renderY + visual.body.height / 2 + 4;
   const intensityBarFillFrac = on ? Math.max(0, Math.min(1, intensity / 100)) : 0;
   const intensityBarFillHeight = BAR_HEIGHT * intensityBarFillFrac;
   const intensityBarFillY = intensityBarY + (BAR_HEIGHT - intensityBarFillHeight);
   const intensityBarFillColor = lightingFixtureColor(cct, true);
+  const hitWidth = Math.max(44, visual.body.width + 18);
+  const hitHeight = Math.max(44, visual.body.height + 18);
+  const rotateHandleRadius = ringRadius(visual, 15);
+  const rotateHandleVisible = canRotate && (selected || pointerHovered || keyboardFocused || rotationGhost !== null);
 
-  const handlePointerDown = (event: ReactPointerEvent<SVGGElement>) => {
-    event.stopPropagation();
-    if (!draggable || event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = {
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startCenterX: centerX,
-      startCenterY: centerY,
-      movedPx: 0,
-    };
+  const clearGlobalDragListeners = () => {
+    globalDragCleanupRef.current?.();
+    globalDragCleanupRef.current = null;
   };
 
-  const handlePointerMove = (event: ReactPointerEvent<SVGGElement>) => {
+  useEffect(
+    () => () => {
+      globalDragCleanupRef.current?.();
+      globalDragCleanupRef.current = null;
+    },
+    []
+  );
+
+  const updateDragFromPointer = (pointerId: number, clientX: number, clientY: number, altKey: boolean) => {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const dx = event.clientX - drag.startClientX;
-    const dy = event.clientY - drag.startClientY;
+    if (!drag || drag.pointerId !== pointerId || !draggable) return;
+    const dx = clientX - drag.startClientX;
+    const dy = clientY - drag.startClientY;
     drag.movedPx = Math.max(drag.movedPx, Math.hypot(dx, dy));
     if (drag.movedPx < CLICK_PX_THRESHOLD) return;
 
     // Use the marker's parent <g> CTM (which includes the viewport
     // pan+zoom transform) to convert client px → inner cm. This keeps the
     // drag math correct under any zoom level without exposing zoom/pan.
-    const parent = event.currentTarget.parentNode;
-    const owner = event.currentTarget.ownerSVGElement;
+    const target = markerRef.current;
+    const parent = target?.parentNode;
+    const owner = target?.ownerSVGElement;
     if (!(parent instanceof SVGGraphicsElement) || !owner) return;
     const ctm = parent.getScreenCTM();
     if (!ctm) return;
@@ -316,8 +252,8 @@ export function FixtureMarker({
     startPt.x = drag.startClientX;
     startPt.y = drag.startClientY;
     const nowPt = owner.createSVGPoint();
-    nowPt.x = event.clientX;
-    nowPt.y = event.clientY;
+    nowPt.x = clientX;
+    nowPt.y = clientY;
     const startInner = startPt.matrixTransform(inverse);
     const nowInner = nowPt.matrixTransform(inverse);
 
@@ -329,38 +265,215 @@ export function FixtureMarker({
     // F9 — surface live drag position to the parent so the smart-guide layer
     // can compute alignment lines vs. other fixtures. Pre-snap meters; the
     // commit handler still applies the 0.5 m snap on pointerup.
-    onDragMove?.(id, nextX / 100, nextY / 100, event.altKey);
+    onDragMove?.(id, nextX / 100, nextY / 100, altKey);
   };
 
-  const finishDrag = (event: ReactPointerEvent<SVGGElement>, kind: "up" | "cancel") => {
+  const finishDragFromPointer = (pointerId: number, altKey: boolean, shiftKey: boolean, kind: "up" | "cancel") => {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!drag || drag.pointerId !== pointerId) return;
+    const target = markerRef.current;
+    try {
+      if (target?.hasPointerCapture?.(pointerId)) {
+        target.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Pointer capture is best-effort on SVG nodes across webviews.
+    }
+    clearGlobalDragListeners();
     const wasDrag = drag.movedPx >= CLICK_PX_THRESHOLD;
     const ghostNow = ghostRef.current;
-    dragRef.current = null;
-    ghostRef.current = null;
-    setGhost(null);
-    onDragEnd?.(id);
+    let committedPosition: { xMeters: number; yMeters: number } | null = null;
 
-    if (kind === "cancel") return;
-
-    if (wasDrag && ghostNow && onPositionCommit) {
-      const altHeld = event.altKey;
+    if (kind !== "cancel" && wasDrag && ghostNow && onPositionCommit) {
       let xMeters = ghostNow.x / 100;
       let yMeters = ghostNow.y / 100;
-      if (!altHeld) {
+      if (!altKey) {
         xMeters = snapMeter(xMeters);
         yMeters = snapMeter(yMeters);
       }
-      onPositionCommit(id, xMeters, yMeters);
+      committedPosition = { xMeters, yMeters };
+    }
+
+    onDragEnd?.(id, committedPosition);
+    dragRef.current = null;
+    ghostRef.current = null;
+    setGhost(null);
+
+    if (kind === "cancel") return;
+
+    if (committedPosition && onPositionCommit) {
+      onPositionCommit(id, committedPosition.xMeters, committedPosition.yMeters);
     } else {
-      onSelect(id, { additive: event.shiftKey });
+      onSelect(id, { additive: shiftKey });
     }
   };
 
+  const bindGlobalDragListeners = (ownerDocument: Document) => {
+    const view = ownerDocument.defaultView;
+    if (!view) return;
+    clearGlobalDragListeners();
+    const handleMove = (event: PointerEvent) => {
+      updateDragFromPointer(event.pointerId, event.clientX, event.clientY, event.altKey);
+    };
+    const handleUp = (event: PointerEvent) => {
+      finishDragFromPointer(event.pointerId, event.altKey, event.shiftKey, "up");
+    };
+    const handleCancel = (event: PointerEvent) => {
+      finishDragFromPointer(event.pointerId, event.altKey, event.shiftKey, "cancel");
+    };
+    view.addEventListener("pointermove", handleMove);
+    view.addEventListener("pointerup", handleUp);
+    view.addEventListener("pointercancel", handleCancel);
+    globalDragCleanupRef.current = () => {
+      view.removeEventListener("pointermove", handleMove);
+      view.removeEventListener("pointerup", handleUp);
+      view.removeEventListener("pointercancel", handleCancel);
+    };
+  };
+
+  const clientPointToInner = (clientX: number, clientY: number) => {
+    const fallbackTarget = rotateHandleRef.current?.closest("[data-fixture-id]");
+    const target = markerRef.current ?? (fallbackTarget instanceof SVGGraphicsElement ? fallbackTarget : null);
+    const parent = target?.parentNode;
+    const owner = target?.ownerSVGElement;
+    if (!(parent instanceof SVGGraphicsElement) || !owner) return null;
+    const ctm = parent.getScreenCTM();
+    if (!ctm) return null;
+    const point = owner.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    return point.matrixTransform(ctm.inverse());
+  };
+
+  const updateRotationFromPointer = (pointerId: number, clientX: number, clientY: number) => {
+    const drag = rotationDragRef.current;
+    if (!drag || drag.pointerId !== pointerId || !canRotate) return;
+    const dx = clientX - drag.startClientX;
+    const dy = clientY - drag.startClientY;
+    drag.movedPx = Math.max(drag.movedPx, Math.hypot(dx, dy));
+
+    const point = clientPointToInner(clientX, clientY);
+    if (!point) return;
+    const rawDegrees = (Math.atan2(point.y - centerY, point.x - centerX) * 180) / Math.PI + 90;
+    const nextDegrees = normalizeDegrees(rawDegrees);
+    drag.latestDegrees = nextDegrees;
+    rotationGhostRef.current = nextDegrees;
+    setRotationGhost(nextDegrees);
+    onRotationMove?.(id, nextDegrees);
+  };
+
+  const finishRotationFromPointer = (pointerId: number, kind: "up" | "cancel") => {
+    const drag = rotationDragRef.current;
+    if (!drag || drag.pointerId !== pointerId) return;
+    const target = markerRef.current;
+    try {
+      if (target?.hasPointerCapture?.(pointerId)) {
+        target.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Pointer capture is best-effort on SVG nodes across webviews.
+    }
+    clearGlobalDragListeners();
+    const wasDrag = drag.movedPx >= CLICK_PX_THRESHOLD;
+    const rotationNow = rotationGhostRef.current;
+    const committedRotationDegrees =
+      kind === "up" && wasDrag && rotationNow !== null && onRotationCommit ? roundedDegrees(rotationNow) : null;
+    onRotationEnd?.(id, committedRotationDegrees);
+    rotationDragRef.current = null;
+    rotationGhostRef.current = null;
+    setRotationGhost(null);
+
+    if (committedRotationDegrees !== null && onRotationCommit) {
+      onRotationCommit(id, committedRotationDegrees);
+    }
+  };
+
+  const bindGlobalRotationListeners = (ownerDocument: Document) => {
+    const view = ownerDocument.defaultView;
+    if (!view) return;
+    clearGlobalDragListeners();
+    const handleMove = (event: PointerEvent) => {
+      updateRotationFromPointer(event.pointerId, event.clientX, event.clientY);
+    };
+    const handleUp = (event: PointerEvent) => {
+      finishRotationFromPointer(event.pointerId, "up");
+    };
+    const handleCancel = (event: PointerEvent) => {
+      finishRotationFromPointer(event.pointerId, "cancel");
+    };
+    view.addEventListener("pointermove", handleMove);
+    view.addEventListener("pointerup", handleUp);
+    view.addEventListener("pointercancel", handleCancel);
+    globalDragCleanupRef.current = () => {
+      view.removeEventListener("pointermove", handleMove);
+      view.removeEventListener("pointerup", handleUp);
+      view.removeEventListener("pointercancel", handleCancel);
+    };
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<SVGGElement>) => {
+    event.stopPropagation();
+    markerRef.current = event.currentTarget;
+    if (event.button !== 0) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startCenterX: centerX,
+      startCenterY: centerY,
+      movedPx: 0,
+    };
+    if (!draggable) return;
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Window-level listeners below keep drag working where SVG capture is unavailable.
+    }
+    bindGlobalDragListeners(event.currentTarget.ownerDocument);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<SVGGElement>) => {
+    updateDragFromPointer(event.pointerId, event.clientX, event.clientY, event.altKey);
+  };
+
+  const finishDrag = (event: ReactPointerEvent<SVGGElement>, kind: "up" | "cancel") => {
+    finishDragFromPointer(event.pointerId, event.altKey, event.shiftKey, kind);
+  };
+
+  useEffect(() => {
+    const node = rotateHandleRef.current;
+    if (!node || !canRotate) return undefined;
+
+    const handleNativePointerDown = (event: PointerEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const marker = node.closest("[data-fixture-id]");
+      if (marker instanceof SVGGraphicsElement) {
+        markerRef.current = marker;
+      }
+      if (event.button !== 0) return;
+      rotationDragRef.current = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        movedPx: 0,
+        latestDegrees: normalizeDegrees(rotationDegrees),
+      };
+      rotationGhostRef.current = normalizeDegrees(rotationDegrees);
+      try {
+        node.setPointerCapture(event.pointerId);
+      } catch {
+        // Window-level listeners below keep rotation working where SVG capture is unavailable.
+      }
+      bindGlobalRotationListeners(node.ownerDocument);
+    };
+
+    node.addEventListener("pointerdown", handleNativePointerDown);
+    return () => node.removeEventListener("pointerdown", handleNativePointerDown);
+  });
+
   const intensityWord = on ? `${Math.round(intensity)} percent` : "off";
-  const ariaLabel = `Fixture ${name}, ${intensityWord}, ${Math.round(cct)} kelvin, ${MOUNTING_SHORT_LABEL[mounting]} mount`;
+  const ariaLabel = `Fixture ${name}, ${intensityWord}, ${Math.round(cct)} kelvin, ${MOUNTING_SHORT_LABEL[mounting]} mount, ${roundedDegrees(rotationDegrees)} degrees`;
   const labelVisible =
     selected || pointerHovered || keyboardFocused || identifying || highlightOverlay || chipHovered || ghost !== null;
 
@@ -408,6 +521,7 @@ export function FixtureMarker({
   return (
     <>
       <g
+        ref={markerRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={(event) => finishDrag(event, "up")}
@@ -441,19 +555,31 @@ export function FixtureMarker({
         {ghost ? (
           <g transform={`translate(${centerX}, ${centerY}) rotate(${rotationDegrees})`} opacity={0.35}>
             <circle
-              r={ringRadius(mounting, 14, 26)}
+              r={ringRadius(visual, 4)}
               fill="none"
               strokeDasharray="3 3"
               style={{ stroke: GHOST_STROKE, strokeWidth: 1 }}
             />
           </g>
         ) : null}
-        <g transform={`translate(${renderX}, ${renderY}) rotate(${rotationDegrees})`} filter="url(#sse-fixture-shadow)">
-          {shapeForMounting(mounting, pixelLayout)}
+        <g
+          transform={`translate(${renderX}, ${renderY}) rotate(${rotationRenderDegrees})`}
+          filter="url(#sse-fixture-shadow)"
+        >
+          <rect
+            x={-hitWidth / 2}
+            y={-hitHeight / 2}
+            width={hitWidth}
+            height={hitHeight}
+            rx={4}
+            fill="transparent"
+            pointerEvents="all"
+          />
+          <FixtureSymbol cct={cct} intensity={intensity} on={on} renderMode={renderMode} visual={visual} />
           <circle r={3.6} fill={color} fillOpacity={dotOpacity} />
           {selected ? (
             <circle
-              r={ringRadius(mounting, 14, 26)}
+              r={ringRadius(visual, 4)}
               fill="none"
               strokeDasharray="4 3"
               style={{ stroke: SELECTED_STROKE, strokeWidth: 1.5 }}
@@ -466,19 +592,51 @@ export function FixtureMarker({
               without overlap when both prop are set. */}
           {highlightOverlay ? (
             <circle
-              r={ringRadius(mounting, 17, 30)}
+              r={ringRadius(visual, 7)}
               fill="none"
               style={{ stroke: HIGHLIGHT_OVERLAY_STROKE, strokeWidth: 2 }}
             />
           ) : null}
         </g>
+        {rotateHandleVisible ? (
+          <g
+            data-fixture-rotate-handle={id}
+            transform={`translate(${renderX}, ${renderY}) rotate(${rotationRenderDegrees})`}
+            style={{ cursor: rotationGhost === null ? "grab" : "grabbing" }}
+          >
+            <line
+              x1={0}
+              x2={0}
+              y1={-ringRadius(visual, 8)}
+              y2={-rotateHandleRadius}
+              pointerEvents="none"
+              style={{ stroke: SELECTED_STROKE, strokeWidth: 1.1, opacity: 0.78 }}
+            />
+            <circle
+              ref={rotateHandleRef}
+              cx={0}
+              cy={-rotateHandleRadius}
+              r={5}
+              fill="var(--color-bg-canvas)"
+              pointerEvents="all"
+              style={{ stroke: SELECTED_STROKE, strokeWidth: 1.4 }}
+            />
+            <path
+              d={`M -2 ${-rotateHandleRadius - 1.5} A 3 3 0 1 1 1.8 ${-rotateHandleRadius + 2.4}`}
+              fill="none"
+              pointerEvents="none"
+              strokeLinecap="round"
+              style={{ stroke: SELECTED_STROKE, strokeWidth: 0.9 }}
+            />
+          </g>
+        ) : null}
         {/* Focus ring — only visible on keyboard focus, mirrors SELECTED_STROKE
           in green so screen-magnifier users can spot the focused marker. */}
         {keyboardFocused ? (
           <circle
             cx={renderX}
             cy={renderY}
-            r={ringRadius(mounting, 18, 30)}
+            r={ringRadius(visual, 8)}
             fill="none"
             pointerEvents="none"
             style={{ stroke: SELECTED_STROKE, strokeWidth: 2 }}
@@ -519,7 +677,7 @@ export function FixtureMarker({
           <circle
             cx={renderX}
             cy={renderY}
-            r={ringRadius(mounting, 19, 32)}
+            r={ringRadius(visual, 9)}
             fill="none"
             strokeWidth={1.6}
             pointerEvents="none"
@@ -537,7 +695,7 @@ export function FixtureMarker({
           <circle
             cx={renderX}
             cy={renderY}
-            r={ringRadius(mounting, 22, 36)}
+            r={ringRadius(visual, 12)}
             fill="none"
             strokeWidth={2}
             pointerEvents="none"
@@ -597,6 +755,28 @@ export function FixtureMarker({
               style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
             >
               {(ghost.x / 100).toFixed(1)} m, {(ghost.y / 100).toFixed(1)} m
+            </text>
+          </g>
+        ) : null}
+        {rotationGhost !== null ? (
+          <g pointerEvents="none">
+            <rect
+              x={renderX + 12}
+              y={renderY - rotateHandleRadius - 16}
+              width={42}
+              height={18}
+              rx={3}
+              style={{ fill: "var(--color-bg-canvas)", stroke: SELECTED_STROKE, strokeWidth: 0.8 }}
+            />
+            <text
+              x={renderX + 33}
+              y={renderY - rotateHandleRadius - 4}
+              textAnchor="middle"
+              fontSize={10}
+              fontWeight={600}
+              style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
+            >
+              {roundedDegrees(rotationGhost)}°
             </text>
           </g>
         ) : null}

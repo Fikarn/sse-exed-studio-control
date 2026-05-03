@@ -114,6 +114,10 @@ pub struct LightingFixtureControlOptionSnapshot {
 #[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingFixtureVisualSnapshot {
     pub shape: String,
+    #[serde(rename = "symbolKind")]
+    pub symbol_kind: String,
+    #[serde(rename = "symbolVariant")]
+    pub symbol_variant: String,
     #[serde(rename = "widthMm")]
     pub width_mm: i64,
     #[serde(rename = "heightMm")]
@@ -128,6 +132,51 @@ pub struct LightingFixtureVisualSnapshot {
     pub field_angle: Option<f64>,
     #[serde(rename = "pixelLayout")]
     pub pixel_layout: Option<LightingFixturePixelLayoutSnapshot>,
+    #[serde(rename = "emitterLayout")]
+    pub emitter_layout: Option<LightingFixtureEmitterLayoutSnapshot>,
+    pub output: LightingFixtureOutputSnapshot,
+    #[serde(rename = "visualConfidence")]
+    pub visual_confidence: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct LightingFixtureEmitterLayoutSnapshot {
+    #[serde(rename = "emitterKind")]
+    pub emitter_kind: String,
+    pub rows: i64,
+    pub columns: i64,
+    pub segments: i64,
+    #[serde(rename = "physicalPixels")]
+    pub physical_pixels: Option<i64>,
+    pub direction: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct LightingFixtureOutputSnapshot {
+    #[serde(rename = "beamType")]
+    pub beam_type: String,
+    #[serde(rename = "beamAngle")]
+    pub beam_angle: Option<f64>,
+    #[serde(rename = "fieldAngle")]
+    pub field_angle: Option<f64>,
+    #[serde(rename = "photometricSamples")]
+    pub photometric_samples: Vec<LightingFixturePhotometricSampleSnapshot>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct LightingFixturePhotometricSampleSnapshot {
+    pub cct: i64,
+    #[serde(rename = "distanceMeters")]
+    pub distance_meters: f64,
+    pub lux: f64,
+    pub modifier: String,
+    pub source: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -320,9 +369,94 @@ fn default_fixture_definition() -> LightingFixtureDefinitionSnapshot {
         .expect("default fixture definition should exist")
 }
 
+struct DefinitionSpec<'a> {
+    id: &'a str,
+    manufacturer: &'a str,
+    family: &'a str,
+    model: &'a str,
+    display_name: &'a str,
+    status: &'a str,
+    source_url: &'a str,
+    source_version: &'a str,
+    source_date: &'a str,
+    kind: &'a str,
+    default_mode_id: &'a str,
+}
+
+struct VisualSpec<'a> {
+    shape: &'a str,
+    width_mm: i64,
+    height_mm: i64,
+    depth_mm: i64,
+    beam_angle_min: Option<f64>,
+    beam_angle_max: Option<f64>,
+    field_angle: Option<f64>,
+    pixel_layout: Option<LightingFixturePixelLayoutSnapshot>,
+}
+
+macro_rules! definition {
+    (
+        $id:expr,
+        $manufacturer:expr,
+        $family:expr,
+        $model:expr,
+        $display_name:expr,
+        $status:expr,
+        $source_url:expr,
+        $source_version:expr,
+        $source_date:expr,
+        $kind:expr,
+        $default_mode_id:expr,
+        $modes:expr,
+        $visual:expr $(,)?
+    ) => {
+        build_definition(
+            DefinitionSpec {
+                id: $id,
+                manufacturer: $manufacturer,
+                family: $family,
+                model: $model,
+                display_name: $display_name,
+                status: $status,
+                source_url: $source_url,
+                source_version: $source_version,
+                source_date: $source_date,
+                kind: $kind,
+                default_mode_id: $default_mode_id,
+            },
+            $modes,
+            $visual,
+        )
+    };
+}
+
+macro_rules! visual {
+    (
+        $shape:expr,
+        $width_mm:expr,
+        $height_mm:expr,
+        $depth_mm:expr,
+        $beam_angle_min:expr,
+        $beam_angle_max:expr,
+        $field_angle:expr,
+        $pixel_layout:expr $(,)?
+    ) => {
+        build_visual(VisualSpec {
+            shape: $shape,
+            width_mm: $width_mm,
+            height_mm: $height_mm,
+            depth_mm: $depth_mm,
+            beam_angle_min: $beam_angle_min,
+            beam_angle_max: $beam_angle_max,
+            field_angle: $field_angle,
+            pixel_layout: $pixel_layout,
+        })
+    };
+}
+
 fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
     vec![
-        definition(
+        definition!(
             DEFAULT_FIXTURE_DEFINITION_ID,
             "Litepanels",
             "Astra",
@@ -354,9 +488,9 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                     ("cctMax", 5600),
                 ]),
             )],
-            visual("panel", 450, 300, 90, Some(50.0), Some(50.0), None, None),
+            visual!("panel", 450, 300, 90, Some(50.0), Some(50.0), None, None),
         ),
-        definition(
+        definition!(
             "aputure-infinimat-generic",
             "Aputure",
             "INFINIMAT",
@@ -416,7 +550,7 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                     ]),
                 ),
             ],
-            visual(
+            visual!(
                 "mat",
                 1220,
                 305,
@@ -427,7 +561,7 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                 Some(pixel_layout(4, 1, 4, 4, "row-major")),
             ),
         ),
-        definition(
+        definition!(
             "aputure-infinibar-pb12",
             "Aputure",
             "INFINIBAR",
@@ -485,7 +619,7 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                     defaults(&[("red", 0), ("green", 0), ("blue", 0)]),
                 ),
             ],
-            visual(
+            visual!(
                 "bar",
                 1200,
                 45,
@@ -496,7 +630,7 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                 Some(pixel_layout(48, 1, 48, 48, "left-to-right")),
             ),
         ),
-        definition(
+        definition!(
             "litepanels-apollo-bridge",
             "Litepanels",
             "Apollo",
@@ -509,14 +643,14 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
             "control-node",
             DEFAULT_MODE_ID,
             vec![no_dmx_mode(DEFAULT_MODE_ID, "Control node")],
-            visual("control-node", 180, 120, 40, None, None, None, None),
+            visual!("control-node", 180, 120, 40, None, None, None, None),
         ),
     ]
 }
 
 fn aputure_verified_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
     vec![
-        definition(
+        definition!(
             "aputure-ls-600d-pro",
             "Aputure",
             "Light Storm",
@@ -571,7 +705,7 @@ fn aputure_verified_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                     ("cctMax", 5600),
                 ]),
             )],
-            visual("fresnel", 335, 338, 557, Some(15.0), Some(60.0), None, None),
+            visual!("fresnel", 335, 338, 557, Some(15.0), Some(60.0), None, None),
         ),
         storm_80c_definition(),
         storm_1200x_definition(),
@@ -579,7 +713,7 @@ fn aputure_verified_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
 }
 
 fn storm_80c_definition() -> LightingFixtureDefinitionSnapshot {
-    definition(
+    definition!(
         "aputure-storm-80c",
         "Aputure",
         "STORM",
@@ -646,12 +780,12 @@ fn storm_80c_definition() -> LightingFixtureDefinitionSnapshot {
                 defaults(&[("intensity", 100), ("cct", 5600), ("cctMin", 1800), ("cctMax", 20000), ("hue", 0), ("saturation", 0)]),
             ),
         ],
-        visual("fresnel", 167, 225, 147, Some(35.0), Some(60.0), None, None),
+        visual!("fresnel", 167, 225, 147, Some(35.0), Some(60.0), None, None),
     )
 }
 
 fn storm_1200x_definition() -> LightingFixtureDefinitionSnapshot {
-    definition(
+    definition!(
         "aputure-storm-1200x",
         "Aputure",
         "STORM",
@@ -680,7 +814,7 @@ fn storm_1200x_definition() -> LightingFixtureDefinitionSnapshot {
             ],
             defaults(&[("intensity", 100), ("cct", 5600), ("cctMin", 2500), ("cctMax", 10000)]),
         )],
-        visual("fresnel", 335, 338, 557, Some(12.0), Some(60.0), None, None),
+        visual!("fresnel", 335, 338, 557, Some(12.0), Some(60.0), None, None),
     )
 }
 
@@ -694,7 +828,7 @@ fn litepanels_verified_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
 }
 
 fn litepanels_astra_ip_definition() -> LightingFixtureDefinitionSnapshot {
-    definition(
+    definition!(
         "litepanels-astra-ip",
         "Litepanels",
         "Astra IP",
@@ -756,7 +890,7 @@ fn litepanels_astra_ip_definition() -> LightingFixtureDefinitionSnapshot {
                 ]),
             ),
         ],
-        visual("panel", 450, 300, 110, Some(30.0), Some(30.0), None, None),
+        visual!("panel", 450, 300, 110, Some(30.0), Some(30.0), None, None),
     )
 }
 
@@ -765,7 +899,7 @@ fn litepanels_gemini_definition(
     family: &str,
     model: &str,
 ) -> LightingFixtureDefinitionSnapshot {
-    definition(
+    definition!(
         id,
         "Litepanels",
         family,
@@ -883,12 +1017,12 @@ fn litepanels_gemini_definition(
                 ]),
             ),
         ],
-        visual("panel", 635, 305, 150, Some(90.0), Some(90.0), None, None),
+        visual!("panel", 635, 305, 150, Some(90.0), Some(90.0), None, None),
     )
 }
 
 fn litepanels_studio_x_definition() -> LightingFixtureDefinitionSnapshot {
-    definition(
+    definition!(
         "litepanels-studio-x-bicolor",
         "Litepanels",
         "Studio X",
@@ -951,7 +1085,7 @@ fn litepanels_studio_x_definition() -> LightingFixtureDefinitionSnapshot {
                 ]),
             ),
         ],
-        visual("fresnel", 300, 300, 420, Some(8.0), Some(70.0), None, None),
+        visual!("fresnel", 300, 300, 420, Some(8.0), Some(70.0), None, None),
     )
 }
 
@@ -1028,7 +1162,7 @@ fn research_needed_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
     ]
     .into_iter()
     .map(|(id, manufacturer, family, model, kind)| {
-        definition(
+        definition!(
             id,
             manufacturer,
             family,
@@ -1045,7 +1179,7 @@ fn research_needed_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
             kind,
             DEFAULT_MODE_ID,
             vec![no_dmx_mode(DEFAULT_MODE_ID, "Profile pending verification")],
-            visual(
+            visual!(
                 if kind == "panel" { "panel" } else { "fresnel" },
                 300,
                 300,
@@ -1060,36 +1194,198 @@ fn research_needed_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
     .collect()
 }
 
-fn definition(
-    id: &str,
-    manufacturer: &str,
-    family: &str,
-    model: &str,
-    display_name: &str,
-    status: &str,
-    source_url: &str,
-    source_version: &str,
-    source_date: &str,
-    kind: &str,
-    default_mode_id: &str,
+fn build_definition(
+    spec: DefinitionSpec<'_>,
     modes: Vec<LightingFixtureModeSnapshot>,
     visual: LightingFixtureVisualSnapshot,
 ) -> LightingFixtureDefinitionSnapshot {
+    let visual = visual_for_definition(spec.id, spec.family, spec.kind, spec.status, visual);
     LightingFixtureDefinitionSnapshot {
-        id: String::from(id),
-        manufacturer: String::from(manufacturer),
-        family: String::from(family),
-        model: String::from(model),
-        display_name: String::from(display_name),
-        status: String::from(status),
-        source_url: String::from(source_url),
-        source_version: String::from(source_version),
-        source_date: String::from(source_date),
-        kind: String::from(kind),
-        default_mode_id: String::from(default_mode_id),
+        id: String::from(spec.id),
+        manufacturer: String::from(spec.manufacturer),
+        family: String::from(spec.family),
+        model: String::from(spec.model),
+        display_name: String::from(spec.display_name),
+        status: String::from(spec.status),
+        source_url: String::from(spec.source_url),
+        source_version: String::from(spec.source_version),
+        source_date: String::from(spec.source_date),
+        kind: String::from(spec.kind),
+        default_mode_id: String::from(spec.default_mode_id),
         modes,
         visual,
     }
+}
+
+fn visual_for_definition(
+    id: &str,
+    family: &str,
+    kind: &str,
+    status: &str,
+    mut visual: LightingFixtureVisualSnapshot,
+) -> LightingFixtureVisualSnapshot {
+    visual.symbol_kind = symbol_kind_for_visual(visual.shape.as_str()).to_owned();
+    visual.symbol_variant = symbol_variant_for_definition(id, family, visual.symbol_kind.as_str());
+    visual.output = output_for_visual(
+        id,
+        visual.shape.as_str(),
+        visual.beam_angle_min,
+        visual.beam_angle_max,
+        visual.field_angle,
+    );
+    visual.emitter_layout = emitter_layout_for_visual(
+        id,
+        visual.symbol_kind.as_str(),
+        visual.pixel_layout.as_ref(),
+    );
+    visual.visual_confidence = visual_confidence_for_definition(id, status, kind).to_owned();
+    visual
+}
+
+fn symbol_kind_for_visual(shape: &str) -> &'static str {
+    match shape {
+        "bar" => "linear-bar",
+        "control-node" => "control-node",
+        "fresnel" => "fresnel",
+        "mat" => "soft-mat",
+        "panel" => "panel",
+        _ => "fresnel",
+    }
+}
+
+fn symbol_variant_for_definition(id: &str, family: &str, symbol_kind: &str) -> String {
+    match id {
+        "aputure-infinibar-pb12" => String::from("infinibar-pb12"),
+        "aputure-infinimat-generic" => String::from("infinimat"),
+        "litepanels-apollo-bridge" => String::from("apollo-bridge"),
+        "litepanels-astra-bicolor" => String::from("astra"),
+        "litepanels-astra-ip" => String::from("astra-ip"),
+        "litepanels-gemini-1x1" | "litepanels-gemini-2x1" => String::from("gemini"),
+        "aputure-ls-600d-pro" => String::from("light-storm"),
+        "aputure-storm-80c" | "aputure-storm-1200x" => String::from("storm"),
+        "litepanels-studio-x-bicolor" | "litepanels-studio-x-daylight" => String::from("studio-x"),
+        _ => match symbol_kind {
+            "panel" => match family {
+                "Astra" => String::from("astra"),
+                "Astra IP" => String::from("astra-ip"),
+                "Gemini" => String::from("gemini"),
+                _ => String::from("panel"),
+            },
+            "fresnel" => match family {
+                "Light Storm" => String::from("light-storm"),
+                "STORM" => String::from("storm"),
+                "Studio X" => String::from("studio-x"),
+                _ => String::from("fresnel"),
+            },
+            other => String::from(other),
+        },
+    }
+}
+
+fn visual_confidence_for_definition(id: &str, status: &str, _kind: &str) -> &'static str {
+    if status == "research-needed" {
+        "fallback"
+    } else if matches!(id, "aputure-infinibar-pb12" | "litepanels-apollo-bridge") {
+        "verified"
+    } else {
+        "catalogue-derived"
+    }
+}
+
+fn beam_type_for_shape(shape: &str) -> &'static str {
+    match shape {
+        "bar" => "rectangle",
+        "control-node" => "none",
+        "fresnel" => "fresnel",
+        "mat" | "panel" => "wash",
+        _ => "fresnel",
+    }
+}
+
+fn output_for_visual(
+    id: &str,
+    shape: &str,
+    beam_angle_min: Option<f64>,
+    beam_angle_max: Option<f64>,
+    field_angle: Option<f64>,
+) -> LightingFixtureOutputSnapshot {
+    LightingFixtureOutputSnapshot {
+        beam_type: String::from(beam_type_for_shape(shape)),
+        beam_angle: if shape == "control-node" {
+            None
+        } else {
+            beam_angle_max.or(beam_angle_min)
+        },
+        field_angle: if shape == "control-node" {
+            None
+        } else {
+            field_angle
+        },
+        photometric_samples: photometric_samples_for_definition(id),
+    }
+}
+
+fn photometric_samples_for_definition(id: &str) -> Vec<LightingFixturePhotometricSampleSnapshot> {
+    if id != "aputure-infinibar-pb12" {
+        return Vec::new();
+    }
+
+    vec![
+        photometric_sample(
+            5600,
+            0.5,
+            1600.0,
+            "none",
+            "Aputure INFINIBAR PB12 product page",
+        ),
+        photometric_sample(
+            5600,
+            1.0,
+            593.0,
+            "none",
+            "Aputure INFINIBAR PB12 product page",
+        ),
+    ]
+}
+
+fn photometric_sample(
+    cct: i64,
+    distance_meters: f64,
+    lux: f64,
+    modifier: &str,
+    source: &str,
+) -> LightingFixturePhotometricSampleSnapshot {
+    LightingFixturePhotometricSampleSnapshot {
+        cct,
+        distance_meters,
+        lux,
+        modifier: String::from(modifier),
+        source: String::from(source),
+    }
+}
+
+fn emitter_layout_for_visual(
+    id: &str,
+    symbol_kind: &str,
+    pixel_layout: Option<&LightingFixturePixelLayoutSnapshot>,
+) -> Option<LightingFixtureEmitterLayoutSnapshot> {
+    let pixel_layout = pixel_layout?;
+    Some(LightingFixtureEmitterLayoutSnapshot {
+        emitter_kind: String::from(match symbol_kind {
+            "linear-bar" => "pixel-line",
+            "soft-mat" => "pixel-mat",
+            _ => "pixel-grid",
+        }),
+        rows: pixel_layout.rows,
+        columns: pixel_layout.columns,
+        segments: pixel_layout.segments,
+        physical_pixels: if id == "aputure-infinibar-pb12" {
+            Some(96)
+        } else {
+            None
+        },
+        direction: pixel_layout.order.clone(),
+    })
 }
 
 fn mode(
@@ -1245,25 +1541,26 @@ fn defaults(entries: &[(&str, i64)]) -> HashMap<String, i64> {
         .collect()
 }
 
-fn visual(
-    shape: &str,
-    width_mm: i64,
-    height_mm: i64,
-    depth_mm: i64,
-    beam_angle_min: Option<f64>,
-    beam_angle_max: Option<f64>,
-    field_angle: Option<f64>,
-    pixel_layout: Option<LightingFixturePixelLayoutSnapshot>,
-) -> LightingFixtureVisualSnapshot {
+fn build_visual(spec: VisualSpec<'_>) -> LightingFixtureVisualSnapshot {
     LightingFixtureVisualSnapshot {
-        shape: String::from(shape),
-        width_mm,
-        height_mm,
-        depth_mm,
-        beam_angle_min,
-        beam_angle_max,
-        field_angle,
-        pixel_layout,
+        shape: String::from(spec.shape),
+        symbol_kind: String::new(),
+        symbol_variant: String::new(),
+        width_mm: spec.width_mm,
+        height_mm: spec.height_mm,
+        depth_mm: spec.depth_mm,
+        beam_angle_min: spec.beam_angle_min,
+        beam_angle_max: spec.beam_angle_max,
+        field_angle: spec.field_angle,
+        pixel_layout: spec.pixel_layout,
+        emitter_layout: None,
+        output: LightingFixtureOutputSnapshot {
+            beam_type: String::from("none"),
+            beam_angle: None,
+            field_angle: None,
+            photometric_samples: Vec::new(),
+        },
+        visual_confidence: String::new(),
     }
 }
 

@@ -168,6 +168,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
   let unsubscribeTransport = () => {};
   let initializePromise: Promise<void> | null = null;
   let pendingStartupGate: PendingStartupGate | null = null;
+  let bootstrapGeneration = 0;
 
   const setState = (nextState: ShellState) => {
     state = nextState;
@@ -317,6 +318,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
   };
 
   const bootstrap = async () => {
+    const generation = ++bootstrapGeneration;
+    const isCurrentBootstrap = () => generation === bootstrapGeneration;
+
     clearStartupGate();
     unsubscribeTransport();
     unsubscribeTransport = () => {};
@@ -326,10 +330,16 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       lifecycle: transitionStartupState("idle", { type: "spawned" }),
     });
 
-    unsubscribeTransport = transport.subscribe(handleTransportEvent);
+    unsubscribeTransport = transport.subscribe((event) => {
+      if (isCurrentBootstrap()) {
+        handleTransportEvent(event);
+      }
+    });
 
     try {
       await transport.initialize?.();
+      if (!isCurrentBootstrap()) return;
+
       updateState({
         lifecycle: transitionStartupState("launching-process", {
           type: "process-launched",
@@ -337,6 +347,8 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       });
 
       const readyPayload = await waitForEngineHandshake();
+      if (!isCurrentBootstrap()) return;
+
       const reportedProtocol = typeof readyPayload.protocol === "string" ? readyPayload.protocol : "unknown";
 
       if (reportedProtocol !== PROTOCOL_VERSION) {
@@ -356,6 +368,8 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       });
 
       const healthSnapshot = (await transport.request("health.snapshot")) as JsonObject;
+      if (!isCurrentBootstrap()) return;
+
       updateState({
         lifecycle: transitionStartupState("waiting-for-health-snapshot", {
           type: "health-loaded",
@@ -389,6 +403,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         transport.request("support.snapshot").then((value) => value as JsonObject),
         transport.request("controlSurface.snapshot").then((value) => value as JsonObject),
       ]);
+      if (!isCurrentBootstrap()) return;
 
       setState({
         lifecycle: transitionStartupState("waiting-for-app-snapshot", { type: "app-loaded" }),
@@ -409,6 +424,8 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         errorSummary: null,
       });
     } catch (error) {
+      if (!isCurrentBootstrap()) return;
+
       const startupFailure = normalizeStartupFailure(error);
       setState({
         ...state,
@@ -418,15 +435,20 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         errorSummary: startupFailure.message,
       });
     } finally {
-      clearStartupGate();
+      if (isCurrentBootstrap()) {
+        clearStartupGate();
+      }
     }
   };
 
   const start = () => {
     if (!initializePromise) {
-      initializePromise = bootstrap().finally(() => {
-        initializePromise = null;
+      const trackedPromise = bootstrap().finally(() => {
+        if (initializePromise === trackedPromise) {
+          initializePromise = null;
+        }
       });
+      initializePromise = trackedPromise;
     }
 
     return initializePromise;
@@ -454,6 +476,11 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       await refreshDomain(state.lastEvent);
     },
     async restart() {
+      bootstrapGeneration++;
+      initializePromise = null;
+      clearStartupGate();
+      unsubscribeTransport();
+      unsubscribeTransport = () => {};
       await transport.dispose?.();
       return start();
     },
@@ -640,8 +667,11 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return () => listeners.delete(listener);
     },
     async dispose() {
+      bootstrapGeneration++;
+      initializePromise = null;
       clearStartupGate();
       unsubscribeTransport();
+      unsubscribeTransport = () => {};
       await transport.dispose?.();
     },
   };

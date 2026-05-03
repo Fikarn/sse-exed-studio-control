@@ -175,6 +175,99 @@ fn lighting_fixture_catalog_modes_have_valid_channel_maps() {
 }
 
 #[test]
+fn lighting_fixture_catalog_visual_metadata_is_complete() {
+    let catalog = read_lighting_fixture_catalog_snapshot();
+    let allowed_symbol_kinds = ["control-node", "fresnel", "linear-bar", "panel", "soft-mat"];
+    let allowed_beam_types = ["fresnel", "glow", "none", "rectangle", "spot", "wash"];
+    let allowed_confidence = ["catalogue-derived", "fallback", "verified"];
+
+    for definition in &catalog.definitions {
+        let visual = &definition.visual;
+        assert!(
+            allowed_symbol_kinds.contains(&visual.symbol_kind.as_str()),
+            "{} has invalid symbolKind {}",
+            definition.id,
+            visual.symbol_kind
+        );
+        assert!(
+            !visual.symbol_variant.trim().is_empty(),
+            "{} should expose a stable symbolVariant",
+            definition.id
+        );
+        assert!(
+            allowed_beam_types.contains(&visual.output.beam_type.as_str()),
+            "{} has invalid beamType {}",
+            definition.id,
+            visual.output.beam_type
+        );
+        assert!(
+            allowed_confidence.contains(&visual.visual_confidence.as_str()),
+            "{} has invalid visualConfidence {}",
+            definition.id,
+            visual.visual_confidence
+        );
+
+        if visual.shape == "control-node" {
+            assert_eq!(visual.symbol_kind, "control-node");
+            assert_eq!(visual.output.beam_type, "none");
+            assert!(visual.output.photometric_samples.is_empty());
+        }
+
+        if let Some(emitter_layout) = &visual.emitter_layout {
+            assert!(
+                emitter_layout.rows > 0,
+                "{} emitter rows should be positive",
+                definition.id
+            );
+            assert!(
+                emitter_layout.columns > 0,
+                "{} emitter columns should be positive",
+                definition.id
+            );
+            assert!(
+                emitter_layout.segments > 0,
+                "{} emitter segments should be positive",
+                definition.id
+            );
+            if let Some(pixel_layout) = &visual.pixel_layout {
+                assert_eq!(emitter_layout.rows, pixel_layout.rows);
+                assert_eq!(emitter_layout.columns, pixel_layout.columns);
+                assert_eq!(emitter_layout.segments, pixel_layout.segments);
+                assert_eq!(emitter_layout.direction, pixel_layout.order);
+            }
+        }
+    }
+
+    let pb12 = catalog
+        .definitions
+        .iter()
+        .find(|definition| definition.id == "aputure-infinibar-pb12")
+        .expect("PB12 definition should be present");
+    assert_eq!(pb12.visual.symbol_kind, "linear-bar");
+    assert_eq!(pb12.visual.symbol_variant, "infinibar-pb12");
+    assert_eq!(pb12.visual.output.beam_type, "rectangle");
+    assert_eq!(
+        pb12.visual
+            .emitter_layout
+            .as_ref()
+            .and_then(|layout| layout.physical_pixels),
+        Some(96)
+    );
+    let samples = &pb12.visual.output.photometric_samples;
+    assert_eq!(samples.len(), 2);
+    assert_eq!(samples[0].cct, 5600);
+    assert_eq!(samples[0].distance_meters, 0.5);
+    assert_eq!(samples[0].lux, 1600.0);
+    assert_eq!(samples[0].modifier, "none");
+    assert_eq!(samples[0].source, "Aputure INFINIBAR PB12 product page");
+    assert_eq!(samples[1].cct, 5600);
+    assert_eq!(samples[1].distance_meters, 1.0);
+    assert_eq!(samples[1].lux, 593.0);
+    assert_eq!(samples[1].modifier, "none");
+    assert_eq!(samples[1].source, "Aputure INFINIBAR PB12 product page");
+}
+
+#[test]
 fn lighting_snapshot_backfills_catalog_identity_for_legacy_fixture_types() {
     let test_dir = initialize_ready_lighting("catalog-legacy-bridge");
     let snapshot = read_lighting_snapshot(
@@ -1428,16 +1521,16 @@ fn lighting_spatial_updates_and_markers_round_trip() {
             cct: None,
             control_values: None,
             group_id: None,
-            spatial_x: Some(Some(0.62)),
-            spatial_y: Some(Some(0.38)),
+            spatial_x: Some(Some(6.2)),
+            spatial_y: Some(Some(3.8)),
             spatial_rotation: Some(225.0),
             rig_z: None,
             beam_angle_degrees: None,
         },
     )
     .expect("fixture spatial update should succeed");
-    assert_eq!(fixture_update.fixture.spatial_x, Some(0.62));
-    assert_eq!(fixture_update.fixture.spatial_y, Some(0.38));
+    assert_eq!(fixture_update.fixture.spatial_x, Some(6.2));
+    assert_eq!(fixture_update.fixture.spatial_y, Some(3.8));
     assert_eq!(fixture_update.fixture.spatial_rotation, 225.0);
 
     let settings_update = update_lighting_settings(
@@ -1478,8 +1571,8 @@ fn lighting_spatial_updates_and_markers_round_trip() {
         .iter()
         .find(|fixture| fixture.id == "fixture-key-left")
         .expect("fixture should remain present");
-    assert_eq!(fixture.spatial_x, Some(0.62));
-    assert_eq!(fixture.spatial_y, Some(0.38));
+    assert_eq!(fixture.spatial_x, Some(6.2));
+    assert_eq!(fixture.spatial_y, Some(3.8));
     assert_eq!(fixture.spatial_rotation, 225.0);
     assert_eq!(
         snapshot.selected_fixture_id.as_deref(),

@@ -266,10 +266,8 @@ pub(super) fn remove_fixture_from_scenes(
 pub(super) fn lighting_fixture_update_summary(fixture: &LightingEditorFixtureState) -> String {
     let spatial_summary = match (fixture.spatial_x, fixture.spatial_y) {
         (Some(x), Some(y)) => format!(
-            "manual layout at {:.0}% / {:.0}% / {:.0}deg",
-            x * 100.0,
-            y * 100.0,
-            fixture.spatial_rotation
+            "manual layout at {:.1}m / {:.1}m / {:.0}deg",
+            x, y, fixture.spatial_rotation
         ),
         _ => format!("auto layout / {:.0}deg", fixture.spatial_rotation),
     };
@@ -547,7 +545,7 @@ pub(super) fn serialize_optional_marker(
 pub(super) fn normalize_optional_coordinate(value: Option<f64>) -> Option<f64> {
     value
         .filter(|coordinate| coordinate.is_finite())
-        .map(|coordinate| clamp_f64(coordinate, 0.0, 1.0))
+        .map(|coordinate| clamp_f64(coordinate, 0.0, 20.0))
 }
 
 pub(super) fn normalize_rotation(value: f64) -> f64 {

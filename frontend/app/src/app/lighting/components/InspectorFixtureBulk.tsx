@@ -12,6 +12,8 @@ export interface BulkFixtureValue {
   value: number;
 }
 
+type FixtureValuePreviewPhase = "editing" | "committing";
+
 export interface InspectorFixtureBulkProps {
   fixtures: readonly LightingFixtureSnapshot[];
   onClearSelection: () => void;
@@ -20,8 +22,10 @@ export interface InspectorFixtureBulkProps {
    *  delta-input ("+5", "+10%", "65") applies per-fixture math via
    *  MultiValueSlider's parser. */
   onBulkIntensityValues: (values: ReadonlyArray<BulkFixtureValue>) => void;
+  onBulkIntensityPreview?: (values: ReadonlyArray<BulkFixtureValue>, phase: FixtureValuePreviewPhase) => void;
   /** Per-fixture CCT update (Wave 27). Same semantics as intensity. */
   onBulkCctValues: (values: ReadonlyArray<BulkFixtureValue>) => void;
+  onBulkCctPreview?: (values: ReadonlyArray<BulkFixtureValue>, phase: FixtureValuePreviewPhase) => void;
   /**
    * Click → focus this fixture as the single primary selection.
    * Shift-click → toggle the fixture out of the bulk extras (cannot remove
@@ -54,7 +58,9 @@ export function InspectorFixtureBulk({
   onClearSelection,
   onBulkTogglePower,
   onBulkIntensityValues,
+  onBulkIntensityPreview,
   onBulkCctValues,
+  onBulkCctPreview,
   onSelectFixture,
 }: InspectorFixtureBulkProps) {
   const ids = fixtures.map((fixture) => fixture.id);
@@ -68,11 +74,26 @@ export function InspectorFixtureBulk({
   const intensityValues = fixtures.map((fixture) => fixture.intensity);
   const cctValues = fixtures.map((fixture) => fixture.cct);
 
+  const buildIntensityValues = (next: readonly number[]): BulkFixtureValue[] =>
+    next.map((value, index) => ({ fixtureId: ids[index]!, value: Math.round(value) }));
+  const buildCctValues = (next: readonly number[]): BulkFixtureValue[] =>
+    next.map((value, index) => ({ fixtureId: ids[index]!, value: Math.round(value / 100) * 100 }));
+
+  const handleIntensityPreview = (next: number[]) => {
+    onBulkIntensityPreview?.(buildIntensityValues(next), "editing");
+  };
   const handleIntensityValues = (next: number[]) => {
-    onBulkIntensityValues(next.map((value, index) => ({ fixtureId: ids[index]!, value: Math.round(value) })));
+    const values = buildIntensityValues(next);
+    onBulkIntensityPreview?.(values, "committing");
+    onBulkIntensityValues(values);
+  };
+  const handleCctPreview = (next: number[]) => {
+    onBulkCctPreview?.(buildCctValues(next), "editing");
   };
   const handleCctValues = (next: number[]) => {
-    onBulkCctValues(next.map((value, index) => ({ fixtureId: ids[index]!, value: Math.round(value / 100) * 100 })));
+    const values = buildCctValues(next);
+    onBulkCctPreview?.(values, "committing");
+    onBulkCctValues(values);
   };
 
   return (
@@ -135,13 +156,9 @@ export function InspectorFixtureBulk({
           min={0}
           max={100}
           step={1}
-          // onValuesChange is intentionally a no-op so the slider's internal
-          // draftAvg drives the thumb during drag without firing N IPCs per
-          // pointermove (was 720+ IPCs/sec at 60 Hz × 12 fixtures). The
-          // onValuesCommit handler fires once on pointerup with the final
-          // delta-shifted values; the delta-input field also routes through
-          // onValuesCommit on Enter.
-          onValuesChange={() => undefined}
+          // onValuesChange only updates the stage-plot render preview. IPC
+          // still fires once on pointerup through onValuesCommit.
+          onValuesChange={handleIntensityPreview}
           onValuesCommit={handleIntensityValues}
           // No disable on busy — bulk-IPCs commit in <1ms, so the brief
           // disabled state was perceived as a release-blink. Slider stays
@@ -158,7 +175,7 @@ export function InspectorFixtureBulk({
           min={cctRange.min}
           max={cctRange.max}
           step={100}
-          onValuesChange={() => undefined}
+          onValuesChange={handleCctPreview}
           onValuesCommit={handleCctValues}
           unit="K"
         />

@@ -54,7 +54,10 @@ export type { LightingFixtureChannelSnapshot } from "./generated/snapshots/Light
 export type { LightingFixtureControlOptionSnapshot } from "./generated/snapshots/LightingFixtureControlOptionSnapshot";
 export type { LightingFixtureControlSnapshot } from "./generated/snapshots/LightingFixtureControlSnapshot";
 export type { LightingFixtureDefinitionSnapshot } from "./generated/snapshots/LightingFixtureDefinitionSnapshot";
+export type { LightingFixtureEmitterLayoutSnapshot } from "./generated/snapshots/LightingFixtureEmitterLayoutSnapshot";
 export type { LightingFixtureModeSnapshot } from "./generated/snapshots/LightingFixtureModeSnapshot";
+export type { LightingFixtureOutputSnapshot } from "./generated/snapshots/LightingFixtureOutputSnapshot";
+export type { LightingFixturePhotometricSampleSnapshot } from "./generated/snapshots/LightingFixturePhotometricSampleSnapshot";
 export type { LightingFixturePixelLayoutSnapshot } from "./generated/snapshots/LightingFixturePixelLayoutSnapshot";
 export type { LightingFixtureSnapshot } from "./generated/snapshots/LightingFixtureSnapshot";
 export type { LightingFixtureVisualSnapshot } from "./generated/snapshots/LightingFixtureVisualSnapshot";

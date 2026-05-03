@@ -16,6 +16,7 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - Native and replacement-shell verification are target-host gates. GitHub Actions is not the acceptance mechanism for current cutover work; the advisory `dev-checks` workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) runs four jobs on pull requests (format-protocol, lint, frontend-typecheck, rust) but is intentionally not a required status check, and Actions billing is not paid — failed CI runs are expected baseline noise.
 - Responsive operator layout support landed in [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71) on `2026-05-03` (`4af7e8b8427cff78837054326478e1a67398154c`). Lighting now has logical CSS-pixel layout modes, mode-keyed column persistence, toolbar priority overflow, a narrow inspector drawer, separate stage zoom controls, shell-owned window layout persistence, and Scaled Studio Preview for current-hardware human review.
 - Lighting fixture catalog implementation landed after the responsive pass. The Rust engine now owns fixture definitions, mode/channel metadata, DMX mapping and validation, persistence compatibility, universe-aware patching, scene `controlValues`, and catalog snapshots. React renders catalog metadata and sends explicit commands only; it is not the source of truth for fixture/DMX policy. Verified catalog entries are selectable in the Add Fixture dialog; `research-needed` entries remain non-selectable tracking metadata.
+- Stage plot fixture identity implementation landed after the catalog pass. The engine-owned catalog now exposes additive visual metadata for existing fixture definitions, and React renders fixture family symbols, output footprints, live drag/rotation/value previews, render modes, and selected-scene previews from snapshots only. Fixture/device policy remains engine-owned; React does not own DMX footprint, persistence, or vendor behavior.
 - A one-way legacy-import path (`native/rust-engine/src/legacy_import.rs`) remains so that operators migrating from a pre-`v2.0.0` Electron installation can bring their old `db.json` forward on first native launch. This is the only legacy code that is intentionally retained.
 
 ## Start Here
@@ -70,6 +71,8 @@ The highest-value unresolved work is:
    The studio surface is a logical `2560x1440` operator composition whose layout decisions are driven by CSS viewport size, not physical pixels or `devicePixelRatio`. Aspect-ratio-correct Scaled Studio Preview is the normal current-hardware human review path for studio composition on the built-in MacBook display. The fixed studio monitor remains the final authority for physical-size readability and ergonomics. BetterDisplay is now optional fallback tooling, not the standard workflow.
 7. Preserve fixture-catalog ownership.
    Fixture definitions, DMX footprints, DMX labels/encoders, universe-aware overlap validation, scene serialization, and persisted compatibility live in `native/rust-engine/src/lighting/`. Frontend code may mirror catalog metadata for fixture transport tests and render controls/shapes from snapshots, but it must not own device policy. Do not add GDTF import, Sidus Bluetooth discovery, firmware update, or vendor auto-configuration without a new scoped plan.
+8. Preserve stage-plot smoothness.
+   Fixture drag, rotation, scene recall, and value slider edits now rely on short-lived render previews so the marker, output beam, active scene pill, and scene rail selection stay visually continuous while engine IPC catches up. Future changes should keep that preview layer render-only and clear it when authoritative snapshots match.
 
 ## Execution Queue
 
@@ -130,6 +133,31 @@ Validation recorded for the fixture catalog pass:
 - `npm run frontend:playwright:test` passed: 39 tests.
 - `npm run tauri:visual:review` passed with 30 screenshots and 0 failures; summary at `artifacts/visual/tauri-cutover/fixture-viewport-summary.json`.
 - `npm run format:check` passed.
+
+### Stage plot fixture identity and motion polish
+
+Status: implemented on branch `codex/stage-plot-fixture-identity-polish` on `2026-05-03`.
+
+Important facts for future sessions:
+
+- The implementation plan is preserved at [docs/plans/stage-plot-fixture-identity-implementation.md](./plans/stage-plot-fixture-identity-implementation.md).
+- The engine catalog exposes additive fixture visual metadata for existing definitions only. Do not add new fixture catalog entries as part of stage-plot rendering polish.
+- Stage plot render modes use the shared design-system `SegmentedControl`.
+- Fixture symbols and output footprints render from catalog metadata via frontend visual helpers. The frontend layer remains render-only and must not encode device policy, DMX validation, fixture discovery, vendor configuration, or persistence rules.
+- Drag, rotation, and intensity/CCT edits use short-lived render previews so fixture symbols and output beams track the operator interaction immediately and do not snap back during IPC round trips.
+- Plot rotation is free/continuous while dragging and commits/displays nearest one-degree values.
+- Clicking a scene now drives a render-only scene preview immediately. The selected scene tile, active scene pill, and stage plot contents stay aligned while the engine recall snapshot catches up; the preview clears once authoritative fixtures match the scene.
+- A closeout validation run exposed a fixture-transport StrictMode startup lifecycle bug: the first development-only effect cleanup could drop a startup failure event and turn `protocol-mismatch` into `ENGINE_READY_TIMEOUT`. `createShellStore` now generation-guards startup work, and the fixture transport clears delayed startup timers on dispose.
+- `npm run tauri:visual:review` requires `127.0.0.1:4173` to be free. Stop stale `tauri dev` / Vite shells before running it.
+
+Validation recorded for this pass:
+
+- `npm run protocol:generate` passed.
+- `npm run native:test` passed: 10 Tauri shell tests, 161 engine tests, and protocol/doc-tests clean.
+- `npm run frontend:typecheck` passed across workspaces.
+- `npm run frontend:playwright:test` passed: 42 tests.
+- `npm run tauri:visual:review` passed with 30 screenshots and 0 failures; summary at `artifacts/visual/tauri-cutover/fixture-viewport-summary.json`.
+- `git diff --check` passed.
 
 ## Validation Baseline
 

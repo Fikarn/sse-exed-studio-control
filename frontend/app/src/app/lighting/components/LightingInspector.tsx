@@ -28,6 +28,7 @@ import {
 import styles from "./LightingInspector.module.css";
 
 export type LightingUiMode = "recall" | "patch";
+type FixtureValuePreviewPhase = "editing" | "committing";
 
 export interface LightingInspectorProps {
   uiMode: LightingUiMode;
@@ -60,7 +61,9 @@ export interface LightingInspectorProps {
 
   onTogglePower: (fixtureId: string, on: boolean) => void;
   onIntensityCommit: (fixtureId: string, intensity: number) => void;
+  onIntensityPreview?: (fixtureId: string, intensity: number, phase: FixtureValuePreviewPhase) => void;
   onCctCommit: (fixtureId: string, cct: number) => void;
+  onCctPreview?: (fixtureId: string, cct: number, phase: FixtureValuePreviewPhase) => void;
   onControlValuesCommit?: (fixtureId: string, controlValues: Record<string, number>) => void;
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   onPatchCommit: (fixtureId: string, nextStartAddress: number) => void;
@@ -104,7 +107,15 @@ export interface LightingInspectorProps {
   /** Per-fixture bulk update (Wave 27 — replaces flatten-to-one handlers).
    *  Drag-shift preserves spread; delta-input parses per-value math. */
   onBulkIntensityValues?: (values: ReadonlyArray<{ fixtureId: string; value: number }>) => void;
+  onBulkIntensityPreview?: (
+    values: ReadonlyArray<{ fixtureId: string; value: number }>,
+    phase: FixtureValuePreviewPhase
+  ) => void;
   onBulkCctValues?: (values: ReadonlyArray<{ fixtureId: string; value: number }>) => void;
+  onBulkCctPreview?: (
+    values: ReadonlyArray<{ fixtureId: string; value: number }>,
+    phase: FixtureValuePreviewPhase
+  ) => void;
   onApplyPalette?: (paletteId: string, fixtureIds: readonly string[]) => void;
   onCreatePalette?: (request: {
     name: string;
@@ -187,7 +198,9 @@ export function LightingInspector({
   previewDirty = false,
   onTogglePower,
   onIntensityCommit,
+  onIntensityPreview,
   onCctCommit,
+  onCctPreview,
   onControlValuesCommit,
   onIdentifyBurst,
   onPatchCommit,
@@ -212,7 +225,9 @@ export function LightingInspector({
   onClearSelection,
   onBulkTogglePower,
   onBulkIntensityValues,
+  onBulkIntensityPreview,
   onBulkCctValues,
+  onBulkCctPreview,
   onApplyPalette,
   onCreatePalette,
   onUpdatePalette,
@@ -299,7 +314,9 @@ export function LightingInspector({
             onClearSelection={onClearSelection ?? (() => undefined)}
             onBulkTogglePower={onBulkTogglePower ?? (() => undefined)}
             onBulkIntensityValues={onBulkIntensityValues ?? (() => undefined)}
+            onBulkIntensityPreview={onBulkIntensityPreview}
             onBulkCctValues={onBulkCctValues ?? (() => undefined)}
+            onBulkCctPreview={onBulkCctPreview}
             onSelectFixture={onSelectFixture}
           />
         ) : null}
@@ -313,7 +330,9 @@ export function LightingInspector({
             bridgeReachable={bridgeReachable}
             onTogglePower={onTogglePower}
             onIntensityCommit={onIntensityCommit}
+            onIntensityPreview={onIntensityPreview}
             onCctCommit={onCctCommit}
+            onCctPreview={onCctPreview}
             onControlValuesCommit={onControlValuesCommit}
             onIdentifyBurst={onIdentifyBurst}
             onDeleteFixture={onDeleteFixture}

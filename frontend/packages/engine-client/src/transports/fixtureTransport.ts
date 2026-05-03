@@ -1039,6 +1039,7 @@ function fixtureDefinition(
   visual: JsonObject,
   status = "verified"
 ): JsonObject {
+  const enrichedVisual = withFixtureVisualMetadata(id, family, kind, status, visual);
   return {
     id,
     manufacturer,
@@ -1052,7 +1053,164 @@ function fixtureDefinition(
     kind,
     defaultModeId,
     modes,
-    visual,
+    visual: enrichedVisual,
+  };
+}
+
+const FIXTURE_VISUAL_BEAM_ANGLES: Record<string, { max: number; min: number }> = {
+  "aputure-infinibar-pb12": { min: 120, max: 120 },
+  "aputure-infinimat-generic": { min: 100, max: 100 },
+  "aputure-ls-600d-pro": { min: 15, max: 60 },
+  "aputure-storm-1200x": { min: 12, max: 60 },
+  "aputure-storm-80c": { min: 35, max: 60 },
+  "litepanels-astra-bicolor": { min: 50, max: 50 },
+  "litepanels-astra-ip": { min: 30, max: 30 },
+  "litepanels-gemini-1x1": { min: 90, max: 90 },
+  "litepanels-gemini-2x1": { min: 90, max: 90 },
+  "litepanels-studio-x-bicolor": { min: 8, max: 70 },
+};
+
+function symbolKindForVisualShape(shape: string) {
+  switch (shape) {
+    case "bar":
+      return "linear-bar";
+    case "control-node":
+      return "control-node";
+    case "mat":
+      return "soft-mat";
+    case "panel":
+      return "panel";
+    case "fresnel":
+    default:
+      return "fresnel";
+  }
+}
+
+function symbolVariantForFixtureDefinition(id: string, family: string, symbolKind: string) {
+  switch (id) {
+    case "aputure-infinibar-pb12":
+      return "infinibar-pb12";
+    case "aputure-infinimat-generic":
+      return "infinimat";
+    case "litepanels-apollo-bridge":
+      return "apollo-bridge";
+    case "litepanels-astra-bicolor":
+      return "astra";
+    case "litepanels-astra-ip":
+      return "astra-ip";
+    case "litepanels-gemini-1x1":
+    case "litepanels-gemini-2x1":
+      return "gemini";
+    case "aputure-ls-600d-pro":
+      return "light-storm";
+    case "aputure-storm-80c":
+    case "aputure-storm-1200x":
+      return "storm";
+    case "litepanels-studio-x-bicolor":
+    case "litepanels-studio-x-daylight":
+      return "studio-x";
+    default:
+      if (symbolKind === "panel") {
+        if (family === "Astra") return "astra";
+        if (family === "Astra IP") return "astra-ip";
+        if (family === "Gemini") return "gemini";
+        return "panel";
+      }
+      if (symbolKind === "fresnel") {
+        if (family === "Light Storm") return "light-storm";
+        if (family === "STORM") return "storm";
+        if (family === "Studio X") return "studio-x";
+        return "fresnel";
+      }
+      return symbolKind;
+  }
+}
+
+function beamTypeForVisualShape(shape: string) {
+  switch (shape) {
+    case "bar":
+      return "rectangle";
+    case "control-node":
+      return "none";
+    case "mat":
+    case "panel":
+      return "wash";
+    case "fresnel":
+    default:
+      return "fresnel";
+  }
+}
+
+function visualConfidenceForFixtureDefinition(id: string, status: string) {
+  if (status === "research-needed") return "fallback";
+  if (id === "aputure-infinibar-pb12" || id === "litepanels-apollo-bridge") return "verified";
+  return "catalogue-derived";
+}
+
+function photometricSamplesForFixtureDefinition(id: string): JsonObject[] {
+  if (id !== "aputure-infinibar-pb12") return [];
+  return [
+    {
+      cct: 5600,
+      distanceMeters: 0.5,
+      lux: 1600,
+      modifier: "none",
+      source: "Aputure INFINIBAR PB12 product page",
+    },
+    {
+      cct: 5600,
+      distanceMeters: 1.0,
+      lux: 593,
+      modifier: "none",
+      source: "Aputure INFINIBAR PB12 product page",
+    },
+  ];
+}
+
+function emitterLayoutForVisual(id: string, symbolKind: string, visual: JsonObject): JsonObject | null {
+  const pixelLayout = asRecord(visual.pixelLayout);
+  if (!pixelLayout) return null;
+  return {
+    emitterKind: symbolKind === "linear-bar" ? "pixel-line" : symbolKind === "soft-mat" ? "pixel-mat" : "pixel-grid",
+    rows: Math.max(1, Math.round(asNumber(pixelLayout.rows, 1))),
+    columns: Math.max(1, Math.round(asNumber(pixelLayout.columns, 1))),
+    segments: Math.max(1, Math.round(asNumber(pixelLayout.segments, 1))),
+    physicalPixels: id === "aputure-infinibar-pb12" ? 96 : null,
+    direction: asString(pixelLayout.order, "row-major"),
+  };
+}
+
+function withFixtureVisualMetadata(
+  id: string,
+  family: string,
+  kind: string,
+  status: string,
+  visual: JsonObject
+): JsonObject {
+  const shape = asString(visual.shape, kind === "panel" ? "panel" : "fresnel");
+  const beamAngles = FIXTURE_VISUAL_BEAM_ANGLES[id];
+  const beamAngleMin = typeof visual.beamAngleMin === "number" ? visual.beamAngleMin : (beamAngles?.min ?? null);
+  const beamAngleMax = typeof visual.beamAngleMax === "number" ? visual.beamAngleMax : (beamAngles?.max ?? null);
+  const symbolKind = symbolKindForVisualShape(shape);
+  const beamType = beamTypeForVisualShape(shape);
+  const output = {
+    beamType,
+    beamAngle: beamType === "none" ? null : (beamAngleMax ?? beamAngleMin),
+    fieldAngle: beamType === "none" ? null : typeof visual.fieldAngle === "number" ? visual.fieldAngle : null,
+    photometricSamples: photometricSamplesForFixtureDefinition(id),
+  };
+
+  return {
+    ...visual,
+    shape,
+    symbolKind,
+    symbolVariant: symbolVariantForFixtureDefinition(id, family, symbolKind),
+    beamAngleMin,
+    beamAngleMax,
+    fieldAngle: typeof visual.fieldAngle === "number" ? visual.fieldAngle : null,
+    emitterLayout: emitterLayoutForVisual(id, symbolKind, visual),
+    output,
+    visualConfidence: visualConfidenceForFixtureDefinition(id, status),
   };
 }
 
@@ -1922,7 +2080,7 @@ function buildLightingFixtureUpdateSummary(fixture: JsonObject) {
   const spatialRotation = asNumber(fixture.spatialRotation, 0);
   const spatialSummary =
     typeof fixture.spatialX === "number" && typeof fixture.spatialY === "number"
-      ? `manual layout at ${Math.round(fixture.spatialX * 100)}% / ${Math.round(fixture.spatialY * 100)}% / ${Math.round(spatialRotation)}deg`
+      ? `manual layout at ${fixture.spatialX.toFixed(1)}m / ${fixture.spatialY.toFixed(1)}m / ${Math.round(spatialRotation)}deg`
       : `auto layout / ${Math.round(spatialRotation)}deg`;
   const beamAngle = asNumber(fixture.beamAngleDegrees, defaultLightingBeamAngle(asString(fixture.type, "fixture")));
   const rigZSummary = typeof fixture.rigZ === "number" ? `${fixture.rigZ.toFixed(1)}m rig` : "auto rig height";
@@ -2002,8 +2160,8 @@ function normalizeLightingFixtureSnapshotEntry(fixture: JsonObject, fallbackUniv
     dmxStartAddress: normalizedStart,
     kind: profile.kind,
     groupId: typeof fixture.groupId === "string" && fixture.groupId.trim() ? fixture.groupId : null,
-    spatialX: typeof fixture.spatialX === "number" ? clampNumber(fixture.spatialX, 0, 1) : null,
-    spatialY: typeof fixture.spatialY === "number" ? clampNumber(fixture.spatialY, 0, 1) : null,
+    spatialX: typeof fixture.spatialX === "number" ? clampNumber(fixture.spatialX, 0, 20) : null,
+    spatialY: typeof fixture.spatialY === "number" ? clampNumber(fixture.spatialY, 0, 20) : null,
     spatialRotation: asNumber(fixture.spatialRotation, 0),
     rigZ: typeof fixture.rigZ === "number" ? clampNumber(fixture.rigZ, 0, 20) : null,
     beamAngleDegrees:
@@ -2659,6 +2817,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       ? (scenario.startupFailure as JsonObject)
       : null;
   let startupResolved = startupDelayMs <= 0 && startupFailure === null;
+  let startupTimeoutId: number | null = null;
   let resolveStartupGate = () => {};
   let rejectStartupGate = (_error: unknown) => {};
   const startupGate = new Promise<void>((resolve, reject) => {
@@ -3863,6 +4022,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const hasGroupId = Object.prototype.hasOwnProperty.call(params, "groupId");
         const hasSpatialX = Object.prototype.hasOwnProperty.call(params, "spatialX");
         const hasSpatialY = Object.prototype.hasOwnProperty.call(params, "spatialY");
+        const hasSpatialRotation = Object.prototype.hasOwnProperty.call(params, "spatialRotation");
         const hasRigZ = Object.prototype.hasOwnProperty.call(params, "rigZ");
         const hasBeamAngleDegrees = Object.prototype.hasOwnProperty.call(params, "beamAngleDegrees");
         if (
@@ -3879,6 +4039,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           !hasGroupId &&
           !hasSpatialX &&
           !hasSpatialY &&
+          !hasSpatialRotation &&
           !hasRigZ &&
           !hasBeamAngleDegrees
         ) {
@@ -3907,6 +4068,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             hasGroupId ||
             hasSpatialX ||
             hasSpatialY ||
+            hasSpatialRotation ||
             hasRigZ ||
             hasBeamAngleDegrees
           ) {
@@ -4062,7 +4224,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
                 spatialX:
                   params.spatialX === null
                     ? null
-                    : clampNumber(asNumber(params.spatialX, asNumber(targetFixture.spatialX, 0.5)), 0, 1),
+                    : clampNumber(asNumber(params.spatialX, asNumber(targetFixture.spatialX, 0.5)), 0, 20),
               }
             : {}),
           ...(hasSpatialY
@@ -4070,7 +4232,15 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
                 spatialY:
                   params.spatialY === null
                     ? null
-                    : clampNumber(asNumber(params.spatialY, asNumber(targetFixture.spatialY, 0.5)), 0, 1),
+                    : clampNumber(asNumber(params.spatialY, asNumber(targetFixture.spatialY, 0.5)), 0, 20),
+              }
+            : {}),
+          ...(hasSpatialRotation
+            ? {
+                spatialRotation:
+                  ((Math.round(asNumber(params.spatialRotation, asNumber(targetFixture.spatialRotation, 0))) % 360) +
+                    360) %
+                  360,
               }
             : {}),
           ...(hasRigZ
@@ -4992,6 +5162,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
   return {
     async initialize() {
       const emitStartupEvent = () => {
+        startupTimeoutId = null;
         startupResolved = true;
         if (startupFailure) {
           rejectStartupGate(startupFailure);
@@ -5007,12 +5178,17 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         );
       };
 
+      if (startupTimeoutId !== null) {
+        window.clearTimeout(startupTimeoutId);
+        startupTimeoutId = null;
+      }
+
       if (startupDelayMs > 0) {
-        window.setTimeout(emitStartupEvent, startupDelayMs);
+        startupTimeoutId = window.setTimeout(emitStartupEvent, startupDelayMs);
         return;
       }
 
-      window.setTimeout(emitStartupEvent, 0);
+      startupTimeoutId = window.setTimeout(emitStartupEvent, 0);
     },
     async request(method, params = {}) {
       if (method === "engine.ping" && !startupResolved) {
@@ -5023,6 +5199,13 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
+    },
+    async dispose() {
+      if (startupTimeoutId !== null) {
+        window.clearTimeout(startupTimeoutId);
+        startupTimeoutId = null;
+      }
+      listeners.clear();
     },
   };
 }

@@ -81,6 +81,55 @@ function buildLightingPalettePreviewFixture(): FixtureScenarioRecord {
   return scenario;
 }
 
+function buildLightingSymbolFamiliesFixture(): FixtureScenarioRecord {
+  const scenario = cloneFixture(fixtureMap["lighting-populated"]) as FixtureScenarioRecord & {
+    lightingSnapshot: Record<string, unknown>;
+  };
+  const fixtures = (
+    Array.isArray(scenario.lightingSnapshot.fixtures)
+      ? (scenario.lightingSnapshot.fixtures as Array<Record<string, unknown>>)
+      : []
+  ).map((fixture) =>
+    fixture.id === "fixture-back" ? { ...fixture, intensity: 42, on: true, spatialRotation: 180 } : fixture
+  );
+  scenario.lightingSnapshot.fixtures = [
+    ...fixtures,
+    {
+      id: "fixture-soft-mat",
+      name: "Soft mat",
+      type: "infinimat",
+      dmxStartAddress: 81,
+      kind: "wash",
+      groupId: "group-front",
+      spatialX: 0.36,
+      spatialY: 0.5,
+      spatialRotation: 90,
+      rigZ: 3.4,
+      beamAngleDegrees: null,
+      on: true,
+      intensity: 48,
+      cct: 5600,
+    },
+    {
+      id: "fixture-fresnel",
+      name: "Fresnel",
+      type: "aputure-ls-600d-pro",
+      dmxStartAddress: 101,
+      kind: "beam",
+      groupId: "group-back",
+      spatialX: 0.65,
+      spatialY: 0.5,
+      spatialRotation: 145,
+      rigZ: 4.8,
+      beamAngleDegrees: null,
+      on: true,
+      intensity: 72,
+      cct: 5600,
+    },
+  ];
+  return scenario;
+}
+
 const derivedFixtureMap: FixtureMap = {
   ...fixtureMap,
   "lighting-palettes-empty": buildLightingPaletteFixture("empty"),
@@ -90,6 +139,7 @@ const derivedFixtureMap: FixtureMap = {
   "lighting-preview-clean": buildLightingPreviewFixture("clean"),
   "lighting-preview-dirty": buildLightingPreviewFixture("dirty"),
   "lighting-preview-patch-conflict": buildLightingPreviewFixture("patch-conflict"),
+  "lighting-symbol-families": buildLightingSymbolFamiliesFixture(),
 };
 
 export const fixtureScenarios = derivedFixtureMap;

@@ -1,17 +1,18 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Sun } from "lucide-react";
 
 import { EmptyState, PlotMeta, PlotPill } from "@sse/design-system";
 import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { deriveMounting } from "../fixtureMounting";
-import { lightingFixtureBeamLength, lightingFixtureBeamWidth } from "../lightingHelpers";
+import { getFixtureVisualModel, type StagePlotRenderMode } from "../fixtureVisuals";
 import { STUDIO_LAYOUT, type StudioLayout } from "../studioLayout";
 import { useMarqueeSelection } from "../useMarqueeSelection";
 import type { StagePlotViewport } from "../useStagePlotViewport";
 
+import { FixtureOutputFootprint } from "./FixtureOutputFootprint";
 import { FixtureMarker } from "./FixtureMarker";
-import { LightPool } from "./LightPool";
+import { FixtureSymbolKey } from "./FixtureSymbolKey";
 import { PatchAddressTag } from "./PatchAddressTag";
 import { PatchOverlay } from "./PatchOverlay";
 import { StagePlotControls } from "./StagePlotControls";
@@ -32,6 +33,7 @@ export interface StagePlotProps {
   liveFixtures?: readonly LightingFixtureSnapshot[];
   activeSceneName?: string;
   isSceneModified?: boolean;
+  renderMode: StagePlotRenderMode;
   /**
    * When false, the plot's "modified" treatment is downgraded to neutral —
    * drift detection in degraded states compares live state to a preview-only
@@ -48,6 +50,7 @@ export interface StagePlotProps {
   highlightOverlayFixtureIds?: ReadonlySet<string>;
   onSelectFixture: (id: string | null, options?: { additive?: boolean }) => void;
   onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
+  onRotationCommit?: (fixtureId: string, rotationDegrees: number) => void;
   /** Right-click "Rename" — selects the fixture for inspection and triggers
    *  the inspector's inline rename. */
   onRequestRenameFixture?: (id: string) => void;
@@ -68,11 +71,32 @@ export interface StagePlotProps {
    *  renders a soft pulse so the chip ↔ marker pairing reads at a
    *  glance. Null when no chip is hovered. */
   chipHoverFixtureId?: string | null;
+  onRenderModeChange: (mode: StagePlotRenderMode) => void;
 }
 
 const FALLBACK_X_STEP = 1.5;
 const FALLBACK_Y = 4.0;
 const PLOT_TOP_GUTTER_CM = 56;
+const POSITION_MATCH_EPSILON_METERS = 0.01;
+const ROTATION_MATCH_EPSILON_DEGREES = 0.5;
+const COMMIT_PREVIEW_TIMEOUT_MS = 1800;
+
+interface PlotPosition {
+  xMeters: number;
+  yMeters: number;
+}
+
+interface TransientFixturePosition extends PlotPosition {
+  altKey: boolean;
+  id: string;
+  phase: "dragging" | "committing";
+}
+
+interface TransientFixtureRotation {
+  id: string;
+  phase: "dragging" | "committing";
+  rotationDegrees: number;
+}
 
 function meterPositionFor(fixture: LightingFixtureSnapshot, index: number) {
   const x = fixture.spatialX ?? Math.min(11, FALLBACK_X_STEP * (index + 1));
@@ -88,6 +112,15 @@ function previewDiffersFromLive(preview: LightingFixtureSnapshot, live: Lighting
   return false;
 }
 
+function normalizeDegrees(value: number): number {
+  return ((value % 360) + 360) % 360;
+}
+
+function rotationDistanceDegrees(a: number, b: number): number {
+  const delta = Math.abs(normalizeDegrees(a) - normalizeDegrees(b));
+  return Math.min(delta, 360 - delta);
+}
+
 export function StagePlot({
   fixtures,
   catalog = null,
@@ -99,12 +132,14 @@ export function StagePlot({
   liveFixtures = [],
   activeSceneName,
   isSceneModified = false,
+  renderMode,
   bridgeReachable = true,
   searchQuery = "",
   identifyingFixtureIds,
   highlightOverlayFixtureIds,
   onSelectFixture,
   onPositionCommit,
+  onRotationCommit,
   onRequestRenameFixture,
   onIdentifyFixture,
   onRequestDeleteFixture,
@@ -112,25 +147,106 @@ export function StagePlot({
   onAddFixture,
   viewport,
   chipHoverFixtureId,
+  onRenderModeChange,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
 
-  // F9 — track in-flight fixture-drag state so we can render alignment
-  // guides against other fixtures' axes. Driven by FixtureMarker's
-  // onDragMove / onDragEnd callbacks. Cleared on commit / cancel.
-  const [dragState, setDragState] = useState<{
-    id: string;
-    xMeters: number;
-    yMeters: number;
-    altKey: boolean;
-  } | null>(null);
+  // Track the fixture position while a drag is in flight, then hold the
+  // snapped drop position until the engine snapshot refresh lands. This keeps
+  // marker + output movement visually continuous across the IPC round trip.
+  const [transientPosition, setTransientPosition] = useState<TransientFixturePosition | null>(null);
+  const [transientRotation, setTransientRotation] = useState<TransientFixtureRotation | null>(null);
+  const dragState = transientPosition?.phase === "dragging" ? transientPosition : null;
   const handleFixtureDragMove = useCallback((id: string, xMeters: number, yMeters: number, altKey: boolean) => {
-    setDragState({ id, xMeters, yMeters, altKey });
+    setTransientPosition({ altKey, id, phase: "dragging", xMeters, yMeters });
   }, []);
-  const handleFixtureDragEnd = useCallback((_id: string) => {
-    setDragState(null);
+  const handleFixtureDragEnd = useCallback((id: string, committedPosition: PlotPosition | null) => {
+    if (!committedPosition) {
+      setTransientPosition((current) => (current?.id === id ? null : current));
+      return;
+    }
+    setTransientPosition({ altKey: false, id, phase: "committing", ...committedPosition });
   }, []);
+  const handleFixtureRotationMove = useCallback((id: string, rotationDegrees: number) => {
+    setTransientRotation({ id, phase: "dragging", rotationDegrees });
+  }, []);
+  const handleFixtureRotationEnd = useCallback((id: string, committedRotationDegrees: number | null) => {
+    if (committedRotationDegrees === null) {
+      setTransientRotation((current) => (current?.id === id ? null : current));
+      return;
+    }
+    setTransientRotation({ id, phase: "committing", rotationDegrees: committedRotationDegrees });
+  }, []);
+
+  useEffect(() => {
+    if (!transientPosition || transientPosition.phase !== "committing") return undefined;
+    const fixtureIndex = fixtures.findIndex((fixture) => fixture.id === transientPosition.id);
+    if (fixtureIndex < 0) {
+      setTransientPosition(null);
+      return undefined;
+    }
+
+    const snapshotPosition = meterPositionFor(fixtures[fixtureIndex]!, fixtureIndex);
+    const snapshotMatches =
+      Math.abs(snapshotPosition.xMeters - transientPosition.xMeters) <= POSITION_MATCH_EPSILON_METERS &&
+      Math.abs(snapshotPosition.yMeters - transientPosition.yMeters) <= POSITION_MATCH_EPSILON_METERS;
+    if (snapshotMatches) {
+      setTransientPosition(null);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setTransientPosition((current) =>
+        current?.phase === "committing" && current.id === transientPosition.id ? null : current
+      );
+    }, COMMIT_PREVIEW_TIMEOUT_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [fixtures, transientPosition]);
+
+  useEffect(() => {
+    if (!transientRotation || transientRotation.phase !== "committing") return undefined;
+    const fixture = fixtures.find((candidate) => candidate.id === transientRotation.id);
+    if (!fixture) {
+      setTransientRotation(null);
+      return undefined;
+    }
+
+    if (
+      rotationDistanceDegrees(fixture.spatialRotation ?? 0, transientRotation.rotationDegrees) <=
+      ROTATION_MATCH_EPSILON_DEGREES
+    ) {
+      setTransientRotation(null);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setTransientRotation((current) =>
+        current?.phase === "committing" && current.id === transientRotation.id ? null : current
+      );
+    }, COMMIT_PREVIEW_TIMEOUT_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [fixtures, transientRotation]);
+
+  const displayedPositionFor = useCallback(
+    (fixture: LightingFixtureSnapshot, index: number, includeDragging: boolean): PlotPosition => {
+      if (transientPosition?.id === fixture.id && (transientPosition.phase === "committing" || includeDragging)) {
+        return { xMeters: transientPosition.xMeters, yMeters: transientPosition.yMeters };
+      }
+      return meterPositionFor(fixture, index);
+    },
+    [transientPosition]
+  );
+
+  const displayedRotationFor = useCallback(
+    (fixture: LightingFixtureSnapshot, includeDragging: boolean): number => {
+      if (transientRotation?.id === fixture.id && (transientRotation.phase === "committing" || includeDragging)) {
+        return transientRotation.rotationDegrees;
+      }
+      return fixture.spatialRotation ?? 0;
+    },
+    [transientRotation]
+  );
 
   // F2 — marquee selection on plain left-drag. Pan is now middle-mouse only.
   // Hit-test resolves on pointerup against the current fixture positions.
@@ -142,7 +258,7 @@ export function StagePlot({
     onBackgroundClick: () => onSelectFixture(null),
     resolveTargets: () =>
       fixtures.map((fixture, index) => {
-        const { xMeters, yMeters } = meterPositionFor(fixture, index);
+        const { xMeters, yMeters } = displayedPositionFor(fixture, index, false);
         return { id: fixture.id, xCm: xMeters * 100, yCm: yMeters * 100 };
       }),
   });
@@ -179,10 +295,18 @@ export function StagePlot({
   const orderedFixtures = selectedFixture
     ? [...fixtures.filter((fixture) => fixture.id !== selectedFixture.id), selectedFixture]
     : fixtures;
+  const fixtureVisuals = useMemo(() => {
+    const visualMap = new Map<string, ReturnType<typeof getFixtureVisualModel>>();
+    for (const fixture of fixtures) {
+      visualMap.set(fixture.id, getFixtureVisualModel(catalog, fixture));
+    }
+    return visualMap;
+  }, [catalog, fixtures]);
 
   return (
     <div
       className={`${styles.plotShell} ${patchMode ? styles.plotShellPatch : ""} ${previewMode ? styles.plotShellPreview : ""}`}
+      data-render-mode={renderMode}
       role="application"
       aria-label="Lighting stage plot"
     >
@@ -271,54 +395,26 @@ export function StagePlot({
           <StudioFloor layout={layout} />
           <StagePlotGrid layout={layout} />
 
-          {/* Beam pools (under markers so markers stay legible) */}
+          {/* Output footprints sit under markers so marker identity and selection remain legible. */}
           {fixtures.map((fixture, index) => {
-            const { xMeters, yMeters } = meterPositionFor(fixture, index);
-            const beamWidth = lightingFixtureBeamWidth(fixture.beamAngleDegrees ?? 50, fixture.rigZ ?? 3);
-            const radius = Math.max(40, beamWidth * 50);
+            const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
+            const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
             return (
-              <LightPool
-                key={`pool-${fixture.id}`}
-                id={fixture.id}
+              <FixtureOutputFootprint
+                key={`output-${fixture.id}`}
+                fixtureId={fixture.id}
                 centerX={xMeters * 100}
                 centerY={yMeters * 100}
-                radius={radius}
+                rotationDegrees={displayedRotationFor(fixture, true)}
+                rigHeightMeters={fixture.rigZ}
+                beamAngle={visual.output.beamAngle}
+                fieldAngle={visual.output.fieldAngle}
                 intensity={fixture.intensity}
                 cct={fixture.cct}
                 on={fixture.on}
+                visual={visual}
+                renderMode={renderMode}
               />
-            );
-          })}
-
-          {/* Beam length indicator (vertical line forward from rig point) */}
-          {fixtures.map((fixture, index) => {
-            if (!fixture.on) return null;
-            const { xMeters, yMeters } = meterPositionFor(fixture, index);
-            const length = lightingFixtureBeamLength(fixture.kind ?? fixture.type) * 100;
-            return (
-              <g key={`beam-${fixture.id}`}>
-                <defs>
-                  <linearGradient
-                    id={`beam-grad-${fixture.id}`}
-                    x1={xMeters * 100}
-                    y1={yMeters * 100}
-                    x2={xMeters * 100}
-                    y2={yMeters * 100 + length}
-                    gradientUnits="userSpaceOnUse"
-                  >
-                    <stop offset="0%" style={{ stopColor: "var(--color-stage-beam-line)", stopOpacity: 0.6 }} />
-                    <stop offset="100%" style={{ stopColor: "var(--color-stage-beam-line)", stopOpacity: 0 }} />
-                  </linearGradient>
-                </defs>
-                <line
-                  x1={xMeters * 100}
-                  y1={yMeters * 100}
-                  x2={xMeters * 100}
-                  y2={yMeters * 100 + length}
-                  stroke={`url(#beam-grad-${fixture.id})`}
-                  strokeWidth={1}
-                />
-              </g>
             );
           })}
 
@@ -361,7 +457,8 @@ export function StagePlot({
               without interfering with React reconciliation (key-stable). */}
           {orderedFixtures.map((fixture) => {
             const originalIndex = fixtures.indexOf(fixture);
-            const { xMeters, yMeters } = meterPositionFor(fixture, originalIndex);
+            const { xMeters, yMeters } = displayedPositionFor(fixture, originalIndex, false);
+            const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
             return (
               <FixtureMarker
                 key={fixture.id}
@@ -369,12 +466,10 @@ export function StagePlot({
                 name={fixture.name}
                 centerX={xMeters * 100}
                 centerY={yMeters * 100}
-                rotationDegrees={fixture.spatialRotation}
-                mounting={deriveMounting(fixture, catalog)}
-                pixelLayout={
-                  catalog?.definitions.find((definition) => definition.id === fixture.definitionId)?.visual
-                    .pixelLayout ?? null
-                }
+                rotationDegrees={displayedRotationFor(fixture, false)}
+                mounting={visual.mounting}
+                renderMode={renderMode}
+                visual={visual}
                 intensity={fixture.intensity}
                 cct={fixture.cct}
                 on={fixture.on}
@@ -385,11 +480,14 @@ export function StagePlot({
                 chipHovered={chipHoverFixtureId === fixture.id}
                 onSelect={(id, options) => onSelectFixture(id, options)}
                 onPositionCommit={onPositionCommit}
+                onRotationCommit={onRotationCommit}
                 onRequestRename={onRequestRenameFixture}
                 onIdentify={onIdentifyFixture}
                 onRequestDelete={onRequestDeleteFixture}
                 onDragMove={handleFixtureDragMove}
                 onDragEnd={handleFixtureDragEnd}
+                onRotationMove={handleFixtureRotationMove}
+                onRotationEnd={handleFixtureRotationEnd}
               />
             );
           })}
@@ -451,7 +549,7 @@ export function StagePlot({
           {/* Patch overlay — DMX address tags above each fixture */}
           <PatchOverlay active={patchMode}>
             {fixtures.map((fixture, index) => {
-              const { xMeters, yMeters } = meterPositionFor(fixture, index);
+              const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
               return (
                 <PatchAddressTag
                   key={`addr-${fixture.id}`}
@@ -465,15 +563,19 @@ export function StagePlot({
         </g>
       </svg>
 
+      <FixtureSymbolKey catalog={catalog} fixtures={fixtures} renderMode={renderMode} />
+
       <StagePlotControls
         zoom={viewport.zoom}
         zoomMode={viewport.zoomMode}
+        renderMode={renderMode}
         onZoomIn={viewport.zoomIn}
         onZoomOut={viewport.zoomOut}
         onReset={viewport.reset}
         onFitRoom={viewport.fitRoom}
         onFillDesk={viewport.fillDesk}
         onActualSize={viewport.actualSize}
+        onRenderModeChange={onRenderModeChange}
         viewBookmarks={viewport.viewBookmarks}
         onSaveViewBookmark={viewport.saveViewBookmark}
         onRecallViewBookmark={viewport.recallViewBookmark}
