@@ -1,54 +1,81 @@
-// DMX patching helpers. Channel counts depend on fixture type; the rest of
-// the helpers compose channel counts to detect overlapping fixtures and
-// suggest replacement addresses.
+import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
 
-export function lightingFixtureChannelCount(fixtureType: string) {
-  const normalized = fixtureType.trim().toLowerCase();
-  switch (normalized) {
-    case "infinimat":
+import { getFixtureMode, getFixtureModeForFixture, normalizeCatalogAlias } from "./fixtureCatalog";
+
+type FixturePatchIdentity =
+  | string
+  | Pick<LightingFixtureSnapshot, "definitionId" | "modeId" | "type" | "kind" | "universe" | "dmxStartAddress">;
+
+function fallbackChannelCount(fixtureType: string) {
+  switch (normalizeCatalogAlias(fixtureType)) {
+    case "aputure-infinimat-generic":
       return 4;
-    case "infinibar":
-    case "infinibar pb12":
-    case "infinibar-pb12":
+    case "aputure-infinibar-pb12":
       return 8;
+    case "litepanels-apollo-bridge":
+      return 0;
     default:
       return 2;
   }
 }
 
-export function lightingFixtureChannelLabels(fixtureType: string) {
-  const normalized = fixtureType.trim().toLowerCase();
-  switch (normalized) {
-    case "astra":
-    case "astra bi-color":
-    case "astra-bicolor":
-    case "apollo bridge":
-      return ["Dimmer", "CCT"];
-    case "infinimat":
-      return ["Dimmer", "CCT", "±G/M", "Strobe"];
-    case "infinibar":
-    case "infinibar pb12":
-    case "infinibar-pb12":
-      return ["Dimmer", "CCT", "Mix", "Red", "Green", "Blue", "FX", "Speed"];
-    default:
-      return [];
+function fixtureMode(identity: FixturePatchIdentity, catalog?: LightingFixtureCatalogSnapshot | null) {
+  if (typeof identity === "string") {
+    const definition = (catalog?.definitions ?? []).find((entry) => entry.id === normalizeCatalogAlias(identity));
+    return getFixtureMode(definition, undefined);
   }
+  return getFixtureModeForFixture(catalog, identity);
 }
 
-export function lightingFixtureMaxStartAddress(fixtureType: string) {
-  return 512 - lightingFixtureChannelCount(fixtureType) + 1;
+export function lightingFixtureChannelCount(
+  identity: FixturePatchIdentity,
+  catalog?: LightingFixtureCatalogSnapshot | null
+) {
+  return (
+    fixtureMode(identity, catalog)?.channelCount ??
+    fallbackChannelCount(typeof identity === "string" ? identity : identity.type)
+  );
 }
 
-export function lightingFixturePatchSummary(dmxStartAddress: number, fixtureType: string, universe = 1) {
-  const channelCount = lightingFixtureChannelCount(fixtureType);
+export function lightingFixtureChannelLabels(
+  identity: FixturePatchIdentity,
+  catalog?: LightingFixtureCatalogSnapshot | null
+) {
+  const mode = fixtureMode(identity, catalog);
+  if (mode) return mode.channels.map((channel) => channel.label);
+  const count = lightingFixtureChannelCount(identity, catalog);
+  return Array.from({ length: count }, (_, index) => `Ch${index + 1}`);
+}
+
+export function lightingFixtureMaxStartAddress(
+  identity: FixturePatchIdentity,
+  catalog?: LightingFixtureCatalogSnapshot | null
+) {
+  const count = lightingFixtureChannelCount(identity, catalog);
+  return count <= 0 ? 0 : 512 - count + 1;
+}
+
+export function lightingFixturePatchSummary(
+  dmxStartAddress: number,
+  identity: FixturePatchIdentity,
+  universe = 1,
+  catalog?: LightingFixtureCatalogSnapshot | null
+) {
+  const channelCount = lightingFixtureChannelCount(identity, catalog);
   if (dmxStartAddress < 1) {
     return `U${universe} · unpatched (${channelCount} ch needed)`;
   }
   return `U${universe} · ${dmxStartAddress}-${dmxStartAddress + channelCount - 1} (${channelCount} ch)`;
 }
 
-export function lightingFixtureModeLabel(fixtureType: string) {
-  return `${lightingFixtureChannelCount(fixtureType)} ch mode`;
+export function lightingFixtureModeLabel(
+  identity: FixturePatchIdentity,
+  catalog?: LightingFixtureCatalogSnapshot | null
+) {
+  const mode = fixtureMode(identity, catalog);
+  return mode
+    ? `${mode.channelCount} ch · ${mode.displayName}`
+    : `${lightingFixtureChannelCount(identity, catalog)} ch mode`;
 }
 
 export function lightingPatchBarSegments(value: number) {
@@ -56,17 +83,25 @@ export function lightingPatchBarSegments(value: number) {
 }
 
 export function findNextLightingFixtureStartAddress(
-  fixtures: Array<{ dmxStartAddress: number; type: string }>,
-  fixtureType: string
+  fixtures: Array<
+    Pick<LightingFixtureSnapshot, "definitionId" | "modeId" | "type" | "kind" | "universe" | "dmxStartAddress">
+  >,
+  identity: FixturePatchIdentity,
+  universe = 1,
+  catalog?: LightingFixtureCatalogSnapshot | null
 ) {
-  const channelCount = lightingFixtureChannelCount(fixtureType);
-  const maxStartAddress = lightingFixtureMaxStartAddress(fixtureType);
+  const channelCount = lightingFixtureChannelCount(identity, catalog);
+  const maxStartAddress = lightingFixtureMaxStartAddress(identity, catalog);
+  if (channelCount <= 0) return 0;
 
   for (let startAddress = 1; startAddress <= maxStartAddress; startAddress += 1) {
     const endAddress = startAddress + channelCount - 1;
     const overlaps = fixtures.some((fixture) => {
+      if ((fixture.universe ?? 1) !== universe) return false;
       const existingStart = fixture.dmxStartAddress;
-      const existingEnd = existingStart + lightingFixtureChannelCount(fixture.type) - 1;
+      const existingCount = lightingFixtureChannelCount(fixture, catalog);
+      if (existingCount <= 0) return false;
+      const existingEnd = existingStart + existingCount - 1;
       return startAddress <= existingEnd && endAddress >= existingStart;
     });
     if (!overlaps) {
@@ -78,20 +113,29 @@ export function findNextLightingFixtureStartAddress(
 }
 
 export function lightingPatchRangeOverlaps(
-  fixtures: Array<{ dmxStartAddress: number; type: string }>,
+  fixtures: Array<
+    Pick<LightingFixtureSnapshot, "definitionId" | "modeId" | "type" | "kind" | "universe" | "dmxStartAddress">
+  >,
   startAddress: number,
-  channelCount: number
+  channelCount: number,
+  universe = 1,
+  catalog?: LightingFixtureCatalogSnapshot | null
 ) {
+  if (channelCount <= 0) return false;
   const endAddress = startAddress + channelCount - 1;
   return fixtures.some((fixture) => {
+    if ((fixture.universe ?? 1) !== universe) return false;
     const existingStart = fixture.dmxStartAddress;
-    const existingEnd = existingStart + lightingFixtureChannelCount(fixture.type) - 1;
+    const existingCount = lightingFixtureChannelCount(fixture, catalog);
+    if (existingCount <= 0) return false;
+    const existingEnd = existingStart + existingCount - 1;
     return startAddress <= existingEnd && endAddress >= existingStart;
   });
 }
 
 export function buildLightingPatchOverlapMap(
-  fixtures: Array<{ dmxStartAddress: number; id: string; name: string; type: string }>
+  fixtures: Array<LightingFixtureSnapshot>,
+  catalog?: LightingFixtureCatalogSnapshot | null
 ) {
   const overlaps = new Map<
     string,
@@ -103,16 +147,22 @@ export function buildLightingPatchOverlapMap(
   >();
 
   fixtures.forEach((fixture) => {
-    const channelCount = lightingFixtureChannelCount(fixture.type);
+    const channelCount = lightingFixtureChannelCount(fixture, catalog);
+    if (channelCount <= 0) return;
     const fixtureStart = fixture.dmxStartAddress;
     const fixtureEnd = fixtureStart + channelCount - 1;
     const conflictingFixtures = fixtures.filter((candidate) => {
       if (candidate.id === fixture.id) {
         return false;
       }
+      if (candidate.universe !== fixture.universe) {
+        return false;
+      }
 
       const candidateStart = candidate.dmxStartAddress;
-      const candidateEnd = candidateStart + lightingFixtureChannelCount(candidate.type) - 1;
+      const candidateCount = lightingFixtureChannelCount(candidate, catalog);
+      if (candidateCount <= 0) return false;
+      const candidateEnd = candidateStart + candidateCount - 1;
       return fixtureStart <= candidateEnd && fixtureEnd >= candidateStart;
     });
 
@@ -121,11 +171,18 @@ export function buildLightingPatchOverlapMap(
     }
 
     const fixturesExcludingCurrent = fixtures.filter((candidate) => candidate.id !== fixture.id);
-    const suggestedStartAddress = findNextLightingFixtureStartAddress(fixturesExcludingCurrent, fixture.type);
+    const suggestedStartAddress = findNextLightingFixtureStartAddress(
+      fixturesExcludingCurrent,
+      fixture,
+      fixture.universe,
+      catalog
+    );
     const safeSuggestedStartAddress = lightingPatchRangeOverlaps(
       fixturesExcludingCurrent,
       suggestedStartAddress,
-      channelCount
+      channelCount,
+      fixture.universe,
+      catalog
     )
       ? null
       : suggestedStartAddress;

@@ -935,6 +935,7 @@ fn handle_light_action(
                                 intensity: fixture.intensity,
                                 cct: fixture.cct,
                                 on: fixture.on,
+                                control_values: fixture.control_values.clone(),
                             })
                             .collect(),
                         color_index: None,

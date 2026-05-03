@@ -10,6 +10,7 @@ use crate::lighting_backend::{
 };
 use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owned};
 
+use super::fixture_catalog::ResolvedFixtureProfile;
 use super::types::*;
 use super::*;
 
@@ -18,12 +19,8 @@ pub(super) fn normalized_fixture_type(
     legacy_kind: Option<&str>,
     fixture_id: &str,
 ) -> String {
-    explicit_type
-        .and_then(validate_fixture_type)
-        .or_else(|| legacy_kind.and_then(validate_fixture_type))
-        .or_else(|| infer_fixture_type_from_legacy_kind(legacy_kind))
-        .or_else(|| infer_fixture_type_from_fixture_id(fixture_id))
-        .unwrap_or_else(default_fixture_type)
+    let definition = resolve_fixture_definition(None, explicit_type, legacy_kind, fixture_id);
+    fixture_type_for_definition(definition.id.as_str())
 }
 
 pub(super) fn fixture_type_for_fixture(fixture: &LightingFixtureSnapshot) -> String {
@@ -35,10 +32,8 @@ pub(super) fn fixture_type_for_fixture(fixture: &LightingFixtureSnapshot) -> Str
 }
 
 pub(super) fn validate_fixture_type(value: &str) -> Option<String> {
-    match value {
-        "astra-bicolor" | "infinimat" | "infinibar-pb12" => Some(String::from(value)),
-        _ => None,
-    }
+    resolve_fixture_alias(value)
+        .map(|definition_id| fixture_type_for_definition(definition_id.as_str()))
 }
 
 pub(super) fn validate_effect_type(value: &str) -> Option<String> {
@@ -48,71 +43,18 @@ pub(super) fn validate_effect_type(value: &str) -> Option<String> {
     }
 }
 
-pub(super) fn infer_fixture_type_from_legacy_kind(value: Option<&str>) -> Option<String> {
-    match value.unwrap_or_default() {
-        "profile" => Some(String::from("astra-bicolor")),
-        "wash" => Some(String::from("infinimat")),
-        "practical" => Some(String::from("infinibar-pb12")),
-        _ => None,
-    }
-}
-
-pub(super) fn infer_fixture_type_from_fixture_id(fixture_id: &str) -> Option<String> {
-    if fixture_id.contains("wash") {
-        Some(String::from("infinimat"))
-    } else if fixture_id.contains("practical") || fixture_id.contains("house") {
-        Some(String::from("infinibar-pb12"))
-    } else if fixture_id.contains("key") {
-        Some(String::from("astra-bicolor"))
-    } else {
-        None
-    }
-}
-
-pub(super) fn lighting_kind_for_type(fixture_type: &str) -> String {
-    match fixture_type {
-        "infinimat" => String::from("wash"),
-        "infinibar-pb12" => String::from("practical"),
-        _ => String::from("profile"),
-    }
-}
-
 pub(super) fn fixture_channel_count(fixture_type: &str) -> i64 {
-    match fixture_type {
-        "infinimat" => 4,
-        "infinibar-pb12" => 8,
-        _ => 2,
-    }
+    resolve_fixture_profile(None, None, Some(fixture_type), None, "").channel_count
 }
 
 pub(super) fn fixture_cct_range(fixture_type: &str) -> (i64, i64) {
-    match fixture_type {
-        "infinimat" | "infinibar-pb12" => (2000, 10000),
-        _ => (3200, 5600),
-    }
-}
-
-pub(super) fn fixture_channel_labels(fixture_type: &str) -> Vec<String> {
-    match fixture_type {
-        "astra-bicolor" => vec![String::from("Dimmer"), String::from("CCT")],
-        "infinimat" => vec![
-            String::from("Dimmer"),
-            String::from("CCT"),
-            String::from("±G/M"),
-            String::from("Strobe"),
-        ],
-        "infinibar-pb12" => vec![
-            String::from("Dimmer"),
-            String::from("CCT"),
-            String::from("Mix"),
-            String::from("Red"),
-            String::from("Green"),
-            String::from("Blue"),
-            String::from("FX"),
-            String::from("Speed"),
-        ],
-        _ => Vec::new(),
-    }
+    fixture_cct_range_from_profile(&resolve_fixture_profile(
+        None,
+        None,
+        Some(fixture_type),
+        None,
+        "",
+    ))
 }
 
 pub(super) fn intensity_to_dmx(percent: i64) -> i64 {
@@ -125,14 +67,21 @@ pub(super) fn cct_to_dmx(kelvin: i64, min: i64, max: i64) -> i64 {
 }
 
 pub(super) fn default_fixture_cct_for_type(fixture_type: &str) -> i64 {
-    match fixture_type {
-        "infinimat" | "infinibar-pb12" => 5600,
-        _ => 4400,
-    }
+    fixture_default_cct(&resolve_fixture_profile(
+        None,
+        None,
+        Some(fixture_type),
+        None,
+        "",
+    ))
 }
 
 pub(super) fn normalize_dmx_start_address(dmx_start_address: i64, fixture_type: &str) -> i64 {
-    let max_start = 512 - fixture_channel_count(fixture_type) + 1;
+    let channel_count = fixture_channel_count(fixture_type);
+    if channel_count <= 0 {
+        return 0;
+    }
+    let max_start = 512 - channel_count + 1;
     clamp_i64(dmx_start_address, 1, max_start)
 }
 
@@ -171,28 +120,38 @@ pub(super) fn validate_group_exists(
 
 pub(super) fn validate_dmx_start_address(
     fixtures: &[LightingEditorFixtureState],
-    fixture_type: &str,
+    profile: &ResolvedFixtureProfile,
+    universe: i64,
     dmx_start_address: i64,
     exclude_fixture_id: Option<&str>,
 ) -> Result<(), LightingCommandError> {
-    let max_start = 512 - fixture_channel_count(fixture_type) + 1;
+    if profile.channel_count <= 0 {
+        return Ok(());
+    }
+    let max_start = 512 - profile.channel_count + 1;
     if !(1..=max_start).contains(&dmx_start_address) {
         return Err(LightingCommandError::Rejected(
             "LIGHTING_INVALID_DMX_ADDRESS",
             format!(
-                "DMX start address must be between 1 and {} for fixture type '{}'.",
-                max_start, fixture_type
+                "DMX start address must be between 1 and {} for fixture definition '{}' mode '{}'.",
+                max_start, profile.definition_id, profile.mode_id
             ),
         ));
     }
 
-    let new_end = dmx_start_address + fixture_channel_count(fixture_type) - 1;
+    let new_end = dmx_start_address + profile.channel_count - 1;
     if let Some(overlap_fixture) = fixtures.iter().find(|fixture| {
         if exclude_fixture_id == Some(fixture.id.as_str()) {
             return false;
         }
-        let existing_end =
-            fixture.dmx_start_address + fixture_channel_count(fixture.fixture_type.as_str()) - 1;
+        if fixture.universe != universe {
+            return false;
+        }
+        let existing_profile = fixture_profile_for_state(fixture);
+        if existing_profile.channel_count <= 0 {
+            return false;
+        }
+        let existing_end = fixture.dmx_start_address + existing_profile.channel_count - 1;
         dmx_start_address <= existing_end && new_end >= fixture.dmx_start_address
     }) {
         return Err(LightingCommandError::Rejected(
@@ -205,6 +164,70 @@ pub(super) fn validate_dmx_start_address(
     }
 
     Ok(())
+}
+
+pub(super) fn fixture_profile_for_state(
+    fixture: &LightingEditorFixtureState,
+) -> ResolvedFixtureProfile {
+    resolve_fixture_profile(
+        fixture.definition_id.as_deref(),
+        fixture.mode_id.as_deref(),
+        Some(fixture.fixture_type.as_str()),
+        Some(fixture.kind.as_str()),
+        fixture.id.as_str(),
+    )
+}
+
+pub(super) fn fixture_profile_for_snapshot(
+    fixture: &LightingFixtureSnapshot,
+) -> ResolvedFixtureProfile {
+    resolve_fixture_profile(
+        Some(fixture.definition_id.as_str()),
+        Some(fixture.mode_id.as_str()),
+        Some(fixture.fixture_type.as_str()),
+        Some(fixture.kind.as_str()),
+        fixture.id.as_str(),
+    )
+}
+
+pub(super) fn normalize_fixture_control_values(
+    profile: &ResolvedFixtureProfile,
+    control_values: &HashMap<String, i64>,
+) -> HashMap<String, i64> {
+    let definition =
+        resolve_fixture_definition(Some(profile.definition_id.as_str()), None, None, "");
+    let mode = resolve_fixture_mode(&definition, Some(profile.mode_id.as_str()));
+    let mut normalized = HashMap::new();
+    for control in mode.controls {
+        if matches!(control.id.as_str(), "intensity" | "cct") {
+            continue;
+        }
+        let value = control_values
+            .get(control.id.as_str())
+            .copied()
+            .unwrap_or(control.default_value);
+        normalized.insert(control.id, clamp_i64(value, control.min, control.max));
+    }
+    normalized
+}
+
+pub(super) fn effective_fixture_control_values(
+    fixture: &LightingEditorFixtureState,
+) -> HashMap<String, i64> {
+    let profile = fixture_profile_for_state(fixture);
+    let mut values = normalize_fixture_control_values(&profile, &fixture.control_values);
+    values.insert(
+        String::from("intensity"),
+        clamp_i64(fixture.intensity, 0, 100),
+    );
+    if profile.capabilities.iter().any(|value| value == "cct") {
+        let (min_cct, max_cct) = fixture_cct_range_from_profile(&profile);
+        values.insert(
+            String::from("cct"),
+            clamp_i64(fixture.cct, min_cct, max_cct),
+        );
+    }
+    values
 }
 
 pub(super) fn append_fixture_to_scenes(
@@ -224,6 +247,7 @@ pub(super) fn append_fixture_to_scenes(
             intensity: fixture.intensity,
             cct: fixture.cct,
             on: fixture.on,
+            control_values: effective_fixture_control_values(fixture),
         });
     }
 }

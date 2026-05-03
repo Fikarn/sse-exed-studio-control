@@ -15,9 +15,17 @@ pub fn create_lighting_fixture(
     let mut editor_state = load_lighting_editor_state(&app_settings);
 
     validate_group_exists(editor_state.groups.as_slice(), request.group_id.as_deref())?;
+    let profile = resolve_fixture_profile(
+        Some(request.definition_id.as_str()),
+        Some(request.mode_id.as_str()),
+        Some(request.fixture_type.as_str()),
+        None,
+        "",
+    );
     validate_dmx_start_address(
         editor_state.fixtures.as_slice(),
-        &request.fixture_type,
+        &profile,
+        request.universe,
         request.dmx_start_address,
         None,
     )?;
@@ -26,8 +34,11 @@ pub fn create_lighting_fixture(
         id: next_custom_fixture_id(editor_state.fixtures.as_slice()),
         name: request.name.clone(),
         fixture_type: request.fixture_type.clone(),
+        definition_id: Some(profile.definition_id.clone()),
+        mode_id: Some(profile.mode_id.clone()),
+        universe: request.universe,
         dmx_start_address: request.dmx_start_address,
-        kind: lighting_kind_for_type(&request.fixture_type),
+        kind: profile.kind.clone(),
         group_id: request.group_id.clone(),
         spatial_x: None,
         spatial_y: None,
@@ -35,8 +46,9 @@ pub fn create_lighting_fixture(
         rig_z: None,
         beam_angle_degrees: None,
         intensity: DEFAULT_FIXTURE_INTENSITY,
-        cct: default_fixture_cct_for_type(&request.fixture_type),
+        cct: fixture_default_cct(&profile),
         on: false,
+        control_values: normalize_fixture_control_values(&profile, &Default::default()),
         effect: None,
     };
     append_fixture_to_scenes(&mut editor_state.scenes, &fixture);
@@ -102,12 +114,67 @@ pub fn update_lighting_fixture(
         .fixture_type
         .clone()
         .unwrap_or_else(|| existing_fixture.fixture_type.clone());
+    let next_definition_id = if let Some(definition_id) = &request.definition_id {
+        definition_id.clone()
+    } else if request.fixture_type.is_some() {
+        resolve_fixture_profile(
+            None,
+            None,
+            Some(next_fixture_type.as_str()),
+            Some(existing_fixture.kind.as_str()),
+            existing_fixture.id.as_str(),
+        )
+        .definition_id
+    } else {
+        existing_fixture.definition_id.clone().unwrap_or_else(|| {
+            resolve_fixture_profile(
+                None,
+                None,
+                Some(next_fixture_type.as_str()),
+                Some(existing_fixture.kind.as_str()),
+                existing_fixture.id.as_str(),
+            )
+            .definition_id
+        })
+    };
+    let next_mode_id = if let Some(mode_id) = &request.mode_id {
+        mode_id.clone()
+    } else if request.definition_id.is_some() || request.fixture_type.is_some() {
+        resolve_fixture_profile(
+            Some(next_definition_id.as_str()),
+            None,
+            Some(next_fixture_type.as_str()),
+            Some(existing_fixture.kind.as_str()),
+            existing_fixture.id.as_str(),
+        )
+        .mode_id
+    } else {
+        existing_fixture.mode_id.clone().unwrap_or_else(|| {
+            resolve_fixture_profile(
+                Some(next_definition_id.as_str()),
+                None,
+                Some(next_fixture_type.as_str()),
+                Some(existing_fixture.kind.as_str()),
+                existing_fixture.id.as_str(),
+            )
+            .mode_id
+        })
+    };
+    let next_universe = request.universe.unwrap_or(existing_fixture.universe);
+    let next_profile = resolve_fixture_profile(
+        Some(next_definition_id.as_str()),
+        Some(next_mode_id.as_str()),
+        Some(next_fixture_type.as_str()),
+        Some(existing_fixture.kind.as_str()),
+        existing_fixture.id.as_str(),
+    );
     let next_dmx_start_address = request
         .dmx_start_address
         .unwrap_or(existing_fixture.dmx_start_address);
     validate_dmx_start_address(
         editor_state.fixtures.as_slice(),
-        &next_fixture_type,
+        &next_profile,
+        next_universe,
         next_dmx_start_address,
         Some(request.fixture_id.as_str()),
     )?;
@@ -124,9 +191,30 @@ pub fn update_lighting_fixture(
         }
         if let Some(fixture_type) = &request.fixture_type {
             fixture.fixture_type = fixture_type.clone();
-            fixture.kind = lighting_kind_for_type(fixture_type);
-            let default_cct = default_fixture_cct_for_type(fixture_type);
-            fixture.cct = clamp_cct_for_type(fixture.cct, fixture_type, default_cct);
+        }
+        if request.definition_id.is_some()
+            || request.mode_id.is_some()
+            || request.fixture_type.is_some()
+        {
+            fixture.definition_id = Some(next_profile.definition_id.clone());
+            fixture.mode_id = Some(next_profile.mode_id.clone());
+            fixture.kind = next_profile.kind.clone();
+            let default_cct = fixture_default_cct(&next_profile);
+            let (min_cct, max_cct) = fixture_cct_range_from_profile(&next_profile);
+            fixture.cct = clamp_i64(
+                if fixture.cct == 0 {
+                    default_cct
+                } else {
+                    fixture.cct
+                },
+                min_cct,
+                max_cct,
+            );
+            fixture.control_values =
+                normalize_fixture_control_values(&next_profile, &fixture.control_values);
+        }
+        if let Some(universe) = request.universe {
+            fixture.universe = universe;
         }
         if let Some(dmx_start_address) = request.dmx_start_address {
             fixture.dmx_start_address = dmx_start_address;
@@ -142,8 +230,14 @@ pub fn update_lighting_fixture(
             fixture.intensity = clamp_i64(intensity, 0, 100);
         }
         if let Some(cct) = request.cct {
-            let default_cct = default_fixture_cct_for_type(&fixture.fixture_type);
-            fixture.cct = clamp_cct_for_type(cct, &fixture.fixture_type, default_cct);
+            let profile = fixture_profile_for_state(fixture);
+            let default_cct = fixture_default_cct(&profile);
+            let (min_cct, max_cct) = fixture_cct_range_from_profile(&profile);
+            fixture.cct = clamp_i64(if cct == 0 { default_cct } else { cct }, min_cct, max_cct);
+        }
+        if let Some(control_values) = &request.control_values {
+            let profile = fixture_profile_for_state(fixture);
+            fixture.control_values = normalize_fixture_control_values(&profile, control_values);
         }
         if let Some(group_id) = &request.group_id {
             fixture.group_id = group_id.clone();

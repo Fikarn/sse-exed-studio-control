@@ -1,5 +1,9 @@
 use serde_json::Value;
+use std::collections::HashMap;
 
+use super::fixture_catalog::{
+    fixture_type_for_definition, normalized_catalog_id, resolve_fixture_profile,
+};
 use super::helpers::*;
 use super::types::{
     FixtureHighlightMode, LightingAllPowerRequest, LightingEditorSceneFixtureState, LightingEffect,
@@ -83,9 +87,24 @@ pub fn parse_lighting_preview_discard_request(
 pub fn parse_lighting_fixture_create_request(
     params: &Value,
 ) -> Result<LightingFixtureCreateRequest, String> {
-    let fixture_type = parse_required_fixture_type(params.get("type"))?;
-    let dmx_start_address =
-        parse_required_fixture_dmx_start_address(params.get("dmxStartAddress"), &fixture_type)?;
+    let (definition_id, mode_id, fixture_type) = parse_fixture_identity(
+        params.get("definitionId"),
+        params.get("modeId"),
+        params.get("type"),
+        true,
+    )?;
+    let universe = params
+        .get("universe")
+        .map(parse_i64_value)
+        .transpose()?
+        .map(|value| clamp_i64(value, 1, 63999))
+        .unwrap_or(super::DEFAULT_UNIVERSE);
+    let dmx_start_address = parse_required_fixture_dmx_start_address(
+        params.get("dmxStartAddress"),
+        &definition_id,
+        &mode_id,
+        &fixture_type,
+    )?;
     let group_id = params
         .get("groupId")
         .map(parse_optional_group_id)
@@ -95,6 +114,9 @@ pub fn parse_lighting_fixture_create_request(
     Ok(LightingFixtureCreateRequest {
         name: parse_required_fixture_name(params.get("name"))?,
         fixture_type,
+        definition_id,
+        mode_id,
+        universe,
         dmx_start_address,
         group_id,
     })
@@ -117,6 +139,19 @@ pub fn parse_lighting_fixture_update_request(
         .get("type")
         .map(|value| parse_required_fixture_type(Some(value)))
         .transpose()?;
+    let definition_id = params
+        .get("definitionId")
+        .map(parse_required_definition_id)
+        .transpose()?;
+    let mode_id = params
+        .get("modeId")
+        .map(parse_required_mode_id)
+        .transpose()?;
+    let universe = params
+        .get("universe")
+        .map(parse_i64_value)
+        .transpose()?
+        .map(|value| clamp_i64(value, 1, 63999));
     let dmx_start_address = params
         .get("dmxStartAddress")
         .map(parse_positive_i64_value)
@@ -142,6 +177,10 @@ pub fn parse_lighting_fixture_update_request(
         .map(|value| clamp_i64(value, 0, 100));
 
     let cct = params.get("cct").map(parse_i64_value).transpose()?;
+    let control_values = params
+        .get("controlValues")
+        .map(parse_control_values)
+        .transpose()?;
 
     let group_id = params
         .get("groupId")
@@ -168,10 +207,14 @@ pub fn parse_lighting_fixture_update_request(
     if on.is_none()
         && name.is_none()
         && fixture_type.is_none()
+        && definition_id.is_none()
+        && mode_id.is_none()
+        && universe.is_none()
         && dmx_start_address.is_none()
         && effect.is_none()
         && intensity.is_none()
         && cct.is_none()
+        && control_values.is_none()
         && group_id.is_none()
         && spatial_x.is_none()
         && spatial_y.is_none()
@@ -188,11 +231,15 @@ pub fn parse_lighting_fixture_update_request(
         fixture_id: String::from(fixture_id),
         name,
         fixture_type,
+        definition_id,
+        mode_id,
+        universe,
         dmx_start_address,
         effect,
         on,
         intensity,
         cct,
+        control_values,
         group_id,
         spatial_x,
         spatial_y,
@@ -661,11 +708,17 @@ fn parse_lighting_scene_fixture_states(
             .get("on")
             .and_then(Value::as_bool)
             .ok_or_else(|| String::from("fixtureStates.on must be a boolean"))?;
+        let control_values = object
+            .get("controlValues")
+            .map(parse_control_values)
+            .transpose()?
+            .unwrap_or_default();
         fixture_states.push(LightingEditorSceneFixtureState {
             fixture_id: String::from(fixture_id),
             intensity,
             cct,
             on,
+            control_values,
         });
     }
     Ok(fixture_states)
@@ -901,26 +954,100 @@ pub(super) fn parse_required_fixture_type(value: Option<&Value>) -> Result<Strin
         .filter(|value| !value.is_empty())
         .ok_or_else(|| String::from("type is required"))?;
 
-    validate_fixture_type(fixture_type).ok_or_else(|| {
-        String::from("type must be one of astra-bicolor, infinimat, or infinibar-pb12")
-    })
+    validate_fixture_type(fixture_type)
+        .ok_or_else(|| String::from("type must resolve to a known fixture catalog entry"))
 }
 
 pub(super) fn parse_required_fixture_dmx_start_address(
     value: Option<&Value>,
+    definition_id: &str,
+    mode_id: &str,
     fixture_type: &str,
 ) -> Result<i64, String> {
     let dmx_start_address = value
         .ok_or_else(|| String::from("dmxStartAddress is required"))
         .and_then(parse_positive_i64_value)?;
-    let max_start = 512 - fixture_channel_count(fixture_type) + 1;
+    let profile = resolve_fixture_profile(
+        Some(definition_id),
+        Some(mode_id),
+        Some(fixture_type),
+        None,
+        "",
+    );
+    if profile.channel_count <= 0 {
+        return Ok(0);
+    }
+    let max_start = 512 - profile.channel_count + 1;
     if !(1..=max_start).contains(&dmx_start_address) {
         return Err(format!(
-            "dmxStartAddress must be between 1 and {} for type '{}'",
-            max_start, fixture_type
+            "dmxStartAddress must be between 1 and {} for definition '{}' mode '{}'",
+            max_start, definition_id, mode_id
         ));
     }
     Ok(dmx_start_address)
+}
+
+fn parse_fixture_identity(
+    definition_value: Option<&Value>,
+    mode_value: Option<&Value>,
+    type_value: Option<&Value>,
+    required: bool,
+) -> Result<(String, String, String), String> {
+    let definition_id = definition_value
+        .map(parse_required_definition_id)
+        .transpose()?;
+    let fixture_type = type_value
+        .map(|value| parse_required_fixture_type(Some(value)))
+        .transpose()?;
+    if required && definition_id.is_none() && fixture_type.is_none() {
+        return Err(String::from("definitionId or type is required"));
+    }
+    let mode_id = mode_value.map(parse_required_mode_id).transpose()?;
+    let profile = resolve_fixture_profile(
+        definition_id.as_deref(),
+        mode_id.as_deref(),
+        fixture_type.as_deref(),
+        None,
+        "",
+    );
+    let fixture_type =
+        fixture_type.unwrap_or_else(|| fixture_type_for_definition(profile.definition_id.as_str()));
+    Ok((profile.definition_id, profile.mode_id, fixture_type))
+}
+
+fn parse_required_definition_id(value: &Value) -> Result<String, String> {
+    let definition_id = value
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| String::from("definitionId must be a non-empty string"))?;
+    normalized_catalog_id(definition_id).ok_or_else(|| {
+        format!("definitionId '{definition_id}' is not present in the fixture catalog")
+    })
+}
+
+fn parse_required_mode_id(value: &Value) -> Result<String, String> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(String::from)
+        .ok_or_else(|| String::from("modeId must be a non-empty string"))
+}
+
+fn parse_control_values(value: &Value) -> Result<HashMap<String, i64>, String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| String::from("controlValues must be an object"))?;
+    let mut values = HashMap::with_capacity(object.len());
+    for (key, value) in object {
+        let trimmed = key.trim();
+        if trimmed.is_empty() {
+            return Err(String::from("controlValues keys must be non-empty"));
+        }
+        values.insert(String::from(trimmed), parse_i64_value(value)?);
+    }
+    Ok(values)
 }
 
 pub(super) fn parse_optional_trimmed_string_or_null(

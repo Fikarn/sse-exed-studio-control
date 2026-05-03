@@ -15,6 +15,7 @@ export interface DMXMonitorDialogProps {
 }
 
 interface CellData {
+  universe: number;
   channel: number;
   value: number;
   assigned: boolean;
@@ -22,28 +23,33 @@ interface CellData {
   channelLabel?: string;
 }
 
-function buildCells(snapshot: LightingDmxMonitorSnapshot | null): CellData[] {
-  const byChannel = new Map<number, { value: number; lightName: string; label: string }>();
+function buildCells(snapshot: LightingDmxMonitorSnapshot | null, universe: number): CellData[] {
+  const byChannel = new Map<string, { value: number; lightName: string; label: string }>();
+  const universes = new Set<number>([universe]);
   for (const entry of snapshot?.channels ?? []) {
-    byChannel.set(entry.channel, {
+    universes.add(entry.universe);
+    byChannel.set(`${entry.universe}:${entry.channel}`, {
       value: entry.value,
       lightName: entry.lightName,
       label: entry.label,
     });
   }
   const cells: CellData[] = [];
-  for (let channel = 1; channel <= TOTAL_CHANNELS; channel += 1) {
-    const entry = byChannel.get(channel);
-    if (entry) {
-      cells.push({
-        channel,
-        value: entry.value,
-        assigned: true,
-        fixtureName: entry.lightName,
-        channelLabel: entry.label,
-      });
-    } else {
-      cells.push({ channel, value: 0, assigned: false });
+  for (const currentUniverse of Array.from(universes).sort((left, right) => left - right)) {
+    for (let channel = 1; channel <= TOTAL_CHANNELS; channel += 1) {
+      const entry = byChannel.get(`${currentUniverse}:${channel}`);
+      if (entry) {
+        cells.push({
+          universe: currentUniverse,
+          channel,
+          value: entry.value,
+          assigned: true,
+          fixtureName: entry.lightName,
+          channelLabel: entry.label,
+        });
+      } else {
+        cells.push({ universe: currentUniverse, channel, value: 0, assigned: false });
+      }
     }
   }
   return cells;
@@ -55,12 +61,14 @@ function toHex(value: number): string {
 }
 
 export function DMXMonitorDialog({ universe, snapshot, reachable, onClose }: DMXMonitorDialogProps) {
-  const cells = useMemo(() => buildCells(snapshot), [snapshot]);
+  const cells = useMemo(() => buildCells(snapshot, universe), [snapshot, universe]);
+  const universes = useMemo(() => Array.from(new Set(cells.map((cell) => cell.universe))), [cells]);
   const assignedCount = cells.filter((cell) => cell.assigned).length;
+  const universeLabel = universes.map((entry) => `U${entry}`).join("/");
 
   return (
     <Dialog
-      title={`DMX universe U${universe}`}
+      title={`DMX universe ${universeLabel}`}
       body={
         reachable
           ? `${assignedCount} of ${TOTAL_CHANNELS} channels are patched to fixtures. Hover any cell for the fixture name and channel label.`
@@ -84,30 +92,48 @@ export function DMXMonitorDialog({ universe, snapshot, reachable, onClose }: DMX
             Unassigned
           </span>
         </div>
-        <div className={styles.grid} role="grid" aria-label={`DMX universe U${universe} channels`}>
-          {Array.from({ length: Math.ceil(cells.length / 16) }, (_, rowIdx) => (
-            <div key={rowIdx} role="row" className={styles.row}>
-              {cells.slice(rowIdx * 16, (rowIdx + 1) * 16).map((cell) => {
-                const tooltip = cell.assigned
-                  ? `Ch ${cell.channel} · ${cell.fixtureName} · ${cell.channelLabel}`
-                  : `Ch ${cell.channel} · unassigned`;
-                const className = cell.assigned ? `${styles.cell} ${styles.cellAssigned}` : styles.cell;
-                const fillPercent = Math.max(0, Math.min(100, (cell.value / 255) * 100));
-                return (
-                  <div key={cell.channel} className={className} role="gridcell" title={tooltip}>
-                    <span className={styles.cellHeader}>
-                      <span>{String(cell.channel).padStart(3, "0")}</span>
-                    </span>
-                    <span className={styles.cellValue}>{toHex(cell.value)}</span>
-                    <span className={styles.cellBar}>
-                      <span className={styles.cellBarFill} style={{ width: `${fillPercent}%` }} />
-                    </span>
-                  </div>
-                );
-              })}
+        {universes.map((currentUniverse) => {
+          const universeCells = cells.filter((cell) => cell.universe === currentUniverse);
+          return (
+            <div
+              key={currentUniverse}
+              className={styles.grid}
+              role="grid"
+              aria-label={`DMX universe U${currentUniverse} channels`}
+            >
+              {universes.length > 1 ? <div className={styles.legendKey}>U{currentUniverse}</div> : null}
+              {Array.from({ length: Math.ceil(universeCells.length / 16) }, (_, rowIdx) => (
+                <div key={rowIdx} role="row" className={styles.row}>
+                  {universeCells.slice(rowIdx * 16, (rowIdx + 1) * 16).map((cell) => {
+                    const channelPrefix =
+                      universes.length === 1 ? `Ch ${cell.channel}` : `U${cell.universe} Ch ${cell.channel}`;
+                    const tooltip = cell.assigned
+                      ? `${channelPrefix} · ${cell.fixtureName} · ${cell.channelLabel}`
+                      : `${channelPrefix} · unassigned`;
+                    const className = cell.assigned ? `${styles.cell} ${styles.cellAssigned}` : styles.cell;
+                    const fillPercent = Math.max(0, Math.min(100, (cell.value / 255) * 100));
+                    return (
+                      <div
+                        key={`${cell.universe}:${cell.channel}`}
+                        className={className}
+                        role="gridcell"
+                        title={tooltip}
+                      >
+                        <span className={styles.cellHeader}>
+                          <span>{String(cell.channel).padStart(3, "0")}</span>
+                        </span>
+                        <span className={styles.cellValue}>{toHex(cell.value)}</span>
+                        <span className={styles.cellBar}>
+                          <span className={styles.cellBarFill} style={{ width: `${fillPercent}%` }} />
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
     </Dialog>
   );

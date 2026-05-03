@@ -57,6 +57,9 @@ pub fn recall_lighting_scene(
                 fixture.on = scene_fixture_state.on;
                 fixture.intensity = scene_fixture_state.intensity;
                 fixture.cct = scene_fixture_state.cct;
+                let profile = fixture_profile_for_state(fixture);
+                fixture.control_values =
+                    normalize_fixture_control_values(&profile, &scene_fixture_state.control_values);
             }
         }
     }
@@ -218,6 +221,13 @@ pub(super) fn validated_scene_fixture_states(
                     "Scene fixture CCT must be between {MIN_FIXTURE_CCT} and {MAX_FIXTURE_CCT}."
                 ),
             ));
+        }
+        if let Some(fixture) = fixtures
+            .iter()
+            .find(|fixture| fixture.id == state.fixture_id)
+        {
+            let profile = fixture_profile_for_state(fixture);
+            let _ = normalize_fixture_control_values(&profile, &state.control_values);
         }
     }
 

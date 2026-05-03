@@ -27,6 +27,7 @@ const DEFAULT_LIGHTING_FIXTURE_TYPE: &str = "astra-bicolor";
 
 mod editor_state;
 mod fade;
+mod fixture_catalog;
 mod fixtures;
 mod groups;
 mod helpers;
@@ -41,6 +42,7 @@ mod snapshot;
 mod types;
 
 pub use editor_state::{load_lighting_editor_state, save_lighting_editor_state};
+pub use fixture_catalog::*;
 pub use fixtures::*;
 pub use groups::*;
 pub use identify::*;

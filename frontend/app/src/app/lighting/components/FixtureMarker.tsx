@@ -25,6 +25,7 @@ export interface FixtureMarkerProps {
   centerY: number;
   rotationDegrees: number;
   mounting: FixtureMounting;
+  pixelLayout?: { pixelCount: number; rows: number; columns: number; segments: number; order: string } | null;
   intensity: number;
   cct: number;
   on: boolean;
@@ -74,10 +75,11 @@ export interface FixtureMarkerProps {
 const BAR_WIDTH = 4;
 const BAR_HEIGHT = 24;
 const BAR_ANCHOR_Y: Record<FixtureMounting, number> = {
-  "grid-panel": 11,
-  "grid-soft": 11,
-  "wall-bar": 5,
-  stand: 11,
+  bar: 5,
+  "control-node": 11,
+  fresnel: 11,
+  mat: 11,
+  panel: 11,
 };
 
 const SHELL_FILL = "var(--color-fixture-shell-fill)";
@@ -90,51 +92,113 @@ const LABEL_NAME_FILL = "var(--color-brand-text-secondary)";
 const LABEL_META_FILL = "var(--color-brand-text-muted)";
 
 const MOUNTING_SHORT_LABEL: Record<FixtureMounting, string> = {
-  "grid-panel": "grid",
-  "grid-soft": "grid",
-  stand: "stand",
-  "wall-bar": "wall",
+  bar: "bar",
+  "control-node": "node",
+  fresnel: "spot",
+  mat: "mat",
+  panel: "panel",
 };
 
-function shapeForMounting(mounting: FixtureMounting): ReactElement {
+function shapeForMounting(
+  mounting: FixtureMounting,
+  pixelLayout?: { pixelCount: number; rows: number; columns: number; segments: number; order: string } | null
+): ReactElement {
+  const segments = Math.max(0, Math.min(64, Math.round(pixelLayout?.segments ?? 0)));
   switch (mounting) {
-    case "grid-panel":
+    case "panel":
+      return (
+        <g>
+          <rect
+            x={-9}
+            y={-9}
+            width={18}
+            height={18}
+            rx={2}
+            style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
+          />
+          {segments > 1
+            ? Array.from({ length: Math.min(segments, 8) - 1 }, (_, index) => (
+                <line
+                  key={`panel-segment-${index}`}
+                  x1={-9 + ((index + 1) * 18) / Math.min(segments, 8)}
+                  x2={-9 + ((index + 1) * 18) / Math.min(segments, 8)}
+                  y1={-8}
+                  y2={8}
+                  style={{ stroke: SHELL_STROKE, strokeWidth: 0.45, opacity: 0.65 }}
+                />
+              ))
+            : null}
+        </g>
+      );
+    case "mat":
+      return (
+        <g>
+          <rect
+            x={-13}
+            y={-9}
+            width={26}
+            height={18}
+            rx={3}
+            style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
+          />
+          {segments > 1
+            ? Array.from({ length: Math.min(segments, 8) - 1 }, (_, index) => (
+                <line
+                  key={`mat-segment-${index}`}
+                  x1={-13 + ((index + 1) * 26) / Math.min(segments, 8)}
+                  x2={-13 + ((index + 1) * 26) / Math.min(segments, 8)}
+                  y1={-8}
+                  y2={8}
+                  style={{ stroke: SHELL_STROKE, strokeWidth: 0.45, opacity: 0.7 }}
+                />
+              ))
+            : null}
+        </g>
+      );
+    case "bar":
+      return (
+        <g>
+          <rect
+            x={-22}
+            y={-3}
+            width={44}
+            height={6}
+            rx={1}
+            style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
+          />
+          {segments > 1
+            ? Array.from({ length: Math.min(segments, 16) - 1 }, (_, index) => (
+                <line
+                  key={`bar-segment-${index}`}
+                  x1={-22 + ((index + 1) * 44) / Math.min(segments, 16)}
+                  x2={-22 + ((index + 1) * 44) / Math.min(segments, 16)}
+                  y1={-2.6}
+                  y2={2.6}
+                  style={{ stroke: SHELL_STROKE, strokeWidth: 0.4, opacity: 0.75 }}
+                />
+              ))
+            : null}
+        </g>
+      );
+    case "control-node":
       return (
         <rect
-          x={-9}
-          y={-9}
-          width={18}
-          height={18}
+          x={-8}
+          y={-8}
+          width={16}
+          height={16}
           rx={2}
           style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
         />
       );
-    case "grid-soft":
-      return (
-        <rect
-          x={-13}
-          y={-9}
-          width={26}
-          height={18}
-          rx={4}
-          style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
-        />
-      );
-    case "wall-bar":
-      return (
-        <rect
-          x={-22}
-          y={-3}
-          width={44}
-          height={6}
-          rx={1}
-          style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }}
-        />
-      );
-    case "stand":
+    case "fresnel":
     default:
       return <circle r={9} style={{ fill: SHELL_FILL, stroke: SHELL_STROKE, strokeWidth: 1 }} />;
   }
+}
+
+function ringRadius(mounting: FixtureMounting, base: number, wide: number) {
+  return mounting === "bar" ? wide : base;
 }
 
 function snapMeter(value: number): number {
@@ -157,6 +221,7 @@ export function FixtureMarker({
   centerY,
   rotationDegrees,
   mounting,
+  pixelLayout = null,
   intensity,
   cct,
   on,
@@ -200,9 +265,9 @@ export function FixtureMarker({
   const intensityLabel = on ? `${Math.round(intensity)}%` : "OFF";
   const metaLabel = `${intensityLabel} · ${Math.round(cct)} K · ${MOUNTING_SHORT_LABEL[mounting]}`;
 
-  // Wall-bar markers are wide; lift labels slightly to clear the bar.
-  const nameOffsetY = mounting === "wall-bar" ? -16 : -32;
-  const metaOffsetY = mounting === "wall-bar" ? -28 : -46;
+  // Bar markers are wide; lift labels slightly to clear the bar.
+  const nameOffsetY = mounting === "bar" ? -16 : -32;
+  const metaOffsetY = mounting === "bar" ? -28 : -46;
 
   const draggable = Boolean(onPositionCommit);
   const renderX = ghost?.x ?? centerX;
@@ -376,7 +441,7 @@ export function FixtureMarker({
         {ghost ? (
           <g transform={`translate(${centerX}, ${centerY}) rotate(${rotationDegrees})`} opacity={0.35}>
             <circle
-              r={mounting === "wall-bar" ? 26 : 14}
+              r={ringRadius(mounting, 14, 26)}
               fill="none"
               strokeDasharray="3 3"
               style={{ stroke: GHOST_STROKE, strokeWidth: 1 }}
@@ -384,11 +449,11 @@ export function FixtureMarker({
           </g>
         ) : null}
         <g transform={`translate(${renderX}, ${renderY}) rotate(${rotationDegrees})`} filter="url(#sse-fixture-shadow)">
-          {shapeForMounting(mounting)}
+          {shapeForMounting(mounting, pixelLayout)}
           <circle r={3.6} fill={color} fillOpacity={dotOpacity} />
           {selected ? (
             <circle
-              r={mounting === "wall-bar" ? 26 : 14}
+              r={ringRadius(mounting, 14, 26)}
               fill="none"
               strokeDasharray="4 3"
               style={{ stroke: SELECTED_STROKE, strokeWidth: 1.5 }}
@@ -401,7 +466,7 @@ export function FixtureMarker({
               without overlap when both prop are set. */}
           {highlightOverlay ? (
             <circle
-              r={mounting === "wall-bar" ? 30 : 17}
+              r={ringRadius(mounting, 17, 30)}
               fill="none"
               style={{ stroke: HIGHLIGHT_OVERLAY_STROKE, strokeWidth: 2 }}
             />
@@ -413,7 +478,7 @@ export function FixtureMarker({
           <circle
             cx={renderX}
             cy={renderY}
-            r={mounting === "wall-bar" ? 30 : 18}
+            r={ringRadius(mounting, 18, 30)}
             fill="none"
             pointerEvents="none"
             style={{ stroke: SELECTED_STROKE, strokeWidth: 2 }}
@@ -454,7 +519,7 @@ export function FixtureMarker({
           <circle
             cx={renderX}
             cy={renderY}
-            r={mounting === "wall-bar" ? 32 : 19}
+            r={ringRadius(mounting, 19, 32)}
             fill="none"
             strokeWidth={1.6}
             pointerEvents="none"
@@ -472,7 +537,7 @@ export function FixtureMarker({
           <circle
             cx={renderX}
             cy={renderY}
-            r={mounting === "wall-bar" ? 36 : 22}
+            r={ringRadius(mounting, 22, 36)}
             fill="none"
             strokeWidth={2}
             pointerEvents="none"

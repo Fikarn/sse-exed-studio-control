@@ -24,6 +24,7 @@ export const REQUEST_METHODS = [
   "exports.companion.export",
   "health.snapshot",
   "lighting.dmxMonitor.snapshot",
+  "lighting.fixtureCatalog.snapshot",
   "lighting.editor.previewDiscard",
   "lighting.editor.previewMode",
   "lighting.fixture.create",

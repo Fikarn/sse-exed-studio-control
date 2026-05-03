@@ -65,6 +65,7 @@ impl LightingPreviewRuntimeState {
                         intensity: clamp_i64(fixture.intensity, 0, 100),
                         cct: fixture.cct,
                         on: fixture.on,
+                        control_values: effective_fixture_control_values(fixture),
                     })
             })
             .collect()
@@ -92,6 +93,7 @@ pub fn read_lighting_snapshot_with_preview(
                 fixture.intensity = clamp_i64(preview_state.intensity, 0, 100);
                 fixture.cct = preview_state.cct;
                 fixture.on = preview_state.on;
+                fixture.control_values = preview_state.control_values.clone();
             }
             fixture
         })
@@ -181,6 +183,7 @@ pub fn update_lighting_fixture_with_preview(
             intensity: clamp_i64(fixture.intensity, 0, 100),
             cct: fixture.cct,
             on: fixture.on,
+            control_values: effective_fixture_control_values(&fixture),
         });
     if let Some(on) = request.on {
         preview_state.on = on;
@@ -191,6 +194,10 @@ pub fn update_lighting_fixture_with_preview(
     if let Some(cct) = request.cct {
         let default_cct = default_fixture_cct_for_type(&fixture.fixture_type);
         preview_state.cct = clamp_cct_for_type(cct, &fixture.fixture_type, default_cct);
+    }
+    if let Some(control_values) = &request.control_values {
+        let profile = fixture_profile_for_state(&fixture);
+        preview_state.control_values = normalize_fixture_control_values(&profile, control_values);
     }
     preview.dirty = true;
 
@@ -247,6 +254,7 @@ pub fn set_lighting_group_power_with_preview(
                 intensity: clamp_i64(fixture.intensity, 0, 100),
                 cct: fixture.cct,
                 on: fixture.on,
+                control_values: effective_fixture_control_values(fixture),
             });
         preview_state.on = request.on;
         affected_fixtures += 1;
@@ -302,6 +310,7 @@ pub fn set_lighting_all_power_with_preview(
                 intensity: clamp_i64(fixture.intensity, 0, 100),
                 cct: fixture.cct,
                 on: fixture.on,
+                control_values: effective_fixture_control_values(fixture),
             });
         preview_state.on = request.on;
     }
@@ -513,6 +522,9 @@ fn reject_preview_structural_fixture_update(
 ) -> Result<(), LightingCommandError> {
     if request.name.is_some()
         || request.fixture_type.is_some()
+        || request.definition_id.is_some()
+        || request.mode_id.is_some()
+        || request.universe.is_some()
         || request.dmx_start_address.is_some()
         || request.effect.is_some()
         || request.group_id.is_some()

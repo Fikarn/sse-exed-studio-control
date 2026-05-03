@@ -9,6 +9,7 @@ import {
 } from "../generated/protocol";
 import type { AudioSnapshot } from "../generated/snapshots/AudioSnapshot";
 import type { LightingDmxMonitorSnapshot } from "../generated/snapshots/LightingDmxMonitorSnapshot";
+import type { LightingFixtureCatalogSnapshot } from "../generated/snapshots/LightingFixtureCatalogSnapshot";
 import type { LightingSnapshot } from "../generated/snapshots/LightingSnapshot";
 import type { PlanningSnapshot } from "../generated/snapshots/PlanningSnapshot";
 import { transitionStartupState } from "../machines/startupMachine";
@@ -66,6 +67,7 @@ const initialState: ShellState = {
   healthSnapshot: null,
   commissioningSnapshot: null,
   lightingSnapshot: null,
+  lightingFixtureCatalogSnapshot: null,
   lightingDmxMonitorSnapshot: null,
   audioSnapshot: null,
   planningSnapshot: null,
@@ -242,6 +244,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       healthSnapshot,
       appSnapshot,
       commissioningSnapshot,
+      lightingFixtureCatalogSnapshot,
       lightingSnapshot,
       lightingDmxMonitorSnapshot,
       audioSnapshot,
@@ -252,6 +255,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       transport.request("health.snapshot").then((value) => value as JsonObject),
       transport.request("app.snapshot").then((value) => value as JsonObject),
       transport.request("commissioning.snapshot").then((value) => value as JsonObject),
+      transport
+        .request("lighting.fixtureCatalog.snapshot")
+        .then((value) => coerceSnapshot<LightingFixtureCatalogSnapshot>(value)),
       transport.request("lighting.snapshot").then((value) => coerceSnapshot<LightingSnapshot>(value)),
       transport
         .request("lighting.dmxMonitor.snapshot")
@@ -269,6 +275,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       healthSnapshot,
       appSnapshot,
       commissioningSnapshot,
+      lightingFixtureCatalogSnapshot,
       lightingSnapshot,
       lightingDmxMonitorSnapshot,
       audioSnapshot,
@@ -360,6 +367,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       const [
         appSnapshot,
         commissioningSnapshot,
+        lightingFixtureCatalogSnapshot,
         lightingSnapshot,
         lightingDmxMonitorSnapshot,
         audioSnapshot,
@@ -369,6 +377,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       ] = await Promise.all([
         transport.request("app.snapshot").then((value) => value as JsonObject),
         transport.request("commissioning.snapshot").then((value) => value as JsonObject),
+        transport
+          .request("lighting.fixtureCatalog.snapshot")
+          .then((value) => coerceSnapshot<LightingFixtureCatalogSnapshot>(value)),
         transport.request("lighting.snapshot").then((value) => coerceSnapshot<LightingSnapshot>(value)),
         transport
           .request("lighting.dmxMonitor.snapshot")
@@ -386,6 +397,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         appSnapshot,
         healthSnapshot,
         commissioningSnapshot,
+        lightingFixtureCatalogSnapshot,
         lightingSnapshot,
         lightingDmxMonitorSnapshot,
         audioSnapshot,

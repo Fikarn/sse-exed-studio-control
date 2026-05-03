@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 
 use super::DEFAULT_LIGHTING_FIXTURE_TYPE;
@@ -9,6 +10,10 @@ pub(super) fn default_fixture_type() -> String {
 
 pub(super) fn default_fixture_dmx_start_address() -> i64 {
     1
+}
+
+pub(super) fn default_fixture_universe() -> i64 {
+    super::DEFAULT_UNIVERSE
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -80,6 +85,11 @@ pub struct LightingFixtureSnapshot {
     pub name: String,
     #[serde(rename = "type")]
     pub fixture_type: String,
+    #[serde(rename = "definitionId")]
+    pub definition_id: String,
+    #[serde(rename = "modeId")]
+    pub mode_id: String,
+    pub universe: i64,
     #[serde(rename = "dmxStartAddress")]
     pub dmx_start_address: i64,
     pub kind: String,
@@ -98,6 +108,8 @@ pub struct LightingFixtureSnapshot {
     pub on: bool,
     pub intensity: i64,
     pub cct: i64,
+    #[serde(rename = "controlValues")]
+    pub control_values: HashMap<String, i64>,
     pub effect: Option<LightingEffect>,
 }
 
@@ -156,6 +168,8 @@ pub struct LightingSceneFixtureSnapshot {
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
+    #[serde(rename = "controlValues")]
+    pub control_values: HashMap<String, i64>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -258,6 +272,12 @@ pub struct LightingEditorFixtureState {
     pub name: String,
     #[serde(rename = "type", default = "default_fixture_type")]
     pub fixture_type: String,
+    #[serde(default, rename = "definitionId")]
+    pub definition_id: Option<String>,
+    #[serde(default, rename = "modeId")]
+    pub mode_id: Option<String>,
+    #[serde(default = "default_fixture_universe")]
+    pub universe: i64,
     #[serde(
         rename = "dmxStartAddress",
         default = "default_fixture_dmx_start_address"
@@ -279,6 +299,8 @@ pub struct LightingEditorFixtureState {
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
+    #[serde(default, rename = "controlValues")]
+    pub control_values: HashMap<String, i64>,
     #[serde(default)]
     pub effect: Option<LightingEffect>,
 }
@@ -309,6 +331,8 @@ pub struct LightingEditorSceneFixtureState {
     pub intensity: i64,
     pub cct: i64,
     pub on: bool,
+    #[serde(default, rename = "controlValues")]
+    pub control_values: HashMap<String, i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -343,6 +367,7 @@ pub struct LightingDmxMonitorSnapshot {
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct LightingDmxChannelSnapshot {
+    pub universe: i64,
     pub channel: i64,
     pub value: i64,
     #[serde(rename = "lightName")]
@@ -652,6 +677,9 @@ pub struct LightingSceneRecallRequest {
 pub struct LightingFixtureCreateRequest {
     pub name: String,
     pub fixture_type: String,
+    pub definition_id: String,
+    pub mode_id: String,
+    pub universe: i64,
     pub dmx_start_address: i64,
     pub group_id: Option<String>,
 }
@@ -661,11 +689,15 @@ pub struct LightingFixtureUpdateRequest {
     pub fixture_id: String,
     pub name: Option<String>,
     pub fixture_type: Option<String>,
+    pub definition_id: Option<String>,
+    pub mode_id: Option<String>,
+    pub universe: Option<i64>,
     pub dmx_start_address: Option<i64>,
     pub effect: Option<Option<LightingEffect>>,
     pub on: Option<bool>,
     pub intensity: Option<i64>,
     pub cct: Option<i64>,
+    pub control_values: Option<HashMap<String, i64>>,
     pub group_id: Option<Option<String>>,
     pub spatial_x: Option<Option<f64>>,
     pub spatial_y: Option<Option<f64>>,

@@ -47,6 +47,7 @@ pub(super) fn sample_lighting_fade_state(
         intensity,
         cct,
         on,
+        control_values: target.control_values.clone(),
     }
 }
 
@@ -85,6 +86,7 @@ pub(super) fn apply_active_fade_sample(
             intensity: fixture.intensity,
             cct: fixture.cct,
             on: fixture.on,
+            control_values: super::helpers::effective_fixture_control_values(fixture),
         };
         let origin = origin_by_id
             .get(fixture.id.as_str())
@@ -98,6 +100,7 @@ pub(super) fn apply_active_fade_sample(
         fixture.intensity = sampled.intensity;
         fixture.cct = sampled.cct;
         fixture.on = sampled.on;
+        fixture.control_values = sampled.control_values;
     }
 
     if progress >= 1.0 {
@@ -137,6 +140,7 @@ fn capture_fixture_states(
             intensity: clamp_i64(fixture.intensity, 0, 100),
             cct: fixture.cct,
             on: fixture.on,
+            control_values: super::helpers::effective_fixture_control_values(fixture),
         })
         .collect()
 }
@@ -164,6 +168,7 @@ mod tests {
             intensity,
             cct,
             on,
+            control_values: HashMap::new(),
         }
     }
 

@@ -74,6 +74,7 @@ function OperatorShellInner() {
   const [confirmIntent, setConfirmIntent] = useState<ConfirmIntent>(null);
   const [showShortcutGuide, setShowShortcutGuide] = useState(false);
   const deferredLightingDmxMonitorSnapshot = useDeferredValue(shellState.lightingDmxMonitorSnapshot);
+  const deferredLightingFixtureCatalogSnapshot = useDeferredValue(shellState.lightingFixtureCatalogSnapshot);
   const deferredLightingSnapshot = useDeferredValue(shellState.lightingSnapshot);
   const deferredAudioSnapshot = useDeferredValue(shellState.audioSnapshot);
   const deferredPlanningSnapshot = useDeferredValue(shellState.planningSnapshot);
@@ -483,6 +484,7 @@ function OperatorShellInner() {
     ) : activeWorkspace === "lighting" ? (
       <LightingWorkspaceSurface
         appSnapshot={shellState.appSnapshot}
+        lightingFixtureCatalogSnapshot={deferredLightingFixtureCatalogSnapshot}
         lightingDmxMonitorSnapshot={deferredLightingDmxMonitorSnapshot}
         lightingSnapshot={deferredLightingSnapshot}
         store={environment.store}

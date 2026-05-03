@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, ConfirmDialog, Dialog, type PaletteAction } from "@sse/design-system";
 import type {
   LightingDmxMonitorSnapshot,
+  LightingFixtureCatalogSnapshot,
   LightingFixtureSnapshot,
   LightingPaletteKind,
   LightingPaletteSnapshot,
@@ -36,6 +37,8 @@ import type { InspectorTab } from "./components/LightingInspectorTabs";
 import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
 import { DMXCompactStrip } from "./components/DMXCompactStrip";
+import { getFixtureModeForFixture } from "./fixtureCatalog";
+import { lightingFixtureChannelCount } from "./lightingPatch";
 import { PreviewBanner } from "./components/PreviewBanner";
 import { RenameDialog } from "./components/RenameDialog";
 import { SelectionChipStrip } from "./components/SelectionChipStrip";
@@ -51,6 +54,7 @@ import styles from "./LightingWorkspace.module.css";
 
 interface LightingWorkspaceSurfaceProps {
   appSnapshot: SnapshotRecord | null;
+  lightingFixtureCatalogSnapshot: LightingFixtureCatalogSnapshot | null;
   lightingDmxMonitorSnapshot: LightingDmxMonitorSnapshot | null;
   lightingSnapshot: LightingSnapshot | null;
   store: ShellStore;
@@ -97,8 +101,21 @@ function pushUndoOutcomeToast(toast: ToastApi, outcome: UndoOutcome): void {
 }
 
 function fixtureStatesEqual(
-  fixtures: ReadonlyArray<{ id: string; intensity: number; cct: number; on: boolean }>,
-  sceneStates: ReadonlyArray<{ fixtureId: string; intensity: number; cct: number; on: boolean }>
+  fixtures: ReadonlyArray<{
+    id: string;
+    intensity: number;
+    cct: number;
+    on: boolean;
+    hasCctControl: boolean;
+    controlValues?: Record<string, number>;
+  }>,
+  sceneStates: ReadonlyArray<{
+    fixtureId: string;
+    intensity: number;
+    cct: number;
+    on: boolean;
+    controlValues?: Record<string, number>;
+  }>
 ): boolean {
   if (fixtures.length === 0 && sceneStates.length === 0) return true;
   const sceneById = new Map(sceneStates.map((state) => [state.fixtureId, state]));
@@ -111,7 +128,16 @@ function fixtureStatesEqual(
     }
     if (sceneState.on !== fixture.on) return false;
     if (sceneState.on && Math.abs(sceneState.intensity - fixture.intensity) > 0.5) return false;
-    if (sceneState.on && Math.abs(sceneState.cct - fixture.cct) > 25) return false;
+    if (sceneState.on && fixture.hasCctControl && Math.abs(sceneState.cct - fixture.cct) > 25) {
+      return false;
+    }
+    const keys = new Set([...Object.keys(fixture.controlValues ?? {}), ...Object.keys(sceneState.controlValues ?? {})]);
+    for (const key of keys) {
+      if (key === "intensity" || key === "cct") continue;
+      if (Math.abs((fixture.controlValues?.[key] ?? 0) - (sceneState.controlValues?.[key] ?? 0)) > 0.5) {
+        return false;
+      }
+    }
   }
   return true;
 }
@@ -125,6 +151,7 @@ function snapshotWithFixtures(
 
 export function LightingWorkspaceSurface({
   appSnapshot,
+  lightingFixtureCatalogSnapshot,
   lightingDmxMonitorSnapshot,
   lightingSnapshot,
   store,
@@ -391,15 +418,21 @@ export function LightingWorkspaceSurface({
         intensity: fixture.intensity,
         cct: fixture.cct,
         on: fixture.on,
+        hasCctControl:
+          getFixtureModeForFixture(lightingFixtureCatalogSnapshot, fixture)?.channels.some(
+            (channel) => channel.controlId === "cct"
+          ) ?? Object.prototype.hasOwnProperty.call(fixture.controlValues ?? {}, "cct"),
+        controlValues: fixture.controlValues,
       })),
       activeScene.fixtureStates.map((state) => ({
         fixtureId: state.fixtureId,
         intensity: state.intensity,
         cct: state.cct,
         on: state.on,
+        controlValues: state.controlValues,
       }))
     );
-  }, [activeScene, fixtureEntries]);
+  }, [activeScene, fixtureEntries, lightingFixtureCatalogSnapshot]);
 
   const previewDirty = previewMode && ((lightingSnapshot?.previewDirty ?? false) || isSceneModified);
   const effectiveSceneModified = previewMode ? previewDirty : isSceneModified;
@@ -849,7 +882,14 @@ export function LightingWorkspaceSurface({
   }, [previewMode, toast]);
 
   const handleAddFixture = useLiveCallback(
-    async (fixtureSpec: { name: string; type: string; dmxStartAddress: number }) => {
+    async (fixtureSpec: {
+      name: string;
+      type: string;
+      definitionId: string;
+      modeId: string;
+      universe: number;
+      dmxStartAddress: number;
+    }) => {
       startBusy("fixture-create");
       try {
         const result = asRecord(await store.createLightingFixture(fixtureSpec));
@@ -1251,6 +1291,7 @@ export function LightingWorkspaceSurface({
             intensity: state.intensity,
             cct: state.cct,
             on: state.on,
+            controlValues: state.controlValues,
           })) satisfies LightingSceneFixtureSnapshot[],
           colorIndex: target.colorIndex ?? null,
           pinned: target.pinned,
@@ -1601,6 +1642,20 @@ export function LightingWorkspaceSurface({
     }
   });
 
+  const handleControlValuesCommit = useLiveCallback(
+    async (fixtureId: string, controlValues: Record<string, number>) => {
+      const busyKey = `fixture-controls:${fixtureId}`;
+      startBusy(busyKey);
+      try {
+        await store.updateLightingFixture({ fixtureId, controlValues });
+      } catch (error) {
+        reportError(error, "Fixture control update failed.");
+      } finally {
+        finishBusy(busyKey);
+      }
+    }
+  );
+
   const handlePatchCommit = useLiveCallback(async (fixtureId: string, dmxStartAddress: number) => {
     const busyKey = `fixture-patch:${fixtureId}`;
     startBusy(busyKey);
@@ -1609,7 +1664,12 @@ export function LightingWorkspaceSurface({
       // Auto-advance to the next unpaired fixture (dmxStartAddress < 1).
       // Excludes the just-patched id since the snapshot may not have caught
       // up. If none remain, exit patch mode.
-      const remaining = fixtures.filter((candidate) => candidate.id !== fixtureId && candidate.dmxStartAddress < 1);
+      const remaining = fixtures.filter(
+        (candidate) =>
+          candidate.id !== fixtureId &&
+          candidate.dmxStartAddress < 1 &&
+          lightingFixtureChannelCount(candidate, lightingFixtureCatalogSnapshot) > 0
+      );
       if (remaining.length > 0) {
         const next = remaining[0]!;
         try {
@@ -1848,6 +1908,9 @@ export function LightingWorkspaceSurface({
               await store.createLightingFixture({
                 name: snapshot.name,
                 type: snapshot.type,
+                definitionId: snapshot.definitionId,
+                modeId: snapshot.modeId,
+                universe: snapshot.universe,
                 dmxStartAddress: snapshot.dmxStartAddress > 0 ? snapshot.dmxStartAddress : 1,
                 groupId: snapshot.groupId ?? undefined,
               })
@@ -2320,6 +2383,7 @@ export function LightingWorkspaceSurface({
       dmxChannels={dmxChannelsRaw}
       dmxStale={!bridgeReachable}
       universe={bridgeUniverse}
+      catalog={lightingFixtureCatalogSnapshot}
       selectedFixtureId={selectedFixture?.id ?? null}
       selectedGroupId={selectedGroupId}
       activeSceneId={activeSceneId}
@@ -2331,6 +2395,7 @@ export function LightingWorkspaceSurface({
       onTogglePower={handleToggleFixturePower}
       onIntensityCommit={handleIntensityCommit}
       onCctCommit={handleCctCommit}
+      onControlValuesCommit={handleControlValuesCommit}
       onIdentifyBurst={handleIdentifyBurst}
       onPatchCommit={handlePatchCommit}
       onToggleGroupPower={handleToggleGroupPower}
@@ -2471,6 +2536,7 @@ export function LightingWorkspaceSurface({
         <main className={styles.stage} data-testid="lighting-stage">
           <StagePlot
             fixtures={fixtures}
+            catalog={lightingFixtureCatalogSnapshot}
             liveFixtures={liveFixtures}
             selectedFixtureId={selectedFixture?.id ?? null}
             selectedFixtureIds={selectedFixtureIds}
@@ -2586,6 +2652,7 @@ export function LightingWorkspaceSurface({
               <DMXCompactStrip
                 snapshot={lightingDmxMonitorSnapshot}
                 fixtures={liveFixtures}
+                catalog={lightingFixtureCatalogSnapshot}
                 bridgeReachable={bridgeReachable}
                 universe={bridgeUniverse}
                 onOpenMonitor={() => setDmxMonitorOpen(true)}
@@ -2788,6 +2855,7 @@ export function LightingWorkspaceSurface({
 
       {createFixtureOpen ? (
         <CreateFixtureDialog
+          catalog={lightingFixtureCatalogSnapshot}
           fixtures={fixtures}
           defaultName={nextLightingFixtureName(fixtures)}
           busy={busyActions.has("fixture-create")}

@@ -5,6 +5,9 @@ export type LightingFixtureSnapshot = {
   id: string;
   name: string;
   type: string;
+  definitionId: string;
+  modeId: string;
+  universe: number;
   dmxStartAddress: number;
   kind: string;
   groupId: string | null;
@@ -16,5 +19,6 @@ export type LightingFixtureSnapshot = {
   on: boolean;
   intensity: number;
   cct: number;
+  controlValues: { [key in string]: number };
   effect: LightingEffect | null;
 };
