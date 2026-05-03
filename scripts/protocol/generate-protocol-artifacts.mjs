@@ -75,6 +75,11 @@ const schema = {
       type: "array",
       items: { enum: contract.devParityFixtures },
     },
+    ...(contract.snapshotShapes
+      ? {
+          snapshotShapes: { const: contract.snapshotShapes },
+        }
+      : {}),
     methods: {
       type: "array",
       items: { enum: contract.methods },
@@ -84,7 +89,15 @@ const schema = {
       items: { enum: contract.events },
     },
   },
-  required: ["version", "transport", "startupLifecycleStates", "devParityFixtures", "methods", "events"],
+  required: [
+    "version",
+    "transport",
+    "startupLifecycleStates",
+    "devParityFixtures",
+    ...(contract.snapshotShapes ? ["snapshotShapes"] : []),
+    "methods",
+    "events",
+  ],
   additionalProperties: false,
 };
 

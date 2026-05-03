@@ -1,8 +1,9 @@
 import { useState, type MouseEvent } from "react";
 import { Bookmark, Minus, Plus, RotateCcw } from "lucide-react";
 
-import { ContextMenu, Tooltip, type ContextMenuItem } from "@sse/design-system";
+import { ContextMenu, SegmentedControl, Tooltip, type ContextMenuItem } from "@sse/design-system";
 
+import type { StagePlotRenderMode } from "../fixtureVisuals";
 import type { StagePlotZoomMode, ViewBookmarks, ViewBookmarkSlot } from "../useStagePlotViewport";
 
 import styles from "./StagePlotControls.module.css";
@@ -10,12 +11,14 @@ import styles from "./StagePlotControls.module.css";
 export interface StagePlotControlsProps {
   zoom: number;
   zoomMode: StagePlotZoomMode;
+  renderMode: StagePlotRenderMode;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onReset: () => void;
   onFitRoom: () => void;
   onFillDesk: () => void;
   onActualSize: () => void;
+  onRenderModeChange: (mode: StagePlotRenderMode) => void;
   /** Wave 31 — view bookmarks (I7). When omitted, the View slot row is not
    *  rendered. */
   viewBookmarks?: ViewBookmarks;
@@ -25,16 +28,24 @@ export interface StagePlotControlsProps {
 }
 
 const SLOTS: readonly ViewBookmarkSlot[] = [0, 1, 2];
+const RENDER_MODE_OPTIONS = [
+  { label: "Rig", value: "rig" },
+  { label: "Coverage", value: "coverage" },
+  { label: "Photometric", value: "photometric" },
+  { label: "Pixel", value: "pixel" },
+];
 
 export function StagePlotControls({
   zoom,
   zoomMode,
+  renderMode,
   onZoomIn,
   onZoomOut,
   onReset,
   onFitRoom,
   onFillDesk,
   onActualSize,
+  onRenderModeChange,
   viewBookmarks,
   onSaveViewBookmark,
   onRecallViewBookmark,
@@ -74,6 +85,15 @@ export function StagePlotControls({
 
   return (
     <div className={styles.controls} role="toolbar" aria-label="Stage plot view">
+      <span className={styles.renderModeGroup}>
+        <SegmentedControl
+          label="Stage plot render mode"
+          onChange={(value) => onRenderModeChange(value as StagePlotRenderMode)}
+          options={RENDER_MODE_OPTIONS}
+          size="compact"
+          value={renderMode}
+        />
+      </span>
       <span className={styles.modeGroup} aria-label="Stage plot zoom mode">
         <Tooltip content="Fit the full room without stretching spatial proportions" placement="top">
           <button

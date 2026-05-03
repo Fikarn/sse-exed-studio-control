@@ -537,7 +537,10 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await expect(page.getByRole("toolbar", { name: "Lighting workspace toolbar" })).toBeVisible();
   await expect(workspace.getByText("192.168.1.80 · U1")).toBeVisible();
   await expect(workspace.getByText("Warm wash").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toHaveAttribute(
+    "data-selected",
+    "true"
+  );
   await expect(page.getByRole("button", { name: "Recall scene Interview" })).toBeVisible();
   await expect(page.getByRole("application", { name: "Lighting stage plot" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Fixture Key, 76 percent, 3200 kelvin/i })).toHaveAttribute(
@@ -552,7 +555,17 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await page.keyboard.press("KeyS");
   await expect(page.getByRole("button", { name: "Recall scene Scene 3" })).toBeVisible();
   await page.getByRole("button", { name: "Recall scene Interview" }).click();
-  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toHaveAttribute(
+    "data-selected",
+    "true"
+  );
+  await expect(
+    page.getByRole("application", { name: "Lighting stage plot" }).getByText("Interview", { exact: true })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Fixture Key, 92 percent, 4400 kelvin/i })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
 
   await page.getByLabel("Fixture intensity").focus();
   await page.getByLabel("Fixture intensity").press("End");
@@ -564,7 +577,9 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await page.getByRole("button", { name: /^Fixture Warm wash,/ }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("button", { name: /^Fixture Warm wash,/ })).toHaveAttribute("aria-pressed", "true");
-  await expect(workspace.getByText("Apollo Bridge", { exact: true })).toBeVisible();
+  await expect(
+    page.getByLabel("Lighting inspector — Fixture").getByText("Apollo Bridge", { exact: true })
+  ).toBeVisible();
   await page.getByRole("button", { name: "Turn off" }).click();
   await expect(page.getByRole("button", { name: /^Fixture Warm wash, off,/ })).toHaveAttribute("aria-pressed", "true");
 
@@ -574,6 +589,40 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await expect(workspace.getByText("Front", { exact: true }).last()).toBeVisible();
   await page.getByRole("button", { name: "Turn group off" }).click();
   await expect(page.getByRole("button", { name: /Front, 2 fixtures.*off\. Toggle on\./i })).toBeVisible();
+});
+
+test("renders lighting fixture symbol families and stage plot render modes", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openFixture(page, "lighting-symbol-families");
+
+  const plot = page.getByRole("application", { name: "Lighting stage plot" });
+  await expect(plot.locator('[data-fixture-id="fixture-key"] [data-symbol-kind="panel"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-id="fixture-soft-mat"] [data-symbol-kind="soft-mat"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-id="fixture-back"] [data-symbol-kind="linear-bar"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-id="fixture-fresnel"] [data-symbol-kind="fresnel"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-id="fixture-kicker"] [data-symbol-kind="control-node"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-output-id="fixture-kicker"]')).toHaveCount(0);
+
+  await page.getByRole("radio", { name: "Coverage" }).click();
+  await expect(plot).toHaveAttribute("data-render-mode", "coverage");
+  await page.getByRole("radio", { name: "Photometric" }).click();
+  await expect(plot).toHaveAttribute("data-render-mode", "photometric");
+  await expect(plot.locator('[data-fixture-output-id="fixture-back"]')).toHaveText(/593 lx @ 1 m|120 deg est\./);
+  await page.getByRole("radio", { name: "Pixel" }).click();
+  await expect(plot).toHaveAttribute("data-render-mode", "pixel");
+  expect(await plot.locator('[data-fixture-id="fixture-back"] [data-emitter-segment="true"]').count()).toBeGreaterThan(
+    0
+  );
+
+  const symbolKey = page.getByTestId("fixture-symbol-key");
+  await expect(symbolKey).toBeVisible();
+  await expect(page.getByTestId("fixture-symbol-key-row-litepanels-astra-bicolor")).toContainText("2");
+  await expect(page.getByTestId("fixture-symbol-key-row-aputure-infinibar-pb12")).toContainText("8 ch");
+
+  const fresnel = page.getByRole("button", { name: /^Fixture Fresnel,/ });
+  await fresnel.focus();
+  await page.keyboard.press("Enter");
+  await expect(fresnel).toHaveAttribute("aria-pressed", "true");
 });
 
 test("keeps the full lighting workspace visible at the 1920x1080 fallback size", async ({ page }) => {
@@ -906,40 +955,98 @@ test("drags the selected fixture to a new plot position", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
   const fixture = page.getByRole("button", { name: /^Fixture Key,/ });
+  const output = page.locator('[data-fixture-output-id="fixture-key"]');
   await fixture.scrollIntoViewIfNeeded();
-  await fixture.evaluate(async (node) => {
+  const start = await fixture.evaluate((node) => {
     const marker = node.querySelector("g[filter]");
     if (!(marker instanceof SVGGraphicsElement)) throw new Error("Fixture marker body not found");
     const matrix = marker.getScreenCTM();
     if (!matrix) throw new Error("Fixture marker matrix not available");
 
-    Object.defineProperty(node, "setPointerCapture", { value: () => {}, configurable: true });
-    Object.defineProperty(node, "releasePointerCapture", { value: () => {}, configurable: true });
+    return { x: matrix.e, y: matrix.f };
+  });
+  const startOutputTransform = await output.getAttribute("transform");
 
-    const startX = matrix.e;
-    const startY = matrix.f;
-    const pointerId = 31;
-    const dispatch = (type: string, clientX: number, clientY: number, buttons: number) => {
-      node.dispatchEvent(
-        new PointerEvent(type, {
-          bubbles: true,
-          pointerId,
-          pointerType: "mouse",
-          button: 0,
-          buttons,
-          clientX,
-          clientY,
-        })
-      );
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 180, start.y + 120, { steps: 8 });
+  await expect.poll(async () => output.getAttribute("transform")).not.toBe(startOutputTransform);
+  await page.mouse.up();
+  expect(await output.getAttribute("transform")).not.toBe(startOutputTransform);
+
+  await expect(page.getByLabel("Stage X position in metres")).toHaveValue("1.5");
+  await expect(page.getByLabel("Stage Y position in metres")).toHaveValue("1.0");
+});
+
+test("mirrors fixture intensity slider drafts on the stage plot before commit", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const fixture = page.getByRole("button", { name: /^Fixture Key,/ });
+  const output = page.locator('[data-fixture-output-id="fixture-key"]');
+  await expect(fixture).toHaveAttribute("aria-label", /76 percent/);
+  const startOutputOpacity = await output.locator("stop").first().getAttribute("stop-opacity");
+
+  const slider = page.getByRole("slider", { name: "Fixture intensity" });
+  const box = await slider.boundingBox();
+  expect(box).not.toBeNull();
+  const y = box!.y + box!.height / 2;
+
+  await page.mouse.move(box!.x + box!.width * 0.76, y);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width * 0.24, y, { steps: 8 });
+
+  await expect.poll(async () => fixture.getAttribute("aria-label")).toMatch(/2[0-9] percent/);
+  await expect
+    .poll(async () => output.locator("stop").first().getAttribute("stop-opacity"))
+    .not.toBe(startOutputOpacity);
+  await page.mouse.up();
+
+  await expect(fixture).toHaveAttribute("aria-label", /2[0-9] percent/);
+});
+
+test("rotates the selected fixture from the plot and inspector", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const rotationInput = page.getByLabel("Fixture rotation in degrees");
+  await expect(rotationInput).toHaveValue("0");
+
+  const output = page.locator('[data-fixture-output-id="fixture-key"]');
+  const startOutputTransform = await output.getAttribute("transform");
+  const handle = page.locator('[data-fixture-rotate-handle="fixture-key"]');
+  await expect(handle).toBeVisible();
+  const points = await handle.evaluate((node) => {
+    const circle = node.querySelector("circle");
+    const marker = node.closest("[data-fixture-id]");
+    const body = marker?.querySelector("g[filter]");
+    if (!(circle instanceof SVGCircleElement) || !(body instanceof SVGGraphicsElement)) {
+      throw new Error("Fixture rotate handle geometry not found");
+    }
+    const circleRect = circle.getBoundingClientRect();
+    const matrix = body.getScreenCTM();
+    if (!matrix) throw new Error("Fixture marker matrix not available");
+    return {
+      centerX: matrix.e,
+      centerY: matrix.f,
+      handleX: circleRect.left + circleRect.width / 2,
+      handleY: circleRect.top + circleRect.height / 2,
     };
-
-    dispatch("pointerdown", startX, startY, 1);
-    dispatch("pointermove", startX + 180, startY + 120, 1);
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    dispatch("pointerup", startX + 180, startY + 120, 0);
   });
 
-  await expect(page.getByLabel("Stage X position in metres")).not.toHaveValue("0.24");
+  await page.mouse.move(points.handleX, points.handleY);
+  await page.mouse.down();
+  await page.mouse.move(points.centerX + 96, points.centerY - 12, { steps: 8 });
+  await expect.poll(async () => output.getAttribute("transform")).not.toBe(startOutputTransform);
+  await page.mouse.up();
+  expect(await output.getAttribute("transform")).not.toBe(startOutputTransform);
+  await expect(rotationInput).toHaveValue("82");
+
+  await rotationInput.fill("270");
+  await rotationInput.press("Enter");
+  await expect(rotationInput).toHaveValue("270");
+  await expect(page.locator('[data-fixture-id="fixture-key"] g[filter]').first()).toHaveAttribute(
+    "transform",
+    /rotate\(270\)/
+  );
 });
 
 test("toggles the expanded DMX monitor from the keyboard", async ({ page }) => {

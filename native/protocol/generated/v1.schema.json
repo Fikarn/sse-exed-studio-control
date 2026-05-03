@@ -53,6 +53,16 @@
         ]
       }
     },
+    "snapshotShapes": {
+      "const": {
+        "lightingFixtureVisual": {
+          "additiveFields": ["symbolKind", "symbolVariant", "emitterLayout", "output", "visualConfidence"],
+          "symbolKind": ["panel", "soft-mat", "linear-bar", "fresnel", "control-node"],
+          "beamType": ["wash", "spot", "fresnel", "rectangle", "glow", "none"],
+          "visualConfidence": ["verified", "catalogue-derived", "fallback"]
+        }
+      }
+    },
     "methods": {
       "type": "array",
       "items": {
@@ -150,6 +160,14 @@
       }
     }
   },
-  "required": ["version", "transport", "startupLifecycleStates", "devParityFixtures", "methods", "events"],
+  "required": [
+    "version",
+    "transport",
+    "startupLifecycleStates",
+    "devParityFixtures",
+    "snapshotShapes",
+    "methods",
+    "events"
+  ],
   "additionalProperties": false
 }

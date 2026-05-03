@@ -38,6 +38,7 @@ import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
 import { DMXCompactStrip } from "./components/DMXCompactStrip";
 import { getFixtureModeForFixture } from "./fixtureCatalog";
+import type { StagePlotRenderMode } from "./fixtureVisuals";
 import { lightingFixtureChannelCount } from "./lightingPatch";
 import { PreviewBanner } from "./components/PreviewBanner";
 import { RenameDialog } from "./components/RenameDialog";
@@ -46,6 +47,7 @@ import { StagePlot } from "./components/StagePlot";
 import { lightingColorTagHex } from "./lightingColorTags";
 import { formatLightingRelativeTime, nextLightingFixtureName } from "./lightingHelpers";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
+import { STUDIO_LAYOUT } from "./studioLayout";
 import { useResizableColumns } from "./useResizableColumns";
 import { useStagePlotViewport, type ViewBookmarkSlot } from "./useStagePlotViewport";
 import { UndoRefusedError, useUndoStack, type UndoOutcome } from "./useUndoStack";
@@ -62,6 +64,33 @@ interface LightingWorkspaceSurfaceProps {
 
 const RECALL_FADE_PRESETS_MS = [0, 1000, 2000, 5000] as const;
 const RECENT_SCENE_LIMIT = 8;
+const FIXTURE_VALUE_PREVIEW_TIMEOUT_MS = 1800;
+
+type FixtureValuePreviewPhase = "editing" | "committing";
+type PreviewableFixtureValue = "intensity" | "cct";
+
+interface FixtureValuePreviewField {
+  phase: FixtureValuePreviewPhase;
+  value: number;
+}
+
+type FixtureValuePreviewFields = Partial<Record<PreviewableFixtureValue, FixtureValuePreviewField>>;
+
+type FixtureSceneComparisonSource = {
+  cct: number;
+  controlValues?: Record<string, number> | null;
+  definitionId: string;
+  id: string;
+  intensity: number;
+  kind: string;
+  modeId: string;
+  on: boolean;
+  type: string;
+};
+
+function clampStudioMeters(value: number, max: number): number {
+  return Math.max(0, Math.min(max, value));
+}
 
 function formatRecallFade(ms: number): string {
   if (ms <= 0) return "snap";
@@ -76,6 +105,73 @@ function formatLightingPaletteQuickValue(palette: LightingPaletteSnapshot): stri
 function lightingPaletteMatchesQuery(palette: LightingPaletteSnapshot, query: string): boolean {
   if (!query) return true;
   return `${palette.name} ${palette.kind} ${formatLightingPaletteQuickValue(palette)}`.toLowerCase().includes(query);
+}
+
+function fixtureHasCctControl(
+  fixture: FixtureSceneComparisonSource,
+  catalog: LightingFixtureCatalogSnapshot | null
+): boolean {
+  return (
+    getFixtureModeForFixture(catalog, fixture)?.channels.some((channel) => channel.controlId === "cct") ??
+    Object.prototype.hasOwnProperty.call(fixture.controlValues ?? {}, "cct")
+  );
+}
+
+function sceneMatchesFixtures(
+  fixtures: readonly FixtureSceneComparisonSource[],
+  scene: LightingSceneSnapshot,
+  catalog: LightingFixtureCatalogSnapshot | null
+): boolean {
+  return fixtureStatesEqual(
+    fixtures.map((fixture) => ({
+      id: fixture.id,
+      intensity: fixture.intensity,
+      cct: fixture.cct,
+      on: fixture.on,
+      hasCctControl: fixtureHasCctControl(fixture, catalog),
+      controlValues: fixture.controlValues,
+    })),
+    scene.fixtureStates.map((state) => ({
+      fixtureId: state.fixtureId,
+      intensity: state.intensity,
+      cct: state.cct,
+      on: state.on,
+      controlValues: state.controlValues,
+    }))
+  );
+}
+
+function fixturesWithSceneState(
+  fixtures: readonly LightingFixtureSnapshot[],
+  scene: LightingSceneSnapshot
+): LightingFixtureSnapshot[] {
+  const sceneStateByFixtureId = new Map(scene.fixtureStates.map((state) => [state.fixtureId, state]));
+  return fixtures.map((fixture) => {
+    const state = sceneStateByFixtureId.get(fixture.id);
+    if (!state) {
+      return { ...fixture, intensity: 0, on: false };
+    }
+    return {
+      ...fixture,
+      intensity: state.intensity,
+      cct: state.cct,
+      on: state.on,
+      controlValues: state.controlValues ?? fixture.controlValues,
+    };
+  });
+}
+
+function fixtureValuePreviewMatches(
+  fixture: LightingFixtureSnapshot,
+  field: PreviewableFixtureValue,
+  value: number
+): boolean {
+  switch (field) {
+    case "intensity":
+      return Math.abs(fixture.intensity - value) <= 0.5;
+    case "cct":
+      return Math.abs(fixture.cct - value) <= 25;
+  }
 }
 
 /** Result-aware toast helper for surfacing UndoOutcome to the operator. The
@@ -107,14 +203,14 @@ function fixtureStatesEqual(
     cct: number;
     on: boolean;
     hasCctControl: boolean;
-    controlValues?: Record<string, number>;
+    controlValues?: Record<string, number> | null;
   }>,
   sceneStates: ReadonlyArray<{
     fixtureId: string;
     intensity: number;
     cct: number;
     on: boolean;
-    controlValues?: Record<string, number>;
+    controlValues?: Record<string, number> | null;
   }>
 ): boolean {
   if (fixtures.length === 0 && sceneStates.length === 0) return true;
@@ -165,6 +261,10 @@ export function LightingWorkspaceSurface({
     () => (previewMode && previewSnapshotFixtures.length > 0 ? previewSnapshotFixtures : liveFixtures),
     [liveFixtures, previewMode, previewSnapshotFixtures]
   );
+  const [fixtureValuePreviews, setFixtureValuePreviews] = useState<ReadonlyMap<string, FixtureValuePreviewFields>>(
+    () => new Map()
+  );
+  const [sceneRenderPreviewId, setSceneRenderPreviewId] = useState<string | null>(null);
   const groups = useMemo(() => lightingSnapshot?.groups ?? [], [lightingSnapshot]);
   const scenes = useMemo(() => lightingSnapshot?.scenes ?? [], [lightingSnapshot]);
   const palettes = useMemo(() => lightingSnapshot?.palettes ?? [], [lightingSnapshot]);
@@ -205,6 +305,7 @@ export function LightingWorkspaceSurface({
     const initialSectionId = asRecord(asRecord(appSnapshot?.shell)?.lighting)?.currentSectionId;
     return initialSectionId === "palettes-patch" ? "patch" : "recall";
   });
+  const [stagePlotRenderMode, setStagePlotRenderMode] = useState<StagePlotRenderMode>("rig");
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [activeTabOverride, setActiveTabOverride] = useState<InspectorTab | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -418,10 +519,7 @@ export function LightingWorkspaceSurface({
         intensity: fixture.intensity,
         cct: fixture.cct,
         on: fixture.on,
-        hasCctControl:
-          getFixtureModeForFixture(lightingFixtureCatalogSnapshot, fixture)?.channels.some(
-            (channel) => channel.controlId === "cct"
-          ) ?? Object.prototype.hasOwnProperty.call(fixture.controlValues ?? {}, "cct"),
+        hasCctControl: fixtureHasCctControl(fixture, lightingFixtureCatalogSnapshot),
         controlValues: fixture.controlValues,
       })),
       activeScene.fixtureStates.map((state) => ({
@@ -490,6 +588,134 @@ export function LightingWorkspaceSurface({
     () => fixtures.find((fixture) => fixture.id === persistedSelectedFixtureId) ?? null,
     [fixtures, persistedSelectedFixtureId]
   );
+  const sceneRenderPreview = useMemo(
+    () => (sceneRenderPreviewId ? (scenes.find((scene) => scene.id === sceneRenderPreviewId) ?? null) : null),
+    [scenes, sceneRenderPreviewId]
+  );
+
+  useEffect(() => {
+    if (!sceneRenderPreviewId) return;
+    if (!sceneRenderPreview) {
+      setSceneRenderPreviewId(null);
+      return;
+    }
+    if (activeSceneId !== sceneRenderPreviewId) return;
+    if (sceneMatchesFixtures(fixtures, sceneRenderPreview, lightingFixtureCatalogSnapshot)) {
+      setSceneRenderPreviewId(null);
+    }
+  }, [activeSceneId, fixtures, lightingFixtureCatalogSnapshot, sceneRenderPreview, sceneRenderPreviewId]);
+
+  const setFixtureValuePreview = useCallback(
+    (fixtureId: string, field: PreviewableFixtureValue, value: number, phase: FixtureValuePreviewPhase) => {
+      setFixtureValuePreviews((current) => {
+        const next = new Map(current);
+        next.set(fixtureId, {
+          ...(next.get(fixtureId) ?? {}),
+          [field]: { phase, value },
+        });
+        return next;
+      });
+    },
+    []
+  );
+
+  const setBulkFixtureValuePreview = useCallback(
+    (
+      values: ReadonlyArray<{ fixtureId: string; value: number }>,
+      field: PreviewableFixtureValue,
+      phase: FixtureValuePreviewPhase
+    ) => {
+      setFixtureValuePreviews((current) => {
+        const next = new Map(current);
+        for (const entry of values) {
+          next.set(entry.fixtureId, {
+            ...(next.get(entry.fixtureId) ?? {}),
+            [field]: { phase, value: entry.value },
+          });
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (fixtureValuePreviews.size === 0) return undefined;
+    const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
+
+    setFixtureValuePreviews((current) => {
+      let changed = false;
+      const next = new Map(current);
+      for (const [fixtureId, fields] of current) {
+        const fixture = fixtureById.get(fixtureId);
+        if (!fixture) {
+          next.delete(fixtureId);
+          changed = true;
+          continue;
+        }
+
+        const nextFields: FixtureValuePreviewFields = { ...fields };
+        for (const field of ["intensity", "cct"] as const) {
+          const preview = fields[field];
+          if (preview?.phase === "committing" && fixtureValuePreviewMatches(fixture, field, preview.value)) {
+            delete nextFields[field];
+            changed = true;
+          }
+        }
+
+        if (Object.keys(nextFields).length === 0) {
+          next.delete(fixtureId);
+        } else {
+          next.set(fixtureId, nextFields);
+        }
+      }
+      return changed ? next : current;
+    });
+
+    const timeoutId = window.setTimeout(() => {
+      setFixtureValuePreviews((current) => {
+        let changed = false;
+        const next = new Map(current);
+        for (const [fixtureId, fields] of current) {
+          const nextFields: FixtureValuePreviewFields = { ...fields };
+          for (const field of ["intensity", "cct"] as const) {
+            if (fields[field]?.phase === "committing") {
+              delete nextFields[field];
+              changed = true;
+            }
+          }
+          if (Object.keys(nextFields).length === 0) {
+            next.delete(fixtureId);
+          } else {
+            next.set(fixtureId, nextFields);
+          }
+        }
+        return changed ? next : current;
+      });
+    }, FIXTURE_VALUE_PREVIEW_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [fixtures, fixtureValuePreviews]);
+
+  const stagePlotFixtures = useMemo(() => {
+    const baseFixtures = sceneRenderPreview ? fixturesWithSceneState(fixtures, sceneRenderPreview) : fixtures;
+    if (fixtureValuePreviews.size === 0) return baseFixtures;
+    return baseFixtures.map((fixture) => {
+      const preview = fixtureValuePreviews.get(fixture.id);
+      if (!preview) return fixture;
+      return {
+        ...fixture,
+        intensity: preview.intensity?.value ?? fixture.intensity,
+        cct: preview.cct?.value ?? fixture.cct,
+      };
+    });
+  }, [fixtures, fixtureValuePreviews, sceneRenderPreview]);
+
+  const stagePlotActiveScene = sceneRenderPreview ?? activeScene;
+  const stagePlotSceneModified = useMemo(() => {
+    if (!stagePlotActiveScene) return false;
+    return !sceneMatchesFixtures(stagePlotFixtures, stagePlotActiveScene, lightingFixtureCatalogSnapshot);
+  }, [lightingFixtureCatalogSnapshot, stagePlotActiveScene, stagePlotFixtures]);
 
   const activeTab =
     activeTabOverride ??
@@ -1407,6 +1633,7 @@ export function LightingWorkspaceSurface({
     // Show the scene in the inspector immediately — even if the recall IPC
     // is rejected by the engine (e.g. pre-probe state), the operator still
     // sees what the scene contains. The recall IPC drives the actual rig.
+    setSceneRenderPreviewId(sceneId);
     setInspectorSelectedSceneId(sceneId);
     if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
     if (!bridgeReachable && !previewMode) {
@@ -1919,9 +2146,6 @@ export function LightingWorkspaceSurface({
             const newId = typeof created?.id === "string" ? created.id : null;
             if (newId) {
               currentId = newId;
-              // spatialRotation isn't yet on LightingFixtureUpdateRequest in
-              // the TS types (Wave 9 will add it); seeded fixtures all have
-              // rotation 0 today so the omission doesn't lose data.
               await store.updateLightingFixture({
                 fixtureId: newId,
                 intensity: snapshot.intensity,
@@ -1929,6 +2153,7 @@ export function LightingWorkspaceSurface({
                 on: snapshot.on,
                 spatialX: snapshot.spatialX ?? null,
                 spatialY: snapshot.spatialY ?? null,
+                spatialRotation: snapshot.spatialRotation,
                 rigZ: snapshot.rigZ ?? null,
                 beamAngleDegrees: snapshot.beamAngleDegrees ?? null,
               });
@@ -2012,9 +2237,16 @@ export function LightingWorkspaceSurface({
       }
     ) => {
       const busyKey = `fixture-spatial:${fixtureId}`;
+      const nextPartial = { ...partial };
+      if (typeof nextPartial.spatialX === "number") {
+        nextPartial.spatialX = clampStudioMeters(nextPartial.spatialX, STUDIO_LAYOUT.roomWidthMeters);
+      }
+      if (typeof nextPartial.spatialY === "number") {
+        nextPartial.spatialY = clampStudioMeters(nextPartial.spatialY, STUDIO_LAYOUT.roomDepthMeters);
+      }
       startBusy(busyKey);
       try {
-        await store.updateLightingFixture({ fixtureId, ...partial });
+        await store.updateLightingFixture({ fixtureId, ...nextPartial });
       } catch (error) {
         reportError(error, "Fixture spatial update failed.");
       } finally {
@@ -2394,7 +2626,11 @@ export function LightingWorkspaceSurface({
       previewDirty={previewDirty}
       onTogglePower={handleToggleFixturePower}
       onIntensityCommit={handleIntensityCommit}
+      onIntensityPreview={(fixtureId, intensity, phase) =>
+        setFixtureValuePreview(fixtureId, "intensity", intensity, phase)
+      }
       onCctCommit={handleCctCommit}
+      onCctPreview={(fixtureId, cct, phase) => setFixtureValuePreview(fixtureId, "cct", cct, phase)}
       onControlValuesCommit={handleControlValuesCommit}
       onIdentifyBurst={handleIdentifyBurst}
       onPatchCommit={handlePatchCommit}
@@ -2419,7 +2655,9 @@ export function LightingWorkspaceSurface({
       onClearSelection={() => void handleSelectFixture(null)}
       onBulkTogglePower={(ids, on) => void handleBulkTogglePower(ids, on)}
       onBulkIntensityValues={(values) => void handleBulkIntensityValues(values)}
+      onBulkIntensityPreview={(values, phase) => setBulkFixtureValuePreview(values, "intensity", phase)}
       onBulkCctValues={(values) => void handleBulkCctValues(values)}
+      onBulkCctPreview={(values, phase) => setBulkFixtureValuePreview(values, "cct", phase)}
       onApplyPalette={(paletteId, ids) => void handleApplyPalette(paletteId, ids)}
       onCreatePalette={(request) => void handleCreatePalette(request)}
       onUpdatePalette={(request) => void handleUpdatePalette(request)}
@@ -2498,6 +2736,7 @@ export function LightingWorkspaceSurface({
           onToggleAllPower={handleToggleAllPower}
           scenes={scenes}
           activeSceneId={liveActiveSceneId}
+          selectedSceneId={stagePlotActiveScene?.id ?? activeSceneId}
           modifiedSceneId={modifiedSceneId}
           previewSceneId={previewMode ? previewTargetSceneId : null}
           previewMode={previewMode}
@@ -2535,15 +2774,16 @@ export function LightingWorkspaceSurface({
 
         <main className={styles.stage} data-testid="lighting-stage">
           <StagePlot
-            fixtures={fixtures}
+            fixtures={stagePlotFixtures}
             catalog={lightingFixtureCatalogSnapshot}
             liveFixtures={liveFixtures}
             selectedFixtureId={selectedFixture?.id ?? null}
             selectedFixtureIds={selectedFixtureIds}
             patchMode={uiMode === "patch"}
             previewMode={previewMode}
-            activeSceneName={activeScene?.name}
-            isSceneModified={effectiveSceneModified}
+            activeSceneName={stagePlotActiveScene?.name}
+            isSceneModified={previewMode ? previewDirty : stagePlotSceneModified}
+            renderMode={stagePlotRenderMode}
             bridgeReachable={bridgeReachable}
             searchQuery={searchQuery}
             identifyingFixtureIds={identifyingIds}
@@ -2555,6 +2795,11 @@ export function LightingWorkspaceSurface({
                 : (id, xMeters, yMeters) =>
                     void handleFixtureSpatialCommit(id, { spatialX: xMeters, spatialY: yMeters })
             }
+            onRotationCommit={
+              previewMode
+                ? undefined
+                : (id, rotationDegrees) => void handleFixtureSpatialCommit(id, { spatialRotation: rotationDegrees })
+            }
             onRequestRenameFixture={(id) => {
               void handleSelectFixture(id, {});
               requestInlineRename("fixture", id);
@@ -2565,6 +2810,7 @@ export function LightingWorkspaceSurface({
             onAddFixture={requestAddFixture}
             viewport={stagePlotViewport}
             chipHoverFixtureId={chipHoverFixtureId}
+            onRenderModeChange={setStagePlotRenderMode}
           />
         </main>
 

@@ -23,6 +23,14 @@
     "setup-required",
     "setup-ready"
   ],
+  "snapshotShapes": {
+    "lightingFixtureVisual": {
+      "additiveFields": ["symbolKind", "symbolVariant", "emitterLayout", "output", "visualConfidence"],
+      "symbolKind": ["panel", "soft-mat", "linear-bar", "fresnel", "control-node"],
+      "beamType": ["wash", "spot", "fresnel", "rectangle", "glow", "none"],
+      "visualConfidence": ["verified", "catalogue-derived", "fallback"]
+    }
+  },
   "methods": [
     "app.snapshot",
     "audio.channel.update",

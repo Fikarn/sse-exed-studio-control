@@ -26,6 +26,7 @@ export interface SceneTileProps {
   /** Average CCT across fixtures `on` in the scene's saved state. */
   avgCct: number;
   isActive: boolean;
+  isSelected?: boolean;
   isModified: boolean;
   isPreviewTarget?: boolean;
   /**
@@ -77,6 +78,7 @@ export function SceneTile({
   onCount,
   avgCct,
   isActive,
+  isSelected = false,
   isModified,
   isPreviewTarget = false,
   bridgeReachable = true,
@@ -113,7 +115,8 @@ export function SceneTile({
       : `${styles.tile} ${styles.tileActive}`
     : styles.tile;
   const previewClass = isPreviewTarget ? `${baseClass} ${styles.tilePreview}` : baseClass;
-  const stateClass = pinned ? `${previewClass} ${styles.tilePinned}` : previewClass;
+  const selectedClass = isSelected ? `${previewClass} ${styles.tileSelected}` : previewClass;
+  const stateClass = pinned ? `${selectedClass} ${styles.tilePinned}` : selectedClass;
 
   const subLine = onCount > 0 ? `${onCount} on · ${Math.round(avgCct)} K` : `${onCount} on`;
   const badgeText = isPreviewTarget
@@ -238,6 +241,7 @@ export function SceneTile({
       onMouseLeave={onHoverPreviewClear ? () => onHoverPreviewClear(id) : undefined}
       aria-current={isActive ? "true" : undefined}
       aria-label={ariaLabel}
+      data-selected={isSelected || undefined}
       data-pinned={pinned || undefined}
       data-dragging={isDragging || undefined}
       data-fading={normalizedFadeProgress !== null || undefined}
