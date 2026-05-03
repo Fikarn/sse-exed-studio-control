@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the top-level engineering handoff for the repository as of `2026-04-27`.
+This is the top-level engineering handoff for the repository as of `2026-05-03`.
 
 Read this first before resuming product, release, or cleanup work. Use it as the entry point into the more detailed documents linked below.
 
@@ -14,6 +14,7 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - Native packaging, installer, update-repository, and release automation lanes exist, produce signed/unsigned operator-ready artifacts, and are driven from tagged releases.
 - Native operator parity is engineering-complete. Acceptance is layered: deterministic offscreen `2560x1440` captures, real-GPU onscreen spot captures, and the install-time first-launch smoke test shipped in the QtIFW installer.
 - Native and replacement-shell verification are target-host gates. GitHub Actions is not the acceptance mechanism for current cutover work; the advisory `dev-checks` workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) runs four jobs on pull requests (format-protocol, lint, frontend-typecheck, rust) but is intentionally not a required status check, and Actions billing is not paid — failed CI runs are expected baseline noise.
+- Responsive operator layout support landed in [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71) on `2026-05-03` (`4af7e8b8427cff78837054326478e1a67398154c`). Lighting now has logical CSS-pixel layout modes, mode-keyed column persistence, toolbar priority overflow, a narrow inspector drawer, separate stage zoom controls, shell-owned window layout persistence, and Scaled Studio Preview for current-hardware human review.
 - A one-way legacy-import path (`native/rust-engine/src/legacy_import.rs`) remains so that operators migrating from a pre-`v2.0.0` Electron installation can bring their old `db.json` forward on first native launch. This is the only legacy code that is intentionally retained.
 
 ## Start Here
@@ -64,6 +65,8 @@ The highest-value unresolved work is:
    `Setup/Support` is the verified pilot. `Lighting` Direction D and the premium Waves 24-34 pass are complete: D supersedes the closed `Cr — Spatial desk` pass, removes the cue model in favour of scene recall, keeps `pan/tilt` intentionally out of scope, and now includes preview editing, manual fade recall, selection chips, compact DMX, Highlight/Solo/Find, color/reorder polish, and per-attribute palette pools. All 28 premium findings in [docs/redesign/lighting-d-premium-plan.md](./redesign/lighting-d-premium-plan.md) are closed; Wave 34 PR #65 landed with macOS and Windows target-host validation, and future Lighting work should start from new issues instead of reopening the wave plan. The `Planning` pass is closed against the checked-in run-of-show timeline / board plan. The `Audio` pass is closed against the locked `Ar+ - Control-room confidence desk` spec in `docs/redesign/audio.md`, including the warning-band trust model, full-width meter bridge, banked strip desk, control-room inspector split, keyboard desk model, degraded-state matrix, and `1920x1080` fallback fit. The broader live Tauri workspace qualification lane now exists as `npm run tauri:workspaces:qualify`; it covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence. The cutover acceptance gate is tracked in `docs/archive/FRONTEND_CUTOVER_PLAN.md`; Checkpoint C is satisfied for published tag `v2.2.0` (`eb166092ad5483a00b6b59137062c86c3193ca53`), the final operator-workstation rollout passed on published tag `v2.2.1` (`951a2c4e1f236200f0f017121158bc9969427051`), and Checkpoint D completed on commit `d0205baf52ce02d7d4d24699facd202f3bbba217`. Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, and the final retirement gate are complete.
 5. Keep Tauri target-host posture honest.
    GitHub Actions is not the acceptance mechanism for the replacement-shell cutover. `npm run tauri:setup-support:qualify`, `npm run tauri:workspaces:qualify`, and `npm run tauri:visual:review` remain local/manual cutover-readiness gates for future shell changes. The historical `tauri:package:*` lanes remain useful pre-switch evidence under `release/tauri-candidate*`. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`; `npm run native:release:mac:local` passed for published `v2.2.1`, and `npm run native:release:win:evidence` passed on Windows 11 `x64` with evidence bundle `2026-04-24T22-17-55-519Z`. Checkpoint D also passed macOS `npm run native:release:mac:local` and Windows 11 `x64` evidence bundle `2026-04-25T07-32-31-463Z` on commit `d0205baf52ce02d7d4d24699facd202f3bbba217`. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) records the completed Checkpoint C evidence and closed fallback window; [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) records the passed `v2.2.1` operator rollout; [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) records the completed Checkpoint D / Qt retirement track.
+6. Preserve responsive-layout semantics.
+   The studio surface is a logical `2560x1440` operator composition whose layout decisions are driven by CSS viewport size, not physical pixels or `devicePixelRatio`. Aspect-ratio-correct Scaled Studio Preview is the normal current-hardware human review path for studio composition on the built-in MacBook display. The fixed studio monitor remains the final authority for physical-size readability and ergonomics. BetterDisplay is now optional fallback tooling, not the standard workflow.
 
 ## Execution Queue
 
@@ -77,6 +80,30 @@ Completed rollout record:
 - [Issue #3: Cutover: Tauri shipping switch evidence and fallback window](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - [Issue #4: Rollout: verify v2.2.1 published installer on operator workstation](https://github.com/Fikarn/sse-exed-studio-control/issues/4), executed through [docs/OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md)
 - [Issue #5: Checkpoint D: plan Qt fallback retirement](https://github.com/Fikarn/sse-exed-studio-control/issues/5), executed through [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](./archive/QT_FALLBACK_RETIREMENT_AUDIT.md)
+
+## Recent Session Record
+
+### Responsive operator layout, Lighting-first pass
+
+Status: complete and merged through [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71).
+
+Important facts for future sessions:
+
+- The exact command-palette entry for built-in-display review is `Studio Preview: Enter 2560x1440 Review`; exit with `Studio Preview: Exit Review`.
+- Scaled Studio Preview preserves the studio layout mode, aspect ratio, and proportions while reducing physical size. It is valid for composition, relative density, toolbar fit, rail/stage/inspector balance, drawer behavior, and operator-flow review.
+- Native windowed mode on the current MacBook is still useful for `desktopCompact` and `narrowUtility` behavior. Do not judge `studioFull` from the unscaled MacBook logical viewport.
+- UI scale and stage zoom are separate concepts. UI scale is the operator chrome density control; stage zoom is content/canvas framing (`Fit Room`, `Fill Desk`, `100%`, bookmarks).
+- Shell/window layout preferences belong in `native/tauri-shell`; fixture/device state, hardware policy, product persistence, and DB logic remain engine-owned.
+- Column widths are saved per layout mode. Future Lighting layout changes should preserve that split unless a new workspace model replaces it deliberately.
+- `npm run tauri:visual:review` now covers `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` logical sizes, primary toolbar fit including the status chip, overflow reachability, narrow inspector drawer behavior, stage minimum bounds, DPR-invariant layout mode selection, and shell window recovery.
+
+Validation recorded for PR #71:
+
+- Human visual review approved in Scaled Studio Preview on current hardware.
+- `npm run frontend:foundation` passed, including Storybook build and 39 Playwright tests.
+- `npm run native:check` passed.
+- `npm run tauri:visual:review` passed with 30 screenshots, 0 failures, and 4 shell window preference recovery tests passed.
+- Advisory GitHub checks passed before merge.
 
 ## Validation Baseline
 

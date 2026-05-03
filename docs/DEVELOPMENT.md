@@ -343,7 +343,14 @@ git commit -m "feat: short description"
 git push -u origin feature-short-description
 ```
 
-If you want a PR, open one before merging.
+Open a PR for reviewable work. Do not consider a session fully closed just because the PR exists or is green. The normal closeout is:
+
+1. push the branch
+2. open the PR as draft while validation or human review is still in progress
+3. mark the PR ready only after the relevant validation and review are complete
+4. merge the approved PR through GitHub
+5. prune deleted remotes, switch back to `main`, fast-forward from `origin/main`, and delete the local feature branch
+6. verify `git status -sb` shows clean `main...origin/main`
 
 ### Recommended commit types
 
