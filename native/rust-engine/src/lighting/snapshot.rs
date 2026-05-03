@@ -160,19 +160,19 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     solo_fixture_ids.sort();
 
     LightingSnapshot {
-        summary: lighting_summary(
-            &status,
-            &config.bridge_ip,
-            config.universe,
-            fixtures.len(),
-            groups.len(),
-            scenes.len(),
-            last_recalled_scene_id.as_deref(),
-            last_scene_recall_at.as_deref(),
-            &last_action_status,
-            last_action_code.as_deref(),
-            last_action_message.as_deref(),
-        ),
+        summary: lighting_summary(LightingSummaryContext {
+            status: &status,
+            bridge_ip: &config.bridge_ip,
+            universe: config.universe,
+            fixture_count: fixtures.len(),
+            group_count: groups.len(),
+            scene_count: scenes.len(),
+            last_recalled_scene_id: last_recalled_scene_id.as_deref(),
+            last_scene_recall_at: last_scene_recall_at.as_deref(),
+            last_action_status: &last_action_status,
+            last_action_code: last_action_code.as_deref(),
+            last_action_message: last_action_message.as_deref(),
+        }),
         status,
         adapter_mode: inventory.adapter_mode,
         bridge_ip: config.bridge_ip,

@@ -44,11 +44,13 @@ export function InspectorPatch({
   onIdentifyBurst,
   busy = false,
 }: InspectorPatchProps) {
-  const [draft, setDraft] = useState(fixture ? String(fixture.dmxStartAddress) : "");
+  const fixtureDraftKey = fixture?.id ?? "";
+  const fixtureDraftAddress = fixture ? String(fixture.dmxStartAddress) : "";
+  const [draft, setDraft] = useState(fixtureDraftAddress);
 
   useEffect(() => {
-    setDraft(fixture ? String(fixture.dmxStartAddress) : "");
-  }, [fixture?.id, fixture?.dmxStartAddress]);
+    setDraft(fixtureDraftAddress);
+  }, [fixtureDraftAddress, fixtureDraftKey]);
 
   if (!fixture) {
     return (

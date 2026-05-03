@@ -1,9 +1,10 @@
-import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, MetricCard, StatusBadge, StatusPill, Surface } from "@sse/design-system";
 import type { JsonValue, ShellStore } from "@sse/engine-client";
 
 import { exportShellDiagnostics, openShellPath } from "../shellCommands";
+import { useLiveCallback } from "../shared/useLiveCallback";
 import {
   asRecord,
   asStatusTone,
@@ -382,31 +383,33 @@ export function SetupSupportPilot({
     [activeStepId, isReady, probeHasError, stepIndex]
   );
 
-  const performAction = useEffectEvent(async (actionId: string, onRun: () => Promise<ActionFeedback | null | void>) => {
-    setBusyAction(actionId);
-    setFeedback(null);
+  const performAction = useLiveCallback(
+    async (actionId: string, onRun: () => Promise<ActionFeedback | null | void>) => {
+      setBusyAction(actionId);
+      setFeedback(null);
 
-    try {
-      const result = await onRun();
-      if (result) {
-        setFeedback(result);
+      try {
+        const result = await onRun();
+        if (result) {
+          setFeedback(result);
+        }
+      } catch (error) {
+        setFeedback({
+          message: error instanceof Error ? error.message : "The setup workflow action failed.",
+          tone: "error",
+        });
+      } finally {
+        setBusyAction(null);
       }
-    } catch (error) {
-      setFeedback({
-        message: error instanceof Error ? error.message : "The setup workflow action failed.",
-        tone: "error",
-      });
-    } finally {
-      setBusyAction(null);
     }
-  });
+  );
 
-  const activateStep = useEffectEvent(async (stepId: RunnerStepId) => {
+  const activateStep = useLiveCallback(async (stepId: RunnerStepId) => {
     startTransition(() => setActiveStepId(stepId));
     await store.updateCommissioning({ runnerStage: stepId });
   });
 
-  const persistMode = useEffectEvent((nextMode: SetupMode) => {
+  const persistMode = useLiveCallback((nextMode: SetupMode) => {
     setMode(nextMode);
     void store.setSetupSection(nextMode === "runner" ? "commissioning" : "support");
   });
@@ -555,7 +558,7 @@ export function SetupSupportPilot({
     return isReady ? "Open planning" : "Publish setup";
   }, [activeStepId, isReady]);
 
-  const invokePrimaryAction = useEffectEvent(() => {
+  const invokePrimaryAction = useLiveCallback(() => {
     if (activeStepId === "import") {
       void performAction("export-companion", () => saveImportProfile(true));
       return;
@@ -590,19 +593,19 @@ export function SetupSupportPilot({
     void performAction("publish-setup", publishSetup);
   });
 
-  const moveControlSelection = useEffectEvent((direction: -1 | 1) => {
+  const moveControlSelection = useLiveCallback((direction: -1 | 1) => {
     const nextId = nextControlId(selectedPageControls, selectedControlId, direction);
     if (nextId) {
       setSelectedControlId(nextId);
     }
   });
 
-  const moveStepSelection = useEffectEvent((direction: -1 | 1) => {
+  const moveStepSelection = useLiveCallback((direction: -1 | 1) => {
     const nextIndex = Math.min(Math.max(stepIndex + direction, 0), runnerStepOrder.length - 1);
     void activateStep(runnerStepOrder[nextIndex]!);
   });
 
-  const requestStepSelection = useEffectEvent((stepId: RunnerStepId) => {
+  const requestStepSelection = useLiveCallback((stepId: RunnerStepId) => {
     const currentIndex = runnerStepOrder.indexOf(activeStepId);
     const nextIndex = runnerStepOrder.indexOf(stepId);
     if (nextIndex > currentIndex) {

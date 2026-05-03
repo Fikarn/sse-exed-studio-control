@@ -81,7 +81,7 @@ function readSmokeStatus(statusPath) {
   try {
     return JSON.parse(readFileSync(statusPath, "utf8"));
   } catch (error) {
-    throw new Error(`Failed to parse smoke status file at ${statusPath}: ${error.message}`);
+    throw new Error(`Failed to parse smoke status file at ${statusPath}: ${error.message}`, { cause: error });
   }
 }
 

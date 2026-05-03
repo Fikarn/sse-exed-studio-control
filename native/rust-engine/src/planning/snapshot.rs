@@ -81,7 +81,10 @@ pub fn read_planning_time_report(
     let filtered_tasks = snapshot
         .tasks
         .iter()
-        .filter(|task| project_id.is_none_or(|value| task.project_id == value))
+        .filter(|task| match project_id {
+            Some(value) => task.project_id == value,
+            None => true,
+        })
         .collect::<Vec<_>>();
 
     let mut project_totals: HashMap<String, PlanningProjectTimeEntry> = HashMap::new();

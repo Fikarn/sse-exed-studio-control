@@ -79,7 +79,7 @@ pub fn validate_protocol_version(requested_protocol_version: &str) -> Result<(),
 pub fn bootstrap_runtime() -> EngineResult<RuntimeContext> {
     let runtime_paths = resolve_runtime_paths();
     validate_protocol_version(&runtime_paths.requested_protocol_version)
-        .map_err(|message| std::io::Error::other(message))?;
+        .map_err(std::io::Error::other)?;
 
     fs::create_dir_all(&runtime_paths.app_data_dir)?;
     fs::create_dir_all(&runtime_paths.logs_dir)?;

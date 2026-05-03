@@ -5,7 +5,6 @@ import type {
   EventEnvelope,
   EventName,
   JsonObject,
-  JsonValue,
   RequestEnvelope,
   RequestMethod,
   ResponseEnvelope,

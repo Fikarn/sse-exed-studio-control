@@ -82,18 +82,21 @@ function checkNode() {
     return;
   }
 
-  const major = Number(version.replace(/^v/, "").split(".")[0]);
-  if (!Number.isFinite(major) || major < 20) {
-    fail("Node.js baseline", `Expected Node >=20; current version is ${version}.`);
+  const [major, minor] = version
+    .replace(/^v/, "")
+    .split(".")
+    .map((part) => Number(part));
+  if (!Number.isFinite(major) || !Number.isFinite(minor) || major < 24) {
+    fail("Node.js baseline", `Expected Node >=24; current version is ${version}.`);
     return;
   }
 
-  if (major !== 20) {
-    warn("Node.js baseline", `Node 20 LTS is the target-host baseline from .nvmrc; current version is ${version}.`);
+  if (major !== 24) {
+    warn("Node.js baseline", `Node 24 LTS is the target-host baseline from .nvmrc; current version is ${version}.`);
     return;
   }
 
-  pass("Node.js baseline", "Matches the Node 20 target-host baseline.");
+  pass("Node.js baseline", "Matches the Node 24 LTS target-host baseline.");
 }
 
 function checkPackageInstall() {

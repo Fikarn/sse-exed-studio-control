@@ -173,6 +173,9 @@ export function StagePlot({
   const selectedFixture = selectedFixtureId
     ? (fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null)
     : null;
+  const orderedFixtures = selectedFixture
+    ? [...fixtures.filter((fixture) => fixture.id !== selectedFixture.id), selectedFixture]
+    : fixtures;
 
   return (
     <div
@@ -356,45 +359,36 @@ export function StagePlot({
           {/* Fixture markers — reorder so the selected fixture paints last
               (above its siblings), giving the in-flight drag a clear z-stack
               without interfering with React reconciliation (key-stable). */}
-          {(() => {
-            const ordered =
-              selectedFixtureId && fixtures.some((fixture) => fixture.id === selectedFixtureId)
-                ? [
-                    ...fixtures.filter((fixture) => fixture.id !== selectedFixtureId),
-                    fixtures.find((fixture) => fixture.id === selectedFixtureId)!,
-                  ]
-                : fixtures;
-            return ordered.map((fixture) => {
-              const originalIndex = fixtures.indexOf(fixture);
-              const { xMeters, yMeters } = meterPositionFor(fixture, originalIndex);
-              return (
-                <FixtureMarker
-                  key={fixture.id}
-                  id={fixture.id}
-                  name={fixture.name}
-                  centerX={xMeters * 100}
-                  centerY={yMeters * 100}
-                  rotationDegrees={fixture.spatialRotation}
-                  mounting={deriveMounting(fixture.type)}
-                  intensity={fixture.intensity}
-                  cct={fixture.cct}
-                  on={fixture.on}
-                  selected={selectedFixtureIds ? selectedFixtureIds.has(fixture.id) : fixture.id === selectedFixtureId}
-                  dimmed={!fixtureMatches(fixture)}
-                  identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
-                  highlightOverlay={highlightOverlayFixtureIds?.has(fixture.id) ?? false}
-                  chipHovered={chipHoverFixtureId === fixture.id}
-                  onSelect={(id, options) => onSelectFixture(id, options)}
-                  onPositionCommit={onPositionCommit}
-                  onRequestRename={onRequestRenameFixture}
-                  onIdentify={onIdentifyFixture}
-                  onRequestDelete={onRequestDeleteFixture}
-                  onDragMove={handleFixtureDragMove}
-                  onDragEnd={handleFixtureDragEnd}
-                />
-              );
-            });
-          })()}
+          {orderedFixtures.map((fixture) => {
+            const originalIndex = fixtures.indexOf(fixture);
+            const { xMeters, yMeters } = meterPositionFor(fixture, originalIndex);
+            return (
+              <FixtureMarker
+                key={fixture.id}
+                id={fixture.id}
+                name={fixture.name}
+                centerX={xMeters * 100}
+                centerY={yMeters * 100}
+                rotationDegrees={fixture.spatialRotation}
+                mounting={deriveMounting(fixture.type)}
+                intensity={fixture.intensity}
+                cct={fixture.cct}
+                on={fixture.on}
+                selected={selectedFixtureIds ? selectedFixtureIds.has(fixture.id) : fixture.id === selectedFixtureId}
+                dimmed={!fixtureMatches(fixture)}
+                identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
+                highlightOverlay={highlightOverlayFixtureIds?.has(fixture.id) ?? false}
+                chipHovered={chipHoverFixtureId === fixture.id}
+                onSelect={(id, options) => onSelectFixture(id, options)}
+                onPositionCommit={onPositionCommit}
+                onRequestRename={onRequestRenameFixture}
+                onIdentify={onIdentifyFixture}
+                onRequestDelete={onRequestDeleteFixture}
+                onDragMove={handleFixtureDragMove}
+                onDragEnd={handleFixtureDragEnd}
+              />
+            );
+          })}
 
           {/* F9 — smart-guide alignment lines. Only render when a fixture
               drag is in progress and Alt isn't held. Stroke is non-scaling

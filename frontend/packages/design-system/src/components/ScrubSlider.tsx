@@ -231,7 +231,7 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (disabled) return;
-      let next = value;
+      let next: number;
       switch (event.key) {
         case "ArrowLeft":
         case "ArrowDown":
@@ -269,11 +269,12 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
   // Release the captured pointer if the component unmounts mid-drag — keeps
   // the browser from leaking pointer-capture state across hot-reloads.
   useEffect(() => {
+    const track = trackRef.current;
     return () => {
       const drag = dragRef.current;
-      if (drag && trackRef.current) {
+      if (drag && track) {
         try {
-          trackRef.current.releasePointerCapture(drag.pointerId);
+          track.releasePointerCapture(drag.pointerId);
         } catch {
           /* ignore */
         }

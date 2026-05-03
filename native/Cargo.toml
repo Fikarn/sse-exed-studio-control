@@ -11,8 +11,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.39.0", features = ["bundled"] }
 studio-control-protocol = { path = "protocol/rust" }
-tauri = { version = "2", features = [] }
-tauri-build = { version = "2", features = [] }
 # Pinned to a minor range so generated TypeScript stays stable. Bumping
 # the minor must be paired with a `npm run protocol:generate` regen run
 # and a check of any diff in frontend/packages/engine-client/src/generated/.

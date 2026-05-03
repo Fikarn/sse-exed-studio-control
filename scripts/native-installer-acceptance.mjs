@@ -101,7 +101,7 @@ function readSmokeStatus(statusPath) {
   try {
     return JSON.parse(readFileSync(statusPath, "utf8"));
   } catch (error) {
-    throw new Error(`Failed to parse smoke status file at ${statusPath}: ${error.message}`);
+    throw new Error(`Failed to parse smoke status file at ${statusPath}: ${error.message}`, { cause: error });
   }
 }
 
@@ -748,7 +748,7 @@ async function main() {
 
   console.log(`${runtimeKind === "tauri" ? "Tauri candidate" : "Native"} installer acceptance root: ${acceptanceRoot}`);
 
-  let teardown = null;
+  let teardown;
   let mainError = null;
   try {
     console.log("Step 1: install the actual offline installer into a clean target root.");

@@ -3,7 +3,6 @@ import {
   type DragEvent as ReactDragEvent,
   useDeferredValue,
   useEffect,
-  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -26,6 +25,7 @@ import {
 } from "../shellData";
 import planningStyles from "./PlanningWorkspace.module.css";
 import { type ActionFeedback } from "../startup/startupHelpers";
+import { useLiveCallback } from "../shared/useLiveCallback";
 import { PlanningClockIcon } from "./icons";
 import { PlanningProjectDetailOverlay } from "./PlanningProjectDetailOverlay";
 import { PlanningTimeReportOverlay } from "./PlanningTimeReportOverlay";
@@ -360,11 +360,13 @@ export function PlanningWorkspaceSurface({
     void store.updatePlanningSettings({ modeSection });
   };
 
-  const updatePlanningViewFilter = useEffectEvent((viewFilter: "all" | "todo" | "in-progress" | "blocked" | "done") => {
-    void store.updatePlanningSettings({ viewFilter });
-  });
+  const updatePlanningViewFilter = useLiveCallback(
+    (viewFilter: "all" | "todo" | "in-progress" | "blocked" | "done") => {
+      void store.updatePlanningSettings({ viewFilter });
+    }
+  );
 
-  const selectPlanningTask = useEffectEvent((taskId: string, projectId: string) => {
+  const selectPlanningTask = useLiveCallback((taskId: string, projectId: string) => {
     selectedTimelineTaskRef.current = tasks.find((task) => task.id === taskId) ?? null;
     void store.updatePlanningSettings({
       selectedProjectId: projectId,
@@ -372,12 +374,12 @@ export function PlanningWorkspaceSurface({
     });
   });
 
-  const closePlanningProjectDetail = useEffectEvent(() => {
+  const closePlanningProjectDetail = useLiveCallback(() => {
     planningProjectDetailOpenRef.current = false;
     setPlanningProjectDetailOpen(false);
   });
 
-  const openPlanningProjectDetail = useEffectEvent((projectId: string, taskId?: string | null) => {
+  const openPlanningProjectDetail = useLiveCallback((projectId: string, taskId?: string | null) => {
     const projectTasks = tasks
       .filter((task) => task.projectId === projectId)
       .sort((left, right) => left.order - right.order);
@@ -393,7 +395,7 @@ export function PlanningWorkspaceSurface({
     });
   });
 
-  const selectPlanningProjectDetailTask = useEffectEvent((taskId: string, projectId: string) => {
+  const selectPlanningProjectDetailTask = useLiveCallback((taskId: string, projectId: string) => {
     setPlanningProjectDetailProjectId(projectId);
     setPlanningProjectDetailTaskId(taskId);
     void store.updatePlanningSettings({
@@ -402,25 +404,25 @@ export function PlanningWorkspaceSurface({
     });
   });
 
-  const togglePlanningProjectDetailTaskComplete = useEffectEvent(async (taskId: string) => {
+  const togglePlanningProjectDetailTaskComplete = useLiveCallback(async (taskId: string) => {
     await store.togglePlanningTaskComplete(taskId);
   });
 
-  const createPlanningProjectDetailTask = useEffectEvent(async (projectId: string, title: string) => {
+  const createPlanningProjectDetailTask = useLiveCallback(async (projectId: string, title: string) => {
     return store.createPlanningTask({ projectId, title });
   });
 
-  const createPlanningProjectDetailChecklistItem = useEffectEvent(async (taskId: string, text: string) => {
+  const createPlanningProjectDetailChecklistItem = useLiveCallback(async (taskId: string, text: string) => {
     return store.addPlanningChecklistItem(taskId, text);
   });
 
-  const togglePlanningProjectDetailChecklistItem = useEffectEvent(
+  const togglePlanningProjectDetailChecklistItem = useLiveCallback(
     async (taskId: string, itemId: string, done: boolean) => {
       await store.setPlanningChecklistItemDone(taskId, itemId, done);
     }
   );
 
-  const reschedulePlanningTask = useEffectEvent(async (taskId: string, deltaMinutes: number) => {
+  const reschedulePlanningTask = useLiveCallback(async (taskId: string, deltaMinutes: number) => {
     const task = tasks.find((entry) => entry.id === taskId) ?? null;
     if (!task?.scheduledStart) {
       return;
@@ -451,7 +453,7 @@ export function PlanningWorkspaceSurface({
     pulsePlanningOverlap(overlapTitle ? task.id : null);
   });
 
-  const movePlanningTaskToAdjacentLane = useEffectEvent(async (taskId: string, direction: -1 | 1) => {
+  const movePlanningTaskToAdjacentLane = useLiveCallback(async (taskId: string, direction: -1 | 1) => {
     const task = tasks.find((entry) => entry.id === taskId) ?? null;
     if (!task?.scheduledStart) {
       return;
@@ -487,18 +489,18 @@ export function PlanningWorkspaceSurface({
     pulsePlanningOverlap(overlapTitle ? task.id : null);
   });
 
-  const reorderPlanningProject = useEffectEvent(
+  const reorderPlanningProject = useLiveCallback(
     async (projectId: string, newStatus: PlanningBoardStatus, newIndex: number) => {
       await store.reorderPlanningProject({ newIndex, newStatus, projectId });
     }
   );
 
-  const clearPlanningBoardDragState = useEffectEvent(() => {
+  const clearPlanningBoardDragState = useLiveCallback(() => {
     setDraggingBoardProjectId(null);
     setPlanningBoardDropTarget(null);
   });
 
-  const resolvePlanningBoardDropIndex = useEffectEvent(
+  const resolvePlanningBoardDropIndex = useLiveCallback(
     (targetStatus: PlanningBoardStatus, targetProjects: PlanningProjectEntry[], rawIndex: number) => {
       const draggedProject = projects.find((project) => project.id === draggingBoardProjectId) ?? null;
       const sameStatus = draggedProject?.status === targetStatus;
@@ -514,7 +516,7 @@ export function PlanningWorkspaceSurface({
     }
   );
 
-  const minuteForLaneDrop = useEffectEvent((event: ReactDragEvent<HTMLDivElement>) => {
+  const minuteForLaneDrop = useLiveCallback((event: ReactDragEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width <= 0) {
       return timelineStartMinute;
@@ -526,7 +528,7 @@ export function PlanningWorkspaceSurface({
     return Math.max(timelineStartMinute, Math.min(timelineEndMinute - 15, snappedMinute));
   });
 
-  const updatePlanningDropTarget = useEffectEvent((event: ReactDragEvent<HTMLDivElement>, projectId: string) => {
+  const updatePlanningDropTarget = useLiveCallback((event: ReactDragEvent<HTMLDivElement>, projectId: string) => {
     if (draggingScheduledTask) {
       setPlanningDropTarget({
         minute: minuteForLaneDrop(event),
@@ -547,7 +549,7 @@ export function PlanningWorkspaceSurface({
     return true;
   });
 
-  const rescheduleScheduledTaskByDrop = useEffectEvent(async (taskId: string, projectId: string, minute: number) => {
+  const rescheduleScheduledTaskByDrop = useLiveCallback(async (taskId: string, projectId: string, minute: number) => {
     const task = tasks.find((entry) => entry.id === taskId) ?? null;
     if (!task) {
       return;
@@ -575,7 +577,7 @@ export function PlanningWorkspaceSurface({
     pulsePlanningOverlap(overlapTitle ? taskId : null);
   });
 
-  const scheduleUnscheduledTask = useEffectEvent(async (taskId: string, projectId: string, minute: number) => {
+  const scheduleUnscheduledTask = useLiveCallback(async (taskId: string, projectId: string, minute: number) => {
     const task = tasks.find((entry) => entry.id === taskId) ?? null;
     if (!task || task.projectId !== projectId) {
       return;
@@ -601,24 +603,24 @@ export function PlanningWorkspaceSurface({
     pulsePlanningOverlap(overlapTitle ? taskId : null);
   });
 
-  const snapTimelineToNow = useEffectEvent(() => {
+  const snapTimelineToNow = useLiveCallback(() => {
     const nextDay = planningDateOnly(new Date());
     const centeredStartMinute = Math.round(currentMinute - timelineRangeMinutes / 2);
     setTimelineDay(nextDay);
     setTimelineOffsetMinutes(centeredStartMinute - timelineBaseStartMinute);
   });
 
-  const openProjectComposer = useEffectEvent(() => {
+  const openProjectComposer = useLiveCallback(() => {
     setProjectComposerOpen(true);
     setPlanningFeedback(null);
   });
 
-  const closeProjectComposer = useEffectEvent(() => {
+  const closeProjectComposer = useLiveCallback(() => {
     setProjectComposerOpen(false);
     setNewProjectTitle("");
   });
 
-  const createPlanningProject = useEffectEvent(async () => {
+  const createPlanningProject = useLiveCallback(async () => {
     const title = newProjectTitle.trim();
     if (!title) {
       return;
@@ -648,7 +650,7 @@ export function PlanningWorkspaceSurface({
     }
   });
 
-  const exportPlanningBackup = useEffectEvent(async () => {
+  const exportPlanningBackup = useLiveCallback(async () => {
     setPlanningBusyAction("backup-export");
     setPlanningFeedback(null);
     try {
@@ -667,19 +669,19 @@ export function PlanningWorkspaceSurface({
     }
   });
 
-  const focusPlanningSearch = useEffectEvent(() => {
+  const focusPlanningSearch = useLiveCallback(() => {
     planningSearchInputRef.current?.focus();
     planningSearchInputRef.current?.select();
   });
 
-  const clearPlanningFilters = useEffectEvent(() => {
+  const clearPlanningFilters = useLiveCallback(() => {
     setPlanningSearchQuery("");
     if (settings.viewFilter !== "all") {
       void store.updatePlanningSettings({ viewFilter: "all" });
     }
   });
 
-  const loadPlanningTimeReport = useEffectEvent(async () => {
+  const loadPlanningTimeReport = useLiveCallback(async () => {
     setPlanningTimeReportLoading(true);
     setPlanningTimeReportError(null);
     try {
@@ -694,18 +696,18 @@ export function PlanningWorkspaceSurface({
     }
   });
 
-  const openPlanningTimeReport = useEffectEvent(() => {
+  const openPlanningTimeReport = useLiveCallback(() => {
     planningTimeReportOpenRef.current = true;
     setPlanningTimeReportOpen(true);
     void loadPlanningTimeReport();
   });
 
-  const closePlanningTimeReport = useEffectEvent(() => {
+  const closePlanningTimeReport = useLiveCallback(() => {
     planningTimeReportOpenRef.current = false;
     setPlanningTimeReportOpen(false);
   });
 
-  const togglePlanningTimeReport = useEffectEvent(() => {
+  const togglePlanningTimeReport = useLiveCallback(() => {
     if (planningTimeReportOpenRef.current) {
       closePlanningTimeReport();
       return;
@@ -714,7 +716,7 @@ export function PlanningWorkspaceSurface({
     openPlanningTimeReport();
   });
 
-  const pulsePlanningOverlap = useEffectEvent((taskId: string | null) => {
+  const pulsePlanningOverlap = useLiveCallback((taskId: string | null) => {
     if (planningOverlapPulseTimerRef.current !== null) {
       window.clearTimeout(planningOverlapPulseTimerRef.current);
       planningOverlapPulseTimerRef.current = null;

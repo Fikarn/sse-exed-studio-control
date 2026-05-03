@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +37,7 @@ Purpose:
   evidence bundle for the active release/evidence issue.
 
 Required host:
-  Windows 11 x64 with Node 20, Rust stable, npm dependencies, and QtIFW
+  Windows 11 x64 with Node 24 LTS, Rust stable, npm dependencies, and QtIFW
   binarycreator/repogen available on PATH or through:
     SSE_QT_IFW_BINARYCREATOR
     SSE_QT_IFW_REPOGEN
@@ -215,18 +215,6 @@ function collectArtifacts() {
       "directory"
     ),
   ];
-}
-
-function readJsonIfExists(targetPath) {
-  if (!existsSync(targetPath)) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(readFileSync(targetPath, "utf8"));
-  } catch {
-    return null;
-  }
 }
 
 function collectHostContext() {

@@ -1,5 +1,17 @@
 version: 2
 updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: "main"
+    schedule:
+      interval: monthly
+      time: "09:00"
+      timezone: "Europe/Stockholm"
+    open-pull-requests-limit: 2
+    rebase-strategy: disabled
+    commit-message:
+      prefix: "chore(actions)"
+
   - package-ecosystem: npm
     directory: "/"
     target-branch: "main"

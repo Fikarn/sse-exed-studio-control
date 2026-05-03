@@ -864,7 +864,7 @@ fn unix_timestamp(time: SystemTime) -> Option<i64> {
 }
 
 fn sanitize_for_file_name(value: &str) -> String {
-    value.replace(':', "-").replace('.', "-")
+    value.replace([':', '.'], "-")
 }
 
 fn bool_to_int(value: bool) -> i64 {

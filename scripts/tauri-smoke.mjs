@@ -284,7 +284,7 @@ function runScenario({
         if (line) {
           try {
             handleMessage(JSON.parse(line));
-          } catch (error) {
+          } catch {
             fail(new Error(`Malformed engine output: ${line}`));
             return;
           }

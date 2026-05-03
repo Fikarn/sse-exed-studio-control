@@ -207,6 +207,12 @@ export function FixtureMarker({
   const renderX = ghost?.x ?? centerX;
   const renderY = ghost?.y ?? centerY;
   const cursorStyle = draggable ? (ghost ? "grabbing" : "grab") : "pointer";
+  const intensityBarX = renderX - BAR_WIDTH / 2;
+  const intensityBarY = renderY + BAR_ANCHOR_Y[mounting];
+  const intensityBarFillFrac = on ? Math.max(0, Math.min(1, intensity / 100)) : 0;
+  const intensityBarFillHeight = BAR_HEIGHT * intensityBarFillFrac;
+  const intensityBarFillY = intensityBarY + (BAR_HEIGHT - intensityBarFillHeight);
+  const intensityBarFillColor = lightingFixtureColor(cct, true);
 
   const handlePointerDown = (event: ReactPointerEvent<SVGGElement>) => {
     event.stopPropagation();
@@ -413,30 +419,27 @@ export function FixtureMarker({
             empty outline still renders at low opacity so the bar's presence
             stays consistent across the rig (fades in cleanly when the
             fixture comes on). */}
-        {(() => {
-          const barX = renderX - BAR_WIDTH / 2;
-          const barY = renderY + BAR_ANCHOR_Y[mounting];
-          const fillFrac = on ? Math.max(0, Math.min(1, intensity / 100)) : 0;
-          const fillH = BAR_HEIGHT * fillFrac;
-          const fillY = barY + (BAR_HEIGHT - fillH);
-          const fillColor = lightingFixtureColor(cct, true);
-          return (
-            <g pointerEvents="none" opacity={on ? 1 : 0.4}>
-              <rect
-                x={barX}
-                y={barY}
-                width={BAR_WIDTH}
-                height={BAR_HEIGHT}
-                rx={1.2}
-                style={{ fill: "var(--color-bg-soft)", stroke: SHELL_STROKE, strokeWidth: 0.6 }}
-                opacity={0.65}
-              />
-              {fillFrac > 0 ? (
-                <rect x={barX} y={fillY} width={BAR_WIDTH} height={fillH} rx={1.2} style={{ fill: fillColor }} />
-              ) : null}
-            </g>
-          );
-        })()}
+        <g pointerEvents="none" opacity={on ? 1 : 0.4}>
+          <rect
+            x={intensityBarX}
+            y={intensityBarY}
+            width={BAR_WIDTH}
+            height={BAR_HEIGHT}
+            rx={1.2}
+            style={{ fill: "var(--color-bg-soft)", stroke: SHELL_STROKE, strokeWidth: 0.6 }}
+            opacity={0.65}
+          />
+          {intensityBarFillFrac > 0 ? (
+            <rect
+              x={intensityBarX}
+              y={intensityBarFillY}
+              width={BAR_WIDTH}
+              height={intensityBarFillHeight}
+              rx={1.2}
+              style={{ fill: intensityBarFillColor }}
+            />
+          ) : null}
+        </g>
         {/* Wave 31 — I9 chip-hover ring. A single soft pulse echoes the
             ChipStrip's hover signal so the chip ↔ marker pairing is
             unambiguous. Distinct from `selected` (dashed green ring) and

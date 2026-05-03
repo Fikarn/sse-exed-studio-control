@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, ConfirmDialog, Dialog, type PaletteAction } from "@sse/design-system";
 import type {
@@ -14,6 +14,7 @@ import type {
 
 import { usePalette } from "../shared/paletteContext";
 import { useToast, type ToastApi } from "../shared/toastContext";
+import { useLiveCallback } from "../shared/useLiveCallback";
 
 import {
   asRecord,
@@ -527,7 +528,7 @@ export function LightingWorkspaceSurface({
 
   // ---------------- handlers ----------------
 
-  const reportError = useEffectEvent((error: unknown, fallback: string) => {
+  const reportError = useLiveCallback((error: unknown, fallback: string) => {
     toast.push({
       message: error instanceof Error ? error.message : fallback,
       tone: "error",
@@ -539,7 +540,7 @@ export function LightingWorkspaceSurface({
   // primary are preserved and the new ids merge in; otherwise the persisted
   // single-selection is replaced by the rectangle's first hit (or cleared if
   // empty) and extras carry the rest.
-  const handleMarqueeSelect = useEffectEvent(async (ids: readonly string[], options: { additive: boolean }) => {
+  const handleMarqueeSelect = useLiveCallback(async (ids: readonly string[], options: { additive: boolean }) => {
     if (options.additive) {
       if (ids.length === 0) return;
       setExtraSelectedFixtureIds((prev) => {
@@ -567,41 +568,43 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleSelectFixture = useEffectEvent(async (fixtureId: string | null, options: { additive?: boolean } = {}) => {
-    const { additive = false } = options;
-    setSelectedGroupId(null);
+  const handleSelectFixture = useLiveCallback(
+    async (fixtureId: string | null, options: { additive?: boolean } = {}) => {
+      const { additive = false } = options;
+      setSelectedGroupId(null);
 
-    if (fixtureId === null) {
-      setExtraSelectedFixtureIds(new Set());
-    } else if (additive) {
-      // Toggle the clicked id in the extras set. The persisted single id
-      // stays as-is so the engine still knows which fixture is "focused";
-      // the bulk inspector renders from persisted ∪ extras.
-      setExtraSelectedFixtureIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(fixtureId) && fixtureId !== persistedSelectedFixtureId) {
-          next.delete(fixtureId);
-        } else if (fixtureId !== persistedSelectedFixtureId) {
-          next.add(fixtureId);
-        }
-        return next;
-      });
-      // Skip the engine sync — additive clicks shouldn't change which
-      // fixture is "primary".
-      return;
-    } else {
-      setExtraSelectedFixtureIds(new Set());
-    }
+      if (fixtureId === null) {
+        setExtraSelectedFixtureIds(new Set());
+      } else if (additive) {
+        // Toggle the clicked id in the extras set. The persisted single id
+        // stays as-is so the engine still knows which fixture is "focused";
+        // the bulk inspector renders from persisted ∪ extras.
+        setExtraSelectedFixtureIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(fixtureId) && fixtureId !== persistedSelectedFixtureId) {
+            next.delete(fixtureId);
+          } else if (fixtureId !== persistedSelectedFixtureId) {
+            next.add(fixtureId);
+          }
+          return next;
+        });
+        // Skip the engine sync — additive clicks shouldn't change which
+        // fixture is "primary".
+        return;
+      } else {
+        setExtraSelectedFixtureIds(new Set());
+      }
 
-    startBusy("fixture-select");
-    try {
-      await store.updateLightingSettings({ selectedFixtureId: fixtureId });
-    } catch (error) {
-      reportError(error, "Lighting selection update failed.");
-    } finally {
-      finishBusy("fixture-select");
+      startBusy("fixture-select");
+      try {
+        await store.updateLightingSettings({ selectedFixtureId: fixtureId });
+      } catch (error) {
+        reportError(error, "Lighting selection update failed.");
+      } finally {
+        finishBusy("fixture-select");
+      }
     }
-  });
+  );
 
   const selectedFixtureIds = useMemo<ReadonlySet<string>>(() => {
     const set = new Set(extraSelectedFixtureIds);
@@ -681,7 +684,7 @@ export function LightingWorkspaceSurface({
 
   const [showPreviewExitPrompt, setShowPreviewExitPrompt] = useState(false);
 
-  const disablePreviewMode = useEffectEvent(async () => {
+  const disablePreviewMode = useLiveCallback(async () => {
     startBusy("preview-mode");
     try {
       await store.setLightingPreviewMode({ enabled: false });
@@ -693,7 +696,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleDiscardPreview = useEffectEvent(async () => {
+  const handleDiscardPreview = useLiveCallback(async () => {
     startBusy("preview-discard");
     try {
       await store.discardLightingPreview();
@@ -714,7 +717,7 @@ export function LightingWorkspaceSurface({
     void disablePreviewMode();
   }, [disablePreviewMode, previewDirty]);
 
-  const handleTogglePreview = useEffectEvent(async () => {
+  const handleTogglePreview = useLiveCallback(async () => {
     if (previewMode) {
       requestExitPreview();
       return;
@@ -734,7 +737,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleTogglePatch = useEffectEvent(() => {
+  const handleTogglePatch = useLiveCallback(() => {
     if (previewMode) {
       toast.push({ message: "Exit preview before entering patch mode.", tone: "info" });
       return;
@@ -746,7 +749,7 @@ export function LightingWorkspaceSurface({
   // keyboard shortcuts (Shift+1/2/3 recall, ⌘⇧1/2/3 save) and other
   // workspace-level affordances can reach the bookmark API. StagePlot
   // consumes the same instance via its `viewport` prop. handleSelectFixture
-  // is `useEffectEvent`-stable so closing over it is safe.
+  // is `useLiveCallback`-stable so closing over it is safe.
   const stagePlotViewport = useStagePlotViewport({
     onBackgroundClick: () => void handleSelectFixture(null),
   });
@@ -763,7 +766,7 @@ export function LightingWorkspaceSurface({
   // chip's × means "take this fixture out of the selection". When removing
   // the primary we promote the first extra so the inspector still has a
   // focused fixture; if no extras remain, primary clears to null.
-  const handleRemoveFromSelection = useEffectEvent(async (fixtureId: string) => {
+  const handleRemoveFromSelection = useLiveCallback(async (fixtureId: string) => {
     if (fixtureId === persistedSelectedFixtureId) {
       const promoted = Array.from(extraSelectedFixtureIds).find((id) => id !== fixtureId) ?? null;
       if (promoted !== null) {
@@ -831,7 +834,7 @@ export function LightingWorkspaceSurface({
     setCreateFixtureOpen(true);
   }, [previewMode, toast]);
 
-  const handleAddFixture = useEffectEvent(
+  const handleAddFixture = useLiveCallback(
     async (fixtureSpec: { name: string; type: string; dmxStartAddress: number }) => {
       startBusy("fixture-create");
       try {
@@ -877,7 +880,7 @@ export function LightingWorkspaceSurface({
     }
   );
 
-  const handleCreateGroup = useEffectEvent(async (name: string) => {
+  const handleCreateGroup = useLiveCallback(async (name: string) => {
     startBusy("group-create");
     try {
       const result = asRecord(await store.createLightingGroup(name));
@@ -889,7 +892,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleRenameScene = useEffectEvent(async (sceneId: string, name: string) => {
+  const handleRenameScene = useLiveCallback(async (sceneId: string, name: string) => {
     const busyKey = `scene-rename:${sceneId}`;
     startBusy(busyKey);
     try {
@@ -902,7 +905,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleRenameFixture = useEffectEvent(async (fixtureId: string, name: string) => {
+  const handleRenameFixture = useLiveCallback(async (fixtureId: string, name: string) => {
     const busyKey = `fixture-rename:${fixtureId}`;
     startBusy(busyKey);
     try {
@@ -919,7 +922,7 @@ export function LightingWorkspaceSurface({
   // owns the persisted `group_order` (Wave 30a / `9ca8e5c`) and the snapshot
   // emits groups in that order, so we just hand the contract through and trust
   // the next snapshot tick to refresh the rail.
-  const handleReorderGroup = useEffectEvent(async (groupId: string, beforeGroupId: string | null) => {
+  const handleReorderGroup = useLiveCallback(async (groupId: string, beforeGroupId: string | null) => {
     const busyKey = `group-reorder:${groupId}`;
     startBusy(busyKey);
     try {
@@ -934,7 +937,7 @@ export function LightingWorkspaceSurface({
   // Wave 30b — I4 set scene color tag. `null` clears, `0..7` sets. The IPC
   // contract from Wave 30a treats omit / null / index distinctly; we always
   // send the field so the engine knows the operator's intent.
-  const handleSetSceneColor = useEffectEvent(async (sceneId: string, colorIndex: number | null) => {
+  const handleSetSceneColor = useLiveCallback(async (sceneId: string, colorIndex: number | null) => {
     const busyKey = `scene-color:${sceneId}`;
     startBusy(busyKey);
     try {
@@ -947,7 +950,7 @@ export function LightingWorkspaceSurface({
   });
 
   // Wave 30b — I4 set group color tag. Mirrors scene shape.
-  const handleSetGroupColor = useEffectEvent(async (groupId: string, colorIndex: number | null) => {
+  const handleSetGroupColor = useLiveCallback(async (groupId: string, colorIndex: number | null) => {
     const busyKey = `group-color:${groupId}`;
     startBusy(busyKey);
     try {
@@ -959,7 +962,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleApplyPalette = useEffectEvent(async (paletteId: string, fixtureIds: readonly string[]) => {
+  const handleApplyPalette = useLiveCallback(async (paletteId: string, fixtureIds: readonly string[]) => {
     if (fixtureIds.length === 0) {
       toast.push({ message: "Select a fixture before applying a palette.", tone: "info" });
       return;
@@ -983,7 +986,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleCreatePalette = useEffectEvent(
+  const handleCreatePalette = useLiveCallback(
     async (request: { name: string; kind: LightingPaletteKind; value: number; colorIndex: number | null }) => {
       const busyKey = `palette-create:${request.kind}`;
       startBusy(busyKey);
@@ -998,7 +1001,7 @@ export function LightingWorkspaceSurface({
     }
   );
 
-  const handleUpdatePalette = useEffectEvent(
+  const handleUpdatePalette = useLiveCallback(
     async (request: {
       paletteId: string;
       name?: string;
@@ -1019,7 +1022,7 @@ export function LightingWorkspaceSurface({
     }
   );
 
-  const handleDeletePalette = useEffectEvent(async (paletteId: string) => {
+  const handleDeletePalette = useLiveCallback(async (paletteId: string) => {
     const busyKey = `palette-delete:${paletteId}`;
     startBusy(busyKey);
     try {
@@ -1032,7 +1035,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleRenameGroup = useEffectEvent(async (groupId: string, name: string) => {
+  const handleRenameGroup = useLiveCallback(async (groupId: string, name: string) => {
     const busyKey = `group-rename:${groupId}`;
     startBusy(busyKey);
     try {
@@ -1045,7 +1048,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleDeleteGroup = useEffectEvent(async (groupId: string, groupName: string) => {
+  const handleDeleteGroup = useLiveCallback(async (groupId: string, groupName: string) => {
     const busyKey = `group-delete:${groupId}`;
     startBusy(busyKey);
     try {
@@ -1064,7 +1067,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const commitGrandMaster = useEffectEvent(async (value: number) => {
+  const commitGrandMaster = useLiveCallback(async (value: number) => {
     grandMasterCommitRef.current = null;
     try {
       await store.updateLightingSettings({ grandMaster: value });
@@ -1087,7 +1090,7 @@ export function LightingWorkspaceSurface({
     [commitGrandMaster]
   );
 
-  const handleEmergencyCut = useEffectEvent(async () => {
+  const handleEmergencyCut = useLiveCallback(async () => {
     startBusy("lighting-blackout");
     try {
       await store.setLightingAllPower(false);
@@ -1103,7 +1106,7 @@ export function LightingWorkspaceSurface({
     setConfirmCutAllOpen(true);
   }, []);
 
-  const handleToggleAllPower = useEffectEvent(async (on: boolean) => {
+  const handleToggleAllPower = useLiveCallback(async (on: boolean) => {
     startBusy("lighting-master-toggle");
     try {
       await store.setLightingAllPower(on);
@@ -1118,7 +1121,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleSaveScene = useEffectEvent(async (overrideName?: string) => {
+  const handleSaveScene = useLiveCallback(async (overrideName?: string) => {
     startBusy("scene-create");
     try {
       // The button onClick paths (scene-rail head, "+ New scene" tile,
@@ -1187,7 +1190,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleResaveScene = useEffectEvent(async () => {
+  const handleResaveScene = useLiveCallback(async () => {
     if (!activeScene) return;
     startBusy("scene-resave");
     try {
@@ -1219,7 +1222,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleDeleteScene = useEffectEvent(async (overrideSceneId?: string) => {
+  const handleDeleteScene = useLiveCallback(async (overrideSceneId?: string) => {
     // Default to the active scene (Inspector → Delete path); right-click
     // delete from a non-active tile passes the tile's id explicitly.
     const sceneId = overrideSceneId ?? activeScene?.id ?? null;
@@ -1302,7 +1305,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleReorderScene = useEffectEvent(async (sceneId: string, beforeSceneId: string | null) => {
+  const handleReorderScene = useLiveCallback(async (sceneId: string, beforeSceneId: string | null) => {
     const busyKey = `scene-reorder:${sceneId}`;
     startBusy(busyKey);
     try {
@@ -1314,7 +1317,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handlePinScene = useEffectEvent(async (sceneId: string, pinned: boolean) => {
+  const handlePinScene = useLiveCallback(async (sceneId: string, pinned: boolean) => {
     const busyKey = `scene-pin:${sceneId}`;
     startBusy(busyKey);
     try {
@@ -1327,7 +1330,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleRecallScene = useEffectEvent(async (sceneId: string) => {
+  const handleRecallScene = useLiveCallback(async (sceneId: string) => {
     if (uiMode === "patch") {
       toast.push({
         message: "Patch mode is active. Exit patch mode before recalling a scene.",
@@ -1411,7 +1414,7 @@ export function LightingWorkspaceSurface({
   // Wave 28a — register lighting actions on the cross-workspace ⌘K palette.
   // Re-registers when the scene list / mode-relevant flags change so per-scene
   // recall actions stay current and the `when` predicates capture fresh state.
-  // Handlers are useEffectEvent and intentionally not in the dep array.
+  // Handlers are useLiveCallback and intentionally not in the dep array.
   useEffect(() => {
     const inPatchMode = uiMode === "patch";
     return palette.register([
@@ -1534,7 +1537,7 @@ export function LightingWorkspaceSurface({
     if (!paletteQuickOpen) setPaletteQuickQuery("");
   }, [paletteQuickOpen]);
 
-  const handleToggleGroupPower = useEffectEvent(async (groupId: string, on: boolean) => {
+  const handleToggleGroupPower = useLiveCallback(async (groupId: string, on: boolean) => {
     const busyKey = `group:${groupId}`;
     startBusy(busyKey);
     try {
@@ -1547,7 +1550,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleToggleFixturePower = useEffectEvent(async (fixtureId: string, on: boolean) => {
+  const handleToggleFixturePower = useLiveCallback(async (fixtureId: string, on: boolean) => {
     const busyKey = `fixture-power:${fixtureId}`;
     startBusy(busyKey);
     try {
@@ -1559,7 +1562,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleIntensityCommit = useEffectEvent(async (fixtureId: string, intensity: number) => {
+  const handleIntensityCommit = useLiveCallback(async (fixtureId: string, intensity: number) => {
     const busyKey = `fixture-intensity:${fixtureId}`;
     startBusy(busyKey);
     try {
@@ -1571,7 +1574,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleCctCommit = useEffectEvent(async (fixtureId: string, cct: number) => {
+  const handleCctCommit = useLiveCallback(async (fixtureId: string, cct: number) => {
     const busyKey = `fixture-cct:${fixtureId}`;
     startBusy(busyKey);
     try {
@@ -1583,7 +1586,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handlePatchCommit = useEffectEvent(async (fixtureId: string, dmxStartAddress: number) => {
+  const handlePatchCommit = useLiveCallback(async (fixtureId: string, dmxStartAddress: number) => {
     const busyKey = `fixture-patch:${fixtureId}`;
     startBusy(busyKey);
     try {
@@ -1612,7 +1615,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleIdentifyBurst = useEffectEvent(async (fixtureId: string, fixtureName: string) => {
+  const handleIdentifyBurst = useLiveCallback(async (fixtureId: string, fixtureName: string) => {
     // Mirror the engine burst on the plot marker: 1.2 s window matches the
     // identify.rs default duration_ms.
     setIdentifyingIds((prev) => {
@@ -1642,7 +1645,7 @@ export function LightingWorkspaceSurface({
   // Wave 29 — Highlight toggle. Selection-driven; pre-clears any active
   // Solo so the engine's mutual-exclusion guard doesn't reject the request.
   // Operator press while highlight is active = clear (toggle).
-  const handleToggleHighlight = useEffectEvent(async () => {
+  const handleToggleHighlight = useLiveCallback(async () => {
     if (previewMode) {
       toast.push({ message: "Exit preview to use live Highlight.", tone: "info" });
       return;
@@ -1681,7 +1684,7 @@ export function LightingWorkspaceSurface({
   });
 
   // Wave 29 — Solo toggle. Symmetric to Highlight.
-  const handleToggleSolo = useEffectEvent(async () => {
+  const handleToggleSolo = useLiveCallback(async () => {
     if (previewMode) {
       toast.push({ message: "Exit preview to use live Solo.", tone: "info" });
       return;
@@ -1723,7 +1726,7 @@ export function LightingWorkspaceSurface({
   // frontend mirrors each slot on the plot marker pulse-ring at the same
   // offset so the operator's eye tracks the active fixture. Step / duration
   // chosen to clear in <2 s for a typical 3-fixture key triangle.
-  const handleIdentifyFind = useEffectEvent(async () => {
+  const handleIdentifyFind = useLiveCallback(async () => {
     if (previewMode) {
       toast.push({ message: "Exit preview to use live Find.", tone: "info" });
       return;
@@ -1773,9 +1776,9 @@ export function LightingWorkspaceSurface({
   // Wave 29 — Esc / workspace-switch cleanup. Clears highlight + solo
   // overlays in the engine and cancels any in-flight Find sequence pulse
   // timers. Each IPC is gated on whether there's anything to clear so
-  // a quiet Esc doesn't burn round-trips. useEffectEvent semantics keep
+  // a quiet Esc doesn't burn round-trips. useLiveCallback semantics keep
   // the gate readings fresh.
-  const clearOverlaysAndSequence = useEffectEvent(async () => {
+  const clearOverlaysAndSequence = useLiveCallback(async () => {
     const hadTimers = findSequenceTimersRef.current.length > 0;
     clearFindSequenceTimers();
     if (identifyingIds.size > 0) {
@@ -1804,9 +1807,9 @@ export function LightingWorkspaceSurface({
     return () => {
       void clearOverlaysAndSequence();
     };
-  }, []);
+  }, [clearOverlaysAndSequence]);
 
-  const handleDeleteFixture = useEffectEvent(async (fixtureId: string) => {
+  const handleDeleteFixture = useLiveCallback(async (fixtureId: string) => {
     // Snapshot the live fixture before deletion so undo can recreate it.
     // groupId / spatial / beam-angle are restored via a follow-up update IPC
     // because createLightingFixture only takes the create-time fields.
@@ -1875,7 +1878,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleBulkTogglePower = useEffectEvent(async (fixtureIds: readonly string[], on: boolean) => {
+  const handleBulkTogglePower = useLiveCallback(async (fixtureIds: readonly string[], on: boolean) => {
     startBusy("fixture-bulk-power");
     try {
       await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, on })));
@@ -1893,7 +1896,7 @@ export function LightingWorkspaceSurface({
   // Wave 27 — bulk slider drag-shift + delta-input both produce per-fixture
   // value arrays. The legacy "flatten to one value" handler is gone; callers
   // map their target value through the array shape.
-  const handleBulkIntensityValues = useEffectEvent(
+  const handleBulkIntensityValues = useLiveCallback(
     async (values: ReadonlyArray<{ fixtureId: string; value: number }>) => {
       startBusy("fixture-bulk-intensity");
       try {
@@ -1908,7 +1911,7 @@ export function LightingWorkspaceSurface({
     }
   );
 
-  const handleBulkCctValues = useEffectEvent(async (values: ReadonlyArray<{ fixtureId: string; value: number }>) => {
+  const handleBulkCctValues = useLiveCallback(async (values: ReadonlyArray<{ fixtureId: string; value: number }>) => {
     startBusy("fixture-bulk-cct");
     try {
       await Promise.all(values.map(({ fixtureId, value }) => store.updateLightingFixture({ fixtureId, cct: value })));
@@ -1919,7 +1922,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleFixtureSpatialCommit = useEffectEvent(
+  const handleFixtureSpatialCommit = useLiveCallback(
     async (
       fixtureId: string,
       partial: {
@@ -1942,7 +1945,7 @@ export function LightingWorkspaceSurface({
     }
   );
 
-  const handleAssignFixtureGroup = useEffectEvent(async (fixtureId: string, groupId: string | null) => {
+  const handleAssignFixtureGroup = useLiveCallback(async (fixtureId: string, groupId: string | null) => {
     const busyKey = `fixture-group:${fixtureId}`;
     startBusy(busyKey);
     try {
@@ -1963,7 +1966,7 @@ export function LightingWorkspaceSurface({
     setActiveTabOverride("group");
   }, []);
 
-  const handleFixtureNudge = useEffectEvent(async (deltaXMeters: number, deltaYMeters: number) => {
+  const handleFixtureNudge = useLiveCallback(async (deltaXMeters: number, deltaYMeters: number) => {
     if (previewMode) {
       toast.push({ message: "Exit preview to move fixtures on the plot.", tone: "info" });
       return;
@@ -1980,7 +1983,7 @@ export function LightingWorkspaceSurface({
     void handleFixtureSpatialCommit(fixture.id, { spatialX: nextX, spatialY: nextY });
   });
 
-  const reportUndoOutcome = useEffectEvent((outcome: UndoOutcome, kind: "Undo" | "Redo") => {
+  const reportUndoOutcome = useLiveCallback((outcome: UndoOutcome, kind: "Undo" | "Redo") => {
     switch (outcome.kind) {
       case "ok":
         toast.push({
@@ -2003,7 +2006,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const triggerUndo = useEffectEvent(async () => {
+  const triggerUndo = useLiveCallback(async () => {
     startBusy("undo");
     try {
       const outcome = await undoStack.undo();
@@ -2013,7 +2016,7 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const triggerRedo = useEffectEvent(async () => {
+  const triggerRedo = useLiveCallback(async () => {
     startBusy("redo");
     try {
       const outcome = await undoStack.redo();
@@ -2198,7 +2201,7 @@ export function LightingWorkspaceSurface({
         void handleSelectFixture(null);
         // Wave 29 — Esc also clears any active Highlight / Solo overlay
         // and cancels an in-flight Find sequence. The cleanup function
-        // reads latest overlay state via useEffectEvent semantics so
+        // reads latest overlay state via useLiveCallback semantics so
         // calling it unconditionally avoids stale-closure traps; the
         // engine no-ops when there's nothing to clear.
         void clearOverlaysAndSequence();
@@ -2208,10 +2211,14 @@ export function LightingWorkspaceSurface({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     activeScene,
+    clearOverlaysAndSequence,
     fixtures,
     handleFixtureNudge,
+    handleIdentifyFind,
     handleTogglePatch,
+    handleToggleHighlight,
     handleTogglePreview,
+    handleToggleSolo,
     handleRecallScene,
     handleResaveScene,
     handleSaveScene,
@@ -2222,6 +2229,7 @@ export function LightingWorkspaceSurface({
     scenes,
     stagePlotViewport,
     store,
+    toast,
     triggerRedo,
     triggerUndo,
   ]);

@@ -565,12 +565,10 @@ pub fn run_commissioning_check(
                 receive_port.to_string(),
             ));
 
-            let message =
-                match probe_audio_transport(&send_host, send_port as u16, receive_port as u16) {
-                    Ok(summary) => (AUDIO_CHECK_ID, String::from("passed"), summary),
-                    Err(summary) => (AUDIO_CHECK_ID, String::from("failed"), summary),
-                };
-            message
+            match probe_audio_transport(&send_host, send_port as u16, receive_port as u16) {
+                Ok(summary) => (AUDIO_CHECK_ID, String::from("passed"), summary),
+                Err(summary) => (AUDIO_CHECK_ID, String::from("failed"), summary),
+            }
         }
     };
 

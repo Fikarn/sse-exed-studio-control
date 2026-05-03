@@ -1,7 +1,11 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
-import react from "eslint-plugin-react";
+import eslintReact from "@eslint-react/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
+
+const reactRecommendedErrorRules = Object.fromEntries(
+  Object.entries(eslintReact.configs.recommended.rules).filter(([, severity]) => severity === "error")
+);
 
 // Initial baseline lint config. Intentionally permissive so the existing
 // 17k-line frontend corpus and the build/release scripts pass; tighten in
@@ -48,15 +52,23 @@ export default [
   },
   {
     files: ["frontend/**/*.{ts,tsx}"],
-    plugins: { react, "react-hooks": reactHooks },
+    plugins: { "@eslint-react": eslintReact, "react-hooks": reactHooks },
     languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
-    settings: { react: { version: "19.2" } },
+    settings: { "react-x": { version: "19.2" } },
     rules: {
-      ...react.configs.recommended.rules,
-      ...reactHooks.configs.recommended.rules,
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
-      "react/no-unescaped-entities": "off",
+      ...reactRecommendedErrorRules,
+      "@eslint-react/dom-no-unknown-property": "off",
+      "@eslint-react/dom-no-unsafe-iframe-sandbox": "off",
+      "@eslint-react/exhaustive-deps": "off",
+      "@eslint-react/no-context-provider": "off",
+      "@eslint-react/no-forward-ref": "off",
+      "@eslint-react/rules-of-hooks": "off",
+      "@eslint-react/static-components": "warn",
+      "@eslint-react/unsupported-syntax": "warn",
+      "@eslint-react/no-use-context": "off",
+      "@eslint-react/use-memo": "warn",
+      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/rules-of-hooks": "error",
     },
   },
 ];
