@@ -2,7 +2,32 @@
 
 Date: 2026-05-03
 
-This brief is intended as a fresh-session handoff for implementing responsive and resizeable operator layouts in SSE ExEd Studio Control, with primary focus on the Lighting page.
+This brief started as a fresh-session handoff for implementing responsive and resizeable operator layouts in SSE ExEd Studio Control, with primary focus on the Lighting page. The implementation landed in [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71) on `2026-05-03` and this file now also records the plan-to-implementation outcome.
+
+## Completion Record
+
+Status: complete and merged.
+
+Merge commit: `4af7e8b8427cff78837054326478e1a67398154c`
+
+Key outcomes:
+
+- `OperatorLayoutProvider` measures the app body with logical CSS pixels and exposes layout mode, scale, size, and diagnostic `devicePixelRatio` without using physical pixels for layout decisions.
+- The supported layout modes are `studioFull`, `desktopCompact`, `narrowUtility`, and `constrained`.
+- Lighting preserves the rail/stage/inspector model at studio size, keeps a compact three-pane layout at desktop-compact size, and uses a right inspector drawer in narrow utility mode.
+- Lighting toolbar controls are priority grouped. Status/title, search, patch, add/select, preview/live state, and overflow stay primary; secondary actions move into overflow as the viewport narrows.
+- Stage zoom is separate from UI scale. The stage supports `Fit Room`, `Fill Desk`, `100%`, and bookmarks.
+- UI scale supports `90%`, `100%`, `110%`, and `125%` through CSS token classes rather than a whole-app transform.
+- Tauri shell owns window-layout preference persistence and recovery. Engine protocol, fixture/device state, hardware policy, product persistence, and DB logic were not moved into React.
+- The current-hardware human review path is Scaled Studio Preview through the exact command-palette item `Studio Preview: Enter 2560x1440 Review`. BetterDisplay is optional fallback tooling only.
+
+Validation recorded for PR #71:
+
+- Human visual review approved in Scaled Studio Preview on current hardware.
+- `npm run frontend:foundation` passed, including Storybook and 39 Playwright tests.
+- `npm run native:check` passed.
+- `npm run tauri:visual:review` passed with 30 screenshots, 0 failures, and 4 shell window preference recovery tests passed.
+- Advisory GitHub checks passed before merge.
 
 ## Fresh Codex Prompt
 
@@ -107,14 +132,14 @@ Validation commands to run when done:
 - npm run frontend:foundation
 - npm run tauri:visual:review
 
-For operator-visible layout changes, also inspect visual review evidence and, if possible, use the BetterDisplay-backed 2560x1440 review surface per repo docs.
+For operator-visible layout changes, also inspect visual review evidence and use Scaled Studio Preview or the fixed studio monitor for human review. BetterDisplay is optional fallback tooling only.
 
 Please implement end to end, keep changes scoped, avoid unrelated refactors, and report changed files plus validation results.
 ```
 
 ## Implementation Summary
 
-The implementation should create a professional workspace system rather than a fully freeform docking framework. Keep the studio fullscreen experience optimized for 2560x1440, but make the app predictable and usable when resized or opened on different monitors.
+The implementation created a professional workspace system rather than a fully freeform docking framework. Keep the studio fullscreen experience optimized for 2560x1440, but make the app predictable and usable when resized or opened on different monitors.
 
 Use named layout modes:
 

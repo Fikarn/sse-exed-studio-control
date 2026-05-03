@@ -9,6 +9,7 @@ Entry point for Codex-assisted work in this repo. Keep it short. Follow the poin
 - For multi-step or risky work, make a short plan after inspection and before edits.
 - Keep changes inside the right layer. If a task crosses the shell/engine/protocol boundary, state the boundary impact before changing files.
 - If validation cannot run, say exactly why and list the next command a human should run. Do not silently stop at partial verification.
+- When the user asks to close out or publish a session, finish the GitHub workflow: commit, push, open or update the PR, wait for the advisory checks that apply, merge the approved PR, prune/delete the feature branch, and sync local `main`.
 
 ## What this product is
 
