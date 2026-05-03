@@ -1,10 +1,16 @@
-import { useState, type ChangeEvent } from "react";
-import { Crosshair, EyeOff, Lightbulb, Locate, MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from "react";
+import { Clock3, Crosshair, EyeOff, Lightbulb, Locate, MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
 
 import { Button, StatusDot, Tooltip } from "@sse/design-system";
 
 import { ShortcutOverlay } from "../../shared/ShortcutOverlay";
 import styles from "./LightingToolbar.module.css";
+
+export interface RecentLightingScene {
+  id: string;
+  name: string;
+  lastRecalledLabel?: string;
+}
 
 export interface LightingToolbarProps {
   bridgeUniverse: number;
@@ -17,6 +23,8 @@ export interface LightingToolbarProps {
   recallFadeMs: number;
   searchQuery: string;
   onSearchChange: (next: string) => void;
+  recentScenes?: readonly RecentLightingScene[];
+  onRecallRecentScene?: (sceneId: string) => void;
   onRecallFadeMsChange: (nextMs: number) => void;
   patchMode: boolean;
   onTogglePatch: () => void;
@@ -46,6 +54,8 @@ export function LightingToolbar({
   recallFadeMs,
   searchQuery,
   onSearchChange,
+  recentScenes = [],
+  onRecallRecentScene,
   onRecallFadeMsChange,
   patchMode,
   onTogglePatch,
@@ -61,9 +71,67 @@ export function LightingToolbar({
   onIdentifyFind,
 }: LightingToolbarProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const [recentActiveIndex, setRecentActiveIndex] = useState(0);
+  const searchShellRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const canShowRecent = searchQuery.trim().length === 0 && recentScenes.length > 0;
+
+  useEffect(() => {
+    if (!canShowRecent) {
+      setRecentOpen(false);
+      return;
+    }
+    setRecentActiveIndex(0);
+    if (document.activeElement === searchInputRef.current) {
+      setRecentOpen(true);
+    }
+  }, [canShowRecent, recentScenes]);
 
   const handleSearch = (event: ChangeEvent<HTMLInputElement>) => {
     onSearchChange(event.target.value);
+  };
+
+  const recallRecent = (sceneId: string) => {
+    onRecallRecentScene?.(sceneId);
+    setRecentOpen(false);
+    searchInputRef.current?.blur();
+  };
+
+  const handleSearchFocus = () => {
+    if (canShowRecent) setRecentOpen(true);
+  };
+
+  const handleSearchBlur = (event: FocusEvent<HTMLInputElement | HTMLButtonElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && searchShellRef.current?.contains(nextTarget)) return;
+    setRecentOpen(false);
+  };
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!canShowRecent) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setRecentOpen(true);
+      setRecentActiveIndex((current) => (current + 1) % recentScenes.length);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setRecentOpen(true);
+      setRecentActiveIndex((current) => (current - 1 + recentScenes.length) % recentScenes.length);
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const target = recentScenes[recentActiveIndex] ?? recentScenes[0];
+      if (target) recallRecent(target.id);
+      return;
+    }
+    if (event.key === "Escape" && recentOpen) {
+      event.preventDefault();
+      setRecentOpen(false);
+    }
   };
 
   const handleFadeChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -160,17 +228,55 @@ export function LightingToolbar({
           <span className={styles.fadeUnit}>s</span>
         </label>
 
-        <label className={styles.search}>
+        <div className={styles.search} ref={searchShellRef}>
           <Search aria-hidden="true" size={12} strokeWidth={1.75} />
           <input
+            ref={searchInputRef}
             aria-label="Search fixtures, scenes and groups"
             className={styles.searchInput}
+            aria-controls={recentOpen ? "lighting-search-recents" : undefined}
+            aria-expanded={recentOpen || undefined}
+            aria-haspopup="listbox"
             onChange={handleSearch}
+            onFocus={handleSearchFocus}
+            onBlur={handleSearchBlur}
+            onKeyDown={handleSearchKeyDown}
             placeholder="Search fixtures…"
             type="search"
             value={searchQuery}
           />
-        </label>
+          {recentOpen && canShowRecent ? (
+            <div
+              className={styles.recentDropdown}
+              id="lighting-search-recents"
+              role="listbox"
+              aria-label="Recent scenes"
+            >
+              <div className={styles.recentHeader}>
+                <Clock3 aria-hidden="true" size={12} strokeWidth={1.75} />
+                <span>Recent</span>
+              </div>
+              {recentScenes.map((scene, index) => (
+                <button
+                  key={scene.id}
+                  type="button"
+                  role="option"
+                  aria-selected={index === recentActiveIndex}
+                  className={styles.recentOption}
+                  onBlur={handleSearchBlur}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setRecentActiveIndex(index)}
+                  onClick={() => recallRecent(scene.id)}
+                >
+                  <span className={styles.recentName}>{scene.name}</span>
+                  <span className={styles.recentMeta}>
+                    {scene.lastRecalledLabel ? `last ${scene.lastRecalledLabel}` : "scene"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
         <Button
           size="compact"

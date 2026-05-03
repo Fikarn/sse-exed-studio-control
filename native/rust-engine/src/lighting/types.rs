@@ -740,6 +740,8 @@ pub struct LightingSettingsUpdateRequest {
 #[derive(Debug, Clone)]
 pub struct LightingSceneCreateRequest {
     pub name: String,
+    pub fixture_states: Option<Vec<LightingEditorSceneFixtureState>>,
+    pub color_index: Option<u8>,
 }
 
 #[derive(Debug, Clone)]

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 
 use crate::lighting_backend::read_default_lighting_inventory;
@@ -117,11 +118,16 @@ pub fn create_lighting_scene(
         ));
     }
 
+    let fixture_states = match &request.fixture_states {
+        Some(states) => validated_scene_fixture_states(&editor_state.fixtures, states)?,
+        None => capture_scene_fixture_states(&editor_state.fixtures),
+    };
+    let color_index = validated_scene_color_index(request.color_index)?;
     let scene = LightingEditorSceneState {
         id: next_custom_scene_id(&editor_state.scenes),
         name: request.name.clone(),
-        fixture_states: capture_scene_fixture_states(&editor_state.fixtures),
-        color_index: None,
+        fixture_states,
+        color_index,
     };
     editor_state.scenes.push(scene.clone());
     // New scenes append to the display order. Pinned scenes float to
@@ -130,10 +136,17 @@ pub fn create_lighting_scene(
     // .scene.pin IPC.
     editor_state.scene_order.push(scene.id.clone());
 
-    let summary = format!(
-        "Lighting scene '{}' was saved from the current fixture state.",
-        scene.name
-    );
+    let summary = if request.fixture_states.is_some() {
+        format!(
+            "Lighting scene '{}' was restored from a saved scene state.",
+            scene.name
+        )
+    } else {
+        format!(
+            "Lighting scene '{}' was saved from the current fixture state.",
+            scene.name
+        )
+    };
     let mut updates = lighting_editor_state_updates(&editor_state)?;
     updates.extend_from_slice(&[
         (
@@ -158,6 +171,69 @@ pub fn create_lighting_scene(
         ),
         summary,
     })
+}
+
+pub(super) fn validated_scene_fixture_states(
+    fixtures: &[LightingEditorFixtureState],
+    states: &[LightingEditorSceneFixtureState],
+) -> Result<Vec<LightingEditorSceneFixtureState>, LightingCommandError> {
+    if states.is_empty() {
+        return Err(LightingCommandError::Rejected(
+            "LIGHTING_SCENE_EMPTY",
+            String::from("Scene fixtureStates must include at least one fixture."),
+        ));
+    }
+
+    let fixture_ids: HashSet<&str> = fixtures.iter().map(|fixture| fixture.id.as_str()).collect();
+    let mut seen_ids = HashSet::with_capacity(states.len());
+    for state in states {
+        if !fixture_ids.contains(state.fixture_id.as_str()) {
+            return Err(LightingCommandError::Rejected(
+                "LIGHTING_FIXTURE_NOT_FOUND",
+                format!(
+                    "Lighting fixture '{}' is not exposed by the native editor state.",
+                    state.fixture_id
+                ),
+            ));
+        }
+        if !seen_ids.insert(state.fixture_id.as_str()) {
+            return Err(LightingCommandError::Rejected(
+                "LIGHTING_SCENE_DUPLICATE_FIXTURE",
+                format!(
+                    "Scene fixtureStates includes fixture '{}' more than once.",
+                    state.fixture_id
+                ),
+            ));
+        }
+        if !(0..=100).contains(&state.intensity) {
+            return Err(LightingCommandError::Rejected(
+                "LIGHTING_SCENE_INVALID_INTENSITY",
+                String::from("Scene fixture intensity must be between 0 and 100."),
+            ));
+        }
+        if !(MIN_FIXTURE_CCT..=MAX_FIXTURE_CCT).contains(&state.cct) {
+            return Err(LightingCommandError::Rejected(
+                "LIGHTING_SCENE_INVALID_CCT",
+                format!(
+                    "Scene fixture CCT must be between {MIN_FIXTURE_CCT} and {MAX_FIXTURE_CCT}."
+                ),
+            ));
+        }
+    }
+
+    Ok(states.to_vec())
+}
+
+pub(super) fn validated_scene_color_index(
+    color_index: Option<u8>,
+) -> Result<Option<u8>, LightingCommandError> {
+    if matches!(color_index, Some(value) if value > 7) {
+        return Err(LightingCommandError::Rejected(
+            "LIGHTING_SCENE_INVALID_COLOR",
+            String::from("Scene colorIndex must be between 0 and 7."),
+        ));
+    }
+    Ok(color_index)
 }
 
 pub fn update_lighting_scene(

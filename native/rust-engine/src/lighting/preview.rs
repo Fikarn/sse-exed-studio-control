@@ -457,11 +457,18 @@ pub fn create_lighting_scene_with_preview(
         ));
     }
 
+    let fixture_states = match &request.fixture_states {
+        Some(states) => {
+            super::scenes::validated_scene_fixture_states(&editor_state.fixtures, states)?
+        }
+        None => preview.scene_fixture_states(&editor_state.fixtures),
+    };
+    let color_index = super::scenes::validated_scene_color_index(request.color_index)?;
     let scene = LightingEditorSceneState {
         id: next_custom_scene_id(&editor_state.scenes),
         name: request.name.clone(),
-        fixture_states: preview.scene_fixture_states(&editor_state.fixtures),
-        color_index: None,
+        fixture_states,
+        color_index,
     };
     editor_state.scenes.push(scene.clone());
     editor_state.scene_order.push(scene.id.clone());

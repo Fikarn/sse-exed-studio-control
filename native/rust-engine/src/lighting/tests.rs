@@ -617,6 +617,8 @@ fn lighting_preview_save_as_creates_scene_and_selects_it() {
         test_dir.db_path().as_path(),
         &LightingSceneCreateRequest {
             name: String::from("Preview Look"),
+            fixture_states: None,
+            color_index: None,
         },
         &mut preview,
     )
@@ -1432,6 +1434,8 @@ fn lighting_scene_crud_uses_shared_editor_state() {
         test_dir.db_path().as_path(),
         &LightingSceneCreateRequest {
             name: String::from("Cue A"),
+            fixture_states: None,
+            color_index: None,
         },
     )
     .expect("scene create should succeed");
@@ -1472,6 +1476,53 @@ fn lighting_scene_crud_uses_shared_editor_state() {
         .scenes
         .iter()
         .all(|scene| scene.id != created.scene.id));
+}
+
+#[test]
+fn lighting_scene_create_accepts_explicit_fixture_states_for_restore() {
+    let test_dir = initialize_ready_lighting("scene-create-explicit-state");
+    update_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-left"),
+            name: None,
+            fixture_type: None,
+            dmx_start_address: None,
+            effect: None,
+            on: Some(false),
+            intensity: Some(10),
+            cct: Some(3200),
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+    )
+    .expect("fixture update should succeed");
+
+    let created = create_lighting_scene(
+        test_dir.db_path().as_path(),
+        &LightingSceneCreateRequest {
+            name: String::from("Restored Look"),
+            fixture_states: Some(vec![LightingEditorSceneFixtureState {
+                fixture_id: String::from("fixture-key-left"),
+                intensity: 77,
+                cct: 5600,
+                on: true,
+            }]),
+            color_index: Some(4),
+        },
+    )
+    .expect("scene create with explicit state should succeed");
+
+    assert_eq!(created.scene.name, "Restored Look");
+    assert_eq!(created.scene.color_index, Some(4));
+    assert_eq!(created.scene.fixture_states.len(), 1);
+    assert_eq!(created.scene.fixture_states[0].intensity, 77);
+    assert_eq!(created.scene.fixture_states[0].cct, 5600);
+    assert!(created.scene.fixture_states[0].on);
 }
 
 #[test]

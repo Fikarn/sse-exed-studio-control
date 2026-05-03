@@ -6,6 +6,7 @@ import type {
   LightingFixtureSnapshot,
   LightingPaletteKind,
   LightingPaletteSnapshot,
+  LightingSceneFixtureSnapshot,
   LightingSceneSnapshot,
   LightingSnapshot,
   ShellStore,
@@ -38,7 +39,7 @@ import { RenameDialog } from "./components/RenameDialog";
 import { SelectionChipStrip } from "./components/SelectionChipStrip";
 import { StagePlot } from "./components/StagePlot";
 import { lightingColorTagHex } from "./lightingColorTags";
-import { nextLightingFixtureName } from "./lightingHelpers";
+import { formatLightingRelativeTime, nextLightingFixtureName } from "./lightingHelpers";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
 import { useResizableColumns } from "./useResizableColumns";
 import { useStagePlotViewport, type ViewBookmarkSlot } from "./useStagePlotViewport";
@@ -54,6 +55,7 @@ interface LightingWorkspaceSurfaceProps {
 }
 
 const RECALL_FADE_PRESETS_MS = [0, 1000, 2000, 5000] as const;
+const RECENT_SCENE_LIMIT = 8;
 
 function formatRecallFade(ms: number): string {
   if (ms <= 0) return "snap";
@@ -152,6 +154,17 @@ export function LightingWorkspaceSurface({
   const sceneEntries = useMemo(() => getLightingScenes(lightingSnapshot), [lightingSnapshot]);
 
   const sceneThumbs = useMemo(() => getSceneThumbs(appSnapshot), [appSnapshot]);
+  const sceneThumbsRef = useRef(sceneThumbs);
+  useEffect(() => {
+    sceneThumbsRef.current = sceneThumbs;
+  }, [sceneThumbs]);
+  const persistSceneThumbs = useCallback(
+    async (next: Record<string, string>) => {
+      sceneThumbsRef.current = next;
+      await store.setLightingSceneThumbs(next);
+    },
+    [store]
+  );
 
   const persistedSelectedFixtureId =
     typeof lightingSnapshot?.selectedFixtureId === "string" ? lightingSnapshot.selectedFixtureId : null;
@@ -169,6 +182,7 @@ export function LightingWorkspaceSurface({
   const [paletteQuickOpen, setPaletteQuickOpen] = useState(false);
   const [paletteQuickQuery, setPaletteQuickQuery] = useState("");
   const [recallFadeMs, setRecallFadeMs] = useState(0);
+  const [recentSceneIds, setRecentSceneIds] = useState<readonly string[]>([]);
   const toast = useToast();
   const palette = usePalette();
   // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
@@ -618,7 +632,28 @@ export function LightingWorkspaceSurface({
     () => fixtures.filter((fixture) => selectedFixtureIds.has(fixture.id)),
     [fixtures, selectedFixtureIds]
   );
+  const pushRecentScene = useCallback((sceneId: string) => {
+    setRecentSceneIds((prev) => {
+      const filtered = prev.filter((id) => id !== sceneId);
+      return [sceneId, ...filtered].slice(0, RECENT_SCENE_LIMIT);
+    });
+  }, []);
   const paletteQuickQueryNormalized = paletteQuickQuery.trim().toLowerCase();
+  const sceneById = useMemo(() => new Map(scenes.map((entry) => [entry.id, entry])), [scenes]);
+  const recentToolbarScenes = useMemo(
+    () =>
+      recentSceneIds
+        .map((id) => sceneById.get(id))
+        .filter((entry): entry is LightingSceneSnapshot => Boolean(entry))
+        .filter((entry, index, entries) => entries.findIndex((candidate) => candidate.id === entry.id) === index)
+        .slice(0, RECENT_SCENE_LIMIT)
+        .map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          lastRecalledLabel: entry.lastRecalledAt ? formatLightingRelativeTime(entry.lastRecalledAt) : undefined,
+        })),
+    [recentSceneIds, sceneById]
+  );
   const paletteById = useMemo(() => new Map(palettes.map((entry) => [entry.id, entry])), [palettes]);
   const recentQuickPalettes = useMemo(
     () =>
@@ -1099,6 +1134,7 @@ export function LightingWorkspaceSurface({
         // I6 — push the newly-saved scene into the palette recents ring so
         // it surfaces at the top of the empty-query palette immediately.
         palette.pushRecent(`lighting:recall:${createdId}`);
+        pushRecentScene(createdId);
         // Pull the fresh scene from the result so we render its true saved
         // state (the snapshot may not have updated yet).
         const fixtureStatesRecord = Array.isArray(created?.fixtureStates) ? created!.fixtureStates : [];
@@ -1106,8 +1142,8 @@ export function LightingWorkspaceSurface({
           fixtures,
           fixtureStates: fixtureStatesRecord as unknown as LightingSceneSnapshot["fixtureStates"],
         });
-        const next = withSceneThumbUpserted(sceneThumbs, createdId, dataUri);
-        await store.setLightingSceneThumbs(next);
+        const next = withSceneThumbUpserted(sceneThumbsRef.current, createdId, dataUri);
+        await persistSceneThumbs(next);
         setLastSavedAt(new Date());
         // Push undo: deleting the just-created scene. Engine has no API to
         // recreate a scene with an explicit fixtureStates snapshot, so this
@@ -1119,8 +1155,8 @@ export function LightingWorkspaceSurface({
           label: `Save scene ${sceneName}`,
           undo: async () => {
             await store.deleteLightingScene(currentSceneId);
-            const cleared = withSceneThumbRemoved(sceneThumbs, currentSceneId);
-            await store.setLightingSceneThumbs(cleared);
+            const cleared = withSceneThumbRemoved(sceneThumbsRef.current, currentSceneId);
+            await persistSceneThumbs(cleared);
           },
           redo: async () => {
             const redoResult = asRecord(await store.createLightingScene({ name: sceneName }));
@@ -1128,8 +1164,8 @@ export function LightingWorkspaceSurface({
             const newId = typeof redoCreated?.id === "string" ? redoCreated.id : null;
             if (newId) {
               currentSceneId = newId;
-              const refreshed = withSceneThumbUpserted(sceneThumbs, newId, cachedDataUri);
-              await store.setLightingSceneThumbs(refreshed);
+              const refreshed = withSceneThumbUpserted(sceneThumbsRef.current, newId, cachedDataUri);
+              await persistSceneThumbs(refreshed);
             }
           },
         });
@@ -1172,8 +1208,8 @@ export function LightingWorkspaceSurface({
         fixtures,
         fixtureStates: liveStates,
       });
-      const nextThumbs = withSceneThumbUpserted(sceneThumbs, sceneId, dataUri);
-      await store.setLightingSceneThumbs(nextThumbs);
+      const nextThumbs = withSceneThumbUpserted(sceneThumbsRef.current, sceneId, dataUri);
+      await persistSceneThumbs(nextThumbs);
       setLastSavedAt(new Date());
       toast.push({ message: `Scene '${sceneName}' updated.`, tone: "ok" });
     } catch (error) {
@@ -1190,12 +1226,75 @@ export function LightingWorkspaceSurface({
     if (!sceneId) return;
     const target = scenes.find((scene) => scene.id === sceneId) ?? null;
     const sceneName = target?.name ?? "Scene";
+    const targetSnapshot = target
+      ? {
+          name: target.name,
+          fixtureStates: target.fixtureStates.map((state) => ({
+            fixtureId: state.fixtureId,
+            intensity: state.intensity,
+            cct: state.cct,
+            on: state.on,
+          })) satisfies LightingSceneFixtureSnapshot[],
+          colorIndex: target.colorIndex ?? null,
+          pinned: target.pinned,
+          thumbDataUri:
+            sceneThumbs[sceneId] ??
+            renderSceneThumbnailDataUri({
+              fixtures: liveFixtures,
+              fixtureStates: target.fixtureStates,
+            }),
+        }
+      : null;
     startBusy("scene-delete");
     try {
       await store.deleteLightingScene(sceneId);
-      const next = withSceneThumbRemoved(sceneThumbs, sceneId);
-      await store.setLightingSceneThumbs(next);
-      toast.push({ message: `Scene '${sceneName}' deleted.`, tone: "ok" });
+      const next = withSceneThumbRemoved(sceneThumbsRef.current, sceneId);
+      await persistSceneThumbs(next);
+      if (targetSnapshot) {
+        let currentSceneId = sceneId;
+        undoStack.push({
+          label: `Delete scene ${targetSnapshot.name}`,
+          undo: async () => {
+            const result = asRecord(
+              await store.createLightingScene({
+                name: targetSnapshot.name,
+                fixtureStates: targetSnapshot.fixtureStates,
+                colorIndex: targetSnapshot.colorIndex,
+              })
+            );
+            const created = asRecord(result?.scene);
+            const restoredId = typeof created?.id === "string" ? created.id : null;
+            if (restoredId) {
+              currentSceneId = restoredId;
+              if (targetSnapshot.pinned) {
+                await store.pinLightingScene(restoredId, true);
+              }
+              const withoutDeletedThumb = withSceneThumbRemoved(sceneThumbsRef.current, sceneId);
+              const restoredThumbs = withSceneThumbUpserted(
+                withoutDeletedThumb,
+                restoredId,
+                targetSnapshot.thumbDataUri
+              );
+              await persistSceneThumbs(restoredThumbs);
+            }
+          },
+          redo: async () => {
+            await store.deleteLightingScene(currentSceneId);
+            const cleared = withSceneThumbRemoved(sceneThumbsRef.current, currentSceneId);
+            await persistSceneThumbs(cleared);
+          },
+        });
+      }
+      toast.push({
+        message: `Scene '${sceneName}' deleted.`,
+        tone: "ok",
+        action: targetSnapshot
+          ? {
+              label: "Undo",
+              onClick: () => void undoStack.undo().then((outcome) => pushUndoOutcomeToast(toast, outcome)),
+            }
+          : undefined,
+      });
     } catch (error) {
       reportError(error, "Scene delete failed.");
     } finally {
@@ -1241,6 +1340,7 @@ export function LightingWorkspaceSurface({
     // here (not only when invoked via palette) so rail-driven recalls also
     // populate recents.
     palette.pushRecent(`lighting:recall:${sceneId}`);
+    pushRecentScene(sceneId);
     // Wave 30b — click is the user's commitment to a scene; cancel any
     // hover preview synchronously so the inspector doesn't show a stale
     // hovered scene during the 200 ms mouseleave grace window after the
@@ -2194,6 +2294,8 @@ export function LightingWorkspaceSurface({
         recallFadeMs={recallFadeMs}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        recentScenes={recentToolbarScenes}
+        onRecallRecentScene={(sceneId) => void handleRecallScene(sceneId)}
         onRecallFadeMsChange={setRecallFadeMs}
         patchMode={uiMode === "patch"}
         onTogglePatch={handleTogglePatch}
@@ -2558,8 +2660,8 @@ export function LightingWorkspaceSurface({
           title="Delete scene?"
           body={
             <>
-              This permanently removes <strong>{confirmDeleteScene.name}</strong>. Other scenes are unaffected and the
-              live rig state stays as it is.
+              This removes <strong>{confirmDeleteScene.name}</strong>. Other scenes are unaffected, the live rig state
+              stays as it is, and the next toast can undo the deletion.
             </>
           }
           confirmLabel="Delete scene"

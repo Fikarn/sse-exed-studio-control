@@ -2638,6 +2638,52 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         if (fixtures.length === 0) {
           throw new Error("No lighting fixtures are available for scene creation.");
         }
+        const hasExplicitFixtureStates = Object.prototype.hasOwnProperty.call(params, "fixtureStates");
+        const explicitFixtureStates = hasExplicitFixtureStates
+          ? asArray(params.fixtureStates).map((entry) => {
+              const fixtureState = asRecord(entry);
+              if (!fixtureState) {
+                throw new Error("fixtureStates entries must be objects");
+              }
+              const fixtureId = asString(fixtureState.fixtureId).trim();
+              if (!fixtureId) {
+                throw new Error("fixtureStates.fixtureId is required");
+              }
+              if (!fixtures.some((fixture) => asString(fixture.id) === fixtureId)) {
+                throw new Error(`Lighting fixture '${fixtureId}' is not present in the fixture list.`);
+              }
+              const intensity = asNumber(fixtureState.intensity, NaN);
+              if (!Number.isFinite(intensity) || intensity < 0 || intensity > 100) {
+                throw new Error("fixtureStates.intensity must be between 0 and 100");
+              }
+              const cct = asNumber(fixtureState.cct, NaN);
+              if (!Number.isFinite(cct) || cct < 2000 || cct > 10_000) {
+                throw new Error("fixtureStates.cct must be between 2000 and 10000");
+              }
+              return {
+                fixtureId,
+                intensity: Math.round(intensity),
+                cct: Math.round(cct),
+                on: asBoolean(fixtureState.on, false),
+              };
+            })
+          : null;
+        if (hasExplicitFixtureStates && explicitFixtureStates?.length === 0) {
+          throw new Error("Scene fixtureStates must include at least one fixture.");
+        }
+        const hasColor = Object.prototype.hasOwnProperty.call(params, "colorIndex");
+        let colorIndex: number | null = null;
+        if (hasColor) {
+          if (params.colorIndex === null) {
+            colorIndex = null;
+          } else {
+            const raw = asNumber(params.colorIndex, NaN);
+            if (!Number.isInteger(raw) || raw < 0 || raw > 7) {
+              throw new Error("colorIndex must be an integer 0..7 or null");
+            }
+            colorIndex = raw;
+          }
+        }
 
         const scenes = asArray(lightingSnapshot.scenes)
           .map((scene) => asRecord(scene))
@@ -2645,15 +2691,18 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const createdScene: JsonObject = {
           id: nextCustomSceneId(scenes),
           name,
-          fixtureCount: fixtures.length,
-          fixtureStates: fixtures.map((fixture) => ({
-            fixtureId: asString(fixture.id),
-            intensity: asNumber(fixture.intensity, 0),
-            cct: asNumber(fixture.cct, 3200),
-            on: asBoolean(fixture.on, false),
-          })),
+          fixtureCount: explicitFixtureStates?.length ?? fixtures.length,
+          fixtureStates:
+            explicitFixtureStates ??
+            fixtures.map((fixture) => ({
+              fixtureId: asString(fixture.id),
+              intensity: asNumber(fixture.intensity, 0),
+              cct: asNumber(fixture.cct, 3200),
+              on: asBoolean(fixture.on, false),
+            })),
           lastRecalled: false,
           lastRecalledAt: null,
+          colorIndex,
         };
 
         lightingSnapshot.scenes = [...scenes, createdScene];
@@ -2661,9 +2710,11 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           lightingSnapshot.selectedSceneId = createdScene.id;
           clearLightingPreview(lightingSnapshot);
         }
-        const summary = previewActive
-          ? `Lighting scene '${name}' was saved from preview.`
-          : `Lighting scene '${name}' was saved from the current fixture state.`;
+        const summary = hasExplicitFixtureStates
+          ? `Lighting scene '${name}' was restored from a saved scene state.`
+          : previewActive
+            ? `Lighting scene '${name}' was saved from preview.`
+            : `Lighting scene '${name}' was saved from the current fixture state.`;
         lightingSnapshot.lastActionStatus = "succeeded";
         lightingSnapshot.lastActionCode = null;
         lightingSnapshot.lastActionMessage = summary;
@@ -2753,6 +2804,45 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         emit("lighting.changed", { reason: "scene-updated" });
         return {
           scene: cloneJson(updatedScene),
+          summary,
+        };
+      }
+      case "lighting.scene.delete": {
+        const sceneId = asString(params.sceneId).trim();
+        if (!sceneId) {
+          throw new Error("sceneId is required");
+        }
+
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+        const scenes = asArray(lightingSnapshot.scenes)
+          .map((scene) => asRecord(scene))
+          .filter((scene): scene is JsonObject => scene !== null);
+        const targetScene = scenes.find((scene) => asString(scene.id) === sceneId);
+        if (!targetScene) {
+          throw new Error(`Lighting scene '${sceneId}' is not present in the scene list.`);
+        }
+
+        lightingSnapshot.scenes = scenes.filter((scene) => asString(scene.id) !== sceneId);
+        if (asString(lightingSnapshot.selectedSceneId) === sceneId) {
+          lightingSnapshot.selectedSceneId = null;
+        }
+        if (asString(lightingSnapshot.lastRecalledSceneId) === sceneId) {
+          lightingSnapshot.lastRecalledSceneId = null;
+          lightingSnapshot.lastSceneRecallAt = null;
+        }
+
+        const sceneName = asString(targetScene.name, sceneId);
+        const summary = `Lighting scene '${sceneName}' was deleted.`;
+        lightingSnapshot.lastActionStatus = "succeeded";
+        lightingSnapshot.lastActionCode = null;
+        lightingSnapshot.lastActionMessage = summary;
+        lightingSnapshot.summary = summary;
+        state.lightingSnapshot = lightingSnapshot;
+        synchronizeFixtureState(state);
+        emit("lighting.changed", { reason: "scene-deleted" });
+        return {
+          deleted: true,
+          sceneId,
           summary,
         };
       }

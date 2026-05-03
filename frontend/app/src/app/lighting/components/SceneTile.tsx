@@ -2,6 +2,7 @@ import { useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEve
 import { Palette, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { LightingSceneFixtureSnapshot } from "@sse/engine-client";
 
 import {
   ColorPicker,
@@ -13,6 +14,7 @@ import {
 
 import { LIGHTING_COLOR_TAG_PALETTE, lightingColorTagHex } from "../lightingColorTags";
 
+import { SceneShapeMiniGraph } from "./SceneShapeMiniGraph";
 import { SceneThumbnail } from "./SceneThumbnail";
 import styles from "./LightingRail.module.css";
 
@@ -36,6 +38,8 @@ export interface SceneTileProps {
   lastRecalledLabel?: string;
   /** 0..1 progress for a manual recall fade targeting this scene. */
   fadeProgress?: number | null;
+  /** Saved fixture states used for the P5 aggregate shape mini-graph. */
+  fixtureStates: readonly LightingSceneFixtureSnapshot[];
   thumbDataUri?: string;
   pinned?: boolean;
   /** When true, dnd-kit sortable hooks are wired in. The parent
@@ -78,6 +82,7 @@ export function SceneTile({
   bridgeReachable = true,
   lastRecalledLabel,
   fadeProgress = null,
+  fixtureStates,
   thumbDataUri,
   pinned = false,
   sortable = false,
@@ -247,7 +252,10 @@ export function SceneTile({
       tabIndex={0}
     >
       {colorHex ? <span aria-hidden="true" className={styles.tileColorBar} style={{ background: colorHex }} /> : null}
-      <SceneThumbnail src={thumbDataUri} alt={`${name} preview`} />
+      <span className={styles.sceneVisual}>
+        <SceneThumbnail src={thumbDataUri} alt={`${name} preview`} />
+        <SceneShapeMiniGraph sceneName={name} fixtureStates={fixtureStates} />
+      </span>
       <span className={styles.tileBody}>
         <span className={styles.tileNameRow}>
           <span className={styles.tileName}>
