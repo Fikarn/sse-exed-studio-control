@@ -15,6 +15,7 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - Native operator parity is engineering-complete. Acceptance is layered: deterministic offscreen `2560x1440` captures, real-GPU onscreen spot captures, and the install-time first-launch smoke test shipped in the QtIFW installer.
 - Native and replacement-shell verification are target-host gates. GitHub Actions is not the acceptance mechanism for current cutover work; the advisory `dev-checks` workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) runs four jobs on pull requests (format-protocol, lint, frontend-typecheck, rust) but is intentionally not a required status check, and Actions billing is not paid — failed CI runs are expected baseline noise.
 - Responsive operator layout support landed in [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71) on `2026-05-03` (`4af7e8b8427cff78837054326478e1a67398154c`). Lighting now has logical CSS-pixel layout modes, mode-keyed column persistence, toolbar priority overflow, a narrow inspector drawer, separate stage zoom controls, shell-owned window layout persistence, and Scaled Studio Preview for current-hardware human review.
+- Lighting fixture catalog implementation landed after the responsive pass. The Rust engine now owns fixture definitions, mode/channel metadata, DMX mapping and validation, persistence compatibility, universe-aware patching, scene `controlValues`, and catalog snapshots. React renders catalog metadata and sends explicit commands only; it is not the source of truth for fixture/DMX policy. Verified catalog entries are selectable in the Add Fixture dialog; `research-needed` entries remain non-selectable tracking metadata.
 - A one-way legacy-import path (`native/rust-engine/src/legacy_import.rs`) remains so that operators migrating from a pre-`v2.0.0` Electron installation can bring their old `db.json` forward on first native launch. This is the only legacy code that is intentionally retained.
 
 ## Start Here
@@ -67,6 +68,8 @@ The highest-value unresolved work is:
    GitHub Actions is not the acceptance mechanism for the replacement-shell cutover. `npm run tauri:setup-support:qualify`, `npm run tauri:workspaces:qualify`, and `npm run tauri:visual:review` remain local/manual cutover-readiness gates for future shell changes. The historical `tauri:package:*` lanes remain useful pre-switch evidence under `release/tauri-candidate*`. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`; `npm run native:release:mac:local` passed for published `v2.2.1`, and `npm run native:release:win:evidence` passed on Windows 11 `x64` with evidence bundle `2026-04-24T22-17-55-519Z`. Checkpoint D also passed macOS `npm run native:release:mac:local` and Windows 11 `x64` evidence bundle `2026-04-25T07-32-31-463Z` on commit `d0205baf52ce02d7d4d24699facd202f3bbba217`. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) records the completed Checkpoint C evidence and closed fallback window; [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) records the passed `v2.2.1` operator rollout; [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) records the completed Checkpoint D / Qt retirement track.
 6. Preserve responsive-layout semantics.
    The studio surface is a logical `2560x1440` operator composition whose layout decisions are driven by CSS viewport size, not physical pixels or `devicePixelRatio`. Aspect-ratio-correct Scaled Studio Preview is the normal current-hardware human review path for studio composition on the built-in MacBook display. The fixed studio monitor remains the final authority for physical-size readability and ergonomics. BetterDisplay is now optional fallback tooling, not the standard workflow.
+7. Preserve fixture-catalog ownership.
+   Fixture definitions, DMX footprints, DMX labels/encoders, universe-aware overlap validation, scene serialization, and persisted compatibility live in `native/rust-engine/src/lighting/`. Frontend code may mirror catalog metadata for fixture transport tests and render controls/shapes from snapshots, but it must not own device policy. Do not add GDTF import, Sidus Bluetooth discovery, firmware update, or vendor auto-configuration without a new scoped plan.
 
 ## Execution Queue
 
@@ -104,6 +107,29 @@ Validation recorded for PR #71:
 - `npm run native:check` passed.
 - `npm run tauri:visual:review` passed with 30 screenshots, 0 failures, and 4 shell window preference recovery tests passed.
 - Advisory GitHub checks passed before merge.
+
+### Lighting fixture catalog, engine-owned pass
+
+Status: committed and published as draft PR [#73](https://github.com/Fikarn/sse-exed-studio-control/pull/73) on branch `codex/lighting-fixture-catalog`.
+
+Important facts for future sessions:
+
+- The implementation plan is preserved at [docs/plans/lighting-fixture-catalog-implementation.md](./plans/lighting-fixture-catalog-implementation.md), with the completed scope documented at the top of that file.
+- `lighting.fixtureCatalog.snapshot` is a read-only protocol method returning the engine-owned catalog.
+- Fixture instances now carry additive `definitionId`, `modeId`, `universe`, and `controlValues` fields while retaining legacy `type` compatibility.
+- The compatibility bridge maps legacy/current aliases (`Astra`, `Infinibar`, `Apollo Bridge`, `astra-bicolor`, `infinimat`, `infinibar-pb12`) before any instance-shape logic depends on catalog identity.
+- `Apollo Bridge` is modeled as a verified control node with no DMX footprint and is skipped by patch auto-advance; existing instances remain editable for power/selection compatibility.
+- The Add Fixture UI exposes only `verified` non-control-node definitions. `research-needed` entries are present in catalog metadata but not selectable.
+- `npm run tauri:dev` needs a current `native/target/debug/studio-control-engine`; run `npm run native:engine:build` first after protocol/engine changes to avoid the Incident Recovery surface.
+
+Validation recorded for the fixture catalog pass:
+
+- `npm run protocol:generate` passed.
+- `npm run native:test` passed: 10 Tauri shell tests, 160 engine tests, and protocol/doc-tests clean.
+- `npm run frontend:typecheck` passed across workspaces.
+- `npm run frontend:playwright:test` passed: 39 tests.
+- `npm run tauri:visual:review` passed with 30 screenshots and 0 failures; summary at `artifacts/visual/tauri-cutover/fixture-viewport-summary.json`.
+- `npm run format:check` passed.
 
 ## Validation Baseline
 

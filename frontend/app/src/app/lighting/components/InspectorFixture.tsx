@@ -12,9 +12,14 @@ import {
   StatusDot,
   type InlineRenameHandle,
 } from "@sse/design-system";
-import type { LightingFixtureSnapshot, LightingGroupSnapshot } from "@sse/engine-client";
+import type {
+  LightingFixtureCatalogSnapshot,
+  LightingFixtureSnapshot,
+  LightingGroupSnapshot,
+} from "@sse/engine-client";
 
 import { deriveMounting, type FixtureMounting } from "../fixtureMounting";
+import { getFixtureDefinition, getFixtureMode, fixtureDefinitionLabel } from "../fixtureCatalog";
 import { defaultLightingBeamAngle, lightingFixtureCctRange } from "../lightingHelpers";
 import { STUDIO_LAYOUT } from "../studioLayout";
 
@@ -27,12 +32,14 @@ const BEAM_ANGLE_MAX_DEGREES = 180;
 
 export interface InspectorFixtureProps {
   fixture: LightingFixtureSnapshot;
+  catalog?: LightingFixtureCatalogSnapshot | null;
   groupName?: string;
   groups?: readonly LightingGroupSnapshot[];
   bridgeReachable?: boolean;
   onTogglePower: (fixtureId: string, on: boolean) => void;
   onIntensityCommit: (fixtureId: string, intensity: number) => void;
   onCctCommit: (fixtureId: string, cct: number) => void;
+  onControlValuesCommit?: (fixtureId: string, controlValues: Record<string, number>) => void;
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   onDeleteFixture?: (fixtureId: string) => void;
   onSpatialCommit?: (
@@ -63,10 +70,11 @@ export interface InspectorFixtureProps {
 const ASSIGN_NEW_GROUP_VALUE = "__create_group__";
 
 const MOUNTING_LABEL: Record<FixtureMounting, string> = {
-  "grid-panel": "Grid · panel",
-  "grid-soft": "Grid · soft",
-  stand: "Stand",
-  "wall-bar": "Wall bar",
+  bar: "Bar",
+  "control-node": "Control node",
+  fresnel: "Fresnel",
+  mat: "Mat",
+  panel: "Panel",
 };
 
 function formatMaybeMeters(value: number | null | undefined): string {
@@ -98,12 +106,14 @@ function formatScrubDegrees(value: number): string {
 
 export function InspectorFixture({
   fixture,
+  catalog = null,
   groupName,
   groups = [],
   bridgeReachable = true,
   onTogglePower,
   onIntensityCommit,
   onCctCommit,
+  onControlValuesCommit,
   onIdentifyBurst,
   onDeleteFixture,
   onSpatialCommit,
@@ -116,10 +126,13 @@ export function InspectorFixture({
   assignGroupBusy = false,
   pendingInlineRenameNonce = null,
 }: InspectorFixtureProps) {
-  const cctRange = lightingFixtureCctRange(fixture.type);
+  const definition = getFixtureDefinition(catalog, fixture);
+  const mode = getFixtureMode(definition, fixture.modeId);
+  const cctRange = lightingFixtureCctRange(fixture, catalog);
   const cctScaleId = useId();
   const [intensityDraft, setIntensityDraft] = useState(fixture.intensity);
   const [cctDraft, setCctDraft] = useState(fixture.cct);
+  const [controlDrafts, setControlDrafts] = useState<Record<string, number>>(fixture.controlValues);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const renameRef = useRef<InlineRenameHandle | null>(null);
 
@@ -145,6 +158,10 @@ export function InspectorFixture({
   useEffect(() => {
     setCctDraft(fixture.cct);
   }, [fixture.id, fixture.cct]);
+
+  useEffect(() => {
+    setControlDrafts(fixture.controlValues);
+  }, [fixture.id, fixture.controlValues]);
 
   // Open the inline rename when the parent signals a one-shot request (marker
   // context-menu "Rename"). Effect runs after mount, so the renameRef is
@@ -238,7 +255,7 @@ export function InspectorFixture({
             </div>
             <div className={styles.fixtureSubline}>
               <StatusDot state={fixture.on ? "ok" : "info"} size="sm" />
-              {fixture.on ? "Live" : "Standby"} · {MOUNTING_LABEL[deriveMounting(fixture.type)]}
+              {fixture.on ? "Live" : "Standby"} · {MOUNTING_LABEL[deriveMounting(fixture, catalog)]}
             </div>
           </div>
           <div className={styles.fixtureHeaderActions}>
@@ -262,11 +279,11 @@ export function InspectorFixture({
         <dl className={styles.factGrid}>
           <div className={styles.fact}>
             <dt className={styles.factLabel}>Type</dt>
-            <dd className={styles.factValue}>{fixture.type}</dd>
+            <dd className={styles.factValue}>{fixtureDefinitionLabel(definition) || fixture.type}</dd>
           </div>
           <div className={styles.fact}>
-            <dt className={styles.factLabel}>Kind</dt>
-            <dd className={styles.factValue}>{fixture.kind}</dd>
+            <dt className={styles.factLabel}>Mode</dt>
+            <dd className={styles.factValue}>{mode ? `${mode.channelCount} ch` : fixture.modeId}</dd>
           </div>
         </dl>
         {onAssignFixtureGroup ? (
@@ -304,6 +321,47 @@ export function InspectorFixture({
           </dl>
         )}
       </InspectorSection>
+
+      {mode && mode.controls.some((control) => !["intensity", "cct"].includes(control.id)) ? (
+        <InspectorSection title="Catalog controls" className={styles.compactSection}>
+          <div className={styles.levelStack}>
+            {mode.controls
+              .filter((control) => !["intensity", "cct"].includes(control.id))
+              .map((control) => {
+                const value = controlDrafts[control.id] ?? control.defaultValue;
+                return (
+                  <div className={styles.levelBlock} key={control.id}>
+                    <div className={styles.levelHeader}>
+                      <span className={styles.levelLabel}>{control.label}</span>
+                      <span className={styles.levelValue}>
+                        {Math.round(value)}
+                        {control.unit ?? ""}
+                      </span>
+                    </div>
+                    <ScrubSlider
+                      ariaLabel={control.label}
+                      min={control.min}
+                      max={control.max}
+                      step={control.step}
+                      value={value}
+                      onChange={(next) =>
+                        setControlDrafts((current) => ({ ...current, [control.id]: Math.round(next) }))
+                      }
+                      onCommit={(next) => {
+                        const rounded = Math.round(next ?? value);
+                        setControlDrafts((current) => ({ ...current, [control.id]: rounded }));
+                        onControlValuesCommit?.(fixture.id, { [control.id]: rounded });
+                      }}
+                      resetValue={control.defaultValue}
+                      disabled={!fixture.on && control.id !== "fan"}
+                      formatValue={(next) => `${Math.round(next)}${control.unit ?? ""}`}
+                    />
+                  </div>
+                );
+              })}
+          </div>
+        </InspectorSection>
+      ) : null}
 
       <InspectorSection title="Levels" className={styles.compactSection}>
         <div className={styles.levelStack}>

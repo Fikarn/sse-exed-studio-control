@@ -3,7 +3,7 @@ use super::*;
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::commissioning::{LIGHTING_BRIDGE_IP_KEY, LIGHTING_CHECK_ID, LIGHTING_UNIVERSE_KEY};
 use crate::storage::{initialize_database, list_settings_by_prefix, set_settings_owned};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::process;
@@ -93,6 +93,224 @@ fn scene_snapshot<'a>(snapshot: &'a LightingSnapshot, scene_id: &str) -> &'a Lig
         .expect("scene should be present")
 }
 
+#[test]
+fn lighting_fixture_catalog_contains_verified_and_research_entries() {
+    let catalog = read_lighting_fixture_catalog_snapshot();
+    let ids = catalog
+        .definitions
+        .iter()
+        .map(|definition| definition.id.as_str())
+        .collect::<HashSet<_>>();
+
+    for expected in [
+        "litepanels-astra-bicolor",
+        "aputure-infinimat-generic",
+        "aputure-infinibar-pb12",
+        "aputure-ls-600d-pro",
+        "aputure-storm-80c",
+        "aputure-storm-1200x",
+        "litepanels-astra-ip",
+        "litepanels-gemini-1x1",
+        "litepanels-gemini-2x1",
+        "litepanels-studio-x-bicolor",
+    ] {
+        assert!(
+            ids.contains(expected),
+            "missing verified catalog entry {expected}"
+        );
+    }
+
+    let research_needed = catalog
+        .definitions
+        .iter()
+        .find(|definition| definition.id == "aputure-storm-1000c")
+        .expect("research-needed entry should be exposed");
+    assert_eq!(research_needed.status, "research-needed");
+    assert_eq!(research_needed.modes[0].channel_count, 0);
+}
+
+#[test]
+fn lighting_fixture_catalog_modes_have_valid_channel_maps() {
+    let catalog = read_lighting_fixture_catalog_snapshot();
+    let mut definition_ids = HashSet::new();
+    for definition in &catalog.definitions {
+        assert!(
+            definition_ids.insert(definition.id.as_str()),
+            "duplicate catalog definition {}",
+            definition.id
+        );
+        assert!(
+            definition
+                .modes
+                .iter()
+                .any(|mode| mode.id == definition.default_mode_id),
+            "definition {} default mode should exist",
+            definition.id
+        );
+        for mode in &definition.modes {
+            assert_eq!(mode.channel_count, mode.channels.len() as i64);
+            assert!(mode.channel_count <= 512);
+            let mut offsets = HashSet::new();
+            for channel in &mode.channels {
+                assert!(channel.offset >= 1);
+                assert!(
+                    offsets.insert(channel.offset),
+                    "duplicate channel offset {} in {} / {}",
+                    channel.offset,
+                    definition.id,
+                    mode.id
+                );
+                assert!(channel.default_dmx >= 0 && channel.default_dmx <= 255);
+            }
+            if definition.status == "verified" && definition.kind != "control-node" {
+                assert!(
+                    mode.channel_count > 0,
+                    "{} / {} should be selectable with DMX channels",
+                    definition.id,
+                    mode.id
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn lighting_snapshot_backfills_catalog_identity_for_legacy_fixture_types() {
+    let test_dir = initialize_ready_lighting("catalog-legacy-bridge");
+    let snapshot = read_lighting_snapshot(
+        &list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+            .expect("settings should load"),
+    );
+    let key = fixture_snapshot(&snapshot, "fixture-key-left");
+    assert_eq!(key.fixture_type, "astra-bicolor");
+    assert_eq!(key.definition_id, "litepanels-astra-bicolor");
+    assert_eq!(key.mode_id, "default");
+    assert_eq!(key.universe, 1);
+    assert!(key.control_values.contains_key("intensity"));
+
+    let practicals = fixture_snapshot(&snapshot, "fixture-house-practicals");
+    assert_eq!(practicals.definition_id, "aputure-infinibar-pb12");
+    assert_eq!(practicals.mode_id, "default");
+}
+
+#[test]
+fn lighting_patch_validation_is_universe_aware() {
+    let test_dir = initialize_ready_lighting("catalog-universe-overlap");
+
+    update_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-right"),
+            name: None,
+            fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: Some(2),
+            dmx_start_address: Some(1),
+            effect: None,
+            on: None,
+            intensity: None,
+            cct: None,
+            control_values: None,
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+    )
+    .expect("same address should be allowed on a different universe");
+
+    let error = update_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-key-right"),
+            name: None,
+            fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: Some(1),
+            dmx_start_address: Some(1),
+            effect: None,
+            on: None,
+            intensity: None,
+            cct: None,
+            control_values: None,
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+    )
+    .expect_err("same universe overlap should reject");
+    match error {
+        LightingCommandError::Rejected(code, _) => assert_eq!(code, "LIGHTING_DMX_OVERLAP"),
+        other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[test]
+fn lighting_catalog_control_values_drive_dmx_and_scene_capture() {
+    let test_dir = initialize_ready_lighting("catalog-control-values");
+    let mut controls = HashMap::new();
+    controls.insert(String::from("red"), 255);
+    controls.insert(String::from("green"), 12);
+    update_lighting_fixture(
+        test_dir.db_path().as_path(),
+        &LightingFixtureUpdateRequest {
+            fixture_id: String::from("fixture-house-practicals"),
+            name: None,
+            fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
+            dmx_start_address: None,
+            effect: None,
+            on: Some(true),
+            intensity: Some(100),
+            cct: None,
+            control_values: Some(controls),
+            group_id: None,
+            spatial_x: None,
+            spatial_y: None,
+            spatial_rotation: None,
+            rig_z: None,
+            beam_angle_degrees: None,
+        },
+    )
+    .expect("fixture control values should update");
+
+    let monitor = read_lighting_dmx_monitor_snapshot(&load_test_app_settings(&test_dir));
+    let red_channel = monitor
+        .channels
+        .iter()
+        .find(|channel| channel.universe == 1 && channel.channel == 12)
+        .expect("red channel should be present");
+    assert_eq!(red_channel.label, "Red");
+    assert_eq!(red_channel.value, 255);
+
+    let scene = create_lighting_scene(
+        test_dir.db_path().as_path(),
+        &LightingSceneCreateRequest {
+            name: String::from("RGB Practical"),
+            fixture_states: None,
+            color_index: None,
+        },
+    )
+    .expect("scene should capture current state");
+    let practical_state = scene
+        .scene
+        .fixture_states
+        .iter()
+        .find(|fixture| fixture.fixture_id == "fixture-house-practicals")
+        .expect("captured scene should include practicals");
+    assert_eq!(practical_state.control_values.get("red"), Some(&255));
+    assert_eq!(practical_state.control_values.get("green"), Some(&12));
+}
+
 fn palette_snapshot<'a>(
     snapshot: &'a LightingSnapshot,
     palette_id: &str,
@@ -161,7 +379,9 @@ fn lighting_dmx_monitor_matches_legacy_channel_shape() {
     assert!(monitor
         .channels
         .iter()
-        .any(|channel| channel.light_name == "Backline Wash" && channel.label == "±G/M"));
+        .any(|channel| channel.light_name == "Backline Wash"
+            && channel.label == "+/- G/M"
+            && channel.universe == 1));
     assert!(monitor
         .channels
         .iter()
@@ -382,11 +602,15 @@ fn lighting_preview_fixture_update_changes_preview_only() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: Some(true),
             intensity: Some(42),
             cct: Some(4100),
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -524,11 +748,15 @@ fn lighting_preview_save_commits_preview_scene_without_live_output() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: Some(true),
             intensity: Some(44),
             cct: None,
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -597,11 +825,15 @@ fn lighting_preview_save_as_creates_scene_and_selects_it() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: Some(true),
             intensity: Some(33),
             cct: None,
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -678,11 +910,15 @@ fn lighting_preview_discard_and_patch_conflict_are_engine_owned() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: Some(true),
             intensity: Some(22),
             cct: None,
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -732,11 +968,15 @@ fn lighting_preview_rejects_structural_fixture_updates() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: Some(21),
             effect: None,
             on: None,
             intensity: None,
             cct: None,
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -835,11 +1075,15 @@ fn lighting_palette_apply_zero_intensity_turns_fixture_off() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: Some(true),
             intensity: Some(44),
             cct: None,
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -1007,6 +1251,9 @@ fn lighting_fixture_effect_and_all_power_refresh_snapshot_state() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: Some(Some(LightingEffect {
                 effect_type: String::from("strobe"),
@@ -1015,6 +1262,7 @@ fn lighting_fixture_effect_and_all_power_refresh_snapshot_state() {
             on: Some(true),
             intensity: Some(72),
             cct: Some(5100),
+            control_values: None,
             group_id: Some(Some(String::from("group-room"))),
             spatial_x: None,
             spatial_y: None,
@@ -1089,11 +1337,15 @@ fn lighting_group_crud_updates_fixture_assignments() {
             fixture_id: String::from("fixture-house-practicals"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: None,
             intensity: None,
             cct: None,
+            control_values: None,
             group_id: Some(Some(created.group.id.clone())),
             spatial_x: None,
             spatial_y: None,
@@ -1166,11 +1418,15 @@ fn lighting_spatial_updates_and_markers_round_trip() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: None,
             intensity: None,
             cct: None,
+            control_values: None,
             group_id: None,
             spatial_x: Some(Some(0.62)),
             spatial_y: Some(Some(0.38)),
@@ -1316,6 +1572,9 @@ fn lighting_fixture_crud_preserves_custom_and_deleted_inventory_state() {
         &LightingFixtureCreateRequest {
             name: String::from("Audience Key"),
             fixture_type: String::from("astra-bicolor"),
+            definition_id: String::from("litepanels-astra-bicolor"),
+            mode_id: String::from("default"),
+            universe: 1,
             dmx_start_address: 33,
             group_id: Some(String::from("group-room")),
         },
@@ -1330,6 +1589,9 @@ fn lighting_fixture_crud_preserves_custom_and_deleted_inventory_state() {
             fixture_id: created.fixture.id.clone(),
             name: Some(String::from("Audience Fill")),
             fixture_type: Some(String::from("infinimat")),
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: Some(41),
             effect: Some(Some(LightingEffect {
                 effect_type: String::from("candle"),
@@ -1338,6 +1600,7 @@ fn lighting_fixture_crud_preserves_custom_and_deleted_inventory_state() {
             on: None,
             intensity: None,
             cct: Some(6100),
+            control_values: None,
             group_id: Some(Some(String::from("group-stage"))),
             spatial_x: None,
             spatial_y: None,
@@ -1415,11 +1678,15 @@ fn lighting_scene_crud_uses_shared_editor_state() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: Some(true),
             intensity: Some(61),
             cct: Some(4900),
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -1487,11 +1754,15 @@ fn lighting_scene_create_accepts_explicit_fixture_states_for_restore() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: Some(false),
             intensity: Some(10),
             cct: Some(3200),
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -1511,6 +1782,7 @@ fn lighting_scene_create_accepts_explicit_fixture_states_for_restore() {
                 intensity: 77,
                 cct: 5600,
                 on: true,
+                control_values: HashMap::new(),
             }]),
             color_index: Some(4),
         },
@@ -1544,11 +1816,15 @@ fn lighting_fixture_rig_z_and_beam_angle_round_trip() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: None,
             intensity: None,
             cct: None,
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,
@@ -1579,11 +1855,15 @@ fn lighting_fixture_rig_z_and_beam_angle_round_trip() {
             fixture_id: String::from("fixture-key-left"),
             name: None,
             fixture_type: None,
+            definition_id: None,
+            mode_id: None,
+            universe: None,
             dmx_start_address: None,
             effect: None,
             on: None,
             intensity: None,
             cct: None,
+            control_values: None,
             group_id: None,
             spatial_x: None,
             spatial_y: None,

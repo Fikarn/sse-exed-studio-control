@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Maximize2, X } from "lucide-react";
 
-import type { LightingDmxMonitorSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
+import type {
+  LightingDmxMonitorSnapshot,
+  LightingFixtureCatalogSnapshot,
+  LightingFixtureSnapshot,
+} from "@sse/engine-client";
 
 import { lightingFixtureColorHex } from "../lightingHelpers";
+import { lightingFixtureChannelCount } from "../lightingPatch";
 
 import styles from "./DMXCompactStrip.module.css";
 
@@ -20,6 +25,7 @@ export interface DMXCompactStripProps {
    *  snapshot's `lightName` when available, falling back to fixture lookup
    *  by start address ranges only when the snapshot is stale. */
   fixtures: readonly LightingFixtureSnapshot[];
+  catalog?: LightingFixtureCatalogSnapshot | null;
   /** Bridge reachability — when false, the strip dims and reads "stale" in
    *  the tooltip. */
   bridgeReachable: boolean;
@@ -34,6 +40,7 @@ export interface DMXCompactStripProps {
 }
 
 interface ChannelCell {
+  universe: number;
   channel: number;
   value: number;
   label: string;
@@ -43,19 +50,16 @@ interface ChannelCell {
 }
 
 function lookupFixtureCct(
+  universe: number,
   channel: number,
-  fixtures: readonly LightingFixtureSnapshot[]
+  fixtures: readonly LightingFixtureSnapshot[],
+  catalog: LightingFixtureCatalogSnapshot | null
 ): { cct: number; on: boolean } | null {
-  // Snapshot channels are 1-indexed. Match against fixture.dmxStartAddress
-  // (also 1-indexed). Each fixture occupies dmxStartAddress..+(channelCount-1).
-  // We don't store channelCount on the snapshot; assume 4 (standard for our
-  // fixture types) — the strip's CCT-tinted color is a glance hint, not
-  // load-bearing. If a fixture occupies fewer/more channels the tint just
-  // reads as the closest-fixture's color.
   for (const fixture of fixtures) {
+    if (fixture.universe !== universe) continue;
     if (!fixture.dmxStartAddress || fixture.dmxStartAddress < 1) continue;
     if (channel < fixture.dmxStartAddress) continue;
-    if (channel > fixture.dmxStartAddress + 3) continue; // assume 4-channel
+    if (channel > fixture.dmxStartAddress + lightingFixtureChannelCount(fixture, catalog) - 1) continue;
     return { cct: fixture.cct, on: fixture.on };
   }
   return null;
@@ -75,6 +79,7 @@ function lookupFixtureCct(
 export function DMXCompactStrip({
   snapshot,
   fixtures,
+  catalog = null,
   bridgeReachable,
   universe,
   onOpenMonitor,
@@ -84,6 +89,7 @@ export function DMXCompactStrip({
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
+    universe: number;
     channel: number;
     label: string;
     lightName: string;
@@ -97,22 +103,22 @@ export function DMXCompactStrip({
   // even on unpatched addresses; the full ⌘⇧M monitor still shows the
   // whole 512-channel universe for power users).
   const cells = useMemo<ChannelCell[]>(() => {
-    const includeChannel = new Set<number>();
+    const includeChannel = new Set<string>();
     for (const fixture of fixtures) {
       if (!fixture.dmxStartAddress || fixture.dmxStartAddress < 1) continue;
-      // Assume 4-channel patches (matches our fixture types). The exact
-      // channel count is glance-only — the strip is a meter, not a patch
-      // table.
-      for (let offset = 0; offset < 4; offset += 1) {
-        includeChannel.add(fixture.dmxStartAddress + offset);
+      const count = lightingFixtureChannelCount(fixture, catalog);
+      for (let offset = 0; offset < count; offset += 1) {
+        includeChannel.add(`${fixture.universe}:${fixture.dmxStartAddress + offset}`);
       }
     }
-    const map = new Map<number, ChannelCell>();
+    const map = new Map<string, ChannelCell>();
     for (const channel of snapshot?.channels ?? []) {
+      const key = `${channel.universe}:${channel.channel}`;
       const isFiring = channel.value > 0;
-      if (!includeChannel.has(channel.channel) && !isFiring) continue;
-      const lookup = lookupFixtureCct(channel.channel, fixtures);
-      map.set(channel.channel, {
+      if (!includeChannel.has(key) && !isFiring) continue;
+      const lookup = lookupFixtureCct(channel.universe, channel.channel, fixtures, catalog);
+      map.set(key, {
+        universe: channel.universe,
         channel: channel.channel,
         value: channel.value,
         label: channel.label,
@@ -123,10 +129,14 @@ export function DMXCompactStrip({
     }
     // Backfill any patched channel the snapshot didn't include so the strip
     // shows the full patched footprint even when the bridge is stale.
-    for (const channel of includeChannel) {
-      if (!map.has(channel)) {
-        const lookup = lookupFixtureCct(channel, fixtures);
-        map.set(channel, {
+    for (const key of includeChannel) {
+      if (!map.has(key)) {
+        const [rawUniverse, rawChannel] = key.split(":");
+        const cellUniverse = Number(rawUniverse);
+        const channel = Number(rawChannel);
+        const lookup = lookupFixtureCct(cellUniverse, channel, fixtures, catalog);
+        map.set(key, {
+          universe: cellUniverse,
           channel,
           value: 0,
           label: "",
@@ -136,8 +146,11 @@ export function DMXCompactStrip({
         });
       }
     }
-    return Array.from(map.values()).sort((a, b) => a.channel - b.channel);
-  }, [snapshot, fixtures]);
+    return Array.from(map.values()).sort((a, b) => {
+      const universeDelta = a.universe - b.universe;
+      return universeDelta !== 0 ? universeDelta : a.channel - b.channel;
+    });
+  }, [catalog, snapshot, fixtures]);
 
   // Single rAF loop reads canvas.clientWidth / clientHeight (its actual
   // rendered size from CSS flex layout) on each tick and resizes the
@@ -227,6 +240,7 @@ export function DMXCompactStrip({
       setTooltip({
         x: event.clientX,
         y: event.clientY,
+        universe: cell.universe,
         channel: cell.channel,
         label: cell.label || "—",
         lightName: cell.lightName || "(unpatched)",
@@ -239,11 +253,15 @@ export function DMXCompactStrip({
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
   const address = tooltip ? String(tooltip.channel).padStart(3, "0") : "";
+  const universes = Array.from(new Set(cells.map((cell) => cell.universe))).sort((a, b) => a - b);
+  const universeLabel = universes.length > 0 ? universes.map((entry) => `U${entry}`).join("/") : `U${universe}`;
+  const regionLabel =
+    universes.length === 1 ? `Universe ${universes[0]} compact DMX strip` : `${universeLabel} compact DMX strip`;
 
   return (
-    <div className={styles.shell} role="region" aria-label={`Universe ${universe} compact DMX strip`}>
+    <div className={styles.shell} role="region" aria-label={regionLabel}>
       <span className={styles.label}>
-        DMX <strong>U{universe}</strong>
+        DMX <strong>{universeLabel}</strong>
         <span className={styles.count}>· {cells.length} ch</span>
         {!bridgeReachable ? <span className={styles.stale}> · stale</span> : null}
       </span>
@@ -285,7 +303,9 @@ export function DMXCompactStrip({
           style={{ left: tooltip.x + TOOLTIP_OFFSET_Y, top: tooltip.y - TOOLTIP_OFFSET_Y }}
           role="tooltip"
         >
-          <span className={styles.tooltipChannel}>Ch {address}</span>
+          <span className={styles.tooltipChannel}>
+            U{tooltip.universe} Ch {address}
+          </span>
           <span className={styles.tooltipLight}>{tooltip.lightName}</span>
           <span className={styles.tooltipLabel}>{tooltip.label}</span>
           <span className={styles.tooltipValue}>{tooltip.value}</span>

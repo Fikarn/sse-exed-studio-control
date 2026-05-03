@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import type {
+  LightingFixtureCatalogSnapshot,
   LightingFixtureSnapshot,
   LightingGroupSnapshot,
   LightingPaletteKind,
@@ -34,6 +35,7 @@ export interface LightingInspectorProps {
   onTabChange: (tab: InspectorTab) => void;
 
   fixtures: readonly LightingFixtureSnapshot[];
+  catalog?: LightingFixtureCatalogSnapshot | null;
   groups: readonly LightingGroupSnapshot[];
   scenes: readonly LightingSceneSnapshot[];
   palettes: readonly LightingPaletteSnapshot[];
@@ -59,6 +61,7 @@ export interface LightingInspectorProps {
   onTogglePower: (fixtureId: string, on: boolean) => void;
   onIntensityCommit: (fixtureId: string, intensity: number) => void;
   onCctCommit: (fixtureId: string, cct: number) => void;
+  onControlValuesCommit?: (fixtureId: string, controlValues: Record<string, number>) => void;
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   onPatchCommit: (fixtureId: string, nextStartAddress: number) => void;
   onToggleGroupPower: (groupId: string, on: boolean) => void;
@@ -167,6 +170,7 @@ export function LightingInspector({
   activeTab,
   onTabChange,
   fixtures,
+  catalog = null,
   groups,
   scenes,
   palettes,
@@ -184,6 +188,7 @@ export function LightingInspector({
   onTogglePower,
   onIntensityCommit,
   onCctCommit,
+  onControlValuesCommit,
   onIdentifyBurst,
   onPatchCommit,
   onToggleGroupPower,
@@ -234,7 +239,7 @@ export function LightingInspector({
     [fixtures, selectedGroup]
   );
 
-  const patchOverlapMap = useMemo(() => buildLightingPatchOverlapMap([...fixtures]), [fixtures]);
+  const patchOverlapMap = useMemo(() => buildLightingPatchOverlapMap([...fixtures], catalog), [catalog, fixtures]);
   const patchOverlap = selectedFixture ? (patchOverlapMap.get(selectedFixture.id) ?? null) : null;
   const paletteFixtureIds =
     selectedFixtures && selectedFixtures.length > 0
@@ -302,12 +307,14 @@ export function LightingInspector({
         {activeTab === "fixture" && selectedFixture && (!selectedFixtures || selectedFixtures.length <= 1) ? (
           <InspectorFixture
             fixture={selectedFixture}
+            catalog={catalog}
             groupName={fixtureGroup?.name}
             groups={groups}
             bridgeReachable={bridgeReachable}
             onTogglePower={onTogglePower}
             onIntensityCommit={onIntensityCommit}
             onCctCommit={onCctCommit}
+            onControlValuesCommit={onControlValuesCommit}
             onIdentifyBurst={onIdentifyBurst}
             onDeleteFixture={onDeleteFixture}
             onSpatialCommit={onSpatialCommit}
@@ -379,6 +386,7 @@ export function LightingInspector({
           <InspectorPatch
             fixture={selectedFixture}
             universe={universe}
+            catalog={catalog}
             dmxChannels={dmxChannels}
             dmxStale={dmxStale}
             bridgeReachable={bridgeReachable}

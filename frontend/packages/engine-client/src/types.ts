@@ -8,6 +8,7 @@ import type {
 } from "./generated/protocol";
 import type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
 import type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingDmxMonitorSnapshot";
+import type { LightingFixtureCatalogSnapshot } from "./generated/snapshots/LightingFixtureCatalogSnapshot";
 import type { LightingPaletteKind } from "./generated/snapshots/LightingPaletteKind";
 import type { LightingSnapshot } from "./generated/snapshots/LightingSnapshot";
 import type { PlanningSnapshot } from "./generated/snapshots/PlanningSnapshot";
@@ -119,9 +120,13 @@ export interface LightingFixtureUpdateRequest {
   fixtureId: string;
   name?: string;
   type?: string;
+  definitionId?: string;
+  modeId?: string;
+  universe?: number;
   on?: boolean;
   intensity?: number;
   cct?: number;
+  controlValues?: Record<string, number>;
   dmxStartAddress?: number;
   groupId?: string | null;
   spatialX?: number | null;
@@ -133,7 +138,10 @@ export interface LightingFixtureUpdateRequest {
 
 export interface LightingFixtureCreateRequest {
   name: string;
-  type: string;
+  type?: string;
+  definitionId: string;
+  modeId: string;
+  universe?: number;
   dmxStartAddress: number;
   groupId?: string;
 }
@@ -145,6 +153,7 @@ export interface LightingSceneCreateRequest {
     intensity: number;
     cct: number;
     on: boolean;
+    controlValues?: Record<string, number>;
   }>;
   colorIndex?: number | null;
 }
@@ -215,6 +224,7 @@ export interface FixtureScenario {
   appSnapshot?: JsonObject;
   healthSnapshot?: JsonObject;
   commissioningSnapshot?: JsonObject;
+  lightingFixtureCatalogSnapshot?: JsonObject;
   lightingSnapshot?: JsonObject;
   audioSnapshot?: JsonObject | null;
   planningSnapshot?: JsonObject | null;
@@ -246,6 +256,7 @@ export interface ShellState {
   // native/rust-engine/src/{lighting,audio,planning}). Regenerated via
   // `npm run protocol:generate`.
   lightingSnapshot: LightingSnapshot | null;
+  lightingFixtureCatalogSnapshot: LightingFixtureCatalogSnapshot | null;
   lightingDmxMonitorSnapshot: LightingDmxMonitorSnapshot | null;
   audioSnapshot: AudioSnapshot | null;
   planningSnapshot: PlanningSnapshot | null;

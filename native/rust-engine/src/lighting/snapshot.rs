@@ -210,12 +210,14 @@ pub fn read_lighting_dmx_monitor_snapshot(
     let channel_data = compute_dmx_channel_data(&snapshot);
     let mut channels = Vec::new();
     for fixture in &snapshot.fixtures {
-        let labels = fixture_channel_labels(fixture.fixture_type.as_str());
-        for offset in 0..fixture_channel_count(fixture.fixture_type.as_str()) {
+        let profile = fixture_profile_for_snapshot(fixture);
+        let labels = profile.labels;
+        for offset in 0..profile.channel_count {
             let channel = fixture.dmx_start_address + offset;
             channels.push(LightingDmxChannelSnapshot {
+                universe: fixture.universe,
                 channel,
-                value: *channel_data.get(&channel).unwrap_or(&0),
+                value: *channel_data.get(&(fixture.universe, channel)).unwrap_or(&0),
                 light_name: fixture.name.clone(),
                 label: labels
                     .get(offset as usize)
@@ -224,7 +226,11 @@ pub fn read_lighting_dmx_monitor_snapshot(
             });
         }
     }
-    channels.sort_by(|left, right| left.channel.cmp(&right.channel));
+    channels.sort_by(|left, right| {
+        left.universe
+            .cmp(&right.universe)
+            .then_with(|| left.channel.cmp(&right.channel))
+    });
 
     LightingDmxMonitorSnapshot { channels }
 }
@@ -241,36 +247,64 @@ pub fn build_lighting_health_check(settings: &HashMap<String, String>) -> Lighti
     }
 }
 
-fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<i64, i64> {
+fn compute_dmx_channel_data(snapshot: &LightingSnapshot) -> HashMap<(i64, i64), i64> {
     let mut channel_data = HashMap::new();
     let grand_master = (snapshot.grand_master as f64 / 100.0).clamp(0.0, 1.0);
 
     for fixture in &snapshot.fixtures {
         let address = fixture.dmx_start_address;
+        let profile = fixture_profile_for_snapshot(fixture);
         let dimmer = if fixture.on {
             ((intensity_to_dmx(fixture.intensity) as f64) * grand_master).round() as i64
         } else {
             0
         };
-        let (cct_min, cct_max) = fixture_cct_range(fixture.fixture_type.as_str());
+        let (cct_min, cct_max) = fixture_cct_range_from_profile(&profile);
+        let definition =
+            resolve_fixture_definition(Some(profile.definition_id.as_str()), None, None, "");
+        let mode = resolve_fixture_mode(&definition, Some(profile.mode_id.as_str()));
 
-        channel_data.insert(address, dimmer);
-        channel_data.insert(address + 1, cct_to_dmx(fixture.cct, cct_min, cct_max));
-
-        match fixture_channel_count(fixture.fixture_type.as_str()) {
-            8 => {
-                channel_data.insert(address + 2, 0);
-                channel_data.insert(address + 3, 0);
-                channel_data.insert(address + 4, 0);
-                channel_data.insert(address + 5, 0);
-                channel_data.insert(address + 6, 0);
-                channel_data.insert(address + 7, 0);
-            }
-            4 => {
-                channel_data.insert(address + 2, 0);
-                channel_data.insert(address + 3, 0);
-            }
-            _ => {}
+        for channel in mode.channels {
+            let value = match channel.control_id.as_str() {
+                "intensity" => dimmer,
+                "cct" => cct_to_dmx(fixture.cct, cct_min, cct_max),
+                "red" | "green" | "blue" | "white" | "mix" | "fx" | "speed" | "fan" | "zoom"
+                | "mode" | "trigger" | "control" | "dimming-curve" => fixture
+                    .control_values
+                    .get(channel.control_id.as_str())
+                    .copied()
+                    .unwrap_or(channel.default_dmx)
+                    .clamp(0, 255),
+                "hue" => {
+                    let hue = fixture
+                        .control_values
+                        .get("hue")
+                        .copied()
+                        .unwrap_or(0)
+                        .clamp(0, 359);
+                    ((hue as f64 / 359.0) * 255.0).round() as i64
+                }
+                "saturation" => intensity_to_dmx(
+                    fixture
+                        .control_values
+                        .get("saturation")
+                        .copied()
+                        .unwrap_or(0),
+                ),
+                "green-magenta" => {
+                    let value = fixture
+                        .control_values
+                        .get("green-magenta")
+                        .copied()
+                        .unwrap_or(0)
+                        .clamp(-100, 100);
+                    (((value + 100) as f64 / 200.0) * 255.0).round() as i64
+                }
+                "reserved" => 0,
+                _ if channel.value_type == "fine" => 0,
+                _ => channel.default_dmx,
+            };
+            channel_data.insert((fixture.universe, address + channel.offset - 1), value);
         }
     }
 

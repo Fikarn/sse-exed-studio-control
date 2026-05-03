@@ -232,6 +232,7 @@ fn apply_lighting_palette_preview(
                     intensity: clamp_i64(fixture.intensity, 0, 100),
                     cct: fixture.cct,
                     on: fixture.on,
+                    control_values: fixture.control_values.clone(),
                 });
             apply_palette_to_preview_state(preview_state, fixture, &palette);
             affected_fixtures += 1;

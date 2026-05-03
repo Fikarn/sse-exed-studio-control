@@ -11,6 +11,7 @@ interface MutableFixtureState {
   appSnapshot: JsonObject;
   healthSnapshot: JsonObject;
   commissioningSnapshot: JsonObject;
+  lightingFixtureCatalogSnapshot: JsonObject;
   lightingSnapshot: JsonObject;
   audioSnapshot: JsonObject | null;
   planningSnapshot: JsonObject | null;
@@ -87,6 +88,7 @@ function previewFixturesFromScene(liveFixtures: readonly JsonObject[], scene: Js
     return {
       ...fixture,
       cct: asNumber(nextState.cct, asNumber(fixture.cct, 3200)),
+      controlValues: asRecord(nextState.controlValues) ?? asRecord(fixture.controlValues) ?? {},
       intensity: asNumber(nextState.intensity, asNumber(fixture.intensity, 0)),
       on: asBoolean(nextState.on, asBoolean(fixture.on, false)),
     };
@@ -968,71 +970,758 @@ function buildPlanningTimeReport(state: MutableFixtureState, projectId?: string 
   };
 }
 
-function normalizeFixtureType(value: unknown) {
-  const normalized = asString(value).trim().toLowerCase();
-  switch (normalized) {
+function fixtureControl(
+  id: string,
+  label: string,
+  min: number,
+  max: number,
+  defaultValue: number,
+  unit?: string
+): JsonObject {
+  return {
+    id,
+    label,
+    kind: "slider",
+    valueType: "number",
+    min,
+    max,
+    step: id === "cct" ? 100 : 1,
+    defaultValue,
+    unit: unit ?? null,
+    options: [],
+  };
+}
+
+function fixtureChannel(
+  offset: number,
+  label: string,
+  controlId: string,
+  valueType = "percent",
+  defaultDmx = 0
+): JsonObject {
+  return {
+    offset,
+    label,
+    controlId,
+    valueType,
+    defaultDmx,
+  };
+}
+
+function fixtureMode(
+  id: string,
+  displayName: string,
+  channels: JsonObject[],
+  controls: JsonObject[],
+  capabilities: string[],
+  defaults: Record<string, number> = {}
+): JsonObject {
+  return {
+    id,
+    displayName,
+    channelCount: channels.length,
+    resolution: displayName.includes("16-bit") ? "16-bit" : "8-bit",
+    capabilities,
+    channels,
+    controls,
+    defaults,
+  };
+}
+
+function fixtureDefinition(
+  id: string,
+  manufacturer: string,
+  family: string,
+  model: string,
+  kind: string,
+  defaultModeId: string,
+  modes: JsonObject[],
+  visual: JsonObject,
+  status = "verified"
+): JsonObject {
+  return {
+    id,
+    manufacturer,
+    family,
+    model,
+    displayName: `${family} ${model}`.trim(),
+    status,
+    sourceUrl: manufacturer === "Aputure" ? "https://help.aputure.com/" : "https://www.litepanels.com/",
+    sourceVersion: status === "verified" ? "Fixture transport catalog mirror" : "Profile verification required",
+    sourceDate: "2026-05-03",
+    kind,
+    defaultModeId,
+    modes,
+    visual,
+  };
+}
+
+function noDmxMode() {
+  return fixtureMode("default", "No DMX profile", [], [], [], {});
+}
+
+function repeatedPixelChannels(pixelCount: number, labels: string[]) {
+  const channels: JsonObject[] = [];
+  for (let pixel = 1; pixel <= pixelCount; pixel += 1) {
+    for (const label of labels) {
+      channels.push(
+        fixtureChannel(
+          channels.length + 1,
+          `Px ${pixel} ${label}`,
+          label.toLowerCase().replace(/[ /]/g, "-"),
+          label === "CCT" ? "kelvin" : "percent"
+        )
+      );
+    }
+  }
+  return channels;
+}
+
+function buildDefaultLightingFixtureCatalogSnapshot(): JsonObject {
+  const cctDefaults = (min: number, max: number, cct: number) => ({ intensity: 100, cct, cctMin: min, cctMax: max });
+  const cctControls = (min: number, max: number, cct: number) => [
+    fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
+    fixtureControl("cct", "CCT", min, max, cct, "K"),
+    fixtureControl("green-magenta", "Green/Magenta", -100, 100, 0),
+    fixtureControl("fan", "Fan", 0, 255, 0),
+  ];
+  const hsiControls = (min: number, max: number, cct: number) => [
+    ...cctControls(min, max, cct),
+    fixtureControl("hue", "Hue", 0, 359, 0, "deg"),
+    fixtureControl("saturation", "Saturation", 0, 100, 0, "%"),
+  ];
+  const visual = (
+    shape: string,
+    widthMm: number,
+    heightMm: number,
+    depthMm: number,
+    pixelLayout: JsonObject | null = null
+  ) => ({
+    shape,
+    widthMm,
+    heightMm,
+    depthMm,
+    beamAngleMin: null,
+    beamAngleMax: null,
+    fieldAngle: null,
+    pixelLayout,
+  });
+  const astraMode = fixtureMode(
+    "default",
+    "2 ch Dimmer + CCT",
+    [fixtureChannel(1, "Dimmer", "intensity"), fixtureChannel(2, "CCT", "cct", "kelvin", 68)],
+    [fixtureControl("intensity", "Intensity", 0, 100, 100, "%"), fixtureControl("cct", "CCT", 3200, 5600, 4400, "K")],
+    ["intensity", "cct"],
+    cctDefaults(3200, 5600, 4400)
+  );
+  const definitions = [
+    fixtureDefinition(
+      "litepanels-astra-bicolor",
+      "Litepanels",
+      "Astra",
+      "Bi-Color",
+      "profile",
+      "default",
+      [astraMode],
+      visual("panel", 450, 300, 90)
+    ),
+    fixtureDefinition(
+      "aputure-infinimat-generic",
+      "Aputure",
+      "INFINIMAT",
+      "Generic mat profile",
+      "wash",
+      "default",
+      [
+        fixtureMode(
+          "default",
+          "4 ch Dimmer + CCT + Green/Magenta + Strobe",
+          [
+            fixtureChannel(1, "Dimmer", "intensity"),
+            fixtureChannel(2, "CCT", "cct", "kelvin", 102),
+            fixtureChannel(3, "+/- G/M", "green-magenta", "offset", 127),
+            fixtureChannel(4, "Strobe", "strobe", "range"),
+          ],
+          [
+            fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
+            fixtureControl("cct", "CCT", 2000, 10000, 5600, "K"),
+            fixtureControl("green-magenta", "Green/Magenta", -100, 100, 0),
+            fixtureControl("strobe", "Strobe", 0, 255, 0),
+          ],
+          ["intensity", "cct", "green-magenta", "strobe"],
+          cctDefaults(2000, 10000, 5600)
+        ),
+        fixtureMode(
+          "le-1x4-rgbww-8bit",
+          "1x4 light-engine RGBWW 20 ch",
+          repeatedPixelChannels(4, ["Dimmer", "CCT", "Red", "Green", "Blue"]),
+          [
+            fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
+            fixtureControl("cct", "CCT", 2000, 10000, 5600, "K"),
+          ],
+          ["intensity", "cct", "rgb", "pixel"],
+          cctDefaults(2000, 10000, 5600)
+        ),
+      ],
+      visual("mat", 1220, 305, 80, { pixelCount: 4, rows: 1, columns: 4, segments: 4, order: "row-major" })
+    ),
+    fixtureDefinition(
+      "aputure-infinibar-pb12",
+      "Aputure",
+      "INFINIBAR",
+      "PB12",
+      "practical",
+      "default",
+      [
+        fixtureMode(
+          "default",
+          "8 ch basic RGBWW",
+          [
+            fixtureChannel(1, "Dimmer", "intensity"),
+            fixtureChannel(2, "CCT", "cct", "kelvin", 102),
+            fixtureChannel(3, "Mix", "mix"),
+            fixtureChannel(4, "Red", "red"),
+            fixtureChannel(5, "Green", "green"),
+            fixtureChannel(6, "Blue", "blue"),
+            fixtureChannel(7, "FX", "fx", "range"),
+            fixtureChannel(8, "Speed", "speed", "range"),
+          ],
+          [
+            fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
+            fixtureControl("cct", "CCT", 2000, 10000, 5600, "K"),
+            fixtureControl("red", "Red", 0, 255, 0),
+            fixtureControl("green", "Green", 0, 255, 0),
+            fixtureControl("blue", "Blue", 0, 255, 0),
+            fixtureControl("fx", "FX", 0, 255, 0),
+            fixtureControl("speed", "Speed", 0, 255, 0),
+          ],
+          ["intensity", "cct", "rgb", "fx"],
+          cctDefaults(2000, 10000, 5600)
+        ),
+        fixtureMode(
+          "pixel-rgb-48",
+          "48 px RGB pixel map 144 ch",
+          repeatedPixelChannels(48, ["Red", "Green", "Blue"]),
+          [
+            fixtureControl("red", "Red", 0, 255, 0),
+            fixtureControl("green", "Green", 0, 255, 0),
+            fixtureControl("blue", "Blue", 0, 255, 0),
+          ],
+          ["rgb", "pixel"],
+          { red: 0, green: 0, blue: 0 }
+        ),
+      ],
+      visual("bar", 1200, 45, 45, { pixelCount: 48, rows: 1, columns: 48, segments: 48, order: "left-to-right" })
+    ),
+    fixtureDefinition(
+      "litepanels-apollo-bridge",
+      "Litepanels",
+      "Apollo",
+      "Bridge",
+      "control-node",
+      "default",
+      [noDmxMode()],
+      visual("control-node", 180, 120, 40)
+    ),
+    fixtureDefinition(
+      "aputure-ls-600d-pro",
+      "Aputure",
+      "Light Storm",
+      "LS 600d Pro",
+      "beam",
+      "5ch-fx",
+      [
+        fixtureMode(
+          "5ch-fx",
+          "5 ch Dimmer + FX",
+          [
+            fixtureChannel(1, "Dimmer", "intensity"),
+            fixtureChannel(2, "Mode Selection", "mode", "range"),
+            fixtureChannel(3, "FX Control", "fx", "range"),
+            fixtureChannel(4, "FX Frequency", "speed", "range"),
+            fixtureChannel(5, "FX Trigger", "trigger", "range"),
+          ],
+          [
+            fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
+            fixtureControl("fx", "FX", 0, 255, 0),
+            fixtureControl("speed", "Speed", 0, 255, 0),
+          ],
+          ["intensity", "fx"],
+          cctDefaults(5600, 5600, 5600)
+        ),
+      ],
+      visual("fresnel", 335, 338, 557)
+    ),
+    fixtureDefinition(
+      "aputure-storm-80c",
+      "Aputure",
+      "STORM",
+      "80c",
+      "beam",
+      "cct-rgb-8bit-7ch",
+      [
+        fixtureMode(
+          "cct-rgb-8bit-7ch",
+          "CCT & RGB 8-bit 7 ch",
+          [
+            fixtureChannel(1, "Dimmer", "intensity"),
+            fixtureChannel(2, "CCT", "cct", "kelvin", 49),
+            fixtureChannel(3, "+/- Green", "green-magenta", "offset", 127),
+            fixtureChannel(4, "Red", "red"),
+            fixtureChannel(5, "Green", "green"),
+            fixtureChannel(6, "Blue", "blue"),
+            fixtureChannel(7, "Color Crossfade", "mix"),
+          ],
+          hsiControls(1800, 20000, 5600),
+          ["intensity", "cct", "rgb", "green-magenta"],
+          cctDefaults(1800, 20000, 5600)
+        ),
+        fixtureMode(
+          "hsic-control-16bit-13ch",
+          "Limited HSIC+ Control 16-bit 13 ch",
+          [
+            fixtureChannel(1, "Dimmer coarse", "intensity"),
+            fixtureChannel(2, "Dimmer fine", "intensity", "fine"),
+            fixtureChannel(3, "Hue coarse", "hue", "degrees"),
+            fixtureChannel(4, "Hue fine", "hue", "fine"),
+            fixtureChannel(5, "Saturation coarse", "saturation"),
+            fixtureChannel(6, "Saturation fine", "saturation", "fine"),
+            fixtureChannel(7, "CCT coarse", "cct", "kelvin", 49),
+            fixtureChannel(8, "CCT fine", "cct", "fine"),
+            fixtureChannel(9, "+/- Green coarse", "green-magenta", "offset", 127),
+            fixtureChannel(10, "+/- Green fine", "green-magenta", "fine"),
+            fixtureChannel(11, "Control", "control", "range"),
+            fixtureChannel(12, "Fan", "fan", "range"),
+            fixtureChannel(13, "Dimming Curve", "dimming-curve", "range"),
+          ],
+          hsiControls(1800, 20000, 5600),
+          ["intensity", "hsi", "cct", "green-magenta", "control"],
+          cctDefaults(1800, 20000, 5600)
+        ),
+      ],
+      visual("fresnel", 167, 225, 147)
+    ),
+    fixtureDefinition(
+      "aputure-storm-1200x",
+      "Aputure",
+      "STORM",
+      "1200x",
+      "beam",
+      "cct-plus-8bit-3ch",
+      [
+        fixtureMode(
+          "cct-plus-8bit-3ch",
+          "CCT+ 8-bit 3 ch",
+          [
+            fixtureChannel(1, "Dimmer", "intensity"),
+            fixtureChannel(2, "CCT", "cct", "kelvin", 91),
+            fixtureChannel(3, "+/- Green", "green-magenta", "offset", 127),
+          ],
+          cctControls(2500, 10000, 5600),
+          ["intensity", "cct", "green-magenta"],
+          cctDefaults(2500, 10000, 5600)
+        ),
+      ],
+      visual("fresnel", 335, 338, 557)
+    ),
+    fixtureDefinition(
+      "litepanels-astra-ip",
+      "Litepanels",
+      "Astra IP",
+      "Astra IP",
+      "profile",
+      "p02-cct-8bit",
+      [
+        fixtureMode(
+          "p01-cct-rgbw-8bit",
+          "P01 CCT & RGBW 8-bit 12 ch",
+          Array.from({ length: 12 }, (_, index) =>
+            fixtureChannel(
+              index + 1,
+              [
+                "Dimmer",
+                "CCT",
+                "Green Offset",
+                "White/RGB Crossfade",
+                "Red",
+                "Green",
+                "Blue",
+                "White",
+                "Fan",
+                "Reserved",
+                "Reserved",
+                "Reserved",
+              ][index]!,
+              [
+                "intensity",
+                "cct",
+                "green-magenta",
+                "mix",
+                "red",
+                "green",
+                "blue",
+                "white",
+                "fan",
+                "reserved",
+                "reserved",
+                "reserved",
+              ][index]!
+            )
+          ),
+          cctControls(2700, 6500, 3200),
+          ["intensity", "cct", "rgb", "fan"],
+          cctDefaults(2700, 6500, 3200)
+        ),
+        fixtureMode(
+          "p02-cct-8bit",
+          "P02 CCT 8-bit 6 ch",
+          Array.from({ length: 6 }, (_, index) =>
+            fixtureChannel(
+              index + 1,
+              ["Dimmer", "CCT", "Green Offset", "Reserved", "DMX Mode Control", "Fan"][index]!,
+              ["intensity", "cct", "green-magenta", "reserved", "mode", "fan"][index]!
+            )
+          ),
+          cctControls(2700, 6500, 3200),
+          ["intensity", "cct", "green-magenta", "fan"],
+          cctDefaults(2700, 6500, 3200)
+        ),
+      ],
+      visual("panel", 450, 300, 110)
+    ),
+    ...["1x1", "2x1"].map((model) =>
+      fixtureDefinition(
+        `litepanels-gemini-${model}`,
+        "Litepanels",
+        "Gemini",
+        model,
+        "wash",
+        "p02-cct-8bit",
+        [
+          fixtureMode(
+            "p02-cct-8bit",
+            "P02 CCT 8-bit 6 ch",
+            Array.from({ length: 6 }, (_, index) =>
+              fixtureChannel(
+                index + 1,
+                ["Dimmer", "CCT", "Green Offset", "Reserved", "DMX Mode Control", "Fan"][index]!,
+                ["intensity", "cct", "green-magenta", "reserved", "mode", "fan"][index]!
+              )
+            ),
+            cctControls(2700, 10000, 3200),
+            ["intensity", "cct", "green-magenta", "fan"],
+            cctDefaults(2700, 10000, 3200)
+          ),
+          fixtureMode(
+            "p03-cct-hsi-8bit",
+            "P03 CCT & HSI 8-bit 10 ch",
+            Array.from({ length: 10 }, (_, index) =>
+              fixtureChannel(
+                index + 1,
+                [
+                  "Dimmer",
+                  "CCT",
+                  "Green Offset",
+                  "White/HSI Crossfade",
+                  "Hue",
+                  "Saturation",
+                  "Fan",
+                  "Reserved",
+                  "Reserved",
+                  "Reserved",
+                ][index]!,
+                [
+                  "intensity",
+                  "cct",
+                  "green-magenta",
+                  "mix",
+                  "hue",
+                  "saturation",
+                  "fan",
+                  "reserved",
+                  "reserved",
+                  "reserved",
+                ][index]!
+              )
+            ),
+            hsiControls(2700, 10000, 3200),
+            ["intensity", "cct", "hsi", "green-magenta", "fan"],
+            cctDefaults(2700, 10000, 3200)
+          ),
+          fixtureMode(
+            "p07-cct-16bit",
+            "P07 CCT 16-bit 8 ch",
+            Array.from({ length: 8 }, (_, index) =>
+              fixtureChannel(
+                index + 1,
+                [
+                  "Dimmer coarse",
+                  "Dimmer fine",
+                  "CCT coarse",
+                  "CCT fine",
+                  "Green Offset coarse",
+                  "Green Offset fine",
+                  "DMX Mode Control",
+                  "Fan",
+                ][index]!,
+                ["intensity", "intensity", "cct", "cct", "green-magenta", "green-magenta", "mode", "fan"][index]!
+              )
+            ),
+            cctControls(2700, 10000, 3200),
+            ["intensity", "cct", "green-magenta", "fan"],
+            cctDefaults(2700, 10000, 3200)
+          ),
+          fixtureMode(
+            "p08-cct-hsi-16bit",
+            "P08 CCT & HSI 16-bit 16 ch",
+            Array.from({ length: 16 }, (_, index) =>
+              fixtureChannel(
+                index + 1,
+                `Channel ${index + 1}`,
+                [
+                  "intensity",
+                  "intensity",
+                  "cct",
+                  "cct",
+                  "green-magenta",
+                  "green-magenta",
+                  "mix",
+                  "mix",
+                  "hue",
+                  "hue",
+                  "saturation",
+                  "saturation",
+                  "fan",
+                  "reserved",
+                  "reserved",
+                  "reserved",
+                ][index]!
+              )
+            ),
+            hsiControls(2700, 10000, 3200),
+            ["intensity", "cct", "hsi", "green-magenta", "fan"],
+            cctDefaults(2700, 10000, 3200)
+          ),
+        ],
+        visual("panel", 635, 305, 150)
+      )
+    ),
+    fixtureDefinition(
+      "litepanels-studio-x-bicolor",
+      "Litepanels",
+      "Studio X",
+      "Bi-Color",
+      "profile",
+      "bicolor-8bit",
+      [
+        fixtureMode(
+          "bicolor-8bit",
+          "Bi-Color 8-bit 3 ch",
+          [
+            fixtureChannel(1, "Dimmer", "intensity"),
+            fixtureChannel(2, "CCT", "cct", "kelvin", 60),
+            fixtureChannel(3, "Spot/Flood", "zoom"),
+          ],
+          [
+            fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
+            fixtureControl("cct", "CCT", 2700, 6500, 3200, "K"),
+            fixtureControl("zoom", "Spot/Flood", 0, 100, 0, "%"),
+          ],
+          ["intensity", "cct", "zoom"],
+          cctDefaults(2700, 6500, 3200)
+        ),
+        fixtureMode(
+          "bicolor-16bit",
+          "Bi-Color 16-bit 6 ch",
+          Array.from({ length: 6 }, (_, index) =>
+            fixtureChannel(
+              index + 1,
+              ["Dimmer coarse", "Dimmer fine", "CCT coarse", "CCT fine", "Spot/Flood coarse", "Spot/Flood fine"][
+                index
+              ]!,
+              ["intensity", "intensity", "cct", "cct", "zoom", "zoom"][index]!
+            )
+          ),
+          [
+            fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
+            fixtureControl("cct", "CCT", 2700, 6500, 3200, "K"),
+            fixtureControl("zoom", "Spot/Flood", 0, 100, 0, "%"),
+          ],
+          ["intensity", "cct", "zoom"],
+          cctDefaults(2700, 6500, 3200)
+        ),
+      ],
+      visual("fresnel", 300, 300, 420)
+    ),
+    ...[
+      ["aputure-ls-600d", "Aputure", "Light Storm", "LS 600d", "beam"],
+      ["aputure-ls-600x-pro", "Aputure", "Light Storm", "LS 600x Pro", "beam"],
+      ["aputure-ls-600c-pro", "Aputure", "Light Storm", "LS 600c Pro", "beam"],
+      ["aputure-ls-1200d-pro", "Aputure", "Light Storm", "LS 1200d Pro", "beam"],
+      ["aputure-storm-1000c", "Aputure", "STORM", "1000c", "beam"],
+      ["aputure-electro-storm-cs15", "Aputure", "Electro Storm", "CS15", "beam"],
+      ["aputure-electro-storm-xt26", "Aputure", "Electro Storm", "XT26", "beam"],
+      ["aputure-nova-p300c", "Aputure", "NOVA", "P300c", "panel"],
+      ["aputure-nova-p600c", "Aputure", "NOVA", "P600c", "panel"],
+      ["aputure-nova-ii", "Aputure", "NOVA II", "Series", "panel"],
+      ["aputure-nova-9", "Aputure", "NOVA", "9", "panel"],
+      ["litepanels-astra-ip-half", "Litepanels", "Astra IP", "Half", "profile"],
+      ["litepanels-astra-ip-2x1", "Litepanels", "Astra IP", "2x1", "profile"],
+      ["litepanels-studio-x-daylight", "Litepanels", "Studio X", "Daylight", "profile"],
+    ].map(([id, manufacturer, family, model, kind]) =>
+      fixtureDefinition(
+        id!,
+        manufacturer!,
+        family!,
+        model!,
+        kind!,
+        "default",
+        [noDmxMode()],
+        visual(kind === "panel" ? "panel" : "fresnel", 300, 300, 150),
+        "research-needed"
+      )
+    ),
+  ];
+
+  return { definitions };
+}
+
+function catalogDefinitions(catalog?: JsonObject | null): JsonObject[] {
+  return asArray((catalog ?? DEFAULT_LIGHTING_FIXTURE_CATALOG).definitions)
+    .map((definition) => asRecord(definition))
+    .filter((definition): definition is JsonObject => definition !== null);
+}
+
+function resolveFixtureAlias(value: unknown): string | null {
+  const cleaned = asString(value).trim().toLowerCase().replace(/[_ ]+/g, "-");
+  switch (cleaned) {
     case "astra":
-    case "astra bi-color":
+    case "astra-bi-color":
     case "astra-bicolor":
-      return "astra-bicolor";
+    case "litepanels-astra":
+      return "litepanels-astra-bicolor";
     case "infinimat":
-      return "infinimat";
+    case "aputure-infinimat":
+      return "aputure-infinimat-generic";
     case "infinibar":
-    case "infinibar pb12":
     case "infinibar-pb12":
+    case "aputure-infinibar-pb12":
+      return "aputure-infinibar-pb12";
+    case "apollo-bridge":
+    case "litepanels-apollo":
+    case "litepanels-apollo-bridge":
+      return "litepanels-apollo-bridge";
+    default:
+      return cleaned || null;
+  }
+}
+
+function fixtureTypeForDefinition(definitionId: string) {
+  switch (definitionId) {
+    case "litepanels-astra-bicolor":
+      return "astra-bicolor";
+    case "aputure-infinimat-generic":
+      return "infinimat";
+    case "aputure-infinibar-pb12":
       return "infinibar-pb12";
+    case "litepanels-apollo-bridge":
+      return "Apollo Bridge";
     default:
-      return normalized;
+      return definitionId;
   }
 }
 
-function lightingFixtureChannelCount(fixtureType: string) {
-  switch (fixtureType) {
-    case "infinimat":
-      return 4;
-    case "infinibar-pb12":
-      return 8;
-    default:
-      return 2;
-  }
+function fixtureDefinitionByIdentity(
+  catalog: JsonObject | null | undefined,
+  definitionId?: unknown,
+  fixtureType?: unknown,
+  kind?: unknown
+) {
+  const definitions = catalogDefinitions(catalog);
+  const aliases = [
+    asString(definitionId).trim().toLowerCase(),
+    resolveFixtureAlias(fixtureType),
+    resolveFixtureAlias(kind),
+  ].filter(Boolean);
+  return (
+    definitions.find((definition) => aliases.includes(asString(definition.id))) ??
+    definitions.find((definition) => asString(definition.id) === "litepanels-astra-bicolor") ??
+    definitions[0] ??
+    null
+  );
 }
 
-function lightingFixtureMaxStartAddress(fixtureType: string) {
-  return 512 - lightingFixtureChannelCount(fixtureType) + 1;
+function fixtureDefinitionSelectable(definition: JsonObject | null) {
+  return asString(definition?.status) === "verified" && asString(definition?.kind) !== "control-node";
 }
 
-function lightingFixtureChannelLabels(fixtureType: string) {
-  switch (fixtureType) {
-    case "astra-bicolor":
-      return ["Dimmer", "CCT"];
-    case "infinimat":
-      return ["Dimmer", "CCT", "±G/M", "Strobe"];
-    case "infinibar-pb12":
-      return ["Dimmer", "CCT", "Mix", "Red", "Green", "Blue", "FX", "Speed"];
-    default:
-      return [];
-  }
+function fixtureModeForDefinition(definition: JsonObject | null, modeId?: unknown): JsonObject | null {
+  const modes = asArray(definition?.modes)
+    .map((mode) => asRecord(mode))
+    .filter((mode): mode is JsonObject => mode !== null);
+  const requested = asString(modeId).trim();
+  return (
+    modes.find((mode) => asString(mode.id) === requested) ??
+    modes.find((mode) => asString(mode.id) === asString(definition?.defaultModeId)) ??
+    modes[0] ??
+    null
+  );
 }
 
-function lightingFixtureCctRange(fixtureType: string) {
-  switch (fixtureType) {
-    case "infinimat":
-    case "infinibar-pb12":
-      return { max: 10_000, min: 2_000 };
-    default:
-      return { max: 5_600, min: 3_200 };
-  }
+function normalizeFixtureType(value: unknown) {
+  const definition = fixtureDefinitionByIdentity(DEFAULT_LIGHTING_FIXTURE_CATALOG, undefined, value);
+  return definition ? fixtureTypeForDefinition(asString(definition.id)) : asString(value).trim().toLowerCase();
 }
 
-function defaultLightingFixtureCct(fixtureType: string) {
-  switch (fixtureType) {
-    case "infinimat":
-    case "infinibar-pb12":
-      return 5_600;
-    default:
-      return 4_400;
-  }
+function fixtureProfileForFixture(fixture: JsonObject, catalog: JsonObject | null = DEFAULT_LIGHTING_FIXTURE_CATALOG) {
+  const definition = fixtureDefinitionByIdentity(catalog, fixture.definitionId, fixture.type, fixture.kind);
+  const mode = fixtureModeForDefinition(definition, fixture.modeId);
+  return {
+    definition,
+    mode,
+    definitionId: asString(definition?.id, "litepanels-astra-bicolor"),
+    modeId: asString(mode?.id, "default"),
+    fixtureType: fixtureTypeForDefinition(asString(definition?.id, "litepanels-astra-bicolor")),
+    kind: asString(definition?.kind, "profile"),
+    channelCount: asNumber(mode?.channelCount, asArray(mode?.channels).length),
+    channels: asArray(mode?.channels)
+      .map((channel) => asRecord(channel))
+      .filter((channel): channel is JsonObject => channel !== null),
+    controls: asArray(mode?.controls)
+      .map((control) => asRecord(control))
+      .filter((control): control is JsonObject => control !== null),
+    defaults: asRecord(mode?.defaults) ?? {},
+  };
 }
+
+function lightingFixtureChannelCount(fixture: string | JsonObject) {
+  if (typeof fixture === "string") {
+    return fixtureProfileForFixture({ type: fixture }).channelCount;
+  }
+  return fixtureProfileForFixture(fixture).channelCount;
+}
+
+function lightingFixtureMaxStartAddress(fixture: string | JsonObject) {
+  const channelCount = lightingFixtureChannelCount(fixture);
+  return channelCount <= 0 ? 0 : 512 - channelCount + 1;
+}
+
+function lightingFixtureCctRange(fixture: string | JsonObject) {
+  const profile =
+    typeof fixture === "string" ? fixtureProfileForFixture({ type: fixture }) : fixtureProfileForFixture(fixture);
+  return {
+    max: asNumber(profile.defaults.cctMax, profile.channelCount > 0 ? 5600 : 0),
+    min: asNumber(profile.defaults.cctMin, profile.channelCount > 0 ? 3200 : 0),
+  };
+}
+
+function defaultLightingFixtureCct(fixture: string | JsonObject) {
+  const profile =
+    typeof fixture === "string" ? fixtureProfileForFixture({ type: fixture }) : fixtureProfileForFixture(fixture);
+  return asNumber(profile.defaults.cct, profile.channelCount > 0 ? 5600 : 0);
+}
+
+const DEFAULT_LIGHTING_FIXTURE_CATALOG = buildDefaultLightingFixtureCatalogSnapshot();
 
 function defaultLightingPalettes(): JsonObject[] {
   return [
@@ -1126,7 +1815,69 @@ function intensityToDmx(percent: number) {
 
 function cctToDmx(kelvin: number, min: number, max: number) {
   const clamped = clampNumber(kelvin, min, max);
+  if (max <= min) return 0;
   return Math.round(((clamped - min) / (max - min)) * 255);
+}
+
+function asNumberRecord(value: unknown): Record<string, number> {
+  const record = asRecord(value);
+  if (!record) return {};
+  return Object.fromEntries(
+    Object.entries(record).flatMap(([key, entry]) => {
+      const numeric = asNumber(entry, NaN);
+      return Number.isFinite(numeric) ? [[key, numeric]] : [];
+    })
+  );
+}
+
+function normalizeControlValues(
+  fixture: JsonObject,
+  profile = fixtureProfileForFixture(fixture)
+): Record<string, number> {
+  const current = asNumberRecord(fixture.controlValues);
+  const values: Record<string, number> = {};
+  for (const control of profile.controls) {
+    const id = asString(control.id);
+    if (!id || id === "intensity" || id === "cct") continue;
+    values[id] = clampNumber(
+      Math.round(current[id] ?? asNumber(control.defaultValue, 0)),
+      asNumber(control.min, 0),
+      asNumber(control.max, 255)
+    );
+  }
+  values.intensity = clampNumber(Math.round(asNumber(fixture.intensity, 0)), 0, 100);
+  if (profile.channels.some((channel) => asString(channel.controlId) === "cct")) {
+    const range = lightingFixtureCctRange(fixture);
+    values.cct = clampNumber(
+      Math.round(asNumber(fixture.cct, defaultLightingFixtureCct(fixture))),
+      range.min,
+      range.max
+    );
+  }
+  return values;
+}
+
+function dmxValueForControl(
+  controlId: string,
+  valueType: string,
+  fixture: JsonObject,
+  profile: ReturnType<typeof fixtureProfileForFixture>,
+  grandMaster: number
+) {
+  const controlValues = normalizeControlValues(fixture, profile);
+  switch (controlId) {
+    case "intensity":
+      return asBoolean(fixture.on, false) ? Math.round(intensityToDmx(controlValues.intensity ?? 0) * grandMaster) : 0;
+    case "cct": {
+      const range = lightingFixtureCctRange(fixture);
+      return cctToDmx(controlValues.cct ?? defaultLightingFixtureCct(fixture), range.min, range.max);
+    }
+    case "green-magenta":
+      return (Math.round(clampNumber(controlValues["green-magenta"] ?? 0, -100, 100) + 100) * 255) / 200;
+    default:
+      if (valueType === "fine") return 0;
+      return clampNumber(Math.round(controlValues[controlId] ?? asNumber(profile.defaults[controlId], 0)), 0, 255);
+  }
 }
 
 function buildLightingDmxMonitorSnapshot(lightingSnapshot: JsonObject | null): JsonObject {
@@ -1137,34 +1888,33 @@ function buildLightingDmxMonitorSnapshot(lightingSnapshot: JsonObject | null): J
   const channels: JsonObject[] = [];
 
   for (const fixture of fixtures) {
-    const fixtureType = normalizeFixtureType(fixture.type);
-    const channelCount = lightingFixtureChannelCount(fixtureType);
-    const labels = lightingFixtureChannelLabels(fixtureType);
+    const profile = fixtureProfileForFixture(fixture);
+    const channelCount = profile.channelCount;
     const startAddress = asNumber(fixture.dmxStartAddress, 1);
-    const dimmer = asBoolean(fixture.on, false)
-      ? Math.round(intensityToDmx(asNumber(fixture.intensity, 0)) * grandMaster)
-      : 0;
-    const cctRange = lightingFixtureCctRange(fixtureType);
+    if (channelCount <= 0 || startAddress <= 0) continue;
+    const universe = asNumber(fixture.universe, asNumber(lightingSnapshot?.universe, 1));
 
     for (let offset = 0; offset < channelCount; offset += 1) {
       const channel = startAddress + offset;
-      let value = 0;
-      if (offset === 0) {
-        value = dimmer;
-      } else if (offset === 1) {
-        value = cctToDmx(asNumber(fixture.cct, 3200), cctRange.min, cctRange.max);
-      }
+      const catalogChannel = profile.channels[offset] ?? {};
+      const controlId = asString(catalogChannel.controlId, "reserved");
+      const valueType = asString(catalogChannel.valueType, "range");
+      const value = dmxValueForControl(controlId, valueType, fixture, profile, grandMaster);
 
       channels.push({
+        universe,
         channel,
-        label: labels[offset] ?? `Ch${offset + 1}`,
+        label: asString(catalogChannel.label, `Ch${offset + 1}`),
         lightName: asString(fixture.name, asString(fixture.id, "Fixture")),
-        value,
+        value: Math.round(clampNumber(value, 0, 255)),
       });
     }
   }
 
-  channels.sort((left, right) => asNumber(left.channel, 0) - asNumber(right.channel, 0));
+  channels.sort((left, right) => {
+    const universeDelta = asNumber(left.universe, 1) - asNumber(right.universe, 1);
+    return universeDelta !== 0 ? universeDelta : asNumber(left.channel, 0) - asNumber(right.channel, 0);
+  });
   return { channels };
 }
 
@@ -1184,17 +1934,6 @@ function buildLightingFixtureUpdateSummary(fixture: JsonObject) {
   const groupId = asString(fixture.groupId).trim();
 
   return `Lighting fixture '${asString(fixture.name, "Fixture")}' (${asString(fixture.type, "fixture")}, DMX ${asNumber(fixture.dmxStartAddress, 0)}) saved as ${asBoolean(fixture.on, false) ? "on" : "off"} at ${asNumber(fixture.intensity, 0)}% / ${asNumber(fixture.cct, 3200)}K in ${groupId || "ungrouped"} with ${spatialSummary}, ${rigZSummary}, beam ${Math.round(beamAngle)}deg, and ${effectSummary}.`;
-}
-
-function lightingFixtureKindForType(fixtureType: string) {
-  switch (fixtureType) {
-    case "infinimat":
-      return "wash";
-    case "infinibar-pb12":
-      return "practical";
-    default:
-      return "profile";
-  }
 }
 
 function nextCustomFixtureId(fixtures: JsonObject[]) {
@@ -1247,6 +1986,47 @@ function synchronizeLightingGroupCounts(lightingSnapshot: JsonObject) {
   }));
 }
 
+function normalizeLightingFixtureSnapshotEntry(fixture: JsonObject, fallbackUniverse: number): JsonObject {
+  const profile = fixtureProfileForFixture(fixture);
+  const cctRange = lightingFixtureCctRange(fixture);
+  const defaultCct = defaultLightingFixtureCct(fixture);
+  const channelCount = profile.channelCount;
+  const normalizedStart =
+    channelCount <= 0 ? 0 : clampNumber(Math.round(asNumber(fixture.dmxStartAddress, 1)), 1, 512 - channelCount + 1);
+  const normalizedFixture: JsonObject = {
+    ...fixture,
+    type: profile.fixtureType,
+    definitionId: profile.definitionId,
+    modeId: profile.modeId,
+    universe: Math.max(1, Math.round(asNumber(fixture.universe, fallbackUniverse))),
+    dmxStartAddress: normalizedStart,
+    kind: profile.kind,
+    groupId: typeof fixture.groupId === "string" && fixture.groupId.trim() ? fixture.groupId : null,
+    spatialX: typeof fixture.spatialX === "number" ? clampNumber(fixture.spatialX, 0, 1) : null,
+    spatialY: typeof fixture.spatialY === "number" ? clampNumber(fixture.spatialY, 0, 1) : null,
+    spatialRotation: asNumber(fixture.spatialRotation, 0),
+    rigZ: typeof fixture.rigZ === "number" ? clampNumber(fixture.rigZ, 0, 20) : null,
+    beamAngleDegrees:
+      typeof fixture.beamAngleDegrees === "number" ? clampNumber(fixture.beamAngleDegrees, 1, 180) : null,
+    on: asBoolean(fixture.on, false),
+    intensity: clampNumber(Math.round(asNumber(fixture.intensity, 0)), 0, 100),
+    cct: clampNumber(Math.round(asNumber(fixture.cct, defaultCct)), cctRange.min, cctRange.max),
+    effect: asRecord(fixture.effect),
+  };
+  normalizedFixture.controlValues = normalizeControlValues(normalizedFixture, profile);
+  return normalizedFixture;
+}
+
+function sceneFixtureStateFromFixture(fixture: JsonObject): JsonObject {
+  return {
+    fixtureId: asString(fixture.id),
+    intensity: asNumber(fixture.intensity, 0),
+    cct: asNumber(fixture.cct, 3200),
+    on: asBoolean(fixture.on, false),
+    controlValues: asRecord(fixture.controlValues) ?? {},
+  };
+}
+
 function createMutableFixtureState(scenario: FixtureScenario): MutableFixtureState {
   const scenarioAudioSnapshot = asRecord(scenario.audioSnapshot);
 
@@ -1254,6 +2034,9 @@ function createMutableFixtureState(scenario: FixtureScenario): MutableFixtureSta
     appSnapshot: cloneJson((scenario.appSnapshot ?? {}) as JsonObject),
     healthSnapshot: cloneJson((scenario.healthSnapshot ?? {}) as JsonObject),
     commissioningSnapshot: cloneJson((scenario.commissioningSnapshot ?? {}) as JsonObject),
+    lightingFixtureCatalogSnapshot: cloneJson(
+      (scenario.lightingFixtureCatalogSnapshot ?? DEFAULT_LIGHTING_FIXTURE_CATALOG) as JsonObject
+    ),
     lightingSnapshot: cloneJson((scenario.lightingSnapshot ?? buildDefaultLightingSnapshot()) as JsonObject),
     audioSnapshot:
       "audioSnapshot" in scenario
@@ -1626,9 +2409,29 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     typeof lightingSnapshot.lastActionCode === "string" ? lightingSnapshot.lastActionCode : null;
   lightingSnapshot.lastActionMessage =
     typeof lightingSnapshot.lastActionMessage === "string" ? lightingSnapshot.lastActionMessage : null;
-  lightingSnapshot.fixtures = asArray(lightingSnapshot.fixtures);
+  lightingSnapshot.fixtures = asArray(lightingSnapshot.fixtures)
+    .map((fixture) => asRecord(fixture))
+    .filter((fixture): fixture is JsonObject => fixture !== null)
+    .map((fixture) => normalizeLightingFixtureSnapshotEntry(fixture, asNumber(lightingSnapshot.universe, 1)));
+  lightingSnapshot.previewFixtures = asArray(lightingSnapshot.previewFixtures)
+    .map((fixture) => asRecord(fixture))
+    .filter((fixture): fixture is JsonObject => fixture !== null)
+    .map((fixture) => normalizeLightingFixtureSnapshotEntry(fixture, asNumber(lightingSnapshot.universe, 1)));
   lightingSnapshot.groups = asArray(lightingSnapshot.groups);
-  lightingSnapshot.scenes = asArray(lightingSnapshot.scenes);
+  lightingSnapshot.scenes = asArray(lightingSnapshot.scenes).map((scene) => {
+    const sceneRecord = asRecord(scene);
+    if (!sceneRecord) return scene;
+    return {
+      ...sceneRecord,
+      fixtureStates: asArray(sceneRecord.fixtureStates)
+        .map((fixtureState) => asRecord(fixtureState))
+        .filter((fixtureState): fixtureState is JsonObject => fixtureState !== null)
+        .map((fixtureState) => ({
+          ...fixtureState,
+          controlValues: asRecord(fixtureState.controlValues) ?? {},
+        })),
+    };
+  });
   lightingSnapshot.palettes = Object.prototype.hasOwnProperty.call(lightingSnapshot, "palettes")
     ? lightingPalettes(lightingSnapshot)
         .flatMap((palette): JsonObject[] => {
@@ -1886,6 +2689,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         return cloneJson(state.commissioningSnapshot);
       case "lighting.snapshot":
         return cloneJson(state.lightingSnapshot);
+      case "lighting.fixtureCatalog.snapshot":
+        return cloneJson(state.lightingFixtureCatalogSnapshot);
       case "lighting.dmxMonitor.snapshot":
         return buildLightingDmxMonitorSnapshot(asRecord(state.lightingSnapshot));
       case "lighting.editor.previewMode": {
@@ -2597,6 +3402,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           return {
             ...fixture,
             cct: asNumber(nextState.cct, asNumber(fixture.cct, 3200)),
+            controlValues: asRecord(nextState.controlValues) ?? asRecord(fixture.controlValues) ?? {},
             intensity: asNumber(nextState.intensity, asNumber(fixture.intensity, 0)),
             on: asBoolean(nextState.on, asBoolean(fixture.on, false)),
           };
@@ -2665,6 +3471,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
                 intensity: Math.round(intensity),
                 cct: Math.round(cct),
                 on: asBoolean(fixtureState.on, false),
+                controlValues: asRecord(fixtureState.controlValues) ?? {},
               };
             })
           : null;
@@ -2692,14 +3499,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           id: nextCustomSceneId(scenes),
           name,
           fixtureCount: explicitFixtureStates?.length ?? fixtures.length,
-          fixtureStates:
-            explicitFixtureStates ??
-            fixtures.map((fixture) => ({
-              fixtureId: asString(fixture.id),
-              intensity: asNumber(fixture.intensity, 0),
-              cct: asNumber(fixture.cct, 3200),
-              on: asBoolean(fixture.on, false),
-            })),
+          fixtureStates: explicitFixtureStates ?? fixtures.map((fixture) => sceneFixtureStateFromFixture(fixture)),
           lastRecalled: false,
           lastRecalledAt: null,
           colorIndex,
@@ -2758,12 +3558,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error("name must not be empty");
         }
         const nextFixtureStates = hasCapture
-          ? fixtures.map((fixture) => ({
-              fixtureId: asString(fixture.id),
-              intensity: asNumber(fixture.intensity, 0),
-              cct: asNumber(fixture.cct, 3200),
-              on: asBoolean(fixture.on, false),
-            }))
+          ? fixtures.map((fixture) => sceneFixtureStateFromFixture(fixture))
           : asArray(targetScene.fixtureStates);
         let nextColorIndex: number | null = (targetScene.colorIndex as number | null | undefined) ?? null;
         if (hasColor) {
@@ -2926,17 +3721,33 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error("name is required");
         }
 
-        const normalizedFixtureType = normalizeFixtureType(params.type);
-        if (!normalizedFixtureType) {
-          throw new Error("type is required");
+        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+        const definition = fixtureDefinitionByIdentity(
+          state.lightingFixtureCatalogSnapshot,
+          params.definitionId,
+          params.type
+        );
+        if (!definition || !fixtureDefinitionSelectable(definition)) {
+          throw new Error("definitionId or type must resolve to a selectable verified fixture catalog entry");
         }
+        const mode = fixtureModeForDefinition(definition, params.modeId);
+        if (!mode) {
+          throw new Error("modeId must resolve to a fixture catalog mode");
+        }
+        const normalizedFixtureType = fixtureTypeForDefinition(asString(definition.id));
+        const fixtureProfileSeed = {
+          type: normalizedFixtureType,
+          definitionId: asString(definition.id),
+          modeId: asString(mode.id),
+        };
+        const profile = fixtureProfileForFixture(fixtureProfileSeed, state.lightingFixtureCatalogSnapshot);
+        const universe = Math.max(1, Math.round(asNumber(params.universe, asNumber(lightingSnapshot?.universe, 1))));
 
         const requestedStartAddress = Math.round(asNumber(params.dmxStartAddress, Number.NaN));
         if (!Number.isFinite(requestedStartAddress)) {
           throw new Error("dmxStartAddress is required");
         }
 
-        const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
         const fixtures = asArray(lightingSnapshot.fixtures)
           .map((fixture) => asRecord(fixture))
           .filter((fixture): fixture is JsonObject => fixture !== null);
@@ -2952,18 +3763,24 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error(`Lighting group '${groupId}' is not present in the group list.`);
         }
 
-        const maxDmxStartAddress = lightingFixtureMaxStartAddress(normalizedFixtureType);
-        if (requestedStartAddress < 1 || requestedStartAddress > maxDmxStartAddress) {
+        const maxDmxStartAddress = lightingFixtureMaxStartAddress(fixtureProfileSeed);
+        if (profile.channelCount > 0 && (requestedStartAddress < 1 || requestedStartAddress > maxDmxStartAddress)) {
           throw new Error(
-            `DMX start address must be between 1 and ${maxDmxStartAddress} for fixture type '${normalizedFixtureType}'.`
+            `DMX start address must be between 1 and ${maxDmxStartAddress} for fixture definition '${asString(definition.id)}'.`
           );
         }
 
-        const requestedEndAddress = requestedStartAddress + lightingFixtureChannelCount(normalizedFixtureType) - 1;
+        const requestedEndAddress = requestedStartAddress + profile.channelCount - 1;
         const overlapFixture = fixtures.find((fixture) => {
-          const fixtureType = normalizeFixtureType(fixture.type);
+          if (asNumber(fixture.universe, 1) !== universe) {
+            return false;
+          }
           const existingStartAddress = asNumber(fixture.dmxStartAddress, 1);
-          const existingEndAddress = existingStartAddress + lightingFixtureChannelCount(fixtureType) - 1;
+          const existingChannelCount = lightingFixtureChannelCount(fixture);
+          if (existingChannelCount <= 0 || profile.channelCount <= 0) {
+            return false;
+          }
+          const existingEndAddress = existingStartAddress + existingChannelCount - 1;
           return requestedStartAddress <= existingEndAddress && requestedEndAddress >= existingStartAddress;
         });
         if (overlapFixture) {
@@ -2979,13 +3796,22 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           id: nextCustomFixtureId(fixtures),
           name,
           type: normalizedFixtureType,
-          dmxStartAddress: requestedStartAddress,
-          kind: lightingFixtureKindForType(normalizedFixtureType),
+          definitionId: asString(definition.id),
+          modeId: asString(mode.id),
+          universe,
+          dmxStartAddress: profile.channelCount <= 0 ? 0 : requestedStartAddress,
+          kind: asString(definition.kind),
           groupId: groupId || null,
           spatialRotation: 0,
+          spatialX: null,
+          spatialY: null,
+          rigZ: null,
+          beamAngleDegrees: null,
           on: false,
           intensity: 100,
-          cct: defaultLightingFixtureCct(normalizedFixtureType),
+          cct: defaultLightingFixtureCct(fixtureProfileSeed),
+          controlValues: normalizeControlValues(fixtureProfileSeed, profile),
+          effect: null,
         };
 
         lightingSnapshot.fixtures = [...fixtures, createdFixture];
@@ -2998,8 +3824,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             {
               fixtureId: createdFixture.id,
               intensity: 100,
-              cct: defaultLightingFixtureCct(normalizedFixtureType),
+              cct: defaultLightingFixtureCct(createdFixture),
               on: false,
+              controlValues: asRecord(createdFixture.controlValues) ?? {},
             },
           ],
         }));
@@ -3025,9 +3852,13 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
 
         const hasName = typeof params.name === "string";
         const hasType = typeof params.type === "string";
+        const hasDefinitionId = typeof params.definitionId === "string";
+        const hasModeId = typeof params.modeId === "string";
+        const hasUniverse = typeof params.universe === "number";
         const hasOn = typeof params.on === "boolean";
         const hasIntensity = typeof params.intensity === "number";
         const hasCct = typeof params.cct === "number";
+        const hasControlValues = Object.prototype.hasOwnProperty.call(params, "controlValues");
         const hasDmxStartAddress = typeof params.dmxStartAddress === "number";
         const hasGroupId = Object.prototype.hasOwnProperty.call(params, "groupId");
         const hasSpatialX = Object.prototype.hasOwnProperty.call(params, "spatialX");
@@ -3037,9 +3868,13 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         if (
           !hasName &&
           !hasType &&
+          !hasDefinitionId &&
+          !hasModeId &&
+          !hasUniverse &&
           !hasOn &&
           !hasIntensity &&
           !hasCct &&
+          !hasControlValues &&
           !hasDmxStartAddress &&
           !hasGroupId &&
           !hasSpatialX &&
@@ -3065,6 +3900,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           if (
             hasName ||
             hasType ||
+            hasDefinitionId ||
+            hasModeId ||
+            hasUniverse ||
             hasDmxStartAddress ||
             hasGroupId ||
             hasSpatialX ||
@@ -3072,15 +3910,20 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             hasRigZ ||
             hasBeamAngleDegrees
           ) {
-            throw new Error("Preview mode only supports fixture power, intensity, and CCT updates.");
+            throw new Error("Preview mode only supports fixture power, intensity, CCT, and catalog control updates.");
           }
           const previewFixtures = lightingFixtures(lightingSnapshot, "previewFixtures");
           const editableFixtures =
             previewFixtures.length > 0 ? previewFixtures : fixtures.map((fixture) => ({ ...fixture }));
           const previewTarget = editableFixtures.find((fixture) => asString(fixture.id) === fixtureId) ?? targetFixture;
-          const normalizedFixtureType = normalizeFixtureType(targetFixture.type);
-          const cctRange = lightingFixtureCctRange(normalizedFixtureType);
-          const defaultCct = defaultLightingFixtureCct(normalizedFixtureType);
+          const cctRange = lightingFixtureCctRange(targetFixture);
+          const defaultCct = defaultLightingFixtureCct(targetFixture);
+          const controlValues = hasControlValues
+            ? {
+                ...asNumberRecord(previewTarget.controlValues),
+                ...asNumberRecord(params.controlValues),
+              }
+            : asNumberRecord(previewTarget.controlValues);
           const updatedFixture: JsonObject = {
             ...previewTarget,
             ...(hasOn ? { on: params.on } : {}),
@@ -3104,7 +3947,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
                   ),
                 }
               : {}),
+            ...(hasControlValues ? { controlValues } : {}),
           };
+          updatedFixture.controlValues = normalizeControlValues(updatedFixture);
           lightingSnapshot.previewFixtures = editableFixtures.map((fixture) =>
             asString(fixture.id) === fixtureId ? updatedFixture : fixture
           );
@@ -3128,32 +3973,62 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error("Lighting fixture update requires a reachable lighting transport.");
         }
 
-        const requestedType = hasType ? normalizeFixtureType(params.type) : null;
-        if (hasType && !requestedType) {
-          throw new Error("type is required");
+        const definition = fixtureDefinitionByIdentity(
+          state.lightingFixtureCatalogSnapshot,
+          hasDefinitionId ? params.definitionId : targetFixture.definitionId,
+          hasType ? params.type : targetFixture.type,
+          targetFixture.kind
+        );
+        const structuralCatalogChange = hasType || hasDefinitionId || hasModeId;
+        if (
+          !definition ||
+          asString(definition.status) !== "verified" ||
+          (structuralCatalogChange && !fixtureDefinitionSelectable(definition))
+        ) {
+          throw new Error("definitionId or type must resolve to a selectable verified fixture catalog entry");
         }
-        const normalizedFixtureType = requestedType ?? normalizeFixtureType(targetFixture.type);
-        const cctRange = lightingFixtureCctRange(normalizedFixtureType);
-        const defaultCct = defaultLightingFixtureCct(normalizedFixtureType);
-        const maxDmxStartAddress = lightingFixtureMaxStartAddress(normalizedFixtureType);
+        const mode = fixtureModeForDefinition(definition, hasModeId ? params.modeId : targetFixture.modeId);
+        if (!mode) {
+          throw new Error("modeId must resolve to a fixture catalog mode");
+        }
+        const normalizedFixtureType = fixtureTypeForDefinition(asString(definition.id));
+        const nextUniverse = hasUniverse
+          ? Math.max(1, Math.round(asNumber(params.universe, asNumber(targetFixture.universe, 1))))
+          : asNumber(targetFixture.universe, 1);
+        const profileSeed = {
+          ...targetFixture,
+          type: normalizedFixtureType,
+          definitionId: asString(definition.id),
+          modeId: asString(mode.id),
+        };
+        const profile = fixtureProfileForFixture(profileSeed, state.lightingFixtureCatalogSnapshot);
+        const cctRange = lightingFixtureCctRange(profileSeed);
+        const defaultCct = defaultLightingFixtureCct(profileSeed);
+        const maxDmxStartAddress = lightingFixtureMaxStartAddress(profileSeed);
         const nextDmxStartAddress = hasDmxStartAddress
           ? Math.round(asNumber(params.dmxStartAddress, asNumber(targetFixture.dmxStartAddress, 1)))
           : asNumber(targetFixture.dmxStartAddress, 1);
-        if (nextDmxStartAddress < 1 || nextDmxStartAddress > maxDmxStartAddress) {
+        if (profile.channelCount > 0 && (nextDmxStartAddress < 1 || nextDmxStartAddress > maxDmxStartAddress)) {
           throw new Error(
-            `DMX start address must be between 1 and ${maxDmxStartAddress} for fixture type '${normalizedFixtureType}'.`
+            `DMX start address must be between 1 and ${maxDmxStartAddress} for fixture definition '${asString(definition.id)}'.`
           );
         }
 
-        const nextDmxEndAddress = nextDmxStartAddress + lightingFixtureChannelCount(normalizedFixtureType) - 1;
+        const nextDmxEndAddress = nextDmxStartAddress + profile.channelCount - 1;
         const overlapFixture = fixtures.find((fixture) => {
           if (asString(fixture.id) === fixtureId) {
             return false;
           }
+          if (asNumber(fixture.universe, 1) !== nextUniverse) {
+            return false;
+          }
 
-          const fixtureType = normalizeFixtureType(fixture.type);
           const existingStartAddress = asNumber(fixture.dmxStartAddress, 1);
-          const existingEndAddress = existingStartAddress + lightingFixtureChannelCount(fixtureType) - 1;
+          const existingChannelCount = lightingFixtureChannelCount(fixture);
+          if (existingChannelCount <= 0 || profile.channelCount <= 0) {
+            return false;
+          }
+          const existingEndAddress = existingStartAddress + existingChannelCount - 1;
           return nextDmxStartAddress <= existingEndAddress && nextDmxEndAddress >= existingStartAddress;
         });
         if (overlapFixture) {
@@ -3173,9 +4048,14 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const updatedFixture: JsonObject = {
           ...targetFixture,
           ...(hasName ? { name: asString(params.name).trim() || asString(targetFixture.name) } : {}),
-          ...(hasType ? { type: normalizedFixtureType } : {}),
+          ...(hasType || hasDefinitionId ? { type: normalizedFixtureType } : {}),
+          ...(hasType || hasDefinitionId ? { definitionId: asString(definition.id) } : {}),
+          ...(hasModeId || hasType || hasDefinitionId ? { modeId: asString(mode.id) } : {}),
+          ...(hasUniverse ? { universe: nextUniverse } : {}),
           ...(hasOn ? { on: params.on } : {}),
-          ...(hasDmxStartAddress ? { dmxStartAddress: nextDmxStartAddress } : {}),
+          ...(hasDmxStartAddress || hasType || hasDefinitionId || hasModeId
+            ? { dmxStartAddress: profile.channelCount <= 0 ? 0 : nextDmxStartAddress }
+            : {}),
           ...(hasGroupId ? { groupId: nextGroupId || null } : {}),
           ...(hasSpatialX
             ? {
@@ -3213,6 +4093,14 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
                       ),
               }
             : {}),
+          ...(hasControlValues
+            ? {
+                controlValues: {
+                  ...asNumberRecord(targetFixture.controlValues),
+                  ...asNumberRecord(params.controlValues),
+                },
+              }
+            : {}),
           ...(hasIntensity
             ? {
                 intensity: Math.max(
@@ -3234,6 +4122,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
               }
             : {}),
         };
+        updatedFixture.controlValues = normalizeControlValues(updatedFixture, profile);
         lightingSnapshot.fixtures = fixtures.map((fixture) =>
           asString(fixture.id) === fixtureId ? updatedFixture : fixture
         );

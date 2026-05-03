@@ -52,11 +52,14 @@ export interface SupportBackupEntry {
 export interface LightingFixtureEntry {
   beamAngleDegrees?: number;
   cct: number;
+  controlValues: Record<string, number>;
+  definitionId: string;
   dmxStartAddress: number;
   groupId?: string;
   id: string;
   intensity: number;
   kind: string;
+  modeId: string;
   name: string;
   on: boolean;
   rigZ?: number;
@@ -64,10 +67,12 @@ export interface LightingFixtureEntry {
   spatialX?: number;
   spatialY?: number;
   type: string;
+  universe: number;
 }
 
 export interface LightingSceneFixtureEntry {
   cct: number;
+  controlValues: Record<string, number>;
   fixtureId: string;
   intensity: number;
   on: boolean;
@@ -94,6 +99,7 @@ export interface LightingDmxChannelEntry {
   channel: number;
   label: string;
   lightName: string;
+  universe: number;
   value: number;
 }
 
@@ -336,11 +342,14 @@ export function getLightingFixtures(snapshot: LightingSnapshot | null): Lighting
   return (snapshot?.fixtures ?? []).map((f: LightingFixtureSnapshot) => ({
     beamAngleDegrees: f.beamAngleDegrees ?? undefined,
     cct: f.cct,
+    controlValues: f.controlValues,
+    definitionId: f.definitionId,
     dmxStartAddress: f.dmxStartAddress,
     groupId: f.groupId ?? undefined,
     id: f.id,
     intensity: f.intensity,
     kind: f.kind,
+    modeId: f.modeId,
     name: f.name,
     on: f.on,
     rigZ: f.rigZ ?? undefined,
@@ -348,6 +357,7 @@ export function getLightingFixtures(snapshot: LightingSnapshot | null): Lighting
     spatialX: f.spatialX ?? undefined,
     spatialY: f.spatialY ?? undefined,
     type: f.type,
+    universe: f.universe,
   }));
 }
 
@@ -357,6 +367,7 @@ export function getLightingScenes(snapshot: LightingSnapshot | null): LightingSc
     fixtureStates: s.fixtureStates.map(
       (entry: LightingSceneFixtureSnapshot): LightingSceneFixtureEntry => ({
         cct: entry.cct,
+        controlValues: entry.controlValues,
         fixtureId: entry.fixtureId,
         intensity: entry.intensity,
         on: entry.on,
@@ -386,10 +397,14 @@ export function getLightingDmxChannels(snapshot: LightingDmxMonitorSnapshot | nu
         channel: c.channel,
         label: c.label,
         lightName: c.lightName,
+        universe: c.universe,
         value: c.value,
       })
     )
-    .sort((left, right) => left.channel - right.channel);
+    .sort((left, right) => {
+      const universeDelta = left.universe - right.universe;
+      return universeDelta !== 0 ? universeDelta : left.channel - right.channel;
+    });
 }
 
 // Scene thumbnails persist on the engine-managed shell.lighting.sceneThumbs

@@ -5,6 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Engine-owned lighting fixture catalog with a `lighting.fixtureCatalog.snapshot` protocol method, additive fixture identity fields (`definitionId`, `modeId`, `universe`, `controlValues`), universe-aware DMX validation/monitoring, scene `controlValues` capture/recall, and a catalog-backed compatibility bridge for legacy `Astra`, `Infinibar`, and `Apollo Bridge` fixture instances.
+- Catalog-backed Lighting UI for adding verified fixtures by manufacturer/family/model/mode, rendering catalog visual shapes and pixel layouts in the stage plot, surfacing generated catalog controls in the inspector, and showing multi-universe DMX output without moving DMX policy into React.
+
 ### Changed
 
 - Aligned the Tauri shell's bundle identifier from `com.sse.exedstudiocontrol.replatform` to `com.sse.exedstudiocontrol`, matching the locked product identity declared in `AGENTS.md` and `docs/RELEASE.md`. The `.replatform` suffix was a checkpoint marker added during the Qt → Tauri cutover and lost its meaning after Checkpoint D retired the Qt fallback shell. The QtIFW `packageId` (`com.sse.exedstudiocontrol.native`) is unchanged, so the maintenance-tool upgrade path from v2.2.1 to the next release continues to work and operator app-data persistence is preserved (app-data is anchored to a fixed directory name, not the bundle identifier). On macOS, operators may see a fresh Spotlight entry on first launch of the next release because `CFBundleIdentifier` changes; this is a one-time visual cue, not a data migration.

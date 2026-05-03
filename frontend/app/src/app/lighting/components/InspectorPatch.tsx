@@ -2,7 +2,7 @@ import { type ChangeEvent, type KeyboardEvent, useEffect, useState } from "react
 import { AlertTriangle } from "lucide-react";
 
 import { Button, InspectorSection } from "@sse/design-system";
-import type { LightingFixtureSnapshot } from "@sse/engine-client";
+import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
 
 import type { LightingDmxChannelEntry } from "../../shellData";
 import { formatLightingBeamAngleValue, formatLightingRigHeight } from "../lightingHelpers";
@@ -20,6 +20,7 @@ import styles from "./LightingInspector.module.css";
 export interface InspectorPatchProps {
   fixture: LightingFixtureSnapshot | null;
   universe: number;
+  catalog?: LightingFixtureCatalogSnapshot | null;
   dmxChannels: readonly LightingDmxChannelEntry[];
   dmxStale: boolean;
   bridgeReachable?: boolean;
@@ -36,6 +37,7 @@ export interface InspectorPatchProps {
 export function InspectorPatch({
   fixture,
   universe,
+  catalog = null,
   dmxChannels,
   dmxStale,
   bridgeReachable = true,
@@ -63,8 +65,8 @@ export function InspectorPatch({
     );
   }
 
-  const maxStartAddress = lightingFixtureMaxStartAddress(fixture.type);
-  const channelCount = lightingFixtureChannelCount(fixture.type);
+  const maxStartAddress = lightingFixtureMaxStartAddress(fixture, catalog);
+  const channelCount = lightingFixtureChannelCount(fixture, catalog);
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     setDraft(event.currentTarget.value);
@@ -106,7 +108,7 @@ export function InspectorPatch({
           <div>
             <div className={styles.fixtureName}>{fixture.name}</div>
             <div className={styles.fixtureSubline}>
-              {fixture.type} · {lightingFixtureModeLabel(fixture.type)}
+              {fixture.type} · {lightingFixtureModeLabel(fixture, catalog)}
             </div>
           </div>
           <IdentifyBurstButton
@@ -121,7 +123,7 @@ export function InspectorPatch({
         <dl className={styles.factGrid}>
           <div className={styles.fact}>
             <dt className={styles.factLabel}>Universe</dt>
-            <dd className={styles.factValue}>U{universe}</dd>
+            <dd className={styles.factValue}>U{fixture.universe ?? universe}</dd>
           </div>
           <div className={styles.fact}>
             <dt className={styles.factLabel}>Range</dt>
@@ -174,7 +176,8 @@ export function InspectorPatch({
           </Button>
         </div>
         <div className={styles.helpText}>
-          {lightingFixturePatchSummary(fixture.dmxStartAddress, fixture.type, universe)} · max start {maxStartAddress}
+          {lightingFixturePatchSummary(fixture.dmxStartAddress, fixture, fixture.universe ?? universe, catalog)} · max
+          start {maxStartAddress}
         </div>
       </InspectorSection>
 
@@ -210,6 +213,8 @@ export function InspectorPatch({
       <InspectorSection title="DMX peek">
         <DMXPeek
           fixtureType={fixture.type}
+          fixture={fixture}
+          catalog={catalog}
           fixtureDmxStartAddress={fixture.dmxStartAddress}
           channels={dmxChannels}
           stale={dmxStale}

@@ -37,13 +37,14 @@ use crate::lighting::{
     parse_lighting_scene_delete_request, parse_lighting_scene_pin_request,
     parse_lighting_scene_recall_request, parse_lighting_scene_reorder_request,
     parse_lighting_scene_update_request, parse_lighting_settings_update_request,
-    pin_lighting_scene, read_lighting_dmx_monitor_snapshot, read_lighting_snapshot_with_preview,
-    recall_lighting_scene_with_preview, reorder_lighting_group, reorder_lighting_scene,
-    set_lighting_all_power_with_preview, set_lighting_fixture_highlight,
-    set_lighting_group_power_with_preview, set_lighting_preview_mode,
-    start_lighting_identify_sequence, update_lighting_fixture_with_preview, update_lighting_group,
-    update_lighting_palette, update_lighting_scene_with_preview, update_lighting_settings,
-    LightingCommandError, LightingPreviewRuntimeState,
+    pin_lighting_scene, read_lighting_dmx_monitor_snapshot, read_lighting_fixture_catalog_snapshot,
+    read_lighting_snapshot_with_preview, recall_lighting_scene_with_preview,
+    reorder_lighting_group, reorder_lighting_scene, set_lighting_all_power_with_preview,
+    set_lighting_fixture_highlight, set_lighting_group_power_with_preview,
+    set_lighting_preview_mode, start_lighting_identify_sequence,
+    update_lighting_fixture_with_preview, update_lighting_group, update_lighting_palette,
+    update_lighting_scene_with_preview, update_lighting_settings, LightingCommandError,
+    LightingPreviewRuntimeState,
 };
 use crate::parity_fixtures::{
     load_parity_fixture, parse_parity_fixture_request, ParityFixtureError,
@@ -158,6 +159,9 @@ impl EngineApp {
                 self.dispatch_read(request.id, Self::read_commissioning_snapshot)
             }
             "lighting.snapshot" => self.dispatch_read(request.id, Self::read_lighting_snapshot),
+            "lighting.fixtureCatalog.snapshot" => {
+                self.dispatch_read(request.id, Self::read_lighting_fixture_catalog_snapshot)
+            }
             "lighting.dmxMonitor.snapshot" => {
                 self.dispatch_read(request.id, Self::read_lighting_dmx_monitor_snapshot)
             }
@@ -831,6 +835,12 @@ impl EngineApp {
             &app_settings,
             &preview,
         ))?)
+    }
+
+    fn read_lighting_fixture_catalog_snapshot(&self) -> EngineResult<serde_json::Value> {
+        Ok(serde_json::to_value(
+            read_lighting_fixture_catalog_snapshot(),
+        )?)
     }
 
     fn read_lighting_dmx_monitor_snapshot(&self) -> EngineResult<serde_json::Value> {

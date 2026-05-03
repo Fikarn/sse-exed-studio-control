@@ -138,21 +138,30 @@ export function lightingFixtureStageFadeOpacity(intensity: number, on: boolean) 
   return Math.max(0.22, Math.min(1, 0.18 + (intensity / 100) * 0.82));
 }
 
-export function lightingFixtureCctRange(fixtureType: string) {
-  const normalized = fixtureType.trim().toLowerCase();
-  switch (normalized) {
-    case "infinimat":
-    case "infinibar":
-    case "infinibar pb12":
-    case "infinibar-pb12":
-      return { max: 10_000, min: 2_000 };
-    default:
-      return { max: 5_600, min: 3_200 };
+export function lightingFixtureCctRange(
+  fixture: string | Pick<LightingFixtureSnapshot, "definitionId" | "modeId" | "type" | "kind">,
+  catalog?: LightingFixtureCatalogSnapshot | null
+) {
+  if (typeof fixture !== "string") {
+    const defaults = getFixtureModeForFixture(catalog, fixture)?.defaults;
+    if (typeof defaults?.cctMin === "number" && typeof defaults.cctMax === "number") {
+      return { max: defaults.cctMax, min: defaults.cctMin };
+    }
   }
+
+  const normalized = (typeof fixture === "string" ? fixture : fixture.type).trim().toLowerCase();
+  if (normalized.includes("infinimat") || normalized.includes("infinibar")) {
+    return { max: 10_000, min: 2_000 };
+  }
+  return { max: 5_600, min: 3_200 };
 }
 
-export function lightingFixtureCctPercent(cct: number, fixtureType: string) {
-  const range = lightingFixtureCctRange(fixtureType);
+export function lightingFixtureCctPercent(
+  cct: number,
+  fixture: string | Pick<LightingFixtureSnapshot, "definitionId" | "modeId" | "type" | "kind">,
+  catalog?: LightingFixtureCatalogSnapshot | null
+) {
+  const range = lightingFixtureCctRange(fixture, catalog);
   const clamped = Math.max(range.min, Math.min(range.max, Math.round(cct)));
   return ((clamped - range.min) / (range.max - range.min)) * 100;
 }
@@ -239,3 +248,6 @@ export function fallbackFixturePosition(index: number) {
 // `app.shell.lighting.currentSectionId` blob is left untouched so older
 // engine binaries keep their value; PR 4 will purge the storage key alongside
 // the cue-model strip if no consumer surfaces.
+import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
+
+import { getFixtureModeForFixture } from "./fixtureCatalog";

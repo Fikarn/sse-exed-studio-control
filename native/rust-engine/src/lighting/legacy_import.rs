@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::Path;
 
 use crate::commissioning::{LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY};
@@ -148,6 +149,13 @@ pub fn import_legacy_lighting_fixture(
                 None,
                 fixture.id.as_str(),
             );
+            let profile = resolve_fixture_profile(
+                None,
+                None,
+                Some(fixture_type.as_str()),
+                None,
+                fixture.id.as_str(),
+            );
             LightingEditorFixtureState {
                 id: fixture.id.clone(),
                 name: if fixture.name.trim().is_empty() {
@@ -156,11 +164,14 @@ pub fn import_legacy_lighting_fixture(
                     fixture.name.clone()
                 },
                 fixture_type: fixture_type.clone(),
+                definition_id: Some(profile.definition_id.clone()),
+                mode_id: Some(profile.mode_id.clone()),
+                universe: config.universe,
                 dmx_start_address: normalize_dmx_start_address(
                     fixture.dmx_start_address,
                     fixture_type.as_str(),
                 ),
-                kind: lighting_kind_for_type(fixture_type.as_str()),
+                kind: profile.kind.clone(),
                 group_id: fixture.group_id.clone(),
                 spatial_x: normalize_optional_coordinate(fixture.spatial_x),
                 spatial_y: normalize_optional_coordinate(fixture.spatial_y),
@@ -190,6 +201,7 @@ pub fn import_legacy_lighting_fixture(
                             10,
                         ),
                     }),
+                control_values: HashMap::new(),
             }
         })
         .collect::<Vec<_>>();
@@ -250,6 +262,7 @@ pub fn import_legacy_lighting_fixture(
                             .map(|state| clamp_i64(state.cct, MIN_FIXTURE_CCT, MAX_FIXTURE_CCT))
                             .unwrap_or(fixture.cct),
                         on: imported_state.map(|state| state.on).unwrap_or(fixture.on),
+                        control_values: fixture.control_values.clone(),
                     }
                 })
                 .collect(),

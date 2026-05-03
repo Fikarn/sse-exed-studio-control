@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Plus, Sun } from "lucide-react";
 
 import { EmptyState, PlotMeta, PlotPill } from "@sse/design-system";
-import type { LightingFixtureSnapshot } from "@sse/engine-client";
+import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { deriveMounting } from "../fixtureMounting";
 import { lightingFixtureBeamLength, lightingFixtureBeamWidth } from "../lightingHelpers";
@@ -22,6 +22,7 @@ import styles from "./StagePlot.module.css";
 
 export interface StagePlotProps {
   fixtures: readonly LightingFixtureSnapshot[];
+  catalog?: LightingFixtureCatalogSnapshot | null;
   layout?: StudioLayout;
   selectedFixtureId: string | null;
   /** Frontend-only multi-select. Includes selectedFixtureId when present. */
@@ -89,6 +90,7 @@ function previewDiffersFromLive(preview: LightingFixtureSnapshot, live: Lighting
 
 export function StagePlot({
   fixtures,
+  catalog = null,
   layout = STUDIO_LAYOUT,
   selectedFixtureId,
   selectedFixtureIds,
@@ -326,8 +328,8 @@ export function StagePlot({
                 const previewFixture = fixtures.find((fixture) => fixture.id === liveFixture.id) ?? null;
                 if (!previewFixture || !previewDiffersFromLive(previewFixture, liveFixture)) return null;
                 const { xMeters, yMeters } = meterPositionFor(liveFixture, index);
-                const mounting = deriveMounting(liveFixture.type);
-                if (mounting === "wall-bar") {
+                const mounting = deriveMounting(liveFixture, catalog);
+                if (mounting === "bar") {
                   return (
                     <rect
                       key={`live-ghost-${liveFixture.id}`}
@@ -346,7 +348,7 @@ export function StagePlot({
                     key={`live-ghost-${liveFixture.id}`}
                     cx={xMeters * 100}
                     cy={yMeters * 100}
-                    r={mounting === "grid-soft" ? 15 : 12}
+                    r={mounting === "mat" ? 15 : 12}
                     className={styles.liveGhostShape}
                   />
                 );
@@ -368,7 +370,11 @@ export function StagePlot({
                 centerX={xMeters * 100}
                 centerY={yMeters * 100}
                 rotationDegrees={fixture.spatialRotation}
-                mounting={deriveMounting(fixture.type)}
+                mounting={deriveMounting(fixture, catalog)}
+                pixelLayout={
+                  catalog?.definitions.find((definition) => definition.id === fixture.definitionId)?.visual
+                    .pixelLayout ?? null
+                }
                 intensity={fixture.intensity}
                 cct={fixture.cct}
                 on={fixture.on}

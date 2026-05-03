@@ -174,11 +174,13 @@ Retina MacBook panels can have enough physical pixels for the target operator su
 
 Use **Scaled Studio Preview** for normal built-in-display human review:
 
-1. Run the app with `npm run tauri:dev`.
+1. Build the Rust engine with `npm run native:engine:build` if `native/target/debug/studio-control-engine` is missing or stale, then run the app with `npm run tauri:dev`.
 2. Open the command palette with `⌘K`.
 3. Run `Studio Preview: Enter 2560x1440 Review`.
 4. Review the proportional `2560x1440` studio canvas scaled into the current window.
 5. Run `Studio Preview: Exit Review` before judging native compact/windowed behavior.
+
+`npm run tauri:dev` starts Vite and the selected Tauri shell; it does not rebuild `studio-control-engine`. If the dev shell lands on Incident Recovery immediately after protocol or engine changes, run `npm run native:engine:build` and relaunch `npm run tauri:dev`.
 
 Scaled Studio Preview deliberately preserves studio layout mode, aspect ratio, and proportions while reducing physical size. It is valid for composition, relative density, toolbar fit, rail/stage/inspector balance, drawer behavior, and operator flow inspection. It is not a substitute for real physical-size readability or final studio-monitor ergonomics.
 

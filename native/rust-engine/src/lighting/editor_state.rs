@@ -43,29 +43,43 @@ pub(super) fn default_lighting_editor_state(
     let fixtures = inventory
         .fixtures
         .iter()
-        .map(|fixture| LightingEditorFixtureState {
-            id: fixture.id.clone(),
-            name: fixture.name.clone(),
-            fixture_type: normalized_fixture_type(
+        .map(|fixture| {
+            let fixture_type = normalized_fixture_type(
                 Some(fixture.fixture_type.as_str()),
                 Some(fixture.kind.as_str()),
                 fixture.id.as_str(),
-            ),
-            dmx_start_address: normalize_dmx_start_address(
-                fixture.dmx_start_address,
-                fixture_type_for_fixture(fixture).as_str(),
-            ),
-            kind: fixture.kind.clone(),
-            group_id: fixture.group_id.clone(),
-            spatial_x: fixture.spatial_x,
-            spatial_y: fixture.spatial_y,
-            spatial_rotation: normalize_rotation(fixture.spatial_rotation),
-            rig_z: None,
-            beam_angle_degrees: None,
-            intensity: DEFAULT_FIXTURE_INTENSITY,
-            cct: DEFAULT_FIXTURE_CCT,
-            on: false,
-            effect: None,
+            );
+            let profile = resolve_fixture_profile(
+                Some(fixture.definition_id.as_str()),
+                Some(fixture.mode_id.as_str()),
+                Some(fixture_type.as_str()),
+                Some(fixture.kind.as_str()),
+                fixture.id.as_str(),
+            );
+            LightingEditorFixtureState {
+                id: fixture.id.clone(),
+                name: fixture.name.clone(),
+                fixture_type,
+                definition_id: Some(profile.definition_id.clone()),
+                mode_id: Some(profile.mode_id.clone()),
+                universe: fixture.universe,
+                dmx_start_address: normalize_dmx_start_address(
+                    fixture.dmx_start_address,
+                    fixture.fixture_type.as_str(),
+                ),
+                kind: profile.kind.clone(),
+                group_id: fixture.group_id.clone(),
+                spatial_x: fixture.spatial_x,
+                spatial_y: fixture.spatial_y,
+                spatial_rotation: normalize_rotation(fixture.spatial_rotation),
+                rig_z: None,
+                beam_angle_degrees: None,
+                intensity: DEFAULT_FIXTURE_INTENSITY,
+                cct: DEFAULT_FIXTURE_CCT,
+                on: false,
+                control_values: normalize_fixture_control_values(&profile, &fixture.control_values),
+                effect: None,
+            }
         })
         .collect::<Vec<_>>();
     let groups = default_lighting_group_states(inventory, &fixtures);
@@ -115,6 +129,13 @@ pub(super) fn normalize_lighting_editor_state(
                 Some(fixture.kind.as_str()),
                 fixture.id.as_str(),
             );
+            let profile = resolve_fixture_profile(
+                fixture.definition_id.as_deref(),
+                fixture.mode_id.as_deref(),
+                Some(fixture_type.as_str()),
+                Some(fixture.kind.as_str()),
+                fixture.id.as_str(),
+            );
             LightingEditorFixtureState {
                 id: fixture.id.clone(),
                 name: if fixture.name.trim().is_empty() {
@@ -125,11 +146,14 @@ pub(super) fn normalize_lighting_editor_state(
                     fixture.name.clone()
                 },
                 fixture_type: fixture_type.clone(),
+                definition_id: Some(profile.definition_id.clone()),
+                mode_id: Some(profile.mode_id.clone()),
+                universe: clamp_i64(fixture.universe, 1, 63999),
                 dmx_start_address: normalize_dmx_start_address(
                     fixture.dmx_start_address,
                     fixture_type.as_str(),
                 ),
-                kind: lighting_kind_for_type(&fixture_type),
+                kind: profile.kind.clone(),
                 group_id: fixture.group_id.clone(),
                 spatial_x: normalize_optional_coordinate(fixture.spatial_x),
                 spatial_y: normalize_optional_coordinate(fixture.spatial_y),
@@ -145,6 +169,7 @@ pub(super) fn normalize_lighting_editor_state(
                         .unwrap_or_else(|| default_fixture_cct_for_type(fixture_type.as_str())),
                 ),
                 on: fixture.on,
+                control_values: normalize_fixture_control_values(&profile, &fixture.control_values),
                 effect: fixture.effect.clone().map(normalize_lighting_effect),
             }
         })
@@ -178,6 +203,15 @@ pub(super) fn normalize_lighting_editor_state(
                             on: existing_fixture_state
                                 .map(|state| state.on)
                                 .unwrap_or(fixture.on),
+                            control_values: existing_fixture_state
+                                .map(|state| {
+                                    let profile = fixture_profile_for_state(fixture);
+                                    normalize_fixture_control_values(
+                                        &profile,
+                                        &state.control_values,
+                                    )
+                                })
+                                .unwrap_or_else(|| effective_fixture_control_values(fixture)),
                         }
                     })
                     .collect(),
@@ -490,15 +524,25 @@ pub(super) fn append_missing_fixture_states(
         }
 
         let fixture_type = fixture_type_for_fixture(inventory_fixture);
+        let profile = resolve_fixture_profile(
+            Some(inventory_fixture.definition_id.as_str()),
+            Some(inventory_fixture.mode_id.as_str()),
+            Some(fixture_type.as_str()),
+            Some(inventory_fixture.kind.as_str()),
+            inventory_fixture.id.as_str(),
+        );
         fixtures.push(LightingEditorFixtureState {
             id: inventory_fixture.id.clone(),
             name: inventory_fixture.name.clone(),
             fixture_type: fixture_type.clone(),
+            definition_id: Some(profile.definition_id.clone()),
+            mode_id: Some(profile.mode_id.clone()),
+            universe: inventory_fixture.universe,
             dmx_start_address: normalize_dmx_start_address(
                 inventory_fixture.dmx_start_address,
                 fixture_type.as_str(),
             ),
-            kind: lighting_kind_for_type(fixture_type.as_str()),
+            kind: profile.kind.clone(),
             group_id: inventory_fixture.group_id.clone(),
             spatial_x: normalize_optional_coordinate(inventory_fixture.spatial_x),
             spatial_y: normalize_optional_coordinate(inventory_fixture.spatial_y),
@@ -512,6 +556,10 @@ pub(super) fn append_missing_fixture_states(
                 inventory_fixture.cct,
             ),
             on: false,
+            control_values: normalize_fixture_control_values(
+                &profile,
+                &inventory_fixture.control_values,
+            ),
             effect: None,
         });
     }
@@ -564,6 +612,7 @@ pub(super) fn default_lighting_scene_fixture_states(
                     .unwrap_or(fixture.intensity),
                 cct: fixture.cct,
                 on: backend_update.map(|update| update.on).unwrap_or(fixture.on),
+                control_values: effective_fixture_control_values(fixture),
             }
         })
         .collect()
@@ -606,12 +655,15 @@ pub(super) fn lighting_fixture_snapshot_from_state(
     fixture: LightingEditorFixtureState,
 ) -> LightingFixtureSnapshot {
     LightingFixtureSnapshot {
-        id: fixture.id,
-        name: fixture.name,
-        fixture_type: fixture.fixture_type,
+        id: fixture.id.clone(),
+        name: fixture.name.clone(),
+        fixture_type: fixture.fixture_type.clone(),
+        definition_id: fixture_profile_for_state(&fixture).definition_id,
+        mode_id: fixture_profile_for_state(&fixture).mode_id,
+        universe: fixture.universe,
         dmx_start_address: fixture.dmx_start_address,
-        kind: fixture.kind,
-        group_id: fixture.group_id,
+        kind: fixture.kind.clone(),
+        group_id: fixture.group_id.clone(),
         spatial_x: fixture.spatial_x,
         spatial_y: fixture.spatial_y,
         spatial_rotation: normalize_rotation(fixture.spatial_rotation),
@@ -620,7 +672,8 @@ pub(super) fn lighting_fixture_snapshot_from_state(
         on: fixture.on,
         intensity: fixture.intensity,
         cct: fixture.cct,
-        effect: fixture.effect.map(normalize_lighting_effect),
+        control_values: effective_fixture_control_values(&fixture),
+        effect: fixture.effect.clone().map(normalize_lighting_effect),
     }
 }
 
@@ -646,6 +699,7 @@ pub(super) fn lighting_scene_snapshot_from_state(
                 intensity: state.intensity,
                 cct: state.cct,
                 on: state.on,
+                control_values: state.control_values.clone(),
             })
             .collect(),
         last_recalled,
@@ -675,6 +729,7 @@ pub(super) fn capture_scene_fixture_states(
             intensity: fixture.intensity,
             cct: fixture.cct,
             on: fixture.on,
+            control_values: effective_fixture_control_values(fixture),
         })
         .collect()
 }

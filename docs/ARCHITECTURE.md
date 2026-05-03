@@ -30,7 +30,7 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 
 ### Native adapters
 
-- lighting adapters stay behind engine-owned health, recall, and failure contracts
+- lighting adapters stay behind engine-owned health, recall, fixture-catalog, DMX mapping, validation, scene serialization, and failure contracts
 - audio adapters stay behind engine-owned sync, recall, and safety contracts
 - control-surface exports and bridge behavior stay engine-owned
 
@@ -76,7 +76,7 @@ Any native studio domain should follow the same shape:
 
 - `native/rust-engine/src/planning.rs`: planning storage, snapshots, and mutations
 - `native/rust-engine/src/commissioning.rs`: commissioning state and probe flows
-- `native/rust-engine/src/lighting.rs`: lighting snapshot, recall, and simulated backend boundary
+- `native/rust-engine/src/lighting/`: lighting snapshot, recall, fixture catalog, DMX mapping/validation, scene serialization, and simulated backend boundary
 - `native/rust-engine/src/audio.rs`: audio snapshot, sync, recall, and simulated backend boundary
 - `native/rust-engine/src/support.rs`: backup, restore, and diagnostics support flows
 - `native/rust-engine/src/control_surface.rs`: Stream Deck bridge and Companion export generation
