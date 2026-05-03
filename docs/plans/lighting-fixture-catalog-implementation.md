@@ -1,6 +1,6 @@
 # Lighting Fixture Catalog Implementation Handoff
 
-Status: implemented in the `codex/lighting-fixture-catalog` pass on `2026-05-03`. Retain this file as the completed scope record and as the boundary reference for future catalog work.
+Status: implemented and merged through [PR #73](https://github.com/Fikarn/sse-exed-studio-control/pull/73) on `2026-05-03`. Retain this file as the completed scope record and as the boundary reference for future catalog work.
 
 ## Summary
 

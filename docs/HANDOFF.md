@@ -110,7 +110,7 @@ Validation recorded for PR #71:
 
 ### Lighting fixture catalog, engine-owned pass
 
-Status: committed and published as draft PR [#73](https://github.com/Fikarn/sse-exed-studio-control/pull/73) on branch `codex/lighting-fixture-catalog`.
+Status: complete and merged through [PR #73](https://github.com/Fikarn/sse-exed-studio-control/pull/73) on `2026-05-03` (`5e3c537a7f70bb104b40519ccbb3b8fc3c710573`).
 
 Important facts for future sessions:
 
