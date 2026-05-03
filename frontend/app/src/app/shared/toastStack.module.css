@@ -1,15 +1,28 @@
 /* Toast stack — bottom-right portal target. Lives at z above shell chrome
    so it sits over modals only when a workspace explicitly raises a toast
    that should pierce them (errors). The portal mounts at document.body
-   so it isn't subject to per-workspace overflow / transform clipping. */
+   so it isn't subject to per-workspace overflow / transform clipping.
+
+   The app's operator workspaces reserve the bottom edge for the health bar,
+   so the stack docks above that chrome instead of competing with it. */
 
 .stack {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  bottom: calc(var(--space-4) + var(--size-health-bar-height) + 12px);
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
+  max-width: calc(100vw - 48px);
   z-index: 1000;
   pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .stack {
+    right: 12px;
+    bottom: calc(12px + var(--size-health-bar-height) + 10px);
+    max-width: calc(100vw - 24px);
+  }
 }

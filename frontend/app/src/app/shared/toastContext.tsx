@@ -38,7 +38,18 @@ const DEFAULT_DURATION_MS: Record<ToastTone, number | null> = {
   error: null, // sticky until manual dismiss
 };
 
+const MAX_VISIBLE_TOASTS = 1;
+
 const ToastContext = createContext<ToastApi | null>(null);
+
+function appendVisibleToast(prev: readonly ToastEntry[], entry: ToastEntry): readonly ToastEntry[] {
+  const next = [...prev, entry];
+  while (next.length > MAX_VISIBLE_TOASTS) {
+    const firstNonErrorIndex = next.findIndex((toast) => toast.tone !== "error");
+    next.splice(firstNonErrorIndex === -1 ? 0 : firstNonErrorIndex, 1);
+  }
+  return next;
+}
 
 /**
  * Wraps the app and exposes `useToast()`. Renders a bottom-right portal that
@@ -75,7 +86,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         title: input.title,
         action: input.action,
       };
-      setToasts((prev) => [...prev, entry]);
+      setToasts((prev) => appendVisibleToast(prev, entry));
       const duration = input.durationMs ?? DEFAULT_DURATION_MS[input.tone];
       if (duration !== null) {
         const timer = window.setTimeout(() => {
