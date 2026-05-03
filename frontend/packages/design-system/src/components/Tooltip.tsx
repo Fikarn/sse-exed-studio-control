@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 
 import styles from "./Tooltip.module.css";
 
@@ -23,13 +23,29 @@ export interface TooltipProps {
 export function Tooltip({ children, content, placement = "top", maxWidth }: TooltipProps) {
   const tooltipId = useId();
   const [visible, setVisible] = useState(false);
+  const suppressUntilLeaveRef = useRef(false);
 
   return (
     <span
       className={styles.wrapper}
-      onPointerEnter={() => setVisible(true)}
-      onPointerLeave={() => setVisible(false)}
-      onFocusCapture={() => setVisible(true)}
+      onPointerEnter={() => {
+        if (!suppressUntilLeaveRef.current) {
+          setVisible(true);
+        }
+      }}
+      onPointerLeave={() => {
+        suppressUntilLeaveRef.current = false;
+        setVisible(false);
+      }}
+      onPointerDownCapture={() => {
+        suppressUntilLeaveRef.current = true;
+        setVisible(false);
+      }}
+      onFocusCapture={() => {
+        if (!suppressUntilLeaveRef.current) {
+          setVisible(true);
+        }
+      }}
       onBlurCapture={() => setVisible(false)}
     >
       <span aria-describedby={tooltipId} className={styles.trigger}>

@@ -102,6 +102,9 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
   const { onBackgroundClick } = options;
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [state, setState] = useState<ViewportState>(IDENTITY);
+  const stateRef = useRef<ViewportState>(IDENTITY);
+  const pendingStateRef = useRef<ViewportState | null>(null);
+  const stateRafRef = useRef<number | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [viewBookmarks, setViewBookmarks] = useState<ViewBookmarks>(EMPTY_BOOKMARKS);
   // Hydrate from localStorage on mount only — avoids SSR-time storage access
@@ -114,6 +117,33 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
   // remain on their default gestures.
   const PAN_BUTTON = 1;
 
+  const setViewportState = useCallback((next: ViewportState | ((prev: ViewportState) => ViewportState)) => {
+    if (stateRafRef.current !== null) {
+      cancelAnimationFrame(stateRafRef.current);
+      stateRafRef.current = null;
+      pendingStateRef.current = null;
+    }
+    setState((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      stateRef.current = resolved;
+      return resolved;
+    });
+  }, []);
+
+  const scheduleViewportState = useCallback((next: ViewportState) => {
+    stateRef.current = next;
+    pendingStateRef.current = next;
+    if (stateRafRef.current !== null) return;
+    stateRafRef.current = requestAnimationFrame(() => {
+      stateRafRef.current = null;
+      const pending = pendingStateRef.current;
+      pendingStateRef.current = null;
+      if (pending) {
+        setState(pending);
+      }
+    });
+  }, []);
+
   const dragRef = useRef<{
     pointerId: number;
     startClientX: number;
@@ -123,19 +153,21 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     movedPx: number;
   } | null>(null);
 
-  const setZoomAt = useCallback((nextZoom: number, anchorSvg: { x: number; y: number }) => {
-    setState((prev) => {
+  const setZoomAt = useCallback(
+    (nextZoom: number, anchorSvg: { x: number; y: number }) => {
+      const prev = stateRef.current;
       const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
-      if (clamped === prev.zoom) return prev;
+      if (clamped === prev.zoom) return;
       const contentX = (anchorSvg.x - prev.panX) / prev.zoom;
       const contentY = (anchorSvg.y - prev.panY) / prev.zoom;
-      return {
+      scheduleViewportState({
         zoom: clamped,
         panX: anchorSvg.x - contentX * clamped,
         panY: anchorSvg.y - contentY * clamped,
-      };
-    });
-  }, []);
+      });
+    },
+    [scheduleViewportState]
+  );
 
   const onWheel = useCallback(
     (event: ReactWheelEvent<SVGSVGElement>) => {
@@ -145,50 +177,50 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
       const anchor = clientToSvg(svg, event.clientX, event.clientY);
       if (!anchor) return;
       const factor = Math.pow(WHEEL_ZOOM_STEP, -event.deltaY);
-      setZoomAt(state.zoom * factor, anchor);
+      setZoomAt(stateRef.current.zoom * factor, anchor);
     },
-    [setZoomAt, state.zoom]
+    [setZoomAt]
   );
 
-  const onPointerDown = useCallback(
-    (event: ReactPointerEvent<SVGSVGElement>) => {
-      if (event.button !== PAN_BUTTON) return;
-      const svg = svgRef.current;
-      if (!svg) return;
-      dragRef.current = {
-        pointerId: event.pointerId,
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        startPanX: state.panX,
-        startPanY: state.panY,
-        movedPx: 0,
-      };
-      svg.setPointerCapture(event.pointerId);
-      setIsPanning(true);
-    },
-    [state.panX, state.panY]
-  );
-
-  const onPointerMove = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+  const onPointerDown = useCallback((event: ReactPointerEvent<SVGSVGElement>) => {
+    if (event.button !== PAN_BUTTON) return;
     const svg = svgRef.current;
     if (!svg) return;
-
-    const dxClient = event.clientX - drag.startClientX;
-    const dyClient = event.clientY - drag.startClientY;
-    drag.movedPx = Math.max(drag.movedPx, Math.hypot(dxClient, dyClient));
-
-    const startSvg = clientToSvg(svg, drag.startClientX, drag.startClientY);
-    const nowSvg = clientToSvg(svg, event.clientX, event.clientY);
-    if (!startSvg || !nowSvg) return;
-
-    setState((prev) => ({
-      ...prev,
-      panX: drag.startPanX + (nowSvg.x - startSvg.x),
-      panY: drag.startPanY + (nowSvg.y - startSvg.y),
-    }));
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startPanX: stateRef.current.panX,
+      startPanY: stateRef.current.panY,
+      movedPx: 0,
+    };
+    svg.setPointerCapture(event.pointerId);
+    setIsPanning(true);
   }, []);
+
+  const onPointerMove = useCallback(
+    (event: ReactPointerEvent<SVGSVGElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const svg = svgRef.current;
+      if (!svg) return;
+
+      const dxClient = event.clientX - drag.startClientX;
+      const dyClient = event.clientY - drag.startClientY;
+      drag.movedPx = Math.max(drag.movedPx, Math.hypot(dxClient, dyClient));
+
+      const startSvg = clientToSvg(svg, drag.startClientX, drag.startClientY);
+      const nowSvg = clientToSvg(svg, event.clientX, event.clientY);
+      if (!startSvg || !nowSvg) return;
+
+      scheduleViewportState({
+        ...stateRef.current,
+        panX: drag.startPanX + (nowSvg.x - startSvg.x),
+        panY: drag.startPanY + (nowSvg.y - startSvg.y),
+      });
+    },
+    [scheduleViewportState]
+  );
 
   const onPointerUp = useCallback(
     (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -207,63 +239,72 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
   const zoomIn = useCallback(() => {
     const svg = svgRef.current;
     const anchor = svg ? svgCenter(svg) : { x: 0, y: 0 };
-    setZoomAt(state.zoom * ZOOM_STEP, anchor);
-  }, [setZoomAt, state.zoom]);
+    setZoomAt(stateRef.current.zoom * ZOOM_STEP, anchor);
+  }, [setZoomAt]);
 
   const zoomOut = useCallback(() => {
     const svg = svgRef.current;
     const anchor = svg ? svgCenter(svg) : { x: 0, y: 0 };
-    setZoomAt(state.zoom / ZOOM_STEP, anchor);
-  }, [setZoomAt, state.zoom]);
+    setZoomAt(stateRef.current.zoom / ZOOM_STEP, anchor);
+  }, [setZoomAt]);
 
   // Tween the viewport from its current state to a target ViewportState.
   // Shared by `reset()` (target = IDENTITY) and `recallViewBookmark()` (target =
   // the stored slot). Honors prefers-reduced-motion by snapping immediately.
-  const animateTo = useCallback((target: ViewportState, durationMs: number) => {
-    if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setState(target);
-      return;
-    }
-    setState((current) => {
-      const startZoom = current.zoom;
-      const startPanX = current.panX;
-      const startPanY = current.panY;
-      if (startZoom === target.zoom && startPanX === target.panX && startPanY === target.panY) {
-        return current;
+  const animateTo = useCallback(
+    (target: ViewportState, durationMs: number) => {
+      if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setViewportState(target);
+        return;
       }
-      const startTime = performance.now();
-      // Approximates cubic-bezier(0.22, 1, 0.36, 1) — same easing token used in the design system.
-      const ease = (t: number) => 1 - Math.pow(1 - t, 4);
-      const tick = (now: number) => {
-        const t = Math.min(1, (now - startTime) / durationMs);
-        const eased = ease(t);
-        setState({
-          zoom: startZoom + (target.zoom - startZoom) * eased,
-          panX: startPanX + (target.panX - startPanX) * eased,
-          panY: startPanY + (target.panY - startPanY) * eased,
-        });
-        if (t < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-      return current;
-    });
-  }, []);
+      setViewportState((current) => {
+        const startZoom = current.zoom;
+        const startPanX = current.panX;
+        const startPanY = current.panY;
+        if (startZoom === target.zoom && startPanX === target.panX && startPanY === target.panY) {
+          return current;
+        }
+        const startTime = performance.now();
+        // Approximates cubic-bezier(0.22, 1, 0.36, 1) — same easing token used in the design system.
+        const ease = (t: number) => 1 - Math.pow(1 - t, 4);
+        const tick = (now: number) => {
+          const t = Math.min(1, (now - startTime) / durationMs);
+          const eased = ease(t);
+          setViewportState({
+            zoom: startZoom + (target.zoom - startZoom) * eased,
+            panX: startPanX + (target.panX - startPanX) * eased,
+            panY: startPanY + (target.panY - startPanY) * eased,
+          });
+          if (t < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        return current;
+      });
+    },
+    [setViewportState]
+  );
 
   const reset = useCallback(() => {
     animateTo(IDENTITY, 250);
   }, [animateTo]);
 
-  const saveViewBookmark = useCallback(
-    (slot: ViewBookmarkSlot) => {
-      setViewBookmarks((prev) => {
-        const next = [...prev] as (ViewportState | null)[];
-        next[slot] = { zoom: state.zoom, panX: state.panX, panY: state.panY };
-        const frozen = next as ViewBookmarks;
-        writeBookmarks(frozen);
-        return frozen;
-      });
+  const saveViewBookmark = useCallback((slot: ViewBookmarkSlot) => {
+    setViewBookmarks((prev) => {
+      const next = [...prev] as (ViewportState | null)[];
+      next[slot] = stateRef.current;
+      const frozen = next as ViewBookmarks;
+      writeBookmarks(frozen);
+      return frozen;
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (stateRafRef.current !== null) {
+        cancelAnimationFrame(stateRafRef.current);
+      }
     },
-    [state.zoom, state.panX, state.panY]
+    []
   );
 
   const recallViewBookmark = useCallback(

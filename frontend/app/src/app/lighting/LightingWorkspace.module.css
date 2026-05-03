@@ -8,6 +8,20 @@
   min-height: 0;
 }
 
+.modeStripWrapper {
+  flex: 0 0 0;
+  height: 0;
+  overflow: hidden;
+  transition:
+    flex-basis var(--motion-duration-normal) var(--motion-easing-standard),
+    height var(--motion-duration-normal) var(--motion-easing-standard);
+}
+
+.modeStripWrapperOpen {
+  flex-basis: 40px;
+  height: 40px;
+}
+
 /* Wave 31 — docked strip stack between body and health bar. Each strip
    handles its own height transition (collapsed = 0 px, open = its own
    height). The body's `flex: 1 1 auto` reclaims any space the stack
@@ -34,14 +48,29 @@
   height: 60px;
 }
 
+.dmxStripContent {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity var(--motion-duration-normal) var(--motion-easing-standard),
+    transform var(--motion-duration-normal) var(--motion-easing-standard);
+}
+
+.dmxStripWrapperOpen .dmxStripContent {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .dmxStripWrapper {
+  .dmxStripWrapper,
+  .dmxStripContent,
+  .modeStripWrapper {
     transition: none;
   }
 }
 
 .body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   display: grid;
   grid-template-columns:
     var(--lighting-rail-width, 280px)

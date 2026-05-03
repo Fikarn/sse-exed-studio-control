@@ -4,6 +4,7 @@
     border-top: 1px solid var(--color-bg-stroke);
     display: flex;
     align-items: stretch;
+    flex: 0 0 var(--size-health-bar-height);
     height: var(--size-health-bar-height);
     position: relative;
   }

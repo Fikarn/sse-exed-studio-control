@@ -2321,18 +2321,20 @@ export function LightingWorkspaceSurface({
 
       <LightingBridgeBanner reachable={bridgeReachable} bridgeIp={bridgeIp} universe={bridgeUniverse} />
 
-      {previewMode ? (
-        <PreviewBanner
-          dirty={previewDirty}
-          targetSceneName={activeScene?.name ?? null}
-          busy={
-            busyActions.has("preview-mode") || busyActions.has("preview-discard") || busyActions.has("scene-resave")
-          }
-          onSave={() => void handleResaveScene()}
-          onDiscard={() => void handleDiscardPreview()}
-          onExit={requestExitPreview}
-        />
-      ) : null}
+      <div className={`${styles.modeStripWrapper} ${previewMode ? styles.modeStripWrapperOpen : ""}`}>
+        {previewMode ? (
+          <PreviewBanner
+            dirty={previewDirty}
+            targetSceneName={activeScene?.name ?? null}
+            busy={
+              busyActions.has("preview-mode") || busyActions.has("preview-discard") || busyActions.has("scene-resave")
+            }
+            onSave={() => void handleResaveScene()}
+            onDiscard={() => void handleDiscardPreview()}
+            onExit={requestExitPreview}
+          />
+        ) : null}
+      </div>
 
       <div
         className={`${styles.body} ${columns.isResizing ? styles.bodyResizing : ""}`}
@@ -2524,14 +2526,16 @@ export function LightingWorkspaceSurface({
           aria-hidden={!dmxStripOn}
         >
           {renderDmxStrip ? (
-            <DMXCompactStrip
-              snapshot={lightingDmxMonitorSnapshot}
-              fixtures={liveFixtures}
-              bridgeReachable={bridgeReachable}
-              universe={bridgeUniverse}
-              onOpenMonitor={() => setDmxMonitorOpen(true)}
-              onClose={() => setDmxStripOn(false)}
-            />
+            <div className={styles.dmxStripContent}>
+              <DMXCompactStrip
+                snapshot={lightingDmxMonitorSnapshot}
+                fixtures={liveFixtures}
+                bridgeReachable={bridgeReachable}
+                universe={bridgeUniverse}
+                onOpenMonitor={() => setDmxMonitorOpen(true)}
+                onClose={() => setDmxStripOn(false)}
+              />
+            </div>
           ) : null}
         </div>
       </div>

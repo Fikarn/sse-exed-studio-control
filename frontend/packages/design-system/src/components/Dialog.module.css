@@ -14,6 +14,36 @@
   overflow: auto;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .overlay {
+    animation: sseDialogOverlayIn 140ms var(--motion-easing-standard);
+  }
+
+  .dialog {
+    animation: sseDialogPanelIn 160ms var(--motion-easing-standard);
+  }
+}
+
+@keyframes sseDialogOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sseDialogPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .title {
   margin: 0;
   font: var(--font-weight-semibold) var(--font-size-xl) / 1.2 var(--font-family-sans);
