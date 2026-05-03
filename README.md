@@ -180,7 +180,7 @@ npm run tauri:cutover:candidate
 npm run ci
 ```
 
-`tauri:setup-support:qualify` and `tauri:workspaces:qualify` launch the real Tauri dev shell on the fixed local port `4173`. Run them serially and do not run them alongside `npm run dev`, `npm run preview`, or Playwright preview.
+`tauri:setup-support:qualify` and `tauri:workspaces:qualify` launch the real Tauri dev shell on the fixed local port `4173`. Run them serially and do not run them alongside the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`) or Playwright preview.
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 

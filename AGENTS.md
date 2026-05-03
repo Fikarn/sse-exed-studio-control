@@ -2,6 +2,14 @@
 
 Entry point for Codex-assisted work in this repo. Keep it short. Follow the pointers into `docs/` for anything that needs depth.
 
+## How to work here
+
+- Inspect the repo before editing. For broad orientation, read `README.md`, `docs/DEVELOPER_QUICKSTART.md`, `docs/HANDOFF.md`, and the docs linked from the section below.
+- Derive commands and conventions from checked-in files (`package.json`, workspace `package.json` files, `native/Cargo.toml`, `.github/workflows/dev-checks.yml`, and `docs/DEVELOPMENT.md`). Do not invent lanes.
+- For multi-step or risky work, make a short plan after inspection and before edits.
+- Keep changes inside the right layer. If a task crosses the shell/engine/protocol boundary, state the boundary impact before changing files.
+- If validation cannot run, say exactly why and list the next command a human should run. Do not silently stop at partial verification.
+
 ## What this product is
 
 `SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. Planning, DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`; there is no browser path.
@@ -45,6 +53,45 @@ Extend tokens and shared components additively. Do not bypass the frontend desig
 
 Build & run commands live in `docs/DEVELOPMENT.md` (`npm run native:foundation`, `native:check`, `native:test`, `native:acceptance`, `frontend:foundation`, `tauri:foundation`, packaging and installer lanes, etc.). Use them; don't invent new ones.
 
+## Command map
+
+Install and environment:
+
+- `npm install` — install root npm workspace dependencies.
+- `npm run doctor` — normal local environment check.
+- `npm run doctor:release` — release-host preflight; expects QtIFW tooling when release evidence is needed.
+
+Code health:
+
+- `npm run format:check` / `npm run format` — Prettier check/write.
+- `npm run lint` / `npm run lint:fix` — ESLint check/fix.
+- `npm run frontend:typecheck` — TypeScript typecheck for all npm workspaces that expose `typecheck`.
+- `npm run rust:fmt:check` — Rust formatting check under `native/`.
+- `npm run rust:clippy` — Rust clippy for the native workspace with warnings denied by the command.
+- `npm run protocol:check` / `npm run protocol:generate` — check or regenerate protocol artifacts from `native/protocol/v1.contract.json`.
+- `npm run dev:check` — full local code-health bundle: format, lint, rustfmt, clippy, protocol, frontend typecheck, native check, native tests.
+- `npm run ci` — repo-local convenience gate: format, release metadata check, native foundation.
+
+Frontend and selected shell:
+
+- `npm run frontend:tokens:build` — regenerate design token outputs.
+- `npm run frontend:foundation` — protocol generation, tokens build, typecheck, Storybook build, fixture check, Playwright.
+- `npm run tauri:dev` — run the selected Tauri dev shell.
+- `npm run tauri:build` — build the selected Tauri shell.
+- `npm run tauri:foundation` — protocol generation, engine build, Tauri build, Tauri smoke.
+- `npm run tauri:setup-support:qualify` and `npm run tauri:workspaces:qualify` — live shell qualification lanes; run serially because they bind fixed local ports.
+- `npm run tauri:visual:review` — required visual evidence lane for operator-visible layout/presentation changes.
+
+Native and release:
+
+- `npm run native:check` — `cargo check --workspace` under `native/`.
+- `npm run native:test` — `cargo test --workspace` under `native/`.
+- `npm run native:engine:build` — build `studio-control-engine`.
+- `npm run native:foundation` — native shipping foundation lane.
+- `npm run native:acceptance` — native acceptance lane.
+- `npm run release:check` / `npm run release:verify` — release metadata and release verification.
+- `npm run native:release:mac:local` and `npm run native:release:win:local` — target-host shipping release gates when QtIFW tools are installed.
+
 ## Visual Review Discipline
 
 Every operator-visible change to the selected Tauri surface must:
@@ -76,6 +123,24 @@ Authoritative source: `docs/RELEASE.md` and `docs/PRODUCTIZATION_PLAN.md`.
 Only one piece of pre-v2.0.0 code is intentionally retained:
 
 - `native/rust-engine/src/legacy_import.rs` — one-way importer that reads a legacy Electron `db.json` on first native launch (env var `SSE_LEGACY_DB_PATH`). Do not touch it as part of new feature work; do not extend it; do not mirror it elsewhere.
+
+## Generated and local-only files
+
+- Protocol source of truth: `native/protocol/v1.contract.json` and `native/protocol/v1.md`. Generated outputs are `native/protocol/generated/v1.schema.json`, `frontend/packages/engine-client/src/generated/protocol.ts`, and `frontend/packages/engine-client/src/generated/snapshots/**`; update them with `npm run protocol:generate`.
+- Token source of truth: `frontend/packages/tokens/src/source/tokens.json` and `frontend/packages/tokens/src/tokens/**`. Generated outputs under `frontend/packages/tokens/src/generated/**` come from `npm run frontend:tokens:build`.
+- Do not hand-edit generated outputs unless the task is explicitly about the generator or the generated diff is produced by the checked-in command.
+- Keep ignored local outputs out of commits: `node_modules/`, `release/`, `artifacts/`, `.tools/`, `.DS_Store`, `.swift-module-cache/`, `native/**/target/`, `native/**/build/`, `frontend/**/dist/`, `frontend/**/storybook-static/`, Playwright reports, and test results.
+
+## Done criteria for future Codex tasks
+
+A task is done when:
+
+- the implementation stays inside the architecture boundary and does not move state, persistence, hardware policy, or DB logic into React;
+- relevant generated artifacts are regenerated or explicitly confirmed unchanged;
+- the smallest validation lane covering the risk has run, or the blocker is stated with the exact command that still needs to run;
+- operator-visible changes have Tauri visual review evidence and, when needed, human inspection on the `2560×1440` review surface;
+- docs, release notes, or `CHANGELOG.md` are updated when behavior, setup, release posture, or user-visible behavior changes;
+- the final handoff lists files changed, verification commands and results, blockers/unknowns, and useful follow-up.
 
 ## Where to look
 

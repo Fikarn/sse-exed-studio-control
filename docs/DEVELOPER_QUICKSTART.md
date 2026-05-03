@@ -77,6 +77,8 @@ Run the fast local gate while working:
 npm run dev:check
 ```
 
+`dev:check` is the normal all-around local code-health gate. It runs Prettier check, ESLint, Rust format check, clippy, protocol artifact check, frontend typecheck, native check, and native tests.
+
 Launch the selected app for visual review:
 
 ```bash
@@ -90,7 +92,7 @@ npm run tauri:foundation
 npm run native:foundation
 ```
 
-Do not run `tauri:setup-support:qualify`, `tauri:workspaces:qualify`, Playwright preview, `npm run dev`, or `npm run preview` concurrently. Those lanes use fixed localhost ports and concurrent servers make the evidence invalid.
+Do not run `tauri:setup-support:qualify`, `tauri:workspaces:qualify`, Playwright preview, or the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`) concurrently. Those lanes use fixed localhost ports and concurrent servers make the evidence invalid.
 
 ## Visual Review On Retina MacBooks
 
@@ -118,14 +120,46 @@ Use the smallest gate that covers the risk.
 | Persistence/recovery/release risk | `npm run native:acceptance`, then target-host release gates if release-critical          |
 | Release metadata or packaging     | `npm run release:verify` plus macOS/Windows target-host release gates                    |
 
-`npm run dev:check` runs the default code-health bundle:
+## Core Command Reference
+
+Setup:
+
+```bash
+npm install
+npm run doctor
+npm run doctor:release
+```
+
+Format, lint, and typecheck:
 
 ```bash
 npm run format:check
-npm run protocol:check
+npm run format
+npm run lint
+npm run lint:fix
 npm run frontend:typecheck
+npm run rust:fmt:check
+npm run rust:clippy
+```
+
+Protocol and generated artifacts:
+
+```bash
+npm run protocol:check
+npm run protocol:generate
+```
+
+Build and test:
+
+```bash
+npm run native:engine:build
+npm run tauri:build
+npm run native:shipping:build
 npm run native:check
 npm run native:test
+npm run frontend:foundation
+npm run tauri:foundation
+npm run native:foundation
 ```
 
 ## Release And Target-Host Gates
@@ -202,7 +236,7 @@ For major upgrades:
 
 ## Troubleshooting
 
-- `tauri:visual:review` or Playwright reports port conflicts: stop dev/preview servers and rerun the lane serially.
+- `tauri:visual:review` or Playwright reports port conflicts: stop frontend dev/preview servers and rerun the lane serially.
 - `doctor` warns about Node: use `nvm use 20` for target-host alignment.
 - `doctor:release` fails on QtIFW: set `SSE_QT_IFW_BINARYCREATOR` and `SSE_QT_IFW_REPOGEN`.
 - Windows evidence says the worktree is dirty: remove generated evidence or rerun only after committing/stashing source changes.
