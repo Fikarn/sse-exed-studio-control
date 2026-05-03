@@ -3,15 +3,19 @@ import { Bookmark, Minus, Plus, RotateCcw } from "lucide-react";
 
 import { ContextMenu, Tooltip, type ContextMenuItem } from "@sse/design-system";
 
-import type { ViewBookmarks, ViewBookmarkSlot } from "../useStagePlotViewport";
+import type { StagePlotZoomMode, ViewBookmarks, ViewBookmarkSlot } from "../useStagePlotViewport";
 
 import styles from "./StagePlotControls.module.css";
 
 export interface StagePlotControlsProps {
   zoom: number;
+  zoomMode: StagePlotZoomMode;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onReset: () => void;
+  onFitRoom: () => void;
+  onFillDesk: () => void;
+  onActualSize: () => void;
   /** Wave 31 — view bookmarks (I7). When omitted, the View slot row is not
    *  rendered. */
   viewBookmarks?: ViewBookmarks;
@@ -24,9 +28,13 @@ const SLOTS: readonly ViewBookmarkSlot[] = [0, 1, 2];
 
 export function StagePlotControls({
   zoom,
+  zoomMode,
   onZoomIn,
   onZoomOut,
   onReset,
+  onFitRoom,
+  onFillDesk,
+  onActualSize,
   viewBookmarks,
   onSaveViewBookmark,
   onRecallViewBookmark,
@@ -66,6 +74,38 @@ export function StagePlotControls({
 
   return (
     <div className={styles.controls} role="toolbar" aria-label="Stage plot view">
+      <span className={styles.modeGroup} aria-label="Stage plot zoom mode">
+        <Tooltip content="Fit the full room without stretching spatial proportions" placement="top">
+          <button
+            type="button"
+            className={`${styles.modeButton} ${zoomMode === "fitRoom" ? styles.modeButtonActive : ""}`}
+            onClick={onFitRoom}
+            aria-pressed={zoomMode === "fitRoom"}
+          >
+            Fit Room
+          </button>
+        </Tooltip>
+        <Tooltip content="Fill the desk surface using the current operator-familiar plot stretch" placement="top">
+          <button
+            type="button"
+            className={`${styles.modeButton} ${zoomMode === "fillDesk" ? styles.modeButtonActive : ""}`}
+            onClick={onFillDesk}
+            aria-pressed={zoomMode === "fillDesk"}
+          >
+            Fill Desk
+          </button>
+        </Tooltip>
+        <Tooltip content="Reset pan and content zoom to 100%" placement="top">
+          <button
+            type="button"
+            className={`${styles.modeButton} ${zoomMode === "actual" ? styles.modeButtonActive : ""}`}
+            onClick={onActualSize}
+            aria-pressed={zoomMode === "actual"}
+          >
+            100%
+          </button>
+        </Tooltip>
+      </span>
       <Tooltip content="Zoom out · scroll wheel works too" placement="top">
         <button type="button" className={styles.button} onClick={onZoomOut} aria-label="Zoom out">
           <Minus aria-hidden="true" size={14} strokeWidth={2} />

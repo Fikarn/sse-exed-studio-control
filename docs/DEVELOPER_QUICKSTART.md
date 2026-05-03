@@ -98,12 +98,14 @@ Do not run `tauri:setup-support:qualify`, `tauri:workspaces:qualify`, Playwright
 
 The production target is fullscreen `2560x1440` on a fixed second monitor. Retina MacBook logical resolution is not a valid layout authority.
 
-For built-in-display development, use the BetterDisplay workflow from [DEVELOPMENT.md](./DEVELOPMENT.md):
+For built-in-display development, use the scaled studio preview workflow from [DEVELOPMENT.md](./DEVELOPMENT.md):
 
-- configure an exact or mirrored `2560x1440` review surface
-- use that surface for human visual inspection
+- run the app with `npm run tauri:dev`
+- open `⌘K` and run `Studio Preview: Enter 2560x1440 Review`
+- review the proportional `2560x1440` studio canvas scaled into the current window
+- exit scaled preview before judging native compact/windowed behavior
 - keep `npm run tauri:visual:review` as the repeatable capture lane
-- do not accept fit/layout decisions from the default Retina logical desktop
+- do not accept `studioFull` composition decisions from the unscaled Retina logical desktop
 
 ## Validation Matrix
 
@@ -116,7 +118,7 @@ Use the smallest gate that covers the risk.
 | Protocol artifacts                | `npm run protocol:check`                                                                 |
 | Rust engine logic                 | `npm run native:check`, `npm run native:test`                                            |
 | Shell startup/integration         | `npm run tauri:foundation`, `npm run native:foundation`                                  |
-| Operator-visible layout           | `npm run tauri:visual:review` plus human review on the `2560x1440` surface               |
+| Operator-visible layout           | `npm run tauri:visual:review` plus scaled studio preview or fixed-monitor human review   |
 | Persistence/recovery/release risk | `npm run native:acceptance`, then target-host release gates if release-critical          |
 | Release metadata or packaging     | `npm run release:verify` plus macOS/Windows target-host release gates                    |
 
@@ -240,7 +242,7 @@ For major upgrades:
 - `doctor` warns about Node: use `nvm use 24` for target-host alignment.
 - `doctor:release` fails on QtIFW: set `SSE_QT_IFW_BINARYCREATOR` and `SSE_QT_IFW_REPOGEN`.
 - Windows evidence says the worktree is dirty: remove generated evidence or rerun only after committing/stashing source changes.
-- The app looks compressed on a Retina MacBook: do not judge layout until the BetterDisplay `2560x1440` review surface is active.
+- The app looks compressed on a Retina MacBook: do not judge `studioFull` composition until `Studio Preview: Enter 2560x1440 Review` is active, or until you are on the fixed studio monitor.
 
 ## Do Not Touch Without A Plan
 

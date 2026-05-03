@@ -79,6 +79,25 @@
     6px
     var(--lighting-inspector-width, 360px);
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.body[data-layout-mode="desktopCompact"] {
+  grid-template-columns:
+    minmax(220px, var(--lighting-rail-width, 260px))
+    6px
+    minmax(var(--operator-stage-min-width, 560px), 1fr)
+    6px
+    minmax(280px, var(--lighting-inspector-width, 320px));
+}
+
+.body[data-layout-mode="narrowUtility"],
+.body[data-layout-mode="constrained"] {
+  grid-template-columns:
+    minmax(240px, var(--lighting-rail-width, 300px))
+    6px
+    minmax(var(--operator-stage-min-width, 520px), 1fr);
 }
 
 .bodyResizing {
@@ -91,7 +110,50 @@
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  min-height: var(--operator-stage-min-height, 480px);
   background: var(--color-bg-canvas);
+}
+
+.inspectorDrawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(4, 8, 14, 0.42);
+}
+
+.inspectorDrawer {
+  width: min(420px, calc(100vw - 48px));
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--color-bg-stroke);
+  background: var(--color-bg-canvas);
+  box-shadow: -24px 0 72px rgba(0, 0, 0, 0.36);
+}
+
+.inspectorDrawerHeader {
+  flex: 0 0 calc(42px * var(--operator-ui-scale-factor, 1));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(12px * var(--operator-ui-scale-factor, 1));
+  padding: 0 calc(12px * var(--operator-ui-scale-factor, 1));
+  border-bottom: 1px solid var(--color-bg-stroke);
+  background: var(--color-bg-soft);
+  color: var(--color-brand-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: var(--operator-font-size-sm, 11px);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.inspectorDrawer > aside {
+  flex: 1 1 auto;
+  border-left: 0;
 }
 
 .paletteQuickOverlay {
@@ -124,13 +186,13 @@
 }
 
 .paletteQuickHeader strong {
-  font-size: 14px;
+  font-size: var(--operator-font-size-xl, 14px);
   color: var(--color-brand-text-primary);
 }
 
 .paletteQuickHeader span {
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   color: var(--color-brand-text-muted);
   text-transform: uppercase;
 }
@@ -155,7 +217,7 @@
   margin: 0;
   padding: 10px 12px 0;
   color: var(--color-brand-text-secondary);
-  font-size: 12px;
+  font-size: var(--operator-font-size-md, 12px);
 }
 
 .paletteQuickSection {
@@ -169,7 +231,7 @@
 .paletteQuickSectionTitle {
   margin: 0 0 8px;
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   font-weight: 700;
   letter-spacing: 0;
   color: var(--color-brand-text-muted);

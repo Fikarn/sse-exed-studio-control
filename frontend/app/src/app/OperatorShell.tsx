@@ -7,9 +7,12 @@ import { StagePlotPlaceholder } from "@sse/shared-graphics";
 
 import styles from "./OperatorShell.module.css";
 import { createShellEnvironment } from "./createShellEnvironment";
+import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
+import { OPERATOR_UI_SCALES } from "./operatorLayout";
 import { buildContextSections, buildMonitorItems, isEditableTarget } from "./shellData";
 import { SetupSupportPilot } from "./setup/SetupSupportPilot";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
+import { enterStudioFullscreen, resetWindowLayout, switchToWindowedLayout } from "./shellCommands";
 import { useTauriShellTestBridge } from "./tauriShellTestBridge";
 import { AudioWorkspace } from "./audio/AudioWorkspace";
 import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
@@ -52,7 +55,9 @@ export function OperatorShell() {
   return (
     <ToastProvider>
       <PaletteProvider>
-        <OperatorShellInner />
+        <OperatorLayoutProvider>
+          <OperatorShellInner />
+        </OperatorLayoutProvider>
       </PaletteProvider>
     </ToastProvider>
   );
@@ -61,6 +66,7 @@ export function OperatorShell() {
 function OperatorShellInner() {
   const environment = useMemo(() => createShellEnvironment(), []);
   const palette = usePalette();
+  const { reviewSurface, setReviewSurface, setUiScale } = useOperatorLayout();
   const shellState = useShellSnapshot(environment.store);
   useTauriShellTestBridge(shellState, environment.store);
   const activeWorkspace = shellState.activeWorkspace;
@@ -107,6 +113,14 @@ function OperatorShellInner() {
   // register from there with `when` predicates so they only surface when the
   // workspace is active.
   useEffect(() => {
+    const uiScaleActions = OPERATOR_UI_SCALES.map((scale) => ({
+      id: `system:ui-scale:${scale}`,
+      label: `Set UI scale to ${scale}%`,
+      group: "System",
+      keywords: ["ui", "scale", "density", "compact", String(scale)],
+      action: () => setUiScale(scale),
+    }));
+
     return palette.register([
       {
         id: "workspace:setup",
@@ -156,8 +170,46 @@ function OperatorShellInner() {
         shortcut: "?",
         action: () => setShowShortcutGuide(true),
       },
+      {
+        id: "system:enter-studio-fullscreen",
+        label: "Enter Studio Fullscreen",
+        group: "Window",
+        keywords: ["studio", "fullscreen", "monitor", "window"],
+        action: () => void enterStudioFullscreen(),
+      },
+      {
+        id: "system:use-windowed-layout",
+        label: "Use Windowed Layout",
+        group: "Window",
+        keywords: ["windowed", "layout", "resize", "monitor"],
+        action: () => void switchToWindowedLayout(),
+      },
+      {
+        id: "system:reset-window-layout",
+        label: "Reset Window Layout",
+        group: "Window",
+        keywords: ["reset", "window", "layout", "monitor"],
+        action: () => void resetWindowLayout(),
+      },
+      {
+        id: "system:enter-studio-preview",
+        label: "Studio Preview: Enter 2560x1440 Review",
+        group: "Window",
+        keywords: ["studio", "preview", "scaled", "review", "2560", "1440", "layout"],
+        when: () => reviewSurface !== "studioPreview",
+        action: () => setReviewSurface("studioPreview"),
+      },
+      {
+        id: "system:exit-studio-preview",
+        label: "Studio Preview: Exit Review",
+        group: "Window",
+        keywords: ["studio", "preview", "scaled", "review", "native", "layout"],
+        when: () => reviewSurface === "studioPreview",
+        action: () => setReviewSurface("native"),
+      },
+      ...uiScaleActions,
     ]);
-  }, [palette, tryNavigateWorkspace]);
+  }, [palette, reviewSurface, setReviewSurface, setUiScale, tryNavigateWorkspace]);
 
   const workspaces = useMemo(
     () =>

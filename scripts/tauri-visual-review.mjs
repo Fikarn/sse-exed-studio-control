@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import process from "node:process";
@@ -21,6 +21,10 @@ const fixtures = readListFlag("--fixtures", [
   "planning-populated",
 ]);
 const sizes = readSizeFlag("--sizes", [
+  { height: 800, label: "1280x800", width: 1280 },
+  { height: 900, label: "1440x900", width: 1440 },
+  { height: 960, label: "1600x960", width: 1600 },
+  { height: 1117, label: "1728x1117", width: 1728 },
   { height: 1080, label: "1920x1080", width: 1920 },
   { height: 1440, label: "2560x1440", width: 2560 },
 ]);
@@ -73,6 +77,44 @@ function resolveGitSha() {
   });
 
   return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function expectedLayoutMode(size) {
+  if (size.width >= 1920 && size.height >= 1080) return "studioFull";
+  if (size.width >= 1440 && size.height >= 900) return "desktopCompact";
+  if (size.width >= 1280 && size.height >= 800) return "narrowUtility";
+  return "constrained";
+}
+
+function prepareOutputRoot() {
+  mkdirSync(outputRoot, { recursive: true });
+  for (const entry of readdirSync(outputRoot, { withFileTypes: true })) {
+    if (!entry.isFile()) {
+      continue;
+    }
+    if (entry.name === "fixture-viewport-summary.json" || entry.name.endsWith(".png")) {
+      unlinkSync(path.join(outputRoot, entry.name));
+    }
+  }
+}
+
+function assertShellWindowRecovery() {
+  const manifestPath = path.join(rootDir, "native/Cargo.toml");
+  const cargoArgs = [
+    "test",
+    "--manifest-path",
+    manifestPath,
+    "--package",
+    "sse-exed-tauri-shell",
+    "--quiet",
+    "shell_window_preferences",
+  ];
+  run("cargo", cargoArgs);
+  return {
+    assertion: "Rust unit coverage exercises stale saved-monitor fallback and monitor identity matching",
+    fallback: "centered 1600x960 windowed layout when a saved monitor cannot be matched",
+    source: `cargo ${cargoArgs.map((value) => (value === manifestPath ? "native/Cargo.toml" : value)).join(" ")}`,
+  };
 }
 
 function run(command, commandArgs) {
@@ -206,6 +248,8 @@ async function captureFixture({ browser, fixture, port, size }) {
   await page.goto(url, { waitUntil: "networkidle" });
   await page.waitForTimeout(500);
 
+  const responsiveAssertions = fixture === "lighting-populated" ? await assertLightingResponsive({ page, size }) : null;
+
   const metrics = await page.evaluate(() => ({
     bodyScrollHeight: document.body?.scrollHeight ?? 0,
     bodyScrollWidth: document.body?.scrollWidth ?? 0,
@@ -232,12 +276,129 @@ async function captureFixture({ browser, fixture, port, size }) {
       metrics.bodyScrollWidth <= metrics.innerWidth &&
       metrics.bodyScrollHeight <= metrics.innerHeight,
     metrics,
+    responsiveAssertions,
     size: size.label,
   };
 }
 
+async function assertLightingResponsive({ page, size }) {
+  const expectedMode = expectedLayoutMode(size);
+  const details = await page.evaluate(() => {
+    const root = document.querySelector("[data-operator-layout-root]");
+    const stage = document.querySelector('[data-testid="lighting-stage"]');
+    const primaryControls = Array.from(document.querySelectorAll("[data-toolbar-primary]"));
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    return {
+      devicePixelRatio: window.devicePixelRatio,
+      layoutMode: root?.dataset.layoutMode ?? null,
+      primaryControls: primaryControls.map((control) => {
+        const rect = control.getBoundingClientRect();
+        return {
+          id: control.dataset.toolbarPrimary ?? "unknown",
+          fits:
+            rect.width > 0 &&
+            rect.height > 0 &&
+            rect.left >= -1 &&
+            rect.top >= -1 &&
+            rect.right <= viewportWidth + 1 &&
+            rect.bottom <= viewportHeight + 1,
+        };
+      }),
+      stage: stage
+        ? {
+            height: stage.getBoundingClientRect().height,
+            width: stage.getBoundingClientRect().width,
+          }
+        : null,
+    };
+  });
+
+  if (details.layoutMode !== expectedMode) {
+    throw new Error(
+      `Lighting layout mode mismatch at ${size.label}: expected ${expectedMode}, got ${details.layoutMode ?? "missing"}.`
+    );
+  }
+
+  const primaryIds = details.primaryControls.map((entry) => entry.id).sort();
+  const expectedPrimaryIds = ["add", "overflow", "patch", "preview", "search", "status", "title"];
+  if (JSON.stringify(primaryIds) !== JSON.stringify(expectedPrimaryIds)) {
+    throw new Error(`Lighting toolbar primary controls mismatch at ${size.label}: ${primaryIds.join(", ")}`);
+  }
+
+  const clipped = details.primaryControls.filter((entry) => !entry.fits);
+  if (clipped.length > 0) {
+    throw new Error(
+      `Lighting toolbar primary controls clipped at ${size.label}: ${clipped.map((entry) => entry.id).join(", ")}`
+    );
+  }
+
+  const stageMinWidth = expectedMode === "narrowUtility" ? 520 : 560;
+  const stageMinHeight = expectedMode === "narrowUtility" ? 400 : 440;
+  if (!details.stage || details.stage.width < stageMinWidth || details.stage.height < stageMinHeight) {
+    throw new Error(
+      `Lighting stage collapsed at ${size.label}: ${details.stage ? `${details.stage.width}x${details.stage.height}` : "missing"}.`
+    );
+  }
+
+  if (expectedMode !== "studioFull") {
+    await page.locator('[data-testid="lighting-toolbar-overflow"]').click();
+    const menuLabels = await page.locator('[role="menuitem"]').allTextContents();
+    for (const label of ["Highlight selection", "Solo selection", "Find selected fixtures"]) {
+      if (!menuLabels.some((entry) => entry.includes(label))) {
+        throw new Error(`Lighting overflow missing '${label}' at ${size.label}.`);
+      }
+    }
+    await page.keyboard.press("Escape");
+  }
+
+  if (expectedMode === "narrowUtility") {
+    const drawer = page.locator('[data-testid="lighting-inspector-drawer"]');
+    if ((await drawer.count()) !== 0) {
+      throw new Error(`Lighting inspector drawer should start closed at ${size.label}.`);
+    }
+    await page.locator('[data-testid="lighting-open-inspector"]').click();
+    await drawer.waitFor({ state: "visible" });
+    if (!(await drawer.getByLabel("Fixture intensity").isVisible())) {
+      throw new Error(`Lighting inspector drawer did not expose selected fixture controls at ${size.label}.`);
+    }
+    await drawer.getByRole("button", { name: "Close" }).click();
+    await drawer.waitFor({ state: "detached" });
+  }
+
+  return {
+    devicePixelRatio: details.devicePixelRatio,
+    layoutMode: details.layoutMode,
+    primaryControls: primaryIds,
+    stage: details.stage,
+  };
+}
+
+async function assertDprIndependentLightingMode({ browser, port }) {
+  const modes = [];
+  for (const deviceScaleFactor of [1, 2]) {
+    const context = await browser.newContext({
+      deviceScaleFactor,
+      timezoneId: "Europe/Stockholm",
+      viewport: { height: 900, width: 1440 },
+    });
+    const page = await context.newPage();
+    await page.goto(`http://127.0.0.1:${port}/?fixture=lighting-populated&transport=fixture`, {
+      waitUntil: "networkidle",
+    });
+    await page.waitForTimeout(250);
+    const mode = await page.locator("[data-operator-layout-root]").getAttribute("data-layout-mode");
+    modes.push({ deviceScaleFactor, mode });
+    await context.close();
+  }
+  if (!modes.every((entry) => entry.mode === "desktopCompact")) {
+    throw new Error(`Layout mode must follow CSS viewport size, not devicePixelRatio: ${JSON.stringify(modes)}`);
+  }
+  return modes;
+}
+
 async function main() {
-  mkdirSync(outputRoot, { recursive: true });
+  prepareOutputRoot();
 
   run(npmCommand, ["run", "build", "--workspace", "frontend/app"]);
   await assertTcpPortAvailable(previewPort);
@@ -254,14 +415,18 @@ async function main() {
         results.push(await captureFixture({ browser, fixture, port: previewPort, size }));
       }
     }
+    const dprLayoutCheck = await assertDprIndependentLightingMode({ browser, port: previewPort });
     await browser.close();
+    const shellWindowRecovery = assertShellWindowRecovery();
 
     const summary = {
       capturedAt: new Date().toISOString(),
+      dprLayoutCheck,
       fixtures,
       githubSha: resolveGitSha(),
       outputRoot,
       results,
+      shellWindowRecovery,
       sizes: sizes.map((size) => size.label),
       source: "Vite preview fixture transport",
     };

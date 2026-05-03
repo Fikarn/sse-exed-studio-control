@@ -2,13 +2,13 @@
   display: flex;
   align-items: center;
   flex: 0 0 var(--size-toolbar-height);
-  gap: 14px;
+  gap: var(--operator-toolbar-gap, 14px);
   height: var(--size-toolbar-height);
-  padding: 0 22px;
+  padding: 0 var(--operator-toolbar-padding-x, 22px);
   background: linear-gradient(180deg, var(--color-bg-canvas) 0%, var(--color-bg-soft) 100%);
   border-bottom: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-ui);
-  font-size: 13px;
+  font-size: var(--operator-font-size-lg, 13px);
   color: var(--color-brand-text-primary);
   position: relative;
   overflow: visible;
@@ -43,10 +43,18 @@
   font-family: var(--font-family-display);
   font-variation-settings: "opsz" 24;
   font-weight: 600;
-  font-size: 16px;
+  font-size: var(--operator-font-size-title-sm, 16px);
   color: var(--color-brand-text-primary);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   flex-shrink: 0;
+  min-width: 0;
+  max-width: 340px;
+}
+
+.title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .titleIcon {
@@ -72,7 +80,7 @@
   border: 1px solid var(--color-brand-yellow-border);
   color: var(--color-brand-yellow);
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-weight: 600;
@@ -90,7 +98,7 @@
   border: 1px solid var(--color-brand-blue-border);
   color: var(--color-brand-blue-hot);
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-weight: 700;
@@ -115,7 +123,7 @@
   background: var(--color-bg-raised);
   border: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: var(--operator-font-size-sm, 11px);
   letter-spacing: 0.04em;
   font-weight: 500;
   font-feature-settings: "tnum", "zero";
@@ -123,6 +131,9 @@
   box-shadow: var(--shadow-inset-hi);
   white-space: nowrap;
   flex-shrink: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chipGreen {
@@ -152,13 +163,13 @@
 }
 
 .statValue {
-  font-size: 14px;
+  font-size: var(--operator-font-size-xl, 14px);
   font-weight: 600;
   color: var(--color-brand-text-primary);
 }
 
 .statLabel {
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
@@ -167,13 +178,14 @@
 
 .spacer {
   flex: 1;
+  min-width: 0;
 }
 
 .fadeControl {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
+  height: var(--operator-toolbar-control-height, 28px);
   padding: 0 8px 0 10px;
   border-radius: var(--radius-tight-md);
   background: var(--color-bg-default);
@@ -191,7 +203,7 @@
 
 .fadeLabel,
 .fadeUnit {
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   font-weight: 600;
   line-height: 1;
   text-transform: uppercase;
@@ -207,7 +219,7 @@
   border: 0;
   color: var(--color-brand-text-primary);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--operator-font-size-md, 12px);
   line-height: 1;
   outline: none;
   text-align: right;
@@ -228,14 +240,14 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 28px;
+  height: var(--operator-toolbar-control-height, 28px);
   padding: 0 11px;
   border-radius: var(--radius-tight-md);
   background: var(--color-bg-default);
   border: 1px solid var(--color-bg-border);
   color: var(--color-brand-text-secondary);
   font-family: var(--font-family-ui);
-  font-size: 12px;
+  font-size: var(--operator-font-size-md, 12px);
   min-width: 0;
   flex: 0 1 240px;
   position: relative;
@@ -281,7 +293,7 @@
   padding: 4px 7px 6px;
   color: var(--color-brand-text-muted);
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -325,12 +337,12 @@
   flex: 0 0 auto;
   color: var(--color-brand-text-muted);
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
 }
 
 .kbd {
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   background: var(--color-bg-soft);
   border: 1px solid var(--color-bg-border);
   border-bottom-width: 2px;
@@ -338,6 +350,7 @@
   padding: 1px 5px;
   margin-left: 6px;
   color: var(--color-brand-text-secondary);
+  display: var(--operator-toolbar-kbd-display, inline);
 }
 
 .kebab {
@@ -352,6 +365,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  height: var(--operator-toolbar-control-height, 28px);
 }
 
 .kebab:hover {
@@ -367,4 +381,103 @@
 .kebab:active {
   transform: translateY(0);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.narrowHidden {
+  display: none;
+}
+
+.iconFirstButton {
+  flex-shrink: 0;
+}
+
+.toolbar[data-layout-mode="desktopCompact"] {
+  gap: 8px;
+}
+
+.toolbar[data-layout-mode="desktopCompact"] .title {
+  max-width: 240px;
+}
+
+.toolbar[data-layout-mode="desktopCompact"] .stats {
+  display: none;
+}
+
+.toolbar[data-layout-mode="desktopCompact"] .divider {
+  display: none;
+}
+
+.toolbar[data-layout-mode="desktopCompact"] .chip {
+  max-width: 178px;
+}
+
+.toolbar[data-layout-mode="desktopCompact"] .search {
+  flex-basis: 220px;
+}
+
+.toolbar[data-layout-mode="narrowUtility"],
+.toolbar[data-layout-mode="constrained"] {
+  gap: 7px;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .title,
+.toolbar[data-layout-mode="constrained"] .title {
+  max-width: 96px;
+  gap: 7px;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .chip,
+.toolbar[data-layout-mode="constrained"] .chip {
+  width: 28px;
+  max-width: 28px;
+  justify-content: center;
+  gap: 0;
+  padding-inline: 0;
+  font-size: 0;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .stats,
+.toolbar[data-layout-mode="constrained"] .stats,
+.toolbar[data-layout-mode="narrowUtility"] .divider,
+.toolbar[data-layout-mode="constrained"] .divider {
+  display: none;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .spacer,
+.toolbar[data-layout-mode="constrained"] .spacer {
+  display: none;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .search,
+.toolbar[data-layout-mode="constrained"] .search {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 8px;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .iconFirstButton,
+.toolbar[data-layout-mode="constrained"] .iconFirstButton {
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  padding-inline: 0;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .kebab,
+.toolbar[data-layout-mode="constrained"] .kebab {
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  padding-inline: 0;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .iconFirstButton > span:last-child,
+.toolbar[data-layout-mode="constrained"] .iconFirstButton > span:last-child {
+  display: none;
+}
+
+.toolbar[data-layout-mode="narrowUtility"] .recentDropdown,
+.toolbar[data-layout-mode="constrained"] .recentDropdown {
+  width: min(300px, calc(100vw - 24px));
+  min-width: 220px;
 }

@@ -1,30 +1,73 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-const RAIL_DEFAULT = 280;
-const INSPECTOR_DEFAULT = 360;
-const RAIL_MIN = 220;
-const RAIL_MAX = 420;
-const INSPECTOR_MIN = 280;
-const INSPECTOR_MAX = 560;
+import type { OperatorLayoutMode } from "../operatorLayout";
 
-const STORAGE_KEY_RAIL = "lighting.layout.railWidth";
-const STORAGE_KEY_INSPECTOR = "lighting.layout.inspectorWidth";
+const LEGACY_STORAGE_KEY_RAIL = "lighting.layout.railWidth";
+const LEGACY_STORAGE_KEY_INSPECTOR = "lighting.layout.inspectorWidth";
+
+export type ResizeSide = "rail" | "inspector";
+
+interface ColumnSpec {
+  railDefault: number;
+  railMin: number;
+  railMax: number;
+  inspectorDefault: number;
+  inspectorMin: number;
+  inspectorMax: number;
+}
+
+const COLUMN_SPECS: Record<OperatorLayoutMode, ColumnSpec> = {
+  studioFull: {
+    railDefault: 280,
+    railMin: 220,
+    railMax: 420,
+    inspectorDefault: 360,
+    inspectorMin: 280,
+    inspectorMax: 560,
+  },
+  desktopCompact: {
+    railDefault: 260,
+    railMin: 220,
+    railMax: 320,
+    inspectorDefault: 320,
+    inspectorMin: 280,
+    inspectorMax: 380,
+  },
+  narrowUtility: {
+    railDefault: 300,
+    railMin: 240,
+    railMax: 360,
+    inspectorDefault: 360,
+    inspectorMin: 320,
+    inspectorMax: 440,
+  },
+  constrained: {
+    railDefault: 260,
+    railMin: 220,
+    railMax: 300,
+    inspectorDefault: 320,
+    inspectorMin: 300,
+    inspectorMax: 380,
+  },
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function readStoredWidth(key: string, fallback: number, min: number, max: number) {
+function storageKey(mode: OperatorLayoutMode, side: ResizeSide) {
+  return `lighting.layout.${mode}.${side}Width`;
+}
+
+function readStoredWidth(key: string, legacyKey: string, fallback: number, min: number, max: number) {
   if (typeof window === "undefined") return fallback;
-  const raw = window.localStorage.getItem(key);
+  const raw = window.localStorage.getItem(key) ?? window.localStorage.getItem(legacyKey);
   if (!raw) return fallback;
   const parsed = Number.parseFloat(raw);
   if (!Number.isFinite(parsed)) return fallback;
   return clamp(parsed, min, max);
 }
-
-export type ResizeSide = "rail" | "inspector";
 
 export interface ResizableColumns {
   railWidth: number;
@@ -33,22 +76,44 @@ export interface ResizableColumns {
   isResizing: boolean;
 }
 
-export function useResizableColumns(): ResizableColumns {
-  const [railWidth, setRailWidth] = useState(() => readStoredWidth(STORAGE_KEY_RAIL, RAIL_DEFAULT, RAIL_MIN, RAIL_MAX));
-  const [inspectorWidth, setInspectorWidth] = useState(() =>
-    readStoredWidth(STORAGE_KEY_INSPECTOR, INSPECTOR_DEFAULT, INSPECTOR_MIN, INSPECTOR_MAX)
-  );
+function readWidths(mode: OperatorLayoutMode) {
+  const spec = COLUMN_SPECS[mode];
+  return {
+    inspectorWidth: readStoredWidth(
+      storageKey(mode, "inspector"),
+      LEGACY_STORAGE_KEY_INSPECTOR,
+      spec.inspectorDefault,
+      spec.inspectorMin,
+      spec.inspectorMax
+    ),
+    railWidth: readStoredWidth(
+      storageKey(mode, "rail"),
+      LEGACY_STORAGE_KEY_RAIL,
+      spec.railDefault,
+      spec.railMin,
+      spec.railMax
+    ),
+  };
+}
+
+export function useResizableColumns(layoutMode: OperatorLayoutMode): ResizableColumns {
+  const [widths, setWidths] = useState(() => readWidths(layoutMode));
   const [isResizing, setIsResizing] = useState(false);
+  const spec = COLUMN_SPECS[layoutMode];
+
+  useEffect(() => {
+    setWidths(readWidths(layoutMode));
+  }, [layoutMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY_RAIL, String(railWidth));
-  }, [railWidth]);
+    window.localStorage.setItem(storageKey(layoutMode, "rail"), String(widths.railWidth));
+  }, [layoutMode, widths.railWidth]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY_INSPECTOR, String(inspectorWidth));
-  }, [inspectorWidth]);
+    window.localStorage.setItem(storageKey(layoutMode, "inspector"), String(widths.inspectorWidth));
+  }, [layoutMode, widths.inspectorWidth]);
 
   const startResize = useCallback(
     (side: ResizeSide) => (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -58,16 +123,22 @@ export function useResizableColumns(): ResizableColumns {
       handle.setPointerCapture(event.pointerId);
 
       const startClientX = event.clientX;
-      const startWidth = side === "rail" ? railWidth : inspectorWidth;
+      const startWidth = side === "rail" ? widths.railWidth : widths.inspectorWidth;
 
       setIsResizing(true);
 
       const onMove = (moveEvent: PointerEvent) => {
         const dx = moveEvent.clientX - startClientX;
         if (side === "rail") {
-          setRailWidth(clamp(startWidth + dx, RAIL_MIN, RAIL_MAX));
+          setWidths((current) => ({
+            ...current,
+            railWidth: clamp(startWidth + dx, spec.railMin, spec.railMax),
+          }));
         } else {
-          setInspectorWidth(clamp(startWidth - dx, INSPECTOR_MIN, INSPECTOR_MAX));
+          setWidths((current) => ({
+            ...current,
+            inspectorWidth: clamp(startWidth - dx, spec.inspectorMin, spec.inspectorMax),
+          }));
         }
       };
 
@@ -83,8 +154,8 @@ export function useResizableColumns(): ResizableColumns {
       handle.addEventListener("pointerup", onUp);
       handle.addEventListener("pointercancel", onUp);
     },
-    [railWidth, inspectorWidth]
+    [spec.inspectorMax, spec.inspectorMin, spec.railMax, spec.railMin, widths.inspectorWidth, widths.railWidth]
   );
 
-  return { railWidth, inspectorWidth, startResize, isResizing };
+  return { railWidth: widths.railWidth, inspectorWidth: widths.inspectorWidth, startResize, isResizing };
 }

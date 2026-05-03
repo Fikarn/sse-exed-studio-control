@@ -18,9 +18,12 @@ interface ViewportState {
   zoom: number;
   panX: number;
   panY: number;
+  zoomMode: StagePlotZoomMode;
 }
 
-const IDENTITY: ViewportState = { zoom: 1, panX: 0, panY: 0 };
+export type StagePlotZoomMode = "fitRoom" | "fillDesk" | "actual";
+
+const IDENTITY: ViewportState = { zoom: 1, panX: 0, panY: 0, zoomMode: "fillDesk" };
 
 function clientToSvg(svg: SVGSVGElement, clientX: number, clientY: number) {
   const ctm = svg.getScreenCTM();
@@ -38,6 +41,7 @@ export interface StagePlotViewport {
   svgRef: RefObject<SVGSVGElement | null>;
   transform: string;
   zoom: number;
+  zoomMode: StagePlotZoomMode;
   isPanning: boolean;
   onPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerMove: (event: ReactPointerEvent<SVGSVGElement>) => void;
@@ -46,6 +50,9 @@ export interface StagePlotViewport {
   zoomIn: () => void;
   zoomOut: () => void;
   reset: () => void;
+  fitRoom: () => void;
+  fillDesk: () => void;
+  actualSize: () => void;
   /** Wave 31 — view bookmarks (I7). Three numbered slots; null when empty. */
   viewBookmarks: ViewBookmarks;
   /** Save current zoom + pan to slot. Persists to localStorage. */
@@ -62,6 +69,8 @@ export interface UseStagePlotViewportOptions {
    *  Plain left-click clearing is owned by the marquee hook; middle-click
    *  rarely fires this path but is preserved for completeness. */
   onBackgroundClick?: () => void;
+  defaultZoomMode?: StagePlotZoomMode;
+  storageScope?: string;
 }
 
 function readBookmarks(): ViewBookmarks {
@@ -73,14 +82,15 @@ function readBookmarks(): ViewBookmarks {
     if (!Array.isArray(parsed)) return EMPTY_BOOKMARKS;
     return parsed.slice(0, VIEW_BOOKMARK_SLOT_COUNT).map((entry) => {
       if (!entry || typeof entry !== "object") return null;
-      const candidate = entry as { zoom?: unknown; panX?: unknown; panY?: unknown };
+      const candidate = entry as { zoom?: unknown; panX?: unknown; panY?: unknown; zoomMode?: unknown };
       const zoom = typeof candidate.zoom === "number" ? candidate.zoom : null;
       const panX = typeof candidate.panX === "number" ? candidate.panX : null;
       const panY = typeof candidate.panY === "number" ? candidate.panY : null;
       if (zoom === null || panX === null || panY === null) return null;
+      const zoomMode = isStagePlotZoomMode(candidate.zoomMode) ? candidate.zoomMode : "fillDesk";
       // Defensive clamp so a corrupted blob can't drive the viewport out of bounds.
       const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
-      return { zoom: clampedZoom, panX, panY };
+      return { zoom: clampedZoom, panX, panY, zoomMode };
     }) as ViewBookmarks;
   } catch {
     return EMPTY_BOOKMARKS;
@@ -98,11 +108,35 @@ function writeBookmarks(next: ViewBookmarks): void {
 
 const EMPTY_BOOKMARKS: ViewBookmarks = Object.freeze([null, null, null]);
 
+function isStagePlotZoomMode(value: unknown): value is StagePlotZoomMode {
+  return value === "fitRoom" || value === "fillDesk" || value === "actual";
+}
+
+function zoomModeStorageKey(scope: string) {
+  return `app.lighting.stagePlotZoomMode.${scope}`;
+}
+
+function readStoredZoomMode(scope: string, fallback: StagePlotZoomMode): StagePlotZoomMode {
+  if (typeof window === "undefined") return fallback;
+  const raw = window.localStorage.getItem(zoomModeStorageKey(scope));
+  return isStagePlotZoomMode(raw) ? raw : fallback;
+}
+
+function writeStoredZoomMode(scope: string, mode: StagePlotZoomMode): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(zoomModeStorageKey(scope), mode);
+  } catch {
+    // Best-effort preference; the in-session mode still applies.
+  }
+}
+
 export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}): StagePlotViewport {
-  const { onBackgroundClick } = options;
+  const { defaultZoomMode = "fillDesk", onBackgroundClick, storageScope = "default" } = options;
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [state, setState] = useState<ViewportState>(IDENTITY);
-  const stateRef = useRef<ViewportState>(IDENTITY);
+  const initialState = { ...IDENTITY, zoomMode: readStoredZoomMode(storageScope, defaultZoomMode) };
+  const [state, setState] = useState<ViewportState>(initialState);
+  const stateRef = useRef<ViewportState>(initialState);
   const pendingStateRef = useRef<ViewportState | null>(null);
   const stateRafRef = useRef<number | null>(null);
   const [isPanning, setIsPanning] = useState(false);
@@ -112,6 +146,7 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
   useEffect(() => {
     setViewBookmarks(readBookmarks());
   }, []);
+
   // Pan is bound to middle-mouse (button 1) only since Wave 26's marquee-
   // selection took over plain left-drag. Wheel-zoom and double-click-reset
   // remain on their default gestures.
@@ -129,6 +164,11 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
       return resolved;
     });
   }, []);
+
+  useEffect(() => {
+    const next = readStoredZoomMode(storageScope, defaultZoomMode);
+    setViewportState((current) => ({ ...current, zoomMode: next }));
+  }, [defaultZoomMode, setViewportState, storageScope]);
 
   const scheduleViewportState = useCallback((next: ViewportState) => {
     stateRef.current = next;
@@ -164,6 +204,7 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
         zoom: clamped,
         panX: anchorSvg.x - contentX * clamped,
         panY: anchorSvg.y - contentY * clamped,
+        zoomMode: prev.zoomMode,
       });
     },
     [scheduleViewportState]
@@ -274,6 +315,7 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
             zoom: startZoom + (target.zoom - startZoom) * eased,
             panX: startPanX + (target.panX - startPanX) * eased,
             panY: startPanY + (target.panY - startPanY) * eased,
+            zoomMode: target.zoomMode,
           });
           if (t < 1) requestAnimationFrame(tick);
         };
@@ -285,8 +327,20 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
   );
 
   const reset = useCallback(() => {
-    animateTo(IDENTITY, 250);
+    animateTo({ ...IDENTITY, zoomMode: stateRef.current.zoomMode }, 250);
   }, [animateTo]);
+
+  const setZoomMode = useCallback(
+    (zoomMode: StagePlotZoomMode) => {
+      writeStoredZoomMode(storageScope, zoomMode);
+      animateTo({ ...IDENTITY, zoomMode }, 200);
+    },
+    [animateTo, storageScope]
+  );
+
+  const fitRoom = useCallback(() => setZoomMode("fitRoom"), [setZoomMode]);
+  const fillDesk = useCallback(() => setZoomMode("fillDesk"), [setZoomMode]);
+  const actualSize = useCallback(() => setZoomMode("actual"), [setZoomMode]);
 
   const saveViewBookmark = useCallback((slot: ViewBookmarkSlot) => {
     setViewBookmarks((prev) => {
@@ -330,6 +384,7 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     svgRef,
     transform: `translate(${state.panX} ${state.panY}) scale(${state.zoom})`,
     zoom: state.zoom,
+    zoomMode: state.zoomMode,
     isPanning,
     onPointerDown,
     onPointerMove,
@@ -338,6 +393,9 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     zoomIn,
     zoomOut,
     reset,
+    fitRoom,
+    fillDesk,
+    actualSize,
     viewBookmarks,
     saveViewBookmark,
     recallViewBookmark,

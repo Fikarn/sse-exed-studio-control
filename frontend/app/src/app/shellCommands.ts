@@ -32,3 +32,21 @@ export async function exportShellDiagnostics(report: Record<string, JsonValue>, 
     ? `${normalizedDirectory.replace(/\/$/, "")}/shell-diagnostics-fixture.json`
     : "shell-diagnostics-fixture.json";
 }
+
+export async function enterStudioFullscreen() {
+  if (tauriAvailable()) {
+    await invoke("shell_enter_studio_fullscreen");
+  }
+}
+
+export async function switchToWindowedLayout() {
+  if (tauriAvailable()) {
+    await invoke("shell_use_windowed_layout");
+  }
+}
+
+export async function resetWindowLayout() {
+  if (tauriAvailable()) {
+    await invoke("shell_reset_window_layout");
+  }
+}

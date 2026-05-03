@@ -13,6 +13,7 @@ import type {
 } from "@sse/engine-client";
 
 import { usePalette } from "../shared/paletteContext";
+import { useOperatorLayout } from "../OperatorLayoutProvider";
 import { useToast, type ToastApi } from "../shared/toastContext";
 import { useLiveCallback } from "../shared/useLiveCallback";
 
@@ -186,6 +187,8 @@ export function LightingWorkspaceSurface({
   const [recentSceneIds, setRecentSceneIds] = useState<readonly string[]>([]);
   const toast = useToast();
   const palette = usePalette();
+  const operatorLayout = useOperatorLayout();
+  const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false);
   // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
   // while saving Scene A) don't stomp each other. Each handler scopes its
   // own key; the inspector reads via `busyActions.has(key)` /
@@ -336,7 +339,7 @@ export function LightingWorkspaceSurface({
     };
   }, []);
 
-  const columns = useResizableColumns();
+  const columns = useResizableColumns(operatorLayout.layoutMode);
   const undoStack = useUndoStack();
 
   // Stable ref to the latest scenes list — undo entries close over this so
@@ -470,6 +473,12 @@ export function LightingWorkspaceSurface({
     setActiveTabOverride(null);
   }, [uiMode, persistedSelectedFixtureId, selectedGroupId]);
 
+  useEffect(() => {
+    if (!operatorLayout.isNarrow) {
+      setInspectorDrawerOpen(false);
+    }
+  }, [operatorLayout.isNarrow]);
+
   // Group rail entries: GroupRailEntry needs id/name/fixtureCount/on/level/drifted.
   // - level: average intensity across the group's currently-on fixtures (0 when
   //   the group is fully off).
@@ -575,7 +584,9 @@ export function LightingWorkspaceSurface({
 
       if (fixtureId === null) {
         setExtraSelectedFixtureIds(new Set());
+        if (operatorLayout.isNarrow) setInspectorDrawerOpen(false);
       } else if (additive) {
+        if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
         // Toggle the clicked id in the extras set. The persisted single id
         // stays as-is so the engine still knows which fixture is "focused";
         // the bulk inspector renders from persisted ∪ extras.
@@ -593,6 +604,7 @@ export function LightingWorkspaceSurface({
         return;
       } else {
         setExtraSelectedFixtureIds(new Set());
+        if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
       }
 
       startBusy("fixture-select");
@@ -751,7 +763,9 @@ export function LightingWorkspaceSurface({
   // consumes the same instance via its `viewport` prop. handleSelectFixture
   // is `useLiveCallback`-stable so closing over it is safe.
   const stagePlotViewport = useStagePlotViewport({
+    defaultZoomMode: operatorLayout.layoutMode === "studioFull" ? "fillDesk" : "fitRoom",
     onBackgroundClick: () => void handleSelectFixture(null),
+    storageScope: operatorLayout.layoutMode,
   });
 
   // Wave 31 — I9 chip-hover signal. SelectionChipStrip writes the hovered
@@ -1353,6 +1367,7 @@ export function LightingWorkspaceSurface({
     // is rejected by the engine (e.g. pre-probe state), the operator still
     // sees what the scene contains. The recall IPC drives the actual rig.
     setInspectorSelectedSceneId(sceneId);
+    if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
     if (!bridgeReachable && !previewMode) {
       // Skip the IPC entirely when the bridge is unreachable — the engine
       // would just reject it. Surface a single non-error toast so the
@@ -1961,10 +1976,14 @@ export function LightingWorkspaceSurface({
     }
   });
 
-  const handleInspectGroup = useCallback((groupId: string) => {
-    setSelectedGroupId(groupId);
-    setActiveTabOverride("group");
-  }, []);
+  const handleInspectGroup = useCallback(
+    (groupId: string) => {
+      setSelectedGroupId(groupId);
+      setActiveTabOverride("group");
+      if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
+    },
+    [operatorLayout.isNarrow]
+  );
 
   const handleFixtureNudge = useLiveCallback(async (deltaXMeters: number, deltaYMeters: number) => {
     if (previewMode) {
@@ -2289,8 +2308,64 @@ export function LightingWorkspaceSurface({
     );
   }
 
+  const inspectorPanel = (
+    <LightingInspector
+      uiMode={uiMode}
+      activeTab={activeTab}
+      onTabChange={setActiveTabOverride}
+      fixtures={fixtures}
+      groups={groups}
+      scenes={scenes}
+      palettes={palettes}
+      dmxChannels={dmxChannelsRaw}
+      dmxStale={!bridgeReachable}
+      universe={bridgeUniverse}
+      selectedFixtureId={selectedFixture?.id ?? null}
+      selectedGroupId={selectedGroupId}
+      activeSceneId={activeSceneId}
+      inspectorSceneId={hoverPreviewSceneId}
+      isSceneModified={effectiveSceneModified}
+      bridgeReachable={bridgeReachable}
+      previewMode={previewMode}
+      previewDirty={previewDirty}
+      onTogglePower={handleToggleFixturePower}
+      onIntensityCommit={handleIntensityCommit}
+      onCctCommit={handleCctCommit}
+      onIdentifyBurst={handleIdentifyBurst}
+      onPatchCommit={handlePatchCommit}
+      onToggleGroupPower={handleToggleGroupPower}
+      onSelectFixture={(id, options) => void handleSelectFixture(id, options)}
+      onSaveScene={handleSaveScene}
+      onSaveSceneAs={() => setSaveSceneAsOpen(true)}
+      onRecallScene={handleRecallScene}
+      onResaveScene={handleResaveScene}
+      onDeleteScene={handleDeleteScene}
+      onDeleteFixture={(id) => void handleDeleteFixture(id)}
+      onSpatialCommit={previewMode ? undefined : (id, partial) => void handleFixtureSpatialCommit(id, partial)}
+      onRenameScene={handleRenameScene}
+      onRenameFixture={handleRenameFixture}
+      onRenameGroup={handleRenameGroup}
+      onSetSceneColor={(sceneId, colorIndex) => void handleSetSceneColor(sceneId, colorIndex)}
+      onSetGroupColor={(groupId, colorIndex) => void handleSetGroupColor(groupId, colorIndex)}
+      onAssignFixtureGroup={(fixtureId, groupId) => void handleAssignFixtureGroup(fixtureId, groupId)}
+      onRemoveFixtureFromGroup={(fixtureId) => void handleAssignFixtureGroup(fixtureId, null)}
+      onCreateGroup={() => setCreateGroupOpen(true)}
+      selectedFixtures={selectedFixtureSnapshots}
+      onClearSelection={() => void handleSelectFixture(null)}
+      onBulkTogglePower={(ids, on) => void handleBulkTogglePower(ids, on)}
+      onBulkIntensityValues={(values) => void handleBulkIntensityValues(values)}
+      onBulkCctValues={(values) => void handleBulkCctValues(values)}
+      onApplyPalette={(paletteId, ids) => void handleApplyPalette(paletteId, ids)}
+      onCreatePalette={(request) => void handleCreatePalette(request)}
+      onUpdatePalette={(request) => void handleUpdatePalette(request)}
+      onDeletePalette={(paletteId) => void handleDeletePalette(paletteId)}
+      busyActions={busyActions}
+      pendingInlineRename={pendingInlineRename}
+    />
+  );
+
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-testid="lighting-workspace" data-layout-mode={operatorLayout.layoutMode}>
       <LightingToolbar
         bridgeUniverse={bridgeUniverse}
         bridgeIp={bridgeIp}
@@ -2317,6 +2392,8 @@ export function LightingWorkspaceSurface({
         onToggleHighlight={() => void handleToggleHighlight()}
         onToggleSolo={() => void handleToggleSolo()}
         onIdentifyFind={() => void handleIdentifyFind()}
+        onOpenInspector={() => setInspectorDrawerOpen(true)}
+        inspectorDrawerOpen={inspectorDrawerOpen}
       />
 
       <LightingBridgeBanner reachable={bridgeReachable} bridgeIp={bridgeIp} universe={bridgeUniverse} />
@@ -2338,6 +2415,8 @@ export function LightingWorkspaceSurface({
 
       <div
         className={`${styles.body} ${columns.isResizing ? styles.bodyResizing : ""}`}
+        data-layout-mode={operatorLayout.layoutMode}
+        data-testid="lighting-body"
         style={{
           ["--lighting-rail-width" as string]: `${columns.railWidth}px`,
           ["--lighting-inspector-width" as string]: `${columns.inspectorWidth}px`,
@@ -2389,7 +2468,7 @@ export function LightingWorkspaceSurface({
 
         <ColumnResizer ariaLabel="Resize scene rail" onPointerDown={columns.startResize("rail")} />
 
-        <main className={styles.stage}>
+        <main className={styles.stage} data-testid="lighting-stage">
           <StagePlot
             fixtures={fixtures}
             liveFixtures={liveFixtures}
@@ -2423,62 +2502,39 @@ export function LightingWorkspaceSurface({
           />
         </main>
 
-        <ColumnResizer ariaLabel="Resize inspector" onPointerDown={columns.startResize("inspector")} />
-
-        <LightingInspector
-          uiMode={uiMode}
-          activeTab={activeTab}
-          onTabChange={setActiveTabOverride}
-          fixtures={fixtures}
-          groups={groups}
-          scenes={scenes}
-          palettes={palettes}
-          dmxChannels={dmxChannelsRaw}
-          dmxStale={!bridgeReachable}
-          universe={bridgeUniverse}
-          selectedFixtureId={selectedFixture?.id ?? null}
-          selectedGroupId={selectedGroupId}
-          activeSceneId={activeSceneId}
-          inspectorSceneId={hoverPreviewSceneId}
-          isSceneModified={effectiveSceneModified}
-          bridgeReachable={bridgeReachable}
-          previewMode={previewMode}
-          previewDirty={previewDirty}
-          onTogglePower={handleToggleFixturePower}
-          onIntensityCommit={handleIntensityCommit}
-          onCctCommit={handleCctCommit}
-          onIdentifyBurst={handleIdentifyBurst}
-          onPatchCommit={handlePatchCommit}
-          onToggleGroupPower={handleToggleGroupPower}
-          onSelectFixture={(id, options) => void handleSelectFixture(id, options)}
-          onSaveScene={handleSaveScene}
-          onSaveSceneAs={() => setSaveSceneAsOpen(true)}
-          onRecallScene={handleRecallScene}
-          onResaveScene={handleResaveScene}
-          onDeleteScene={handleDeleteScene}
-          onDeleteFixture={(id) => void handleDeleteFixture(id)}
-          onSpatialCommit={previewMode ? undefined : (id, partial) => void handleFixtureSpatialCommit(id, partial)}
-          onRenameScene={handleRenameScene}
-          onRenameFixture={handleRenameFixture}
-          onRenameGroup={handleRenameGroup}
-          onSetSceneColor={(sceneId, colorIndex) => void handleSetSceneColor(sceneId, colorIndex)}
-          onSetGroupColor={(groupId, colorIndex) => void handleSetGroupColor(groupId, colorIndex)}
-          onAssignFixtureGroup={(fixtureId, groupId) => void handleAssignFixtureGroup(fixtureId, groupId)}
-          onRemoveFixtureFromGroup={(fixtureId) => void handleAssignFixtureGroup(fixtureId, null)}
-          onCreateGroup={() => setCreateGroupOpen(true)}
-          selectedFixtures={selectedFixtureSnapshots}
-          onClearSelection={() => void handleSelectFixture(null)}
-          onBulkTogglePower={(ids, on) => void handleBulkTogglePower(ids, on)}
-          onBulkIntensityValues={(values) => void handleBulkIntensityValues(values)}
-          onBulkCctValues={(values) => void handleBulkCctValues(values)}
-          onApplyPalette={(paletteId, ids) => void handleApplyPalette(paletteId, ids)}
-          onCreatePalette={(request) => void handleCreatePalette(request)}
-          onUpdatePalette={(request) => void handleUpdatePalette(request)}
-          onDeletePalette={(paletteId) => void handleDeletePalette(paletteId)}
-          busyActions={busyActions}
-          pendingInlineRename={pendingInlineRename}
-        />
+        {!operatorLayout.isNarrow ? (
+          <>
+            <ColumnResizer ariaLabel="Resize inspector" onPointerDown={columns.startResize("inspector")} />
+            {inspectorPanel}
+          </>
+        ) : null}
       </div>
+
+      {operatorLayout.isNarrow && inspectorDrawerOpen ? (
+        <div
+          className={styles.inspectorDrawerBackdrop}
+          role="presentation"
+          onMouseDown={() => setInspectorDrawerOpen(false)}
+          data-testid="lighting-inspector-drawer-backdrop"
+        >
+          <section
+            className={styles.inspectorDrawer}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Lighting inspector drawer"
+            onMouseDown={(event) => event.stopPropagation()}
+            data-testid="lighting-inspector-drawer"
+          >
+            <div className={styles.inspectorDrawerHeader}>
+              <span>Inspector</span>
+              <Button size="compact" variant="ghost" onClick={() => setInspectorDrawerOpen(false)}>
+                Close
+              </Button>
+            </div>
+            {inspectorPanel}
+          </section>
+        </div>
+      ) : null}
 
       {paletteQuickOpen ? (
         <div className={styles.paletteQuickOverlay} role="presentation" onMouseDown={() => setPaletteQuickOpen(false)}>
