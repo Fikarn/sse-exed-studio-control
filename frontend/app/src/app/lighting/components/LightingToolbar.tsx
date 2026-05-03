@@ -1,8 +1,32 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from "react";
-import { Clock3, Crosshair, EyeOff, Lightbulb, Locate, MoreVertical, Pencil, Plus, Search, Sun, X } from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
+import {
+  Clock3,
+  Crosshair,
+  EyeOff,
+  Keyboard,
+  Lightbulb,
+  Locate,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Search,
+  Sidebar,
+  Sun,
+  TimerReset,
+  X,
+} from "lucide-react";
 
-import { Button, StatusDot, Tooltip } from "@sse/design-system";
+import { Button, ContextMenu, StatusDot, Tooltip, type ContextMenuItem } from "@sse/design-system";
 
+import { useOperatorLayout } from "../../OperatorLayoutProvider";
 import { ShortcutOverlay } from "../../shared/ShortcutOverlay";
 import styles from "./LightingToolbar.module.css";
 
@@ -32,15 +56,14 @@ export interface LightingToolbarProps {
   previewDirty: boolean;
   onTogglePreview: () => void;
   onAddFixture: () => void;
-  /** I2 — Highlight/Solo overlay states + Find sequence trigger.
-   *  Selection-driven: buttons gate on hasSelection so operators don't
-   *  fire IPCs against an empty target. */
   hasSelection: boolean;
   highlightActive: boolean;
   soloActive: boolean;
   onToggleHighlight: () => void;
   onToggleSolo: () => void;
   onIdentifyFind: () => void;
+  onOpenInspector?: () => void;
+  inspectorDrawerOpen?: boolean;
 }
 
 export function LightingToolbar({
@@ -69,13 +92,18 @@ export function LightingToolbar({
   onToggleHighlight,
   onToggleSolo,
   onIdentifyFind,
+  onOpenInspector,
+  inspectorDrawerOpen = false,
 }: LightingToolbarProps) {
+  const operatorLayout = useOperatorLayout();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [overflowMenu, setOverflowMenu] = useState<{ x: number; y: number } | null>(null);
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentActiveIndex, setRecentActiveIndex] = useState(0);
   const searchShellRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const canShowRecent = searchQuery.trim().length === 0 && recentScenes.length > 0;
+  const secondaryInOverflow = operatorLayout.isCompact;
 
   useEffect(() => {
     if (!canShowRecent) {
@@ -141,6 +169,125 @@ export function LightingToolbar({
   };
 
   const recallFadeSeconds = Math.round((recallFadeMs / 1000) * 10) / 10;
+  const setRecallFadeSeconds = (seconds: number) => onRecallFadeMsChange(Math.round(seconds * 1000));
+  const openOverflow = (event: MouseEvent<HTMLButtonElement>) => {
+    setOverflowMenu({ x: event.clientX, y: event.clientY });
+  };
+
+  const secondaryActions = (
+    <>
+      <Tooltip
+        content={hasSelection ? "Hold selection at full white at neutral CCT" : "Select fixtures to enable Highlight"}
+        placement="bottom"
+      >
+        <Button
+          size="compact"
+          variant={highlightActive ? "primary" : "secondary"}
+          onClick={onToggleHighlight}
+          leadingVisual={<Lightbulb aria-hidden="true" size={13} strokeWidth={1.75} />}
+          aria-pressed={highlightActive}
+          disabled={previewMode || (!hasSelection && !highlightActive)}
+        >
+          Highlight <kbd className={styles.kbd}>H</kbd>
+        </Button>
+      </Tooltip>
+
+      <Tooltip
+        content={hasSelection ? "Dim every fixture except the selection" : "Select fixtures to enable Solo"}
+        placement="bottom"
+      >
+        <Button
+          size="compact"
+          variant={soloActive ? "primary" : "secondary"}
+          onClick={onToggleSolo}
+          leadingVisual={<Crosshair aria-hidden="true" size={13} strokeWidth={1.75} />}
+          aria-pressed={soloActive}
+          disabled={previewMode || (!hasSelection && !soloActive)}
+        >
+          Solo <kbd className={styles.kbd}>⇧H</kbd>
+        </Button>
+      </Tooltip>
+
+      <Tooltip
+        content={
+          hasSelection ? "Pulse the selection in turn so you can locate each fixture" : "Select fixtures to enable Find"
+        }
+        placement="bottom"
+      >
+        <Button
+          size="compact"
+          variant="secondary"
+          onClick={onIdentifyFind}
+          leadingVisual={<Locate aria-hidden="true" size={13} strokeWidth={1.75} />}
+          disabled={previewMode || !hasSelection}
+        >
+          Find <kbd className={styles.kbd}>⇧I</kbd>
+        </Button>
+      </Tooltip>
+    </>
+  );
+
+  const overflowItems: ContextMenuItem[] = [
+    ...(secondaryInOverflow
+      ? [
+          {
+            id: "highlight",
+            label: highlightActive ? "Clear Highlight" : "Highlight selection",
+            icon: Lightbulb,
+            disabled: previewMode || (!hasSelection && !highlightActive),
+            onSelect: onToggleHighlight,
+          },
+          {
+            id: "solo",
+            label: soloActive ? "Clear Solo" : "Solo selection",
+            icon: Crosshair,
+            disabled: previewMode || (!hasSelection && !soloActive),
+            onSelect: onToggleSolo,
+          },
+          {
+            id: "find",
+            label: "Find selected fixtures",
+            icon: Locate,
+            disabled: previewMode || !hasSelection,
+            onSelect: onIdentifyFind,
+          },
+        ]
+      : []),
+    {
+      id: "fade-snap",
+      label: "Scene fade: snap",
+      icon: TimerReset,
+      disabled: previewMode,
+      onSelect: () => setRecallFadeSeconds(0),
+    },
+    {
+      id: "fade-1",
+      label: "Scene fade: 1 s",
+      icon: TimerReset,
+      disabled: previewMode,
+      onSelect: () => setRecallFadeSeconds(1),
+    },
+    {
+      id: "fade-2",
+      label: "Scene fade: 2 s",
+      icon: TimerReset,
+      disabled: previewMode,
+      onSelect: () => setRecallFadeSeconds(2),
+    },
+    {
+      id: "fade-5",
+      label: "Scene fade: 5 s",
+      icon: TimerReset,
+      disabled: previewMode,
+      onSelect: () => setRecallFadeSeconds(5),
+    },
+    {
+      id: "shortcuts",
+      label: "Keyboard shortcuts",
+      icon: Keyboard,
+      onSelect: () => setShortcutsOpen(true),
+    },
+  ];
 
   return (
     <>
@@ -150,15 +297,13 @@ export function LightingToolbar({
         aria-label="Lighting workspace toolbar"
         data-patch-mode={patchMode || undefined}
         data-preview-mode={previewMode || undefined}
+        data-layout-mode={operatorLayout.layoutMode}
+        data-testid="lighting-toolbar"
       >
-        <div className={styles.title}>
+        <div className={styles.title} data-toolbar-primary="title">
           <Sun aria-hidden="true" className={styles.titleIcon} size={17} strokeWidth={1.75} />
           <span>Lighting</span>
           {patchMode ? (
-            // F11 — persistent on-screen exit affordance. Replaces the static
-            // "Patch mode" eyebrow with a clickable pill so the keyboard
-            // shortcut isn't the only way out. Click toggles patch off
-            // (handlers in LightingWorkspace already cover the toggle).
             <Button
               size="compact"
               variant="primary"
@@ -175,7 +320,10 @@ export function LightingToolbar({
         </div>
 
         <Tooltip content={bridgeIp ? bridgeIp : "No bridge configured"} placement="bottom">
-          <span className={`${styles.chip} ${bridgeReachable ? styles.chipGreen : styles.chipErr}`}>
+          <span
+            className={`${styles.chip} ${bridgeReachable ? styles.chipGreen : styles.chipErr}`}
+            data-toolbar-primary="status"
+          >
             <StatusDot state={bridgeReachable ? "ok" : "err"} size="sm" />
             DMX U{bridgeUniverse} · {bridgeReachable ? "reachable" : "unreachable"}
           </span>
@@ -212,7 +360,7 @@ export function LightingToolbar({
 
         <span className={styles.spacer} />
 
-        <label className={styles.fadeControl}>
+        <label className={`${styles.fadeControl} ${operatorLayout.isNarrow ? styles.narrowHidden : ""}`}>
           <span className={styles.fadeLabel}>Fade</span>
           <input
             aria-label="Scene recall fade seconds"
@@ -228,7 +376,7 @@ export function LightingToolbar({
           <span className={styles.fadeUnit}>s</span>
         </label>
 
-        <div className={styles.search} ref={searchShellRef}>
+        <div className={styles.search} ref={searchShellRef} data-toolbar-primary="search">
           <Search aria-hidden="true" size={12} strokeWidth={1.75} />
           <input
             ref={searchInputRef}
@@ -282,68 +430,17 @@ export function LightingToolbar({
           size="compact"
           variant={patchMode ? "primary" : "secondary"}
           onClick={onTogglePatch}
+          className={styles.iconFirstButton}
           leadingVisual={<Pencil aria-hidden="true" size={13} strokeWidth={1.75} />}
           aria-pressed={patchMode}
           disabled={previewMode}
+          aria-label={patchMode ? "Exit patch mode" : "Patch"}
+          data-toolbar-primary="patch"
         >
           Patch <kbd className={styles.kbd}>P</kbd>
         </Button>
 
-        {/* I2 + F12 — Highlight, Solo, Find. Selection-gated so the
-            operator can't fire them against an empty target. Highlight
-            and Solo are mutually exclusive at the engine layer; the
-            toolbar reflects that by showing only one as `primary` at a
-            time. */}
-        <Tooltip
-          content={hasSelection ? "Hold selection at full white at neutral CCT" : "Select fixtures to enable Highlight"}
-          placement="bottom"
-        >
-          <Button
-            size="compact"
-            variant={highlightActive ? "primary" : "secondary"}
-            onClick={onToggleHighlight}
-            leadingVisual={<Lightbulb aria-hidden="true" size={13} strokeWidth={1.75} />}
-            aria-pressed={highlightActive}
-            disabled={previewMode || (!hasSelection && !highlightActive)}
-          >
-            Highlight <kbd className={styles.kbd}>H</kbd>
-          </Button>
-        </Tooltip>
-
-        <Tooltip
-          content={hasSelection ? "Dim every fixture except the selection" : "Select fixtures to enable Solo"}
-          placement="bottom"
-        >
-          <Button
-            size="compact"
-            variant={soloActive ? "primary" : "secondary"}
-            onClick={onToggleSolo}
-            leadingVisual={<Crosshair aria-hidden="true" size={13} strokeWidth={1.75} />}
-            aria-pressed={soloActive}
-            disabled={previewMode || (!hasSelection && !soloActive)}
-          >
-            Solo <kbd className={styles.kbd}>⇧H</kbd>
-          </Button>
-        </Tooltip>
-
-        <Tooltip
-          content={
-            hasSelection
-              ? "Pulse the selection in turn so you can locate each fixture"
-              : "Select fixtures to enable Find"
-          }
-          placement="bottom"
-        >
-          <Button
-            size="compact"
-            variant="secondary"
-            onClick={onIdentifyFind}
-            leadingVisual={<Locate aria-hidden="true" size={13} strokeWidth={1.75} />}
-            disabled={previewMode || !hasSelection}
-          >
-            Find <kbd className={styles.kbd}>⇧I</kbd>
-          </Button>
-        </Tooltip>
+        {secondaryInOverflow ? null : secondaryActions}
 
         <Tooltip
           content={patchMode ? "Exit patch mode before preview editing." : "Edit scene levels offline"}
@@ -353,9 +450,12 @@ export function LightingToolbar({
             size="compact"
             variant={previewMode ? "primary" : "secondary"}
             onClick={onTogglePreview}
+            className={styles.iconFirstButton}
             leadingVisual={<EyeOff aria-hidden="true" size={13} strokeWidth={1.75} />}
             aria-pressed={previewMode}
             disabled={patchMode}
+            aria-label={previewMode ? "Preview mode toolbar toggle" : "Preview"}
+            data-toolbar-primary="preview"
           >
             Preview <kbd className={styles.kbd}>B</kbd>
           </Button>
@@ -365,24 +465,55 @@ export function LightingToolbar({
           size="compact"
           variant="primary"
           onClick={onAddFixture}
+          className={styles.iconFirstButton}
           leadingVisual={<Plus aria-hidden="true" size={13} strokeWidth={2} />}
           disabled={previewMode}
+          aria-label="Add fixture"
+          data-toolbar-primary="add"
         >
           Add fixture
         </Button>
 
+        {operatorLayout.isNarrow && onOpenInspector ? (
+          <Tooltip content="Open inspector drawer" placement="bottom">
+            <Button
+              size="compact"
+              variant={inspectorDrawerOpen ? "primary" : "secondary"}
+              onClick={onOpenInspector}
+              className={styles.iconFirstButton}
+              leadingVisual={<Sidebar aria-hidden="true" size={13} strokeWidth={1.75} />}
+              aria-pressed={inspectorDrawerOpen}
+              aria-label="Inspector"
+              data-testid="lighting-open-inspector"
+            >
+              Inspector
+            </Button>
+          </Tooltip>
+        ) : null}
+
         <button
           type="button"
           className={styles.kebab}
-          onClick={() => setShortcutsOpen(true)}
-          aria-label="Keyboard shortcuts"
-          aria-haspopup="dialog"
-          aria-expanded={shortcutsOpen}
+          onClick={openOverflow}
+          aria-label="Lighting overflow actions"
+          aria-haspopup="menu"
+          aria-expanded={Boolean(overflowMenu)}
+          data-toolbar-primary="overflow"
+          data-testid="lighting-toolbar-overflow"
         >
           <MoreVertical aria-hidden="true" size={14} strokeWidth={1.75} />
         </button>
       </div>
 
+      {overflowMenu ? (
+        <ContextMenu
+          x={overflowMenu.x}
+          y={overflowMenu.y}
+          items={overflowItems}
+          onClose={() => setOverflowMenu(null)}
+          ariaLabel="Lighting overflow actions"
+        />
+      ) : null}
       {shortcutsOpen ? <ShortcutOverlay onClose={() => setShortcutsOpen(false)} /> : null}
     </>
   );

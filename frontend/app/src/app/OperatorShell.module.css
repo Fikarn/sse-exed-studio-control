@@ -4,11 +4,14 @@
   gap: var(--space-4);
   height: 100%;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 .workspaceStack > :last-child {
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
 }
 
 .statusBanner {

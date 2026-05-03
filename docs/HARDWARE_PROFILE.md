@@ -5,10 +5,12 @@ This repository is built around a specific studio installation. The product and 
 ## Operator Environment
 
 - Dedicated second monitor
-- Primary target resolution: `2560x1440`
-- Minimum supported live-use resolution: `1920x1080`
+- Primary target resolution: `2560x1440` logical pixels on the fixed studio monitor
+- Minimum supported live-use resolution: `1920x1080` logical pixels
+- Utility/minimum mode: `1280x800` logical pixels for setup, inspection, and recovery workflows, not full simultaneous show control
 - No page scroll during normal operation
 - Dense, fixed-height operator surfaces preferred over document-style layouts
+- Layout decisions are based on logical viewport/CSS pixels. Physical monitor pixels and backing scale are diagnostics, not layout thresholds.
 
 ## Audio
 

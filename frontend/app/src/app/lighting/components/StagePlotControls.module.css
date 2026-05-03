@@ -1,12 +1,12 @@
 .controls {
   position: absolute;
-  bottom: 16px;
-  right: 16px;
+  bottom: var(--operator-stage-control-inset, 16px);
+  right: var(--operator-stage-control-inset, 16px);
   z-index: 2;
   display: inline-flex;
   align-items: stretch;
   gap: 1px;
-  padding: 2px;
+  padding: var(--operator-stage-control-padding, 2px);
   background: rgba(8, 10, 8, 0.78);
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-md);
@@ -14,20 +14,66 @@
   font-family: var(--font-family-mono);
 }
 
+.modeGroup {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 1px;
+  padding-right: 2px;
+  margin-right: 2px;
+  border-right: 1px solid var(--color-bg-stroke);
+}
+
+.modeButton {
+  appearance: none;
+  min-width: var(--operator-stage-control-mode-width, 62px);
+  height: var(--operator-stage-control-height, 26px);
+  padding: 0 calc(8px * var(--operator-ui-scale-factor, 1));
+  border: 1px solid transparent;
+  border-radius: var(--radius-tight-sm);
+  background: transparent;
+  color: var(--color-brand-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--operator-font-size-xs, 10px);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.modeButton:hover {
+  background: var(--color-bg-strong);
+  color: var(--color-brand-text-primary);
+}
+
+.modeButton:focus-visible {
+  outline: 2px solid var(--color-brand-green);
+  outline-offset: 1px;
+}
+
+.modeButtonActive {
+  background: var(--color-brand-green-soft);
+  border-color: var(--color-brand-green-border);
+  color: var(--color-brand-green);
+}
+
 .button {
   appearance: none;
   background: transparent;
   border: none;
   color: var(--color-brand-text-secondary);
-  width: 28px;
-  height: 26px;
+  width: var(--operator-stage-control-button-width, 28px);
+  height: var(--operator-stage-control-height, 26px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-tight-sm);
   cursor: pointer;
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--operator-font-size-xl, 14px);
   line-height: 1;
   transition:
     background 120ms ease,
@@ -60,9 +106,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  padding: 0 6px;
-  font-size: 10px;
+  min-width: var(--operator-stage-control-zoom-width, 44px);
+  padding: 0 calc(6px * var(--operator-ui-scale-factor, 1));
+  font-size: var(--operator-font-size-xs, 10px);
   letter-spacing: 0.16em;
   color: var(--color-brand-text-muted);
   font-feature-settings: "tnum", "zero";
@@ -89,13 +135,13 @@
   cursor: pointer;
   font-family: inherit;
   font-feature-settings: "tnum", "zero";
-  font-size: 10px;
+  font-size: var(--operator-font-size-xs, 10px);
   font-weight: 600;
-  height: 26px;
+  height: var(--operator-stage-control-height, 26px);
   letter-spacing: 0.04em;
   line-height: 1;
   padding: 0;
-  width: 22px;
+  width: var(--operator-stage-control-bookmark-width, 22px);
   transition:
     background 120ms ease,
     color 120ms ease,
@@ -121,4 +167,16 @@
 .bookmarkButtonFilled:hover {
   background: var(--color-brand-green-glow);
   color: var(--color-brand-text-primary);
+}
+
+@media (max-width: 1440px) {
+  .controls {
+    right: var(--operator-stage-control-inset, 10px);
+    bottom: var(--operator-stage-control-inset, 10px);
+  }
+
+  .modeButton {
+    min-width: var(--operator-stage-control-mode-width, 44px);
+    padding: 0 calc(6px * var(--operator-ui-scale-factor, 1));
+  }
 }

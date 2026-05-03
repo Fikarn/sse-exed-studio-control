@@ -16,6 +16,49 @@ async function openFixture(page: Page, fixtureId: string) {
   expect(page.url()).toContain(`fixture=${fixtureId}`);
 }
 
+async function expectNoDocumentScroll(page: Page) {
+  const metrics = await page.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    scrollWidth: document.documentElement.scrollWidth,
+    viewportHeight: window.innerHeight,
+    viewportWidth: window.innerWidth,
+  }));
+  expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.viewportHeight + 1);
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+}
+
+async function expectToolbarPrimaryControlsFit(page: Page) {
+  const result = await page.evaluate(() => {
+    const controls = Array.from(document.querySelectorAll<HTMLElement>("[data-toolbar-primary]"));
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    return controls.map((control) => {
+      const rect = control.getBoundingClientRect();
+      return {
+        id: control.dataset.toolbarPrimary ?? "unknown",
+        fits:
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.left >= -1 &&
+          rect.top >= -1 &&
+          rect.right <= viewportWidth + 1 &&
+          rect.bottom <= viewportHeight + 1,
+      };
+    });
+  });
+
+  expect(result.map((entry) => entry.id).sort()).toEqual([
+    "add",
+    "overflow",
+    "patch",
+    "preview",
+    "search",
+    "status",
+    "title",
+  ]);
+  expect(result.filter((entry) => !entry.fits)).toEqual([]);
+}
+
 test("renders the setup/support pilot shell from fixtures", async ({ page }) => {
   await openFixture(page, "setup-required");
 
@@ -554,6 +597,92 @@ test("keeps the full lighting workspace visible at the 1920x1080 fallback size",
 
   expect(layoutMetrics.scrollHeight).toBeLessThanOrEqual(layoutMetrics.viewportHeight + 1);
   expect(layoutMetrics.scrollWidth).toBeLessThanOrEqual(layoutMetrics.viewportWidth + 1);
+});
+
+test("adapts lighting layout modes across supported logical viewport sizes", async ({ page }) => {
+  const cases = [
+    { width: 1280, height: 800, mode: "narrowUtility" },
+    { width: 1440, height: 900, mode: "desktopCompact" },
+    { width: 1600, height: 960, mode: "desktopCompact" },
+    { width: 1728, height: 1117, mode: "desktopCompact" },
+    { width: 1920, height: 1080, mode: "studioFull" },
+    { width: 2560, height: 1440, mode: "studioFull" },
+  ] as const;
+
+  for (const entry of cases) {
+    await page.setViewportSize({ width: entry.width, height: entry.height });
+    await openFixture(page, "lighting-populated");
+
+    await expect(page.locator("[data-operator-layout-root]")).toHaveAttribute("data-layout-mode", entry.mode);
+    await expect(page.getByTestId("lighting-toolbar")).toBeVisible();
+    await expect(page.getByTestId("lighting-stage")).toBeVisible();
+    await expectToolbarPrimaryControlsFit(page);
+    await expectNoDocumentScroll(page);
+
+    const stageBounds = await page.getByTestId("lighting-stage").boundingBox();
+    expect(stageBounds?.width ?? 0).toBeGreaterThanOrEqual(entry.mode === "narrowUtility" ? 520 : 560);
+    expect(stageBounds?.height ?? 0).toBeGreaterThanOrEqual(entry.mode === "narrowUtility" ? 400 : 440);
+
+    if (entry.mode !== "studioFull") {
+      await page.getByTestId("lighting-toolbar-overflow").click();
+      await expect(page.getByRole("menuitem", { name: /Highlight selection|Clear Highlight/ })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: /Solo selection|Clear Solo/ })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Find selected fixtures" })).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
+
+    if (entry.mode === "narrowUtility") {
+      await expect(page.getByTestId("lighting-inspector-drawer")).toHaveCount(0);
+      await page.getByTestId("lighting-open-inspector").click();
+      await expect(page.getByTestId("lighting-inspector-drawer")).toBeVisible();
+      await expect(page.getByTestId("lighting-inspector-drawer").getByLabel("Fixture intensity")).toBeVisible();
+      await page.getByTestId("lighting-inspector-drawer").getByRole("button", { name: "Close" }).click();
+      await expect(page.getByTestId("lighting-inspector-drawer")).toHaveCount(0);
+    }
+  }
+});
+
+test("renders scaled studio preview inside the current MacBook-sized viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1512, height: 982 });
+  const response = await page.goto("/?fixture=lighting-populated&transport=fixture&operatorReview=studio");
+  expect(response, "studio preview fixture should return a document response").not.toBeNull();
+  expect(response!.status(), "studio preview fixture should not fail to load").toBeLessThan(400);
+
+  const root = page.locator("[data-operator-layout-root]");
+  await expect(root).toHaveAttribute("data-review-surface", "studioPreview");
+  await expect(root).toHaveAttribute("data-layout-mode", "studioFull");
+  await expect(root).toHaveAttribute("data-layout-width", "2560");
+  await expect(root).toHaveAttribute("data-layout-height", "1440");
+  await expect(page.getByText(/Studio Preview/)).toBeVisible();
+  await expectToolbarPrimaryControlsFit(page);
+  await expectNoDocumentScroll(page);
+
+  const visualBounds = await root.boundingBox();
+  expect(visualBounds?.width ?? 0).toBeLessThanOrEqual(1512 + 1);
+  expect(visualBounds?.height ?? 0).toBeLessThanOrEqual(982 + 1);
+  expect((visualBounds?.width ?? 0) / (visualBounds?.height ?? 1)).toBeCloseTo(16 / 9, 2);
+});
+
+test("enters and exits scaled studio preview from the command palette", async ({ page }) => {
+  await page.setViewportSize({ width: 1512, height: 982 });
+  await openFixture(page, "lighting-populated");
+
+  await page.keyboard.press("Meta+K");
+  await page.locator("input[placeholder*=command]").fill("studio preview");
+  await expect(page.getByRole("option", { name: "Studio Preview: Enter 2560x1440 Review" })).toBeVisible();
+  await page.getByRole("option", { name: "Studio Preview: Enter 2560x1440 Review" }).click();
+
+  const root = page.locator("[data-operator-layout-root]");
+  await expect(root).toHaveAttribute("data-review-surface", "studioPreview");
+  await expect(root).toHaveAttribute("data-layout-mode", "studioFull");
+  await expect(page.getByText(/Studio Preview - 2560x1440 @/)).toBeVisible();
+
+  await page.keyboard.press("Meta+K");
+  await page.locator("input[placeholder*=command]").fill("studio preview");
+  await expect(page.getByRole("option", { name: "Studio Preview: Exit Review" })).toBeVisible();
+  await page.getByRole("option", { name: "Studio Preview: Exit Review" }).click();
+
+  await expect(root).toHaveAttribute("data-review-surface", "native");
 });
 
 test("supports lighting preview mode without driving live scene state", async ({ page }) => {

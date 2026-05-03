@@ -225,10 +225,10 @@ export function StagePlot({
         ref={viewport.svgRef}
         className={`${styles.plotSvg} ${viewport.isPanning ? styles.plotSvgPanning : ""} ${marquee.rect ? styles.plotSvgMarqueeing : ""}`}
         viewBox={`0 -${PLOT_TOP_GUTTER_CM} ${widthCm} ${depthCm + PLOT_TOP_GUTTER_CM}`}
-        // Fill the container instead of letterboxing. The top gutter keeps
-        // fixture labels and marker rings out from under the fixed chrome
-        // while preserving a full-room glanceable plot.
-        preserveAspectRatio="none"
+        // Fill Desk preserves the current operator-familiar stretched plot.
+        // Fit Room / 100% use SVG meet scaling so spatial proportions remain
+        // accurate in compact utility windows.
+        preserveAspectRatio={viewport.zoomMode === "fillDesk" ? "none" : "xMidYMid meet"}
         xmlns="http://www.w3.org/2000/svg"
         onPointerDown={(event) => {
           // Route by mouse button: middle (1) drives pan, left (0) drives
@@ -461,9 +461,13 @@ export function StagePlot({
 
       <StagePlotControls
         zoom={viewport.zoom}
+        zoomMode={viewport.zoomMode}
         onZoomIn={viewport.zoomIn}
         onZoomOut={viewport.zoomOut}
         onReset={viewport.reset}
+        onFitRoom={viewport.fitRoom}
+        onFillDesk={viewport.fillDesk}
+        onActualSize={viewport.actualSize}
         viewBookmarks={viewport.viewBookmarks}
         onSaveViewBookmark={viewport.saveViewBookmark}
         onRecallViewBookmark={viewport.recallViewBookmark}

@@ -2,13 +2,38 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 14px 14px 18px;
+  padding: var(--operator-pane-padding, 14px) var(--operator-pane-padding, 14px) 18px;
   background: linear-gradient(180deg, var(--color-bg-canvas) 0%, var(--color-bg-soft) 100%);
   border-right: 1px solid var(--color-bg-stroke);
   overflow-y: auto;
   font-family: var(--font-family-ui);
+  font-size: var(--operator-font-size-md, 12px);
   color: var(--color-brand-text-primary);
   transition: opacity var(--motion-duration-fast) ease;
+}
+
+:global([data-layout-mode="desktopCompact"]) .rail {
+  gap: 10px;
+}
+
+:global([data-layout-mode="desktopCompact"]) .sceneGrid {
+  gap: 7px;
+}
+
+:global([data-layout-mode="narrowUtility"]) .rail,
+:global([data-layout-mode="constrained"]) .rail {
+  gap: 9px;
+}
+
+:global([data-layout-mode="narrowUtility"]) .master,
+:global([data-layout-mode="constrained"]) .master {
+  gap: 10px;
+  padding: 12px;
+}
+
+:global([data-layout-mode="narrowUtility"]) .sceneGrid,
+:global([data-layout-mode="constrained"]) .sceneGrid {
+  grid-template-columns: 1fr;
 }
 
 .railPaused {
@@ -880,4 +905,45 @@
 
 .actionAlt:hover:not(:disabled) {
   color: var(--color-brand-yellow);
+}
+
+.headLabel,
+.masterEyebrow,
+.tileEyebrow,
+.sceneTitle,
+.cueMetaLabel {
+  font-size: var(--operator-font-size-2xs, 9px);
+}
+
+.headCount,
+.headButton,
+.headButtonKbd,
+.masterValue,
+.tileLevel,
+.groupChipDelta,
+.groupChipCount,
+.cueMeta {
+  font-size: var(--operator-font-size-xs, 10px);
+}
+
+.tileMeta,
+.groupChipLevel,
+.sceneSubtitle {
+  font-size: var(--operator-font-size-sm, 11px);
+}
+
+.emptyText,
+.action,
+.groupChipName,
+.sceneCueName,
+.cueValue {
+  font-size: var(--operator-font-size-md, 12px);
+}
+
+.tileName {
+  font-size: var(--operator-font-size-lg, 13px);
+}
+
+.masterName {
+  font-size: calc(17px * var(--operator-ui-scale-factor, 1));
 }

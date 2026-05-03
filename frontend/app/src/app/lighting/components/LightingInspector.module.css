@@ -1,11 +1,21 @@
 .inspector {
+  --lighting-inspector-font-eyebrow: var(--operator-font-size-2xs, 9px);
+  --lighting-inspector-font-caption: var(--operator-font-size-xs, 10px);
+  --lighting-inspector-font-small: var(--operator-font-size-sm, 11px);
+  --lighting-inspector-font-body: var(--operator-font-size-md, 12px);
+  --lighting-inspector-font-strong: var(--operator-font-size-lg, 13px);
+  --lighting-inspector-font-heading: var(--operator-font-size-title-sm, 16px);
+  --lighting-inspector-font-stat: var(--operator-font-size-title-md, 18px);
+  --lighting-inspector-font-scene-title: var(--operator-font-size-title-lg, 22px);
+
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--operator-inspector-gap, 12px);
+  padding: var(--operator-inspector-padding, 12px);
   background: linear-gradient(180deg, var(--color-bg-canvas) 0%, var(--color-bg-soft) 100%);
   border-left: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-ui);
+  font-size: var(--lighting-inspector-font-body);
   color: var(--color-brand-text-primary);
   overflow-y: auto;
   min-height: 0;
@@ -24,13 +34,13 @@
 .tabPanel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--operator-inspector-section-gap, 10px);
   min-width: 0;
 }
 
 .compactSection {
-  gap: 9px;
-  padding: 11px 12px;
+  gap: calc(9px * var(--operator-ui-scale-factor, 1));
+  padding: var(--operator-inspector-section-padding-y, 11px) var(--operator-inspector-section-padding-x, 12px);
 }
 
 .previewSource {
@@ -1052,4 +1062,71 @@
   font-size: 11px;
   color: var(--color-brand-text-primary);
   font-weight: 600;
+}
+
+.previewSourceEyebrow,
+.palettePoolHeader h3,
+.sceneEyebrow,
+.sceneStatLabel,
+.sceneSectionHead,
+.positionLabel,
+.levelLabel,
+.factLabel,
+.patchFieldLabel,
+.cctScale {
+  font-size: var(--lighting-inspector-font-eyebrow);
+}
+
+.tab,
+.tabHint,
+.kbd,
+.paletteStatus,
+.paletteValueInput span,
+.sceneStatValue small,
+.sceneFixtureLevel,
+.levelValue,
+.memberMeta,
+.channelAddress,
+.channelLabel {
+  font-size: var(--lighting-inspector-font-caption);
+}
+
+.previewSource,
+.helpText,
+.paletteTileMain span,
+.sceneFixtureChip,
+.fixtureSubline,
+.collisionHeader,
+.channelValue {
+  font-size: var(--lighting-inspector-font-small);
+}
+
+.empty,
+.paletteNotice,
+.sceneSub,
+.sceneProvenance,
+.groupAssignSelect,
+.colorPickerTrigger,
+.positionInput,
+.factValue,
+.memberName,
+.patchInput {
+  font-size: var(--lighting-inspector-font-body);
+}
+
+.paletteTileMain strong,
+.sliderValue {
+  font-size: var(--lighting-inspector-font-strong);
+}
+
+.fixtureName {
+  font-size: var(--lighting-inspector-font-heading);
+}
+
+.sceneStatValue {
+  font-size: var(--lighting-inspector-font-stat);
+}
+
+.sceneTitle {
+  font-size: var(--lighting-inspector-font-scene-title);
 }

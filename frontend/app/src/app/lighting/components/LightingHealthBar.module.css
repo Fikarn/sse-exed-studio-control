@@ -8,10 +8,10 @@
   cursor: pointer;
   display: inline-flex;
   font-family: var(--font-family-mono);
-  font-size: 10px;
-  gap: 6px;
+  font-size: var(--operator-font-size-xs, 10px);
+  gap: var(--operator-health-toggle-gap, 6px);
   letter-spacing: 0.08em;
-  padding: 4px 8px;
+  padding: var(--operator-health-toggle-padding-y, 4px) var(--operator-health-toggle-padding-x, 8px);
   text-transform: uppercase;
   transition:
     color var(--motion-duration-fast) ease,
@@ -39,8 +39,8 @@
   background: var(--color-brand-text-muted);
   border-radius: 50%;
   display: inline-block;
-  height: 6px;
-  width: 6px;
+  height: var(--operator-health-dot-size, 6px);
+  width: var(--operator-health-dot-size, 6px);
   transition: background var(--motion-duration-fast) ease;
 }
 

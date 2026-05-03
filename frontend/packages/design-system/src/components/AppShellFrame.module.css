@@ -1,13 +1,13 @@
 .shell {
   display: grid;
   grid-template:
-    "header header header" var(--size-shell-height)
+    "header header header" var(--operator-shell-height, var(--size-shell-height))
     "main main context" minmax(0, 1fr)
     / minmax(0, 1fr) minmax(0, 1fr) minmax(280px, var(--size-context-rail-width));
-  height: 100vh;
-  height: 100dvh;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: var(--operator-app-height, 100vh);
+  height: var(--operator-app-height-dynamic, 100dvh);
+  min-height: var(--operator-app-min-height, 100vh);
+  min-height: var(--operator-app-min-height-dynamic, 100dvh);
   background:
     radial-gradient(circle at top left, var(--color-brand-green-glow), transparent 32%),
     linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-bg-canvas) 100%);
@@ -17,7 +17,7 @@
 
 .shell[data-context-visible="false"] {
   grid-template:
-    "header header" var(--size-shell-height)
+    "header header" var(--operator-shell-height, var(--size-shell-height))
     "main main" minmax(0, 1fr)
     / minmax(0, 1fr) minmax(0, 1fr);
 }
@@ -27,12 +27,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 0 24px 0 36px;
+  gap: var(--operator-shell-header-gap, 18px);
+  padding: 0 var(--operator-shell-header-padding-x, 24px) 0 var(--operator-shell-header-padding-left, 36px);
   background: linear-gradient(180deg, var(--color-bg-deep) 0%, #060706 100%);
   border-bottom: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-mono);
-  font-size: 13px;
+  font-size: var(--operator-font-size-lg, 13px);
   color: var(--color-brand-text-muted);
   position: relative;
   overflow: hidden;
@@ -58,7 +58,7 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: var(--operator-shell-brand-gap, 22px);
   height: 100%;
   min-width: 0;
   overflow: hidden;
@@ -67,7 +67,7 @@
 
 .brandDivider {
   width: 1px;
-  height: 42px;
+  height: calc(42px * var(--operator-ui-scale-factor, 1));
   background: linear-gradient(180deg, transparent 0%, var(--color-bg-border) 50%, transparent 100%);
   margin: 0 4px;
   display: inline-block;
@@ -78,7 +78,7 @@
   font-family: var(--font-family-display);
   font-variation-settings: "opsz" 36;
   font-weight: 500;
-  font-size: 20px;
+  font-size: calc(20px * var(--operator-ui-scale-factor, 1));
   color: var(--color-brand-text-secondary);
   letter-spacing: -0.008em;
   line-height: 1;
@@ -90,7 +90,7 @@
   display: flex;
   gap: 4px;
   font-family: var(--font-family-ui);
-  margin-left: 18px;
+  margin-left: var(--operator-shell-header-gap, 18px);
   height: 100%;
   align-items: center;
 }
@@ -98,7 +98,7 @@
 .shellMeta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--operator-shell-meta-gap, 10px);
   flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
@@ -109,7 +109,7 @@
   font-feature-settings: "tnum", "zero";
   color: var(--color-brand-text-secondary);
   letter-spacing: 0.06em;
-  font-size: 14px;
+  font-size: var(--operator-font-size-xl, 14px);
   font-family: var(--font-family-mono);
   white-space: nowrap;
 }
@@ -127,7 +127,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: var(--space-4);
+  padding: var(--operator-shell-main-padding, var(--space-4));
 }
 
 .mainSurface {
@@ -144,21 +144,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 72px;
-  padding: 0 var(--space-5);
+  gap: var(--operator-shell-main-header-gap, var(--space-3));
+  min-height: var(--operator-shell-main-header-height, 72px);
+  padding: 0 var(--operator-shell-main-header-padding-x, var(--space-5));
   border-bottom: 1px solid var(--color-bg-stroke);
 }
 
 .titleBlock {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--operator-shell-title-block-gap, 6px);
 }
 
 .eyebrow {
   color: var(--color-brand-text-muted);
-  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -168,7 +168,7 @@
   font-family: var(--font-family-display);
   font-variation-settings: "opsz" 64;
   font-weight: 600;
-  font-size: 30px;
+  font-size: var(--operator-font-size-shell-title, 30px);
   line-height: 1;
   color: var(--color-brand-text-primary);
   letter-spacing: -0.015em;
@@ -177,7 +177,7 @@
 .subtitle {
   margin: 0;
   color: var(--color-brand-text-secondary);
-  font: var(--font-weight-regular) var(--font-size-md) / 1.5 var(--font-family-ui);
+  font: var(--font-weight-regular) var(--operator-font-size-md, var(--font-size-md)) / 1.5 var(--font-family-ui);
 }
 
 .mainBody {
@@ -192,20 +192,20 @@
   grid-area: context;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--operator-shell-main-header-gap, var(--space-3));
+  padding: var(--operator-shell-main-padding, var(--space-4));
   border-left: 1px solid var(--color-bg-stroke);
   background: color-mix(in srgb, var(--color-bg-soft) 84%, transparent);
 }
 
 .contextSection {
   composes: surface;
-  padding: var(--space-4);
+  padding: var(--operator-shell-main-padding, var(--space-4));
 }
 
 .contextHeading {
   margin: 0 0 var(--space-3);
-  font: var(--font-weight-semibold) var(--font-size-lg) / 1.2 var(--font-family-ui);
+  font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-lg)) / 1.2 var(--font-family-ui);
   color: var(--color-brand-text-primary);
 }
 
@@ -213,20 +213,21 @@
   margin: 0;
   padding-left: 18px;
   color: var(--color-brand-text-muted);
+  font-size: var(--operator-font-size-md, var(--font-size-md));
 }
 
 @media (max-width: 1440px) {
   .shellHeader {
-    padding: 0 24px;
-    gap: 12px;
+    padding: 0 var(--operator-shell-header-padding-x, 24px);
+    gap: var(--operator-shell-header-gap, 12px);
   }
 
   .brand {
-    gap: 18px;
+    gap: var(--operator-shell-brand-gap, 18px);
   }
 
   .workspaceNav {
-    margin-left: 12px;
+    margin-left: var(--operator-shell-header-gap, 12px);
   }
 
   .productName {

@@ -33,7 +33,7 @@ Rule: if a change would move product state, persistence, or device policy into R
 - **No scroll during normal operation.** Dense fixed-height layouts.
 - Devices currently in play: RME Fireface UFX III (audio), Litepanels Apollo Bridge / Astra Bi-Color / Aputure Infinimat / Infinibar PB12 (lighting), Stream Deck+ + Bitfocus Companion local (control).
 
-When developing on a Retina MacBook, enforce the built-in-display review workflow from `docs/DEVELOPMENT.md`: use the BetterDisplay-backed mirrored `2560×1440` review surface for live visual inspection, and do not judge fit/layout from the default Retina logical desktop.
+When developing on a Retina MacBook, enforce the built-in-display review workflow from `docs/DEVELOPMENT.md`: use the app-owned Scaled Studio Preview for proportional `2560×1440` studio review, and do not judge studio-full fit/layout from the default Retina logical desktop.
 
 Authoritative source: `docs/HARDWARE_PROFILE.md`.
 
@@ -98,7 +98,7 @@ Every operator-visible change to the selected Tauri surface must:
 
 1. run the relevant frontend, Tauri, or native validation lane for the changed surface,
 2. run `npm run tauri:visual:review` when layout or operator presentation changes,
-3. inspect the result on the BetterDisplay-backed `2560×1440` review surface or the fixed studio monitor when human fit judgment matters.
+3. inspect the result with Scaled Studio Preview or on the fixed studio monitor when human fit judgment matters.
 
 Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/archive/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Historical Qt parity screenshots were retired in Checkpoint D.
 

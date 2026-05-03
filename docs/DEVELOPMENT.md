@@ -119,7 +119,7 @@ The promotion gate for the Tauri shipping switch lives in [FRONTEND_CUTOVER_PLAN
 
 `npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, workspace qualification, and visual review serially.
 
-`npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting, Audio, and Planning screenshots at `2560x1440` and `1920x1080`, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. This complements, but does not replace, live human review on the BetterDisplay-backed `2560x1440` surface or the fixed studio monitor.
+`npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting, Audio, and Planning screenshots at `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` logical CSS pixels, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. Lighting also asserts toolbar primary-control fit, compact overflow reachability, narrow inspector drawer behavior, stage minimum bounds, and CSS-viewport-driven layout mode selection. This complements, but does not replace, live human review with Scaled Studio Preview or the fixed studio monitor.
 
 `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` are Checkpoint C hardening lanes for historical/pre-switch replacement-shell evidence. They stage the Tauri shell and `studio-control-engine` side by side under `release/tauri-candidate/**`, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository payloads under separate `release/tauri-candidate-installer/**` and `release/tauri-candidate-updates/**` roots, and verify staged payload parity. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`.
 
@@ -141,7 +141,7 @@ Use the matching Windows QtIFW tools on a Windows 11 `x64` host for `npm run nat
 
 ### 2b. Visual review
 
-When the task changes any operator-visible selected Tauri surface, do not stop at code. Run the fixture-driven visual lane and inspect the result on the BetterDisplay-backed `2560x1440` review surface or the fixed studio monitor:
+When the task changes any operator-visible selected Tauri surface, do not stop at code. Run the fixture-driven visual lane and inspect the result with the built-in scaled studio preview workflow or the fixed studio monitor:
 
 ```bash
 npm run tauri:visual:review
@@ -150,18 +150,37 @@ npm run tauri:visual:review
 Required selected-runtime workflow:
 
 1. build and validate the selected Tauri shell
-2. capture repeatable `2560x1440` and `1920x1080` visual evidence with `tauri:visual:review`
-3. launch the real app fullscreen when human inspection is needed
-4. interact with the live app directly when the workflow being checked depends on it
+2. capture repeatable `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` visual evidence with `tauri:visual:review`
+3. launch the real app when human inspection is needed
+4. use **Studio Preview: Enter 2560x1440 Review** from the command palette to review the `2560x1440` studio canvas proportionally on the current display
 5. compare against the intended operator state before accepting the change
 
 Treat raw window width alone as an invalid authority for operator layout. The primary target is fullscreen `2560x1440` on the permanent second monitor.
+
+Responsive operator modes are based on logical viewport/CSS pixels, not physical monitor pixels or Retina/Windows backing scale:
+
+- `studioFull`: `>=1920x1080`, the full live-operation rail/stage/inspector layout.
+- `desktopCompact`: `>=1440x900`, a compact three-pane layout with reduced chrome and overflowed secondary controls.
+- `narrowUtility`: `>=1280x800`, a utility layout with rail + stage and a right inspector drawer.
+- `constrained`: below `1280x800`, for development diagnostics only.
+
+`1280x800` is supported for utility work, not as the full simultaneous show-control surface. Panel-level scroll inside rails, inspectors, or drawers is acceptable in compact modes; document-level scroll is not.
 
 Do not accept stale live evidence. If the current Tauri visual review output or live screenshot does not clearly correspond to the operator state being checked, regenerate it before continuing.
 
 #### Built-in display review on Retina Macs
 
-Retina MacBook panels can have enough physical pixels for the target operator surface while still exposing a much smaller logical desktop. Treat the built-in panel as a review surface only when it is explicitly configured for that purpose.
+Retina MacBook panels can have enough physical pixels for the target operator surface while still exposing a much smaller logical desktop. The current built-in 14-inch M5 display exposes roughly `1512x982` logical points at `2.0` backing scale (`3024x1964` backing pixels), so a native `2560x1440` logical Tauri window cannot fit on the desktop.
+
+Use **Scaled Studio Preview** for normal built-in-display human review:
+
+1. Run the app with `npm run tauri:dev`.
+2. Open the command palette with `⌘K`.
+3. Run `Studio Preview: Enter 2560x1440 Review`.
+4. Review the proportional `2560x1440` studio canvas scaled into the current window.
+5. Run `Studio Preview: Exit Review` before judging native compact/windowed behavior.
+
+Scaled Studio Preview deliberately preserves studio layout mode, aspect ratio, and proportions while reducing physical size. It is valid for composition, relative density, toolbar fit, rail/stage/inspector balance, drawer behavior, and operator flow inspection. It is not a substitute for real physical-size readability or final studio-monitor ergonomics.
 
 Check the current machine state with the direct Swift probe:
 
@@ -169,20 +188,9 @@ Check the current machine state with the direct Swift probe:
 swift -e 'import AppKit; import CoreGraphics; for screen in NSScreen.screens { if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber { let id = CGDirectDisplayID(truncating: number); if let mode = CGDisplayCopyDisplayMode(id) { print("id=\(id) frame=\(Int(screen.frame.width))x\(Int(screen.frame.height)) points=\(mode.width)x\(mode.height) pixels=\(mode.pixelWidth)x\(mode.pixelHeight) backing=\(Double(screen.backingScaleFactor)) builtin=\(CGDisplayIsBuiltin(id) != 0)") } } }'
 ```
 
-On the current 14-inch M5 workstation, this reports the built-in panel as `1512x982` points at `2.0` backing (`3024x1964` pixels), which is why the app looks compressed without a dedicated review workflow.
+Use native windowed mode on the built-in display for compact-mode interaction review. Do not sign off the `studioFull` operator composition from the unscaled native MacBook viewport; it is a compact logical surface, not the studio surface.
 
-Recommended built-in-display workflow:
-
-1. **Preferred:** use `BetterDisplay` flexible scaling on the built-in display. The current vendor docs explicitly support built-in Apple Silicon panels and flexible scaling on internal displays.
-2. Configure the built-in panel for an exact `2560x1440` review mode if the flexible-scaling list exposes it.
-3. If flexible scaling does not produce a stable exact target, use `BetterDisplay` virtual-screen mirroring instead:
-   - create a virtual screen associated with the built-in display,
-   - enable HiDPI for that virtual screen,
-   - include `2560x1440` in the virtual resolution list,
-   - mirror the virtual screen to the built-in panel,
-   - set the mirrored set as main.
-4. If the virtual mirror reverses direction or loses main-display status, stop mirroring and reattach it. `BetterDisplay` documents this as a macOS display-management quirk rather than an app-specific bug.
-5. Use the built-in panel only for human visual inspection. The acceptance gate remains the Tauri visual review lane plus target-host release evidence.
+BetterDisplay flexible scaling or virtual-screen mirroring remains an optional fallback, not the standard workflow. Use it only when you specifically need an OS-level exact logical review surface.
 
 Reference docs:
 

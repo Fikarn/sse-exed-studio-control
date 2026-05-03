@@ -4,9 +4,7 @@ use engine::{EngineBootstrapSummary, EngineBridge};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::env;
-#[cfg(feature = "test-bridge")]
-use std::fs::read_to_string;
-use std::fs::{create_dir_all, write};
+use std::fs::{create_dir_all, read_to_string, remove_file, write};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -14,7 +12,10 @@ use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use studio_control_protocol::RequestEnvelope;
-use tauri::{Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, PhysicalPosition, PhysicalSize,
+    WebviewWindow,
+};
 
 struct EngineState {
     bridge: EngineBridge,
@@ -37,10 +38,306 @@ struct ShellStartupFailure {
     stage: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ShellLaunchMode {
+    StudioFullscreen,
+    Windowed,
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LogicalSizeSnapshot {
+    width: f64,
+    height: f64,
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LogicalPositionSnapshot {
+    x: f64,
+    y: f64,
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MonitorSnapshot {
+    name: Option<String>,
+    physical_position: LogicalPositionSnapshot,
+    physical_size: LogicalSizeSnapshot,
+    logical_size: LogicalSizeSnapshot,
+    scale_factor: f64,
+}
+
+#[derive(Clone)]
+struct AvailableMonitorSnapshot {
+    name: Option<String>,
+    physical_position: LogicalPositionSnapshot,
+    physical_size: LogicalSizeSnapshot,
+    scale_factor: f64,
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShellWindowPreferences {
+    launch_mode: ShellLaunchMode,
+    last_logical_size: Option<LogicalSizeSnapshot>,
+    last_logical_position: Option<LogicalPositionSnapshot>,
+    fullscreen: bool,
+    monitor: Option<MonitorSnapshot>,
+    scale_factor: Option<f64>,
+    updated_at_epoch_seconds: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SavedWindowRecoveryAction {
+    FallbackWindowed,
+    Restore {
+        launch_mode: ShellLaunchMode,
+        monitor_index: usize,
+    },
+}
+
 fn read_arg_value(args: &[String], name: &str) -> Option<String> {
     let prefix = format!("{name}=");
     args.iter()
         .find_map(|value| value.strip_prefix(&prefix).map(ToString::to_string))
+}
+
+fn now_epoch_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn window_preferences_path(app: &AppHandle) -> Result<PathBuf, String> {
+    let config_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| format!("Failed to resolve Tauri config directory: {error}"))?;
+    Ok(config_dir.join("shell-window-layout.json"))
+}
+
+fn read_window_preferences(app: &AppHandle) -> Option<ShellWindowPreferences> {
+    let path = window_preferences_path(app).ok()?;
+    let payload = read_to_string(path).ok()?;
+    serde_json::from_str(&payload).ok()
+}
+
+fn write_window_preferences(
+    app: &AppHandle,
+    preferences: &ShellWindowPreferences,
+) -> Result<(), String> {
+    let path = window_preferences_path(app)?;
+    if let Some(parent) = path.parent() {
+        create_dir_all(parent)
+            .map_err(|error| format!("Failed to create shell config directory: {error}"))?;
+    }
+    let payload = serde_json::to_vec_pretty(preferences)
+        .map_err(|error| format!("Failed to serialize shell window preferences: {error}"))?;
+    write(&path, payload).map_err(|error| {
+        format!(
+            "Failed to write shell window preferences {}: {error}",
+            path.display()
+        )
+    })
+}
+
+fn remove_window_preferences(app: &AppHandle) -> Result<(), String> {
+    let path = window_preferences_path(app)?;
+    if path.exists() {
+        remove_file(&path).map_err(|error| {
+            format!(
+                "Failed to remove shell window preferences {}: {error}",
+                path.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
+fn logical_monitor_size(monitor: &Monitor) -> LogicalSizeSnapshot {
+    let scale_factor = monitor.scale_factor();
+    LogicalSizeSnapshot {
+        width: monitor.size().width as f64 / scale_factor,
+        height: monitor.size().height as f64 / scale_factor,
+    }
+}
+
+fn monitor_snapshot(monitor: &Monitor) -> MonitorSnapshot {
+    MonitorSnapshot {
+        name: monitor.name().cloned(),
+        physical_position: LogicalPositionSnapshot {
+            x: monitor.position().x as f64,
+            y: monitor.position().y as f64,
+        },
+        physical_size: LogicalSizeSnapshot {
+            width: monitor.size().width as f64,
+            height: monitor.size().height as f64,
+        },
+        logical_size: logical_monitor_size(monitor),
+        scale_factor: monitor.scale_factor(),
+    }
+}
+
+fn available_monitor_snapshot(monitor: &Monitor) -> AvailableMonitorSnapshot {
+    AvailableMonitorSnapshot {
+        name: monitor.name().cloned(),
+        physical_position: LogicalPositionSnapshot {
+            x: monitor.position().x as f64,
+            y: monitor.position().y as f64,
+        },
+        physical_size: LogicalSizeSnapshot {
+            width: monitor.size().width as f64,
+            height: monitor.size().height as f64,
+        },
+        scale_factor: monitor.scale_factor(),
+    }
+}
+
+fn available_monitor_matches_snapshot(
+    monitor: &AvailableMonitorSnapshot,
+    saved: &MonitorSnapshot,
+) -> bool {
+    if saved
+        .name
+        .as_ref()
+        .zip(monitor.name.as_ref())
+        .is_some_and(|(saved_name, monitor_name)| saved_name == monitor_name)
+    {
+        return true;
+    }
+
+    let size_matches = (saved.physical_size.width - monitor.physical_size.width).abs() < 1.0
+        && (saved.physical_size.height - monitor.physical_size.height).abs() < 1.0;
+    let position_matches = (saved.physical_position.x - monitor.physical_position.x).abs() < 1.0
+        && (saved.physical_position.y - monitor.physical_position.y).abs() < 1.0;
+    let scale_matches = (saved.scale_factor - monitor.scale_factor).abs() < 0.01;
+
+    size_matches && position_matches && scale_matches
+}
+
+fn saved_monitor_index_from_snapshots(
+    monitors: &[AvailableMonitorSnapshot],
+    saved: Option<&MonitorSnapshot>,
+) -> Option<usize> {
+    let saved = saved?;
+    monitors
+        .iter()
+        .position(|monitor| available_monitor_matches_snapshot(monitor, saved))
+}
+
+fn saved_window_recovery_action(
+    monitors: &[AvailableMonitorSnapshot],
+    preferences: &ShellWindowPreferences,
+) -> SavedWindowRecoveryAction {
+    match saved_monitor_index_from_snapshots(monitors, preferences.monitor.as_ref()) {
+        Some(monitor_index) => SavedWindowRecoveryAction::Restore {
+            launch_mode: preferences.launch_mode,
+            monitor_index,
+        },
+        None => SavedWindowRecoveryAction::FallbackWindowed,
+    }
+}
+
+#[cfg(test)]
+fn saved_monitor_is_unavailable(
+    monitors: &[AvailableMonitorSnapshot],
+    preferences: &ShellWindowPreferences,
+) -> bool {
+    preferences
+        .monitor
+        .as_ref()
+        .is_some_and(|saved| saved_monitor_index_from_snapshots(monitors, Some(saved)).is_none())
+}
+
+fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
+    app.get_webview_window("main")
+        .ok_or_else(|| "Main Tauri window is unavailable.".to_string())
+}
+
+fn window_scale_factor(window: &WebviewWindow) -> f64 {
+    window
+        .scale_factor()
+        .ok()
+        .filter(|scale| scale.is_finite() && *scale > 0.0)
+        .or_else(|| {
+            window
+                .current_monitor()
+                .ok()
+                .flatten()
+                .map(|monitor| monitor.scale_factor())
+        })
+        .unwrap_or(1.0)
+}
+
+fn capture_current_window_preferences(
+    app: &AppHandle,
+    window: &WebviewWindow,
+    launch_mode_override: Option<ShellLaunchMode>,
+) -> ShellWindowPreferences {
+    let existing = read_window_preferences(app);
+    let scale_factor = window_scale_factor(window);
+    let fullscreen = window.is_fullscreen().unwrap_or(false);
+    let launch_mode = launch_mode_override
+        .or_else(|| existing.as_ref().map(|preferences| preferences.launch_mode))
+        .unwrap_or(if fullscreen {
+            ShellLaunchMode::StudioFullscreen
+        } else {
+            ShellLaunchMode::Windowed
+        });
+
+    let last_logical_size = window.inner_size().ok().map(|size| LogicalSizeSnapshot {
+        width: size.width as f64 / scale_factor,
+        height: size.height as f64 / scale_factor,
+    });
+    let last_logical_position =
+        window
+            .outer_position()
+            .ok()
+            .map(|position| LogicalPositionSnapshot {
+                x: position.x as f64 / scale_factor,
+                y: position.y as f64 / scale_factor,
+            });
+
+    ShellWindowPreferences {
+        launch_mode,
+        last_logical_size,
+        last_logical_position,
+        fullscreen,
+        monitor: window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .map(|monitor| monitor_snapshot(&monitor)),
+        scale_factor: Some(scale_factor),
+        updated_at_epoch_seconds: now_epoch_seconds(),
+    }
+}
+
+fn persist_current_window_preferences(
+    app: &AppHandle,
+    window: &WebviewWindow,
+    launch_mode_override: Option<ShellLaunchMode>,
+) {
+    let preferences = capture_current_window_preferences(app, window, launch_mode_override);
+    let _ = write_window_preferences(app, &preferences);
+}
+
+fn apply_centered_windowed_layout(window: &WebviewWindow) -> Result<(), String> {
+    window
+        .set_fullscreen(false)
+        .map_err(|error| format!("Failed to leave fullscreen: {error}"))?;
+    window
+        .set_size(LogicalSize::new(1600.0, 960.0))
+        .map_err(|error| format!("Failed to set fallback window size: {error}"))?;
+    window
+        .center()
+        .map_err(|error| format!("Failed to center fallback window: {error}"))?;
+    window
+        .show()
+        .map_err(|error| format!("Failed to show fallback window: {error}"))
 }
 
 fn write_smoke_status(status_path: Option<&str>, status: Value) {
@@ -533,21 +830,309 @@ fn preferred_review_monitor(window: &WebviewWindow) -> Option<Monitor> {
         })
 }
 
-fn route_window_to_preferred_monitor(window: &WebviewWindow) {
+fn route_window_to_monitor(window: &WebviewWindow, monitor: &Monitor) -> Result<(), String> {
+    let _ = window.set_fullscreen(false);
+    window
+        .set_position(PhysicalPosition::new(
+            monitor.position().x,
+            monitor.position().y,
+        ))
+        .map_err(|error| format!("Failed to position window on monitor: {error}"))?;
+    window
+        .set_size(PhysicalSize::new(
+            monitor.size().width,
+            monitor.size().height,
+        ))
+        .map_err(|error| format!("Failed to size window for monitor: {error}"))?;
+    window
+        .set_fullscreen(true)
+        .map_err(|error| format!("Failed to enter fullscreen: {error}"))
+}
+
+fn route_window_to_preferred_monitor(window: &WebviewWindow) -> Result<(), String> {
     let Some(monitor) = preferred_review_monitor(window) else {
-        return;
+        return apply_centered_windowed_layout(window);
     };
 
-    let _ = window.set_fullscreen(false);
-    let _ = window.set_position(PhysicalPosition::new(
-        monitor.position().x,
-        monitor.position().y,
-    ));
-    let _ = window.set_size(PhysicalSize::new(
-        monitor.size().width,
-        monitor.size().height,
-    ));
-    let _ = window.set_fullscreen(true);
+    route_window_to_monitor(window, &monitor)
+}
+
+fn restore_saved_window_layout(
+    window: &WebviewWindow,
+    preferences: &ShellWindowPreferences,
+) -> Result<bool, String> {
+    let monitors = window
+        .available_monitors()
+        .map_err(|error| format!("Failed to list monitors for saved window restore: {error}"))?;
+    let monitor_snapshots = monitors
+        .iter()
+        .map(available_monitor_snapshot)
+        .collect::<Vec<_>>();
+
+    let (launch_mode, monitor) = match saved_window_recovery_action(&monitor_snapshots, preferences)
+    {
+        SavedWindowRecoveryAction::FallbackWindowed => {
+            apply_centered_windowed_layout(window)?;
+            return Ok(false);
+        }
+        SavedWindowRecoveryAction::Restore {
+            launch_mode,
+            monitor_index,
+        } => {
+            let monitor = monitors.get(monitor_index).ok_or_else(|| {
+                "Saved window monitor restore index was unavailable after matching.".to_string()
+            })?;
+            (launch_mode, monitor)
+        }
+    };
+
+    match launch_mode {
+        ShellLaunchMode::StudioFullscreen => {
+            route_window_to_monitor(window, monitor)?;
+            Ok(true)
+        }
+        ShellLaunchMode::Windowed => {
+            window
+                .set_fullscreen(false)
+                .map_err(|error| format!("Failed to leave fullscreen: {error}"))?;
+            if let Some(size) = preferences.last_logical_size.as_ref() {
+                window
+                    .set_size(LogicalSize::new(size.width, size.height))
+                    .map_err(|error| format!("Failed to restore saved window size: {error}"))?;
+            } else {
+                window
+                    .set_size(LogicalSize::new(1600.0, 960.0))
+                    .map_err(|error| format!("Failed to set default window size: {error}"))?;
+            }
+            if let Some(position) = preferences.last_logical_position.as_ref() {
+                window
+                    .set_position(LogicalPosition::new(position.x, position.y))
+                    .map_err(|error| format!("Failed to restore saved window position: {error}"))?;
+            } else {
+                window
+                    .center()
+                    .map_err(|error| format!("Failed to center restored window: {error}"))?;
+            }
+            window
+                .show()
+                .map_err(|error| format!("Failed to show restored window: {error}"))?;
+            Ok(true)
+        }
+    }
+}
+
+fn restore_or_route_initial_window(app: &AppHandle, window: &WebviewWindow) {
+    let restored = read_window_preferences(app)
+        .as_ref()
+        .map(|preferences| restore_saved_window_layout(window, preferences).unwrap_or(false));
+
+    match restored {
+        Some(true) => persist_current_window_preferences(app, window, None),
+        Some(false) => {
+            persist_current_window_preferences(app, window, Some(ShellLaunchMode::Windowed))
+        }
+        None => {
+            if route_window_to_preferred_monitor(window).is_ok() {
+                let mode = if window.is_fullscreen().unwrap_or(false) {
+                    ShellLaunchMode::StudioFullscreen
+                } else {
+                    ShellLaunchMode::Windowed
+                };
+                persist_current_window_preferences(app, window, Some(mode));
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn shell_enter_studio_fullscreen(app: AppHandle) -> Result<(), String> {
+    let window = main_window(&app)?;
+    let monitor = preferred_review_monitor(&window)
+        .or_else(|| window.current_monitor().ok().flatten())
+        .ok_or_else(|| "No monitor is available for studio fullscreen.".to_string())?;
+    route_window_to_monitor(&window, &monitor)?;
+    persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::StudioFullscreen));
+    Ok(())
+}
+
+#[tauri::command]
+fn shell_use_windowed_layout(app: AppHandle) -> Result<(), String> {
+    let window = main_window(&app)?;
+    apply_centered_windowed_layout(&window)?;
+    persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::Windowed));
+    Ok(())
+}
+
+#[tauri::command]
+fn shell_reset_window_layout(app: AppHandle) -> Result<(), String> {
+    let window = main_window(&app)?;
+    remove_window_preferences(&app)?;
+    if let Some(monitor) = preferred_review_monitor(&window) {
+        route_window_to_monitor(&window, &monitor)?;
+        persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::StudioFullscreen));
+    } else {
+        apply_centered_windowed_layout(&window)?;
+        persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::Windowed));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod shell_window_preferences_tests {
+    use super::*;
+
+    fn logical_size(width: f64, height: f64) -> LogicalSizeSnapshot {
+        LogicalSizeSnapshot { width, height }
+    }
+
+    fn logical_position(x: f64, y: f64) -> LogicalPositionSnapshot {
+        LogicalPositionSnapshot { x, y }
+    }
+
+    fn saved_monitor(
+        name: Option<&str>,
+        position: (f64, f64),
+        physical_size: (f64, f64),
+        scale_factor: f64,
+    ) -> MonitorSnapshot {
+        MonitorSnapshot {
+            name: name.map(ToString::to_string),
+            physical_position: logical_position(position.0, position.1),
+            physical_size: logical_size(physical_size.0, physical_size.1),
+            logical_size: logical_size(
+                physical_size.0 / scale_factor,
+                physical_size.1 / scale_factor,
+            ),
+            scale_factor,
+        }
+    }
+
+    fn available_monitor(
+        name: Option<&str>,
+        position: (f64, f64),
+        physical_size: (f64, f64),
+        scale_factor: f64,
+    ) -> AvailableMonitorSnapshot {
+        AvailableMonitorSnapshot {
+            name: name.map(ToString::to_string),
+            physical_position: logical_position(position.0, position.1),
+            physical_size: logical_size(physical_size.0, physical_size.1),
+            scale_factor,
+        }
+    }
+
+    fn preferences_with_monitor(monitor: Option<MonitorSnapshot>) -> ShellWindowPreferences {
+        ShellWindowPreferences {
+            launch_mode: ShellLaunchMode::StudioFullscreen,
+            last_logical_size: Some(logical_size(2560.0, 1440.0)),
+            last_logical_position: Some(logical_position(0.0, 0.0)),
+            fullscreen: true,
+            monitor,
+            scale_factor: Some(1.0),
+            updated_at_epoch_seconds: 1,
+        }
+    }
+
+    #[test]
+    fn shell_window_preferences_saved_monitor_missing_falls_back_to_windowed_layout() {
+        let preferences = preferences_with_monitor(Some(saved_monitor(
+            Some("Studio Review"),
+            (2560.0, 0.0),
+            (2560.0, 1440.0),
+            1.0,
+        )));
+        let available = [available_monitor(
+            Some("Laptop"),
+            (0.0, 0.0),
+            (1728.0, 1117.0),
+            2.0,
+        )];
+
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&available, preferences.monitor.as_ref()),
+            None
+        );
+        assert_eq!(
+            saved_window_recovery_action(&available, &preferences),
+            SavedWindowRecoveryAction::FallbackWindowed
+        );
+        assert!(saved_monitor_is_unavailable(&available, &preferences));
+    }
+
+    #[test]
+    fn shell_window_preferences_saved_monitor_matches_by_name() {
+        let preferences = preferences_with_monitor(Some(saved_monitor(
+            Some("Studio Review"),
+            (2560.0, 0.0),
+            (2560.0, 1440.0),
+            1.0,
+        )));
+        let available = [
+            available_monitor(Some("Laptop"), (0.0, 0.0), (1728.0, 1117.0), 2.0),
+            available_monitor(Some("Studio Review"), (100.0, 100.0), (1920.0, 1080.0), 2.0),
+        ];
+
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&available, preferences.monitor.as_ref()),
+            Some(1)
+        );
+        assert_eq!(
+            saved_window_recovery_action(&available, &preferences),
+            SavedWindowRecoveryAction::Restore {
+                launch_mode: ShellLaunchMode::StudioFullscreen,
+                monitor_index: 1,
+            }
+        );
+        assert!(!saved_monitor_is_unavailable(&available, &preferences));
+    }
+
+    #[test]
+    fn shell_window_preferences_saved_monitor_matches_by_geometry_without_name() {
+        let preferences = preferences_with_monitor(Some(saved_monitor(
+            None,
+            (2560.0, 0.0),
+            (2560.0, 1440.0),
+            1.0,
+        )));
+        let available = [
+            available_monitor(Some("Laptop"), (0.0, 0.0), (1728.0, 1117.0), 2.0),
+            available_monitor(Some("Renamed Studio"), (2560.0, 0.0), (2560.0, 1440.0), 1.0),
+        ];
+
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&available, preferences.monitor.as_ref()),
+            Some(1)
+        );
+        assert_eq!(
+            saved_window_recovery_action(&available, &preferences),
+            SavedWindowRecoveryAction::Restore {
+                launch_mode: ShellLaunchMode::StudioFullscreen,
+                monitor_index: 1,
+            }
+        );
+        assert!(!saved_monitor_is_unavailable(&available, &preferences));
+    }
+
+    #[test]
+    fn shell_window_preferences_without_saved_monitor_uses_safe_windowed_fallback() {
+        let preferences = preferences_with_monitor(None);
+        let available = [available_monitor(
+            Some("Laptop"),
+            (0.0, 0.0),
+            (1728.0, 1117.0),
+            2.0,
+        )];
+
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&available, preferences.monitor.as_ref()),
+            None
+        );
+        assert_eq!(
+            saved_window_recovery_action(&available, &preferences),
+            SavedWindowRecoveryAction::FallbackWindowed
+        );
+        assert!(!saved_monitor_is_unavailable(&available, &preferences));
+    }
 }
 
 fn main() {
@@ -563,7 +1148,22 @@ fn main() {
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
-                route_window_to_preferred_monitor(&window);
+                let app_handle = app.handle().clone();
+                restore_or_route_initial_window(&app_handle, &window);
+                let window_for_events = window.clone();
+                window.on_window_event(move |event| {
+                    if !matches!(
+                        event,
+                        tauri::WindowEvent::Resized(_)
+                            | tauri::WindowEvent::Moved(_)
+                            | tauri::WindowEvent::ScaleFactorChanged { .. }
+                            | tauri::WindowEvent::Focused(false)
+                            | tauri::WindowEvent::CloseRequested { .. }
+                    ) {
+                        return;
+                    }
+                    persist_current_window_preferences(&app_handle, &window_for_events, None);
+                });
             }
             Ok(())
         });
@@ -576,6 +1176,9 @@ fn main() {
         engine_summary,
         shell_open_path,
         shell_export_diagnostics,
+        shell_enter_studio_fullscreen,
+        shell_use_windowed_layout,
+        shell_reset_window_layout,
         shell_test_bridge_config,
         shell_test_bridge_write_status,
         shell_test_bridge_read_command
@@ -588,7 +1191,10 @@ fn main() {
         engine_stop,
         engine_summary,
         shell_open_path,
-        shell_export_diagnostics
+        shell_export_diagnostics,
+        shell_enter_studio_fullscreen,
+        shell_use_windowed_layout,
+        shell_reset_window_layout
     ]);
 
     builder
