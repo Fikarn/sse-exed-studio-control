@@ -529,7 +529,7 @@
         flex: 1 1 auto;
         min-height: 0;
         display: grid;
-        grid-template-columns: var(--rail-width) 6px minmax(0, 1fr) 6px var(--inspector-width);
+        grid-template-columns: var(--rail-width) 1px minmax(0, 1fr) 1px var(--inspector-width);
         overflow: hidden;
       }
 
@@ -550,9 +550,7 @@
       }
 
       .resizer {
-        background: var(--bg-deep);
-        border-left: 1px solid rgba(250, 246, 230, 0.02);
-        border-right: 1px solid rgba(250, 246, 230, 0.02);
+        background: linear-gradient(90deg, transparent, var(--bg-stroke), transparent);
       }
 
       .canvas {
@@ -2263,7 +2261,7 @@
         }
 
         .body {
-          grid-template-columns: var(--rail-width) 4px minmax(0, 1fr) 4px var(--inspector-width);
+          grid-template-columns: var(--rail-width) 1px minmax(0, 1fr) 1px var(--inspector-width);
         }
 
         .rail {
