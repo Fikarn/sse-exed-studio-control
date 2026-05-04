@@ -1180,6 +1180,11 @@
         height: var(--playback-meter-height);
       }
 
+      .tier-playback .scale-track span:nth-child(2),
+      .tier-playback .scale-track span:nth-child(4) {
+        display: none;
+      }
+
       .scale-track span {
         position: absolute;
         right: 7px;
@@ -2205,6 +2210,12 @@
           grid-template-rows: minmax(0, 1fr) minmax(96px, 0.7fr) minmax(0, 1fr);
         }
 
+        .scale-track span:nth-child(2),
+        .tier-playback .scale-track span:nth-child(3),
+        .scale-track span:nth-child(4) {
+          display: none;
+        }
+
         .tier-header {
           min-height: 34px;
           padding: 6px 9px;
@@ -2312,6 +2323,10 @@
 
         .active-mix-pill strong {
           font-size: 13px;
+        }
+
+        .scale-track span:nth-child(3) {
+          display: none;
         }
       }
     </style>
