@@ -2201,6 +2201,8 @@
         .tier-deck {
           inset: 60px 8px 8px;
           gap: 7px;
+          /* Give the playback row a content-aware minimum so its strips can fit. */
+          grid-template-rows: minmax(0, 1fr) minmax(96px, 0.7fr) minmax(0, 1fr);
         }
 
         .tier-header {
@@ -2226,6 +2228,16 @@
 
         .source-send {
           padding: 4px 4px 5px;
+        }
+
+        .tier-playback .source-strip {
+          padding: 6px;
+          gap: 4px;
+        }
+
+        .tier-playback .source-send {
+          padding: 3px 3px 4px;
+          gap: 3px;
         }
 
         .output-strip {
