@@ -3602,6 +3602,7 @@
           deck.dataset[kind === "output" ? "selectedOutput" : "selectedSource"] = strip.dataset.channel || "";
           if (kind === "output" && activeMixName) activeMixName.textContent = channelName(strip);
           if (kind === "source") updateInspectorForSource(strip);
+          strip.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
           scheduleRoute();
         };
 
