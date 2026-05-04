@@ -7,6 +7,7 @@ pub const WORKSPACE_KEY: &str = "shell.workspace";
 pub const SETUP_ACTIVE_SECTION_KEY: &str = "shell.setup.activeSection";
 pub const LIGHTING_CURRENT_SECTION_ID_KEY: &str = "shell.lighting.currentSectionId";
 pub const LIGHTING_SCENE_THUMBS_KEY: &str = "shell.lighting.sceneThumbs";
+pub const LIGHTING_TALENT_MARKS_KEY: &str = "shell.lighting.talentMarks";
 pub const WINDOW_WIDTH_KEY: &str = "shell.window.width";
 pub const WINDOW_HEIGHT_KEY: &str = "shell.window.height";
 pub const WINDOW_MAXIMIZED_KEY: &str = "shell.window.maximized";
@@ -23,13 +24,28 @@ const MIN_WINDOW_WIDTH: i64 = 800;
 const MAX_WINDOW_WIDTH: i64 = 8192;
 const MIN_WINDOW_HEIGHT: i64 = 600;
 const MAX_WINDOW_HEIGHT: i64 = 4320;
+const MAX_TALENT_MARK_COUNT: usize = 12;
+const MAX_TALENT_MARK_LABEL_LEN: usize = 40;
+const MIN_STUDIO_COORDINATE_METERS: f64 = 0.0;
+const MAX_STUDIO_COORDINATE_METERS: f64 = 20.0;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct ShellTalentMark {
+    pub id: String,
+    pub label: String,
+    #[serde(rename = "xMeters")]
+    pub x_meters: f64,
+    #[serde(rename = "yMeters")]
+    pub y_meters: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ShellSettingsSnapshot {
     pub workspace: String,
     pub setup_active_section: String,
     pub lighting_current_section_id: Option<String>,
     pub lighting_scene_thumbs: HashMap<String, String>,
+    pub lighting_talent_marks: Vec<ShellTalentMark>,
     pub window_width: i64,
     pub window_height: i64,
     pub window_maximized: bool,
@@ -43,6 +59,7 @@ impl Default for ShellSettingsSnapshot {
             setup_active_section: String::from(DEFAULT_SETUP_ACTIVE_SECTION),
             lighting_current_section_id: None,
             lighting_scene_thumbs: HashMap::new(),
+            lighting_talent_marks: Vec::new(),
             window_width: DEFAULT_WINDOW_WIDTH,
             window_height: DEFAULT_WINDOW_HEIGHT,
             window_maximized: DEFAULT_WINDOW_MAXIMIZED,
@@ -73,6 +90,10 @@ impl ShellSettingsSnapshot {
         snapshot.lighting_scene_thumbs = settings
             .get(LIGHTING_SCENE_THUMBS_KEY)
             .and_then(|raw| serde_json::from_str::<HashMap<String, String>>(raw).ok())
+            .unwrap_or_default();
+        snapshot.lighting_talent_marks = settings
+            .get(LIGHTING_TALENT_MARKS_KEY)
+            .and_then(|raw| serde_json::from_str::<Vec<ShellTalentMark>>(raw).ok())
             .unwrap_or_default();
 
         if let Some(width) = settings
@@ -123,6 +144,7 @@ impl ShellSettingsSnapshot {
                 "lighting": {
                     "currentSectionId": self.lighting_current_section_id,
                     "sceneThumbs": self.lighting_scene_thumbs,
+                    "talentMarks": self.lighting_talent_marks,
                 },
                 "window": {
                     "width": self.window_width,
@@ -141,6 +163,7 @@ pub fn default_settings_entries() -> Vec<(&'static str, &'static str)> {
         (SETUP_ACTIVE_SECTION_KEY, DEFAULT_SETUP_ACTIVE_SECTION),
         (LIGHTING_CURRENT_SECTION_ID_KEY, ""),
         (LIGHTING_SCENE_THUMBS_KEY, "{}"),
+        (LIGHTING_TALENT_MARKS_KEY, "[]"),
         (WINDOW_WIDTH_KEY, "1280"),
         (WINDOW_HEIGHT_KEY, "800"),
         (WINDOW_MAXIMIZED_KEY, "false"),
@@ -217,6 +240,13 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
             let serialized = serde_json::to_string(&thumbs)
                 .map_err(|err| format!("lighting.sceneThumbs failed to serialize: {err}"))?;
             updates.push((LIGHTING_SCENE_THUMBS_KEY, serialized));
+        }
+
+        if let Some(talent_marks_value) = lighting.get("talentMarks") {
+            let talent_marks = parse_lighting_talent_marks(talent_marks_value)?;
+            let serialized = serde_json::to_string(&talent_marks)
+                .map_err(|err| format!("lighting.talentMarks failed to serialize: {err}"))?;
+            updates.push((LIGHTING_TALENT_MARKS_KEY, serialized));
         }
     }
 
@@ -348,6 +378,77 @@ fn validate_window_dimension(
     Ok(())
 }
 
+fn parse_lighting_talent_marks(value: &Value) -> Result<Vec<ShellTalentMark>, String> {
+    let marks = value
+        .as_array()
+        .ok_or_else(|| String::from("lighting.talentMarks must be an array"))?;
+    if marks.len() > MAX_TALENT_MARK_COUNT {
+        return Err(format!(
+            "lighting.talentMarks must contain at most {MAX_TALENT_MARK_COUNT} entries"
+        ));
+    }
+
+    let mut parsed = Vec::with_capacity(marks.len());
+    for (index, mark_value) in marks.iter().enumerate() {
+        let mark = mark_value
+            .as_object()
+            .ok_or_else(|| format!("lighting.talentMarks[{index}] must be an object"))?;
+        let id = mark
+            .get("id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                format!("lighting.talentMarks[{index}].id must be a non-empty string")
+            })?;
+        let label = mark
+            .get("label")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                format!("lighting.talentMarks[{index}].label must be a non-empty string")
+            })?;
+        if label.chars().count() > MAX_TALENT_MARK_LABEL_LEN {
+            return Err(format!(
+                "lighting.talentMarks[{index}].label must be {MAX_TALENT_MARK_LABEL_LEN} characters or fewer"
+            ));
+        }
+        let x_meters = parse_talent_mark_coordinate(
+            mark.get("xMeters"),
+            format!("lighting.talentMarks[{index}].xMeters").as_str(),
+        )?;
+        let y_meters = parse_talent_mark_coordinate(
+            mark.get("yMeters"),
+            format!("lighting.talentMarks[{index}].yMeters").as_str(),
+        )?;
+
+        parsed.push(ShellTalentMark {
+            id: id.to_string(),
+            label: label.to_string(),
+            x_meters,
+            y_meters,
+        });
+    }
+
+    Ok(parsed)
+}
+
+fn parse_talent_mark_coordinate(value: Option<&Value>, field: &str) -> Result<f64, String> {
+    let coordinate = value
+        .and_then(Value::as_f64)
+        .ok_or_else(|| format!("{field} must be a number"))?;
+    if !coordinate.is_finite()
+        || !(MIN_STUDIO_COORDINATE_METERS..=MAX_STUDIO_COORDINATE_METERS).contains(&coordinate)
+    {
+        return Err(format!(
+            "{field} must be between {MIN_STUDIO_COORDINATE_METERS:.0} and {MAX_STUDIO_COORDINATE_METERS:.0}"
+        ));
+    }
+
+    Ok((coordinate * 100.0).round() / 100.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,6 +461,7 @@ mod tests {
         assert_eq!(snapshot.workspace, DEFAULT_WORKSPACE);
         assert_eq!(snapshot.setup_active_section, DEFAULT_SETUP_ACTIVE_SECTION);
         assert_eq!(snapshot.lighting_current_section_id, None);
+        assert!(snapshot.lighting_talent_marks.is_empty());
         assert_eq!(snapshot.window_width, DEFAULT_WINDOW_WIDTH);
         assert_eq!(snapshot.window_height, DEFAULT_WINDOW_HEIGHT);
         assert_eq!(snapshot.window_maximized, DEFAULT_WINDOW_MAXIMIZED);
@@ -461,6 +563,61 @@ mod tests {
     }
 
     #[test]
+    fn settings_update_accepts_lighting_talent_marks() {
+        let params = json!({
+            "lighting": {
+                "talentMarks": [
+                    { "id": "talent-1", "label": "Talent 1", "xMeters": 4.7, "yMeters": 4.7 },
+                    { "id": "talent-2", "label": "Talent 2", "xMeters": 6.01, "yMeters": 4.74 }
+                ]
+            }
+        });
+
+        let updates = parse_settings_update(&params).expect("talent marks should parse");
+
+        assert_eq!(updates.len(), 1);
+        assert_eq!(updates[0].0, LIGHTING_TALENT_MARKS_KEY);
+
+        let parsed: Vec<ShellTalentMark> =
+            serde_json::from_str(&updates[0].1).expect("serialised marks should parse");
+        assert_eq!(
+            parsed,
+            vec![
+                ShellTalentMark {
+                    id: String::from("talent-1"),
+                    label: String::from("Talent 1"),
+                    x_meters: 4.7,
+                    y_meters: 4.7,
+                },
+                ShellTalentMark {
+                    id: String::from("talent-2"),
+                    label: String::from("Talent 2"),
+                    x_meters: 6.01,
+                    y_meters: 4.74,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn settings_update_rejects_invalid_lighting_talent_mark_coordinate() {
+        let params = json!({
+            "lighting": {
+                "talentMarks": [
+                    { "id": "talent-1", "label": "Talent 1", "xMeters": 30, "yMeters": 4.7 }
+                ]
+            }
+        });
+
+        let error = parse_settings_update(&params)
+            .expect_err("out-of-range talent mark should be rejected");
+        assert_eq!(
+            error,
+            "lighting.talentMarks[0].xMeters must be between 0 and 20"
+        );
+    }
+
+    #[test]
     fn settings_update_rejects_non_string_scene_thumb_entry() {
         let params = json!({
             "lighting": {
@@ -512,6 +669,22 @@ mod tests {
                 .map(String::as_str),
             Some("data:image/svg+xml;base64,AAA")
         );
+    }
+
+    #[test]
+    fn snapshot_round_trips_lighting_talent_marks() {
+        let marks = vec![ShellTalentMark {
+            id: String::from("talent-1"),
+            label: String::from("Talent 1"),
+            x_meters: 4.7,
+            y_meters: 4.7,
+        }];
+        let serialised = serde_json::to_string(&marks).expect("serialise");
+
+        let settings = HashMap::from([(String::from(LIGHTING_TALENT_MARKS_KEY), serialised)]);
+        let snapshot = ShellSettingsSnapshot::from_settings(&settings);
+
+        assert_eq!(snapshot.lighting_talent_marks, marks);
     }
 
     #[test]

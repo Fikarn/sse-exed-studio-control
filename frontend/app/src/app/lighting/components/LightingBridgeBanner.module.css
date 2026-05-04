@@ -1,0 +1,21 @@
+.banner {
+  border-radius: var(--radius-tight-sm);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008)), var(--color-bg-soft);
+}
+
+.title {
+  display: block;
+  font-family: var(--font-family-mono);
+  font-size: var(--operator-font-size-xs, 10px);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.summary {
+  display: block;
+  font-family: var(--font-family-mono);
+  font-size: var(--operator-font-size-sm, 11px);
+  font-weight: 500;
+  letter-spacing: 0;
+}

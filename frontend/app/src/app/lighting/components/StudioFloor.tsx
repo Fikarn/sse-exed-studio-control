@@ -77,24 +77,6 @@ export function StudioFloor({ layout }: StudioFloorProps) {
         }
         return null;
       })}
-      {layout.talentMarks.map((mark, index) => (
-        <g key={`talent-${index}`}>
-          <circle
-            cx={mark.xMeters * 100}
-            cy={mark.yMeters * 100}
-            r={6}
-            fill="none"
-            strokeDasharray="3 3"
-            style={{ stroke: "var(--color-studio-talent-ring)", strokeWidth: 1 }}
-          />
-          <circle
-            cx={mark.xMeters * 100}
-            cy={mark.yMeters * 100}
-            r={1.5}
-            style={{ fill: "var(--color-studio-talent-dot)" }}
-          />
-        </g>
-      ))}
       {layout.cameras.map((camera) => (
         <g
           key={camera.id}

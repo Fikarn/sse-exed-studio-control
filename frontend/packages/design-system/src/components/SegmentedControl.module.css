@@ -26,8 +26,9 @@
     color: var(--color-studio-300);
     cursor: pointer;
     display: inline-flex;
-    font: var(--font-weight-semibold) var(--font-size-sm) / 1 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
     justify-content: center;
+    letter-spacing: 0;
     min-height: calc(var(--size-compactControlHeight) - 6px);
     min-width: 88px;
     padding: 0 var(--space-5);
@@ -35,6 +36,7 @@
       background-color var(--motion-duration-fast) ease,
       border-color var(--motion-duration-fast) ease,
       color var(--motion-duration-fast) ease;
+    text-transform: uppercase;
     white-space: nowrap;
   }
 

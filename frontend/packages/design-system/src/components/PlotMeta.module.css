@@ -12,7 +12,7 @@
     font-family: var(--font-family-mono);
     font-size: 11px;
     color: var(--color-brand-text-muted);
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
     box-shadow: var(--shadow-glass);
     font-feature-settings: "tnum", "zero";
   }

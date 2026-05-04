@@ -27,13 +27,16 @@
 
   .eyebrow {
     color: var(--color-studio-400);
-    font: var(--font-weight-semibold) var(--font-size-xs) / 1 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-xs, var(--font-size-xs)) / 1 var(--font-family-mono);
+    letter-spacing: 0;
     text-transform: uppercase;
   }
 
   .title {
     color: var(--color-studio-050);
-    font: var(--font-weight-semibold) var(--font-size-lg) / 1.2 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-title-sm, var(--font-size-lg)) / 1.2
+      var(--font-family-display);
+    letter-spacing: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -64,6 +67,8 @@
 
   .sectionTitle {
     color: var(--color-studio-200);
-    font: var(--font-weight-semibold) var(--font-size-sm) / 1.2 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-mono);
+    letter-spacing: 0;
+    text-transform: uppercase;
   }
 }

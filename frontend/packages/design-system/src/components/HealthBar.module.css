@@ -42,7 +42,7 @@
   .label {
     font-family: var(--font-family-mono);
     font-size: 9px;
-    letter-spacing: 0.26em;
+    letter-spacing: 0;
     text-transform: uppercase;
     color: var(--color-brand-text-muted);
     font-weight: 600;
@@ -59,10 +59,12 @@
     font-feature-settings: "tnum", "zero";
     line-height: 1.1;
     white-space: nowrap;
-    overflow: hidden;
+    min-width: 0;
+    overflow: visible;
   }
 
   .valueText {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -101,7 +103,7 @@
     font-family: var(--font-family-mono);
     font-size: 11px;
     color: var(--color-brand-text-muted);
-    letter-spacing: 0.06em;
+    letter-spacing: 0;
     white-space: nowrap;
   }
 

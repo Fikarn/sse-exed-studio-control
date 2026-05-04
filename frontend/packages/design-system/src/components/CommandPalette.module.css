@@ -101,7 +101,7 @@
   padding: 8px 18px 4px;
   font-family: var(--font-family-mono);
   font-size: 10px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
 }

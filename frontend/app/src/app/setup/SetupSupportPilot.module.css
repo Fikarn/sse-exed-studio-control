@@ -63,12 +63,15 @@
   .modeHeadline,
   .sectionTitle {
     margin: 0;
-    font: var(--font-weight-semibold) 22px / 1.15 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-display);
+    letter-spacing: 0;
   }
 
   .supportPrompt {
     color: var(--color-text-subtle);
-    font: var(--font-weight-medium) var(--font-size-md) / 1 var(--font-family-sans);
+    font: var(--font-weight-medium) var(--operator-font-size-md, var(--font-size-md)) / 1 var(--font-family-mono);
+    letter-spacing: 0;
+    text-transform: uppercase;
   }
 
   .bannerBody,
@@ -76,7 +79,7 @@
   .dialogBody {
     margin: 0;
     color: var(--color-text-muted);
-    font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-sans);
+    font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-ui);
   }
 
   .bannerActions,
@@ -95,7 +98,7 @@
   .sideLabel {
     color: var(--color-text-subtle);
     font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
     text-transform: uppercase;
   }
 
@@ -129,6 +132,8 @@
     border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
     color: inherit;
+    font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-mono);
+    letter-spacing: 0;
     transition:
       transform var(--motion-duration-fast) ease,
       border-color var(--motion-duration-fast) ease,
@@ -168,7 +173,8 @@
   }
 
   .stepLabel {
-    font: var(--font-weight-semibold) var(--font-size-md) / 1.2 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.2 var(--font-family-mono);
+    letter-spacing: 0;
   }
 
   .stepHint,
@@ -179,7 +185,7 @@
   .supportInfoList,
   .pathRow {
     color: var(--color-text-muted);
-    font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+    font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
   }
 
   .runnerBody {
@@ -259,6 +265,8 @@
     border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
     color: var(--color-text-strong);
+    font: var(--font-weight-regular) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-ui);
+    letter-spacing: 0;
   }
 
   .textField:disabled {
@@ -276,8 +284,9 @@
   .checkTitle,
   .selectionTitle,
   .dialogTitle {
-    font: var(--font-weight-semibold) var(--font-size-md) / 1.3 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.3 var(--font-family-display);
     color: var(--color-text-strong);
+    letter-spacing: 0;
   }
 
   .verifyLead {
@@ -383,8 +392,9 @@
 
   .backupRow strong {
     display: block;
-    font: var(--font-weight-semibold) var(--font-size-md) / 1.3 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.3 var(--font-family-mono);
     color: var(--color-text-strong);
+    letter-spacing: 0;
   }
 
   .supportGrid {
@@ -412,7 +422,8 @@
 
   .supportInfoList strong {
     color: var(--color-text-strong);
-    font: var(--font-weight-semibold) var(--font-size-sm) / 1.2 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-mono);
+    letter-spacing: 0;
   }
 
   .railButton {
@@ -421,7 +432,7 @@
     background: transparent;
     color: var(--color-text-muted);
     font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
   }
 
   .railButton:hover {

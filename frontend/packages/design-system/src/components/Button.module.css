@@ -7,13 +7,14 @@
     color: var(--color-brand-text-primary);
     cursor: pointer;
     display: inline-flex;
-    font-family: var(--font-family-ui);
-    font-size: 12px;
-    font-weight: 500;
+    font-family: var(--font-family-mono);
+    font-size: var(--operator-font-size-sm, 11px);
+    font-weight: 700;
     gap: 7px;
     justify-content: center;
-    letter-spacing: 0.01em;
+    letter-spacing: 0;
     padding: 0 14px;
+    text-transform: uppercase;
     transition:
       transform var(--motion-duration-fast) ease,
       box-shadow var(--motion-duration-fast) ease,
@@ -56,14 +57,14 @@
   .compact {
     min-height: 28px;
     padding-inline: 12px;
-    font-size: 12px;
+    font-size: var(--operator-font-size-xs, 10px);
   }
 
   .primary {
     background: linear-gradient(180deg, var(--color-brand-green-hot) 0%, var(--color-brand-green) 100%);
     border-color: var(--color-brand-green);
     color: var(--color-bg-deep);
-    font-weight: 600;
+    font-weight: 700;
     box-shadow:
       var(--shadow-inset-hi-strong),
       0 1px 2px rgba(0, 0, 0, 0.4);

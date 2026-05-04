@@ -16,6 +16,7 @@ export type {
   RecoveryState,
   RunnerStage,
   ShellState,
+  ShellTalentMark,
   ShellStore,
   SetupSection,
   StartupFailure,

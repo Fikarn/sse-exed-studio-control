@@ -25,12 +25,15 @@
 
   .title {
     color: var(--color-studio-050);
-    font: var(--font-weight-semibold) var(--font-size-md) / 1.25 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-title-sm, var(--font-size-lg)) / 1.2
+      var(--font-family-display);
+    letter-spacing: 0;
   }
 
   .message {
     color: var(--color-studio-400);
-    font: var(--font-weight-regular) var(--font-size-sm) / 1.4 var(--font-family-sans);
+    font: var(--font-weight-regular) var(--operator-font-size-sm, var(--font-size-sm)) / 1.4 var(--font-family-ui);
+    letter-spacing: 0;
   }
 
   .actions {

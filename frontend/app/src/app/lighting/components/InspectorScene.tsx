@@ -37,6 +37,8 @@ export interface InspectorSceneProps {
   onRenameScene?: (sceneId: string, newName: string) => void | Promise<void>;
   /** Set color tag handler. Receives `null` (clear) or `0..7` (set). */
   onSetSceneColor?: (sceneId: string, colorIndex: number | null) => void;
+  /** Select one of the scene's saved fixture states and open its fixture settings. */
+  onSelectFixture?: (fixtureId: string) => void;
   saveBusy?: boolean;
   recallBusy?: boolean;
   resaveBusy?: boolean;
@@ -100,6 +102,7 @@ export function InspectorScene({
   onDeleteScene,
   onRenameScene,
   onSetSceneColor,
+  onSelectFixture,
   saveBusy = false,
   recallBusy = false,
   resaveBusy = false,
@@ -124,6 +127,7 @@ export function InspectorScene({
           <div className={styles.sceneActions}>
             {onSaveScene ? (
               <Button
+                className={styles.sceneActionButton}
                 onClick={onSaveScene}
                 disabled={saveBusy || fixtures.length === 0}
                 variant="primary"
@@ -135,6 +139,7 @@ export function InspectorScene({
             ) : null}
             {onSaveSceneAs ? (
               <Button
+                className={styles.sceneActionButton}
                 onClick={onSaveSceneAs}
                 disabled={saveBusy || fixtures.length === 0}
                 variant="ghost"
@@ -249,11 +254,29 @@ export function InspectorScene({
               const state = onStateById.get(fixture.id);
               if (!state) return null;
               const swatch = lightingFixtureColor(state.cct, true);
-              return (
-                <li key={fixture.id} className={styles.sceneFixtureChip}>
+              const chipContent = (
+                <>
                   <span className={styles.sceneFixtureSwatch} style={{ background: swatch }} aria-hidden="true" />
                   <span className={styles.sceneFixtureName}>{fixture.name}</span>
                   <span className={styles.sceneFixtureLevel}>{state.intensity}%</span>
+                </>
+              );
+
+              return (
+                <li key={fixture.id}>
+                  {onSelectFixture ? (
+                    <button
+                      type="button"
+                      className={`${styles.sceneFixtureChip} ${styles.sceneFixtureChipButton}`}
+                      onClick={() => onSelectFixture(fixture.id)}
+                      aria-label={`Open fixture settings for ${fixture.name}`}
+                      title={`Open fixture settings for ${fixture.name}`}
+                    >
+                      {chipContent}
+                    </button>
+                  ) : (
+                    <span className={styles.sceneFixtureChip}>{chipContent}</span>
+                  )}
                 </li>
               );
             })}
@@ -317,6 +340,7 @@ export function InspectorScene({
       <div className={styles.sceneActions}>
         {onRecallScene ? (
           <Button
+            className={styles.sceneActionButton}
             onClick={() => onRecallScene(scene.id)}
             loading={recallBusy}
             disabled={!bridgeReachable && !isPreviewMode}
@@ -329,6 +353,7 @@ export function InspectorScene({
         ) : null}
         {onResaveScene ? (
           <Button
+            className={styles.sceneActionButton}
             onClick={onResaveScene}
             loading={resaveBusy}
             disabled={!isModified || (!bridgeReachable && !isPreviewMode)}
@@ -341,6 +366,7 @@ export function InspectorScene({
         ) : null}
         {onSaveSceneAs ? (
           <Button
+            className={styles.sceneActionButton}
             onClick={onSaveSceneAs}
             loading={saveBusy}
             disabled={fixtures.length === 0}
@@ -353,6 +379,7 @@ export function InspectorScene({
         ) : null}
         {onDeleteScene ? (
           <Button
+            className={styles.sceneActionButton}
             onClick={() => setConfirmingDelete(true)}
             loading={deleteBusy}
             variant="danger"

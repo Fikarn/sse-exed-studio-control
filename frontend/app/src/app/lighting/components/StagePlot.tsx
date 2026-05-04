@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Plus, Sun } from "lucide-react";
 
 import { EmptyState, PlotMeta, PlotPill } from "@sse/design-system";
@@ -18,6 +18,7 @@ import { PatchOverlay } from "./PatchOverlay";
 import { StagePlotControls } from "./StagePlotControls";
 import { StagePlotGrid } from "./StagePlotGrid";
 import { StudioFloor } from "./StudioFloor";
+import { TalentMarkMarker } from "./TalentMarkMarker";
 
 import styles from "./StagePlot.module.css";
 
@@ -61,6 +62,7 @@ export interface StagePlotProps {
   /** Marquee result — fixture ids inside the released selection rectangle.
    *  When `additive`, the parent merges with the existing multi-select. */
   onMarqueeSelect?: (fixtureIds: readonly string[], options: { additive: boolean }) => void;
+  onTalentMarkPositionCommit?: (id: string, xMeters: number, yMeters: number) => void;
   /** F10 — empty-state CTA. When provided and `fixtures.length === 0`, the
    *  empty state renders a primary "Add fixture" button that fires this. */
   onAddFixture?: () => void;
@@ -144,6 +146,7 @@ export function StagePlot({
   onIdentifyFixture,
   onRequestDeleteFixture,
   onMarqueeSelect,
+  onTalentMarkPositionCommit,
   onAddFixture,
   viewport,
   chipHoverFixtureId,
@@ -151,6 +154,7 @@ export function StagePlot({
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
+  const floorClipId = `stage-floor-clip-${useId().replace(/:/g, "")}`;
 
   // Track the fixture position while a drag is in flight, then hold the
   // snapped drop position until the engine snapshot refresh lands. This keeps
@@ -380,6 +384,9 @@ export function StagePlot({
       >
         <g data-inner-content="true" transform={viewport.transform}>
           <defs>
+            <clipPath id={floorClipId} clipPathUnits="userSpaceOnUse">
+              <rect x={0} y={0} width={widthCm} height={depthCm} />
+            </clipPath>
             <filter id="sse-fixture-shadow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur in="SourceAlpha" stdDeviation="1.2" />
               <feOffset dx="0" dy="1" result="offsetblur" />
@@ -396,27 +403,41 @@ export function StagePlot({
           <StagePlotGrid layout={layout} />
 
           {/* Output footprints sit under markers so marker identity and selection remain legible. */}
-          {fixtures.map((fixture, index) => {
-            const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
-            const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
-            return (
-              <FixtureOutputFootprint
-                key={`output-${fixture.id}`}
-                fixtureId={fixture.id}
-                centerX={xMeters * 100}
-                centerY={yMeters * 100}
-                rotationDegrees={displayedRotationFor(fixture, true)}
-                rigHeightMeters={fixture.rigZ}
-                beamAngle={visual.output.beamAngle}
-                fieldAngle={visual.output.fieldAngle}
-                intensity={fixture.intensity}
-                cct={fixture.cct}
-                on={fixture.on}
-                visual={visual}
-                renderMode={renderMode}
+          <g clipPath={`url(#${floorClipId})`} data-testid="fixture-output-layer">
+            {fixtures.map((fixture, index) => {
+              const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
+              const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
+              return (
+                <FixtureOutputFootprint
+                  key={`output-${fixture.id}`}
+                  fixtureId={fixture.id}
+                  centerX={xMeters * 100}
+                  centerY={yMeters * 100}
+                  rotationDegrees={displayedRotationFor(fixture, true)}
+                  rigHeightMeters={fixture.rigZ}
+                  beamAngle={visual.output.beamAngle}
+                  fieldAngle={visual.output.fieldAngle}
+                  intensity={fixture.intensity}
+                  cct={fixture.cct}
+                  on={fixture.on}
+                  visual={visual}
+                  renderMode={renderMode}
+                />
+              );
+            })}
+          </g>
+
+          <g aria-label="Talent marks" role="group">
+            {layout.talentMarks.map((mark) => (
+              <TalentMarkMarker
+                key={mark.id}
+                mark={mark}
+                widthCm={widthCm}
+                depthCm={depthCm}
+                onPositionCommit={onTalentMarkPositionCommit}
               />
-            );
-          })}
+            ))}
+          </g>
 
           {previewMode ? (
             <g className={styles.liveGhostLayer} pointerEvents="none" aria-hidden="true">

@@ -28,7 +28,7 @@
   font-family: var(--font-family-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-blue-hot);
 }

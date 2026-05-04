@@ -60,7 +60,7 @@
 .headLabel {
   font-family: var(--font-family-mono);
   font-size: 9px;
-  letter-spacing: 0.26em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
   font-weight: 600;
@@ -72,7 +72,7 @@
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   color: var(--color-brand-text-muted);
 }
 
@@ -90,7 +90,7 @@
   padding: 3px 9px;
   font-family: var(--font-family-mono);
   font-size: 10px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -183,7 +183,7 @@
 .masterEyebrow {
   font-family: var(--font-family-mono);
   font-size: 9px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
   white-space: nowrap;
@@ -260,7 +260,7 @@
 .masterFaderLabel {
   font-family: var(--font-family-mono);
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
 }
@@ -354,7 +354,7 @@
   font-family: var(--font-family-ui);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   cursor: pointer;
 }
 
@@ -553,7 +553,7 @@
   gap: 4px;
   font-family: var(--font-family-mono);
   font-size: 9px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-green);
   font-weight: 600;
@@ -619,7 +619,7 @@
   font-feature-settings: "tnum", "zero";
   font-size: 10px;
   color: var(--color-brand-text-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .sceneVisual {
@@ -723,8 +723,8 @@
   background: transparent;
   border: none;
   padding: 0;
-  font: inherit;
-  font-weight: 600;
+  font: var(--font-weight-semibold) var(--operator-font-size-md, 12px) / 1.55 var(--font-family-ui);
+  letter-spacing: 0;
   color: var(--color-brand-green);
   cursor: pointer;
   text-decoration: underline;
@@ -886,7 +886,7 @@
   padding: 0;
   font-family: var(--font-family-ui);
   font-size: 12px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   color: var(--color-brand-text-secondary);
   cursor: pointer;
 }

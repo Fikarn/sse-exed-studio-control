@@ -208,7 +208,8 @@
   border-radius: var(--radius-tight-sm);
   background: var(--color-bg-default);
   color: var(--color-brand-text-primary);
-  font: inherit;
+  font: var(--font-weight-regular) var(--operator-font-size-md, 12px) / 1.3 var(--font-family-ui);
+  letter-spacing: 0;
   padding: 8px 10px;
 }
 

@@ -7,8 +7,10 @@
 
   .caption {
     color: var(--color-studio-400);
-    font-size: var(--font-size-xs);
-    letter-spacing: 0.08em;
+    font-family: var(--font-family-mono);
+    font-size: var(--operator-font-size-xs, var(--font-size-xs));
+    font-weight: 700;
+    letter-spacing: 0;
     text-transform: uppercase;
   }
 
@@ -21,7 +23,9 @@
 
   .value {
     color: var(--color-studio-050);
-    font-size: var(--font-size-md);
+    font-family: var(--font-family-mono);
+    font-size: var(--operator-font-size-lg, var(--font-size-md));
     font-weight: 600;
+    letter-spacing: 0;
   }
 }

@@ -55,6 +55,38 @@ function asBoolean(value: unknown, fallback = false) {
   return typeof value === "boolean" ? value : fallback;
 }
 
+function normalizeTalentMarks(value: unknown): JsonObject[] {
+  return asArray(value).map((entry, index) => {
+    const mark = asRecord(entry);
+    if (!mark) {
+      throw new Error(`lighting.talentMarks[${index}] must be an object`);
+    }
+    const id = asString(mark.id).trim();
+    const label = asString(mark.label).trim();
+    const xMeters = asNumber(mark.xMeters, Number.NaN);
+    const yMeters = asNumber(mark.yMeters, Number.NaN);
+    if (!id) {
+      throw new Error(`lighting.talentMarks[${index}].id must be a non-empty string`);
+    }
+    if (!label) {
+      throw new Error(`lighting.talentMarks[${index}].label must be a non-empty string`);
+    }
+    if (!Number.isFinite(xMeters) || xMeters < 0 || xMeters > 20) {
+      throw new Error(`lighting.talentMarks[${index}].xMeters must be between 0 and 20`);
+    }
+    if (!Number.isFinite(yMeters) || yMeters < 0 || yMeters > 20) {
+      throw new Error(`lighting.talentMarks[${index}].yMeters must be between 0 and 20`);
+    }
+
+    return {
+      id,
+      label,
+      xMeters: Math.round(xMeters * 100) / 100,
+      yMeters: Math.round(yMeters * 100) / 100,
+    };
+  });
+}
+
 function lightingFixtures(snapshot: JsonObject, key: "fixtures" | "previewFixtures" = "fixtures"): JsonObject[] {
   return asArray(snapshot[key])
     .map((fixture) => asRecord(fixture))
@@ -2479,6 +2511,9 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   shell.setup = shellSetup;
   shellLighting.currentSectionId =
     typeof shellLighting.currentSectionId === "string" ? shellLighting.currentSectionId : null;
+  shellLighting.sceneThumbs = asRecord(shellLighting.sceneThumbs) ?? {};
+  shellLighting.talentMarks =
+    asArray(shellLighting.talentMarks).length > 0 ? normalizeTalentMarks(shellLighting.talentMarks) : [];
   shell.lighting = shellLighting;
   shell.summary = hasCompletedSetup ? "Operator surface ready." : "Commissioning required before operator mode.";
   state.appSnapshot.shell = shell;
@@ -3134,6 +3169,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           emit("settings.changed", { reason: "setup-section-updated" });
         }
         const lighting = asRecord(params.lighting);
+        let shellSettingsChanged = false;
         if (lighting && "currentSectionId" in lighting) {
           const shell = asRecord(state.appSnapshot.shell) ?? {};
           const shellLighting = asRecord(shell.lighting) ?? {};
@@ -3141,6 +3177,25 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             typeof lighting.currentSectionId === "string" ? lighting.currentSectionId : null;
           shell.lighting = shellLighting;
           state.appSnapshot.shell = shell;
+          shellSettingsChanged = true;
+        }
+        if (lighting && "sceneThumbs" in lighting) {
+          const shell = asRecord(state.appSnapshot.shell) ?? {};
+          const shellLighting = asRecord(shell.lighting) ?? {};
+          shellLighting.sceneThumbs = asRecord(lighting.sceneThumbs) ?? {};
+          shell.lighting = shellLighting;
+          state.appSnapshot.shell = shell;
+          shellSettingsChanged = true;
+        }
+        if (lighting && "talentMarks" in lighting) {
+          const shell = asRecord(state.appSnapshot.shell) ?? {};
+          const shellLighting = asRecord(shell.lighting) ?? {};
+          shellLighting.talentMarks = normalizeTalentMarks(lighting.talentMarks);
+          shell.lighting = shellLighting;
+          state.appSnapshot.shell = shell;
+          shellSettingsChanged = true;
+        }
+        if (shellSettingsChanged) {
           emit("settings.changed", { reason: "lighting-shell-state-updated" });
         }
         synchronizeFixtureState(state);

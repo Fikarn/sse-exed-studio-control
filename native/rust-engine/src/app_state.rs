@@ -175,6 +175,7 @@ pub fn build_app_snapshot(
             "lighting": {
                 "currentSectionId": shell.lighting_current_section_id,
                 "sceneThumbs": shell.lighting_scene_thumbs,
+                "talentMarks": shell.lighting_talent_marks,
             },
             "window": {
                 "width": shell.window_width,

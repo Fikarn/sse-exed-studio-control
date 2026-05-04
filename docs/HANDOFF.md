@@ -159,6 +159,25 @@ Validation recorded for this pass:
 - `npm run tauri:visual:review` passed with 30 screenshots and 0 failures; summary at `artifacts/visual/tauri-cutover/fixture-viewport-summary.json`.
 - `git diff --check` passed.
 
+### Live operator UX closeout polish
+
+Status: implemented on branch `codex/operator-ux-closeout-polish` on `2026-05-04`.
+
+Important facts for future sessions:
+
+- The live operator review found and fixed a sequence of Lighting workspace issues: fixture output beams are clipped to the studio floor, talent/stage marks are labeled draggable controls, talent mark persistence uses supported `settings.update` fields, health-bar marker glow is no longer clipped, top-right monitor chips route to Setup, and Scene inspector fixture chips route to fixture settings.
+- The typography pass intentionally removes default-looking text paths from app and shared design-system surfaces. UI copy uses the app UI stack, titles use the display stack, and operational labels/actions/status text use the mono stack. New visible text should choose one of those tokenized stacks explicitly instead of relying on browser defaults.
+- The session normalized operator-visible letter spacing to `0`. Do not reintroduce negative or tracked letter spacing in app/design-system CSS without a specific design decision.
+- Remaining `font: inherit` usage is limited to reset mechanics and inline rename controls where inheriting the already-styled surrounding text avoids layout shift.
+- If a live `npm run tauri:dev` shell is kept open while broad frontend edits, `frontend:playwright:test`, or `tauri:visual:review` run, do a clean Tauri dev-shell restart before handing the app back to an operator. HMR invalidations and test/report navigations can leave the webview showing a stale Startup Recovery surface even when the Rust engine bootstrapped cleanly. The fix is to stop the old `npm run tauri:dev` process tree and start `npm run tauri:dev` again so the shell store performs a fresh engine handshake.
+
+Validation recorded for this pass:
+
+- `npm run frontend:typecheck` passed.
+- `npm run frontend:playwright:test` passed: 42 tests.
+- `npm run tauri:visual:review -- --fixtures=setup-required,setup-degraded,audio-populated,planning-populated,lighting-populated,lighting-dmx-unreachable --sizes=2560x1440,1920x1080 --port=4174` passed with 12 screenshots and 0 failures; summary at `artifacts/visual/tauri-cutover/fixture-viewport-summary.json`.
+- Static typography scans found no remaining `font-family-sans`, raw `system-ui`/`sans-serif`/`monospace`, or nonzero/negative letter spacing in app/design-system source.
+
 ## Validation Baseline
 
 Before trusting any substantial change, run the smallest command set that matches the risk.

@@ -80,7 +80,7 @@
   font-weight: 500;
   font-size: calc(20px * var(--operator-ui-scale-factor, 1));
   color: var(--color-brand-text-secondary);
-  letter-spacing: -0.008em;
+  letter-spacing: 0;
   line-height: 1;
   white-space: nowrap;
   flex-shrink: 0;
@@ -98,17 +98,114 @@
 .shellMeta {
   display: flex;
   align-items: center;
-  gap: var(--operator-shell-meta-gap, 10px);
+  gap: var(--operator-shell-meta-gap, 8px);
   flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+.monitorAction {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: calc(204px * var(--operator-ui-scale-factor, 1));
+  height: calc(30px * var(--operator-ui-scale-factor, 1));
+  padding: 0 9px;
+  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-tight-sm);
+  background: linear-gradient(180deg, rgba(250, 246, 230, 0.045), rgba(250, 246, 230, 0.012)), var(--color-bg-soft);
+  color: var(--color-brand-text-secondary);
+  font-family: var(--font-family-ui);
+  font-size: calc(11.5px * var(--operator-ui-scale-factor, 1));
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: var(--shadow-inset-hi);
+  transition:
+    background var(--motion-duration-fast) ease,
+    border-color var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
+    transform var(--motion-duration-fast) ease;
+}
+
+button.monitorAction {
+  cursor: pointer;
+}
+
+button.monitorAction:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--monitor-tone, var(--color-bg-border)) 20%, var(--color-bg-border));
+  background: linear-gradient(180deg, rgba(250, 246, 230, 0.065), rgba(250, 246, 230, 0.018)), var(--color-bg-raised);
+  color: var(--color-brand-text-primary);
+}
+
+button.monitorAction:active {
+  transform: translateY(0);
+}
+
+button.monitorAction:focus-visible {
+  outline: 2px solid var(--color-primary-400);
+  outline-offset: 2px;
+}
+
+.monitorDot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--monitor-tone, var(--color-info-500));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--monitor-tone, var(--color-info-500)) 58%, transparent);
+}
+
+.monitorText {
+  display: inline-flex;
+  align-items: baseline;
+  flex: 1 1 auto;
+  gap: 5px;
+  min-width: 0;
+}
+
+.monitorLabel,
+.monitorDetail {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitorLabel {
+  flex: 0 0 auto;
+  color: var(--color-brand-text-secondary);
+}
+
+.monitorDetail {
+  flex: 1 1 auto;
+  color: var(--color-brand-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 0.9em;
+  letter-spacing: 0;
+}
+
+.monitorTarget {
+  flex: 0 0 auto;
+  margin-left: 1px;
+  padding-left: 7px;
+  border-left: 1px solid var(--color-bg-border);
+  color: var(--color-brand-green);
+  font-size: 0.86em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .clock {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum", "zero";
   color: var(--color-brand-text-secondary);
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   font-size: var(--operator-font-size-xl, 14px);
   font-family: var(--font-family-mono);
   white-space: nowrap;
@@ -160,7 +257,7 @@
   color: var(--color-brand-text-muted);
   font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .title {
@@ -171,7 +268,7 @@
   font-size: var(--operator-font-size-shell-title, 30px);
   line-height: 1;
   color: var(--color-brand-text-primary);
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 
 .subtitle {
@@ -235,6 +332,15 @@
   }
 
   .brandDivider {
+    display: none;
+  }
+
+  .monitorAction {
+    max-width: calc(124px * var(--operator-ui-scale-factor, 1));
+    padding-inline: 8px;
+  }
+
+  .monitorTarget {
     display: none;
   }
 }

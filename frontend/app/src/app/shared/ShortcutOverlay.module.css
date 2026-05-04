@@ -136,7 +136,7 @@
   margin: 8px 0 6px;
   font-family: var(--font-family-mono);
   font-size: 10px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
 }
@@ -195,5 +195,5 @@
   font-family: var(--font-family-mono);
   font-size: 10px;
   color: var(--color-brand-text-muted);
-  letter-spacing: 0.4px;
+  letter-spacing: 0;
 }
