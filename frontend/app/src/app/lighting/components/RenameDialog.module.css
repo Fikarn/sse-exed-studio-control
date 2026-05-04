@@ -8,7 +8,7 @@
 .label {
   font-family: var(--font-family-mono);
   font-size: 9px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
   font-weight: 600;

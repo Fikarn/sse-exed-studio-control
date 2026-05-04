@@ -42,12 +42,15 @@
 
   .label {
     color: var(--color-studio-050);
-    font: var(--font-weight-semibold) var(--font-size-sm) / 1.15 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.15 var(--font-family-mono);
+    letter-spacing: 0;
+    text-transform: uppercase;
   }
 
   .description {
     color: var(--color-studio-400);
-    font: var(--font-weight-regular) var(--font-size-xs) / 1.25 var(--font-family-sans);
+    font: var(--font-weight-medium) var(--operator-font-size-xs, var(--font-size-xs)) / 1.25 var(--font-family-mono);
+    letter-spacing: 0;
   }
 
   .toggle[aria-pressed="true"] {

@@ -58,7 +58,7 @@
   background: transparent;
   color: var(--color-brand-text-secondary);
   cursor: pointer;
-  font-family: inherit;
+  font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-xs, 10px);
   font-weight: 600;
   line-height: 1;
@@ -97,7 +97,7 @@
   justify-content: center;
   border-radius: var(--radius-tight-sm);
   cursor: pointer;
-  font-family: inherit;
+  font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-xl, 14px);
   line-height: 1;
   transition:
@@ -134,7 +134,7 @@
   min-width: var(--operator-stage-control-zoom-width, 44px);
   padding: 0 calc(6px * var(--operator-ui-scale-factor, 1));
   font-size: var(--operator-font-size-xs, 10px);
-  letter-spacing: 0.16em;
+  letter-spacing: 0;
   color: var(--color-brand-text-muted);
   font-feature-settings: "tnum", "zero";
 }
@@ -158,12 +158,12 @@
   border-radius: var(--radius-tight-sm);
   color: var(--color-brand-text-muted);
   cursor: pointer;
-  font-family: inherit;
+  font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
   font-size: var(--operator-font-size-xs, 10px);
   font-weight: 600;
   height: var(--operator-stage-control-height, 26px);
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   line-height: 1;
   padding: 0;
   width: var(--operator-stage-control-bookmark-width, 22px);

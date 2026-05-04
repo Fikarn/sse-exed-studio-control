@@ -1,5 +1,7 @@
 import { StatusBand } from "@sse/design-system";
 
+import styles from "./LightingBridgeBanner.module.css";
+
 export interface LightingBridgeBannerProps {
   /** Reachable === false renders the banner; otherwise nothing renders. */
   reachable: boolean;
@@ -21,9 +23,14 @@ export function LightingBridgeBanner({ reachable, bridgeIp, universe }: Lighting
   const target = bridgeIp.trim() ? `${bridgeIp} · U${universe}` : `U${universe}`;
   return (
     <StatusBand
+      className={styles.banner}
       tone="error"
-      title="DMX bridge unreachable"
-      summary={`Lighting commands won't reach the rig until the bridge (${target}) responds. Check the network connection or run the bridge probe in Setup.`}
+      title={<span className={styles.title}>DMX bridge unreachable</span>}
+      summary={
+        <span className={styles.summary}>
+          {`Lighting commands won't reach the rig until the bridge (${target}) responds. Check the network connection or run the bridge probe in Setup.`}
+        </span>
+      }
     />
   );
 }

@@ -40,7 +40,8 @@
 
   .rowTitle {
     color: var(--color-studio-050);
-    font: var(--font-weight-semibold) var(--font-size-sm) / 1.15 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.15 var(--font-family-ui);
+    letter-spacing: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -49,7 +50,8 @@
   .rowDetail,
   .meta {
     color: var(--color-studio-400);
-    font: var(--font-weight-regular) var(--font-size-xs) / 1.25 var(--font-family-sans);
+    font: var(--font-weight-medium) var(--operator-font-size-xs, var(--font-size-xs)) / 1.25 var(--font-family-mono);
+    letter-spacing: 0;
   }
 
   .meta {
@@ -69,7 +71,9 @@
 
   .caption {
     color: var(--color-studio-300);
-    font: var(--font-weight-semibold) var(--font-size-sm) / 1.2 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-mono);
+    letter-spacing: 0;
+    text-transform: uppercase;
     padding: var(--space-3) var(--space-4);
     text-align: left;
   }
@@ -77,7 +81,8 @@
   .table th,
   .table td {
     border-top: 1px solid var(--color-surface-border);
-    font: var(--font-weight-regular) var(--font-size-sm) / 1.2 var(--font-family-sans);
+    font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-ui);
+    letter-spacing: 0;
     height: 40px;
     padding: 0 var(--space-4);
     text-align: left;

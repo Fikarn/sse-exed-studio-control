@@ -81,7 +81,7 @@
   color: var(--color-brand-yellow);
   font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-xs, 10px);
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
   font-weight: 600;
   white-space: nowrap;
@@ -99,7 +99,7 @@
   color: var(--color-brand-blue-hot);
   font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-xs, 10px);
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
   font-weight: 700;
   white-space: nowrap;
@@ -124,7 +124,7 @@
   border: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-sm, 11px);
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   font-weight: 500;
   font-feature-settings: "tnum", "zero";
   color: var(--color-brand-text-primary);
@@ -170,7 +170,7 @@
 
 .statLabel {
   font-size: var(--operator-font-size-xs, 10px);
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
   font-weight: 600;
@@ -218,8 +218,8 @@
   background: transparent;
   border: 0;
   color: var(--color-brand-text-primary);
-  font: inherit;
-  font-size: var(--operator-font-size-md, 12px);
+  font: var(--font-weight-semibold) var(--operator-font-size-md, 12px) / 1 var(--font-family-mono);
+  letter-spacing: 0;
   line-height: 1;
   outline: none;
   text-align: right;
@@ -263,7 +263,8 @@
   background: transparent;
   border: none;
   color: var(--color-brand-text-primary);
-  font: inherit;
+  font: var(--font-weight-regular) var(--operator-font-size-md, 12px) / 1 var(--font-family-ui);
+  letter-spacing: 0;
   outline: none;
   width: 100%;
 }
@@ -295,7 +296,7 @@
   font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-xs, 10px);
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -312,7 +313,8 @@
   border-radius: var(--radius-tight-sm);
   background: transparent;
   color: var(--color-brand-text-primary);
-  font: inherit;
+  font: var(--font-weight-medium) var(--operator-font-size-sm, 11px) / 1.2 var(--font-family-ui);
+  letter-spacing: 0;
   text-align: left;
   cursor: pointer;
 }

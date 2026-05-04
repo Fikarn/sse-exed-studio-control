@@ -581,10 +581,9 @@ export function getPlanningCounts(snapshot: PlanningSnapshot | null): PlanningCo
 }
 
 // Map the long engine summary to a short status word for the shell header
-// pill (e.g. "ready", "pending", "passed"). The 92 px header is tight at
+// monitor control (e.g. "ready", "pending", "passed"). The 92 px header is tight at
 // 1280 px Tauri default — the per-item summary belongs in the workspace's
-// own health bar, not the global header. Full summary stays available via
-// the title attribute / hover tooltip in StatusPill.
+// own health bar, not the global header.
 function statusLabelFor(check: { status?: string } | undefined, fallback: string): string {
   switch (check?.status) {
     case "passed":
@@ -611,15 +610,21 @@ export function buildMonitorItems(healthSnapshot: SnapshotRecord | null) {
 
   return [
     {
-      label: `Lighting · ${statusLabelFor(checks.lighting, "pending")}`,
+      id: "lighting",
+      label: "Lighting",
+      detail: statusLabelFor(checks.lighting, "pending"),
       status: asStatusTone(checks.lighting?.status, "attention"),
     },
     {
-      label: `Audio · ${statusLabelFor(checks.audio, "pending")}`,
+      id: "audio",
+      label: "Audio",
+      detail: statusLabelFor(checks.audio, "pending"),
       status: asStatusTone(checks.audio?.status, "attention"),
     },
     {
-      label: `Surface · ${statusLabelFor(checks.controlSurface, "pending")}`,
+      id: "surface",
+      label: "Surface",
+      detail: statusLabelFor(checks.controlSurface, "pending"),
       status: asStatusTone(checks.controlSurface?.status, "info"),
     },
   ] as const;

@@ -33,12 +33,15 @@
 
 .statusBannerTitle {
   margin: 0 0 6px;
-  font: var(--font-weight-semibold) var(--font-size-lg) / 1.2 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-sm, var(--font-size-lg)) / 1.15
+    var(--font-family-display);
+  letter-spacing: 0;
 }
 
 .statusBannerBody {
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--operator-font-size-sm, var(--font-size-sm)) / 1.5 var(--font-family-ui);
+  letter-spacing: 0;
 }
 
 .statusBannerActions {
@@ -112,13 +115,14 @@
 
 .cardTitle {
   margin: 0 0 6px;
-  font: var(--font-weight-semibold) 22px / 1.2 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-display);
+  letter-spacing: 0;
 }
 
 .cardSubtitle {
   margin: 0;
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-md) / 1.5 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-md) / 1.5 var(--font-family-ui);
 }
 
 .checkList {
@@ -143,12 +147,13 @@
 }
 
 .checkHeading {
-  font: var(--font-weight-medium) var(--font-size-md) / 1 var(--font-family-sans);
+  font: var(--font-weight-medium) var(--operator-font-size-md, var(--font-size-md)) / 1 var(--font-family-mono);
+  letter-spacing: 0;
 }
 
 .checkDetail {
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.4 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.4 var(--font-family-ui);
 }
 
 .stagePlot {
@@ -195,21 +200,23 @@ button.lightingDmxDrawerCell {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .metaValue {
-  font: var(--font-weight-semibold) var(--font-size-lg) / 1.3 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-lg)) / 1.3 var(--font-family-mono);
+  letter-spacing: 0;
 }
 
 .summaryValue {
-  font: var(--font-weight-semibold) 18px / 1.25 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-md, 18px) / 1.2 var(--font-family-mono);
+  letter-spacing: 0;
 }
 
 .summaryDetail {
   margin-top: 8px;
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
 }
 
 .supportList {
@@ -218,12 +225,12 @@ button.lightingDmxDrawerCell {
   margin: 0;
   padding-left: 18px;
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
 }
 
 .footerNote {
   color: var(--color-text-subtle);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
 }
 
 @keyframes setupStartupPulse {
@@ -298,13 +305,14 @@ button.lightingDmxDrawerCell {
 .setupUtilityEyebrow {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .setupUtilityTitle {
   margin: 0;
-  font: var(--font-weight-semibold) 22px / 1.15 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-display);
+  letter-spacing: 0;
 }
 
 .setupLoadingState {
@@ -319,7 +327,7 @@ button.lightingDmxDrawerCell {
 .setupLoadingLabel {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) 28px / 1 var(--font-family-mono);
-  letter-spacing: 0.2em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -384,7 +392,9 @@ button.lightingDmxDrawerCell {
 
 .setupIncidentPrompt {
   color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-md) / 1 var(--font-family-sans);
+  font: var(--font-weight-medium) var(--operator-font-size-md, var(--font-size-md)) / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .setupIncidentHeader {
@@ -399,19 +409,20 @@ button.lightingDmxDrawerCell {
 .setupIncidentMetaLabel {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .setupIncidentTitle {
   margin: 0;
-  font: var(--font-weight-semibold) 34px / 1.05 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-display);
+  letter-spacing: 0;
 }
 
 .setupIncidentBody {
   margin: 12px 0 0;
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-ui);
 }
 
 .setupIncidentMetaGrid,
@@ -434,7 +445,8 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentMetaValue {
-  font: var(--font-weight-semibold) var(--font-size-lg) / 1.25 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-lg)) / 1.25 var(--font-family-mono);
+  letter-spacing: 0;
 }
 
 .setupIncidentHint,
@@ -442,7 +454,7 @@ button.lightingDmxDrawerCell {
 .setupIncidentInfoList span,
 .setupIncidentBackupRow small {
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
 }
 
 .setupIncidentField {
@@ -458,7 +470,8 @@ button.lightingDmxDrawerCell {
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-surface-800) 94%, transparent);
   color: var(--color-text-strong);
-  font: var(--font-weight-regular) var(--font-size-md) / 1.4 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--operator-font-size-md, var(--font-size-md)) / 1.4 var(--font-family-ui);
+  letter-spacing: 0;
 }
 
 .setupIncidentInput:focus-visible {
@@ -538,7 +551,7 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentCheckTitle {
-  font: var(--font-weight-semibold) var(--font-size-md) / 1.2 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--font-size-md) / 1.2 var(--font-family-ui);
 }
 
 .setupIncidentDetailList {
@@ -600,20 +613,21 @@ button.lightingDmxDrawerCell {
   margin-bottom: 8px;
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .stateTitle {
   margin: 0;
-  font: var(--font-weight-semibold) 36px / 1.05 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 36px) / 1.05 var(--font-family-display);
+  letter-spacing: 0;
 }
 
 .stateSubtitle {
   margin: 12px 0 0;
   max-width: 72ch;
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-ui);
 }
 
 .metricGrid {
@@ -639,13 +653,14 @@ button.lightingDmxDrawerCell {
 }
 
 .stepLabel {
-  font: var(--font-weight-semibold) var(--font-size-md) / 1.3 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.3 var(--font-family-mono);
+  letter-spacing: 0;
 }
 
 .stepDetail {
   margin-top: 8px;
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
 }
 
 .protocolSummary {
@@ -689,7 +704,7 @@ button.lightingDmxDrawerCell {
 .pathKey {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -730,13 +745,14 @@ button.lightingDmxDrawerCell {
 
 .dialogTitle {
   margin: 0;
-  font: var(--font-weight-semibold) 28px / 1.15 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 28px) / 1.15 var(--font-family-display);
+  letter-spacing: 0;
 }
 
 .dialogBody {
   margin: 0;
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-ui);
 }
 
 .dialogActions {
@@ -798,7 +814,7 @@ button.planningProjectDetailTaskCard {
 
   .setupLoadingLabel {
     font-size: 22px;
-    letter-spacing: 0.14em;
+    letter-spacing: 0;
     text-align: center;
   }
 

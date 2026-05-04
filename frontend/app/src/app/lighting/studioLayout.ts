@@ -30,9 +30,10 @@ export interface StudioBenchElement {
 export type StudioSetElement = StudioBenchElement;
 
 export interface StudioTalentMark {
+  id: string;
   xMeters: number;
   yMeters: number;
-  label?: string;
+  label: string;
 }
 
 export interface StudioCamera {
@@ -71,9 +72,9 @@ export const STUDIO_LAYOUT: StudioLayout = {
     },
   ],
   talentMarks: [
-    { xMeters: 4.7, yMeters: 4.7 },
-    { xMeters: 6.0, yMeters: 4.7 },
-    { xMeters: 7.3, yMeters: 4.7 },
+    { id: "talent-1", label: "Talent 1", xMeters: 4.7, yMeters: 4.7 },
+    { id: "talent-2", label: "Talent 2", xMeters: 6.0, yMeters: 4.7 },
+    { id: "talent-3", label: "Talent 3", xMeters: 7.3, yMeters: 4.7 },
   ],
   cameras: [
     { id: "cam-a", xMeters: 6.0, yMeters: 7.2, rotationDegrees: 0, label: "CAM A" },

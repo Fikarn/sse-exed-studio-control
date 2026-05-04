@@ -46,13 +46,16 @@
 
 .title {
   margin: 0;
-  font: var(--font-weight-semibold) var(--font-size-xl) / 1.2 var(--font-family-sans);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.12 var(--font-family-display);
+  font-variation-settings: "opsz" 34;
+  letter-spacing: 0;
 }
 
 .body {
   margin: var(--space-3) 0 0;
   color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-md) / 1.55 var(--font-family-sans);
+  font: var(--font-weight-regular) var(--operator-font-size-md, var(--font-size-md)) / 1.55 var(--font-family-ui);
+  letter-spacing: 0;
 }
 
 .footer {

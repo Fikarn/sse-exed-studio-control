@@ -10,6 +10,7 @@ import type {
   LightingSceneFixtureSnapshot,
   LightingSceneSnapshot,
   LightingSnapshot,
+  ShellTalentMark,
   ShellStore,
 } from "@sse/engine-client";
 
@@ -47,7 +48,7 @@ import { StagePlot } from "./components/StagePlot";
 import { lightingColorTagHex } from "./lightingColorTags";
 import { formatLightingRelativeTime, nextLightingFixtureName } from "./lightingHelpers";
 import { renderSceneThumbnailDataUri, withSceneThumbRemoved, withSceneThumbUpserted } from "./sceneThumbnails";
-import { STUDIO_LAYOUT } from "./studioLayout";
+import { STUDIO_LAYOUT, type StudioTalentMark } from "./studioLayout";
 import { useResizableColumns } from "./useResizableColumns";
 import { useStagePlotViewport, type ViewBookmarkSlot } from "./useStagePlotViewport";
 import { UndoRefusedError, useUndoStack, type UndoOutcome } from "./useUndoStack";
@@ -90,6 +91,41 @@ type FixtureSceneComparisonSource = {
 
 function clampStudioMeters(value: number, max: number): number {
   return Math.max(0, Math.min(max, value));
+}
+
+function normalizeTalentMarkCoordinate(value: unknown, fallback: number, max: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? clampStudioMeters(value, max) : fallback;
+}
+
+function resolveTalentMarks(appSnapshot: SnapshotRecord | null): readonly StudioTalentMark[] {
+  const shellLighting = asRecord(asRecord(appSnapshot?.shell)?.lighting);
+  const storedMarks = Array.isArray(shellLighting?.talentMarks) ? shellLighting.talentMarks : [];
+  const storedById = new Map(
+    storedMarks
+      .map((entry) => asRecord(entry))
+      .filter((entry): entry is SnapshotRecord => entry !== null)
+      .map((entry) => [String(entry.id ?? ""), entry] as const)
+      .filter(([id]) => id.trim().length > 0)
+  );
+
+  return STUDIO_LAYOUT.talentMarks.map((fallback) => {
+    const stored = storedById.get(fallback.id);
+    return {
+      id: fallback.id,
+      label: typeof stored?.label === "string" && stored.label.trim() ? stored.label.trim() : fallback.label,
+      xMeters: normalizeTalentMarkCoordinate(stored?.xMeters, fallback.xMeters, STUDIO_LAYOUT.roomWidthMeters),
+      yMeters: normalizeTalentMarkCoordinate(stored?.yMeters, fallback.yMeters, STUDIO_LAYOUT.roomDepthMeters),
+    };
+  });
+}
+
+function toShellTalentMarks(marks: readonly StudioTalentMark[]): readonly ShellTalentMark[] {
+  return marks.map((mark) => ({
+    id: mark.id,
+    label: mark.label,
+    xMeters: Math.round(clampStudioMeters(mark.xMeters, STUDIO_LAYOUT.roomWidthMeters) * 100) / 100,
+    yMeters: Math.round(clampStudioMeters(mark.yMeters, STUDIO_LAYOUT.roomDepthMeters) * 100) / 100,
+  }));
 }
 
 function formatRecallFade(ms: number): string {
@@ -283,6 +319,19 @@ export function LightingWorkspaceSurface({
   const sceneEntries = useMemo(() => getLightingScenes(lightingSnapshot), [lightingSnapshot]);
 
   const sceneThumbs = useMemo(() => getSceneThumbs(appSnapshot), [appSnapshot]);
+  const persistedTalentMarks = useMemo(() => resolveTalentMarks(appSnapshot), [appSnapshot]);
+  const [optimisticTalentMarks, setOptimisticTalentMarks] = useState<readonly StudioTalentMark[] | null>(null);
+  useEffect(() => {
+    setOptimisticTalentMarks(null);
+  }, [appSnapshot]);
+  const displayedTalentMarks = optimisticTalentMarks ?? persistedTalentMarks;
+  const studioLayout = useMemo(
+    () => ({
+      ...STUDIO_LAYOUT,
+      talentMarks: displayedTalentMarks,
+    }),
+    [displayedTalentMarks]
+  );
   const sceneThumbsRef = useRef(sceneThumbs);
   useEffect(() => {
     sceneThumbsRef.current = sceneThumbs;
@@ -801,6 +850,25 @@ export function LightingWorkspaceSurface({
       message: error instanceof Error ? error.message : fallback,
       tone: "error",
     });
+  });
+
+  const handleTalentMarkPositionCommit = useLiveCallback(async (id: string, xMeters: number, yMeters: number) => {
+    const nextMarks = displayedTalentMarks.map((mark) =>
+      mark.id === id
+        ? {
+            ...mark,
+            xMeters: Math.round(clampStudioMeters(xMeters, STUDIO_LAYOUT.roomWidthMeters) * 100) / 100,
+            yMeters: Math.round(clampStudioMeters(yMeters, STUDIO_LAYOUT.roomDepthMeters) * 100) / 100,
+          }
+        : mark
+    );
+    setOptimisticTalentMarks(nextMarks);
+    try {
+      await store.setLightingTalentMarks(toShellTalentMarks(nextMarks));
+    } catch (error) {
+      setOptimisticTalentMarks(null);
+      reportError(error, "Talent mark move failed.");
+    }
   });
 
   // F2 — marquee commit handler. `ids` is the full set inside the released
@@ -2776,6 +2844,7 @@ export function LightingWorkspaceSurface({
           <StagePlot
             fixtures={stagePlotFixtures}
             catalog={lightingFixtureCatalogSnapshot}
+            layout={studioLayout}
             liveFixtures={liveFixtures}
             selectedFixtureId={selectedFixture?.id ?? null}
             selectedFixtureIds={selectedFixtureIds}
@@ -2807,6 +2876,9 @@ export function LightingWorkspaceSurface({
             onIdentifyFixture={(id, name) => void handleIdentifyBurst(id, name)}
             onRequestDeleteFixture={(id, name) => setConfirmDeleteFixture({ id, name })}
             onMarqueeSelect={(ids, options) => void handleMarqueeSelect(ids, options)}
+            onTalentMarkPositionCommit={(id, xMeters, yMeters) =>
+              void handleTalentMarkPositionCommit(id, xMeters, yMeters)
+            }
             onAddFixture={requestAddFixture}
             viewport={stagePlotViewport}
             chipHoverFixtureId={chipHoverFixtureId}

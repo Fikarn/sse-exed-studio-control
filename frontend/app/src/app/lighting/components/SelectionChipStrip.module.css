@@ -42,7 +42,7 @@
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .summary strong {

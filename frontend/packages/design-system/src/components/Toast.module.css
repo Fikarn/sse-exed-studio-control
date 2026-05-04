@@ -14,8 +14,9 @@
   background: var(--color-bg-soft);
   color: var(--color-brand-text-primary);
   font-family: var(--font-family-ui);
-  font-size: 12px;
+  font-size: var(--operator-font-size-sm, 12px);
   line-height: 1.4;
+  letter-spacing: 0;
   box-shadow: var(--shadow-md);
   pointer-events: auto;
 }
@@ -62,12 +63,17 @@
 }
 
 .title {
-  font-weight: 600;
-  font-size: 12px;
+  font-family: var(--font-family-mono);
+  font-size: var(--operator-font-size-sm, 11px);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .message {
-  font-size: 12px;
+  font-family: var(--font-family-ui);
+  font-size: var(--operator-font-size-sm, 12px);
+  letter-spacing: 0;
   word-wrap: break-word;
 }
 
@@ -78,8 +84,9 @@
   color: inherit;
   padding: 2px 8px;
   border-radius: var(--radius-tight-sm);
-  font: inherit;
-  font-weight: 600;
+  font: var(--font-weight-semibold) var(--operator-font-size-xs, 10px) / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
   cursor: pointer;
   flex-shrink: 0;
   align-self: center;

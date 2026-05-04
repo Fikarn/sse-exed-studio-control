@@ -522,6 +522,9 @@ function OperatorShellInner() {
         title={activeWorkspace === "setup" ? "Startup, recovery, and setup posture" : "Operator console foundation"}
         workspaces={workspaces}
         contextSections={frameContextSections}
+        onMonitorItemClick={() => {
+          void tryNavigateWorkspace("setup");
+        }}
         onWorkspaceChange={(workspaceId) => {
           void tryNavigateWorkspace(workspaceId as ShellState["activeWorkspace"]);
         }}

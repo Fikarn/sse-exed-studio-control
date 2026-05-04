@@ -4,9 +4,10 @@
     border: 1px solid transparent;
     border-radius: var(--radius-pill);
     display: inline-flex;
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    font-family: var(--font-family-mono);
+    font-size: var(--operator-font-size-xs, var(--font-size-xs));
+    font-weight: 700;
+    letter-spacing: 0;
     min-height: 28px;
     padding: 0 var(--space-5);
     text-transform: uppercase;

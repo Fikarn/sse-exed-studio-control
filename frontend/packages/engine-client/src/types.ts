@@ -220,6 +220,13 @@ export interface StartupFailure {
   supportedProtocol?: string;
 }
 
+export interface ShellTalentMark {
+  id: string;
+  label: string;
+  xMeters: number;
+  yMeters: number;
+}
+
 export interface FixtureScenario {
   appSnapshot?: JsonObject;
   healthSnapshot?: JsonObject;
@@ -274,6 +281,7 @@ export interface ShellStore {
   setSetupSection(section: SetupSection): Promise<JsonValue>;
   setLightingSection(sectionId: string | null): Promise<JsonValue>;
   setLightingSceneThumbs(thumbs: Record<string, string>): Promise<JsonValue>;
+  setLightingTalentMarks(marks: readonly ShellTalentMark[]): Promise<JsonValue>;
   runCommissioningCheck(request: CommissioningCheckRequest): Promise<JsonValue>;
   updateCommissioning(request: CommissioningUpdateRequest): Promise<JsonValue>;
   syncAudio(): Promise<JsonValue>;

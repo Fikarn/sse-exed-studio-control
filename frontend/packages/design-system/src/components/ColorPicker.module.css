@@ -66,10 +66,12 @@
     color: var(--color-studio-300);
     cursor: pointer;
     display: inline-flex;
-    font: var(--font-weight-regular) var(--font-size-xs) / 1 var(--font-family-sans);
+    font: var(--font-weight-semibold) var(--operator-font-size-xs, var(--font-size-xs)) / 1 var(--font-family-mono);
     gap: 6px;
     justify-content: center;
+    letter-spacing: 0;
     padding: 4px 8px;
+    text-transform: uppercase;
   }
 
   .clear:hover {

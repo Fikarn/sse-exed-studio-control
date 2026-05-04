@@ -89,7 +89,7 @@
   justify-content: center;
   font-family: var(--font-family-mono);
   font-size: 9px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
   color: var(--color-brand-text-muted);
   pointer-events: none;
   text-transform: uppercase;

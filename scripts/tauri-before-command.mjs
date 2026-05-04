@@ -23,6 +23,7 @@ function findWorkspaceRoot(startDirectory) {
 }
 
 const command = process.argv[2];
+const cargo = process.platform === "win32" ? "cargo.exe" : "cargo";
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const rootDirectory = findWorkspaceRoot(process.cwd());
 
@@ -36,6 +37,20 @@ const args =
 if (!args) {
   console.error(`Unsupported Tauri before-command "${command ?? ""}".`);
   process.exit(1);
+}
+
+const engineBuild = spawnSync(cargo, ["build", "--package", "studio-control-engine"], {
+  cwd: path.join(rootDirectory, "native"),
+  stdio: "inherit",
+  shell: process.platform === "win32",
+});
+
+if (engineBuild.error) {
+  console.error(`Tauri before-command failed to start cargo: ${engineBuild.error.message}`);
+}
+
+if (engineBuild.status !== 0) {
+  process.exit(engineBuild.status ?? 1);
 }
 
 const result = spawnSync(npm, args, {

@@ -118,7 +118,7 @@
 .plotPillLabel {
   font-family: var(--font-family-mono);
   font-size: 10px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
 }

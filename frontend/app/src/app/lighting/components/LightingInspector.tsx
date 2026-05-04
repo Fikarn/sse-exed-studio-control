@@ -299,6 +299,10 @@ export function LightingInspector({
             onDeleteScene={onDeleteScene}
             onRenameScene={onRenameScene}
             onSetSceneColor={onSetSceneColor}
+            onSelectFixture={(fixtureId) => {
+              onSelectFixture(fixtureId);
+              onTabChange("fixture");
+            }}
             saveBusy={busyActions.has("scene-create")}
             recallBusy={hasBusyPrefix("scene:")}
             resaveBusy={busyActions.has("scene-resave")}

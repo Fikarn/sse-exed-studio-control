@@ -508,6 +508,13 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         },
       });
     },
+    async setLightingTalentMarks(marks) {
+      return performRequest("settings.update", {
+        lighting: {
+          talentMarks: marks as unknown as JsonObject[],
+        },
+      });
+    },
     async runCommissioningCheck(request: CommissioningCheckRequest) {
       return performRequest("commissioning.check.run", request as unknown as JsonObject);
     },

@@ -32,10 +32,10 @@ export function StagePlotPlaceholder({ title, subtitle }: StagePlotPlaceholderPr
       <circle cx="312" cy="256" r="22" fill="rgba(153, 186, 146, 0.88)" />
       <circle cx="492" cy="194" r="22" fill="rgba(105, 169, 209, 0.88)" />
       <circle cx="598" cy="276" r="20" fill="rgba(213, 106, 101, 0.88)" />
-      <text x="92" y="92" fill="#F4F8F2" fontFamily="Inter, system-ui, sans-serif" fontSize="24" fontWeight="600">
+      <text x="92" y="92" fill="#F4F8F2" fontFamily="var(--font-family-display)" fontSize="24" fontWeight="600">
         {title}
       </text>
-      <text x="92" y="122" fill="#B7C2BA" fontFamily="Inter, system-ui, sans-serif" fontSize="14">
+      <text x="92" y="122" fill="#B7C2BA" fontFamily="var(--font-family-mono)" fontSize="14" fontWeight="500">
         {subtitle}
       </text>
     </svg>
