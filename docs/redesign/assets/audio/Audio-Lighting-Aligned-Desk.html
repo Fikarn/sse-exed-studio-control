@@ -142,6 +142,11 @@
         border-radius: inherit;
       }
 
+      .source-strip :focus-visible,
+      .output-strip :focus-visible {
+        outline-offset: -2px;
+      }
+
       .visually-hidden,
       .skip-link:not(:focus-visible) {
         position: absolute;
@@ -1030,7 +1035,6 @@
         min-width: var(--source-strip-min);
         position: relative;
         z-index: 2;
-        overflow: hidden;
         cursor: pointer;
         border: 1px solid rgba(250, 246, 230, 0.075);
         border-radius: 5px;
@@ -1053,6 +1057,8 @@
         width: 1px;
         pointer-events: none;
         opacity: 0.46;
+        border-top-left-radius: inherit;
+        border-bottom-left-radius: inherit;
       }
 
       .tier-inputs .source-strip::before {
