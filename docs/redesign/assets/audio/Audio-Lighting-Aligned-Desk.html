@@ -128,7 +128,6 @@
         button.action-row,
         button.tab,
         button.seg,
-        button.meter-tile,
         button.toggle,
         button.footer-help
       ) {
@@ -611,9 +610,7 @@
       .target-row,
       .snapshot-row,
       .action-row,
-      .inspector-card,
-      .lane,
-      .meter-tile {
+      .inspector-card {
         border: 1px solid var(--bg-stroke);
         background: linear-gradient(180deg, rgba(250, 246, 230, 0.022), rgba(0, 0, 0, 0.08)), rgba(18, 20, 18, 0.86);
         box-shadow:
@@ -1413,6 +1410,8 @@
       }
 
       .source-send .fader::after {
+        content: "";
+        position: absolute;
         left: 50%;
         top: calc(100% - var(--value));
         width: 29px;
@@ -1532,64 +1531,6 @@
         text-transform: uppercase;
       }
 
-      .meter-ribbon {
-        height: 132px;
-        display: grid;
-        grid-template-columns: repeat(18, minmax(0, 1fr));
-        gap: 8px;
-        padding: 56px 14px 12px;
-        border-bottom: 1px solid var(--bg-stroke);
-        background:
-          linear-gradient(180deg, color-mix(in srgb, var(--green) 5%, transparent), transparent 70%),
-          rgba(8, 9, 10, 0.72);
-      }
-
-      .meter-tile {
-        min-width: 0;
-        border-radius: 6px;
-        padding: 9px 8px;
-        display: grid;
-        gap: 6px;
-      }
-
-      .meter-tile.selected {
-        border-color: var(--green-border);
-        background: linear-gradient(180deg, var(--green-soft), rgba(18, 20, 18, 0.88));
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 22%, transparent);
-      }
-
-      .meter-label {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-      }
-
-      .meter-name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--text-primary);
-        font-weight: 700;
-      }
-
-      .meter-short {
-        font-family: var(--font-mono);
-        font-size: 9px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-      }
-
-      .meter-bars {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 4px;
-        height: 28px;
-        align-items: end;
-      }
-
       .meter-track {
         height: 100%;
         position: relative;
@@ -1669,130 +1610,6 @@
 
       .meter-track.clip {
         --meter-peak-color: var(--meter-clip);
-      }
-
-      .mixer {
-        position: absolute;
-        inset: 132px 0 0;
-        padding: 72px 16px 18px;
-      }
-
-      .bank-title {
-        position: absolute;
-        top: 18px;
-        left: 18px;
-      }
-
-      .bank-title strong {
-        display: block;
-        font-family: var(--font-ui);
-        font-size: 14px;
-        color: var(--text-primary);
-        font-weight: 600;
-      }
-
-      .bank-title span {
-        display: block;
-        margin-top: 4px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-      }
-
-      .lane-grid {
-        height: 100%;
-        display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 10px;
-      }
-
-      .lane {
-        border-radius: 6px;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        padding: 12px;
-        position: relative;
-        background:
-          linear-gradient(180deg, color-mix(in srgb, var(--green) 4%, transparent), transparent 52%),
-          rgba(14, 17, 14, 0.88);
-      }
-
-      .lane.selected {
-        border-color: var(--green-border);
-        background: linear-gradient(180deg, var(--green-soft), rgba(14, 17, 14, 0.88) 56%), rgba(14, 17, 14, 0.88);
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 22%, transparent);
-      }
-
-      .lane-top {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 18px;
-      }
-
-      .lane-meter {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        align-items: end;
-        margin-bottom: 12px;
-      }
-
-      .lane-meter .meter-track {
-        border-radius: 10px 10px 5px 5px;
-        min-height: 320px;
-      }
-
-      .db {
-        text-align: center;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-bottom: 12px;
-      }
-
-      .fader {
-        height: 8px;
-        border-radius: 999px;
-        background: linear-gradient(90deg, var(--green) var(--value, 70%), var(--bg-border) var(--value, 70%));
-        position: relative;
-        margin-bottom: 14px;
-      }
-
-      .fader::after {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: var(--value, 70%);
-        width: 14px;
-        height: 14px;
-        transform: translate(-50%, -50%);
-        background: var(--text-primary);
-        border-radius: 999px;
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 20%, transparent);
-      }
-
-      .lane-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-
-      .lane-actions .button {
-        height: 31px;
-        font-family: var(--font-mono);
-        font-size: 10px;
-        text-transform: uppercase;
-      }
-
-      .lane-actions .button.active {
-        border-color: var(--green-border);
-        background: var(--green-soft);
-        color: var(--text-primary);
       }
 
       .tabs {
