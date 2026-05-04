@@ -1761,6 +1761,11 @@
         color: var(--text-primary);
       }
 
+      .tab[disabled] {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
       .inspector-card {
         border-radius: 5px;
         padding: 12px;
@@ -3077,10 +3082,21 @@
         <div class="resizer" aria-hidden="true"></div>
 
         <aside class="inspector">
-          <div class="tabs" role="tablist" aria-label="Inspector panels">
-            <button class="tab active" type="button" role="tab" aria-selected="true">Channel</button>
-            <button class="tab" type="button" role="tab" aria-selected="false">Mix</button>
-            <button class="tab" type="button" role="tab" aria-selected="false">Session</button>
+          <div class="tabs" role="group" aria-label="Inspector view">
+            <button class="tab active" type="button" aria-pressed="true">Channel</button>
+            <button class="tab" type="button" aria-pressed="false" disabled aria-disabled="true" title="Mix view — coming soon">
+              Mix
+            </button>
+            <button
+              class="tab"
+              type="button"
+              aria-pressed="false"
+              disabled
+              aria-disabled="true"
+              title="Session view — coming soon"
+            >
+              Session
+            </button>
           </div>
           <section class="inspector-card">
             <div class="eyebrow">Selected channel</div>
@@ -3652,10 +3668,10 @@
         document.querySelectorAll(".tabs").forEach((tabs) => {
           tabs.addEventListener("click", (event) => {
             const tab = event.target.closest(".tab");
-            if (!tab) return;
+            if (!tab || tab.disabled) return;
             tabs.querySelectorAll(".tab").forEach((item) => {
               item.classList.toggle("active", item === tab);
-              item.setAttribute("aria-selected", item === tab ? "true" : "false");
+              item.setAttribute("aria-pressed", item === tab ? "true" : "false");
             });
           });
         });
