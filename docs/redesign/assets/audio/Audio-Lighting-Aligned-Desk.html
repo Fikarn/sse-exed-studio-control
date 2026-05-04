@@ -1,0 +1,3614 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Audio L1 - Control Room Signal Desk</title>
+    <style>
+      :root {
+        --bg-deep: #08090a;
+        --bg-canvas: #0d0f0d;
+        --bg-soft: #0f110f;
+        --bg-default: #121412;
+        --bg-raised: #161916;
+        --bg-strong: #1c201c;
+        --bg-stroke: #21251f;
+        --bg-border: #2a2f28;
+        --bg-border-strong: #383f35;
+        --surface-ink: rgba(9, 12, 10, 0.92);
+        --surface-ink-soft: rgba(13, 16, 13, 0.86);
+        --surface-highlight: rgba(250, 246, 230, 0.055);
+        --surface-shadow: rgba(0, 0, 0, 0.48);
+        --surface-pressed: rgba(0, 0, 0, 0.22);
+        --text-primary: #faf6e6;
+        --text-secondary: #d4cdb3;
+        --text-muted: #8a8470;
+        --green: #99ba92;
+        --green-hot: #b5d4ad;
+        --green-soft: rgba(153, 186, 146, 0.16);
+        --green-glow: var(--green-soft);
+        --green-border: rgba(153, 186, 146, 0.5);
+        --yellow: #e8d561;
+        --yellow-soft: rgba(232, 213, 97, 0.14);
+        --yellow-border: rgba(232, 213, 97, 0.5);
+        --blue: #3f70c8;
+        --blue-hot: #6a93dc;
+        --blue-soft: rgba(63, 112, 200, 0.16);
+        --blue-border: rgba(63, 112, 200, 0.55);
+        --coral: #ed7c5e;
+        --coral-soft: rgba(237, 124, 94, 0.16);
+        --coral-border: rgba(237, 124, 94, 0.5);
+        --tier-input-accent: var(--green);
+        --tier-input-hot: var(--green-hot);
+        --tier-input-soft: var(--green-soft);
+        --tier-input-border: var(--green-border);
+        --tier-playback-accent: var(--yellow);
+        --tier-playback-soft: var(--yellow-soft);
+        --tier-playback-border: var(--yellow-border);
+        --tier-output-accent: var(--blue);
+        --tier-output-hot: var(--blue-hot);
+        --tier-output-soft: var(--blue-soft);
+        --tier-output-border: var(--blue-border);
+        --glass: rgba(8, 10, 8, 0.78);
+        --glass-strong: rgba(8, 10, 8, 0.86);
+        --hairline: rgba(250, 246, 230, 0.04);
+        --meter-signal: #4ad17a;
+        --meter-signal-hot: #74f7a1;
+        --meter-warn: #ffd33d;
+        --meter-hot: #ff9f1a;
+        --meter-clip: #ff2d2d;
+        --meter-track-bg: #111711;
+        --meter-peak-line: #ffd33d;
+        --meter-reference-lines:
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 0 1px, transparent 1px),
+          linear-gradient(to bottom, transparent 9.78%, rgba(255, 211, 61, 0.26) 10%, transparent 10.42%),
+          linear-gradient(to bottom, transparent 19.78%, rgba(255, 211, 61, 0.2) 20%, transparent 20.42%),
+          linear-gradient(to bottom, transparent 29.78%, rgba(255, 255, 255, 0.16) 30%, transparent 30.42%),
+          linear-gradient(to bottom, transparent 39.78%, rgba(255, 255, 255, 0.13) 40%, transparent 40.42%),
+          linear-gradient(to bottom, transparent 66.42%, rgba(255, 255, 255, 0.12) 66.66%, transparent 67.08%),
+          linear-gradient(to bottom, transparent calc(100% - 1px), rgba(255, 255, 255, 0.12) calc(100% - 1px));
+        --font-ui: "Inter Variable", "Inter", system-ui, sans-serif;
+        --font-display: "Fraunces Variable", "Fraunces", Georgia, serif;
+        --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+        --rail-width: 280px;
+        --inspector-width: 360px;
+        --source-strip-min: 164px;
+        --playback-strip-min: 236px;
+        --output-strip-min: 460px;
+        --tier-scale-width: 34px;
+        --tier-meter-height: clamp(150px, 18vh, 265px);
+        --playback-meter-height: clamp(78px, 10vh, 112px);
+        --tier-fader-height: calc(var(--tier-meter-height) - 32px);
+        --playback-fader-height: calc(var(--playback-meter-height) - 22px);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+        background: var(--bg-deep);
+        color: var(--text-primary);
+        font-family: var(--font-ui);
+        font-feature-settings: "ss01", "cv01", "cv02", "cv11";
+        letter-spacing: 0;
+      }
+
+      body {
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font: inherit;
+      }
+
+      :where(
+        button.nav-item,
+        button.target-row,
+        button.snapshot-row,
+        button.action-row,
+        button.tab,
+        button.seg,
+        button.meter-tile,
+        button.toggle,
+        button.footer-help
+      ) {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        text-align: left;
+        font: inherit;
+        cursor: pointer;
+        appearance: none;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--green-hot);
+        outline-offset: 2px;
+        border-radius: inherit;
+      }
+
+      .visually-hidden,
+      .skip-link:not(:focus-visible) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .skip-link {
+        position: fixed;
+        z-index: 100;
+        top: 12px;
+        left: 12px;
+        padding: 10px 14px;
+        border: 1px solid var(--green-border);
+        border-radius: 6px;
+        background: var(--bg-raised);
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        text-decoration: none;
+      }
+
+      .app {
+        width: 100vw;
+        height: 100vh;
+        min-width: 0;
+        /* min-height removed — short-viewport behavior handled by media query below */
+        display: flex;
+        flex-direction: column;
+        background:
+          radial-gradient(900px 540px at 11% 10%, color-mix(in srgb, var(--green) 7.5%, transparent), transparent 58%),
+          radial-gradient(980px 520px at 72% 22%, rgba(63, 112, 200, 0.045), transparent 64%),
+          linear-gradient(180deg, var(--bg-deep), var(--bg-canvas));
+      }
+
+      .shell {
+        height: 92px;
+        flex: 0 0 92px;
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--bg-stroke);
+        background: linear-gradient(180deg, #090a09 0%, #070807 100%);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        width: 330px;
+        flex-shrink: 0;
+      }
+
+      .brand img {
+        width: 156px;
+        height: 52px;
+        object-fit: contain;
+        display: block;
+      }
+
+      .brand-divider {
+        width: 1px;
+        height: 38px;
+        background: var(--bg-stroke);
+      }
+
+      .wordmark {
+        font-family: var(--font-display);
+        font-size: 20px;
+        color: var(--text-secondary);
+        white-space: nowrap;
+      }
+
+      .nav {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+        height: 56px;
+      }
+
+      .nav-item {
+        min-width: 104px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 0 18px;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        color: var(--text-muted);
+        font-size: 14px;
+        position: relative;
+      }
+
+      .nav-item.active {
+        color: var(--text-primary);
+        background: linear-gradient(180deg, var(--green-soft), color-mix(in srgb, var(--green) 5%, transparent));
+        border-color: var(--bg-stroke);
+      }
+
+      .nav-item.active::after {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 5px;
+        height: 2px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--green) 55%, transparent);
+      }
+
+      .shell-spacer {
+        flex: 1;
+      }
+
+      .monitor-strip {
+        display: flex;
+        gap: 10px;
+      }
+
+      .monitor-chip,
+      .pill,
+      .kbd {
+        font-family: var(--font-mono);
+        letter-spacing: 0;
+        font-feature-settings: "tnum", "zero";
+      }
+
+      .monitor-chip {
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 11px;
+        border: 1px solid var(--bg-stroke);
+        border-radius: 4px;
+        background: var(--bg-default);
+        color: var(--text-secondary);
+        font-size: 11px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--green) 55%, transparent);
+      }
+
+      .dot.yellow {
+        background: var(--yellow);
+        box-shadow: 0 0 7px rgba(232, 213, 97, 0.5);
+      }
+
+      .toolbar {
+        height: 44px;
+        flex: 0 0 44px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 22px;
+        border-bottom: 1px solid var(--bg-stroke);
+        background: linear-gradient(180deg, var(--bg-canvas) 0%, var(--bg-soft) 100%);
+      }
+
+      .title {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        max-width: 360px;
+        font-family: var(--font-display);
+        font-size: 17px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .title svg {
+        color: var(--green);
+      }
+
+      .divider {
+        width: 1px;
+        height: 22px;
+        background: var(--bg-border);
+      }
+
+      .stats {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+      }
+
+      .stat {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+        font-family: var(--font-mono);
+        font-feature-settings: "tnum", "zero";
+      }
+
+      .stat strong {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .stat span {
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .toolbar-spacer {
+        flex: 1;
+      }
+
+      .pill {
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 11px;
+        border-radius: 999px;
+        border: 1px solid var(--bg-stroke);
+        background: var(--bg-raised);
+        color: var(--text-primary);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .pill.green {
+        color: var(--green);
+        border-color: var(--green-border);
+        background: linear-gradient(180deg, var(--green-soft), var(--green-glow));
+      }
+
+      .pill.yellow {
+        color: var(--yellow);
+        border-color: var(--yellow-border);
+        background: linear-gradient(180deg, var(--yellow-soft), rgba(232, 213, 97, 0.05));
+      }
+
+      .button,
+      .icon-button,
+      .seg {
+        height: 30px;
+        border-radius: 5px;
+        border: 1px solid rgba(250, 246, 230, 0.09);
+        background:
+          linear-gradient(180deg, rgba(250, 246, 230, 0.04), rgba(0, 0, 0, 0.16)),
+          linear-gradient(180deg, var(--bg-default), #0c0f0c);
+        color: var(--text-secondary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 0 12px;
+        font-size: 12px;
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.055),
+          0 1px 0 rgba(0, 0, 0, 0.32);
+      }
+
+      .button.primary {
+        background: linear-gradient(180deg, #c8e1bf, var(--green-hot) 44%, #89a981);
+        color: #0b1009;
+        border-color: var(--green-hot);
+        font-weight: 700;
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.42),
+          0 0 0 1px color-mix(in srgb, var(--green) 22%, transparent);
+      }
+
+      .icon-button {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+      }
+
+      .icon-button svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+      }
+
+      .kbd {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 17px;
+        min-width: 18px;
+        padding: 0 5px;
+        border-radius: 3px;
+        border: 1px solid var(--bg-border);
+        background: var(--bg-deep);
+        color: var(--text-muted);
+        font-size: 9px;
+      }
+
+      .segmented {
+        display: inline-flex;
+        height: 30px;
+        padding: 3px;
+        border: 1px solid var(--bg-border);
+        border-radius: 999px;
+        background: var(--bg-soft);
+        gap: 3px;
+      }
+
+      .seg {
+        height: 22px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .seg.active {
+        background: linear-gradient(180deg, var(--green-soft), color-mix(in srgb, var(--green) 5%, transparent));
+        color: var(--text-primary);
+      }
+
+      .body {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: var(--rail-width) 6px minmax(0, 1fr) 6px var(--inspector-width);
+        overflow: hidden;
+      }
+
+      .rail,
+      .inspector {
+        min-height: 0;
+        background: linear-gradient(180deg, var(--bg-canvas), var(--bg-soft));
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .rail {
+        padding: 14px;
+        border-right: 1px solid var(--bg-stroke);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .resizer {
+        background: var(--bg-deep);
+        border-left: 1px solid rgba(250, 246, 230, 0.02);
+        border-right: 1px solid rgba(250, 246, 230, 0.02);
+      }
+
+      .canvas {
+        min-width: 0;
+        min-height: 0;
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(860px 560px at 48% 10%, color-mix(in srgb, var(--green) 5.5%, transparent), transparent 62%),
+          radial-gradient(680px 520px at 88% 86%, rgba(63, 112, 200, 0.038), transparent 70%),
+          linear-gradient(180deg, rgba(250, 246, 230, 0.018), transparent 28%), var(--bg-deep);
+      }
+
+      .canvas::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(0, 0, 0, 0.28), transparent 14%, transparent 86%, rgba(0, 0, 0, 0.34)),
+          linear-gradient(180deg, rgba(250, 246, 230, 0.018), transparent 18%, transparent 76%, rgba(0, 0, 0, 0.28));
+        z-index: 1;
+      }
+
+      .inspector {
+        border-left: 1px solid var(--bg-stroke);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .rail-head,
+      .section-head {
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 0 4px;
+      }
+
+      .eyebrow,
+      .caption,
+      .meta,
+      .rail-head h2,
+      .rail-head span,
+      .section-head span {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        letter-spacing: 0;
+      }
+
+      .master-card,
+      .target-row,
+      .snapshot-row,
+      .action-row,
+      .inspector-card,
+      .lane,
+      .meter-tile {
+        border: 1px solid var(--bg-stroke);
+        background: linear-gradient(180deg, rgba(250, 246, 230, 0.022), rgba(0, 0, 0, 0.08)), rgba(18, 20, 18, 0.86);
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.045),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.24);
+      }
+
+      .master-card {
+        border-radius: 8px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .master-card.live {
+        border-color: var(--green-border);
+        background: linear-gradient(180deg, var(--green-soft), rgba(18, 20, 18, 0.9) 62%);
+        box-shadow:
+          0 0 0 1px color-mix(in srgb, var(--green) 25%, transparent),
+          0 14px 28px color-mix(in srgb, var(--green) 14%, transparent),
+          inset 0 1px 0 rgba(250, 246, 230, 0.08);
+      }
+
+      .master-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .master-name,
+      .rail-title,
+      .inspector-title {
+        font-family: var(--font-display);
+        font-weight: 600;
+        color: var(--text-primary);
+        letter-spacing: 0;
+      }
+
+      .master-name {
+        margin-top: 3px;
+        font-size: 17px;
+        color: var(--green);
+      }
+
+      .toggle {
+        width: 52px;
+        height: 28px;
+        border-radius: 999px;
+        border: 1px solid var(--green-border);
+        background: linear-gradient(180deg, var(--green), color-mix(in srgb, var(--green) 50%, transparent));
+        position: relative;
+        box-shadow: 0 0 12px color-mix(in srgb, var(--green) 35%, transparent);
+      }
+
+      .toggle[aria-checked="false"] {
+        border-color: var(--bg-border);
+        background: linear-gradient(180deg, var(--bg-border), var(--bg-strong));
+        box-shadow: none;
+      }
+
+      .toggle::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: var(--text-primary);
+      }
+
+      .toggle[aria-checked="false"]::after {
+        right: 27px;
+        background: var(--text-muted);
+      }
+
+      .mini-slider {
+        height: 8px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--green) var(--v, 72%), var(--bg-border) var(--v, 72%));
+        position: relative;
+      }
+
+      .mini-slider::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: var(--v, 72%);
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--text-primary);
+        transform: translate(-50%, -50%);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 18%, transparent);
+      }
+
+      .button-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+
+      .button-row .button {
+        height: 28px;
+        padding: 0;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+      }
+
+      .rail-title {
+        font-size: 13px;
+      }
+
+      .target-list,
+      .snapshot-list,
+      .action-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .target-row,
+      .snapshot-row,
+      .action-row {
+        min-height: 48px;
+        border-radius: 5px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 11px;
+      }
+
+      .target-row.active,
+      .snapshot-row.active {
+        border-color: var(--green-border);
+        background:
+          linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--green) 18%, transparent),
+            color-mix(in srgb, var(--green) 3.5%, transparent) 58%,
+            transparent
+          ),
+          rgba(18, 20, 18, 0.9);
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.06),
+          0 0 0 1px color-mix(in srgb, var(--green) 13%, transparent);
+      }
+
+      .row-name,
+      .lane-name {
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        color: var(--text-primary);
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .row-sub,
+      .lane-sub {
+        margin-top: 4px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .chip {
+        min-height: 22px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 8px;
+        border: 1px solid var(--bg-border);
+        border-radius: 999px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .chip.green {
+        border-color: var(--green-border);
+        background: var(--green-soft);
+        color: var(--green-hot);
+      }
+
+      .chip.yellow {
+        border-color: var(--yellow-border);
+        background: var(--yellow-soft);
+        color: var(--yellow);
+      }
+
+      .chip.blue {
+        border-color: var(--blue-border);
+        background: var(--blue-soft);
+        color: var(--blue-hot);
+      }
+
+      .active-mix-pill {
+        position: absolute;
+        z-index: 5;
+        top: 40px;
+        left: 50%;
+        transform: translateX(-50%);
+        min-width: 270px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 11px;
+        border-radius: 999px;
+        border: 1px solid rgba(106, 147, 220, 0.58);
+        background: linear-gradient(180deg, rgba(63, 112, 200, 0.13), rgba(6, 9, 12, 0.82)), var(--glass-strong);
+        backdrop-filter: blur(16px);
+        box-shadow:
+          0 8px 24px rgba(0, 0, 0, 0.55),
+          0 0 0 1px rgba(63, 112, 200, 0.12),
+          inset 0 1px 0 rgba(250, 246, 230, 0.1);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .active-mix-pill strong {
+        font-family: var(--font-display);
+        font-size: 16px;
+        color: var(--text-primary);
+        text-transform: none;
+      }
+
+      .tier-deck {
+        position: absolute;
+        z-index: 2;
+        inset: 82px 14px 14px;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 0.56fr) minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .signal-flow-layer {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: visible;
+        --signal-accent: var(--tier-playback-accent);
+      }
+
+      .signal-route {
+        fill: none;
+        stroke: var(--signal-accent);
+        stroke-width: 1.5;
+        stroke-dasharray: 4 4;
+        stroke-linecap: round;
+        opacity: 0.72;
+      }
+
+      .signal-route.glow {
+        stroke-width: 5;
+        opacity: 0.2;
+        filter: url(#signal-soft-glow);
+      }
+
+      .signal-pulse {
+        display: none;
+        fill: var(--signal-accent);
+        filter: url(#signal-dot-glow);
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .signal-pulse {
+          display: block;
+        }
+      }
+
+      .tier {
+        position: relative;
+        min-height: 0;
+        border: 1px solid var(--bg-stroke);
+        border-radius: 6px;
+        background: linear-gradient(180deg, rgba(250, 246, 230, 0.018), transparent 36%), rgba(8, 10, 8, 0.72);
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.045),
+          0 14px 28px rgba(0, 0, 0, 0.24);
+      }
+
+      .tier::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        pointer-events: none;
+        background: rgba(212, 205, 179, 0.16);
+      }
+
+      .tier-inputs {
+        border-color: color-mix(in srgb, var(--green) 31%, transparent);
+        background:
+          linear-gradient(90deg, color-mix(in srgb, var(--green) 4.5%, transparent), transparent 16%),
+          linear-gradient(180deg, color-mix(in srgb, var(--green) 4%, transparent), transparent 50%),
+          rgba(8, 10, 8, 0.76);
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.05),
+          0 0 0 1px color-mix(in srgb, var(--green) 7.5%, transparent),
+          0 14px 28px rgba(0, 0, 0, 0.24);
+      }
+
+      .tier-inputs::before {
+        width: 4px;
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--green) 90%, transparent),
+          color-mix(in srgb, var(--green) 18%, transparent)
+        );
+      }
+
+      .tier-playback {
+        border-color: rgba(232, 213, 97, 0.19);
+        background:
+          linear-gradient(90deg, rgba(232, 213, 97, 0.036), transparent 18%),
+          linear-gradient(180deg, rgba(232, 213, 97, 0.024), transparent 60%), rgba(7, 9, 8, 0.58);
+      }
+
+      .tier-playback::before {
+        width: 4px;
+        background: linear-gradient(180deg, rgba(232, 213, 97, 0.76), rgba(232, 213, 97, 0.14));
+      }
+
+      .tier-outputs {
+        border-color: rgba(63, 112, 200, 0.45);
+        background:
+          linear-gradient(90deg, rgba(63, 112, 200, 0.052), transparent 17%),
+          linear-gradient(180deg, rgba(63, 112, 200, 0.04), transparent 54%), rgba(8, 10, 8, 0.76);
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.05),
+          0 0 0 1px rgba(63, 112, 200, 0.08),
+          0 14px 28px rgba(0, 0, 0, 0.24);
+      }
+
+      .tier-outputs::before {
+        width: 4px;
+        background: linear-gradient(180deg, rgba(106, 147, 220, 0.9), rgba(63, 112, 200, 0.18));
+      }
+
+      .tier.active {
+        border-color: color-mix(in srgb, var(--green) 38%, transparent);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 12%, transparent);
+      }
+
+      .tier-playback.active {
+        border-color: rgba(232, 213, 97, 0.26);
+        box-shadow: 0 0 0 1px rgba(232, 213, 97, 0.055);
+      }
+
+      .tier-header {
+        min-height: 41px;
+        padding: 8px 12px 9px;
+        border-bottom: 1px solid var(--bg-stroke);
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.24);
+      }
+
+      .tier-inputs .tier-header {
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--green) 9.5%, transparent),
+          color-mix(in srgb, var(--green) 1.8%, transparent) 48%,
+          transparent
+        );
+      }
+
+      .tier-playback .tier-header {
+        background: linear-gradient(90deg, rgba(232, 213, 97, 0.065), rgba(232, 213, 97, 0.014) 48%, transparent);
+      }
+
+      .tier-outputs .tier-header {
+        background: linear-gradient(90deg, rgba(63, 112, 200, 0.105), rgba(63, 112, 200, 0.018) 48%, transparent);
+      }
+
+      .tier-header h2 {
+        font-family: var(--font-ui);
+        font-size: 13px;
+        color: var(--text-primary);
+      }
+
+      .tier-inputs .tier-header h2,
+      .tier-outputs .tier-header h2 {
+        font-size: 14px;
+      }
+
+      .tier-inputs .eyebrow {
+        color: rgba(181, 212, 173, 0.76);
+      }
+
+      .tier-playback .eyebrow {
+        color: rgba(232, 213, 97, 0.68);
+      }
+
+      .tier-outputs .eyebrow {
+        color: rgba(106, 147, 220, 0.78);
+      }
+
+      .tier-header span:last-child {
+        margin-left: auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .source-grid {
+        min-height: 0;
+        display: grid;
+        gap: 8px;
+        padding: 12px 10px 10px;
+        position: relative;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: var(--bg-border-strong) transparent;
+        background:
+          linear-gradient(to right, rgba(8, 10, 8, 0.98) 30%, transparent) left / 44px 100% local,
+          linear-gradient(to left, rgba(8, 10, 8, 0.98) 30%, transparent) right / 44px 100% local,
+          radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.34), transparent) left / 18px 100% scroll,
+          radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.44), transparent) right / 28px 100% scroll;
+        background-repeat: no-repeat;
+      }
+
+      .source-grid.hardware {
+        grid-template-columns: var(--tier-scale-width) repeat(8, minmax(var(--source-strip-min), 1fr));
+      }
+
+      .source-grid.playback {
+        grid-template-columns: var(--tier-scale-width) repeat(6, minmax(var(--playback-strip-min), 1fr));
+      }
+
+      .tier-playback .source-grid {
+        padding-top: 10px;
+      }
+
+      .source-strip,
+      .output-strip {
+        min-width: var(--source-strip-min);
+        position: relative;
+        z-index: 2;
+        overflow: hidden;
+        cursor: pointer;
+        border: 1px solid rgba(250, 246, 230, 0.075);
+        border-radius: 5px;
+        background: linear-gradient(180deg, rgba(250, 246, 230, 0.018), rgba(0, 0, 0, 0.14)), rgba(13, 16, 13, 0.92);
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.035),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+      }
+
+      .source-strip::before,
+      .output-strip::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        pointer-events: none;
+        opacity: 0.46;
+      }
+
+      .tier-inputs .source-strip::before {
+        background: linear-gradient(180deg, var(--tier-input-hot), color-mix(in srgb, var(--green) 8%, transparent));
+      }
+
+      .tier-playback .source-strip::before {
+        background: linear-gradient(180deg, var(--tier-playback-accent), rgba(232, 213, 97, 0.08));
+      }
+
+      .tier-outputs .output-strip::before {
+        background: linear-gradient(180deg, var(--tier-output-hot), rgba(63, 112, 200, 0.08));
+      }
+
+      .source-strip.selected::before,
+      .output-strip.selected::before {
+        width: 2px;
+        opacity: 0.86;
+      }
+
+      .source-strip {
+        grid-template-columns: minmax(0, 1fr) 50px;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+          "top top"
+          "meter send"
+          "actions actions";
+      }
+
+      .source-strip.selected,
+      .output-strip.selected {
+        border-color: var(--green-border);
+        background:
+          linear-gradient(180deg, color-mix(in srgb, var(--green) 13%, transparent), rgba(13, 16, 13, 0.94) 58%),
+          rgba(13, 16, 13, 0.94);
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.045),
+          0 0 0 1px color-mix(in srgb, var(--green) 18%, transparent);
+      }
+
+      .tier-playback .source-strip {
+        min-width: var(--playback-strip-min);
+        border-color: rgba(232, 213, 97, 0.085);
+        background: linear-gradient(180deg, rgba(232, 213, 97, 0.018), rgba(0, 0, 0, 0.14)), rgba(11, 13, 12, 0.82);
+      }
+
+      .tier-playback .source-strip.selected {
+        border-color: rgba(232, 213, 97, 0.38);
+        background:
+          linear-gradient(180deg, rgba(232, 213, 97, 0.095), rgba(11, 13, 12, 0.82) 60%), rgba(11, 13, 12, 0.82);
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.04),
+          0 0 0 1px rgba(232, 213, 97, 0.12);
+      }
+
+      .tier-outputs .output-strip {
+        border-color: rgba(63, 112, 200, 0.16);
+        background: linear-gradient(180deg, rgba(63, 112, 200, 0.024), rgba(0, 0, 0, 0.14)), rgba(13, 16, 15, 0.9);
+      }
+
+      .tier-outputs .output-strip.selected {
+        border-color: rgba(63, 112, 200, 0.52);
+        background:
+          linear-gradient(180deg, rgba(63, 112, 200, 0.12), rgba(13, 16, 15, 0.92) 60%), rgba(13, 16, 15, 0.92);
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.045),
+          0 0 0 1px rgba(63, 112, 200, 0.17);
+      }
+
+      .source-top,
+      .output-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .source-top {
+        grid-area: top;
+      }
+
+      .output-top {
+        grid-area: top;
+      }
+
+      .source-meter {
+        grid-area: meter;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: repeat(2, 16px);
+        justify-content: center;
+        gap: 4px;
+        align-items: end;
+      }
+
+      .tier-scale {
+        position: sticky;
+        left: 0;
+        z-index: 4;
+        align-self: stretch;
+        width: var(--tier-scale-width);
+        min-width: var(--tier-scale-width);
+        display: grid;
+        place-items: center;
+        border-right: 1px solid rgba(250, 246, 230, 0.055);
+        background:
+          linear-gradient(90deg, rgba(8, 10, 8, 0.98), rgba(8, 10, 8, 0.86)),
+          linear-gradient(180deg, rgba(250, 246, 230, 0.018), transparent);
+        box-shadow: 10px 0 18px rgba(0, 0, 0, 0.28);
+        pointer-events: none;
+      }
+
+      .scale-track {
+        width: 100%;
+        height: var(--tier-meter-height);
+        position: relative;
+        font-family: var(--font-mono);
+        font-size: 9px;
+        line-height: 1;
+        color: rgba(212, 205, 179, 0.68);
+      }
+
+      .tier-playback .scale-track {
+        height: var(--playback-meter-height);
+      }
+
+      .scale-track span {
+        position: absolute;
+        right: 7px;
+        bottom: var(--p);
+        transform: translateY(50%);
+      }
+
+      .scale-track span:first-child {
+        top: 0;
+        bottom: auto;
+        transform: none;
+        color: rgba(255, 45, 45, 0.82);
+      }
+
+      .scale-track span:last-child {
+        bottom: 0;
+        transform: none;
+      }
+
+      .scale-track span:nth-child(2),
+      .scale-track span:nth-child(3) {
+        color: rgba(255, 211, 61, 0.78);
+      }
+
+      .source-meter .meter-track {
+        min-height: 72px;
+        border-radius: 2px;
+      }
+
+      .tier-inputs .source-meter .meter-track {
+        min-height: 0;
+      }
+
+      .playback .source-meter .meter-track {
+        min-height: 72px;
+      }
+
+      .tier-inputs .source-meter,
+      .tier-outputs .output-meter {
+        height: var(--tier-meter-height);
+        align-self: center;
+      }
+
+      .source-send {
+        grid-area: send;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        gap: 6px;
+        justify-items: center;
+        min-height: 0;
+        padding: 5px 5px 6px;
+        border: 1px solid rgba(250, 246, 230, 0.075);
+        border-radius: 4px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 26%),
+          linear-gradient(90deg, rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.025) 50%, rgba(0, 0, 0, 0.3)),
+          rgba(8, 10, 9, 0.74);
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+          inset 0 12px 22px rgba(0, 0, 0, 0.34);
+      }
+
+      .tier-playback .source-send {
+        border-color: rgba(232, 213, 97, 0.13);
+      }
+
+      .tier-outputs .source-send {
+        border-color: rgba(63, 112, 200, 0.16);
+      }
+
+      .source-send-row {
+        order: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1px;
+        font-family: var(--font-mono);
+        font-size: 9px;
+        color: var(--text-muted);
+      }
+
+      .source-send-row strong {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        padding: 3px 2px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.34);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+        color: var(--text-primary);
+        font-size: 9px;
+        text-align: center;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .source-send-row span {
+        display: none;
+      }
+
+      .source-send .fader {
+        order: 1;
+        position: relative;
+        width: 24px;
+        height: 100%;
+        min-height: 74px;
+        align-self: stretch;
+        margin-bottom: 0;
+        border: 1px solid rgba(250, 246, 230, 0.095);
+        border-radius: 3px;
+        background:
+          linear-gradient(to bottom, transparent 30%, rgba(255, 255, 255, 0.24) 30%, transparent 30.8%),
+          repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 9px),
+          linear-gradient(
+            90deg,
+            rgba(0, 0, 0, 0.5) 0 28%,
+            rgba(94, 112, 94, 0.22) 28% 42%,
+            rgba(10, 13, 11, 0.88) 42% 58%,
+            rgba(94, 112, 94, 0.22) 58% 72%,
+            rgba(0, 0, 0, 0.5) 72% 100%
+          ),
+          rgba(8, 11, 9, 0.9);
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+          0 0 0 1px rgba(0, 0, 0, 0.42),
+          inset 0 10px 16px rgba(0, 0, 0, 0.42);
+      }
+
+      .tier-inputs .source-send .fader {
+        min-height: 0;
+      }
+
+      .tier-playback .source-send .fader {
+        min-height: 72px;
+      }
+
+      .tier-inputs .source-send,
+      .tier-outputs .output-send {
+        height: var(--tier-fader-height);
+        align-self: center;
+      }
+
+      .source-send .fader::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 6px;
+        bottom: 6px;
+        width: 4px;
+        transform: translateX(-50%);
+        border-radius: 1px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.58));
+        box-shadow:
+          inset 0 0 0 1px rgba(0, 0, 0, 0.42),
+          0 0 0 1px rgba(255, 255, 255, 0.025);
+      }
+
+      .source-send .fader::after {
+        left: 50%;
+        top: calc(100% - var(--value));
+        width: 29px;
+        height: 12px;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(0, 0, 0, 0.74);
+        border-radius: 2px;
+        background:
+          repeating-linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.26) 0 1px,
+            transparent 1px 3px,
+            rgba(0, 0, 0, 0.26) 3px 4px
+          ),
+          linear-gradient(180deg, #d8ddd3 0%, #8f968c 42%, #555c55 58%, #242a26 100%);
+        box-shadow:
+          0 2px 5px rgba(0, 0, 0, 0.62),
+          inset 0 1px rgba(255, 255, 255, 0.5),
+          inset 0 -2px rgba(0, 0, 0, 0.38);
+      }
+
+      .source-actions {
+        grid-area: actions;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .source-actions .button {
+        min-width: 44px;
+        height: 30px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+      }
+
+      .source-actions .button.active {
+        border-color: var(--green-border);
+        background: var(--green-soft);
+        color: var(--text-primary);
+      }
+
+      .output-grid {
+        display: grid;
+        grid-template-columns: var(--tier-scale-width) repeat(3, minmax(var(--output-strip-min), 1fr));
+        gap: 8px;
+        padding: 12px 10px 10px;
+        min-height: 0;
+        position: relative;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: thin;
+        scrollbar-color: var(--bg-border-strong) transparent;
+        background:
+          linear-gradient(to right, rgba(8, 10, 8, 0.98) 30%, transparent) left / 44px 100% local,
+          linear-gradient(to left, rgba(8, 10, 8, 0.98) 30%, transparent) right / 44px 100% local,
+          radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.34), transparent) left / 18px 100% scroll,
+          radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.44), transparent) right / 28px 100% scroll;
+        background-repeat: no-repeat;
+      }
+
+      .source-grid::before,
+      .output-grid::before {
+        content: none;
+      }
+
+      .output-strip {
+        min-width: var(--output-strip-min);
+        grid-template-columns: minmax(126px, 0.95fr) 72px 50px minmax(96px, 126px);
+        grid-template-areas: "top meter send actions";
+        align-items: stretch;
+        min-height: 0;
+      }
+
+      .output-top,
+      .output-actions {
+        align-self: center;
+      }
+
+      .output-meter {
+        grid-area: meter;
+        min-height: 0;
+        align-self: stretch;
+        display: grid;
+        grid-template-columns: repeat(2, 16px);
+        justify-content: center;
+        gap: 4px;
+        align-items: end;
+      }
+
+      .output-meter .meter-track {
+        min-height: 0;
+        border-radius: 2px;
+      }
+
+      .output-send .fader {
+        min-height: 0;
+      }
+
+      .output-send {
+        align-self: center;
+      }
+
+      .output-actions {
+        grid-area: actions;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+
+      .output-actions .button {
+        min-width: 44px;
+        height: 30px;
+        padding: 0;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+      }
+
+      .meter-ribbon {
+        height: 132px;
+        display: grid;
+        grid-template-columns: repeat(18, minmax(0, 1fr));
+        gap: 8px;
+        padding: 56px 14px 12px;
+        border-bottom: 1px solid var(--bg-stroke);
+        background:
+          linear-gradient(180deg, color-mix(in srgb, var(--green) 5%, transparent), transparent 70%),
+          rgba(8, 9, 10, 0.72);
+      }
+
+      .meter-tile {
+        min-width: 0;
+        border-radius: 6px;
+        padding: 9px 8px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .meter-tile.selected {
+        border-color: var(--green-border);
+        background: linear-gradient(180deg, var(--green-soft), rgba(18, 20, 18, 0.88));
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 22%, transparent);
+      }
+
+      .meter-label {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .meter-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+
+      .meter-short {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .meter-bars {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        height: 28px;
+        align-items: end;
+      }
+
+      .meter-track {
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+        border-radius: 1px;
+        background:
+          linear-gradient(90deg, rgba(0, 0, 0, 0.52), transparent 28%, transparent 72%, rgba(0, 0, 0, 0.5)),
+          repeating-linear-gradient(to top, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 8px),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.032), transparent 28%), var(--meter-track-bg);
+        box-shadow:
+          inset 0 0 0 1px rgba(250, 246, 230, 0.04),
+          0 0 0 1px rgba(0, 0, 0, 0.45),
+          inset 0 8px 18px rgba(0, 0, 0, 0.42);
+      }
+
+      .meter-track::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: var(--level, 45%);
+        background: linear-gradient(180deg, var(--meter-signal-hot), var(--meter-signal));
+        border-radius: 0;
+        box-shadow:
+          inset 0 1px 0 rgba(250, 246, 230, 0.16),
+          0 0 10px rgba(32, 196, 90, 0.24);
+      }
+
+      .meter-track.hot::before {
+        background: linear-gradient(
+          180deg,
+          var(--meter-hot) 0%,
+          var(--meter-warn) 18%,
+          var(--meter-signal-hot) 46%,
+          var(--meter-signal) 100%
+        );
+        box-shadow:
+          0 0 12px rgba(255, 211, 61, 0.2),
+          0 0 18px rgba(32, 196, 90, 0.18);
+      }
+
+      .meter-track.clip::before {
+        background: linear-gradient(
+          180deg,
+          var(--meter-clip) 0%,
+          var(--meter-hot) 16%,
+          var(--meter-warn) 32%,
+          var(--meter-signal-hot) 58%,
+          var(--meter-signal) 100%
+        );
+        box-shadow:
+          0 0 12px rgba(255, 45, 45, 0.28),
+          0 0 20px rgba(255, 159, 26, 0.16);
+      }
+
+      .meter-track::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(
+            to top,
+            transparent calc(var(--peak, 55%) - 1px),
+            var(--meter-peak-color, var(--meter-peak-line)) calc(var(--peak, 55%) - 1px),
+            var(--meter-peak-color, var(--meter-peak-line)) calc(var(--peak, 55%) + 1px),
+            transparent calc(var(--peak, 55%) + 1px)
+          ),
+          var(--meter-reference-lines);
+        opacity: 0.9;
+        pointer-events: none;
+      }
+
+      .meter-track.hot {
+        --meter-peak-color: var(--meter-warn);
+      }
+
+      .meter-track.clip {
+        --meter-peak-color: var(--meter-clip);
+      }
+
+      .mixer {
+        position: absolute;
+        inset: 132px 0 0;
+        padding: 72px 16px 18px;
+      }
+
+      .bank-title {
+        position: absolute;
+        top: 18px;
+        left: 18px;
+      }
+
+      .bank-title strong {
+        display: block;
+        font-family: var(--font-ui);
+        font-size: 14px;
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .bank-title span {
+        display: block;
+        margin-top: 4px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .lane-grid {
+        height: 100%;
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .lane {
+        border-radius: 6px;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+        position: relative;
+        background:
+          linear-gradient(180deg, color-mix(in srgb, var(--green) 4%, transparent), transparent 52%),
+          rgba(14, 17, 14, 0.88);
+      }
+
+      .lane.selected {
+        border-color: var(--green-border);
+        background: linear-gradient(180deg, var(--green-soft), rgba(14, 17, 14, 0.88) 56%), rgba(14, 17, 14, 0.88);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 22%, transparent);
+      }
+
+      .lane-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .lane-meter {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        align-items: end;
+        margin-bottom: 12px;
+      }
+
+      .lane-meter .meter-track {
+        border-radius: 10px 10px 5px 5px;
+        min-height: 320px;
+      }
+
+      .db {
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+      }
+
+      .fader {
+        height: 8px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--green) var(--value, 70%), var(--bg-border) var(--value, 70%));
+        position: relative;
+        margin-bottom: 14px;
+      }
+
+      .fader::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: var(--value, 70%);
+        width: 14px;
+        height: 14px;
+        transform: translate(-50%, -50%);
+        background: var(--text-primary);
+        border-radius: 999px;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 20%, transparent);
+      }
+
+      .lane-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .lane-actions .button {
+        height: 31px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+      }
+
+      .lane-actions .button.active {
+        border-color: var(--green-border);
+        background: var(--green-soft);
+        color: var(--text-primary);
+      }
+
+      .tabs {
+        display: flex;
+        gap: 4px;
+        padding: 6px;
+        border: 1px solid rgba(250, 246, 230, 0.075);
+        border-radius: 5px;
+        background: linear-gradient(180deg, rgba(250, 246, 230, 0.02), rgba(0, 0, 0, 0.12)), var(--bg-soft);
+      }
+
+      .tab {
+        flex: 1;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .tab.active {
+        border-color: var(--green-border);
+        background: linear-gradient(180deg, var(--green-soft), color-mix(in srgb, var(--green) 5%, transparent));
+        color: var(--text-primary);
+      }
+
+      .inspector-card {
+        border-radius: 5px;
+        padding: 12px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .inspector-title {
+        font-size: 20px;
+        line-height: 1.1;
+      }
+
+      .selected-state {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .field {
+        min-height: 68px;
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid rgba(250, 246, 230, 0.065);
+        border-radius: 5px;
+        background: linear-gradient(180deg, rgba(250, 246, 230, 0.015), rgba(0, 0, 0, 0.08)), var(--bg-soft);
+      }
+
+      .field strong {
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+
+      .wide {
+        grid-column: 1 / -1;
+      }
+
+      .inspector-buttons {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .inspector-buttons .button {
+        height: 34px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+      }
+
+      .inspector-buttons .button.active {
+        background: var(--green-soft);
+        border-color: var(--green-border);
+        color: var(--text-primary);
+      }
+
+      .health {
+        height: 64px;
+        flex: 0 0 64px;
+        border-top: 1px solid var(--bg-stroke);
+        background:
+          linear-gradient(180deg, rgba(250, 246, 230, 0.018), rgba(0, 0, 0, 0.12)),
+          linear-gradient(180deg, var(--bg-soft), var(--bg-canvas));
+        display: grid;
+        grid-template-columns: minmax(290px, 1.15fr) repeat(4, minmax(0, 1fr)) auto;
+      }
+
+      .health-item {
+        border-right: 1px solid var(--bg-stroke);
+        padding: 10px 22px;
+        display: grid;
+        align-content: center;
+        gap: 5px;
+      }
+
+      .health .label {
+        font-family: var(--font-mono);
+        font-size: 9px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .health .value {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        color: var(--text-primary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .health-actions {
+        padding: 0 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .footer-help {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+      }
+
+      .shortcut-key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 3px;
+        border: 1px solid var(--bg-border);
+        background: var(--bg-deep);
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+        font-size: 9px;
+      }
+
+      .shortcut-help[hidden] {
+        display: none;
+      }
+
+      .shortcut-help {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: grid;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.56);
+        backdrop-filter: blur(5px);
+      }
+
+      .shortcut-panel {
+        width: min(520px, calc(100vw - 32px));
+        border: 1px solid var(--bg-border-strong);
+        border-radius: 8px;
+        background: linear-gradient(180deg, rgba(250, 246, 230, 0.035), rgba(0, 0, 0, 0.12)), rgba(14, 17, 14, 0.98);
+        box-shadow:
+          0 24px 80px rgba(0, 0, 0, 0.64),
+          inset 0 1px 0 rgba(250, 246, 230, 0.06);
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .shortcut-panel header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .shortcut-panel h2 {
+        font-family: var(--font-display);
+        font-size: 20px;
+        color: var(--text-primary);
+      }
+
+      .shortcut-list {
+        display: grid;
+        gap: 9px;
+      }
+
+      .shortcut-row {
+        display: grid;
+        grid-template-columns: 112px minmax(0, 1fr);
+        gap: 14px;
+        padding: 10px;
+        border: 1px solid rgba(250, 246, 230, 0.07);
+        border-radius: 5px;
+        background: rgba(8, 10, 8, 0.56);
+      }
+
+      .shortcut-row dt {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+      }
+
+      .shortcut-row dd {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      @media (max-width: 1920px) {
+        :root {
+          --rail-width: 260px;
+          --inspector-width: 340px;
+          --source-strip-min: 147px;
+          --playback-strip-min: 198px;
+          --output-strip-min: 400px;
+          --tier-meter-height: clamp(96px, 13vh, 156px);
+          --playback-meter-height: clamp(58px, 8vh, 88px);
+        }
+
+        .shell {
+          height: 88px;
+          flex-basis: 88px;
+          gap: 22px;
+          padding: 0 18px;
+        }
+
+        .toolbar {
+          height: 42px;
+          flex-basis: 42px;
+          gap: 11px;
+          padding: 0 18px;
+        }
+
+        .tier-deck {
+          inset: 72px 12px 12px;
+          gap: 9px;
+        }
+
+        .active-mix-pill {
+          top: 26px;
+          height: 34px;
+          min-width: 244px;
+        }
+
+        .tier-header {
+          min-height: 38px;
+          padding: 8px 10px;
+        }
+
+        .source-grid,
+        .output-grid {
+          gap: 7px;
+          padding: 10px 8px 8px;
+        }
+
+        .source-strip,
+        .output-strip {
+          padding: 9px;
+          gap: 7px;
+        }
+
+        .source-meter {
+          grid-template-columns: repeat(2, 14px);
+        }
+
+        .output-meter {
+          grid-template-columns: repeat(2, 14px);
+        }
+
+        .source-meter .meter-track {
+          min-height: 52px;
+        }
+
+        .tier-inputs .source-meter .meter-track,
+        .tier-outputs .output-meter .meter-track,
+        .tier-inputs .source-send .fader,
+        .output-send .fader {
+          min-height: 0;
+        }
+
+        .playback .source-meter .meter-track,
+        .tier-playback .source-send .fader {
+          min-height: 48px;
+        }
+
+        .tier-playback .source-strip {
+          grid-template-rows: auto minmax(0, 1fr);
+          grid-template-areas:
+            "top top"
+            "meter send";
+        }
+
+        .tier-playback .source-actions {
+          display: none;
+        }
+
+        .field-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .health {
+          height: 56px;
+          flex-basis: 56px;
+        }
+
+        .health-item {
+          padding: 8px 16px;
+        }
+      }
+
+      @media (max-width: 1720px) {
+        :root {
+          --rail-width: 238px;
+          --inspector-width: 318px;
+          --source-strip-min: 150px;
+          --playback-strip-min: 206px;
+          --output-strip-min: 390px;
+          --tier-scale-width: 32px;
+          --tier-meter-height: clamp(84px, 11vh, 120px);
+          --playback-meter-height: clamp(52px, 7.5vh, 76px);
+        }
+
+        .shell {
+          height: 82px;
+          flex-basis: 82px;
+          gap: 18px;
+        }
+
+        .brand {
+          width: 300px;
+          gap: 14px;
+        }
+
+        .brand img {
+          width: 132px;
+          height: 48px;
+        }
+
+        .nav {
+          gap: 6px;
+        }
+
+        .nav-item {
+          min-width: 92px;
+          padding: 0 12px;
+          font-size: 13px;
+        }
+
+        .monitor-chip {
+          padding: 0 9px;
+          font-size: 10px;
+        }
+
+        .tier-deck {
+          inset: 60px 10px 10px;
+          gap: 8px;
+        }
+
+        .active-mix-pill {
+          top: 24px;
+          height: 34px;
+          min-width: 244px;
+        }
+
+        .tier-header span:last-child {
+          font-size: 9px;
+        }
+
+        .row-name,
+        .lane-name {
+          font-size: 12px;
+        }
+
+        .row-sub,
+        .lane-sub {
+          font-size: 9px;
+        }
+
+        .output-strip {
+          grid-template-columns: minmax(112px, 0.95fr) 64px 46px minmax(86px, 102px);
+        }
+      }
+
+      @media (max-width: 1480px) {
+        :root {
+          --rail-width: 220px;
+          --inspector-width: 300px;
+          --source-strip-min: 148px;
+          --playback-strip-min: 196px;
+          --output-strip-min: 360px;
+          --tier-scale-width: 32px;
+          --tier-meter-height: clamp(70px, 9vh, 90px);
+          --playback-meter-height: clamp(48px, 7vh, 64px);
+        }
+
+        .shell {
+          height: 76px;
+          flex-basis: 76px;
+          padding: 0 14px;
+          gap: 14px;
+        }
+
+        .brand {
+          width: 284px;
+        }
+
+        .brand img {
+          width: 124px;
+          height: 46px;
+        }
+
+        .wordmark {
+          font-size: 18px;
+        }
+
+        .nav-item {
+          min-width: 84px;
+          padding: 0 10px;
+        }
+
+        .monitor-chip .kbd {
+          display: none;
+        }
+
+        .toolbar {
+          height: 40px;
+          flex-basis: 40px;
+          gap: 8px;
+          padding: 0 14px;
+        }
+
+        .stats {
+          gap: 9px;
+        }
+
+        .pill {
+          padding: 0 9px;
+        }
+
+        .body {
+          grid-template-columns: var(--rail-width) 4px minmax(0, 1fr) 4px var(--inspector-width);
+        }
+
+        .rail {
+          padding: 12px;
+          gap: 10px;
+        }
+
+        .inspector {
+          padding: 10px;
+        }
+
+        .tier-deck {
+          inset: 60px 8px 8px;
+          gap: 7px;
+        }
+
+        .tier-header {
+          min-height: 34px;
+          padding: 6px 9px;
+        }
+
+        .source-grid,
+        .output-grid {
+          gap: 7px;
+          padding: 8px 7px 7px;
+        }
+
+        .source-strip,
+        .output-strip {
+          padding: 8px;
+          gap: 6px;
+        }
+
+        .source-strip {
+          grid-template-columns: minmax(0, 1fr) 46px;
+        }
+
+        .source-send {
+          padding: 4px 4px 5px;
+        }
+
+        .output-strip {
+          grid-template-columns: minmax(104px, 0.9fr) 58px 44px minmax(76px, 92px);
+        }
+
+        .output-actions .button,
+        .source-actions .button {
+          height: 30px;
+        }
+
+        .health {
+          height: 52px;
+          flex-basis: 52px;
+        }
+
+        .health {
+          grid-template-columns: minmax(270px, 1.25fr) repeat(4, minmax(0, 0.9fr)) auto;
+        }
+
+        .health-item {
+          padding: 7px 10px;
+        }
+
+        .health-actions {
+          gap: 8px;
+          padding: 0 12px;
+        }
+      }
+
+      @media (max-height: 820px) {
+        :root {
+          --tier-meter-height: clamp(64px, 8vh, 86px);
+          --playback-meter-height: clamp(44px, 6vh, 60px);
+        }
+
+        .shell {
+          height: 64px;
+          flex-basis: 64px;
+        }
+
+        .brand img {
+          width: 116px;
+          height: 40px;
+        }
+
+        .toolbar {
+          height: 36px;
+          flex-basis: 36px;
+        }
+
+        .health {
+          height: 48px;
+          flex-basis: 48px;
+        }
+
+        .health-item {
+          padding: 6px 12px;
+        }
+
+        .tier-deck {
+          inset: 50px 8px 6px;
+          gap: 6px;
+        }
+
+        .active-mix-pill {
+          top: 14px;
+          height: 28px;
+          min-width: 220px;
+          font-size: 10px;
+        }
+
+        .active-mix-pill strong {
+          font-size: 13px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#audio-main">Skip to main content</a>
+    <main class="app">
+      <h1 class="visually-hidden">Audio control surface — Studio Control</h1>
+      <header class="shell">
+        <div class="brand">
+          <img
+            src="../lighting/logos/SSE_Logo_Unit_ExecutiveEducation_White_RGB.png"
+            alt="Stockholm School of Economics Executive Education"
+            width="156"
+            height="52"
+          />
+          <div class="brand-divider"></div>
+          <div class="wordmark">Studio Control</div>
+        </div>
+        <nav class="nav" aria-label="Workspaces">
+          <button class="nav-item" type="button">Setup / Support</button>
+          <button class="nav-item" type="button">Lighting</button>
+          <button class="nav-item active" type="button" aria-current="page">Audio</button>
+          <button class="nav-item" type="button">Planning</button>
+        </nav>
+        <div class="shell-spacer"></div>
+        <div class="monitor-strip">
+          <div class="monitor-chip"><span class="dot"></span>Lighting ok <span class="kbd">SETUP</span></div>
+          <div class="monitor-chip"><span class="dot"></span>Audio linked <span class="kbd">SETUP</span></div>
+          <div class="monitor-chip"><span class="dot"></span>Surface ok <span class="kbd">SETUP</span></div>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <div class="title">
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3v10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            <path
+              d="M8 7v6a4 4 0 0 0 8 0V7"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+            <path
+              d="M5 13a7 7 0 0 0 14 0M12 20v-3"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span>Audio</span>
+        </div>
+        <span class="divider"></span>
+        <div class="stats">
+          <span class="stat"><strong>18</strong><span>ch</span></span>
+          <span class="stat"><strong>3</strong><span>mix</span></span>
+          <span class="stat"><strong>5</strong><span>snap</span></span>
+          <span class="stat"><strong>2</strong><span>bank</span></span>
+        </div>
+        <div class="toolbar-spacer"></div>
+        <button class="button">Sync</button>
+        <span class="pill yellow"><span class="dot yellow"></span>State assumed</span>
+        <button class="icon-button" aria-label="Previous bank">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="m15 6-6 6 6 6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div class="pill">Bank 2 / 2</div>
+        <div class="segmented">
+          <button class="seg active" type="button">Overview</button>
+          <button class="seg" type="button">Precision</button>
+        </div>
+        <button class="icon-button" aria-label="Next bank">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="m9 6 6 6-6 6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <span class="divider"></span>
+        <span class="pill">Recalled Show open</span>
+        <button class="button primary">Recall</button>
+        <button class="icon-button" aria-label="More">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </section>
+
+      <section class="body">
+        <aside class="rail">
+          <div class="master-card live">
+            <div class="master-top">
+              <div>
+                <div class="eyebrow">Control room</div>
+                <h2 class="master-name">Main Out</h2>
+              </div>
+              <button
+                class="toggle"
+                type="button"
+                role="switch"
+                aria-checked="true"
+                aria-label="Main Out monitor"
+              ></button>
+            </div>
+            <div class="caption">Monitor level</div>
+            <div class="mini-slider" data-control="monitor-level"></div>
+            <div class="button-row">
+              <button class="button">Dim</button>
+              <button class="button">Mono</button>
+              <button class="button">Talk</button>
+            </div>
+          </div>
+
+          <div class="rail-head">
+            <h2>Mix targets</h2>
+            <span>3</span>
+          </div>
+          <div class="target-list">
+            <button class="target-row active" type="button">
+              <div>
+                <div class="row-name">Main Out</div>
+                <div class="row-sub">Monitor</div>
+              </div>
+              <span class="chip green">Selected</span>
+            </button>
+            <button class="target-row" type="button">
+              <div>
+                <div class="row-name">Phones 1</div>
+                <div class="row-sub">Cue A</div>
+              </div>
+              <span class="chip">Talk</span>
+            </button>
+            <button class="target-row" type="button">
+              <div>
+                <div class="row-name">Phones 2</div>
+                <div class="row-sub">Cue B</div>
+              </div>
+            </button>
+          </div>
+
+          <div class="rail-head">
+            <h2>Snapshots</h2>
+            <span>Shift 1-8</span>
+          </div>
+          <div class="snapshot-list">
+            <button class="snapshot-row" type="button">
+              <div>
+                <div class="row-name">Open rehearsal</div>
+                <div class="row-sub">Slot 1</div>
+              </div>
+              <span>Recall</span>
+            </button>
+            <button class="snapshot-row active" type="button">
+              <div>
+                <div class="row-name">Show open</div>
+                <div class="row-sub">Slot 2 · 06:05</div>
+              </div>
+              <span class="chip green">Current</span>
+            </button>
+            <button class="snapshot-row" type="button">
+              <div>
+                <div class="row-name">Interview block</div>
+                <div class="row-sub">Slot 3</div>
+              </div>
+              <span>Recall</span>
+            </button>
+            <button class="snapshot-row" type="button">
+              <div>
+                <div class="row-name">Break bumper</div>
+                <div class="row-sub">Slot 4</div>
+              </div>
+              <span>Recall</span>
+            </button>
+            <button class="snapshot-row" type="button">
+              <div>
+                <div class="row-name">Credits</div>
+                <div class="row-sub">Slot 5</div>
+              </div>
+              <span>Recall</span>
+            </button>
+          </div>
+
+          <div class="rail-head">
+            <h2>Actions</h2>
+            <span>Audio</span>
+          </div>
+          <div class="action-list">
+            <button class="action-row" type="button">
+              <div>
+                <div class="row-name">Sync audio</div>
+                <div class="row-sub">Run OSC probe</div>
+              </div>
+              <span class="chip">Enter</span>
+            </button>
+            <button class="action-row" type="button">
+              <div>
+                <div class="row-name">Audio setup</div>
+                <div class="row-sub">OSC host and ports</div>
+              </div>
+              <span class="chip">SETUP</span>
+            </button>
+          </div>
+        </aside>
+
+        <div class="resizer" aria-hidden="true"></div>
+
+        <section class="canvas" id="audio-main" tabindex="-1">
+          <div class="active-mix-pill"><span class="dot"></span>Selected output / submix <strong>Main Out</strong></div>
+
+          <div class="tier-deck" data-selected-source="fx-3-4" data-selected-output="main-out">
+            <svg class="signal-flow-layer" aria-hidden="true">
+              <defs>
+                <filter id="signal-soft-glow" x="-25%" y="-25%" width="150%" height="150%">
+                  <feGaussianBlur stdDeviation="2.4" />
+                </filter>
+                <filter id="signal-dot-glow" x="-80%" y="-80%" width="260%" height="260%">
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              <path id="signal-route-glow" class="signal-route glow"></path>
+              <path id="signal-route" class="signal-route"></path>
+              <circle class="signal-pulse" r="5">
+                <animateMotion dur="2.4s" repeatCount="indefinite">
+                  <mpath href="#signal-route" />
+                </animateMotion>
+              </circle>
+            </svg>
+            <section class="tier tier-inputs">
+              <div class="tier-header">
+                <span class="eyebrow">Top row</span>
+                <h2>Hardware Inputs</h2>
+                <span>Input level is source truth · faders send into Main Out</span>
+              </div>
+              <div class="source-grid hardware">
+                <div class="tier-scale" aria-hidden="true">
+                  <div class="scale-track">
+                    <span style="--p: 100%">0</span><span style="--p: 90%">-6</span><span style="--p: 80%">-12</span
+                    ><span style="--p: 60%">-24</span><span style="--p: 0%">-60</span>
+                  </div>
+                </div>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="host"
+                  aria-label="Select source Host"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Host</h3>
+                      <div class="lane-sub">Mic pre 9</div>
+                    </div>
+                    <span class="chip">IN</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-5.0 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="guest"
+                  aria-label="Select source Guest"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Guest</h3>
+                      <div class="lane-sub">Mic pre 10</div>
+                    </div>
+                    <span class="chip">IN</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-6.2 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="boom"
+                  aria-label="Select source Boom"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Boom</h3>
+                      <div class="lane-sub">Mic pre 11</div>
+                    </div>
+                    <span class="chip">IN</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-11.0 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="guitar-di"
+                  aria-label="Select source Guitar DI"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Guitar DI</h3>
+                      <div class="lane-sub">Mic pre 12</div>
+                    </div>
+                    <span class="chip">IN</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-14.5 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="line-1"
+                  aria-label="Select source Line 1"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Line 1</h3>
+                      <div class="lane-sub">Rear line</div>
+                    </div>
+                    <span class="chip">IN</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-16.0 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="line-2"
+                  aria-label="Select source Line 2"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Line 2</h3>
+                      <div class="lane-sub">Rear line</div>
+                    </div>
+                    <span class="chip">IN</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-17.5 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="remote-a"
+                  aria-label="Select source Remote A"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Remote A</h3>
+                      <div class="lane-sub">Rear line</div>
+                    </div>
+                    <span class="chip">IN</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-12.8 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="remote-b"
+                  aria-label="Select source Remote B"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Remote B</h3>
+                      <div class="lane-sub">Rear line</div>
+                    </div>
+                    <span class="chip">IN</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-12.2 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="tier tier-playback active">
+              <div class="tier-header">
+                <span class="eyebrow">Middle row</span>
+                <h2>Software Playback</h2>
+                <span>Program returns and app audio feeding the selected output</span>
+              </div>
+              <div class="source-grid playback">
+                <div class="tier-scale" aria-hidden="true">
+                  <div class="scale-track">
+                    <span style="--p: 100%">0</span><span style="--p: 90%">-6</span><span style="--p: 80%">-12</span
+                    ><span style="--p: 60%">-24</span><span style="--p: 0%">-60</span>
+                  </div>
+                </div>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="program-1-2"
+                  aria-label="Select source Program 1/2"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Program 1/2</h3>
+                      <div class="lane-sub">Playback</div>
+                    </div>
+                    <span class="chip">ST</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track hot"></span>
+                    <span class="meter-track hot"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-2.5 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip selected"
+                  role="button"
+                  tabindex="0"
+                  data-channel="fx-3-4"
+                  aria-label="Select source FX 3/4"
+                  aria-pressed="true"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">FX 3/4</h3>
+                      <div class="lane-sub">Playback</div>
+                    </div>
+                    <span class="chip green">ST</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-3.2 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button active">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="n-1-5-6"
+                  aria-label="Select source N-1 5/6"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">N-1 5/6</h3>
+                      <div class="lane-sub">Playback</div>
+                    </div>
+                    <span class="chip">ST</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-10.8 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="music-7-8"
+                  aria-label="Select source Music 7/8"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Music 7/8</h3>
+                      <div class="lane-sub">Playback</div>
+                    </div>
+                    <span class="chip">ST</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-6.8 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="playback-9-10"
+                  aria-label="Select source Playback 9/10"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Playback 9/10</h3>
+                      <div class="lane-sub">Playback</div>
+                    </div>
+                    <span class="chip">ST</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-15.5 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+                <article
+                  class="source-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="playback-11-12"
+                  aria-label="Select source Playback 11/12"
+                  aria-pressed="false"
+                >
+                  <div class="source-top">
+                    <div>
+                      <h3 class="lane-name">Playback 11/12</h3>
+                      <div class="lane-sub">Playback</div>
+                    </div>
+                    <span class="chip">ST</span>
+                  </div>
+                  <div class="source-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send">
+                    <div class="source-send-row"><span>Main Out send</span><strong>-15.8 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="source-actions">
+                    <button class="button">Mute</button><button class="button">Solo</button>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="tier tier-outputs">
+              <div class="tier-header">
+                <span class="eyebrow">Bottom row</span>
+                <h2>Hardware Outputs</h2>
+                <span>Selecting an output changes the active submix</span>
+              </div>
+              <div class="output-grid">
+                <div class="tier-scale" aria-hidden="true">
+                  <div class="scale-track">
+                    <span style="--p: 100%">0</span><span style="--p: 90%">-6</span><span style="--p: 80%">-12</span
+                    ><span style="--p: 60%">-24</span><span style="--p: 0%">-60</span>
+                  </div>
+                </div>
+                <article
+                  class="output-strip selected"
+                  role="button"
+                  tabindex="0"
+                  data-channel="main-out"
+                  aria-label="Select output Main Out"
+                  aria-pressed="true"
+                >
+                  <div class="output-top">
+                    <div>
+                      <h3 class="lane-name">Main Out</h3>
+                      <div class="lane-sub">Selected submix</div>
+                    </div>
+                    <span class="chip blue">Active</span>
+                  </div>
+                  <div class="output-meter">
+                    <span class="meter-track hot"></span>
+                    <span class="meter-track hot"></span>
+                  </div>
+                  <div class="source-send output-send">
+                    <div class="source-send-row"><span>Output level</span><strong>-3.0 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="output-actions">
+                    <button class="button">Dim</button><button class="button">Mono</button>
+                  </div>
+                </article>
+                <article
+                  class="output-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="phones-1"
+                  aria-label="Select output Phones 1"
+                  aria-pressed="false"
+                >
+                  <div class="output-top">
+                    <div>
+                      <h3 class="lane-name">Phones 1</h3>
+                      <div class="lane-sub">Cue A</div>
+                    </div>
+                    <span class="chip">Cue</span>
+                  </div>
+                  <div class="output-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send output-send">
+                    <div class="source-send-row"><span>Output level</span><strong>-8.0 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="output-actions">
+                    <button class="button">Talk</button><button class="button">Mono</button>
+                  </div>
+                </article>
+                <article
+                  class="output-strip"
+                  role="button"
+                  tabindex="0"
+                  data-channel="phones-2"
+                  aria-label="Select output Phones 2"
+                  aria-pressed="false"
+                >
+                  <div class="output-top">
+                    <div>
+                      <h3 class="lane-name">Phones 2</h3>
+                      <div class="lane-sub">Cue B</div>
+                    </div>
+                    <span class="chip">Cue</span>
+                  </div>
+                  <div class="output-meter">
+                    <span class="meter-track"></span>
+                    <span class="meter-track"></span>
+                  </div>
+                  <div class="source-send output-send">
+                    <div class="source-send-row"><span>Output level</span><strong>-11.5 dB</strong></div>
+                    <div class="fader"></div>
+                  </div>
+                  <div class="output-actions">
+                    <button class="button">Talk</button><button class="button">Mono</button>
+                  </div>
+                </article>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <div class="resizer" aria-hidden="true"></div>
+
+        <aside class="inspector">
+          <div class="tabs" role="tablist" aria-label="Inspector panels">
+            <button class="tab active" type="button" role="tab" aria-selected="true">Channel</button>
+            <button class="tab" type="button" role="tab" aria-selected="false">Mix</button>
+            <button class="tab" type="button" role="tab" aria-selected="false">Session</button>
+          </div>
+          <section class="inspector-card">
+            <div class="eyebrow">Selected channel</div>
+            <h2 class="inspector-title">FX 3/4</h2>
+            <div class="selected-state"><span class="dot"></span>Playback · Stereo · Main Out send</div>
+            <div class="field-grid">
+              <div class="field wide">
+                <span class="caption">Fader</span>
+                <div class="mini-slider" data-control="inspector-fader"></div>
+                <strong>-3.2 dB</strong>
+              </div>
+              <div class="field">
+                <span class="caption">Gain</span>
+                <div class="mini-slider" data-control="inspector-gain"></div>
+                <strong>n/a</strong>
+              </div>
+              <div class="field">
+                <span class="caption">Peak</span><strong>L 0.66 / R 0.62</strong><span class="meta">Hold 0.72</span>
+              </div>
+              <div class="field wide">
+                <span class="caption">Send matrix</span><strong>Main Out -3.2 dB</strong
+                ><span class="meta">Phones 1 -6.2 dB · Phones 2 -8.4 dB</span>
+              </div>
+            </div>
+            <div class="inspector-buttons">
+              <button class="button">Mute</button>
+              <button class="button active">Solo</button>
+              <button class="button">PFL</button>
+              <button class="button">Clear</button>
+            </div>
+          </section>
+
+          <section class="inspector-card">
+            <div class="eyebrow">Mix context</div>
+            <div class="field-grid">
+              <div class="field">
+                <span class="caption">Target</span><strong>Main Out</strong><span class="meta">Monitor</span>
+              </div>
+              <div class="field wide">
+                <span class="caption">Last action</span><strong>Recall succeeded</strong
+                ><span class="meta">Show open · slot 2</span>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </section>
+
+      <footer class="health">
+        <div class="health-item">
+          <span class="label">OSC</span
+          ><span class="value"><span class="dot yellow"></span>127.0.0.1 · TX 7001 · RX 9001</span>
+        </div>
+        <div class="health-item">
+          <span class="label">Metering</span><span class="value"><span class="dot"></span>Live</span>
+        </div>
+        <div class="health-item"><span class="label">Mix</span><span class="value">Main Out</span></div>
+        <div class="health-item"><span class="label">Snapshot</span><span class="value">Show open</span></div>
+        <div class="health-item"><span class="label">Session</span><span class="value">Last sync 18:24</span></div>
+        <div class="health-actions">
+          <span class="kbd">⌘ K</span><span class="caption">command palette</span>
+          <button class="footer-help" type="button" aria-expanded="false" aria-controls="shortcut-help">
+            <span class="shortcut-key">?</span><span class="caption">shortcuts</span>
+          </button>
+          <span class="kbd">[ ]</span><span class="caption">bank</span>
+        </div>
+      </footer>
+
+      <div class="shortcut-help" id="shortcut-help" role="dialog" aria-labelledby="shortcut-help-title" hidden>
+        <div class="shortcut-panel">
+          <header>
+            <h2 id="shortcut-help-title">Keyboard shortcuts</h2>
+            <button class="icon-button" type="button" data-close-help aria-label="Close shortcuts">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m7 7 10 10M17 7 7 17" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+            </button>
+          </header>
+          <dl class="shortcut-list">
+            <div class="shortcut-row">
+              <dt>Up / down row</dt>
+              <dd>Move between inputs, playback, and outputs.</dd>
+            </div>
+            <div class="shortcut-row">
+              <dt>1-8 source</dt>
+              <dd>Select a visible source strip in the active row.</dd>
+            </div>
+            <div class="shortcut-row">
+              <dt>Outputs visible</dt>
+              <dd>The output row stays available while source tiers scroll.</dd>
+            </div>
+            <div class="shortcut-row">
+              <dt>?</dt>
+              <dd>Open or close this shortcut overlay.</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </main>
+    <script type="application/json" id="channel-state">
+      {
+        "channels": {
+          "host": {
+            "meters": [
+              {
+                "level": 72,
+                "peak": 78
+              },
+              {
+                "level": 68,
+                "peak": 72
+              }
+            ],
+            "fader": 66
+          },
+          "guest": {
+            "meters": [
+              {
+                "level": 58,
+                "peak": 62
+              },
+              {
+                "level": 48,
+                "peak": 55
+              }
+            ],
+            "fader": 60
+          },
+          "boom": {
+            "meters": [
+              {
+                "level": 32,
+                "peak": 39
+              },
+              {
+                "level": 28,
+                "peak": 34
+              }
+            ],
+            "fader": 38
+          },
+          "guitar-di": {
+            "meters": [
+              {
+                "level": 20,
+                "peak": 24
+              },
+              {
+                "level": 18,
+                "peak": 21
+              }
+            ],
+            "fader": 24
+          },
+          "line-1": {
+            "meters": [
+              {
+                "level": 16,
+                "peak": 22
+              },
+              {
+                "level": 14,
+                "peak": 20
+              }
+            ],
+            "fader": 18
+          },
+          "line-2": {
+            "meters": [
+              {
+                "level": 12,
+                "peak": 18
+              },
+              {
+                "level": 10,
+                "peak": 16
+              }
+            ],
+            "fader": 12
+          },
+          "remote-a": {
+            "meters": [
+              {
+                "level": 24,
+                "peak": 30
+              },
+              {
+                "level": 22,
+                "peak": 28
+              }
+            ],
+            "fader": 34
+          },
+          "remote-b": {
+            "meters": [
+              {
+                "level": 25,
+                "peak": 30
+              },
+              {
+                "level": 23,
+                "peak": 27
+              }
+            ],
+            "fader": 36
+          },
+          "program-1-2": {
+            "meters": [
+              {
+                "level": 78,
+                "peak": 84
+              },
+              {
+                "level": 74,
+                "peak": 80
+              }
+            ],
+            "fader": 84
+          },
+          "fx-3-4": {
+            "meters": [
+              {
+                "level": 66,
+                "peak": 72
+              },
+              {
+                "level": 62,
+                "peak": 68
+              }
+            ],
+            "fader": 80
+          },
+          "n-1-5-6": {
+            "meters": [
+              {
+                "level": 32,
+                "peak": 38
+              },
+              {
+                "level": 30,
+                "peak": 36
+              }
+            ],
+            "fader": 42
+          },
+          "music-7-8": {
+            "meters": [
+              {
+                "level": 44,
+                "peak": 50
+              },
+              {
+                "level": 42,
+                "peak": 48
+              }
+            ],
+            "fader": 62
+          },
+          "playback-9-10": {
+            "meters": [
+              {
+                "level": 12,
+                "peak": 18
+              },
+              {
+                "level": 10,
+                "peak": 15
+              }
+            ],
+            "fader": 18
+          },
+          "playback-11-12": {
+            "meters": [
+              {
+                "level": 9,
+                "peak": 13
+              },
+              {
+                "level": 8,
+                "peak": 12
+              }
+            ],
+            "fader": 15
+          },
+          "main-out": {
+            "meters": [
+              {
+                "level": 82,
+                "peak": 88
+              },
+              {
+                "level": 78,
+                "peak": 84
+              }
+            ],
+            "fader": 74
+          },
+          "phones-1": {
+            "meters": [
+              {
+                "level": 58,
+                "peak": 64
+              },
+              {
+                "level": 54,
+                "peak": 60
+              }
+            ],
+            "fader": 56
+          },
+          "phones-2": {
+            "meters": [
+              {
+                "level": 35,
+                "peak": 42
+              },
+              {
+                "level": 33,
+                "peak": 40
+              }
+            ],
+            "fader": 42
+          }
+        },
+        "controls": {
+          "monitor-level": {
+            "value": 82
+          },
+          "inspector-fader": {
+            "value": 80
+          },
+          "inspector-gain": {
+            "value": 0
+          }
+        }
+      }
+    </script>
+    <script>
+      (() => {
+        const deck = document.querySelector(".tier-deck");
+        const route = document.querySelector("#signal-route");
+        const routeGlow = document.querySelector("#signal-route-glow");
+        const signalLayer = document.querySelector(".signal-flow-layer");
+        const activeMixName = document.querySelector(".active-mix-pill strong");
+        const state = JSON.parse(document.querySelector("#channel-state")?.textContent || "{}");
+        const percent = (value) => (Number.isFinite(Number(value)) ? String(Number(value)) + "%" : "0%");
+        const findChannel = (id) =>
+          [...document.querySelectorAll("[data-channel]")].find((node) => node.dataset.channel === id);
+        const renderState = () => {
+          Object.entries(state.channels || {}).forEach(([id, channel]) => {
+            const strip = findChannel(id);
+            if (!strip) return;
+            strip.querySelectorAll(".meter-track").forEach((track, index) => {
+              const meter = channel.meters?.[index];
+              if (!meter) return;
+              track.style.setProperty("--level", percent(meter.level));
+              track.style.setProperty("--peak", percent(meter.peak));
+            });
+            const fader = strip.querySelector(".source-send .fader, .output-send .fader");
+            if (fader) fader.style.setProperty("--value", percent(channel.fader));
+          });
+          Object.entries(state.controls || {}).forEach(([id, control]) => {
+            document.querySelector('[data-control="' + id + '"]')?.style.setProperty("--v", percent(control.value));
+          });
+        };
+        renderState();
+
+        const scheduleRoute = () => requestAnimationFrame(updateSignalRoute);
+        const channelName = (node) => node?.querySelector(".lane-name")?.textContent.trim() || "";
+        const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+        const wireSliderKeys = (slider) => {
+          slider.addEventListener("keydown", (event) => {
+            const min = Number.parseFloat(slider.getAttribute("aria-valuemin") || "0");
+            const max = Number.parseFloat(slider.getAttribute("aria-valuemax") || "100");
+            let value = Number.parseFloat(slider.getAttribute("aria-valuenow") || "0");
+            const step = event.shiftKey || event.key === "PageUp" || event.key === "PageDown" ? 5 : 1;
+            const property = slider.classList.contains("fader") ? "--value" : "--v";
+            const currentPercent = Number.parseFloat(slider.style.getPropertyValue(property)) || 0;
+            let nextPercent = currentPercent;
+
+            if (event.key === "ArrowRight" || event.key === "ArrowUp" || event.key === "PageUp") {
+              value += step;
+              nextPercent += (step / (max - min)) * 100;
+            } else if (event.key === "ArrowLeft" || event.key === "ArrowDown" || event.key === "PageDown") {
+              value -= step;
+              nextPercent -= (step / (max - min)) * 100;
+            } else if (event.key === "Home") {
+              value = min;
+              nextPercent = 0;
+            } else if (event.key === "End") {
+              value = max;
+              nextPercent = 100;
+            } else return;
+
+            event.preventDefault();
+            value = clamp(value, min, max);
+            nextPercent = clamp(nextPercent, 0, 100);
+            const isDb = max <= 0;
+            const text = isDb ? `${value.toFixed(1)} dB` : `${Math.round(value)}%`;
+            slider.setAttribute("aria-valuenow", String(Number(value.toFixed(1))));
+            slider.setAttribute("aria-valuetext", text);
+            slider.style.setProperty(property, `${nextPercent}%`);
+          });
+        };
+
+        document.querySelectorAll(".toggle").forEach((toggle) => {
+          toggle.addEventListener("click", () => {
+            const next = toggle.getAttribute("aria-checked") !== "true";
+            toggle.setAttribute("aria-checked", String(next));
+          });
+        });
+
+        document.querySelectorAll(".source-send .fader, .output-send .fader").forEach((fader) => {
+          const strip = fader.closest(".source-strip, .output-strip");
+          const label = channelName(strip) || "Channel";
+          const readout =
+            fader.closest(".source-send")?.querySelector(".source-send-row strong")?.textContent.trim() || "0 dB";
+          const numeric = Number.parseFloat(readout);
+          fader.setAttribute("role", "slider");
+          fader.setAttribute("tabindex", "0");
+          fader.setAttribute("aria-valuemin", "-60");
+          fader.setAttribute("aria-valuemax", "0");
+          fader.setAttribute("aria-valuenow", Number.isFinite(numeric) ? String(numeric) : "0");
+          fader.setAttribute("aria-valuetext", readout);
+          fader.setAttribute("aria-label", `${label} fader`);
+          wireSliderKeys(fader);
+        });
+
+        document.querySelectorAll(".mini-slider").forEach((slider) => {
+          const field = slider.closest(".field");
+          const card = slider.closest(".master-card");
+          const caption =
+            field?.querySelector(".caption")?.textContent.trim() ||
+            card?.querySelector(".caption")?.textContent.trim() ||
+            "Level";
+          const readout = field?.querySelector("strong")?.textContent.trim();
+          const isDb = Boolean(readout?.includes("dB"));
+          const percent = Number.parseFloat(slider.style.getPropertyValue("--v")) || 0;
+          const numeric = isDb ? Number.parseFloat(readout) : percent;
+          slider.setAttribute("role", "slider");
+          slider.setAttribute("tabindex", "0");
+          slider.setAttribute("aria-valuemin", isDb ? "-60" : "0");
+          slider.setAttribute("aria-valuemax", isDb ? "0" : "100");
+          slider.setAttribute("aria-valuenow", Number.isFinite(numeric) ? String(numeric) : "0");
+          slider.setAttribute("aria-valuetext", readout || `${percent}%`);
+          slider.setAttribute("aria-label", caption);
+          wireSliderKeys(slider);
+        });
+
+        const setSelected = (strip, kind) => {
+          if (!strip || !deck) return;
+          const selector = kind === "output" ? ".output-strip" : ".source-strip";
+          deck.querySelectorAll(selector).forEach((item) => {
+            item.classList.toggle("selected", item === strip);
+            item.setAttribute("aria-pressed", item === strip ? "true" : "false");
+          });
+          deck.dataset[kind === "output" ? "selectedOutput" : "selectedSource"] = strip.dataset.channel || "";
+          if (kind === "output" && activeMixName) activeMixName.textContent = channelName(strip);
+          scheduleRoute();
+        };
+
+        const isStripControl = (target) =>
+          Boolean(target.closest(".source-actions, .output-actions, .source-send, .output-send"));
+
+        deck?.addEventListener("click", (event) => {
+          if (isStripControl(event.target)) return;
+          const source = event.target.closest(".source-strip");
+          if (source) return setSelected(source, "source");
+          const output = event.target.closest(".output-strip");
+          if (output) return setSelected(output, "output");
+        });
+
+        deck?.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          if (!event.target.matches(".source-strip, .output-strip")) return;
+          event.preventDefault();
+          setSelected(event.target, event.target.matches(".output-strip") ? "output" : "source");
+        });
+
+        function updateSignalRoute() {
+          if (!deck || !route || !routeGlow || !signalLayer) return;
+          const source = deck.querySelector(".source-strip.selected");
+          const output = deck.querySelector(".output-strip.selected");
+          const sourceMeter = source?.querySelector(".source-meter");
+          const outputMeter = output?.querySelector(".output-meter");
+          if (!sourceMeter || !outputMeter) return;
+
+          const deckRect = deck.getBoundingClientRect();
+          const sourceRect = sourceMeter.getBoundingClientRect();
+          const outputRect = outputMeter.getBoundingClientRect();
+          const x1 = sourceRect.left + sourceRect.width / 2 - deckRect.left;
+          const y1 = sourceRect.bottom - deckRect.top;
+          const x2 = outputRect.left + outputRect.width / 2 - deckRect.left;
+          const y2 = outputRect.top - deckRect.top;
+          const midY = y1 + (y2 - y1) * 0.52;
+          const curve = Math.max(28, Math.min(92, Math.abs(x2 - x1) * 0.18));
+          const d = `M ${x1.toFixed(1)} ${y1.toFixed(1)} V ${midY.toFixed(1)} C ${x1.toFixed(1)} ${(
+            midY + curve
+          ).toFixed(
+            1
+          )} ${x2.toFixed(1)} ${(midY - curve).toFixed(1)} ${x2.toFixed(1)} ${midY.toFixed(1)} V ${y2.toFixed(1)}`;
+
+          signalLayer.setAttribute("viewBox", `0 0 ${deckRect.width.toFixed(1)} ${deckRect.height.toFixed(1)}`);
+          route.setAttribute("d", d);
+          routeGlow.setAttribute("d", d);
+          signalLayer.style.setProperty(
+            "--signal-accent",
+            source.closest(".tier-playback") ? "var(--tier-playback-accent)" : "var(--tier-input-hot)"
+          );
+          signalLayer.querySelector("animateMotion")?.beginElement?.();
+        }
+
+        document.querySelectorAll(".source-grid.hardware, .source-grid.playback, .output-grid").forEach((scroller) => {
+          scroller.addEventListener("scroll", scheduleRoute, { passive: true });
+        });
+        window.addEventListener("resize", scheduleRoute);
+        new ResizeObserver(scheduleRoute).observe(document.querySelector(".canvas"));
+        updateSignalRoute();
+
+        document.querySelectorAll(".tabs").forEach((tabs) => {
+          tabs.addEventListener("click", (event) => {
+            const tab = event.target.closest(".tab");
+            if (!tab) return;
+            tabs.querySelectorAll(".tab").forEach((item) => {
+              item.classList.toggle("active", item === tab);
+              item.setAttribute("aria-selected", item === tab ? "true" : "false");
+            });
+          });
+        });
+
+        document.querySelectorAll(".segmented").forEach((group) => {
+          group.addEventListener("click", (event) => {
+            const seg = event.target.closest(".seg");
+            if (!seg) return;
+            group.querySelectorAll(".seg").forEach((item) => item.classList.toggle("active", item === seg));
+          });
+        });
+
+        const help = document.querySelector("#shortcut-help");
+        const helpTrigger = document.querySelector(".footer-help");
+        const closeHelp = document.querySelector("[data-close-help]");
+        const setHelp = (open) => {
+          if (!help || !helpTrigger) return;
+          help.hidden = !open;
+          helpTrigger.setAttribute("aria-expanded", String(open));
+          if (open) closeHelp?.focus();
+          else helpTrigger.focus();
+        };
+
+        helpTrigger?.addEventListener("click", () => setHelp(help.hidden));
+        closeHelp?.addEventListener("click", () => setHelp(false));
+        help?.addEventListener("click", (event) => {
+          if (event.target === help) setHelp(false);
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && !help?.hidden) setHelp(false);
+          if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            event.preventDefault();
+            setHelp(Boolean(help?.hidden));
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
