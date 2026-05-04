@@ -3449,6 +3449,53 @@
 
         const scheduleRoute = () => requestAnimationFrame(updateSignalRoute);
         const channelName = (node) => node?.querySelector(".lane-name")?.textContent.trim() || "";
+        const updateInspectorForSource = (strip) => {
+          if (!strip) return;
+          const inspectorTitle = document.querySelector(".inspector-card .inspector-title");
+          const selectedState = document.querySelector(".inspector-card .selected-state");
+          const fields = document.querySelectorAll(".inspector-card .field");
+          const inspectorFader = document.querySelector('[data-control="inspector-fader"]');
+
+          const name = strip.querySelector(".lane-name")?.textContent.trim() || "";
+          const sub = strip.querySelector(".lane-sub")?.textContent.trim() || "";
+          const tier = strip.closest(".tier-inputs") ? "Input" : strip.closest(".tier-playback") ? "Playback" : "Output";
+          const stereo = strip.querySelector(".chip")?.textContent.trim() === "ST" ? "Stereo" : "Mono";
+          const dbText = strip.querySelector(".source-send-row strong")?.textContent.trim() || "0 dB";
+          const channelData = state.channels?.[strip.dataset.channel] || {};
+          const peakL = channelData.meters?.[0]?.peak;
+          const peakR = channelData.meters?.[1]?.peak;
+          const faderPercent = channelData.fader ?? 0;
+
+          if (inspectorTitle) inspectorTitle.textContent = name;
+          if (selectedState) {
+            const dot = selectedState.querySelector(".dot");
+            selectedState.textContent = "";
+            if (dot) selectedState.appendChild(dot);
+            selectedState.appendChild(document.createTextNode(` ${tier} · ${stereo} · ${sub}`));
+          }
+
+          if (fields[0]) {
+            const strongEl = fields[0].querySelector("strong");
+            if (strongEl) strongEl.textContent = dbText;
+          }
+          if (fields[2]) {
+            const strongEl = fields[2].querySelector("strong");
+            const meta = fields[2].querySelector(".meta");
+            if (strongEl && Number.isFinite(peakL) && Number.isFinite(peakR)) {
+              strongEl.textContent = `L ${(peakL / 100).toFixed(2)} / R ${(peakR / 100).toFixed(2)}`;
+            }
+            if (meta && Number.isFinite(peakL)) meta.textContent = `Hold ${(Math.max(peakL, peakR) / 100).toFixed(2)}`;
+          }
+          if (fields[3]) {
+            const strongEl = fields[3].querySelector("strong");
+            if (strongEl) strongEl.textContent = `${activeMixName?.textContent || "Main Out"} ${dbText}`;
+          }
+          if (inspectorFader) {
+            inspectorFader.style.setProperty("--v", percent(faderPercent));
+            inspectorFader.setAttribute("aria-valuenow", String(parseFloat(dbText) || 0));
+            inspectorFader.setAttribute("aria-valuetext", dbText);
+          }
+        };
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
         const wireSliderKeys = (slider) => {
           slider.addEventListener("keydown", (event) => {
@@ -3538,6 +3585,7 @@
           });
           deck.dataset[kind === "output" ? "selectedOutput" : "selectedSource"] = strip.dataset.channel || "";
           if (kind === "output" && activeMixName) activeMixName.textContent = channelName(strip);
+          if (kind === "source") updateInspectorForSource(strip);
           scheduleRoute();
         };
 
@@ -3598,6 +3646,8 @@
         window.addEventListener("resize", scheduleRoute);
         new ResizeObserver(scheduleRoute).observe(document.querySelector(".canvas"));
         updateSignalRoute();
+        const initiallySelected = deck.querySelector(".source-strip.selected");
+        if (initiallySelected) updateInspectorForSource(initiallySelected);
 
         document.querySelectorAll(".tabs").forEach((tabs) => {
           tabs.addEventListener("click", (event) => {
