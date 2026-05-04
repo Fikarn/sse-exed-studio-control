@@ -3700,11 +3700,76 @@
         help?.addEventListener("click", (event) => {
           if (event.target === help) setHelp(false);
         });
+
+        const TIER_SELECTORS = [".tier-inputs", ".tier-playback", ".tier-outputs"];
+
+        const tierIndexOf = (el) => {
+          if (!el) return -1;
+          return TIER_SELECTORS.findIndex((sel) => el.closest(sel));
+        };
+
+        const stripsInTier = (tierIdx) => {
+          const sel = TIER_SELECTORS[tierIdx];
+          if (!sel) return [];
+          return [...document.querySelectorAll(`${sel} .source-strip, ${sel} .output-strip`)];
+        };
+
+        const focusedStripContext = () => {
+          const focused = document.activeElement;
+          const strip = focused?.closest(".source-strip, .output-strip");
+          if (strip) return { strip, tierIdx: tierIndexOf(strip) };
+          const selected = deck?.querySelector(".source-strip.selected, .output-strip.selected");
+          if (selected) return { strip: selected, tierIdx: tierIndexOf(selected) };
+          return { strip: null, tierIdx: 1 };
+        };
+
         document.addEventListener("keydown", (event) => {
-          if (event.key === "Escape" && !help?.hidden) setHelp(false);
+          if (event.target.matches("input, textarea, [contenteditable]")) return;
+
+          if (event.key === "Escape" && !help?.hidden) {
+            setHelp(false);
+            return;
+          }
           if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey) {
             event.preventDefault();
             setHelp(Boolean(help?.hidden));
+            return;
+          }
+          if (help && !help.hidden) return;
+
+          if (/^[1-8]$/.test(event.key) && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            const { tierIdx } = focusedStripContext();
+            const idx = parseInt(event.key, 10) - 1;
+            const strips = stripsInTier(tierIdx);
+            if (strips[idx]) {
+              event.preventDefault();
+              strips[idx].focus();
+              setSelected(strips[idx], tierIdx === 2 ? "output" : "source");
+            }
+            return;
+          }
+
+          if (
+            (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+            event.target.matches(".source-strip, .output-strip")
+          ) {
+            event.preventDefault();
+            const currTier = tierIndexOf(event.target);
+            const nextTier =
+              event.key === "ArrowDown" ? Math.min(2, currTier + 1) : Math.max(0, currTier - 1);
+            if (nextTier === currTier) return;
+            const colIdx = stripsInTier(currTier).indexOf(event.target);
+            const targets = stripsInTier(nextTier);
+            const target = targets[Math.min(colIdx, targets.length - 1)];
+            if (target) target.focus();
+          }
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if ((event.key === "[" || event.key === "]") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            if (event.target.matches("input, textarea, [contenteditable]")) return;
+            // TODO: wire to actual bank state when bank model exists
+            event.preventDefault();
           }
         });
       })();
