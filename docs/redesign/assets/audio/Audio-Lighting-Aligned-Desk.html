@@ -153,7 +153,7 @@
       }
 
       .visually-hidden,
-      .skip-link:not(:focus-visible) {
+      .skip-link:not(:focus):not(:focus-visible) {
         position: absolute;
         width: 1px;
         height: 1px;
@@ -1757,6 +1757,12 @@
         gap: 12px;
       }
 
+      .health-shortcut {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
       .footer-help {
         display: inline-flex;
         align-items: center;
@@ -2239,7 +2245,10 @@
               alt="SSE Executive Education"
               width="156"
               height="52"
-              onerror="this.style.display='none';this.parentElement.dataset.imgFailed='true';"
+              onerror="
+                this.style.display = 'none';
+                this.parentElement.dataset.imgFailed = 'true';
+              "
             />
           </span>
           <div class="brand-divider"></div>
@@ -2345,21 +2354,21 @@
             <span>3</span>
           </div>
           <div class="target-list">
-            <button class="target-row active" type="button">
+            <button class="target-row active" type="button" aria-label="Main Out, Monitor — selected">
               <div>
                 <div class="row-name">Main Out</div>
                 <div class="row-sub">Monitor</div>
               </div>
               <span class="chip green">Selected</span>
             </button>
-            <button class="target-row" type="button">
+            <button class="target-row" type="button" aria-label="Phones 1, Cue A">
               <div>
                 <div class="row-name">Phones 1</div>
                 <div class="row-sub">Cue A</div>
               </div>
               <span class="chip">Talk</span>
             </button>
-            <button class="target-row" type="button">
+            <button class="target-row" type="button" aria-label="Phones 2, Cue B">
               <div>
                 <div class="row-name">Phones 2</div>
                 <div class="row-sub">Cue B</div>
@@ -2372,35 +2381,35 @@
             <span>Shift 1-8</span>
           </div>
           <div class="snapshot-list">
-            <button class="snapshot-row" type="button">
+            <button class="snapshot-row" type="button" aria-label="Open rehearsal, Slot 1">
               <div>
                 <div class="row-name">Open rehearsal</div>
                 <div class="row-sub">Slot 1</div>
               </div>
               <span>Recall</span>
             </button>
-            <button class="snapshot-row active" type="button">
+            <button class="snapshot-row active" type="button" aria-label="Show open, Slot 2 · 06:05 — current">
               <div>
                 <div class="row-name">Show open</div>
                 <div class="row-sub">Slot 2 · 06:05</div>
               </div>
               <span class="chip green">Current</span>
             </button>
-            <button class="snapshot-row" type="button">
+            <button class="snapshot-row" type="button" aria-label="Interview block, Slot 3">
               <div>
                 <div class="row-name">Interview block</div>
                 <div class="row-sub">Slot 3</div>
               </div>
               <span>Recall</span>
             </button>
-            <button class="snapshot-row" type="button">
+            <button class="snapshot-row" type="button" aria-label="Break bumper, Slot 4">
               <div>
                 <div class="row-name">Break bumper</div>
                 <div class="row-sub">Slot 4</div>
               </div>
               <span>Recall</span>
             </button>
-            <button class="snapshot-row" type="button">
+            <button class="snapshot-row" type="button" aria-label="Credits, Slot 5">
               <div>
                 <div class="row-name">Credits</div>
                 <div class="row-sub">Slot 5</div>
@@ -2414,14 +2423,14 @@
             <span>Audio</span>
           </div>
           <div class="action-list">
-            <button class="action-row" type="button">
+            <button class="action-row" type="button" aria-label="Sync audio, Run OSC probe">
               <div>
                 <div class="row-name">Sync audio</div>
                 <div class="row-sub">Run OSC probe</div>
               </div>
               <span class="chip">Enter</span>
             </button>
-            <button class="action-row" type="button">
+            <button class="action-row" type="button" aria-label="Audio setup, OSC host and ports">
               <div>
                 <div class="row-name">Audio setup</div>
                 <div class="row-sub">OSC host and ports</div>
@@ -2471,18 +2480,14 @@
                     ><span style="--p: 60%">-24</span><span style="--p: 0%">-60</span>
                   </div>
                 </div>
-                <article
-                  class="source-strip"
-                  data-channel="host"
-                  aria-labelledby="strip-host-name"
-                >
+                <article class="source-strip" data-channel="host" aria-labelledby="strip-host-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Host">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-host-name" class="lane-name">Host</h3>
-                      <div class="lane-sub">Mic pre 9</div>
-                    </div>
-                    <span class="chip">IN</span>
+                      <div>
+                        <h3 id="strip-host-name" class="lane-name">Host</h3>
+                        <div class="lane-sub">Mic pre 9</div>
+                      </div>
+                      <span class="chip">IN</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2494,21 +2499,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="guest"
-                  aria-labelledby="strip-guest-name"
-                >
+                <article class="source-strip" data-channel="guest" aria-labelledby="strip-guest-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Guest">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-guest-name" class="lane-name">Guest</h3>
-                      <div class="lane-sub">Mic pre 10</div>
-                    </div>
-                    <span class="chip">IN</span>
+                      <div>
+                        <h3 id="strip-guest-name" class="lane-name">Guest</h3>
+                        <div class="lane-sub">Mic pre 10</div>
+                      </div>
+                      <span class="chip">IN</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2520,21 +2522,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="boom"
-                  aria-labelledby="strip-boom-name"
-                >
+                <article class="source-strip" data-channel="boom" aria-labelledby="strip-boom-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Boom">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-boom-name" class="lane-name">Boom</h3>
-                      <div class="lane-sub">Mic pre 11</div>
-                    </div>
-                    <span class="chip">IN</span>
+                      <div>
+                        <h3 id="strip-boom-name" class="lane-name">Boom</h3>
+                        <div class="lane-sub">Mic pre 11</div>
+                      </div>
+                      <span class="chip">IN</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2546,21 +2545,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="guitar-di"
-                  aria-labelledby="strip-guitar-di-name"
-                >
+                <article class="source-strip" data-channel="guitar-di" aria-labelledby="strip-guitar-di-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Guitar DI">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-guitar-di-name" class="lane-name">Guitar DI</h3>
-                      <div class="lane-sub">Mic pre 12</div>
-                    </div>
-                    <span class="chip">IN</span>
+                      <div>
+                        <h3 id="strip-guitar-di-name" class="lane-name">Guitar DI</h3>
+                        <div class="lane-sub">Mic pre 12</div>
+                      </div>
+                      <span class="chip">IN</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2572,21 +2568,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="line-1"
-                  aria-labelledby="strip-line-1-name"
-                >
+                <article class="source-strip" data-channel="line-1" aria-labelledby="strip-line-1-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Line 1">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-line-1-name" class="lane-name">Line 1</h3>
-                      <div class="lane-sub">Rear line</div>
-                    </div>
-                    <span class="chip">IN</span>
+                      <div>
+                        <h3 id="strip-line-1-name" class="lane-name">Line 1</h3>
+                        <div class="lane-sub">Rear line</div>
+                      </div>
+                      <span class="chip">IN</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2598,21 +2591,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="line-2"
-                  aria-labelledby="strip-line-2-name"
-                >
+                <article class="source-strip" data-channel="line-2" aria-labelledby="strip-line-2-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Line 2">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-line-2-name" class="lane-name">Line 2</h3>
-                      <div class="lane-sub">Rear line</div>
-                    </div>
-                    <span class="chip">IN</span>
+                      <div>
+                        <h3 id="strip-line-2-name" class="lane-name">Line 2</h3>
+                        <div class="lane-sub">Rear line</div>
+                      </div>
+                      <span class="chip">IN</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2624,21 +2614,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="remote-a"
-                  aria-labelledby="strip-remote-a-name"
-                >
+                <article class="source-strip" data-channel="remote-a" aria-labelledby="strip-remote-a-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Remote A">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-remote-a-name" class="lane-name">Remote A</h3>
-                      <div class="lane-sub">Rear line</div>
-                    </div>
-                    <span class="chip">IN</span>
+                      <div>
+                        <h3 id="strip-remote-a-name" class="lane-name">Remote A</h3>
+                        <div class="lane-sub">Rear line</div>
+                      </div>
+                      <span class="chip">IN</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2650,21 +2637,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="remote-b"
-                  aria-labelledby="strip-remote-b-name"
-                >
+                <article class="source-strip" data-channel="remote-b" aria-labelledby="strip-remote-b-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Remote B">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-remote-b-name" class="lane-name">Remote B</h3>
-                      <div class="lane-sub">Rear line</div>
-                    </div>
-                    <span class="chip">IN</span>
+                      <div>
+                        <h3 id="strip-remote-b-name" class="lane-name">Remote B</h3>
+                        <div class="lane-sub">Rear line</div>
+                      </div>
+                      <span class="chip">IN</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2676,7 +2660,8 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
               </div>
@@ -2695,18 +2680,19 @@
                     ><span style="--p: 60%">-24</span><span style="--p: 0%">-60</span>
                   </div>
                 </div>
-                <article
-                  class="source-strip"
-                  data-channel="program-1-2"
-                  aria-labelledby="strip-program-1-2-name"
-                >
-                  <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Program 1/2">
+                <article class="source-strip" data-channel="program-1-2" aria-labelledby="strip-program-1-2-name">
+                  <button
+                    class="strip-select"
+                    type="button"
+                    aria-pressed="false"
+                    aria-label="Select source Program 1/2"
+                  >
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-program-1-2-name" class="lane-name">Program 1/2</h3>
-                      <div class="lane-sub">Playback</div>
-                    </div>
-                    <span class="chip">ST</span>
+                      <div>
+                        <h3 id="strip-program-1-2-name" class="lane-name">Program 1/2</h3>
+                        <div class="lane-sub">Playback</div>
+                      </div>
+                      <span class="chip">ST</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2718,21 +2704,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip selected"
-                  data-channel="fx-3-4"
-                  aria-labelledby="strip-fx-3-4-name"
-                >
+                <article class="source-strip selected" data-channel="fx-3-4" aria-labelledby="strip-fx-3-4-name">
                   <button class="strip-select" type="button" aria-pressed="true" aria-label="Select source FX 3/4">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-fx-3-4-name" class="lane-name">FX 3/4</h3>
-                      <div class="lane-sub">Playback</div>
-                    </div>
-                    <span class="chip green">ST</span>
+                      <div>
+                        <h3 id="strip-fx-3-4-name" class="lane-name">FX 3/4</h3>
+                        <div class="lane-sub">Playback</div>
+                      </div>
+                      <span class="chip green">ST</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2744,21 +2727,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button active" aria-pressed="true">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button active" aria-pressed="true">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="n-1-5-6"
-                  aria-labelledby="strip-n-1-5-6-name"
-                >
+                <article class="source-strip" data-channel="n-1-5-6" aria-labelledby="strip-n-1-5-6-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source N-1 5/6">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-n-1-5-6-name" class="lane-name">N-1 5/6</h3>
-                      <div class="lane-sub">Playback</div>
-                    </div>
-                    <span class="chip">ST</span>
+                      <div>
+                        <h3 id="strip-n-1-5-6-name" class="lane-name">N-1 5/6</h3>
+                        <div class="lane-sub">Playback</div>
+                      </div>
+                      <span class="chip">ST</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2770,21 +2750,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="music-7-8"
-                  aria-labelledby="strip-music-7-8-name"
-                >
+                <article class="source-strip" data-channel="music-7-8" aria-labelledby="strip-music-7-8-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Music 7/8">
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-music-7-8-name" class="lane-name">Music 7/8</h3>
-                      <div class="lane-sub">Playback</div>
-                    </div>
-                    <span class="chip">ST</span>
+                      <div>
+                        <h3 id="strip-music-7-8-name" class="lane-name">Music 7/8</h3>
+                        <div class="lane-sub">Playback</div>
+                      </div>
+                      <span class="chip">ST</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2796,21 +2773,23 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="playback-9-10"
-                  aria-labelledby="strip-playback-9-10-name"
-                >
-                  <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Playback 9/10">
+                <article class="source-strip" data-channel="playback-9-10" aria-labelledby="strip-playback-9-10-name">
+                  <button
+                    class="strip-select"
+                    type="button"
+                    aria-pressed="false"
+                    aria-label="Select source Playback 9/10"
+                  >
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-playback-9-10-name" class="lane-name">Playback 9/10</h3>
-                      <div class="lane-sub">Playback</div>
-                    </div>
-                    <span class="chip">ST</span>
+                      <div>
+                        <h3 id="strip-playback-9-10-name" class="lane-name">Playback 9/10</h3>
+                        <div class="lane-sub">Playback</div>
+                      </div>
+                      <span class="chip">ST</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2822,21 +2801,23 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
-                <article
-                  class="source-strip"
-                  data-channel="playback-11-12"
-                  aria-labelledby="strip-playback-11-12-name"
-                >
-                  <button class="strip-select" type="button" aria-pressed="false" aria-label="Select source Playback 11/12">
+                <article class="source-strip" data-channel="playback-11-12" aria-labelledby="strip-playback-11-12-name">
+                  <button
+                    class="strip-select"
+                    type="button"
+                    aria-pressed="false"
+                    aria-label="Select source Playback 11/12"
+                  >
                     <div class="source-top">
-                    <div>
-                      <h3 id="strip-playback-11-12-name" class="lane-name">Playback 11/12</h3>
-                      <div class="lane-sub">Playback</div>
-                    </div>
-                    <span class="chip">ST</span>
+                      <div>
+                        <h3 id="strip-playback-11-12-name" class="lane-name">Playback 11/12</h3>
+                        <div class="lane-sub">Playback</div>
+                      </div>
+                      <span class="chip">ST</span>
                     </div>
                   </button>
                   <div class="source-meter">
@@ -2848,7 +2829,8 @@
                     <div class="fader"></div>
                   </div>
                   <div class="source-actions">
-                    <button class="button" aria-pressed="false">Mute</button><button class="button" aria-pressed="false">Solo</button>
+                    <button class="button" aria-pressed="false">Mute</button
+                    ><button class="button" aria-pressed="false">Solo</button>
                   </div>
                 </article>
               </div>
@@ -2867,18 +2849,14 @@
                     ><span style="--p: 60%">-24</span><span style="--p: 0%">-60</span>
                   </div>
                 </div>
-                <article
-                  class="output-strip selected"
-                  data-channel="main-out"
-                  aria-labelledby="strip-main-out-name"
-                >
+                <article class="output-strip selected" data-channel="main-out" aria-labelledby="strip-main-out-name">
                   <button class="strip-select" type="button" aria-pressed="true" aria-label="Select output Main Out">
                     <div class="output-top">
-                    <div>
-                      <h3 id="strip-main-out-name" class="lane-name">Main Out</h3>
-                      <div class="lane-sub">Selected submix</div>
-                    </div>
-                    <span class="chip blue">Active</span>
+                      <div>
+                        <h3 id="strip-main-out-name" class="lane-name">Main Out</h3>
+                        <div class="lane-sub">Selected submix</div>
+                      </div>
+                      <span class="chip blue">Active</span>
                     </div>
                   </button>
                   <div class="output-meter">
@@ -2890,21 +2868,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="output-actions">
-                    <button class="button" aria-pressed="false">Dim</button><button class="button" aria-pressed="false">Mono</button>
+                    <button class="button" aria-pressed="false">Dim</button
+                    ><button class="button" aria-pressed="false">Mono</button>
                   </div>
                 </article>
-                <article
-                  class="output-strip"
-                  data-channel="phones-1"
-                  aria-labelledby="strip-phones-1-name"
-                >
+                <article class="output-strip" data-channel="phones-1" aria-labelledby="strip-phones-1-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select output Phones 1">
                     <div class="output-top">
-                    <div>
-                      <h3 id="strip-phones-1-name" class="lane-name">Phones 1</h3>
-                      <div class="lane-sub">Cue A</div>
-                    </div>
-                    <span class="chip">Cue</span>
+                      <div>
+                        <h3 id="strip-phones-1-name" class="lane-name">Phones 1</h3>
+                        <div class="lane-sub">Cue A</div>
+                      </div>
+                      <span class="chip">Cue</span>
                     </div>
                   </button>
                   <div class="output-meter">
@@ -2916,21 +2891,18 @@
                     <div class="fader"></div>
                   </div>
                   <div class="output-actions">
-                    <button class="button" aria-pressed="false">Talk</button><button class="button" aria-pressed="false">Mono</button>
+                    <button class="button" aria-pressed="false">Talk</button
+                    ><button class="button" aria-pressed="false">Mono</button>
                   </div>
                 </article>
-                <article
-                  class="output-strip"
-                  data-channel="phones-2"
-                  aria-labelledby="strip-phones-2-name"
-                >
+                <article class="output-strip" data-channel="phones-2" aria-labelledby="strip-phones-2-name">
                   <button class="strip-select" type="button" aria-pressed="false" aria-label="Select output Phones 2">
                     <div class="output-top">
-                    <div>
-                      <h3 id="strip-phones-2-name" class="lane-name">Phones 2</h3>
-                      <div class="lane-sub">Cue B</div>
-                    </div>
-                    <span class="chip">Cue</span>
+                      <div>
+                        <h3 id="strip-phones-2-name" class="lane-name">Phones 2</h3>
+                        <div class="lane-sub">Cue B</div>
+                      </div>
+                      <span class="chip">Cue</span>
                     </div>
                   </button>
                   <div class="output-meter">
@@ -2942,7 +2914,8 @@
                     <div class="fader"></div>
                   </div>
                   <div class="output-actions">
-                    <button class="button" aria-pressed="false">Talk</button><button class="button" aria-pressed="false">Mono</button>
+                    <button class="button" aria-pressed="false">Talk</button
+                    ><button class="button" aria-pressed="false">Mono</button>
                   </div>
                 </article>
               </div>
@@ -2955,7 +2928,14 @@
         <aside class="inspector">
           <div class="tabs" role="group" aria-label="Inspector view">
             <button class="tab active" type="button" aria-pressed="true">Channel</button>
-            <button class="tab" type="button" aria-pressed="false" disabled aria-disabled="true" title="Mix view — coming soon">
+            <button
+              class="tab"
+              type="button"
+              aria-pressed="false"
+              disabled
+              aria-disabled="true"
+              title="Mix view — coming soon"
+            >
               Mix
             </button>
             <button
@@ -3027,11 +3007,11 @@
         <div class="health-item"><span class="label">Snapshot</span><span class="value">Show open</span></div>
         <div class="health-item"><span class="label">Session</span><span class="value">Last sync 18:24</span></div>
         <div class="health-actions">
-          <span class="kbd">⌘ K</span><span class="caption">command palette</span>
+          <span class="health-shortcut"><span class="kbd">⌘ K</span><span class="caption">command palette</span></span>
           <button class="footer-help" type="button" aria-expanded="false" aria-controls="shortcut-help">
             <span class="shortcut-key">?</span><span class="caption">shortcuts</span>
           </button>
-          <span class="kbd">[ ]</span><span class="caption">bank</span>
+          <span class="health-shortcut"><span class="kbd">[ ]</span><span class="caption">bank</span></span>
         </div>
       </footer>
 
@@ -3345,7 +3325,11 @@
 
           const name = strip.querySelector(".lane-name")?.textContent.trim() || "";
           const sub = strip.querySelector(".lane-sub")?.textContent.trim() || "";
-          const tier = strip.closest(".tier-inputs") ? "Input" : strip.closest(".tier-playback") ? "Playback" : "Output";
+          const tier = strip.closest(".tier-inputs")
+            ? "Input"
+            : strip.closest(".tier-playback")
+              ? "Playback"
+              : "Output";
           const stereo = strip.querySelector(".chip")?.textContent.trim() === "ST" ? "Stereo" : "Mono";
           const dbText = strip.querySelector(".source-send-row strong")?.textContent.trim() || "0 dB";
           const channelData = state.channels?.[strip.dataset.channel] || {};
@@ -3549,7 +3533,9 @@
 
         const TOGGLE_BUTTON_LABELS = new Set(["mute", "solo", "talk", "dim", "mono", "pfl"]);
         document
-          .querySelectorAll(".source-actions .button, .output-actions .button, .button-row .button, .inspector-buttons .button")
+          .querySelectorAll(
+            ".source-actions .button, .output-actions .button, .button-row .button, .inspector-buttons .button"
+          )
           .forEach((btn) => {
             const label = (btn.textContent || "").trim().toLowerCase();
             if (!TOGGLE_BUTTON_LABELS.has(label)) return;
@@ -3603,7 +3589,8 @@
         };
 
         document.addEventListener("keydown", (event) => {
-          if (event.target.matches("input, textarea, [contenteditable]")) return;
+          const eventTarget = event.target instanceof Element ? event.target : null;
+          if (eventTarget?.matches("input, textarea, [contenteditable]")) return;
 
           if (event.key === "Escape" && !help?.hidden) {
             setHelp(false);
@@ -3629,16 +3616,12 @@
             return;
           }
 
-          if (
-            (event.key === "ArrowUp" || event.key === "ArrowDown") &&
-            event.target.matches(".strip-select")
-          ) {
+          if ((event.key === "ArrowUp" || event.key === "ArrowDown") && eventTarget?.matches(".strip-select")) {
             event.preventDefault();
-            const currTier = tierIndexOf(event.target);
-            const nextTier =
-              event.key === "ArrowDown" ? Math.min(2, currTier + 1) : Math.max(0, currTier - 1);
+            const currTier = tierIndexOf(eventTarget);
+            const nextTier = event.key === "ArrowDown" ? Math.min(2, currTier + 1) : Math.max(0, currTier - 1);
             if (nextTier === currTier) return;
-            const currentStrip = event.target.closest(".source-strip, .output-strip");
+            const currentStrip = eventTarget.closest(".source-strip, .output-strip");
             const colIdx = stripsInTier(currTier).indexOf(currentStrip);
             const targets = stripsInTier(nextTier);
             const target = targets[Math.min(colIdx, targets.length - 1)];
@@ -3649,7 +3632,8 @@
 
         document.addEventListener("keydown", (event) => {
           if ((event.key === "[" || event.key === "]") && !event.metaKey && !event.ctrlKey && !event.altKey) {
-            if (event.target.matches("input, textarea, [contenteditable]")) return;
+            const eventTarget = event.target instanceof Element ? event.target : null;
+            if (eventTarget?.matches("input, textarea, [contenteditable]")) return;
             // TODO: wire to actual bank state when bank model exists
             event.preventDefault();
           }
