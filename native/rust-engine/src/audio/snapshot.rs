@@ -47,6 +47,8 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
     let expected_submix_lock = audio_expected_submix_lock(settings);
     let expected_compatibility_mode = audio_expected_compatibility_mode(settings);
     let faders_per_bank = audio_faders_per_bank(settings);
+    let view_mode = audio_view_mode(settings);
+    let capabilities = audio_capabilities(&status, osc_enabled);
     let snapshots = snapshot_entries
         .into_iter()
         .map(|snapshot| {
@@ -61,6 +63,7 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
                     None
                 },
                 last_recalled,
+                preview: audio_scene_preview(snapshot.contents.as_ref(), &channels, &mix_targets),
                 ..snapshot
             }
         })
@@ -106,6 +109,8 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
         expected_submix_lock,
         expected_compatibility_mode,
         faders_per_bank,
+        view_mode,
+        capabilities,
         console_state_confidence,
         last_console_sync_at,
         last_console_sync_reason,

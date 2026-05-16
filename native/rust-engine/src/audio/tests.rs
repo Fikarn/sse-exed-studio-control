@@ -180,6 +180,7 @@ fn audio_snapshot_crud_uses_persisted_native_state() {
         &AudioSnapshotCreateRequest {
             name: String::from("Podcast"),
             osc_index: 6,
+            capture_current_state: Some(true),
         },
     )
     .expect("audio snapshot create should succeed");
@@ -193,6 +194,7 @@ fn audio_snapshot_crud_uses_persisted_native_state() {
             snapshot_id: created.snapshot.id.clone(),
             name: Some(String::from("Podcast A")),
             osc_index: Some(4),
+            capture_current_state: Some(true),
         },
     )
     .expect("audio snapshot update should succeed");
@@ -247,13 +249,14 @@ fn audio_channel_update_persists_front_preamp_controls() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-input-9"),
             mix_target_id: None,
+            name: Some(String::from("Host Mic")),
             gain: Some(41),
             fader: None,
             mute: None,
             solo: Some(true),
             phantom: Some(true),
             phase: Some(true),
-            pad: Some(true),
+            pad: None,
             instrument: Some(true),
             auto_set: Some(true),
         },
@@ -261,11 +264,12 @@ fn audio_channel_update_persists_front_preamp_controls() {
     .expect("front preamp update should succeed");
 
     assert_eq!(updated.id, "audio-input-9");
+    assert_eq!(updated.name, "Host Mic");
     assert_eq!(updated.gain, 41);
     assert!(updated.solo);
     assert!(updated.phantom);
     assert!(updated.phase);
-    assert!(updated.pad);
+    assert!(!updated.pad);
     assert!(updated.instrument);
     assert!(updated.auto_set);
 
@@ -277,10 +281,11 @@ fn audio_channel_update_persists_front_preamp_controls() {
         .iter()
         .find(|entry| entry.id == "audio-input-9")
         .expect("updated channel should be present");
+    assert_eq!(refreshed.name, "Host Mic");
     assert_eq!(refreshed.gain, 41);
     assert!(refreshed.phantom);
     assert!(refreshed.phase);
-    assert!(refreshed.pad);
+    assert!(!refreshed.pad);
     assert!(refreshed.instrument);
     assert!(refreshed.auto_set);
     assert_eq!(snapshot.last_action_status, "succeeded");
@@ -297,13 +302,14 @@ fn audio_channel_update_succeeds_before_probe_passes() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-input-9"),
             mix_target_id: None,
+            name: None,
             gain: Some(38),
             fader: None,
             mute: Some(true),
             solo: None,
             phantom: Some(true),
             phase: Some(true),
-            pad: Some(true),
+            pad: None,
             instrument: Some(true),
             auto_set: Some(true),
         },
@@ -315,7 +321,7 @@ fn audio_channel_update_succeeds_before_probe_passes() {
     assert!(updated.mute);
     assert!(updated.phantom);
     assert!(updated.phase);
-    assert!(updated.pad);
+    assert!(!updated.pad);
     assert!(updated.instrument);
     assert!(updated.auto_set);
 
@@ -353,6 +359,7 @@ fn audio_channel_update_rejects_unsupported_gain_controls() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-playback-1-2"),
             mix_target_id: None,
+            name: None,
             gain: Some(12),
             fader: None,
             mute: None,
@@ -453,6 +460,7 @@ fn audio_settings_update_persists_selection_and_checklist_flags() {
             expected_submix_lock: Some(false),
             expected_compatibility_mode: Some(true),
             faders_per_bank: Some(8),
+            view_mode: Some(String::from("master")),
         },
     )
     .expect("settings update should succeed");
@@ -466,6 +474,7 @@ fn audio_settings_update_persists_selection_and_checklist_flags() {
     assert!(!snapshot.expected_submix_lock);
     assert!(snapshot.expected_compatibility_mode);
     assert_eq!(snapshot.faders_per_bank, 8);
+    assert_eq!(snapshot.view_mode, "master");
     assert_eq!(snapshot.last_action_status, "succeeded");
 }
 
@@ -505,6 +514,7 @@ fn audio_settings_update_resets_probe_when_transport_changes() {
             expected_submix_lock: None,
             expected_compatibility_mode: None,
             faders_per_bank: None,
+            view_mode: None,
         },
     )
     .expect("transport settings update should succeed");

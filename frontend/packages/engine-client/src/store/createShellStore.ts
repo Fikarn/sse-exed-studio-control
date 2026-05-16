@@ -527,8 +527,29 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async recallAudioSnapshot(snapshotId: string) {
       return performRequest("audio.snapshot.recall", { snapshotId });
     },
+    async createAudioSnapshot(request) {
+      return performRequest("audio.snapshot.create", request as unknown as JsonObject);
+    },
+    async updateAudioSnapshot(request) {
+      return performRequest("audio.snapshot.update", request as unknown as JsonObject);
+    },
+    async deleteAudioSnapshot(request) {
+      return performRequest("audio.snapshot.delete", request as unknown as JsonObject);
+    },
+    async clearAudioClips(request = {}) {
+      return performRequest("audio.clip.clear", request as unknown as JsonObject);
+    },
     async updateAudioChannel(request: AudioChannelUpdateRequest) {
       return performRequest("audio.channel.update", request as unknown as JsonObject);
+    },
+    async updateAudioChannelEq(request) {
+      return performRequest("audio.channel.eq.update", request as unknown as JsonObject);
+    },
+    async updateAudioChannelDynamics(request) {
+      return performRequest("audio.channel.dynamics.update", request as unknown as JsonObject);
+    },
+    async updateAudioChannelSendMode(request) {
+      return performRequest("audio.channel.send.update", request as unknown as JsonObject);
     },
     async updateAudioMixTarget(request: AudioMixTargetUpdateRequest) {
       return performRequest("audio.mixTarget.update", request as unknown as JsonObject);

@@ -12,6 +12,13 @@ export default defineConfig({
   plugins: [react()],
   build: {
     chunkSizeWarningLimit: 900,
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          return id.includes("/node_modules/") ? "vendor" : undefined;
+        },
+      },
+    },
   },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

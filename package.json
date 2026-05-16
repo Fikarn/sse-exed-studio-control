@@ -39,7 +39,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "rust:fmt:check": "cd native && cargo fmt --all -- --check",
-    "rust:clippy": "cd native && cargo clippy --workspace --all-targets -- -W warnings",
+    "rust:clippy": "cd native && cargo clippy --workspace --all-targets -- -D warnings",
     "protocol:generate": "node scripts/protocol/generate-protocol-artifacts.mjs",
     "protocol:check": "node scripts/protocol/generate-protocol-artifacts.mjs --check",
     "frontend:tokens:build": "npm run build --workspace frontend/packages/tokens",

@@ -711,7 +711,6 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     channelId: "audio-input-12",
     gain: 40,
     phantom: true,
-    pad: true,
     instrument: true,
     autoSet: true,
     phase: true,
@@ -720,11 +719,11 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     updatedFront.id === "audio-input-12" &&
       updatedFront.gain === 40 &&
       updatedFront.phantom === true &&
-      updatedFront.pad === true &&
+      updatedFront.pad === baselineFront.pad &&
       updatedFront.instrument === true &&
       updatedFront.autoSet === true &&
       updatedFront.phase === true,
-    `${runtimeLabel} audio.channel.update did not persist the expected front-preamp-only controls.`
+    `${runtimeLabel} audio.channel.update did not persist the expected writable front-preamp controls.`
   );
 
   const updatedRear = await harness.request(`${requestIdPrefix}-audio-rear-line`, "audio.channel.update", {
@@ -824,7 +823,7 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     mutatedFront &&
       mutatedFront.gain === 40 &&
       mutatedFront.phantom === true &&
-      mutatedFront.pad === true &&
+      mutatedFront.pad === baselineFront.pad &&
       mutatedFront.instrument === true &&
       mutatedFront.autoSet === true &&
       mutatedFront.phase === true,

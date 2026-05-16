@@ -13,7 +13,7 @@ If a change improves a secondary feature but increases risk to lighting, audio, 
 
 ## Prerequisites
 
-- Node.js 20
+- Node.js 24
 - npm
 - Rust stable toolchain
 - Qt Installer Framework for local release packaging
@@ -98,7 +98,7 @@ Release packaging and installer evidence must run on the relevant target host. m
 
 ## Dependency Upgrade Policy
 
-The active development baseline is Node 20 LTS and TypeScript 5.9. Routine minor/patch dependency updates may be handled through Dependabot and the normal local gates. Major TypeScript and `@types/node` upgrades are intentionally not background maintenance; they need an engineering-task issue, a stated validation plan, and updated docs if the baseline changes.
+The active development baseline is Node 24 LTS and TypeScript 6.0. Routine minor/patch dependency updates may be handled through Dependabot and the normal local gates. Major TypeScript and `@types/node` upgrades are intentionally not background maintenance; they need an engineering-task issue, a stated validation plan, and updated docs if the baseline changes.
 
 ## Pull Requests
 

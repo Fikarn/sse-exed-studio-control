@@ -1,679 +1,4814 @@
 .audioShell {
-  display: grid;
-  gap: var(--space-4);
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  --audio-canvas: #06070a;
+  --audio-panel: #0e1015;
+  --audio-panel-soft: #11141a;
+  --audio-panel-strong: #161922;
+  --audio-card: #181b22;
+  --audio-card-hover: #1f232c;
+  --audio-border: rgba(245, 232, 200, 0.1);
+  --audio-border-strong: rgba(245, 232, 200, 0.18);
+  --audio-border-bright: rgba(245, 232, 200, 0.28);
+  --audio-text-strong: #f5efde;
+  --audio-text-default: #cfc8b3;
+  --audio-text-muted: #908a76;
+  --audio-text-subtle: #5e5946;
+  --audio-text-disabled: #4a4636;
+  --audio-accent: #5dc5e8;
+  --audio-hot: #ffd33d;
+  --audio-clip: #ff2d2d;
+  --audio-mute: #ff7d55;
+  --audio-solo: #ffd94a;
+  --audio-talk: #74e3a3;
+  --audio-meter-low: #36ce71;
+  --audio-meter-low-hot: #6cf99d;
+  --audio-meter-warn: #ffd33d;
+  --audio-meter-hot: #ff9f1a;
+  --audio-meter-bg: #050608;
+  --audio-group-talent: #d8c483;
+  --audio-group-line: #b9b29a;
+  --audio-group-bed: #b9d2a0;
+  --audio-group-fx: #d6acce;
+  --audio-group-remote: #8fc2d2;
+  --audio-tier-accent: var(--audio-accent);
+  --audio-lane-accent: var(--audio-tier-accent);
+  --color-surface-900: var(--audio-canvas);
+  --color-surface-800: var(--audio-panel);
+  --color-surface-700: var(--audio-card);
+  --color-border-default: var(--audio-border);
+  --color-text-strong: var(--audio-text-strong);
+  --color-text-default: var(--audio-text-default);
+  --color-text-muted: var(--audio-text-muted);
+  --color-text-subtle: var(--audio-text-subtle);
+  --color-primary-500: var(--audio-accent);
+  --color-warning-500: var(--audio-hot);
+  --color-danger-500: var(--audio-clip);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   height: 100%;
   min-height: 0;
-}
-
-.audioCard,
-.audioLoadingCard {
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 86%, transparent);
-  border-radius: var(--radius-lg);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-surface-800) 94%, transparent),
-      color-mix(in srgb, var(--color-surface-900) 96%, black 4%)
-    ),
-    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary-500) 10%, transparent), transparent 58%);
-  box-shadow: 0 18px 48px color-mix(in srgb, black 28%, transparent);
-}
-
-.audioToolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) auto auto auto;
-  gap: var(--space-3);
-  align-items: center;
-  min-height: 44px;
-  padding: var(--space-3) var(--space-4);
-}
-
-.audioToolbarIdentity {
   min-width: 0;
+  overflow: hidden;
+  background: var(--audio-canvas);
+  color: var(--audio-text-default);
 }
 
-.audioToolbarEyebrow,
-.audioRailEyebrow,
-.audioInspectorEyebrow,
-.audioWarningLabel,
-.audioControlRoomLabel,
-.audioInspectorFieldLabel,
-.audioDeskSubtitle,
-.audioDeskHint,
-.audioLoadingBridgeTitle,
-.audioToolbarMeta,
-.audioSnapshotMeta,
-.audioMixTargetMeta,
-.audioInspectorMeta {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
+.audioShell[data-output-role="phones-a"] {
+  --audio-accent: #e8a341;
 }
 
-.audioToolbarTitle,
-.audioRailTitle,
-.audioInspectorTitle,
-.audioControlRoomValue,
-.audioStripName,
-.audioMixTargetName,
-.audioSnapshotName {
-  color: var(--color-text-strong);
-  font: var(--font-weight-semibold) var(--font-size-lg) / 1.2 var(--font-family-ui);
-  letter-spacing: 0;
+.audioShell[data-output-role="phones-b"] {
+  --audio-accent: #b388f5;
 }
 
-.audioToolbarTitle,
-.audioRailTitle,
-.audioInspectorTitle {
-  font-family: var(--font-family-display);
-  font-size: var(--operator-font-size-title-sm, var(--font-size-lg));
-  line-height: 1.15;
-}
-
-.audioControlRoomValue,
-.audioStripName,
-.audioMixTargetName,
-.audioSnapshotName {
-  font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-lg, var(--font-size-lg));
-  line-height: 1.15;
-}
-
-.audioToolbarSubtitle,
-.audioNoSelectionCopy,
-.audioWarningBody,
-.audioControlRoomMeta,
-.audioStripMeta {
-  color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
-}
-
-.audioToolbarCluster {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.audioToolbarPill,
-.audioChip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-700) 88%, transparent);
+.eyebrow {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.audioChip[data-tone="selected"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 14%, var(--color-surface-800));
+.audioToolbar,
+.railPanel,
+.railToolsPanel,
+.signalCanvas,
+.inspector,
+.healthBar,
+.loadingPanel {
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(245, 232, 200, 0.035), transparent 36%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--audio-accent) 9%, transparent), transparent 58%),
+    var(--audio-panel);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
+}
+
+.audioToolbar {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto auto auto minmax(220px, auto);
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 12px;
+}
+
+.toolbarIdentity {
+  min-width: 0;
+}
+
+.toolbarIdentity h1,
+.railHeader h2,
+.canvasHeader h2,
+.snapshotDeckHeader h2,
+.inspectorHeader h2,
+.outputInspector h3,
+.emptyInspector h3,
+.placeholderPanel h3 {
+  margin: 3px 0 0;
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-sm, 18px) / 1.12 var(--font-family-display);
+  letter-spacing: 0;
+}
+
+.toolbarIdentity p,
+.inspectorHeader p,
+.placeholderPanel p,
+.emptyInspector p,
+.railNote {
+  margin: 2px 0 0;
+  color: var(--color-text-muted);
+  font: var(--font-weight-regular) var(--operator-font-size-sm, 13px) / 1.35 var(--font-family-ui);
+  letter-spacing: 0;
+}
+
+.toolbarCluster {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.toolbarMeta,
+.bankPill,
+.snapshotStatusName,
+.snapshotShortcut,
+.railCount,
+.meterReadout,
+.faderValue,
+.snapshotSlot {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.bankPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 92px;
+  padding: 0 10px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 86%, transparent);
   color: var(--color-text-strong);
 }
 
-.audioDensityToggle {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
+.iconButton {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-800) 82%, transparent);
+  color: var(--color-text-muted);
+  cursor: pointer;
 }
 
-.audioDensityButton {
-  min-height: 28px;
-  padding: 0 12px;
+.iconButton:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.densityToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 3px 5px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 88%, transparent);
+  color: var(--color-text-muted);
+}
+
+.densityToggle button,
+.viewModeButton,
+.inspectorTabs button {
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: 6px;
   background: transparent;
-  color: var(--color-text-subtle);
+  color: var(--color-text-muted);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
   cursor: pointer;
 }
 
-.audioDensityButton[data-active="true"] {
-  background: color-mix(in srgb, var(--color-primary-500) 16%, var(--color-surface-700));
+.densityToggle button {
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.densityToggle button[data-active="true"],
+.viewModeButton[data-active="true"],
+.inspectorTabs button[data-active="true"] {
+  background: color-mix(in srgb, var(--audio-accent) 16%, var(--color-surface-700));
   color: var(--color-text-strong);
 }
 
-.audioToolbarSnapshot {
+.snapshotStatus {
   display: grid;
-  gap: 6px;
-  min-width: 220px;
-  justify-items: end;
-}
-
-.audioToolbarSnapshotRow {
-  display: inline-flex;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-2);
+  gap: 4px 8px;
+  justify-self: end;
+  min-width: 230px;
 }
 
-.audioToolbarSnapshotName {
+.snapshotStatus .eyebrow {
+  grid-column: 1 / -1;
+}
+
+.snapshotStatusName {
   color: var(--color-text-strong);
-  font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1.4 var(--font-family-mono);
-  letter-spacing: 0;
+  text-transform: none;
 }
 
-.audioWarningBand,
-.audioFeedbackBanner {
+.warningBand,
+.feedbackBanner {
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--space-3);
   align-items: center;
-  min-height: 40px;
-  padding: 0 var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--color-warning-500) 30%, var(--color-border-default));
-  border-radius: var(--radius-md);
+  gap: 12px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--audio-hot) 38%, var(--audio-border));
+  border-radius: 8px;
   background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-warning-500) 10%, transparent),
-      color-mix(in srgb, var(--color-surface-900) 94%, black 6%)
-    ),
-    linear-gradient(90deg, color-mix(in srgb, var(--color-warning-500) 14%, transparent), transparent);
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 14%, transparent), transparent),
+    color-mix(in srgb, var(--color-surface-900) 92%, transparent);
 }
 
-.audioWarningBand:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 72%, transparent);
+.signalCanvas > .warningBand {
+  min-height: 28px;
+  padding: 0 12px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 10%, transparent), transparent 50%),
+    color-mix(in srgb, var(--audio-canvas) 88%, var(--audio-panel) 12%);
+  box-shadow: none;
+}
+
+.signalCanvas > .warningBand strong {
+  font-size: 11px;
+}
+
+.signalCanvas > .warningBand span,
+.signalCanvas > .warningBand small {
+  font-size: 11px;
+}
+
+.warningBand:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--audio-accent) 80%, transparent);
   outline-offset: 2px;
 }
 
-.audioWarningHint {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+.warningBand strong {
+  color: var(--audio-hot);
+  font: var(--font-weight-semibold) 12px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.audioFeedbackBanner {
+.warningBand span,
+.warningBand small,
+.feedbackBanner {
+  color: var(--color-text-muted);
+  font: var(--font-weight-regular) 12px / 1.25 var(--font-family-ui);
+  letter-spacing: 0;
+}
+
+.feedbackBanner {
   grid-template-columns: 1fr;
 }
 
-.audioFeedbackBanner[data-tone="error"] {
-  border-color: color-mix(in srgb, var(--color-danger-500) 36%, var(--color-border-default));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-danger-500) 10%, transparent),
-      color-mix(in srgb, var(--color-surface-900) 94%, black 6%)
-    ),
-    linear-gradient(90deg, color-mix(in srgb, var(--color-danger-500) 14%, transparent), transparent);
+.feedbackBanner[data-tone="error"] {
+  border-color: color-mix(in srgb, var(--audio-clip) 42%, var(--audio-border));
 }
 
-.audioMeterBridge {
+.audioBody {
+  flex: 1 1 auto;
   display: grid;
-  grid-template-columns: repeat(18, minmax(0, 1fr));
-  gap: var(--space-2);
-  padding: var(--space-3);
-  min-height: 136px;
-}
-
-.audioMeterTile {
-  display: grid;
-  gap: 6px;
-  align-content: start;
+  grid-template-columns: 304px minmax(0, 1fr) 416px;
+  gap: 8px;
+  min-height: 0;
   min-width: 0;
-  padding: 10px 8px;
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 78%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
+  overflow: hidden;
+}
+
+.audioRail,
+.signalCanvas,
+.inspector {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.audioRail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.railPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+}
+
+.railMonitorCard {
+  flex: 0 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.railMonitorCard > :not(.masterHalo) {
+  position: relative;
+  z-index: 1;
+}
+
+.masterHalo {
+  position: absolute;
+  inset: -28px;
+  z-index: 0;
+  border-radius: 999px;
+  background: radial-gradient(
+    220px 180px at 50% 22%,
+    color-mix(in srgb, var(--audio-accent) 46%, transparent) 0%,
+    transparent 70%
+  );
+  opacity: calc(0.18 + var(--master-glow, 0) * 0.55);
+  filter: blur(2px);
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.railMonitorCard .railHeader h2 {
+  font-size: 27px;
+}
+
+.monitorCardStatus,
+.monitorMeta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--audio-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--audio-accent) 16%, transparent);
+}
+
+.monitorLevel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 72%, transparent);
+}
+
+.monitorLevel span,
+.monitorLevel strong {
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.monitorLevel strong {
+  color: var(--color-text-strong);
+  text-transform: none;
+}
+
+.monitorLevel .sliderControl {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.monitorButtonGrid,
+.railToolGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.monitorButtonGrid button,
+.railToolGrid button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.monitorButtonGrid button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 16%, var(--color-surface-800));
+  color: var(--color-text-strong);
+}
+
+.monitorButtonGrid button:disabled,
+.railToolGrid button:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.railToolsPanel {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.railToolGrid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.railHeader,
+.canvasHeader,
+.snapshotDeckHeader,
+.inspectorHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.railCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+}
+
+.railCaret {
+  margin-left: 6px;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 12px / 1 var(--font-family-mono);
+}
+
+.mixTargetList {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+}
+
+.mixTargetButton {
+  --target-accent: var(--audio-accent);
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 48px;
+  gap: 8px;
+  align-items: center;
+  min-height: 50px;
+  padding: 7px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 70%, transparent);
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.audioMeterTile[data-selected="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 12%, var(--color-surface-800));
+.mixTargetButton[data-role="main-out"],
+.outputLane[data-role="main-out"] {
+  --target-accent: #5dc5e8;
 }
 
-.audioMeterTile[data-clip="true"] {
-  border-color: color-mix(in srgb, var(--color-danger-500) 38%, var(--color-border-default));
+.mixTargetButton[data-role="phones-a"],
+.outputLane[data-role="phones-a"] {
+  --target-accent: #e8a341;
 }
 
-.audioMeterName {
+.mixTargetButton[data-role="phones-b"],
+.outputLane[data-role="phones-b"] {
+  --target-accent: #b388f5;
+}
+
+.mixTargetButton[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--target-accent) 54%, var(--audio-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--target-accent) 18%, transparent), transparent),
+    color-mix(in srgb, var(--color-surface-800) 84%, transparent);
+  overflow: hidden;
+}
+
+.mixTargetStripe {
+  align-self: stretch;
+  width: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--target-accent),
+    color-mix(in srgb, var(--target-accent) 58%, var(--audio-hot))
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--target-accent) 32%, transparent);
+}
+
+.mixTargetCopy,
+.laneNameBlock,
+.channelSummaryText {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mixTargetName,
+.laneName,
+.snapshotName {
   overflow: hidden;
   color: var(--color-text-strong);
-  font: var(--font-weight-medium) var(--operator-font-size-sm, 12px) / 1.2 var(--font-family-mono);
+  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-mono);
   letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.audioMeterShort,
-.audioMeterMeta {
+.mixTargetMeta,
+.laneMeta,
+.snapshotMeta,
+.tierLabel small,
+.lineModule small {
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 10px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mixTargetFlags {
+  display: none;
+}
+
+.mixTargetMiniMeter {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mixTargetMiniMeter i {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--target-accent), var(--audio-hot));
+}
+
+.mixTargetFlags span,
+.outputAccent,
+.laneBadge,
+.miniToggle,
+.snapshotShortcut {
   display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-700) 76%, transparent);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.viewModeStack {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 78%, transparent);
+}
+
+.viewModeButton {
+  min-height: 30px;
+}
+
+.viewModeButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.railStatsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.railStatsGrid span {
+  display: grid;
+  gap: 4px;
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 72%, transparent);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 10px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.railStatsGrid strong {
+  color: var(--color-text-strong);
+  font-size: 17px;
+}
+
+.signalCanvas {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.canvasHeader {
+  flex: 0 0 auto;
+}
+
+.canvasContextBar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  overflow-x: auto;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--audio-border);
+  background: linear-gradient(180deg, var(--audio-panel-soft), var(--audio-panel));
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.canvasContextBar::-webkit-scrollbar {
+  display: none;
+}
+
+.canvasBarLabel {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.meterSimulationChip,
+.meterSimulationBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--audio-hot) 58%, var(--audio-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-hot) 13%, var(--audio-panel-strong));
+  color: var(--audio-hot);
+  font: var(--font-weight-semibold) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.canvasSelectedMeta {
+  overflow: hidden;
+  max-width: 260px;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.canvasDivider {
+  width: 1px;
+  height: 18px;
+  flex: 0 0 auto;
+  background: var(--audio-border);
+}
+
+.canvasSpacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+
+.canvasContextCopy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.targetPicker {
+  position: relative;
+  min-width: 0;
+}
+
+.targetPickerButton {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  width: auto;
+  max-width: 280px;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--audio-border-strong);
+  border-radius: 999px;
+  background: var(--audio-card);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.targetPickerItem span:not(.targetPickerSwatch) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.targetPickerButton small,
+.targetPickerItem small {
+  overflow: hidden;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.targetPickerButton strong,
+.targetPickerItem strong {
+  overflow: hidden;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 13px / 1 var(--font-family-display);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.targetPickerSwatch {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--audio-accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--audio-accent) 36%, transparent);
+}
+
+.targetPickerSwatch[data-role="main-out"] {
+  background: #5dc5e8;
+}
+
+.targetPickerSwatch[data-role="phones-a"] {
+  background: #e8a341;
+}
+
+.targetPickerSwatch[data-role="phones-b"] {
+  background: #b388f5;
+}
+
+.targetPickerMenu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(420px, calc(100vh - 180px));
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--audio-border-strong);
+  border-radius: 8px;
+  background: var(--audio-panel-strong);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.56);
+}
+
+.targetPickerItem {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 54px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.targetPickerItem[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 50%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 13%, transparent);
+}
+
+.targetPickerItem em {
+  color: var(--audio-text-default);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  font-style: normal;
+}
+
+.canvasContextCopy strong {
+  overflow: hidden;
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 15px / 1 var(--font-family-display);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvasContextCopy small {
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.canvasModeSwitch {
+  display: inline-flex;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-900) 84%, transparent);
+}
+
+.canvasModeSwitch button,
+.canvasModeSwitch span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.canvasModeSwitch button[data-active="true"],
+.canvasModeSwitch span[data-active="true"] {
+  background: color-mix(in srgb, var(--audio-accent) 16%, var(--color-surface-700));
+  color: var(--color-text-strong);
+}
+
+.canvasModeSwitch button:disabled,
+.canvasModeSwitch span[aria-disabled="true"] {
+  opacity: 0.45;
+}
+
+.canvasStatPills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.canvasStatPills span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.canvasStatPills strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 15px / 1 var(--font-family-display);
+}
+
+.canvasActiveMixMeter {
+  display: grid;
+  grid-template-columns: auto 64px 64px auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.canvasActiveMixMeter span,
+.canvasActiveMixMeter strong {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.canvasActiveMixMeter strong {
+  color: var(--audio-text-strong);
+  text-transform: none;
+}
+
+.canvasActiveMixMeter i {
+  --meter-level: 0%;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 1px;
+  background:
+    linear-gradient(
+        90deg,
+        var(--audio-meter-low) 0,
+        var(--audio-meter-low-hot) 54%,
+        var(--audio-meter-warn) 78%,
+        var(--audio-meter-hot) 92%,
+        var(--audio-clip) 100%
+      )
+      0 / var(--meter-level) 100% no-repeat,
+    var(--audio-meter-bg);
+  box-shadow: inset 0 0 0 1px var(--audio-border);
+}
+
+.canvasActiveMixMeter[data-simulated-meter="true"] i,
+.mixTargetMiniMeter[data-simulated-meter="true"] i {
+  transform-origin: left center;
+  animation: audioMeterHorizontal 1180ms ease-in-out infinite;
+  will-change: transform, filter;
+}
+
+.canvasActiveMixMeter[data-simulated-meter="true"] i:nth-of-type(2),
+.mixTargetMiniMeter[data-simulated-meter="true"] i:nth-of-type(2) {
+  animation-delay: -360ms;
+  animation-duration: 1340ms;
+}
+
+.canvasWarningStack {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 6px;
+}
+
+.canvasWarningBand {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 0 10px 0 14px;
+  border: 1px solid color-mix(in srgb, var(--audio-hot) 44%, var(--audio-border));
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 14%, transparent), transparent),
+    color-mix(in srgb, var(--color-surface-900) 82%, transparent);
+}
+
+.canvasWarningBand::before {
+  content: "!";
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--audio-hot);
+  color: #1a1500;
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-display);
+}
+
+.canvasWarningBand::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  border-radius: 8px 0 0 8px;
+  background: var(--audio-hot);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--audio-hot) 42%, transparent);
+}
+
+.canvasWarningBand[data-kind="clip"] {
+  border-color: color-mix(in srgb, var(--audio-clip) 44%, var(--audio-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-clip) 13%, transparent), transparent),
+    color-mix(in srgb, var(--color-surface-900) 82%, transparent);
+}
+
+.canvasWarningBand[data-kind="clip"]::before,
+.canvasWarningBand[data-kind="clip"]::after {
+  background: var(--audio-clip);
+  color: #1a0000;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--audio-clip) 46%, transparent);
+}
+
+.canvasWarningBand strong {
+  color: var(--audio-hot);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.canvasWarningBand[data-kind="clip"] strong {
+  color: var(--audio-clip);
+}
+
+.canvasWarningBand span {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font: var(--font-weight-regular) 12px / 1.2 var(--font-family-ui);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvasWarningBand span b {
+  color: var(--audio-hot);
+  font-weight: var(--font-weight-semibold);
+}
+
+.canvasWarningChip {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  min-height: 22px;
+  max-width: 110px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--audio-hot) 46%, var(--audio-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-hot) 12%, var(--audio-canvas));
+  color: var(--audio-hot);
+  cursor: pointer;
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.canvasWarningBand > button:not(.canvasWarningChip) {
+  min-height: 22px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--audio-hot) 55%, var(--audio-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-hot) 8%, var(--audio-canvas));
+  color: var(--audio-hot);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.canvasWarningBand button kbd {
+  margin-left: 6px;
+  color: currentColor;
+  font: inherit;
+}
+
+.canvasWarningBand[data-kind="clip"] > button:not(.canvasWarningChip) {
+  border-color: color-mix(in srgb, var(--audio-clip) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-clip) 9%, var(--audio-canvas));
+  color: var(--audio-clip);
+}
+
+.canvasWarningBand > button:not(.canvasWarningChip):disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.canvasLegend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvasLegend span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.audioMeterBars {
+.canvasLegend span[data-tone="green"] {
+  color: var(--audio-meter-low-hot);
+}
+
+.canvasLegend span[data-tone="amber"] {
+  color: var(--audio-hot);
+}
+
+.canvasLegend span[data-tone="red"] {
+  color: var(--audio-clip);
+}
+
+.tieredMixer {
   position: relative;
+  flex: 1 1 auto;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  align-items: end;
-  height: 44px;
+  grid-template-rows: minmax(184px, 1.1fr) minmax(116px, 0.9fr) minmax(108px, 0.84fr);
+  gap: 8px;
+  min-height: 0;
+  padding: 8px;
 }
 
-.audioMeterBar {
-  position: relative;
-  display: block;
+.routingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
   height: 100%;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
-  overflow: hidden;
-}
-
-.audioMeterBar::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: var(--audio-meter-left);
-  border-radius: inherit;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, #ffe5ab 84%, white 16%),
-    color-mix(in srgb, var(--color-primary-500) 72%, #ffe5ab 28%)
-  );
-}
-
-.audioMeterBar[data-side="right"]::after {
-  height: var(--audio-meter-right);
-}
-
-.audioMeterPeak {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--audio-meter-peak);
-  height: 2px;
-  border-radius: 999px;
-  background: color-mix(in srgb, #fff4c9 88%, transparent);
+  overflow: visible;
   pointer-events: none;
 }
 
-.audioMainGrid {
+.routingOverlay path {
+  fill: none;
+  stroke: var(--audio-accent);
+  stroke-width: calc(1.2px + var(--routing-strength, 0.3) * 1.4px);
+  stroke-linecap: round;
+  stroke-dasharray: 4 8;
+  opacity: calc(0.28 + var(--routing-strength, 0.3) * 0.44);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--audio-accent) 42%, transparent));
+  animation: audioRouteShimmer 1100ms linear infinite;
+}
+
+.routingOverlay circle {
+  fill: var(--audio-accent);
+  opacity: calc(0.34 + var(--routing-strength, 0.3) * 0.5);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--audio-accent) 54%, transparent));
+}
+
+.mixerTier {
+  --audio-tier-accent: var(--audio-accent);
+  position: relative;
+  z-index: 2;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 460px;
-  gap: var(--space-4);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
   min-height: 0;
+  padding: 8px;
+  border: 1px solid var(--audio-border);
+  border-top-color: color-mix(in srgb, var(--audio-tier-accent) 30%, var(--audio-border));
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--audio-tier-accent) 4%, transparent), transparent 38%),
+    color-mix(in srgb, var(--audio-canvas) 76%, var(--audio-panel) 24%);
 }
 
-.audioRail,
-.audioDesk,
-.audioInspectorColumn {
-  min-height: 0;
+.mixerTier[data-tier="hardware-inputs"] {
+  --audio-tier-accent: #d8c483;
 }
 
-.audioRail {
+.mixerTier[data-tier="software-playback"] {
+  --audio-tier-accent: #d6acce;
+}
+
+.mixerTier[data-tier="hardware-outputs"] {
+  --audio-tier-accent: var(--audio-accent);
+}
+
+.outputTier {
+  border-color: color-mix(in srgb, var(--audio-accent) 34%, var(--audio-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 10%, transparent), transparent),
+    color-mix(in srgb, var(--color-surface-900) 68%, transparent);
+}
+
+.tierLabel {
   display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4);
-}
-
-.audioRailSection {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.audioRailHeader,
-.audioDeskHeader,
-.audioInspectorHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.audioMixTargetList,
-.audioSnapshotList {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.audioMixTargetRow,
-.audioSnapshotRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 88%, transparent);
-  color: inherit;
-  text-align: left;
-}
-
-.audioMixTargetRow {
-  cursor: pointer;
-}
-
-.audioMixTargetRow[data-selected="true"],
-.audioSnapshotRow[data-current="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 11%, var(--color-surface-800));
-}
-
-.audioSnapshotRow[data-flash="true"] {
-  animation: audioSnapshotFlash 900ms ease-out;
-}
-
-.audioMixTargetChips,
-.audioChipRow {
-  display: flex;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: stretch;
+  gap: 14px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0;
+  border-bottom: 1px solid var(--audio-border);
 }
 
-.audioDesk {
+.tierTitleBlock {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  grid-template-columns: 22px auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
-.audioStripGrid {
-  display: grid;
-  grid-template-columns: repeat(var(--audio-strip-count), minmax(0, 1fr));
-  gap: var(--space-2);
-  min-height: 0;
+.tierTitleBlock span {
+  color: var(--audio-tier-accent);
+  font: var(--font-weight-semibold) 24px / 1.05 var(--font-family-display);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
-.audioStrip {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
-  gap: var(--space-3);
-  min-height: 540px;
-  padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 78%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 88%, transparent);
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.audioStrip[data-selected="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 40%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 8%, var(--color-surface-800));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
-}
-
-.audioStripHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.audioStripBadge {
+.tierIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  min-height: 22px;
+  width: 22px;
+  height: 22px;
+  color: var(--audio-tier-accent);
+}
+
+.tierNum {
+  color: var(--audio-text-subtle) !important;
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono) !important;
+  letter-spacing: 0;
+  text-transform: uppercase !important;
+  align-self: end;
+  padding-bottom: 4px;
+}
+
+.tierChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  justify-content: flex-start;
+}
+
+.tierChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
   padding: 0 6px;
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-pill);
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-700) 70%, transparent);
   color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.tierChip[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-tier-accent) 52%, var(--audio-border));
+  color: var(--color-text-strong);
+}
+
+.tierChip[data-chip="talent"] {
+  border-color: color-mix(in srgb, var(--audio-group-talent) 52%, var(--audio-border));
+  color: var(--audio-group-talent);
+}
+
+.tierChip[data-chip="line"] {
+  border-color: color-mix(in srgb, var(--audio-group-line) 50%, var(--audio-border));
+  color: var(--audio-group-line);
+}
+
+.tierChip[data-chip="bed"] {
+  border-color: color-mix(in srgb, var(--audio-group-bed) 50%, var(--audio-border));
+  color: var(--audio-group-bed);
+}
+
+.tierChip[data-chip="fx"] {
+  border-color: color-mix(in srgb, var(--audio-group-fx) 50%, var(--audio-border));
+  color: var(--audio-group-fx);
+}
+
+.tierChip[data-chip="remote"] {
+  border-color: color-mix(in srgb, var(--audio-group-remote) 50%, var(--audio-border));
+  color: var(--audio-group-remote);
+}
+
+.tierLaneGrid,
+.outputLaneGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 7px;
+  min-height: 0;
+  min-width: 0;
+}
+
+.tierLaneGrid[data-tier="hardware-inputs"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.outputLaneGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.emptyTier {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  border: 1px dashed color-mix(in srgb, var(--audio-border) 76%, transparent);
+  border-radius: 8px;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1.2 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.channelLane,
+.outputLane {
+  --target-accent: var(--audio-accent);
+  --audio-lane-accent: var(--audio-tier-accent);
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(76px, 1fr) auto auto auto;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 82%, transparent);
+  border-top-color: color-mix(in srgb, var(--audio-lane-accent) 48%, var(--audio-border));
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(245, 232, 200, 0.035), transparent 26%),
+    color-mix(in srgb, var(--audio-card) 86%, var(--audio-panel) 14%);
+  cursor: pointer;
+}
+
+.outputLane {
+  --audio-lane-accent: var(--target-accent);
+  grid-template-rows: auto minmax(72px, 1fr) auto;
+}
+
+.channelLane::before,
+.outputLane::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 8px;
+  left: 8px;
+  height: 2px;
+  border-radius: 0 0 999px 999px;
+  background: color-mix(in srgb, var(--audio-lane-accent) 78%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--audio-lane-accent) 38%, transparent);
+  pointer-events: none;
+}
+
+.channelLane[data-selected="true"],
+.outputLane[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 62%, var(--audio-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-accent) 26%, transparent);
+}
+
+.channelLane[data-no-send="true"]:not([data-selected="true"]) {
+  opacity: 0.58;
+}
+
+.channelLane[data-feeding="true"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-accent) 35%, transparent);
+}
+
+.channelLane[data-role="front-preamp"] {
+  grid-template-rows: auto 65px minmax(52px, 1fr) auto auto;
+  background: color-mix(in srgb, var(--audio-card) 88%, black 12%);
+}
+
+.channelLane[data-role="front-preamp"] .laneBody {
+  grid-template-columns: minmax(0, 1fr) 26px;
+  min-height: 52px;
+}
+
+.channelLane:not([data-role="front-preamp"]) .laneBody {
+  grid-template-columns: minmax(0, 1fr) 28px;
+}
+
+.channelLane[data-role="front-preamp"] .preampControl {
+  min-height: 65px;
+  height: 65px;
+}
+
+.channelLane[data-role="front-preamp"] .laneHeader {
+  position: relative;
+  display: grid;
+  min-height: 34px;
+  align-items: start;
+  justify-content: stretch;
+}
+
+.channelLane[data-role="front-preamp"] .laneNameBlock {
+  gap: 2px;
+  width: 100%;
+}
+
+.lanePreampRow,
+.laneIndexRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lanePreampRow span:first-child,
+.laneIndexRow span:first-child {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.channelLane[data-role="front-preamp"][data-clip="true"] .lanePreampRow span:last-child {
+  padding-right: 16px;
+}
+
+.channelLane[data-role="front-preamp"] .laneName {
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 13px / 1.18 var(--font-family-display);
+}
+
+.channelLane[data-role="front-preamp"] .laneHeaderBadges {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.channelLane[data-group="talent"] {
+  --audio-lane-accent: var(--audio-group-talent);
+}
+
+.channelLane[data-group="line"] {
+  --audio-lane-accent: var(--audio-group-line);
+}
+
+.channelLane[data-group="bed"] {
+  --audio-lane-accent: var(--audio-group-bed);
+}
+
+.channelLane[data-group="fx"] {
+  --audio-lane-accent: var(--audio-group-fx);
+}
+
+.channelLane[data-group="remote"] {
+  --audio-lane-accent: var(--audio-group-remote);
+}
+
+.laneHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.laneHeaderBadges {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.laneClipDot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--audio-clip);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-clip) 70%, transparent);
+  cursor: pointer;
+}
+
+.laneBody,
+.outputBody {
+  display: grid;
+  grid-template-columns: minmax(34px, 1fr) 26px minmax(42px, 0.74fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 6px;
+  min-height: 76px;
+}
+
+.outputBody {
+  grid-template-columns: minmax(34px, 0.32fr) 28px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 72px;
+}
+
+.laneBody .stereoMeter,
+.laneBody .fader {
+  grid-row: 1;
+}
+
+.laneReadout {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.channelLane[data-feeding="true"] .laneReadout {
+  color: var(--audio-accent);
+}
+
+.outputBusPanel {
+  grid-column: 3;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-content: start;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+
+.outputBusPanel span {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 78%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-900) 58%, transparent);
+}
+
+.outputBusPanel strong {
+  color: var(--audio-accent);
+  font: var(--font-weight-semibold) 20px / 1 var(--font-family-display);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.outputBusPanel strong em {
+  margin-left: 16px;
+  color: var(--audio-text-strong);
+  font-style: normal;
+}
+
+.outputBusPanel small {
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.outputMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.outputMetricGrid span:first-child {
+  grid-column: 1 / -1;
+}
+
+.outputMetricGrid span {
+  min-height: 48px;
+  padding: 8px 10px;
+}
+
+.outputMetricGrid strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 14px / 1 var(--font-family-mono);
+}
+
+.outputLane .laneControls {
+  position: static;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  pointer-events: auto;
+}
+
+.outputLane .laneToggle {
+  min-height: 24px;
+  padding: 0 5px;
+  font-size: 9px;
+}
+
+.stereoMeter {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 4px 3px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.stereoMeter[data-readout="false"] {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.meterPair {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  min-height: 0;
+}
+
+.meterPeakReadout {
+  display: none;
+}
+
+.meterTrack {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 84%, transparent);
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 14px), var(--audio-meter-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.58);
+}
+
+.meterFill {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  left: 2px;
+  min-height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    180deg,
+    var(--audio-hot) 0 12%,
+    var(--audio-meter-warn) 12% 26%,
+    var(--audio-meter-low-hot) 26% 100%
+  );
+}
+
+.meterFill[data-side="left"] {
+  height: var(--audio-meter-left);
+}
+
+.meterFill[data-side="right"] {
+  height: var(--audio-meter-right);
+}
+
+.stereoMeter[data-simulated-meter="true"] .meterFill {
+  transform-origin: center bottom;
+  will-change: transform, filter;
+}
+
+.stereoMeter[data-simulated-meter="true"] .meterFill[data-side="left"] {
+  animation: audioMeterVerticalLeft var(--audio-meter-sim-duration, 1100ms) ease-in-out
+    var(--audio-meter-sim-delay, 0ms) infinite;
+}
+
+.stereoMeter[data-simulated-meter="true"] .meterFill[data-side="right"] {
+  animation: audioMeterVerticalRight var(--audio-meter-sim-duration, 1100ms) ease-in-out
+    calc(var(--audio-meter-sim-delay, 0ms) - 180ms) infinite;
+}
+
+.meterPeak {
+  position: absolute;
+  right: 1px;
+  bottom: var(--audio-meter-peak);
+  left: 1px;
+  height: 2px;
+  background: color-mix(in srgb, white 84%, transparent);
+}
+
+.stereoMeter[data-clip="true"] .meterTrack {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.58),
+    inset 0 0 0 1px color-mix(in srgb, var(--audio-clip) 65%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--audio-clip) 20%, transparent);
+}
+
+.stereoMeter[data-clip="true"] .meterTrack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--audio-clip) 14%, transparent);
+  pointer-events: none;
+}
+
+.meterReadout {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  text-align: center;
+}
+
+.meterScale {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  display: block;
+  min-height: 0;
+}
+
+.meterScale span {
+  position: absolute;
+  right: 2px;
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  transform: translateY(50%);
+  white-space: nowrap;
+}
+
+.meterScale span:nth-child(1) {
+  bottom: 96%;
+  color: var(--audio-accent);
+}
+
+.meterScale span:nth-child(2) {
+  bottom: 78%;
+}
+
+.meterScale span:nth-child(3) {
+  bottom: 60%;
+}
+
+.meterScale span:nth-child(4) {
+  bottom: 36%;
+}
+
+.meterScale span:nth-child(5) {
+  bottom: 4%;
+}
+
+.fader {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.faderValue {
+  color: var(--color-text-strong);
+  font-size: 10px;
+  line-height: 1;
+  text-align: center;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.outputLane .faderValue {
+  display: none;
+}
+
+.sliderControl {
+  --slider-pct: 0%;
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.sliderControl[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.sliderControl[data-orientation="vertical"] {
+  width: 100%;
+  min-height: 72px;
+}
+
+.sliderControl[data-orientation="horizontal"] {
+  height: 30px;
+  min-width: 0;
+}
+
+.sliderTrack {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 84%, transparent);
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 12px), var(--audio-meter-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.42);
+}
+
+.sliderControl[data-orientation="vertical"] .sliderTrack {
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.46) 8%, rgba(0, 0, 0, 0.68) 92%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-border) 88%, transparent);
+}
+
+.sliderControl[data-orientation="vertical"] .sliderTrack::after {
+  content: "";
+  position: absolute;
+  top: 4%;
+  bottom: 4%;
+  left: 50%;
+  width: 1px;
+  border-radius: 1px;
+  background: var(--audio-border);
+  transform: translateX(-50%);
+}
+
+.sliderFill {
+  position: absolute;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    var(--audio-hot) 0 12%,
+    var(--audio-meter-warn) 12% 26%,
+    var(--audio-meter-low-hot) 26% 100%
+  );
+}
+
+.sliderControl[data-orientation="vertical"] .sliderFill {
+  bottom: 4%;
+  left: 50%;
+  width: 2px;
+  height: max(0px, calc(var(--slider-pct) - 4%));
+  border-radius: 1px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--audio-accent) 30%, transparent), var(--audio-accent));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--audio-accent) 42%, transparent);
+  transform: translateX(-50%);
+}
+
+.sliderControl[data-orientation="horizontal"] .sliderFill {
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: var(--slider-pct);
+}
+
+.sliderCap {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--audio-accent) 70%, white 16%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-accent) 88%, white 12%);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--audio-accent) 48%, transparent);
+}
+
+.sliderControl[data-orientation="vertical"] .sliderCap {
+  left: 50%;
+  bottom: var(--slider-pct);
+  width: 20px;
+  height: 10px;
+  border-color: #1a1814;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #d8d3c3, #5b574b 40%, #2e2c25);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.6) inset,
+    0 4px 10px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, 50%);
+}
+
+.sliderControl[data-orientation="vertical"] .sliderCap::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  left: 3px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+}
+
+.sliderControl[data-orientation="vertical"] .sliderCap::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.7), transparent);
+  transform: translate(-50%, -50%);
+}
+
+.sliderControl[data-orientation="horizontal"] .sliderCap {
+  top: 50%;
+  left: calc(var(--slider-pct) - 8px);
+  width: 18px;
+  height: 18px;
+  transform: translateY(-50%);
+}
+
+.sliderControl[data-orientation="vertical"][data-unity="true"] .sliderCap {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.6) inset,
+    0 4px 10px rgba(0, 0, 0, 0.6),
+    0 0 0 1px color-mix(in srgb, var(--audio-accent) 58%, transparent);
+}
+
+.sliderControl[data-orientation="vertical"][data-unity="true"] .sliderCap::after {
+  background: var(--audio-accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--audio-accent) 60%, transparent);
+}
+
+.sliderControl[data-orientation="horizontal"][data-unity="true"] .sliderCap {
+  background: var(--audio-text-strong);
+}
+
+.inspectorSendSlider[data-orientation="horizontal"] {
+  height: 22px;
+}
+
+.inspectorSendSlider[data-orientation="horizontal"] .sliderTrack {
+  top: 8px;
+  bottom: 8px;
+  border-color: color-mix(in srgb, var(--audio-accent) 36%, var(--audio-border));
+  background: var(--audio-meter-bg);
+}
+
+.inspectorSendSlider[data-orientation="horizontal"] .sliderFill {
+  top: 9px;
+  bottom: 9px;
+  left: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 34%, transparent), var(--audio-accent));
+  box-shadow: 0 0 9px color-mix(in srgb, var(--audio-accent) 36%, transparent);
+}
+
+.inspectorSendSlider[data-orientation="horizontal"] .sliderCap {
+  width: 16px;
+  height: 16px;
+}
+
+.preampModule,
+.lineModule {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.72),
+    0 2px 5px rgba(0, 0, 0, 0.36);
+}
+
+.preampControl {
+  --gain-pct: 0%;
+  --gain-rotation: -125deg;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.preampControl[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.preampPanel {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.preampLedRing {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.preampLedDot {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 0;
+  filter: none;
+  opacity: 0;
+}
+
+.preampLedDotActive {
+  fill: #5fe7ff;
+  stroke: rgba(213, 252, 255, 0.96);
+  stroke-width: 0.28;
+  filter: drop-shadow(0 0 1.1px rgba(126, 236, 255, 0.9)) drop-shadow(0 0 3.4px rgba(48, 198, 255, 0.54));
+  opacity: 1;
+}
+
+.preampLedDotCurrent {
+  fill: #f3feff;
+  stroke: #fff;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 5px rgba(76, 217, 255, 0.78));
+}
+
+.preampLedArc {
+  position: absolute;
+  left: 18.2%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  pointer-events: none;
+  border-radius: 999px;
+  background: conic-gradient(
+    from -135deg,
+    rgba(86, 222, 255, 0.96) 0 var(--gain-sweep),
+    rgba(242, 250, 255, 0.3) var(--gain-sweep) 270deg,
+    transparent 270deg 360deg
+  );
+  opacity: 0.72;
+  filter: drop-shadow(0 0 4px rgba(66, 214, 255, 0.62));
+  mask: radial-gradient(circle, transparent 0 22px, black 23px 25px, transparent 26px);
+  transform: translate(-50%, -50%);
+}
+
+.preampKnob {
+  position: absolute;
+  z-index: 2;
+  left: 18.2%;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 8px color-mix(in srgb, black 46%, transparent));
+  transform: translate(-50%, -50%) rotate(var(--gain-rotation));
+}
+
+.preampNumber {
+  display: none;
+}
+
+.preampGainLabel {
+  position: absolute;
+  z-index: 4;
+  left: 54.6%;
+  top: 50%;
+  min-width: 66px;
+  pointer-events: none;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #8beaff;
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+  text-shadow: 0 0 5px rgba(75, 217, 255, 0.66);
+  transform: translate(-50%, -50%);
+}
+
+.preampGainLabel i {
+  margin-left: 3px;
+  color: rgba(216, 247, 255, 0.5);
+  font-size: 8px;
+  font-style: normal;
+  text-shadow: none;
+}
+
+.preampControl[data-variant="narrow"] .preampLedArc,
+.preampControl[data-variant="narrow"] .preampKnob {
+  left: 50%;
+  top: 42.5%;
+}
+
+.preampControl[data-variant="narrow"] .preampLedArc {
+  width: 64px;
+  height: 64px;
+  mask: radial-gradient(circle, transparent 0 23px, black 24px 26px, transparent 27px);
+}
+
+.preampControl[data-variant="narrow"] .preampKnob {
+  width: 42px;
+  height: 42px;
+}
+
+.preampControl[data-variant="narrow"] .preampGainLabel {
+  left: 50%;
+  top: 66%;
+  min-width: 68px;
+  font-size: 9px;
+}
+
+.lineModule {
+  gap: 4px;
+  padding: 6px;
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.laneControls,
+.laneChipRow,
+.unsupportedToggleRow,
+.sendModeRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.laneChipRow:empty {
+  display: none;
+}
+
+.laneToggle,
+.inspectorButtonGrid button,
+.inspectorActionRow button,
+.unsupportedToggleRow button,
+.sendModeRow button,
+.placeholderPanel button {
+  min-height: 25px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.laneToggle[data-active="true"],
+.inspectorButtonGrid button[data-active="true"],
+.inspectorActionRow button[data-active="true"],
+.unsupportedToggleRow button[data-active="true"],
+.sendModeRow button[data-active="true"],
+.miniToggle[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
+  color: var(--audio-solo);
+}
+
+.laneToggle[data-control="mute"][data-active="true"],
+.inspectorButtonGrid button[data-control="mute"][data-active="true"],
+.inspectorActionRow button[data-control="mute"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-mute) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-mute) 18%, var(--audio-panel));
+  color: var(--audio-mute);
+}
+
+.monitorButtonGrid button[data-control="talk"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-talk) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-talk) 18%, var(--audio-panel));
+  color: var(--audio-talk);
+}
+
+.monitorButtonGrid button[data-control="dim"][data-active="true"],
+.monitorButtonGrid button[data-control="mono"][data-active="true"],
+.laneToggle[data-control="dim"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 16%, var(--audio-panel));
+  color: var(--audio-accent);
+}
+
+.laneToggle:disabled,
+.inspectorButtonGrid button:disabled,
+.inspectorActionRow button:disabled,
+.unsupportedToggleRow button:disabled,
+.sendModeRow button:disabled,
+.placeholderPanel button:disabled,
+.miniToggle:disabled,
+.inspectorPfl:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.laneChipRow {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-height: 20px;
+}
+
+.softwarePanelStack {
+  display: grid;
+  gap: 8px;
+}
+
+.unsupportedToggleRow button[data-readonly="true"] {
+  cursor: default;
+}
+
+.unsupportedToggleRow button[data-readonly="true"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 58%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 18%, var(--audio-panel));
+  color: var(--audio-accent);
+}
+
+.unsupportedToggleRow button small {
+  margin-left: 8px;
+  color: var(--audio-text-muted);
+  font: inherit;
+}
+
+.miniToggle {
+  justify-content: center;
+  min-width: 0;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.snapshotDeck {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 4px;
+  min-height: 82px;
+  margin: 0;
+  padding: 8px 16px;
+  border-top: 1px solid var(--audio-border);
+  border-radius: 0;
+  background: linear-gradient(180deg, var(--audio-panel), var(--audio-canvas));
+}
+
+.snapshotDeckHeader {
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.snapshotDeckHeader h2 {
+  margin: 0;
+  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-ui);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.snapshotGrid {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.snapshotCapture,
+.snapshotTile {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 2px;
+  align-items: start;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 66px;
+  padding: 7px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-800) 72%, transparent);
+  color: inherit;
+  text-align: left;
+}
+
+.snapshotPreview {
+  position: absolute;
+  z-index: 20;
+  right: 4px;
+  bottom: calc(100% + 6px);
+  display: none;
+  width: 180px;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid var(--audio-border-strong);
+  border-radius: 8px;
+  background: var(--audio-panel-strong);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.54);
+}
+
+.snapshotTile:hover .snapshotPreview,
+.snapshotTile:focus-within .snapshotPreview {
+  display: grid;
+}
+
+.snapshotPreview strong,
+.snapshotPreview small {
+  color: var(--audio-text-default);
+  font: var(--font-weight-medium) 10px / 1.15 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.snapshotPreview strong {
+  color: var(--audio-text-strong);
+}
+
+.snapshotPreviewLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.snapshotPreviewLine span {
+  overflow: hidden;
+  color: var(--audio-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshotPreviewLine strong {
+  color: var(--audio-accent);
+  white-space: nowrap;
+}
+
+.snapshotCapture {
+  align-content: center;
+  justify-items: start;
+  flex: 0 0 118px;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--audio-accent) 48%, var(--audio-border));
+  color: var(--color-text-muted);
+  font: var(--font-weight-semibold) 11px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.snapshotCapture:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.snapshotRecallSurface {
+  display: contents;
+  color: inherit;
+  cursor: pointer;
+}
+
+.snapshotRecallSurface:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.snapshotTileActions {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  z-index: 2;
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.snapshotTile:hover .snapshotTileActions,
+.snapshotTile:focus-within .snapshotTileActions {
+  opacity: 1;
+}
+
+.snapshotTileActions button {
+  min-height: 18px;
+  padding: 0 5px;
+  border: 1px solid color-mix(in srgb, var(--audio-border-strong) 78%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--audio-panel-strong) 92%, transparent);
+  color: var(--audio-text-default);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.snapshotTileActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.snapshotTile[data-current="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 14%, transparent), transparent),
+    color-mix(in srgb, var(--color-surface-800) 76%, transparent);
+}
+
+.snapshotTile[data-flash="true"] {
+  animation: snapshotPulse 1.5s ease-out;
+}
+
+.snapshotSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.snapshotName {
+  grid-column: 1;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  text-transform: none;
+  white-space: normal;
+}
+
+.snapshotName[data-kind="capture"]::after {
+  content: " snapshot";
+}
+
+.snapshotThumb {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+  min-height: 22px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 74%, transparent);
+  border-radius: 6px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--audio-border) 26%, transparent) 1px, transparent 1px),
+    color-mix(in srgb, var(--color-surface-900) 58%, transparent);
+  background-size: 100% 50%;
+}
+
+.snapshotThumb i {
+  display: block;
+  min-height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: color-mix(in srgb, var(--audio-accent) 66%, transparent);
+}
+
+.snapshotEmpty {
+  opacity: 0.66;
+}
+
+.snapshotEmpty .snapshotThumb i {
+  height: 20%;
+  background: color-mix(in srgb, var(--color-text-subtle) 24%, transparent);
+}
+
+.snapshotMeta {
+  grid-column: 1 / -1;
+  align-self: end;
+  text-transform: none;
+}
+
+.inspector {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+
+.inspector::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--audio-accent) 54%, transparent),
+    transparent
+  );
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.inspectorPfl {
+  min-width: 46px;
+  min-height: 30px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 78%, transparent);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.inspectorTabs {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--audio-border);
+  border-radius: 8px 8px 0 0;
+  background: var(--audio-panel-soft);
+  overflow: hidden;
+}
+
+.inspectorTabs button {
+  position: relative;
+  min-height: 38px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.inspectorTabs button[data-active="true"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--audio-accent) 28%, transparent), transparent);
+  color: var(--audio-text-strong);
+}
+
+.inspectorTabs button[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: var(--audio-accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--audio-accent) 62%, transparent);
+}
+
+.inspectorSticky {
+  display: grid;
+  gap: 5px;
+  padding: 6px 12px 7px;
+  border-bottom: 1px solid var(--audio-border);
+  background: linear-gradient(180deg, var(--audio-panel), var(--audio-panel-soft));
+}
+
+.inspectorEyebrowRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.inspectorTagRow {
+  display: inline-flex;
+  gap: 5px;
+}
+
+.inspectorTag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 7px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-card) 70%, transparent);
+  color: var(--audio-text-default);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  text-transform: uppercase;
+}
+
+.inspectorTag[data-group="talent"] {
+  color: var(--audio-group-talent);
+}
+
+.inspectorTag[data-group="line"] {
+  color: var(--audio-group-line);
+}
+
+.inspectorTag[data-group="bed"] {
+  color: var(--audio-group-bed);
+}
+
+.inspectorTag[data-group="fx"] {
+  color: var(--audio-group-fx);
+}
+
+.inspectorTag[data-group="output"] {
+  color: var(--audio-accent);
+}
+
+.inspectorTitle {
+  margin: 0;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 24px / 1.02 var(--font-family-display);
+  letter-spacing: 0;
+  text-shadow: 0 0 22px color-mix(in srgb, var(--audio-accent) 30%, transparent);
+}
+
+.inspectorSubtitle {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-regular) 12px / 1.25 var(--font-family-ui);
+  letter-spacing: 0;
+}
+
+.inspectorSubtitle strong {
+  color: var(--audio-text-strong);
+  font-weight: var(--font-weight-medium);
+}
+
+.bigMeterCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: var(--audio-panel-strong);
+}
+
+.bigMeter {
+  display: grid;
+  grid-template-columns: repeat(2, 12px);
+  gap: 3px;
+  height: 48px;
+}
+
+.bigMeter > span {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 10px), var(--audio-meter-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.56);
+}
+
+.bigMeter i {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  min-height: 2px;
+  background: linear-gradient(180deg, var(--audio-meter-warn), var(--audio-meter-low-hot));
+}
+
+.bigMeterCard[data-simulated-meter="true"] .bigMeter i {
+  transform-origin: center bottom;
+  animation: audioMeterVerticalLeft 1120ms ease-in-out infinite;
+  will-change: transform, filter;
+}
+
+.bigMeterCard[data-simulated-meter="true"] .bigMeter span:nth-child(2) i {
+  animation-name: audioMeterVerticalRight;
+  animation-delay: -220ms;
+  animation-duration: 1280ms;
+}
+
+.bigMeter b {
+  position: absolute;
+  right: 1px;
+  left: 1px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.bigMeterInfo {
+  display: grid;
+  gap: 6px;
+  align-content: space-between;
+  min-width: 0;
+}
+
+.bigMeterInfo .meterSimulationBadge {
+  justify-self: start;
+  min-height: 17px;
+  padding: 0 6px;
+}
+
+.bigMeterRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bigMeterRow span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bigMeterRow small,
+.inspectorFaderHead span,
+.inspectorFaderTicks,
+.graphCardHead,
+.detailGrid small,
+.sendCardTag {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.bigMeterRow strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 15px / 1 var(--font-family-display);
+}
+
+.bigMeterRow strong[data-tone="warn"] {
+  color: var(--audio-meter-warn);
+}
+
+.bigMeterRow strong[data-tone="clip"] {
+  color: var(--audio-clip);
+}
+
+.bigMeterRow em {
+  margin-left: 2px;
+  color: var(--audio-text-subtle);
+  font-style: normal;
+  font-weight: var(--font-weight-regular);
+}
+
+.inspectorFaderCard {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: var(--audio-panel-strong);
+}
+
+.inspectorFaderHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inspectorFaderHead span strong {
+  color: var(--audio-accent);
+}
+
+.inspectorFaderHead > strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 18px / 1 var(--font-family-display);
+}
+
+.inspectorFaderTicks {
+  display: flex;
+  justify-content: space-between;
+  color: var(--audio-text-subtle);
+  font-size: 9px;
+  text-transform: none;
+}
+
+.inspectorPanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 4px 12px 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.channelSummary {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.inspectorPreamp {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 104px;
+  overflow: hidden;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, black 18%, transparent);
+}
+
+.inspectorPreampPanel {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.9;
+}
+
+.inspectorPreampKnob {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.inspectorPreamp span {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, black 54%, transparent);
+  color: var(--color-text-strong);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
 }
 
-.audioStripMeterWell {
-  display: grid;
-  align-content: end;
-  gap: var(--space-3);
+.channelSummaryText strong {
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 18px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
 }
 
-.audioStripMeterPair {
+.channelSummaryText span,
+.outputInspector span,
+.inspectorField span {
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 11px / 1.2 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.inspectorFieldStack,
+.sendStack {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.inspectorSendStrip {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) 56px;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--audio-accent) 34%, var(--audio-border));
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 10%, transparent), transparent),
+    color-mix(in srgb, var(--color-surface-900) 68%, transparent);
+}
+
+.inspectorSendStrip div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.inspectorSendStrip strong {
+  overflow: hidden;
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 11px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspectorSendStrip > strong {
+  text-align: right;
+}
+
+.inspectorSendStrip input {
+  width: 100%;
+  accent-color: var(--audio-accent);
+}
+
+.inspectorActionRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 0;
+}
+
+.inspectorField,
+.sendRow {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 58px;
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+}
+
+.sendModeRow {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.inspectorField input,
+.sendRow input,
+.inspectorField .sliderControl,
+.sendRow .sliderControl {
+  width: 100%;
+  accent-color: var(--audio-accent);
+}
+
+.inspectorField strong,
+.sendRow strong {
+  color: var(--color-text-strong);
+  font: var(--font-weight-medium) 11px / 1.2 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: right;
+}
+
+.inspectorButtonGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.inspectorMiniGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+  margin-top: 0;
+}
+
+.inspectorMiniCard {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 52px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--audio-panel-strong) 92%, var(--audio-accent) 8%),
+    var(--audio-panel-strong)
+  );
+  color: inherit;
+  text-align: left;
+}
+
+button.inspectorMiniCard {
+  cursor: pointer;
+}
+
+.inspectorMiniCard strong {
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 12px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.inspectorMiniCard span:not(.eyebrow) {
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1.15 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.inspectorGraphCard {
+  min-height: 66px;
+}
+
+.graphCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eqBandRow,
+.dynamicsPills {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.eqBandRow i,
+.eqBandRow button,
+.dynamicsPills button,
+.dynamicsPills i {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  color: var(--audio-text-subtle);
+  background: transparent;
+  font-style: normal;
+  cursor: pointer;
+}
+
+.eqBandRow i[data-active="true"],
+.eqBandRow button[data-active="true"],
+.dynamicsPills button[data-active="true"],
+.dynamicsPills i:first-child {
+  border-color: color-mix(in srgb, var(--audio-accent) 50%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 14%, transparent);
+  color: var(--audio-accent);
+}
+
+.eqBandRow button[data-selected="true"] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--audio-hot) 42%, transparent);
+}
+
+.eqGraphMini,
+.dynamicsGraphMini,
+.eqGraphFull,
+.dynamicsGraphFull {
+  position: relative;
+  display: block;
+  min-height: 44px;
+  overflow: hidden;
+  border-radius: 5px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--audio-border) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-border) 18%, transparent) 1px, transparent 1px),
+    var(--audio-meter-bg);
+  background-size:
+    100% 50%,
+    25% 100%,
+    auto;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.54);
+}
+
+.eqGraphMini,
+.dynamicsGraphMini {
+  min-height: 38px;
+}
+
+.eqGraphMini svg,
+.dynamicsGraphMini svg,
+.eqGraphFull svg,
+.dynamicsGraphFull svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.eqGraphMini path,
+.eqGraphFull path {
+  fill: none;
+  stroke: var(--audio-accent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.eqPointLayer {
+  position: absolute;
+  inset: 0;
+}
+
+.eqPoint {
+  position: absolute;
+  left: var(--eq-point-x);
+  top: var(--eq-point-y);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--audio-accent) 74%, white 12%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.22), transparent 36%),
+    color-mix(in srgb, var(--audio-panel-strong) 74%, var(--audio-accent) 26%);
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.eqPoint[data-selected="true"] {
+  border-color: var(--audio-hot);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.66),
+    0 0 18px color-mix(in srgb, var(--audio-hot) 46%, transparent);
+}
+
+.eqPoint:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.dynamicsGraphMini path,
+.dynamicsGraphFull path {
+  fill: none;
+  stroke: var(--audio-accent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.dynamicsGraphMini circle,
+.dynamicsGraphFull circle {
+  fill: var(--audio-accent);
+}
+
+.dynamicsGraphMini > i,
+.dynamicsGraphFull > i {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: 10px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--audio-meter-warn), var(--audio-clip));
+}
+
+.routingMiniCard {
+  min-height: 82px;
+}
+
+.routingGraphMini {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) 50px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  min-height: 50px;
+}
+
+.routingSourceNode,
+.routingTargetNode {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--audio-canvas) 72%, transparent);
+  color: var(--audio-text-strong);
+}
+
+.routingGraphMini i {
+  display: block;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--audio-accent) 70%, transparent),
+    transparent
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-accent) 38%, transparent);
+}
+
+.routingCurve {
+  display: block;
+  width: 50px;
+  height: 50px;
+}
+
+.routingCurve path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--audio-text-subtle) 64%, transparent);
+  stroke-dasharray: 3 3;
+  stroke-linecap: round;
+  stroke-width: 1;
+}
+
+.routingCurve path:nth-child(2) {
+  stroke: color-mix(in srgb, var(--audio-accent) 76%, transparent);
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--audio-accent) 34%, transparent));
+}
+
+.routingTargetStack {
+  display: grid;
+  gap: 4px;
+}
+
+.routingTargetNode {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 23px;
+  padding: 4px 6px;
+  background: color-mix(in srgb, var(--audio-canvas) 62%, transparent);
+}
+
+.routingTargetNode[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 58%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 12%, var(--audio-canvas));
+}
+
+.routingSourceNode strong,
+.routingTargetNode strong {
+  overflow: hidden;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routingSourceNode small,
+.routingTargetNode small {
+  color: var(--audio-accent);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  text-align: right;
+}
+
+.sourceCard strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-medium) 13px / 1.2 var(--font-family-ui);
+}
+
+.detailGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  align-items: end;
-  min-height: 320px;
 }
 
-.audioStripMeterTrack {
-  position: relative;
-  display: block;
-  height: 100%;
-  border-radius: 14px 14px 10px 10px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-surface-700) 86%, transparent),
-    color-mix(in srgb, var(--color-surface-900) 94%, black 6%)
-  );
+.detailGrid span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--audio-canvas) 62%, transparent);
+}
+
+.detailGrid strong {
   overflow: hidden;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-medium) 12px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.audioStripMeterFill {
-  position: absolute;
-  inset: auto 0 0 0;
-  border-radius: inherit;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, #ffd487 88%, white 12%),
-      color-mix(in srgb, var(--color-primary-500) 72%, #ffd487 28%)
-    ),
-    linear-gradient(180deg, color-mix(in srgb, white 12%, transparent), transparent);
+.inspectorHardwareGrid {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
 }
 
-.audioStripMeterPeak {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  height: 2px;
-  border-radius: 999px;
-  background: color-mix(in srgb, #fff4c9 92%, transparent);
+.inspectorHardwareGrid .preampControl {
+  min-height: 72px;
 }
 
-.audioStripFaderValue {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
-  text-align: center;
-}
-
-.audioStripFader,
-.audioInspectorRange {
-  width: 100%;
-  accent-color: var(--color-primary-500);
-}
-
-.audioStripActions,
-.audioInspectorButtonGrid {
+.miniMeterBars,
+.miniDynamicsBars,
+.miniCurve {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
+  align-items: end;
+  gap: 4px;
+  min-height: 28px;
 }
 
-.audioStripToggle,
-.audioInspectorToggle {
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-900) 90%, transparent);
+.miniMeterBars i,
+.miniDynamicsBars i,
+.miniCurve i {
+  display: block;
+  min-height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-accent) 64%, transparent);
+}
+
+.miniCurve {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+}
+
+.miniCurve i {
+  height: 4px;
+}
+
+.miniCurve i:nth-child(1) {
+  transform: translateY(7px);
+}
+
+.miniCurve i:nth-child(2) {
+  transform: translateY(-4px);
+}
+
+.miniDynamicsBars {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.miniDynamicsBars i:nth-child(1) {
+  height: 8px;
+}
+
+.miniDynamicsBars i:nth-child(2) {
+  height: 16px;
+  background: color-mix(in srgb, var(--audio-hot) 58%, transparent);
+}
+
+.miniDynamicsBars i:nth-child(3) {
+  height: 24px;
+  background: color-mix(in srgb, var(--audio-clip) 48%, transparent);
+}
+
+.emptyInspector,
+.placeholderPanel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  height: 100%;
+}
+
+.inspectorFullGraphPanel {
+  align-content: start;
+}
+
+.eqGraphFull,
+.dynamicsGraphFull {
+  min-height: 170px;
+}
+
+.placeholderCurve {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-height: 108px;
+  padding: 12px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--audio-border) 38%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-border) 38%, transparent) 1px, transparent 1px),
+    color-mix(in srgb, var(--color-surface-900) 76%, transparent);
+  background-size:
+    100% 25%,
+    25% 100%,
+    auto;
+}
+
+.placeholderCurve span,
+.dynamicsPlaceholder span {
+  display: block;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-accent) 58%, transparent);
+}
+
+.placeholderCurve span:nth-child(1) {
+  height: 30%;
+}
+
+.placeholderCurve span:nth-child(2) {
+  height: 64%;
+}
+
+.placeholderCurve span:nth-child(3) {
+  height: 46%;
+}
+
+.placeholderCurve span:nth-child(4) {
+  height: 72%;
+}
+
+.dynamicsPlaceholder {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 10px;
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 76%, transparent);
+}
+
+.dynamicsPlaceholder span {
+  height: 10px;
+}
+
+.dynamicsPlaceholder span:nth-child(2) {
+  background: color-mix(in srgb, var(--audio-hot) 58%, transparent);
+}
+
+.dynamicsPlaceholder span:nth-child(3) {
+  background: color-mix(in srgb, var(--audio-clip) 58%, transparent);
+}
+
+.sendTargetButton {
+  min-height: 28px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 76%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sendTargetButton[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 54%, var(--audio-border));
+  color: var(--color-text-strong);
+}
+
+.unsupportedToggleRow {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 4px;
+}
+
+.sendCardFull {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--audio-panel-strong) 90%, var(--audio-accent) 10%),
+    var(--audio-panel-strong)
+  );
+}
+
+.sendCardFull[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+}
+
+.sendCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.processingControlGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.processingControl {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.processingControl span {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-semibold) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.processingControl strong {
+  justify-self: end;
+  min-width: 0;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.sendCardValue {
+  justify-self: end;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 18px / 1 var(--font-family-display);
+}
+
+.outputInspector {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 68%, transparent);
+}
+
+.healthBar {
+  flex: 0 0 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+}
+
+.contextMenu {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  gap: 4px;
+  width: 190px;
+  padding: 7px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 96%, black 4%);
+  box-shadow: 0 18px 50px color-mix(in srgb, black 44%, transparent);
+}
+
+.contextMenu span,
+.contextMenu small {
+  padding: 3px 5px;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.contextMenu button {
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-ui);
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.contextMenu button:disabled {
+  opacity: 0.54;
+}
+
+.healthItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
-  cursor: pointer;
+  white-space: nowrap;
 }
 
-.audioStripToggle[data-active="true"],
-.audioInspectorToggle[data-active="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 40%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 14%, var(--color-surface-800));
+.healthItem strong {
+  overflow: hidden;
+  max-width: 170px;
   color: var(--color-text-strong);
+  font: inherit;
+  text-overflow: ellipsis;
 }
 
-.audioStripFooter {
+.healthTelemetry,
+.healthShortcutGroup {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.audioInspectorColumn {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.audioInspectorCard {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.audioControlRoomGrid,
-.audioInspectorFieldGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.audioControlRoomCell {
-  display: grid;
-  gap: 6px;
-  padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 88%, transparent);
-}
-
-.audioControlRoomSection {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.audioInspectorField {
-  display: grid;
-  gap: 10px;
-  padding: var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 88%, transparent);
-}
-
-.audioInspectorFieldValue {
-  color: var(--color-text-strong);
-  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-}
-
-.audioLoadingBar,
-.audioLoadingChip,
-.audioLoadingRailSection,
-.audioLoadingInspectorCard,
-.audioLoadingStrip,
-.audioLoadingMeter {
-  position: relative;
+  min-width: 0;
   overflow: hidden;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-700) 90%, transparent);
 }
 
-.audioLoadingBar::after,
-.audioLoadingChip::after,
-.audioLoadingRailSection::after,
-.audioLoadingInspectorCard::after,
-.audioLoadingStrip::after,
-.audioLoadingMeter::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, white 12%, transparent), transparent);
-  animation: audioLoadingSweep 1.6s ease-in-out infinite;
+.healthTelemetry {
+  gap: 12px;
 }
 
-.audioLoadingBar {
-  height: 32px;
+.healthShortcutGroup {
+  justify-content: flex-end;
+  gap: 6px;
 }
 
-.audioLoadingChipRow {
-  display: flex;
-  gap: var(--space-2);
+.healthCommand,
+.healthShortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 76%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-panel-strong) 62%, transparent);
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.audioLoadingChip {
-  width: 88px;
-  height: 28px;
+.healthCommand {
+  color: var(--audio-text-default);
 }
 
-.audioLoadingBridgeGrid,
-.audioLoadingStripGrid {
+.healthCommand kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  border: 1px solid var(--audio-border);
+  border-radius: 4px;
+  color: var(--audio-text-strong);
+  font: inherit;
+}
+
+.healthShortcut {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loadingPanel {
   display: grid;
-  gap: var(--space-2);
+  align-content: start;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 18px;
 }
 
-.audioLoadingBridgeGrid {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+.loadingPanel h1 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-md, 22px) / 1.15 var(--font-family-display);
+  letter-spacing: 0;
 }
 
-.audioLoadingMeter {
-  min-height: 86px;
+.loadingGrid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.audioLoadingRailSection,
-.audioLoadingInspectorCard {
-  min-height: 180px;
+.loadingGrid span {
+  min-height: 140px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-700) 72%, transparent);
 }
 
-.audioLoadingStripGrid {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+@keyframes snapshotPulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--audio-accent) 54%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
 }
 
-.audioLoadingStrip {
-  min-height: 520px;
+@keyframes audioMeterVerticalLeft {
+  0% {
+    filter: brightness(0.9);
+    transform: scaleY(0.72);
+  }
+
+  38% {
+    filter: brightness(1.12);
+    transform: scaleY(1.08);
+  }
+
+  70% {
+    filter: brightness(0.98);
+    transform: scaleY(0.86);
+  }
+
+  100% {
+    filter: brightness(1.06);
+    transform: scaleY(0.96);
+  }
+}
+
+@keyframes audioMeterVerticalRight {
+  0% {
+    filter: brightness(0.95);
+    transform: scaleY(0.82);
+  }
+
+  45% {
+    filter: brightness(1.1);
+    transform: scaleY(1.03);
+  }
+
+  76% {
+    filter: brightness(0.92);
+    transform: scaleY(0.74);
+  }
+
+  100% {
+    filter: brightness(1.08);
+    transform: scaleY(0.94);
+  }
+}
+
+@keyframes audioMeterHorizontal {
+  0% {
+    filter: brightness(0.94);
+    transform: scaleX(0.76);
+  }
+
+  42% {
+    filter: brightness(1.13);
+    transform: scaleX(1.04);
+  }
+
+  74% {
+    filter: brightness(0.97);
+    transform: scaleX(0.84);
+  }
+
+  100% {
+    filter: brightness(1.06);
+    transform: scaleX(0.98);
+  }
+}
+
+@keyframes audioRouteShimmer {
+  from {
+    stroke-dashoffset: 0;
+  }
+
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@media (min-width: 2200px) and (min-height: 1250px) {
+  .audioBody {
+    grid-template-columns: 352px minmax(0, 1fr) 504px;
+    gap: 0;
+  }
+
+  .tieredMixer {
+    grid-template-rows: minmax(380px, 1.12fr) minmax(258px, 0.78fr) minmax(348px, 1.06fr);
+    gap: 12px;
+    padding: 14px 18px;
+  }
+
+  .channelLane[data-role="front-preamp"] {
+    grid-template-areas:
+      "header header"
+      "body preamp"
+      "body readout"
+      "body controls"
+      "body .";
+    grid-template-columns: 118px minmax(0, 1fr);
+    grid-template-rows: auto 82px auto auto minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 5px;
+    min-height: 330px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneHeader {
+    grid-area: header;
+    min-height: 41px;
+  }
+
+  .channelLane[data-role="front-preamp"] .lanePreampRow {
+    font-size: 11px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneName {
+    font-size: 18px;
+    line-height: 1.15;
+  }
+
+  .channelLane[data-role="front-preamp"] .preampControl {
+    grid-area: preamp;
+    align-self: stretch;
+    min-height: 82px;
+    height: 82px;
+    margin-top: 4px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneBody {
+    grid-area: body;
+    grid-template-columns: minmax(0, 1fr) 28px;
+    min-height: 242px;
+  }
+
+  .channelLane[data-role="front-preamp"] .stereoMeter[data-peak-readout="true"],
+  .channelLane[data-role="playback-pair"] .stereoMeter[data-peak-readout="true"] {
+    grid-template-rows: 18px minmax(0, 1fr);
+  }
+
+  .channelLane[data-role="front-preamp"] .stereoMeter[data-peak-readout="true"] .meterPeakReadout,
+  .channelLane[data-role="playback-pair"] .stereoMeter[data-peak-readout="true"] .meterPeakReadout {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--audio-text-subtle);
+    font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+    letter-spacing: 0;
+  }
+
+  .channelLane[data-role="front-preamp"] .stereoMeter[data-peak-readout="true"] .meterPair,
+  .channelLane[data-role="front-preamp"] .stereoMeter[data-peak-readout="true"] .meterScale,
+  .channelLane[data-role="playback-pair"] .stereoMeter[data-peak-readout="true"] .meterPair,
+  .channelLane[data-role="playback-pair"] .stereoMeter[data-peak-readout="true"] .meterScale {
+    grid-row: 2;
+  }
+
+  .channelLane[data-role="front-preamp"] .fader,
+  .channelLane[data-role="playback-pair"] .fader {
+    padding-top: 22px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneReadout {
+    grid-area: readout;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    justify-self: stretch;
+    width: 100%;
+    margin-top: 8px;
+    min-height: 22px;
+    padding: 0 8px;
+    color: var(--audio-text-strong);
+    font: var(--font-weight-semibold) 16px / 1 var(--font-family-mono);
+    text-align: right;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneReadout::before {
+    content: "FADER";
+    color: var(--audio-text-subtle);
+    font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+    letter-spacing: 0;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneControls {
+    grid-area: controls;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .channelLane[data-role="front-preamp"] .laneToggle {
+    min-height: 30px;
+  }
+
+  .channelLane[data-role="front-preamp"] .preampKnob {
+    width: 44px;
+    height: 44px;
+  }
+
+  .channelLane[data-role="front-preamp"] .preampLedArc {
+    width: 70px;
+    height: 70px;
+    mask: radial-gradient(circle, transparent 0 40px, black 41px 45px, transparent 46px);
+  }
+
+  .channelLane[data-role="front-preamp"] .preampGainLabel {
+    min-width: 78px;
+    font-size: 13px;
+  }
+
+  .channelLane[data-role="playback-pair"] {
+    grid-template-areas:
+      "header header"
+      "body readout"
+      "body ."
+      "body controls";
+    grid-template-columns: 118px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 5px;
+    min-height: 214px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneHeader {
+    grid-area: header;
+    min-height: 39px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneNameBlock {
+    gap: 4px;
+    width: 100%;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneIndexRow {
+    font-size: 11px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneName {
+    font-size: 16px;
+    line-height: 1.15;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneBody {
+    grid-area: body;
+    grid-template-columns: minmax(0, 1fr) 30px;
+    min-height: 151px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneReadout {
+    grid-area: readout;
+    align-self: center;
+    justify-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 31px;
+    color: var(--audio-text-strong);
+    font: var(--font-weight-semibold) 22px / 1 var(--font-family-mono);
+    text-align: right;
+    transform: translateY(18px);
+  }
+
+  .channelLane[data-role="playback-pair"] .laneControls {
+    grid-area: controls;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .channelLane[data-role="playback-pair"] .laneToggle {
+    min-height: 36px;
+    font-size: 12px;
+  }
+
+  .outputLane {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 5px;
+    min-height: 302px;
+  }
+
+  .outputLane .laneNameBlock {
+    gap: 4px;
+    width: 100%;
+  }
+
+  .outputLane .laneIndexRow {
+    font-size: 11px;
+  }
+
+  .outputLane .laneName {
+    font-size: 16px;
+    line-height: 1.15;
+  }
+
+  .outputLane .outputBody {
+    grid-template-columns: 118px minmax(0, 1fr);
+    gap: 10px;
+    min-height: 218px;
+  }
+
+  .outputLane .stereoMeter {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    width: 84px;
+  }
+
+  .outputLane .fader {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: end;
+    width: 30px;
+  }
+
+  .outputLane .outputBusPanel {
+    grid-column: 2;
+    grid-row: 1;
+    padding-bottom: 50px;
+  }
+
+  .outputLane .laneControls {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    left: 136px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .outputLane .laneToggle {
+    min-height: 40px;
+    font-size: 12px;
+  }
+
+  .snapshotDeck {
+    min-height: 118px;
+  }
+
+  .snapshotTile,
+  .snapshotCapture {
+    min-height: 92px;
+  }
+
+  .snapshotThumb {
+    min-height: 30px;
+  }
 }
 
 @media (max-width: 2100px) {
-  .audioMainGrid {
-    grid-template-columns: 280px minmax(0, 1fr) 380px;
+  .audioToolbar {
+    grid-template-columns: minmax(220px, 1fr) auto auto auto minmax(210px, auto);
   }
 
-  .audioMeterBridge {
-    min-height: 104px;
+  .snapshotStatus {
+    grid-column: auto;
+    justify-self: end;
+    min-width: 210px;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .snapshotStatus .eyebrow {
+    grid-column: 1 / -1;
+  }
+
+  .audioBody {
+    grid-template-columns: 276px minmax(0, 1fr) 364px;
+  }
+
+  .mixTargetList {
+    gap: 6px;
+  }
+
+  .mixTargetButton {
+    min-height: 50px;
+    padding: 6px;
+  }
+
+  .railPanel,
+  .railToolsPanel {
+    gap: 9px;
+    padding: 10px;
+  }
+
+  .railNote {
+    display: none;
+  }
+
+  .railStatsGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .railStatsGrid span {
+    min-height: 42px;
+    padding: 6px 4px;
+    font-size: 8px;
+    overflow: hidden;
+  }
+
+  .railStatsGrid strong {
+    font-size: 14px;
+  }
+
+  .inspectorPreamp {
+    height: 84px;
+  }
+
+  .inspectorFieldStack {
+    display: none;
+  }
+
+  .inspectorMiniCard {
+    min-height: 68px;
+  }
+
+  .mixerTier {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .tieredMixer {
+    grid-template-rows: minmax(292px, 1.18fr) minmax(196px, 0.78fr) minmax(176px, 0.7fr);
+  }
+
+  .tierLaneGrid {
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  }
+
+  .tierLaneGrid[data-tier="hardware-inputs"] {
+    grid-template-columns: repeat(4, minmax(198px, 210px));
+    align-items: start;
+    justify-content: space-between;
+  }
+
+  .channelLane,
+  .outputLane {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .laneBody {
+    grid-template-columns: minmax(30px, 1fr) 24px minmax(34px, 0.68fr);
+    gap: 4px;
+  }
+
+  .outputBody {
+    grid-template-columns: minmax(30px, 0.32fr) 26px minmax(0, 1fr);
+  }
+
+  .outputLane .sliderControl[data-orientation="vertical"] {
+    min-height: 68px;
+  }
+
+  .outputLane .laneControls {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .outputLane .laneToggle {
+    min-height: 18px;
+    font-size: 8px;
+  }
+
+  .outputMetricGrid {
+    gap: 3px;
+  }
+
+  .outputMetricGrid span {
+    gap: 2px;
+    min-height: 18px;
+    padding: 3px;
+  }
+
+  .outputMetricGrid small {
+    display: none;
+  }
+
+  .outputMetricGrid strong {
+    font-size: 9px;
+  }
+
+  .laneName {
+    font-size: 12px;
+  }
+
+  .laneMeta,
+  .snapshotMeta,
+  .tierLabel small,
+  .lineModule small {
+    font-size: 9px;
+  }
+
+  .lineModule {
+    padding: 4px;
+    font-size: 9px;
+  }
+
+  .preampKnob {
+    width: 24px;
+    height: 24px;
+  }
+
+  .preampGainLabel {
+    right: 3px;
+    bottom: 3px;
+    padding: 2px 4px;
+    font-size: 8px;
+  }
+
+  .sliderControl[data-orientation="vertical"] {
+    min-height: 60px;
+  }
+
+  .channelLane[data-role="front-preamp"] {
+    height: 222px;
+    grid-template-rows: 34px 65px 52px 14px 22px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneBody {
+    min-height: 52px;
+    height: 52px;
+  }
+
+  .channelLane[data-role="front-preamp"] .sliderControl[data-orientation="vertical"] {
+    min-height: 52px;
+  }
+
+  .channelLane[data-role="front-preamp"] .preampKnob {
+    width: 36px;
+    height: 36px;
+  }
+
+  .channelLane[data-role="front-preamp"] .preampGainLabel {
+    right: auto;
+    bottom: auto;
+    left: 54.6%;
+    top: 50%;
+    min-width: 66px;
+    padding: 0;
+    color: #8beaff;
+    font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+    text-align: center;
+    transform: translate(-50%, -50%);
+  }
+
+  .channelLane[data-role="front-preamp"] .laneToggle {
+    min-height: 22px;
+  }
+
+  .channelLane[data-role="playback-pair"] {
+    grid-template-rows: auto minmax(48px, 1fr) 14px 20px;
+    gap: 3px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneBody {
+    min-height: 48px;
+  }
+
+  .channelLane[data-role="playback-pair"] .sliderControl[data-orientation="vertical"] {
+    min-height: 48px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneToggle {
+    min-height: 20px;
+  }
+
+  .laneToggle,
+  .inspectorButtonGrid button,
+  .unsupportedToggleRow button,
+  .placeholderPanel button {
+    min-height: 23px;
+    font-size: 9px;
+  }
+
+  .snapshotGrid {
+    grid-template-columns: 1.05fr repeat(8, minmax(0, 1fr));
+  }
+
+  .snapshotTile,
+  .snapshotCapture {
+    padding: 6px;
+  }
+
+  .canvasContextBar {
+    padding-inline: 10px;
+  }
+
+  .canvasStatPills {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .canvasWarningBand {
+    gap: 7px;
+    min-height: 28px;
+    padding-right: 7px;
+  }
+
+  .canvasWarningBand span {
+    font-size: 11px;
+  }
+
+  .canvasWarningBand > button:not(.canvasWarningChip) {
+    padding: 0 7px;
+    font-size: 8px;
+  }
+
+  .healthBar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .healthTelemetry .healthItem:nth-child(6) {
+    display: none;
   }
 }
 
-@keyframes audioLoadingSweep {
-  0% {
-    transform: translateX(-120%);
+@media (max-width: 1600px) {
+  .audioBody {
+    grid-template-columns: 196px minmax(0, 1fr) 280px;
   }
 
-  100% {
-    transform: translateX(120%);
+  .toolbarMeta,
+  .canvasLegend,
+  .healthTelemetry .healthItem:nth-child(5) {
+    display: none;
+  }
+
+  .tierLabel {
+    display: none;
+  }
+
+  .mixerTier {
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 
-@keyframes audioSnapshotFlash {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-500) 42%, transparent);
+[data-layout-mode="studioFull"] .audioShell .audioBody {
+  grid-template-columns: 352px minmax(0, 1fr) 504px;
+  gap: 0;
+}
+
+[data-layout-mode="studioFull"] .audioShell .toolbarMeta,
+[data-layout-mode="studioFull"] .audioShell .canvasLegend,
+[data-layout-mode="studioFull"] .audioShell .healthItem:nth-child(5),
+[data-layout-mode="studioFull"] .audioShell .healthItem:nth-child(6) {
+  display: inline-flex;
+}
+
+[data-layout-mode="studioFull"] .audioShell .healthBar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 44px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .healthTelemetry .healthItem {
+  display: inline-flex;
+}
+
+[data-layout-mode="studioFull"] .audioShell .tieredMixer {
+  grid-template-rows: minmax(350px, 1.06fr) minmax(240px, 0.76fr) minmax(326px, 0.98fr);
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .mixerTier {
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+[data-layout-mode="studioFull"] .audioShell .tierLabel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+[data-layout-mode="studioFull"] .audioShell .tierLaneGrid[data-tier="hardware-inputs"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+[data-layout-mode="studioFull"] .audioShell .tierLaneGrid[data-tier="software-playback"] {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLaneGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane,
+[data-layout-mode="studioFull"] .audioShell .outputLane {
+  align-self: stretch;
+  height: auto;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] {
+  grid-template-rows: auto 76px minmax(0, 1fr) auto auto;
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneBody {
+  height: auto;
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="front-preamp"]
+  .sliderControl[data-orientation="vertical"],
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="playback-pair"]
+  .sliderControl[data-orientation="vertical"],
+[data-layout-mode="studioFull"] .audioShell .outputLane .sliderControl[data-orientation="vertical"] {
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] {
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneBody {
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] {
+  grid-template-areas:
+    "header header"
+    "body preamp"
+    "body readout"
+    "body controls"
+    "body .";
+  grid-template-columns: 118px minmax(0, 1fr);
+  grid-template-rows: auto 82px auto auto minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 5px;
+  min-height: 330px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneHeader {
+  grid-area: header;
+  min-height: 41px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .lanePreampRow {
+  font-size: 11px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneName {
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .preampControl {
+  grid-area: preamp;
+  align-self: stretch;
+  min-height: 82px;
+  height: 82px;
+  margin-top: 4px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneBody {
+  grid-area: body;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  min-height: 242px;
+}
+
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="front-preamp"]
+  .stereoMeter[data-peak-readout="true"],
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="playback-pair"]
+  .stereoMeter[data-peak-readout="true"] {
+  grid-template-rows: 18px minmax(0, 1fr);
+}
+
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="front-preamp"]
+  .stereoMeter[data-peak-readout="true"]
+  .meterPeakReadout,
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="playback-pair"]
+  .stereoMeter[data-peak-readout="true"]
+  .meterPeakReadout {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="front-preamp"]
+  .stereoMeter[data-peak-readout="true"]
+  .meterPair,
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="front-preamp"]
+  .stereoMeter[data-peak-readout="true"]
+  .meterScale,
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="playback-pair"]
+  .stereoMeter[data-peak-readout="true"]
+  .meterPair,
+[data-layout-mode="studioFull"]
+  .audioShell
+  .channelLane[data-role="playback-pair"]
+  .stereoMeter[data-peak-readout="true"]
+  .meterScale {
+  grid-row: 2;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .fader,
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .fader {
+  padding-top: 22px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneReadout {
+  grid-area: readout;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  justify-self: stretch;
+  width: 100%;
+  min-height: 22px;
+  margin-top: 8px;
+  padding: 0 8px;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 16px / 1 var(--font-family-mono);
+  text-align: right;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneReadout::before {
+  content: "FADER";
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneControls {
+  grid-area: controls;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneToggle {
+  min-height: 30px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .preampKnob {
+  width: 44px;
+  height: 44px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .preampLedArc {
+  width: 70px;
+  height: 70px;
+  mask: radial-gradient(circle, transparent 0 40px, black 41px 45px, transparent 46px);
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .preampGainLabel {
+  min-width: 78px;
+  font-size: 13px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] {
+  grid-template-areas:
+    "header header"
+    "body readout"
+    "body ."
+    "body controls";
+  grid-template-columns: 118px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 5px;
+  min-height: 214px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneHeader {
+  grid-area: header;
+  min-height: 39px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneNameBlock {
+  gap: 4px;
+  width: 100%;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneIndexRow {
+  font-size: 11px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneName {
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneBody {
+  grid-area: body;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  min-height: 151px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneReadout {
+  grid-area: readout;
+  align-self: center;
+  justify-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 31px;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 22px / 1 var(--font-family-mono);
+  text-align: right;
+  transform: translateY(18px);
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneControls {
+  grid-area: controls;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneToggle {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane {
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 5px;
+  min-height: 302px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .laneNameBlock {
+  gap: 4px;
+  width: 100%;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .laneIndexRow {
+  font-size: 11px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .laneName {
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .outputBody {
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 218px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .stereoMeter {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  width: 84px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .fader {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  width: 30px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .outputBusPanel {
+  grid-column: 2;
+  grid-row: 1;
+  padding-bottom: 50px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .laneControls {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 136px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .outputLane .laneToggle {
+  min-height: 40px;
+  font-size: 12px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .snapshotDeck {
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 118px;
+  padding: 10px 16px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .snapshotTile,
+[data-layout-mode="studioFull"] .audioShell .snapshotCapture {
+  min-height: 92px;
+}
+
+[data-layout-mode="studioFull"] .audioShell .snapshotThumb {
+  min-height: 30px;
+}
+
+@media (max-height: 1100px) {
+  [data-layout-mode="studioFull"] .audioShell .tieredMixer {
+    grid-template-rows: minmax(212px, 1.06fr) minmax(132px, 0.76fr) minmax(122px, 0.72fr);
+    gap: 8px;
+    padding: 8px 10px;
   }
 
-  35% {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 34%, transparent);
+  [data-layout-mode="studioFull"] .audioShell .mixerTier {
+    gap: 5px;
+    padding: 6px;
   }
 
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-500) 0%, transparent);
+  [data-layout-mode="studioFull"] .audioShell .tierLabel {
+    min-height: 32px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] {
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-rows: auto 50px auto auto minmax(0, 1fr);
+    column-gap: 8px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneHeader {
+    min-height: 30px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneName {
+    font-size: 14px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .preampControl {
+    min-height: 50px;
+    height: 50px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneBody {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneReadout {
+    min-height: 18px;
+    margin-top: 2px;
+    font-size: 12px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .laneToggle {
+    min-height: 22px;
+    font-size: 9px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .preampKnob {
+    width: 34px;
+    height: 34px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .preampLedArc {
+    width: 54px;
+    height: 54px;
+    mask: radial-gradient(circle, transparent 0 30px, black 31px 35px, transparent 36px);
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="front-preamp"] .preampGainLabel {
+    min-width: 60px;
+    font-size: 10px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] {
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 8px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneHeader {
+    min-height: 30px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneName {
+    font-size: 13px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneBody {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneReadout {
+    min-height: 20px;
+    font-size: 14px;
+    transform: none;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .channelLane[data-role="playback-pair"] .laneToggle {
+    min-height: 22px;
+    font-size: 9px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .outputLane {
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .outputLane .laneName {
+    font-size: 13px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .outputLane .outputBody {
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 8px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .outputLane .stereoMeter {
+    width: 58px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .outputLane .fader {
+    width: 24px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .outputLane .outputBusPanel {
+    padding-bottom: 34px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .outputLane .laneControls {
+    left: 100px;
+    gap: 4px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .outputLane .laneToggle {
+    min-height: 24px;
+    font-size: 9px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .snapshotDeck {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 6px;
+    min-height: 82px;
+    padding: 8px 12px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .snapshotTile,
+  [data-layout-mode="studioFull"] .audioShell .snapshotCapture {
+    min-height: 66px;
+    padding: 6px;
+  }
+
+  [data-layout-mode="studioFull"] .audioShell .snapshotThumb {
+    min-height: 18px;
   }
 }

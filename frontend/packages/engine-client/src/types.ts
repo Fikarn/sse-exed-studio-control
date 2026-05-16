@@ -78,11 +78,13 @@ export interface AudioSettingsUpdateRequest {
   expectedSubmixLock?: boolean;
   expectedCompatibilityMode?: boolean;
   fadersPerBank?: number;
+  viewMode?: "submix" | "master";
 }
 
 export interface AudioChannelUpdateRequest {
   channelId: string;
   mixTargetId?: string;
+  name?: string;
   gain?: number;
   fader?: number;
   mute?: boolean;
@@ -92,6 +94,57 @@ export interface AudioChannelUpdateRequest {
   pad?: boolean;
   instrument?: boolean;
   autoSet?: boolean;
+}
+
+export interface AudioSnapshotCreateRequest {
+  name: string;
+  oscIndex: number;
+  captureCurrentState?: boolean;
+}
+
+export interface AudioSnapshotUpdateRequest {
+  snapshotId: string;
+  name?: string;
+  oscIndex?: number;
+  captureCurrentState?: boolean;
+}
+
+export interface AudioSnapshotDeleteRequest {
+  snapshotId: string;
+}
+
+export interface AudioClipClearRequest {
+  channelId?: string;
+}
+
+export interface AudioEqUpdateRequest {
+  channelId: string;
+  enabled?: boolean;
+  bandId?: "lc" | "lo" | "mid" | "hi";
+  bandEnabled?: boolean;
+  frequencyHz?: number;
+  gainDb?: number;
+  q?: number;
+}
+
+export interface AudioDynamicsUpdateRequest {
+  channelId: string;
+  section: "compressor" | "gate";
+  enabled?: boolean;
+  thresholdDb?: number;
+  ratio?: number;
+  attackMs?: number;
+  releaseMs?: number;
+  makeupDb?: number;
+}
+
+export interface AudioSendModeUpdateRequest {
+  channelId: string;
+  mixTargetId: string;
+  preFader?: boolean;
+  mute?: boolean;
+  linkStereo?: boolean;
+  solo?: boolean;
 }
 
 export interface AudioMixTargetUpdateRequest {
@@ -286,7 +339,14 @@ export interface ShellStore {
   updateCommissioning(request: CommissioningUpdateRequest): Promise<JsonValue>;
   syncAudio(): Promise<JsonValue>;
   recallAudioSnapshot(snapshotId: string): Promise<JsonValue>;
+  createAudioSnapshot(request: AudioSnapshotCreateRequest): Promise<JsonValue>;
+  updateAudioSnapshot(request: AudioSnapshotUpdateRequest): Promise<JsonValue>;
+  deleteAudioSnapshot(request: AudioSnapshotDeleteRequest): Promise<JsonValue>;
+  clearAudioClips(request?: AudioClipClearRequest): Promise<JsonValue>;
   updateAudioChannel(request: AudioChannelUpdateRequest): Promise<JsonValue>;
+  updateAudioChannelEq(request: AudioEqUpdateRequest): Promise<JsonValue>;
+  updateAudioChannelDynamics(request: AudioDynamicsUpdateRequest): Promise<JsonValue>;
+  updateAudioChannelSendMode(request: AudioSendModeUpdateRequest): Promise<JsonValue>;
   updateAudioMixTarget(request: AudioMixTargetUpdateRequest): Promise<JsonValue>;
   updateAudioSettings(request: AudioSettingsUpdateRequest): Promise<JsonValue>;
   updateLightingSettings(request: LightingSettingsUpdateRequest): Promise<JsonValue>;

@@ -41,18 +41,7 @@ pub fn update_audio_channel(
         .channels
         .iter()
         .find(|entry| entry.id == request.channel_id)
-        .map(|channel| StoredAudioChannelState {
-            gain: channel.gain,
-            fader: channel.fader,
-            mix_levels: channel.mix_levels.clone(),
-            mute: channel.mute,
-            solo: channel.solo,
-            phantom: channel.phantom,
-            phase: channel.phase,
-            pad: channel.pad,
-            instrument: channel.instrument,
-            auto_set: channel.auto_set,
-        })
+        .map(stored_channel_state_from_snapshot)
         .ok_or_else(|| {
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
@@ -63,6 +52,18 @@ pub fn update_audio_channel(
             )
         })?;
 
+    if let Some(name) = &request.name {
+        let trimmed = name.trim();
+        if trimmed.is_empty() || trimmed.len() > 50 {
+            let message = String::from("Audio channel names must be 1-50 characters.");
+            record_audio_action_failure(db_path, "AUDIO_CHANNEL_NAME_INVALID", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NAME_INVALID",
+                message,
+            ));
+        }
+        next_state.name = Some(String::from(trimmed));
+    }
     if let Some(gain) = request.gain {
         if !channel_supports_gain_from_role(&snapshot, &request.channel_id) {
             let message = format!(
@@ -200,6 +201,287 @@ pub fn update_audio_channel(
 
     let refreshed = read_audio_snapshot(&load_audio_settings(db_path)?);
     refreshed
+        .channels
+        .into_iter()
+        .find(|entry| entry.id == request.channel_id)
+        .ok_or_else(|| {
+            AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NOT_FOUND",
+                format!(
+                    "Audio channel '{}' is not exposed by the engine.",
+                    request.channel_id
+                ),
+            )
+        })
+}
+
+pub fn update_audio_channel_eq(
+    db_path: &Path,
+    request: &AudioEqUpdateRequest,
+) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    let app_settings = load_audio_settings(db_path)?;
+    let snapshot = read_audio_snapshot(&app_settings);
+    if !snapshot.capabilities.can_edit_processing {
+        let message = String::from("Audio EQ editing is unavailable while OSC is disabled.");
+        record_audio_action_failure(db_path, "AUDIO_PROCESSING_UNAVAILABLE", &message)?;
+        return Err(AudioCommandError::Rejected(
+            "AUDIO_PROCESSING_UNAVAILABLE",
+            message,
+        ));
+    }
+
+    let mut channel_state = read_channel_state_map(&app_settings);
+    let mut next_state = snapshot
+        .channels
+        .iter()
+        .find(|entry| entry.id == request.channel_id)
+        .map(stored_channel_state_from_snapshot)
+        .ok_or_else(|| {
+            AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NOT_FOUND",
+                format!(
+                    "Audio channel '{}' is not exposed by the engine.",
+                    request.channel_id
+                ),
+            )
+        })?;
+
+    if let Some(enabled) = request.enabled {
+        next_state.eq.enabled = enabled;
+    }
+
+    if let Some(band_id) = &request.band_id {
+        let band = next_state
+            .eq
+            .bands
+            .iter_mut()
+            .find(|entry| entry.id == *band_id)
+            .ok_or_else(|| {
+                AudioCommandError::Rejected(
+                    "AUDIO_EQ_BAND_NOT_FOUND",
+                    format!("Audio EQ band '{band_id}' is not exposed by the engine."),
+                )
+            })?;
+        if let Some(enabled) = request.band_enabled {
+            band.enabled = enabled;
+        }
+        if let Some(frequency_hz) = request.frequency_hz {
+            band.frequency_hz = clamp_eq_frequency(frequency_hz);
+        }
+        if let Some(gain_db) = request.gain_db {
+            band.gain_db = clamp_eq_gain(gain_db);
+        }
+        if let Some(q) = request.q {
+            band.q = clamp_eq_q(q);
+        }
+    }
+
+    channel_state.insert(request.channel_id.clone(), next_state);
+    persist_audio_state(
+        db_path,
+        &[
+            (
+                String::from(AUDIO_CHANNEL_STATE_KEY),
+                serialize_json_state(&channel_state)?,
+            ),
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from("succeeded"),
+            ),
+            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::new()),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from("Audio EQ updated."),
+            ),
+        ],
+    )?;
+
+    read_audio_snapshot(&load_audio_settings(db_path)?)
+        .channels
+        .into_iter()
+        .find(|entry| entry.id == request.channel_id)
+        .ok_or_else(|| {
+            AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NOT_FOUND",
+                format!(
+                    "Audio channel '{}' is not exposed by the engine.",
+                    request.channel_id
+                ),
+            )
+        })
+}
+
+pub fn update_audio_channel_dynamics(
+    db_path: &Path,
+    request: &AudioDynamicsUpdateRequest,
+) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    let app_settings = load_audio_settings(db_path)?;
+    let snapshot = read_audio_snapshot(&app_settings);
+    if !snapshot.capabilities.can_edit_processing {
+        let message = String::from("Audio dynamics editing is unavailable while OSC is disabled.");
+        record_audio_action_failure(db_path, "AUDIO_PROCESSING_UNAVAILABLE", &message)?;
+        return Err(AudioCommandError::Rejected(
+            "AUDIO_PROCESSING_UNAVAILABLE",
+            message,
+        ));
+    }
+
+    let mut channel_state = read_channel_state_map(&app_settings);
+    let mut next_state = snapshot
+        .channels
+        .iter()
+        .find(|entry| entry.id == request.channel_id)
+        .map(stored_channel_state_from_snapshot)
+        .ok_or_else(|| {
+            AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NOT_FOUND",
+                format!(
+                    "Audio channel '{}' is not exposed by the engine.",
+                    request.channel_id
+                ),
+            )
+        })?;
+
+    let processor = match request.section.as_str() {
+        "gate" => &mut next_state.dynamics.gate,
+        _ => &mut next_state.dynamics.compressor,
+    };
+    if let Some(enabled) = request.enabled {
+        processor.enabled = enabled;
+    }
+    if let Some(threshold_db) = request.threshold_db {
+        processor.threshold_db = clamp_dynamics_threshold(threshold_db);
+    }
+    if let Some(ratio) = request.ratio {
+        processor.ratio = clamp_dynamics_ratio(ratio);
+    }
+    if let Some(attack_ms) = request.attack_ms {
+        processor.attack_ms = clamp_dynamics_time(attack_ms);
+    }
+    if let Some(release_ms) = request.release_ms {
+        processor.release_ms = clamp_dynamics_time(release_ms);
+    }
+    if let Some(makeup_db) = request.makeup_db {
+        processor.makeup_db = clamp_dynamics_makeup(makeup_db);
+    }
+
+    channel_state.insert(request.channel_id.clone(), next_state);
+    persist_audio_state(
+        db_path,
+        &[
+            (
+                String::from(AUDIO_CHANNEL_STATE_KEY),
+                serialize_json_state(&channel_state)?,
+            ),
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from("succeeded"),
+            ),
+            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::new()),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from("Audio dynamics updated."),
+            ),
+        ],
+    )?;
+
+    read_audio_snapshot(&load_audio_settings(db_path)?)
+        .channels
+        .into_iter()
+        .find(|entry| entry.id == request.channel_id)
+        .ok_or_else(|| {
+            AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NOT_FOUND",
+                format!(
+                    "Audio channel '{}' is not exposed by the engine.",
+                    request.channel_id
+                ),
+            )
+        })
+}
+
+pub fn update_audio_channel_send_mode(
+    db_path: &Path,
+    request: &AudioSendModeUpdateRequest,
+) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    let app_settings = load_audio_settings(db_path)?;
+    let snapshot = read_audio_snapshot(&app_settings);
+    if !snapshot.capabilities.can_edit_mixer_state {
+        let message = String::from("Audio send controls are unavailable while OSC is disabled.");
+        record_audio_action_failure(db_path, "AUDIO_SEND_UNAVAILABLE", &message)?;
+        return Err(AudioCommandError::Rejected(
+            "AUDIO_SEND_UNAVAILABLE",
+            message,
+        ));
+    }
+    if !snapshot
+        .mix_targets
+        .iter()
+        .any(|entry| entry.id == request.mix_target_id)
+    {
+        return Err(AudioCommandError::Rejected(
+            "AUDIO_MIX_TARGET_NOT_FOUND",
+            format!(
+                "Audio mix target '{}' is not exposed by the engine.",
+                request.mix_target_id
+            ),
+        ));
+    }
+
+    let mut channel_state = read_channel_state_map(&app_settings);
+    let mut next_state = snapshot
+        .channels
+        .iter()
+        .find(|entry| entry.id == request.channel_id)
+        .map(stored_channel_state_from_snapshot)
+        .ok_or_else(|| {
+            AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NOT_FOUND",
+                format!(
+                    "Audio channel '{}' is not exposed by the engine.",
+                    request.channel_id
+                ),
+            )
+        })?;
+
+    let send_mode = next_state
+        .send_modes
+        .entry(request.mix_target_id.clone())
+        .or_insert_with(default_audio_send_mode_snapshot);
+    if let Some(pre_fader) = request.pre_fader {
+        send_mode.pre_fader = pre_fader;
+    }
+    if let Some(mute) = request.mute {
+        send_mode.mute = mute;
+    }
+    if let Some(link_stereo) = request.link_stereo {
+        send_mode.link_stereo = link_stereo;
+    }
+    if let Some(solo) = request.solo {
+        send_mode.solo = solo;
+    }
+
+    channel_state.insert(request.channel_id.clone(), next_state);
+    persist_audio_state(
+        db_path,
+        &[
+            (
+                String::from(AUDIO_CHANNEL_STATE_KEY),
+                serialize_json_state(&channel_state)?,
+            ),
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from("succeeded"),
+            ),
+            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::new()),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from("Audio send mode updated."),
+            ),
+        ],
+    )?;
+
+    read_audio_snapshot(&load_audio_settings(db_path)?)
         .channels
         .into_iter()
         .find(|entry| entry.id == request.channel_id)

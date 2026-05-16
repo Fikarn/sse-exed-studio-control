@@ -16,9 +16,8 @@ studio-control-protocol = { path = "protocol/rust" }
 # and a check of any diff in frontend/packages/engine-client/src/generated/.
 ts-rs = { version = "12", features = ["serde-compat"] }
 
-# Workspace-wide lints. Tightening from `warn` to `deny` is a follow-up item
-# once Phase 3 splits land and the existing 10 default-clippy warnings are
-# triaged.
+# Workspace-wide lints. The root `rust:clippy` npm lane denies warnings so
+# warning regressions fail the local and CI health gates.
 [workspace.lints.rust]
 unsafe_code = "forbid"
 

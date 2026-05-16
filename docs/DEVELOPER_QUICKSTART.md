@@ -226,7 +226,7 @@ npm run clean:local
 
 ## Dependency Policy
 
-The active baseline is Node 24 LTS and TypeScript 5.9. Dependabot is allowed to propose routine npm and Cargo maintenance updates, but major TypeScript and `@types/node` upgrades are intentional engineering tasks, not background merges.
+The active baseline is Node 24 LTS and TypeScript 6.0. Dependabot is allowed to propose routine npm and Cargo maintenance updates, but major TypeScript and `@types/node` upgrades are intentional engineering tasks, not background merges.
 
 For major upgrades:
 

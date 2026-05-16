@@ -314,6 +314,43 @@ function buildAudioMixLevels(main: number, phonesA: number, phonesB: number) {
   };
 }
 
+function buildAudioEq() {
+  return {
+    enabled: false,
+    bands: [
+      { id: "lc", label: "LC", enabled: false, frequencyHz: 80, gainDb: 0, q: 0.7, bandType: "low-cut" },
+      { id: "lo", label: "LO", enabled: true, frequencyHz: 180, gainDb: 0, q: 0.9, bandType: "bell" },
+      { id: "mid", label: "MID", enabled: true, frequencyHz: 1600, gainDb: 0, q: 1.2, bandType: "bell" },
+      { id: "hi", label: "HI", enabled: false, frequencyHz: 8500, gainDb: 0, q: 0.8, bandType: "shelf" },
+    ],
+  };
+}
+
+function buildAudioDynamics() {
+  return {
+    compressor: { enabled: false, thresholdDb: -18, ratio: 2, attackMs: 12, releaseMs: 120, makeupDb: 0 },
+    gate: { enabled: false, thresholdDb: -48, ratio: 1.5, attackMs: 4, releaseMs: 180, makeupDb: 0 },
+  };
+}
+
+function buildAudioSendModes() {
+  return {
+    "audio-mix-main": { preFader: false, mute: false, linkStereo: true, solo: false },
+    "audio-mix-phones-a": { preFader: false, mute: false, linkStereo: true, solo: false },
+    "audio-mix-phones-b": { preFader: false, mute: false, linkStereo: true, solo: false },
+  } satisfies JsonObject;
+}
+
+function buildAudioSnapshotPreview(hasContents = false) {
+  return {
+    hasContents,
+    channelCount: hasContents ? 18 : 0,
+    mixTargetCount: hasContents ? 3 : 0,
+    changedChannels: [],
+    changedMixTargets: [],
+  };
+}
+
 function buildAudioChannel(
   id: string,
   name: string,
@@ -346,9 +383,12 @@ function buildAudioChannel(
     solo: options.solo === true,
     phantom: role === "front-preamp",
     phase: options.phase === true,
-    pad: options.pad === true,
+    pad: false,
     instrument: options.instrument === true,
     autoSet: options.autoSet === true,
+    eq: buildAudioEq(),
+    dynamics: buildAudioDynamics(),
+    sendModes: buildAudioSendModes(),
   };
 }
 
@@ -371,11 +411,21 @@ function buildDefaultAudioSnapshot(): JsonObject {
     expectedSubmixLock: true,
     expectedCompatibilityMode: false,
     fadersPerBank: 12,
+    viewMode: "submix",
+    capabilities: {
+      canEditMixerState: true,
+      canSync: true,
+      canRecallConsoleSnapshot: true,
+      canEditProcessing: true,
+      canClearClips: true,
+      canCaptureSnapshot: true,
+      canUseMasterView: true,
+    },
     consoleStateConfidence: "aligned",
     lastConsoleSyncAt: "2026-04-23T18:24:12+02:00",
     lastConsoleSyncReason: "manual sync",
     lastRecalledSnapshotId: "snapshot-show-open",
-    lastSnapshotRecallAt: "2026-04-23T18:05:43+02:00",
+    lastSnapshotRecallAt: "2026-04-23T06:05:43+02:00",
     lastActionStatus: "succeeded",
     lastActionCode: null,
     lastActionMessage: "Sync succeeded",
@@ -386,40 +436,39 @@ function buildDefaultAudioSnapshot(): JsonObject {
         "HOST",
         "front-preamp",
         false,
-        34,
-        buildAudioMixLevels(0.84, 0.78, 0.62),
-        0.82
+        32,
+        buildAudioMixLevels(0.7, 0.76, 0.5),
+        0.72
       ),
       buildAudioChannel(
         "audio-input-10",
-        "Guest",
-        "GST",
+        "Co-host",
+        "CO-HOST",
         "front-preamp",
         false,
-        34,
-        buildAudioMixLevels(0.72, 0.68, 0.54),
-        0.68
+        28,
+        buildAudioMixLevels(0.68, 0.74, 0.48),
+        0.64
       ),
       buildAudioChannel(
         "audio-input-11",
-        "Boom",
-        "BOOM",
+        "Guest 1",
+        "GUEST 1",
         "front-preamp",
         false,
-        32,
-        buildAudioMixLevels(0.54, 0.42, 0.34),
-        0.54
+        45,
+        buildAudioMixLevels(0.8, 0.8, 0.6),
+        0.98
       ),
       buildAudioChannel(
         "audio-input-12",
-        "Guitar DI",
-        "GTR",
+        "Guest 2",
+        "GUEST 2",
         "front-preamp",
         false,
-        24,
-        buildAudioMixLevels(0.22, 0.12, 0.1),
-        0.2,
-        { instrument: true }
+        36,
+        buildAudioMixLevels(0.64, 0.7, 0.52),
+        0.58
       ),
       buildAudioChannel(
         "audio-input-1",
@@ -510,8 +559,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         "playback-pair",
         true,
         0,
-        buildAudioMixLevels(0.86, 0.68, 0.44),
-        0.84
+        buildAudioMixLevels(0.9, 0.8, 0.78),
+        0.78
       ),
       buildAudioChannel(
         "audio-playback-3-4",
@@ -520,8 +569,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         "playback-pair",
         true,
         0,
-        buildAudioMixLevels(0.82, 0.72, 0.58),
-        0.8,
+        buildAudioMixLevels(0.88, 0.6, 0.5),
+        0.66,
         { solo: true }
       ),
       buildAudioChannel(
@@ -531,8 +580,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         "playback-pair",
         true,
         0,
-        buildAudioMixLevels(0.4, 0.54, 0.38),
-        0.44
+        buildAudioMixLevels(0.46, 0.3, 0.28),
+        0.32
       ),
       buildAudioChannel(
         "audio-playback-7-8",
@@ -541,8 +590,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         "playback-pair",
         true,
         0,
-        buildAudioMixLevels(0.62, 0.24, 0.2),
-        0.6
+        buildAudioMixLevels(0.64, 0.52, 0.48),
+        0.44
       ),
       buildAudioChannel(
         "audio-playback-9-10",
@@ -551,8 +600,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         "playback-pair",
         true,
         0,
-        buildAudioMixLevels(0.14, 0.12, 0.12),
-        0.16
+        buildAudioMixLevels(0.22, 0.16, 0.14),
+        0.12
       ),
       buildAudioChannel(
         "audio-playback-11-12",
@@ -561,8 +610,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         "playback-pair",
         true,
         0,
-        buildAudioMixLevels(0.12, 0.1, 0.1),
-        0.14
+        buildAudioMixLevels(0.18, 0.12, 0.12),
+        0.09
       ),
     ],
     mixTargets: [
@@ -571,7 +620,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         name: "Main Out",
         shortName: "MAIN",
         role: "main-out",
-        volume: 0.82,
+        volume: 0.78,
         mute: false,
         dim: false,
         mono: false,
@@ -582,7 +631,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         name: "Phones 1",
         shortName: "HP 1",
         role: "phones-a",
-        volume: 0.64,
+        volume: 0.56,
         mute: false,
         dim: false,
         mono: false,
@@ -593,7 +642,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
         name: "Phones 2",
         shortName: "HP 2",
         role: "phones-b",
-        volume: 0.71,
+        volume: 0.42,
         mute: false,
         dim: false,
         mono: true,
@@ -607,7 +656,9 @@ function buildDefaultAudioSnapshot(): JsonObject {
         oscIndex: 0,
         order: 0,
         lastRecalled: false,
-        lastRecalledAt: null,
+        lastRecalledAt: "2026-04-23T05:42:00+02:00",
+        contents: null,
+        preview: buildAudioSnapshotPreview(false),
       },
       {
         id: "snapshot-show-open",
@@ -615,7 +666,9 @@ function buildDefaultAudioSnapshot(): JsonObject {
         oscIndex: 1,
         order: 1,
         lastRecalled: true,
-        lastRecalledAt: "2026-04-23T18:05:43+02:00",
+        lastRecalledAt: "2026-04-23T06:05:43+02:00",
+        contents: null,
+        preview: buildAudioSnapshotPreview(false),
       },
       {
         id: "snapshot-interview-block",
@@ -624,6 +677,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         order: 2,
         lastRecalled: false,
         lastRecalledAt: null,
+        contents: null,
+        preview: buildAudioSnapshotPreview(false),
       },
       {
         id: "snapshot-break-bumper",
@@ -632,6 +687,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         order: 3,
         lastRecalled: false,
         lastRecalledAt: null,
+        contents: null,
+        preview: buildAudioSnapshotPreview(false),
       },
       {
         id: "snapshot-credits",
@@ -640,6 +697,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
         order: 4,
         lastRecalled: false,
         lastRecalledAt: null,
+        contents: null,
+        preview: buildAudioSnapshotPreview(false),
       },
     ],
   };
@@ -2220,7 +2279,7 @@ function sceneFixtureStateFromFixture(fixture: JsonObject): JsonObject {
 function createMutableFixtureState(scenario: FixtureScenario): MutableFixtureState {
   const scenarioAudioSnapshot = asRecord(scenario.audioSnapshot);
 
-  return {
+  const state = {
     appSnapshot: cloneJson((scenario.appSnapshot ?? {}) as JsonObject),
     healthSnapshot: cloneJson((scenario.healthSnapshot ?? {}) as JsonObject),
     commissioningSnapshot: cloneJson((scenario.commissioningSnapshot ?? {}) as JsonObject),
@@ -2248,6 +2307,43 @@ function createMutableFixtureState(scenario: FixtureScenario): MutableFixtureSta
       (scenario.controlSurfaceSnapshot ?? buildDefaultControlSurfaceSnapshot()) as JsonObject
     ),
   };
+
+  const fixtureClipChannelIds = asArray(asRecord(state.audioSnapshot)?.clipChannelIds)
+    .map((entry) => asString(entry).trim())
+    .filter(Boolean);
+  if (fixtureClipChannelIds.length > 0 && state.audioSnapshot) {
+    delete state.audioSnapshot.clipChannelIds;
+    const clippedIds = new Set(fixtureClipChannelIds);
+    for (const channel of asArray(state.audioSnapshot.channels).map((entry) => asRecord(entry))) {
+      if (channel && clippedIds.has(asString(channel.id))) {
+        channel.clip = true;
+      }
+    }
+  }
+
+  const fixtureMixLevelOverrides = asArray(asRecord(state.audioSnapshot)?.mixLevelOverrides)
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is JsonObject => entry !== null);
+  if (fixtureMixLevelOverrides.length > 0 && state.audioSnapshot) {
+    delete state.audioSnapshot.mixLevelOverrides;
+    const channels = asArray(state.audioSnapshot.channels).map((entry) => asRecord(entry));
+    for (const override of fixtureMixLevelOverrides) {
+      const channelId = asString(override.channelId).trim();
+      const mixTargetId = asString(override.mixTargetId).trim();
+      if (!channelId || !mixTargetId) continue;
+      const value = clampNumber(asNumber(override.value, 0), 0, 1);
+      const channel = channels.find((entry) => entry && asString(entry.id) === channelId);
+      if (!channel) continue;
+      const mixLevels = asRecord(channel.mixLevels) ?? {};
+      mixLevels[mixTargetId] = value;
+      channel.mixLevels = mixLevels;
+      if (mixTargetId === "audio-mix-main") {
+        channel.fader = value;
+      }
+    }
+  }
+
+  return state;
 }
 
 function ensureCommissioningChecks(state: MutableFixtureState) {
@@ -2699,6 +2795,7 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   audioSnapshotRecord.expectedSubmixLock = asBoolean(audioSnapshotRecord.expectedSubmixLock, true);
   audioSnapshotRecord.expectedCompatibilityMode = asBoolean(audioSnapshotRecord.expectedCompatibilityMode, false);
   audioSnapshotRecord.fadersPerBank = clampNumber(Math.round(asNumber(audioSnapshotRecord.fadersPerBank, 12)), 1, 24);
+  audioSnapshotRecord.viewMode = audioSnapshotRecord.viewMode === "master" ? "master" : "submix";
   audioSnapshotRecord.consoleStateConfidence = (() => {
     const confidence = asString(audioSnapshotRecord.consoleStateConfidence, "unknown");
     if (confidence === "aligned" || confidence === "assumed") {
@@ -2719,7 +2816,16 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     typeof audioSnapshotRecord.lastActionCode === "string" ? audioSnapshotRecord.lastActionCode : null;
   audioSnapshotRecord.lastActionMessage =
     typeof audioSnapshotRecord.lastActionMessage === "string" ? audioSnapshotRecord.lastActionMessage : null;
-  audioSnapshotRecord.channels = asArray(audioSnapshotRecord.channels);
+  audioSnapshotRecord.channels = asArray(audioSnapshotRecord.channels)
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is JsonObject => entry !== null)
+    .map((channel) => ({
+      ...channel,
+      pad: false,
+      eq: asRecord(channel.eq) ?? buildAudioEq(),
+      dynamics: asRecord(channel.dynamics) ?? buildAudioDynamics(),
+      sendModes: asRecord(channel.sendModes) ?? buildAudioSendModes(),
+    }));
   audioSnapshotRecord.mixTargets = asArray(audioSnapshotRecord.mixTargets);
   audioSnapshotRecord.snapshots = asArray(audioSnapshotRecord.snapshots)
     .map((entry) => asRecord(entry))
@@ -2732,6 +2838,8 @@ function synchronizeFixtureState(state: MutableFixtureState) {
         asString(audioSnapshotRecord.lastRecalledSnapshotId) === asString(entry.id)
           ? audioSnapshotRecord.lastSnapshotRecallAt
           : null,
+      contents: asRecord(entry.contents) ?? null,
+      preview: asRecord(entry.preview) ?? buildAudioSnapshotPreview(Boolean(asRecord(entry.contents))),
     }));
   const mixTargets = audioSnapshotRecord.mixTargets
     .map((entry) => asRecord(entry))
@@ -2756,6 +2864,7 @@ function synchronizeFixtureState(state: MutableFixtureState) {
       : audioSnapshotRecord.status === "attention"
         ? `OSC transport check failed for ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} / ${audioSnapshotRecord.receivePort}.`
         : `OSC transport is configured for ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} with receive port ${audioSnapshotRecord.receivePort} before the native audio probe runs.`;
+  refreshAudioCapabilities(audioSnapshotRecord, state);
   state.audioSnapshot = audioSnapshotRecord;
 }
 
@@ -2817,11 +2926,48 @@ function buildFixtureBackupEntry(state: MutableFixtureState) {
   };
 }
 
-function ensureAudioActionAllowed(state: MutableFixtureState) {
+function ensureAudioSnapshotAvailable(state: MutableFixtureState) {
   const audioSnapshot = asRecord(state.audioSnapshot);
   if (!audioSnapshot) {
     throw new Error("Audio snapshot is not available yet.");
   }
+
+  return audioSnapshot;
+}
+
+function refreshAudioCapabilities(audioSnapshot: JsonObject, state: MutableFixtureState) {
+  const audioCheck = asRecord(
+    asArray(state.commissioningSnapshot.checks)
+      .map((entry) => asRecord(entry))
+      .find((entry) => asString(entry?.id) === "audio")
+  );
+  const audioReady = asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok";
+  const oscEnabled = asBoolean(audioSnapshot.oscEnabled, true);
+  audioSnapshot.capabilities = {
+    canEditMixerState: oscEnabled,
+    canSync: oscEnabled,
+    canRecallConsoleSnapshot: oscEnabled && audioReady,
+    canEditProcessing: oscEnabled,
+    canClearClips: oscEnabled,
+    canCaptureSnapshot: oscEnabled,
+    canUseMasterView: oscEnabled,
+  };
+}
+
+function ensureAudioEditAllowed(state: MutableFixtureState) {
+  const audioSnapshot = ensureAudioSnapshotAvailable(state);
+  refreshAudioCapabilities(audioSnapshot, state);
+
+  if (!asBoolean(audioSnapshot.oscEnabled, true)) {
+    throw new Error("OSC transport is disabled in native audio settings.");
+  }
+
+  return audioSnapshot;
+}
+
+function ensureAudioActionAllowed(state: MutableFixtureState) {
+  const audioSnapshot = ensureAudioSnapshotAvailable(state);
+  refreshAudioCapabilities(audioSnapshot, state);
 
   const audioCheck = asRecord(
     asArray(state.commissioningSnapshot.checks)
@@ -2841,6 +2987,59 @@ function ensureAudioActionAllowed(state: MutableFixtureState) {
   }
 
   return audioSnapshot;
+}
+
+function fixtureAudioChannel(audioSnapshot: JsonObject, channelIdValue: unknown) {
+  const channelId = asString(channelIdValue).trim();
+  const channel = asArray(audioSnapshot.channels)
+    .map((entry) => asRecord(entry))
+    .find((entry) => asString(entry?.id) === channelId);
+  if (!channel) {
+    throw new Error(`Audio channel '${channelId}' is not exposed by the fixture transport.`);
+  }
+  return channel;
+}
+
+function captureFixtureAudioScene(audioSnapshot: JsonObject) {
+  const channels: JsonObject = {};
+  for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
+    if (!channel) continue;
+    channels[asString(channel.id)] = {
+      name: asString(channel.name),
+      gain: asNumber(channel.gain, 0),
+      fader: asNumber(channel.fader, 0),
+      clip: asBoolean(channel.clip, false),
+      mixLevels: cloneJson(asRecord(channel.mixLevels) ?? {}),
+      mute: asBoolean(channel.mute, false),
+      solo: asBoolean(channel.solo, false),
+      phantom: asBoolean(channel.phantom, false),
+      phase: asBoolean(channel.phase, false),
+      pad: false,
+      instrument: asBoolean(channel.instrument, false),
+      autoSet: asBoolean(channel.autoSet, false),
+      eq: cloneJson(asRecord(channel.eq) ?? buildAudioEq()),
+      dynamics: cloneJson(asRecord(channel.dynamics) ?? buildAudioDynamics()),
+      sendModes: cloneJson(asRecord(channel.sendModes) ?? buildAudioSendModes()),
+    };
+  }
+
+  const mixTargets: JsonObject = {};
+  for (const mixTarget of asArray(audioSnapshot.mixTargets).map((entry) => asRecord(entry))) {
+    if (!mixTarget) continue;
+    mixTargets[asString(mixTarget.id)] = {
+      volume: asNumber(mixTarget.volume, 0),
+      mute: asBoolean(mixTarget.mute, false),
+      dim: asBoolean(mixTarget.dim, false),
+      mono: asBoolean(mixTarget.mono, false),
+      talkback: asBoolean(mixTarget.talkback, false),
+    };
+  }
+
+  return {
+    capturedAt: new Date().toISOString(),
+    channels,
+    mixTargets,
+  };
 }
 
 export function createFixtureTransport(scenario: FixtureScenario): EngineTransport {
@@ -3258,6 +3457,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         if (typeof params.fadersPerBank === "number") {
           audioSnapshot.fadersPerBank = clampNumber(Math.round(params.fadersPerBank), 1, 24);
         }
+        if (params.viewMode === "submix" || params.viewMode === "master") {
+          audioSnapshot.viewMode = params.viewMode;
+        }
 
         if (transportChanged) {
           if (audioCheck) {
@@ -3275,6 +3477,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         audioSnapshot.lastActionStatus = "succeeded";
         audioSnapshot.lastActionCode = null;
         audioSnapshot.lastActionMessage = "Audio settings updated";
+        refreshAudioCapabilities(audioSnapshot, state);
         state.audioSnapshot = audioSnapshot;
         synchronizeFixtureState(state);
         emit("audio.changed", { reason: "audio-settings-updated" });
@@ -3317,6 +3520,25 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         audioSnapshot.lastActionStatus = "succeeded";
         audioSnapshot.lastActionCode = null;
         audioSnapshot.lastActionMessage = `Recalled ${asString(snapshot.name, snapshotId)}`;
+        const contents = asRecord(snapshot.contents);
+        if (contents) {
+          const sceneChannels = asRecord(contents.channels) ?? {};
+          const sceneMixTargets = asRecord(contents.mixTargets) ?? {};
+          for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
+            if (!channel) continue;
+            const stateEntry = asRecord(sceneChannels[asString(channel.id)]);
+            if (stateEntry) {
+              Object.assign(channel, cloneJson(stateEntry));
+            }
+          }
+          for (const mixTarget of asArray(audioSnapshot.mixTargets).map((entry) => asRecord(entry))) {
+            if (!mixTarget) continue;
+            const stateEntry = asRecord(sceneMixTargets[asString(mixTarget.id)]);
+            if (stateEntry) {
+              Object.assign(mixTarget, cloneJson(stateEntry));
+            }
+          }
+        }
         state.audioSnapshot = audioSnapshot;
         synchronizeFixtureState(state);
         emit("audio.changed", { reason: "audio-snapshot-recalled" });
@@ -3329,8 +3551,98 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           consoleStateConfidence: "assumed",
         };
       }
+      case "audio.snapshot.create": {
+        const audioSnapshot = ensureAudioEditAllowed(state);
+        const name = asString(params.name).trim() || "Snapshot";
+        const oscIndex = clampNumber(Math.round(asNumber(params.oscIndex, 0)), 0, 7);
+        const snapshots = asArray(audioSnapshot.snapshots)
+          .map((entry) => asRecord(entry))
+          .filter((entry): entry is JsonObject => entry !== null);
+        const snapshot = {
+          id: `audio-snapshot-custom-${Date.now()}`,
+          name,
+          oscIndex,
+          order: snapshots.length,
+          lastRecalled: false,
+          lastRecalledAt: null,
+          contents: asBoolean(params.captureCurrentState, false) ? captureFixtureAudioScene(audioSnapshot) : null,
+          preview: buildAudioSnapshotPreview(asBoolean(params.captureCurrentState, false)),
+        };
+        snapshots.push(snapshot);
+        audioSnapshot.snapshots = snapshots;
+        audioSnapshot.lastActionStatus = "succeeded";
+        audioSnapshot.lastActionCode = null;
+        audioSnapshot.lastActionMessage = `Created ${name}`;
+        state.audioSnapshot = audioSnapshot;
+        synchronizeFixtureState(state);
+        emit("audio.changed", { reason: "audio-snapshot-created" });
+        return { snapshot: cloneJson(snapshot), summary: `Audio snapshot '${name}' was created.` };
+      }
+      case "audio.snapshot.update": {
+        const audioSnapshot = ensureAudioEditAllowed(state);
+        const snapshotId = asString(params.snapshotId).trim();
+        const snapshots = asArray(audioSnapshot.snapshots)
+          .map((entry) => asRecord(entry))
+          .filter((entry): entry is JsonObject => entry !== null);
+        const snapshot = snapshots.find((entry) => asString(entry.id) === snapshotId);
+        if (!snapshot) throw new Error(`Audio snapshot '${snapshotId}' is not exposed by the fixture transport.`);
+        if (typeof params.name === "string" && params.name.trim()) {
+          snapshot.name = params.name.trim();
+        }
+        if (typeof params.oscIndex === "number") {
+          snapshot.oscIndex = clampNumber(Math.round(params.oscIndex), 0, 7);
+        }
+        if (asBoolean(params.captureCurrentState, false)) {
+          snapshot.contents = captureFixtureAudioScene(audioSnapshot);
+          snapshot.preview = buildAudioSnapshotPreview(true);
+        }
+        audioSnapshot.snapshots = snapshots;
+        audioSnapshot.lastActionStatus = "succeeded";
+        audioSnapshot.lastActionCode = null;
+        audioSnapshot.lastActionMessage = `Updated ${asString(snapshot.name, snapshotId)}`;
+        state.audioSnapshot = audioSnapshot;
+        synchronizeFixtureState(state);
+        emit("audio.changed", { reason: "audio-snapshot-updated" });
+        return { snapshot: cloneJson(snapshot), summary: `Audio snapshot '${asString(snapshot.name)}' was updated.` };
+      }
+      case "audio.snapshot.delete": {
+        const audioSnapshot = ensureAudioEditAllowed(state);
+        const snapshotId = asString(params.snapshotId).trim();
+        const snapshots = asArray(audioSnapshot.snapshots)
+          .map((entry) => asRecord(entry))
+          .filter((entry): entry is JsonObject => entry !== null);
+        audioSnapshot.snapshots = snapshots.filter((entry) => asString(entry.id) !== snapshotId);
+        if (asString(audioSnapshot.lastRecalledSnapshotId) === snapshotId) {
+          audioSnapshot.lastRecalledSnapshotId = null;
+          audioSnapshot.lastSnapshotRecallAt = null;
+        }
+        audioSnapshot.lastActionStatus = "succeeded";
+        audioSnapshot.lastActionCode = null;
+        audioSnapshot.lastActionMessage = `Deleted ${snapshotId}`;
+        state.audioSnapshot = audioSnapshot;
+        synchronizeFixtureState(state);
+        emit("audio.changed", { reason: "audio-snapshot-deleted" });
+        return { deleted: true, snapshotId, summary: `Audio snapshot '${snapshotId}' was deleted.` };
+      }
+      case "audio.clip.clear": {
+        const audioSnapshot = ensureAudioEditAllowed(state);
+        const channelId = typeof params.channelId === "string" ? params.channelId : null;
+        for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
+          if (!channel) continue;
+          if (!channelId || asString(channel.id) === channelId) {
+            channel.clip = false;
+          }
+        }
+        audioSnapshot.lastActionStatus = "succeeded";
+        audioSnapshot.lastActionCode = null;
+        audioSnapshot.lastActionMessage = channelId ? `Cleared clips for ${channelId}` : "Cleared clips";
+        state.audioSnapshot = audioSnapshot;
+        synchronizeFixtureState(state);
+        emit("audio.changed", { reason: "audio-clips-cleared" });
+        return { cleared: true, channelId, summary: audioSnapshot.lastActionMessage };
+      }
       case "audio.channel.update": {
-        const audioSnapshot = ensureAudioActionAllowed(state);
+        const audioSnapshot = ensureAudioEditAllowed(state);
         const channelId = asString(params.channelId).trim();
         const channels = asArray(audioSnapshot.channels)
           .map((entry) => asRecord(entry))
@@ -3341,6 +3653,9 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         }
 
         const role = asString(channel.role);
+        if (typeof params.name === "string" && params.name.trim()) {
+          channel.name = params.name.trim();
+        }
         if (typeof params.gain === "number") {
           if (role !== "front-preamp") {
             throw new Error("AUDIO_CHANNEL_FIELD_UNSUPPORTED: gain is only available on front preamps.");
@@ -3378,10 +3693,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           channel.phase = asBoolean(params.phase, false);
         }
         if ("pad" in params) {
-          if (role !== "front-preamp") {
-            throw new Error("AUDIO_CHANNEL_FIELD_UNSUPPORTED: pad is only available on front preamps.");
-          }
-          channel.pad = asBoolean(params.pad, false);
+          throw new Error("AUDIO_CHANNEL_FIELD_UNSUPPORTED: pad is not available on UFX III mic preamps.");
         }
         if ("instrument" in params) {
           if (role !== "front-preamp") {
@@ -3404,8 +3716,72 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         emit("audio.changed", { reason: "audio-channel-updated" });
         return cloneJson(channel);
       }
+      case "audio.channel.eq.update": {
+        const audioSnapshot = ensureAudioEditAllowed(state);
+        const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
+        const eq = asRecord(channel.eq) ?? buildAudioEq();
+        if ("enabled" in params) eq.enabled = asBoolean(params.enabled, false);
+        if (typeof params.bandId === "string") {
+          const bands = asArray(eq.bands)
+            .map((entry) => asRecord(entry))
+            .filter((entry): entry is JsonObject => entry !== null);
+          const band = bands.find((entry) => asString(entry.id) === params.bandId);
+          if (!band) throw new Error(`Audio EQ band '${params.bandId}' is not exposed by the fixture transport.`);
+          if ("bandEnabled" in params) band.enabled = asBoolean(params.bandEnabled, false);
+          if (typeof params.frequencyHz === "number") band.frequencyHz = clampNumber(params.frequencyHz, 20, 20_000);
+          if (typeof params.gainDb === "number") band.gainDb = clampNumber(params.gainDb, -12, 12);
+          if (typeof params.q === "number") band.q = clampNumber(params.q, 0.1, 12);
+          eq.bands = bands;
+        }
+        channel.eq = eq;
+        state.audioSnapshot = audioSnapshot;
+        synchronizeFixtureState(state);
+        emit("audio.changed", { reason: "audio-channel-eq-updated" });
+        return cloneJson(channel);
+      }
+      case "audio.channel.dynamics.update": {
+        const audioSnapshot = ensureAudioEditAllowed(state);
+        const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
+        const dynamics = asRecord(channel.dynamics) ?? buildAudioDynamics();
+        const key = params.section === "gate" ? "gate" : "compressor";
+        const section = asRecord(dynamics[key]) ?? {};
+        if ("enabled" in params) section.enabled = asBoolean(params.enabled, false);
+        if (typeof params.thresholdDb === "number") section.thresholdDb = clampNumber(params.thresholdDb, -80, 0);
+        if (typeof params.ratio === "number") section.ratio = clampNumber(params.ratio, 1, 20);
+        if (typeof params.attackMs === "number") section.attackMs = clampNumber(params.attackMs, 0.1, 2000);
+        if (typeof params.releaseMs === "number") section.releaseMs = clampNumber(params.releaseMs, 0.1, 2000);
+        if (typeof params.makeupDb === "number") section.makeupDb = clampNumber(params.makeupDb, 0, 24);
+        dynamics[key] = section;
+        channel.dynamics = dynamics;
+        state.audioSnapshot = audioSnapshot;
+        synchronizeFixtureState(state);
+        emit("audio.changed", { reason: "audio-channel-dynamics-updated" });
+        return cloneJson(channel);
+      }
+      case "audio.channel.send.update": {
+        const audioSnapshot = ensureAudioEditAllowed(state);
+        const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
+        const mixTargetId = asString(params.mixTargetId).trim();
+        const sendModes: JsonObject = asRecord(channel.sendModes) ?? buildAudioSendModes();
+        const sendMode = asRecord(sendModes[mixTargetId]) ?? {
+          preFader: false,
+          mute: false,
+          linkStereo: true,
+          solo: false,
+        };
+        if ("preFader" in params) sendMode.preFader = asBoolean(params.preFader, false);
+        if ("mute" in params) sendMode.mute = asBoolean(params.mute, false);
+        if ("linkStereo" in params) sendMode.linkStereo = asBoolean(params.linkStereo, true);
+        if ("solo" in params) sendMode.solo = asBoolean(params.solo, false);
+        sendModes[mixTargetId] = sendMode;
+        channel.sendModes = sendModes;
+        state.audioSnapshot = audioSnapshot;
+        synchronizeFixtureState(state);
+        emit("audio.changed", { reason: "audio-channel-send-updated" });
+        return cloneJson(channel);
+      }
       case "audio.mixTarget.update": {
-        const audioSnapshot = ensureAudioActionAllowed(state);
+        const audioSnapshot = ensureAudioEditAllowed(state);
         const mixTargetId = asString(params.mixTargetId).trim();
         const mixTargets = asArray(audioSnapshot.mixTargets)
           .map((entry) => asRecord(entry))

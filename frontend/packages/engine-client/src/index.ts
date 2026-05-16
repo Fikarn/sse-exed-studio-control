@@ -8,6 +8,13 @@ export type {
   CommissioningUpdateRequest,
   EngineTransport,
   FixtureScenario,
+  AudioClipClearRequest,
+  AudioDynamicsUpdateRequest,
+  AudioEqUpdateRequest,
+  AudioSendModeUpdateRequest,
+  AudioSnapshotCreateRequest,
+  AudioSnapshotDeleteRequest,
+  AudioSnapshotUpdateRequest,
   LightingPaletteApplyRequest,
   LightingPaletteCreateRequest,
   LightingPaletteUpdateRequest,
@@ -43,8 +50,16 @@ export type {
 // `studio-control-engine/ts-rs` cargo feature). Do not hand-edit; the
 // `protocol:check` lane catches drift.
 export type { AudioChannelSnapshot } from "./generated/snapshots/AudioChannelSnapshot";
+export type { AudioCapabilitySnapshot } from "./generated/snapshots/AudioCapabilitySnapshot";
+export type { AudioDynamicsProcessorSnapshot } from "./generated/snapshots/AudioDynamicsProcessorSnapshot";
+export type { AudioDynamicsSnapshot } from "./generated/snapshots/AudioDynamicsSnapshot";
+export type { AudioEqBandSnapshot } from "./generated/snapshots/AudioEqBandSnapshot";
+export type { AudioEqSnapshot } from "./generated/snapshots/AudioEqSnapshot";
 export type { AudioMixTargetSnapshot } from "./generated/snapshots/AudioMixTargetSnapshot";
+export type { AudioSceneContentsSnapshot } from "./generated/snapshots/AudioSceneContentsSnapshot";
+export type { AudioScenePreviewSnapshot } from "./generated/snapshots/AudioScenePreviewSnapshot";
 export type { AudioSceneSnapshot } from "./generated/snapshots/AudioSceneSnapshot";
+export type { AudioSendModeSnapshot } from "./generated/snapshots/AudioSendModeSnapshot";
 export type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
 export type { LightingDmxChannelSnapshot } from "./generated/snapshots/LightingDmxChannelSnapshot";
 export type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingDmxMonitorSnapshot";
