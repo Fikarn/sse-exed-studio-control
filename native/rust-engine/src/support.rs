@@ -1136,6 +1136,7 @@ mod tests {
                 expected_submix_lock: Some(false),
                 expected_compatibility_mode: Some(true),
                 faders_per_bank: None,
+                view_mode: None,
             },
         )
         .expect("audio settings should persist before restore");
@@ -1156,13 +1157,14 @@ mod tests {
             &AudioChannelUpdateRequest {
                 channel_id: String::from("audio-input-12"),
                 mix_target_id: None,
+                name: None,
                 gain: Some(40),
                 fader: None,
                 mute: None,
                 solo: None,
                 phantom: Some(true),
                 phase: Some(true),
-                pad: Some(true),
+                pad: None,
                 instrument: Some(true),
                 auto_set: Some(true),
             },
@@ -1173,6 +1175,7 @@ mod tests {
             &AudioChannelUpdateRequest {
                 channel_id: String::from("audio-input-1"),
                 mix_target_id: None,
+                name: None,
                 gain: None,
                 fader: None,
                 mute: Some(true),
@@ -1190,6 +1193,7 @@ mod tests {
             &AudioChannelUpdateRequest {
                 channel_id: String::from("audio-playback-1-2"),
                 mix_target_id: Some(String::from("audio-mix-phones-a")),
+                name: None,
                 gain: None,
                 fader: Some(0.61),
                 mute: Some(true),

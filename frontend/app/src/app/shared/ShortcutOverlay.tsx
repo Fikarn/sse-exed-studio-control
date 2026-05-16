@@ -93,12 +93,17 @@ const SHORTCUTS: readonly ShortcutSection[] = [
   {
     heading: "Audio",
     entries: [
-      { keys: ["[", "]"], description: "Page through fader banks" },
-      { keys: ["1–8"], description: "Select a strip in the active bank" },
+      { keys: ["[", "]"], description: "Page through Audio source banks" },
+      { keys: ["1–8"], description: "Select a visible source strip" },
       { keys: ["Shift", "1–8"], description: "Recall an audio snapshot" },
-      { keys: ["←", "→"], description: "Move between mix targets" },
+      { keys: ["←", "→"], description: "Move between Submix output targets" },
       { keys: ["M", "S"], description: "Mute / solo the selected strip" },
-      { keys: ["V"], description: "Cycle Audio density (compact / regular / spacious)" },
+      { keys: ["U"], description: "Reset selected Audio fader to unity" },
+      { keys: ["V"], description: "Toggle Audio Master / Submix view" },
+      { keys: ["⌥", "C"], description: "Clear held audio clip indicators" },
+      { keys: ["⌘/Ctrl", "S"], description: "Save the current audio snapshot" },
+      { keys: ["Right-click"], description: "Open strip actions: reset, polarity, rename" },
+      { keys: ["Esc"], description: "Close Audio menu or return inspector to Channel" },
     ],
   },
   {

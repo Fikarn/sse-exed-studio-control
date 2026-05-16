@@ -130,8 +130,44 @@ function buildLightingSymbolFamiliesFixture(): FixtureScenarioRecord {
   return scenario;
 }
 
+function buildAudioClippedFixture(): FixtureScenarioRecord {
+  const scenario = cloneFixture(fixtureMap["audio-populated"]) as FixtureScenarioRecord & {
+    audioSnapshot: Record<string, unknown>;
+  };
+  scenario.audioSnapshot = {
+    ...scenario.audioSnapshot,
+    clipChannelIds: ["audio-input-11"],
+  };
+  return scenario;
+}
+
+function buildAudioHardwareMeteringFixture(): FixtureScenarioRecord {
+  const scenario = cloneFixture(fixtureMap["audio-populated"]) as FixtureScenarioRecord & {
+    audioSnapshot: Record<string, unknown>;
+  };
+  scenario.audioSnapshot = {
+    ...scenario.audioSnapshot,
+    adapterMode: "totalmix",
+  };
+  return scenario;
+}
+
+function buildAudioNoSendFixture(): FixtureScenarioRecord {
+  const scenario = cloneFixture(fixtureMap["audio-populated"]) as FixtureScenarioRecord & {
+    audioSnapshot: Record<string, unknown>;
+  };
+  scenario.audioSnapshot = {
+    ...scenario.audioSnapshot,
+    mixLevelOverrides: [{ channelId: "audio-playback-3-4", mixTargetId: "audio-mix-main", value: 0 }],
+  };
+  return scenario;
+}
+
 const derivedFixtureMap: FixtureMap = {
   ...fixtureMap,
+  "audio-clipped": buildAudioClippedFixture(),
+  "audio-hardware-metering": buildAudioHardwareMeteringFixture(),
+  "audio-no-send": buildAudioNoSendFixture(),
   "lighting-palettes-empty": buildLightingPaletteFixture("empty"),
   "lighting-palettes-patch-disabled": buildLightingPaletteFixture("patch-disabled"),
   "lighting-palettes-preview-active": buildLightingPalettePreviewFixture(),

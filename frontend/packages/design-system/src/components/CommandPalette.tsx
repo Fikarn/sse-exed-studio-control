@@ -137,8 +137,27 @@ export function CommandPalette({
         scored.push({ action: target as unknown as PaletteAction, score });
       }
     }
-    scored.sort((a, b) => b.score - a.score);
-    return scored.length === 0 ? [] : [{ group: "Results", entries: scored }];
+    const groupOrder: string[] = [];
+    for (const action of visibleActions) {
+      const groupKey = action.group ?? "Commands";
+      if (!groupOrder.includes(groupKey)) {
+        groupOrder.push(groupKey);
+      }
+    }
+    const groups = new Map<string, SortedAction[]>();
+    for (const entry of scored) {
+      const groupKey = entry.action.group ?? "Commands";
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, []);
+      }
+      groups.get(groupKey)!.push(entry);
+    }
+    for (const entries of groups.values()) {
+      entries.sort((a, b) => b.score - a.score);
+    }
+    return groupOrder
+      .map((group) => ({ group, entries: groups.get(group) ?? [] }))
+      .filter((group) => group.entries.length > 0);
   }, [query, recentActionIds, visibleActions]);
 
   // Flatten for keyboard navigation; focusIndex is into this flat list.

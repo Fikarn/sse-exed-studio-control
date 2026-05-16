@@ -1,12 +1,15 @@
 use crate::app_state::{build_app_snapshot, parse_commissioning_update, APP_SETTINGS_PREFIX};
 use crate::audio::{
-    build_audio_health_check, create_audio_snapshot, delete_audio_snapshot,
-    parse_audio_channel_update_request, parse_audio_mix_target_update_request,
+    build_audio_health_check, clear_audio_clips, create_audio_snapshot, delete_audio_snapshot,
+    parse_audio_channel_update_request, parse_audio_clip_clear_request,
+    parse_audio_dynamics_update_request, parse_audio_eq_update_request,
+    parse_audio_mix_target_update_request, parse_audio_send_mode_update_request,
     parse_audio_settings_update_request, parse_audio_snapshot_create_request,
     parse_audio_snapshot_delete_request, parse_audio_snapshot_recall_request,
     parse_audio_snapshot_update_request, read_audio_snapshot, recall_audio_snapshot,
-    sync_audio_console, update_audio_channel, update_audio_mix_target, update_audio_settings,
-    update_audio_snapshot, AudioCommandError,
+    sync_audio_console, update_audio_channel, update_audio_channel_dynamics,
+    update_audio_channel_eq, update_audio_channel_send_mode, update_audio_mix_target,
+    update_audio_settings, update_audio_snapshot, AudioCommandError,
 };
 use crate::bootstrap::{bootstrap_runtime, RuntimeContext};
 use crate::commissioning::{
@@ -355,6 +358,12 @@ impl EngineApp {
             // Audio mutations (M-1event)
             // -------------------------------------------------------------
             "audio.sync" => self.run_audio_mutate(request.id, sync_audio_console, "console-synced"),
+            "audio.clip.clear" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_clip_clear_request,
+                clear_audio_clips,
+                "clips-cleared",
+            ),
             "audio.snapshot.recall" => self.dispatch_audio_mutate(
                 request,
                 parse_audio_snapshot_recall_request,
@@ -384,6 +393,24 @@ impl EngineApp {
                 parse_audio_channel_update_request,
                 update_audio_channel,
                 "channel-updated",
+            ),
+            "audio.channel.eq.update" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_eq_update_request,
+                update_audio_channel_eq,
+                "channel-eq-updated",
+            ),
+            "audio.channel.dynamics.update" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_dynamics_update_request,
+                update_audio_channel_dynamics,
+                "channel-dynamics-updated",
+            ),
+            "audio.channel.send.update" => self.dispatch_audio_mutate(
+                request,
+                parse_audio_send_mode_update_request,
+                update_audio_channel_send_mode,
+                "channel-send-updated",
             ),
             "audio.mixTarget.update" => self.dispatch_audio_mutate(
                 request,

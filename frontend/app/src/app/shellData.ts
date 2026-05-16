@@ -1,7 +1,10 @@
 import type {
   AudioChannelSnapshot,
+  AudioDynamicsSnapshot,
+  AudioEqSnapshot,
   AudioMixTargetSnapshot,
   AudioSceneSnapshot,
+  AudioSendModeSnapshot,
   AudioSnapshot,
   LightingDmxChannelSnapshot,
   LightingDmxMonitorSnapshot,
@@ -124,6 +127,9 @@ export interface AudioChannelEntry {
   shortName: string;
   solo: boolean;
   stereo: boolean;
+  eq: AudioEqSnapshot;
+  dynamics: AudioDynamicsSnapshot;
+  sendModes: Record<string, AudioSendModeSnapshot>;
 }
 
 export interface AudioMixTargetEntry {
@@ -139,12 +145,14 @@ export interface AudioMixTargetEntry {
 }
 
 export interface AudioSnapshotEntry {
+  contents?: AudioSceneSnapshot["contents"];
   id: string;
   lastRecalled: boolean;
   lastRecalledAt?: string;
   name: string;
   order: number;
   oscIndex: number;
+  preview: AudioSceneSnapshot["preview"];
 }
 
 export interface PlanningProjectEntry {
@@ -456,6 +464,9 @@ export function getAudioChannels(snapshot: AudioSnapshot | null): AudioChannelEn
     shortName: c.shortName,
     solo: c.solo,
     stereo: c.stereo,
+    eq: c.eq,
+    dynamics: c.dynamics,
+    sendModes: { ...c.sendModes },
   }));
 }
 
@@ -478,11 +489,13 @@ export function getAudioSnapshots(snapshot: AudioSnapshot | null): AudioSnapshot
     .map(
       (s: AudioSceneSnapshot): AudioSnapshotEntry => ({
         id: s.id,
+        contents: s.contents ?? undefined,
         lastRecalled: s.lastRecalled,
         lastRecalledAt: s.lastRecalledAt ?? undefined,
         name: s.name,
         order: s.order,
         oscIndex: s.oscIndex,
+        preview: s.preview,
       })
     )
     .sort((left, right) => left.order - right.order);

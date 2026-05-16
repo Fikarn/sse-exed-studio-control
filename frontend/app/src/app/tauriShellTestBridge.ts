@@ -98,6 +98,21 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("recallAudioSnapshot requires snapshotId.");
       }
       return store.recallAudioSnapshot(command.snapshotId);
+    case "createAudioSnapshot":
+      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
+        throw new Error("createAudioSnapshot requires a request object.");
+      }
+      return store.createAudioSnapshot(command.request as never);
+    case "updateAudioSnapshot":
+      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
+        throw new Error("updateAudioSnapshot requires a request object.");
+      }
+      return store.updateAudioSnapshot(command.request as never);
+    case "deleteAudioSnapshot":
+      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
+        throw new Error("deleteAudioSnapshot requires a request object.");
+      }
+      return store.deleteAudioSnapshot(command.request as never);
     case "recallLightingScene":
       if (typeof command.sceneId !== "string" || !command.sceneId.trim()) {
         throw new Error("recallLightingScene requires sceneId.");

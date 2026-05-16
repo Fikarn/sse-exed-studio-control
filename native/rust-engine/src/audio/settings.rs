@@ -171,6 +171,11 @@ pub fn update_audio_settings(
         summary_parts.push(format!("bank size -> {} faders", faders_per_bank));
     }
 
+    if let Some(view_mode) = &request.view_mode {
+        updates.push((String::from(AUDIO_VIEW_MODE_KEY), view_mode.clone()));
+        summary_parts.push(format!("view mode -> {}", view_mode));
+    }
+
     if transport_changed {
         updates.push((
             format!("app.commissioning.check.{AUDIO_CHECK_ID}.status"),

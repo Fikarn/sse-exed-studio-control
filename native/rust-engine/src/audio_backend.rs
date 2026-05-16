@@ -1,6 +1,7 @@
 use crate::audio::{
+    default_audio_dynamics_snapshot, default_audio_eq_snapshot, default_audio_send_mode_snapshot,
     AudioChannelSnapshot, AudioChannelUpdateRequest, AudioMixTargetSnapshot,
-    AudioMixTargetUpdateRequest, AudioSceneSnapshot,
+    AudioMixTargetUpdateRequest, AudioScenePreviewSnapshot, AudioSceneSnapshot,
 };
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -288,6 +289,8 @@ impl AudioBackend for SimulatedAudioBackend {
                     order: 0,
                     last_recalled: false,
                     last_recalled_at: None,
+                    contents: None,
+                    preview: empty_audio_scene_preview(),
                 },
                 AudioSceneSnapshot {
                     id: String::from("snapshot-panel"),
@@ -296,6 +299,8 @@ impl AudioBackend for SimulatedAudioBackend {
                     order: 1,
                     last_recalled: false,
                     last_recalled_at: None,
+                    contents: None,
+                    preview: empty_audio_scene_preview(),
                 },
                 AudioSceneSnapshot {
                     id: String::from("snapshot-broadcast"),
@@ -304,6 +309,8 @@ impl AudioBackend for SimulatedAudioBackend {
                     order: 2,
                     last_recalled: false,
                     last_recalled_at: None,
+                    contents: None,
+                    preview: empty_audio_scene_preview(),
                 },
             ],
         }
@@ -392,6 +399,9 @@ impl AudioBackend for SimulatedAudioBackend {
         }
 
         let mut changes = Vec::new();
+        if let Some(name) = &request.name {
+            changes.push(format!("name -> {}", name));
+        }
         if let Some(fader) = request.fader {
             let mix_target = request
                 .mix_target_id
@@ -534,7 +544,37 @@ fn simulated_channel(
         pad: false,
         instrument: id == "audio-input-12",
         auto_set: false,
+        eq: default_audio_eq_snapshot(),
+        dynamics: default_audio_dynamics_snapshot(),
+        send_modes: default_send_modes(),
     }
+}
+
+fn empty_audio_scene_preview() -> AudioScenePreviewSnapshot {
+    AudioScenePreviewSnapshot {
+        has_contents: false,
+        channel_count: 0,
+        mix_target_count: 0,
+        changed_channels: Vec::new(),
+        changed_mix_targets: Vec::new(),
+    }
+}
+
+fn default_send_modes() -> HashMap<String, crate::audio::AudioSendModeSnapshot> {
+    HashMap::from([
+        (
+            String::from("audio-mix-main"),
+            default_audio_send_mode_snapshot(),
+        ),
+        (
+            String::from("audio-mix-phones-a"),
+            default_audio_send_mode_snapshot(),
+        ),
+        (
+            String::from("audio-mix-phones-b"),
+            default_audio_send_mode_snapshot(),
+        ),
+    ])
 }
 
 fn simulated_meter_levels(id: &str, role: &str, stereo: bool) -> (f64, f64, f64, f64, bool) {
@@ -693,6 +733,7 @@ mod tests {
             &AudioChannelUpdateRequest {
                 channel_id: String::from("audio-input-9"),
                 mix_target_id: Some(String::from("audio-mix-main")),
+                name: None,
                 gain: None,
                 fader: Some(0.82),
                 mute: Some(true),

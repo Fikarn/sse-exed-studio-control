@@ -38,13 +38,7 @@ pub fn update_audio_mix_target(
         .mix_targets
         .iter()
         .find(|entry| entry.id == request.mix_target_id)
-        .map(|target| StoredAudioMixTargetState {
-            volume: target.volume,
-            mute: target.mute,
-            dim: target.dim,
-            mono: target.mono,
-            talkback: target.talkback,
-        })
+        .map(stored_mix_target_state_from_snapshot)
         .ok_or_else(|| {
             AudioCommandError::Rejected(
                 "AUDIO_MIX_TARGET_NOT_FOUND",

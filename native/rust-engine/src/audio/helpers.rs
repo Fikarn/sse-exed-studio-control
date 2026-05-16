@@ -29,10 +29,14 @@ pub(super) fn apply_channel_state(
         .into_iter()
         .map(|mut channel| {
             if let Some(state) = stored_state.get(&channel.id) {
+                if let Some(name) = state.name.as_ref().map(String::as_str).map(str::trim).filter(|value| !value.is_empty()) {
+                    channel.name = String::from(name);
+                }
                 if channel_supports_gain(&channel) {
                     channel.gain = clamp_gain(state.gain);
                 }
                 channel.fader = clamp_level(state.fader);
+                channel.clip = state.clip;
                 channel.mute = state.mute;
                 channel.solo = state.solo;
                 if channel_supports_phantom(&channel) {
@@ -50,12 +54,22 @@ pub(super) fn apply_channel_state(
                 if channel_supports_auto_set(&channel) {
                     channel.auto_set = state.auto_set;
                 }
+                channel.eq = state.eq.clone();
+                channel.dynamics = state.dynamics.clone();
+                channel.send_modes = default_send_modes_for_mix_targets(channel.send_modes, &channel.mix_levels);
+                for (mix_target_id, send_mode) in &state.send_modes {
+                    channel
+                        .send_modes
+                        .insert(mix_target_id.clone(), send_mode.clone());
+                }
                 for (mix_target_id, level) in &state.mix_levels {
                     channel
                         .mix_levels
                         .insert(mix_target_id.clone(), clamp_level(*level));
                 }
             }
+            channel.send_modes =
+                default_send_modes_for_mix_targets(channel.send_modes, &channel.mix_levels);
             channel
         })
         .collect()
@@ -96,6 +110,7 @@ pub(super) fn read_audio_snapshot_entries(
                 name: snapshot.name.clone(),
                 osc_index: snapshot.osc_index,
                 order: snapshot.order,
+                contents: snapshot.contents.clone(),
             })
             .collect()
     });
@@ -128,6 +143,14 @@ pub(super) fn normalize_audio_snapshot_entries(
                     order: snapshot.order.max(0),
                     last_recalled: false,
                     last_recalled_at: None,
+                    contents: snapshot.contents,
+                    preview: AudioScenePreviewSnapshot {
+                        has_contents: false,
+                        channel_count: 0,
+                        mix_target_count: 0,
+                        changed_channels: Vec::new(),
+                        changed_mix_targets: Vec::new(),
+                    },
                 },
             ))
         })
@@ -153,6 +176,7 @@ pub(super) fn serialize_audio_snapshot_state(
             name: snapshot.name.clone(),
             osc_index: clamp_snapshot_index(snapshot.osc_index),
             order: order as i64,
+            contents: snapshot.contents.clone(),
         })
         .collect::<Vec<_>>();
     serde_json::to_string(&stored_state)
@@ -389,6 +413,28 @@ pub(super) fn audio_faders_per_bank(settings: &HashMap<String, String>) -> i64 {
     .clamp(1, 24)
 }
 
+pub(super) fn audio_view_mode(settings: &HashMap<String, String>) -> String {
+    match settings.get(AUDIO_VIEW_MODE_KEY).map(String::as_str) {
+        Some("master") => String::from("master"),
+        _ => String::from("submix"),
+    }
+}
+
+pub(super) fn audio_capabilities(
+    status: &str,
+    osc_enabled: bool,
+) -> AudioCapabilitySnapshot {
+    AudioCapabilitySnapshot {
+        can_edit_mixer_state: osc_enabled,
+        can_sync: osc_enabled,
+        can_recall_console_snapshot: osc_enabled && status == "ready",
+        can_edit_processing: osc_enabled,
+        can_clear_clips: osc_enabled,
+        can_capture_snapshot: osc_enabled,
+        can_use_master_view: osc_enabled,
+    }
+}
+
 pub(super) fn audio_selected_channel_id(
     settings: &HashMap<String, String>,
     channels: &[AudioChannelSnapshot],
@@ -432,6 +478,34 @@ pub(super) fn clamp_snapshot_index(value: i64) -> i64 {
     value.clamp(0, 7)
 }
 
+pub(super) fn clamp_eq_frequency(value: f64) -> f64 {
+    value.clamp(20.0, 20_000.0)
+}
+
+pub(super) fn clamp_eq_gain(value: f64) -> f64 {
+    value.clamp(-12.0, 12.0)
+}
+
+pub(super) fn clamp_eq_q(value: f64) -> f64 {
+    value.clamp(0.1, 12.0)
+}
+
+pub(super) fn clamp_dynamics_threshold(value: f64) -> f64 {
+    value.clamp(-80.0, 0.0)
+}
+
+pub(super) fn clamp_dynamics_ratio(value: f64) -> f64 {
+    value.clamp(1.0, 20.0)
+}
+
+pub(super) fn clamp_dynamics_time(value: f64) -> f64 {
+    value.clamp(0.1, 2000.0)
+}
+
+pub(super) fn clamp_dynamics_makeup(value: f64) -> f64 {
+    value.clamp(0.0, 24.0)
+}
+
 pub(super) fn next_custom_audio_snapshot_id(snapshots: &[AudioSceneSnapshot]) -> String {
     let next_index = snapshots
         .iter()
@@ -457,7 +531,8 @@ pub(super) fn channel_supports_phantom(channel: &AudioChannelSnapshot) -> bool {
 }
 
 pub(super) fn channel_supports_pad(channel: &AudioChannelSnapshot) -> bool {
-    channel.role == "front-preamp"
+    let _ = channel;
+    false
 }
 
 pub(super) fn channel_supports_instrument(channel: &AudioChannelSnapshot) -> bool {
@@ -509,6 +584,152 @@ pub(super) fn channel_supports_pad_from_role(snapshot: &AudioSnapshot, channel_i
         .find(|entry| entry.id == channel_id)
         .map(channel_supports_pad)
         .unwrap_or(false)
+}
+
+pub(super) fn stored_channel_state_from_snapshot(
+    channel: &AudioChannelSnapshot,
+) -> StoredAudioChannelState {
+    StoredAudioChannelState {
+        name: Some(channel.name.clone()),
+        gain: channel.gain,
+        fader: channel.fader,
+        clip: channel.clip,
+        mix_levels: channel.mix_levels.clone(),
+        mute: channel.mute,
+        solo: channel.solo,
+        phantom: channel.phantom,
+        phase: channel.phase,
+        pad: false,
+        instrument: channel.instrument,
+        auto_set: channel.auto_set,
+        eq: channel.eq.clone(),
+        dynamics: channel.dynamics.clone(),
+        send_modes: channel.send_modes.clone(),
+    }
+}
+
+pub(super) fn stored_mix_target_state_from_snapshot(
+    mix_target: &AudioMixTargetSnapshot,
+) -> StoredAudioMixTargetState {
+    StoredAudioMixTargetState {
+        volume: mix_target.volume,
+        mute: mix_target.mute,
+        dim: mix_target.dim,
+        mono: mix_target.mono,
+        talkback: mix_target.talkback,
+    }
+}
+
+pub(super) fn capture_audio_scene_contents(
+    snapshot: &AudioSnapshot,
+    captured_at: Option<String>,
+) -> AudioSceneContentsSnapshot {
+    AudioSceneContentsSnapshot {
+        captured_at,
+        channels: snapshot
+            .channels
+            .iter()
+            .map(|channel| (channel.id.clone(), stored_channel_state_from_snapshot(channel)))
+            .collect(),
+        mix_targets: snapshot
+            .mix_targets
+            .iter()
+            .map(|target| (target.id.clone(), stored_mix_target_state_from_snapshot(target)))
+            .collect(),
+    }
+}
+
+pub(super) fn audio_scene_preview(
+    contents: Option<&AudioSceneContentsSnapshot>,
+    channels: &[AudioChannelSnapshot],
+    mix_targets: &[AudioMixTargetSnapshot],
+) -> AudioScenePreviewSnapshot {
+    let Some(contents) = contents else {
+        return AudioScenePreviewSnapshot {
+            has_contents: false,
+            channel_count: 0,
+            mix_target_count: 0,
+            changed_channels: Vec::new(),
+            changed_mix_targets: Vec::new(),
+        };
+    };
+
+    let changed_channels = channels
+        .iter()
+        .filter_map(|channel| {
+            let state = contents.channels.get(&channel.id)?;
+            let current = stored_channel_state_from_snapshot(channel);
+            if audio_channel_state_changed(&current, state) {
+                Some(channel.name.clone())
+            } else {
+                None
+            }
+        })
+        .take(6)
+        .collect::<Vec<_>>();
+    let changed_mix_targets = mix_targets
+        .iter()
+        .filter_map(|target| {
+            let state = contents.mix_targets.get(&target.id)?;
+            let current = stored_mix_target_state_from_snapshot(target);
+            if audio_mix_target_state_changed(&current, state) {
+                Some(target.name.clone())
+            } else {
+                None
+            }
+        })
+        .take(4)
+        .collect::<Vec<_>>();
+
+    AudioScenePreviewSnapshot {
+        has_contents: true,
+        channel_count: contents.channels.len() as i64,
+        mix_target_count: contents.mix_targets.len() as i64,
+        changed_channels,
+        changed_mix_targets,
+    }
+}
+
+pub(super) fn default_send_modes_for_mix_targets(
+    existing: HashMap<String, AudioSendModeSnapshot>,
+    mix_levels: &HashMap<String, f64>,
+) -> HashMap<String, AudioSendModeSnapshot> {
+    let mut send_modes = existing;
+    for mix_target_id in mix_levels.keys() {
+        send_modes
+            .entry(mix_target_id.clone())
+            .or_insert_with(default_audio_send_mode_snapshot);
+    }
+    send_modes
+}
+
+fn audio_channel_state_changed(
+    current: &StoredAudioChannelState,
+    stored: &StoredAudioChannelState,
+) -> bool {
+    current.name != stored.name
+        || current.gain != stored.gain
+        || (current.fader - stored.fader).abs() > f64::EPSILON
+        || current.clip != stored.clip
+        || current.mute != stored.mute
+        || current.solo != stored.solo
+        || current.phantom != stored.phantom
+        || current.phase != stored.phase
+        || current.instrument != stored.instrument
+        || current.auto_set != stored.auto_set
+        || current.mix_levels != stored.mix_levels
+        || current.send_modes != stored.send_modes
+}
+
+fn audio_mix_target_state_changed(
+    current: &StoredAudioMixTargetState,
+    stored: &StoredAudioMixTargetState,
+) -> bool {
+    (current.volume - stored.volume).abs() > f64::EPSILON
+        || current.mute != stored.mute
+        || current.dim != stored.dim
+        || current.mono != stored.mono
+        || current.talkback != stored.talkback
 }
 
 pub(super) fn channel_supports_instrument_from_role(

@@ -20,6 +20,7 @@ const AUDIO_EXPECTED_PEAK_DATA_KEY: &str = "app.audio.expected_peak_data";
 const AUDIO_EXPECTED_SUBMIX_LOCK_KEY: &str = "app.audio.expected_submix_lock";
 const AUDIO_EXPECTED_COMPATIBILITY_MODE_KEY: &str = "app.audio.expected_compatibility_mode";
 const AUDIO_FADERS_PER_BANK_KEY: &str = "app.audio.faders_per_bank";
+const AUDIO_VIEW_MODE_KEY: &str = "app.audio.view_mode";
 const AUDIO_CUSTOM_SNAPSHOT_ID_PREFIX: &str = "audio-snapshot-custom-";
 
 const DEFAULT_AUDIO_OSC_ENABLED: bool = true;
@@ -29,6 +30,7 @@ const DEFAULT_AUDIO_EXPECTED_COMPATIBILITY_MODE: bool = false;
 const DEFAULT_AUDIO_FADERS_PER_BANK: i64 = 12;
 
 mod channels;
+mod clips;
 mod helpers;
 mod mix_targets;
 mod parse;
@@ -39,6 +41,7 @@ mod sync;
 mod types;
 
 pub use channels::*;
+pub use clips::*;
 pub use mix_targets::*;
 pub use parse::*;
 pub use settings::*;

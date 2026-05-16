@@ -29,10 +29,22 @@ pub fn recall_audio_snapshot(
             let _ = record_audio_action_failure(db_path, code, &message);
             AudioCommandError::Rejected(code, message)
         })?;
+    let recalled_snapshot = inventory
+        .snapshots
+        .iter()
+        .find(|entry| entry.id == request.snapshot_id)
+        .cloned()
+        .ok_or_else(|| {
+            AudioCommandError::Rejected(
+                "AUDIO_SNAPSHOT_NOT_FOUND",
+                format!(
+                    "Audio snapshot '{}' is not exposed by the native engine.",
+                    request.snapshot_id
+                ),
+            )
+        })?;
 
-    persist_audio_state(
-        db_path,
-        &[
+    let mut updates = vec![
             (
                 String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
                 String::from("assumed"),
@@ -58,8 +70,18 @@ pub fn recall_audio_snapshot(
                 String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
                 outcome.summary.clone(),
             ),
-        ],
-    )?;
+        ];
+    if let Some(contents) = recalled_snapshot.contents {
+        updates.push((
+            String::from(AUDIO_CHANNEL_STATE_KEY),
+            serialize_json_state(&contents.channels)?,
+        ));
+        updates.push((
+            String::from(AUDIO_MIX_TARGET_STATE_KEY),
+            serialize_json_state(&contents.mix_targets)?,
+        ));
+    }
+    persist_audio_state(db_path, &updates)?;
 
     Ok(AudioSnapshotRecallResult {
         recalled: true,
@@ -79,6 +101,14 @@ pub fn create_audio_snapshot(
     let config = resolve_audio_config(&app_settings);
     let inventory = read_default_audio_inventory(&config);
     let mut snapshots = read_audio_snapshot_entries(&app_settings, inventory.snapshots.as_slice());
+    let contents = if request.capture_current_state.unwrap_or(false) {
+        Some(capture_audio_scene_contents(
+            &read_audio_snapshot(&app_settings),
+            Some(current_timestamp(db_path)?),
+        ))
+    } else {
+        None
+    };
     let snapshot = AudioSceneSnapshot {
         id: next_custom_audio_snapshot_id(&snapshots),
         name: request.name.clone(),
@@ -86,6 +116,14 @@ pub fn create_audio_snapshot(
         order: snapshots.len() as i64,
         last_recalled: false,
         last_recalled_at: None,
+        contents,
+        preview: AudioScenePreviewSnapshot {
+            has_contents: false,
+            channel_count: 0,
+            mix_target_count: 0,
+            changed_channels: Vec::new(),
+            changed_mix_targets: Vec::new(),
+        },
     };
     snapshots.push(snapshot.clone());
     reindex_audio_snapshots(&mut snapshots);
@@ -122,6 +160,14 @@ pub fn update_audio_snapshot(
     let config = resolve_audio_config(&app_settings);
     let inventory = read_default_audio_inventory(&config);
     let mut snapshots = read_audio_snapshot_entries(&app_settings, inventory.snapshots.as_slice());
+    let captured_contents = if request.capture_current_state.unwrap_or(false) {
+        Some(capture_audio_scene_contents(
+            &read_audio_snapshot(&app_settings),
+            Some(current_timestamp(db_path)?),
+        ))
+    } else {
+        None
+    };
     let updated_snapshot = {
         let snapshot = snapshots
             .iter_mut()
@@ -141,6 +187,9 @@ pub fn update_audio_snapshot(
         if let Some(osc_index) = request.osc_index {
             snapshot.osc_index = osc_index;
         }
+        if let Some(contents) = captured_contents {
+            snapshot.contents = Some(contents);
+        }
         snapshot.clone()
     };
     reindex_audio_snapshots(&mut snapshots);
@@ -151,6 +200,9 @@ pub fn update_audio_snapshot(
     }
     if request.osc_index.is_some() {
         summary_parts.push(format!("slot -> {}", updated_snapshot.osc_index + 1));
+    }
+    if request.capture_current_state.unwrap_or(false) {
+        summary_parts.push(String::from("contents captured"));
     }
     let summary = format!(
         "Audio snapshot '{}' updated: {}.",

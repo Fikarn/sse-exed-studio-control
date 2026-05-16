@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { faderDbToNormalized, formatAudioDb, normalizedToFaderDb } from "../src/app/audio/audioFormatting";
+
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 
 function modifierShortcut(key: string) {
@@ -25,6 +27,67 @@ async function expectNoDocumentScroll(page: Page) {
   }));
   expect(metrics.scrollHeight).toBeLessThanOrEqual(metrics.viewportHeight + 1);
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+}
+
+async function readRequiredBox(page: Page, testId: string) {
+  const box = await page.getByTestId(testId).boundingBox();
+  expect(box, `${testId} should render a measurable box`).not.toBeNull();
+  return {
+    bottom: box!.y + box!.height,
+    height: box!.height,
+    left: box!.x,
+    right: box!.x + box!.width,
+    top: box!.y,
+    width: box!.width,
+  };
+}
+
+function expectInsideBox(
+  child: Awaited<ReturnType<typeof readRequiredBox>>,
+  parent: Awaited<ReturnType<typeof readRequiredBox>>,
+  label: string
+) {
+  expect(child.left, `${label} left`).toBeGreaterThanOrEqual(parent.left - 1);
+  expect(child.top, `${label} top`).toBeGreaterThanOrEqual(parent.top - 1);
+  expect(child.right, `${label} right`).toBeLessThanOrEqual(parent.right + 1);
+  expect(child.bottom, `${label} bottom`).toBeLessThanOrEqual(parent.bottom + 1);
+}
+
+async function expectAudioWorkspaceGeometry(page: Page) {
+  await expectNoDocumentScroll(page);
+
+  const workspace = await readRequiredBox(page, "audio-workspace");
+  const canvas = await readRequiredBox(page, "audio-signal-canvas");
+  const mixer = await readRequiredBox(page, "audio-tiered-mixer");
+  const outputTier = await readRequiredBox(page, "audio-hardware-outputs-tier");
+  const snapshotDeck = await readRequiredBox(page, "audio-snapshot-deck");
+  const healthBar = await readRequiredBox(page, "audio-health-bar");
+
+  expectInsideBox(canvas, workspace, "canvas inside workspace");
+  expectInsideBox(mixer, canvas, "tiered mixer inside canvas");
+  expectInsideBox(outputTier, mixer, "output tier inside tiered mixer");
+  expectInsideBox(outputTier, canvas, "output tier inside canvas");
+  expectInsideBox(snapshotDeck, canvas, "snapshot deck inside canvas");
+  expect(outputTier.bottom, "output tier should end before snapshot deck").toBeLessThanOrEqual(snapshotDeck.top + 1);
+  expect(healthBar.top, "health bar should be below canvas").toBeGreaterThanOrEqual(canvas.bottom - 1);
+  expectInsideBox(healthBar, workspace, "health bar inside workspace");
+}
+
+async function readSnapshotThumbHeights(page: Page, snapshotId: string) {
+  return page
+    .getByTestId(`audio-snapshot-thumb-${snapshotId}`)
+    .locator("i")
+    .evaluateAll((bars) => bars.map((bar) => (bar as HTMLElement).style.height));
+}
+
+async function expectSliderValueChanges(page: Page, label: string) {
+  const slider = page.getByRole("slider", { name: label });
+  const before = await slider.getAttribute("aria-valuenow");
+  const max = Number(await slider.getAttribute("aria-valuemax"));
+  const direction = Number(before) >= max ? "ArrowLeft" : "ArrowRight";
+  await slider.focus();
+  await page.keyboard.press(direction);
+  await expect(slider).not.toHaveAttribute("aria-valuenow", before ?? "");
 }
 
 async function expectToolbarPrimaryControlsFit(page: Page) {
@@ -140,25 +203,116 @@ test("shows degraded setup posture from fixtures", async ({ page }) => {
 });
 
 test("renders the audio workspace from an engine-backed snapshot and supports key desk actions", async ({ page }) => {
+  test.slow();
+  await page.setViewportSize({ width: 2560, height: 1440 });
   await openFixture(page, "audio-populated");
 
   const workspace = page.getByTestId("audio-workspace");
   await expect(workspace).toBeVisible();
+  await expect(workspace).toHaveAttribute("data-output-role", "main-out");
+  await expect
+    .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--audio-accent").trim()))
+    .toBe("#5dc5e8");
   await expect(workspace.getByText("Main Out").first()).toBeVisible();
-  await expect(page.getByTestId("audio-meter-bridge")).toBeVisible();
+  await expect(page.getByTestId("audio-signal-canvas")).toBeVisible();
+  await expect(page.getByTestId("audio-signal-canvas").getByText("Editing")).toBeVisible();
+  await expect(page.getByTestId("audio-signal-canvas").getByText("View", { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Submix" })).toBeVisible();
+  await expect(page.getByTestId("audio-signal-canvas").getByText("Active mix").first()).toBeVisible();
+  await expect(page.getByTestId("audio-signal-canvas").getByText("Density").first()).toBeVisible();
+  await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
+  await expect(page.getByTestId("audio-hardware-inputs-tier")).toBeVisible();
+  await expect(page.getByTestId("audio-software-playback-tier")).toBeVisible();
+  await expect(page.getByTestId("audio-hardware-outputs-tier")).toBeVisible();
+  await expect(page.getByTestId("audio-health-bar")).toBeVisible();
+  await expectAudioWorkspaceGeometry(page);
+  await expect(page.getByTestId("audio-master-halo")).toBeVisible();
+  await expect(page.getByTestId("audio-routing-overlay")).toBeVisible();
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Endpoint");
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Metering");
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Clock");
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Palette");
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank");
+  await expect(page.getByTestId("audio-rail-monitor-card")).toBeVisible();
+  await expect(page.getByTestId("audio-rail-tools")).toContainText("Sync");
+  await expect(page.getByTestId("audio-solo-warning-band")).toContainText("Solo engaged");
+  await expect
+    .poll(async () => {
+      const box = await page.getByTestId("audio-solo-warning-band").boundingBox();
+      return Math.round(box?.height ?? 0);
+    })
+    .toBeLessThanOrEqual(36);
+  await expect(page.getByTestId("audio-clip-warning-band")).toHaveCount(0);
+  await page.getByRole("button", { name: "Clear all solo" }).click();
+  await expect(page.getByTestId("audio-solo-warning-band")).toHaveCount(0);
+  await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toBeVisible();
+  await expect(page.getByTestId("audio-tier-chip-playback-bed")).toBeVisible();
+  await expect(page.getByTestId("audio-snapshot-capture")).toBeEnabled();
+  await expect(page.locator("[data-snapshot-slot]")).toHaveCount(8);
+  await expect(page.getByTestId("audio-snapshot-empty-6")).toContainText("Empty");
+  await expect(page.getByTestId("audio-snapshot-thumb-snapshot-show-open")).toBeVisible();
+  await expect(page.getByTestId("audio-snapshot-capture")).toBeEnabled();
+  await page.getByTestId("audio-snapshot-snapshot-open-rehearsal").hover();
+  await expect(
+    page.getByTestId("audio-snapshot-snapshot-open-rehearsal").getByText("Console slot recall")
+  ).toBeVisible();
+  await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Master" })).toBeEnabled();
+  await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
   await expect(page.getByTestId("audio-mix-target-audio-mix-main")).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-group", "talent");
+  await expect(page.getByTestId("audio-strip-audio-playback-1-2")).toHaveAttribute("data-group", "bed");
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-group", "fx");
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toBeVisible();
+  await expect(page.getByTestId("audio-strip-audio-input-12")).toBeVisible();
+  await expect(page.getByTestId("audio-strip-audio-input-1")).toHaveCount(0);
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-feeding", "true");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("FX 3/4");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("Playback engine");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("Buffer status");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("n/a");
+  await expect(page.getByTestId("audio-inspector-channel").getByRole("button", { name: "Stereo link" })).toBeVisible();
+  await expect(page.getByTestId("audio-inspector-channel").getByRole("button", { name: "Auto fade" })).toBeVisible();
+  await page.getByTestId("audio-strip-audio-input-9").click();
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("RME UFX III mic preamp");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("48V");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("Hi-Z");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("Polarity");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("AutoSet");
+  await expect(page.getByTestId("audio-inspector-channel")).not.toContainText("Pad");
+  await page.getByTestId("audio-strip-audio-playback-3-4").click();
+
+  await page.getByRole("button", { name: /Main Out.*selected/i }).click();
+  await expect(page.getByRole("menu", { name: "Audio output targets" })).toBeVisible();
+  await page.getByRole("menuitem", { name: /Phones 1/i }).click();
+  await expect(workspace).toHaveAttribute("data-output-role", "phones-a");
+  await expect(page.getByRole("button", { name: /Phones 1.*selected/i })).toBeVisible();
 
   await page.getByTestId("audio-mix-target-audio-mix-phones-a").click();
   await expect(page.getByTestId("audio-mix-target-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
+  await expect(workspace).toHaveAttribute("data-output-role", "phones-a");
+  await expect
+    .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--audio-accent").trim()))
+    .toBe("#e8a341");
+  await expect(page.getByTestId("audio-hardware-outputs-tier")).toContainText("Phones 1");
+  await page.getByTestId("audio-output-audio-mix-main").click();
+  await expect(page.locator('[data-source-tier="outputs"]')).toBeVisible();
+  await expect(page.getByTestId("audio-inspector-output")).toContainText("Hardware output");
+  await page.getByTestId("audio-tier-lanes-hardware-inputs").dispatchEvent("click");
+  await expect(page.locator('[data-source-tier="outputs"]')).toBeVisible();
+  await expect(page.getByTestId("audio-inspector-output")).toContainText("Hardware output");
+  await expect(page.getByTestId("audio-inspector-output").getByRole("button", { name: "PFL" })).toBeDisabled();
+  await page.getByTestId("audio-strip-audio-playback-3-4").click();
 
   await page.keyboard.press("KeyV");
-  await expect(workspace).toHaveAttribute("data-density", "precision");
+  await expect(workspace).toHaveAttribute("data-view-mode", "master");
+  await page.keyboard.press("KeyV");
+  await expect(workspace).toHaveAttribute("data-view-mode", "submix");
 
   await page.keyboard.press("BracketRight");
-  await expect(workspace.getByText("Bank 2 / 3")).toBeVisible();
+  await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
 
   await page.keyboard.press("Digit1");
-  const selectedStrip = page.getByTestId("audio-strip-audio-input-5");
+  const selectedStrip = page.getByTestId("audio-strip-audio-input-1");
   await expect(selectedStrip).toHaveAttribute("data-selected", "true");
 
   await page.keyboard.press("KeyM");
@@ -168,8 +322,33 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-current", "true");
   await expect(page.getByTestId("audio-toolbar-current-snapshot")).toHaveText("Recalled Interview block");
 
+  await expect(page.getByTestId("audio-inspector-channel")).toBeVisible();
+  await expect(page.getByTestId("audio-inspector-metering")).toContainText("LUFS");
+  await expect(page.getByTestId("audio-inspector-eq-mini")).toContainText("EQ");
+  await expect(page.getByTestId("audio-inspector-dynamics-mini")).toContainText("Dynamics");
+  await expect(page.getByTestId("audio-inspector-sends-mini")).toContainText("Sends");
+  await page.getByTestId("audio-strip-audio-input-1").click({ button: "right" });
+  await expect(page.getByTestId("audio-context-menu")).toContainText("Reset to unity");
+  await expect(page.getByRole("menuitem", { name: "Rename..." })).toBeEnabled();
+  page.once("dialog", (dialog) => dialog.accept("Renamed line 1"));
+  await page.getByRole("menuitem", { name: "Rename..." }).click();
+  await expect(page.getByTestId("audio-strip-audio-input-1")).toContainText("Renamed line 1");
+  await expect(page.getByRole("button", { name: "PFL" })).toBeDisabled();
+  await page.getByRole("button", { name: "EQ" }).click();
+  await expect(page.getByRole("button", { name: "Enable EQ" })).toBeEnabled();
+  await page.getByRole("button", { name: "Enable EQ" }).click();
+  await expect(page.getByRole("button", { name: "Bypass EQ" })).toHaveAttribute("data-active", "true");
+  await page.getByRole("button", { name: "Dynamics" }).click();
+  await expect(page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp" })).toBeEnabled();
+  await page.getByRole("button", { name: "Sends" }).click();
+  await expect(page.getByTestId("audio-inspector-sends")).toContainText("Phones 1");
+  const preFader = page.getByTestId("audio-inspector-sends").getByRole("button", { name: "Pre fader" }).first();
+  await expect(preFader).toBeEnabled();
+  await preFader.click();
+  await expect(preFader).toHaveAttribute("data-active", "true");
+
   await page.keyboard.press("Escape");
-  await expect(page.getByText("Desk help")).toBeVisible();
+  await expect(page.getByTestId("audio-inspector-channel")).toBeVisible();
 });
 
 test("renders audio degraded and loading fixture states", async ({ page }) => {
@@ -179,7 +358,10 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
 
   await openFixture(page, "audio-not-verified");
   await expect(page.getByText("OSC NOT VERIFIED", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sync" })).toBeDisabled();
+  await expect(page.getByTestId("audio-rail-tools").getByRole("button", { name: "Sync" })).toBeEnabled();
+  await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).not.toHaveAttribute("aria-disabled", "true");
+  await page.getByTestId("audio-rail-tools").getByRole("button", { name: "Sync" }).click();
+  await expect(page.getByText(/Run the commissioning audio probe before syncing/i)).toBeVisible();
 
   await openFixture(page, "audio-osc-disabled");
   await expect(page.getByText("OSC DISABLED", { exact: true })).toBeVisible();
@@ -199,6 +381,37 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   await expect(page.getByText("Loading audio snapshot.")).toBeVisible();
 });
 
+test("marks simulated audio metering as test-stage movement", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveText("TEST METER SIMULATION");
+  await expect(page.getByTestId("audio-rail-monitor-card")).toContainText("test meters");
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Test meter simulation");
+  await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST STAGE");
+
+  const stripFill = page
+    .getByTestId("audio-strip-audio-playback-3-4")
+    .locator('[data-simulated-meter="true"] [data-meter-fill="left"]')
+    .first();
+  await expect(stripFill).toBeVisible();
+  await expect.poll(() => stripFill.evaluate((node) => getComputedStyle(node).animationName)).toContain("audioMeter");
+
+  const activeMixFill = page.getByTestId("audio-active-mix-meter").locator("i").first();
+  await expect.poll(() => activeMixFill.evaluate((node) => getComputedStyle(node).animationName)).toContain(
+    "audioMeter"
+  );
+
+  await openFixture(page, "audio-hardware-metering");
+  await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveCount(0);
+  await expect(page.getByTestId("audio-rail-monitor-card")).toContainText("Active mix · live");
+  await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Test meter simulation");
+  await expect(
+    page
+      .getByTestId("audio-strip-audio-playback-3-4")
+      .locator('[data-simulated-meter="true"]')
+  ).toHaveCount(0);
+});
+
 test("supports audio warning-band sync and keyboard mix-target changes", async ({ page }) => {
   await openFixture(page, "audio-state-assumed");
 
@@ -208,9 +421,370 @@ test("supports audio warning-band sync and keyboard mix-target changes", async (
   await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
 
   await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("audio-strip-audio-playback-5-6")).toHaveAttribute("data-selected", "true");
+  await page.keyboard.press("KeyV");
+  await expect(page.getByTestId("audio-workspace")).toHaveAttribute("data-view-mode", "master");
+  await page.keyboard.press("KeyV");
+  await expect(page.getByTestId("audio-workspace")).toHaveAttribute("data-view-mode", "submix");
+});
+
+test("supports audio group filtering and source/output selection flow", async ({ page }) => {
+  test.slow();
+  await openFixture(page, "audio-populated");
+
+  await page.getByTestId("audio-tier-chip-inputs-talent").click();
+  await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toBeVisible();
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
+
+  await page.getByTestId("audio-tier-chip-inputs-talent").click();
+  await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toHaveAttribute("data-active", "false");
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toBeVisible();
+
+  await page.getByTestId("audio-tier-chip-inputs-line").click();
+  await page.getByTestId("audio-tier-chip-inputs-remote").click({ modifiers: ["Shift"] });
+  await expect(page.getByTestId("audio-tier-chip-inputs-line")).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-strip-audio-input-1")).toBeVisible();
+  await expect(page.getByTestId("audio-strip-audio-input-3")).toBeVisible();
+
+  await page.getByTestId("audio-tier-chip-inputs-line").click({ modifiers: ["Alt"] });
+  await expect(page.getByTestId("audio-tier-chip-inputs-line")).toHaveAttribute("data-active", "false");
+  await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveAttribute("data-active", "false");
+  await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toHaveAttribute("data-active", "true");
+
+  await page.getByTestId("audio-tier-chip-playback-fx").click();
+  await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
+  await expect(page.getByTestId("audio-strip-audio-playback-1-2")).toHaveCount(0);
+  await page.getByTestId("audio-tier-chip-playback-bed").click({ modifiers: ["Shift"] });
+  await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-tier-chip-playback-bed")).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-strip-audio-playback-1-2")).toBeVisible();
+
+  await page.getByTestId("audio-strip-audio-input-9").click();
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-selected", "true");
+  await page.getByTestId("audio-tier-label-hardware-inputs").click();
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-selected", "false");
+  await page.getByTestId("audio-strip-audio-input-9").click();
+  await page.getByTestId("audio-strip-audio-input-9").click();
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-selected", "true");
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  });
+
+  for (let index = 0; index < 30; index += 1) {
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(20);
+  }
+  await expect(page.getByTestId("audio-output-audio-mix-phones-b")).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-selected", "false");
+
+  await page.getByTestId("audio-tier-chip-inputs-talent").click();
+  await page.getByTestId("audio-tier-chip-playback-fx").click();
+  await page.getByTestId("audio-strip-audio-playback-3-4").click();
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("FX 3/4");
+  await page.getByTestId("audio-output-audio-mix-phones-a").click();
   await expect(page.getByTestId("audio-mix-target-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByTestId("audio-mix-target-audio-mix-phones-b")).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("audio-inspector-channel")).toContainText("Phones 1");
+
+  await page.getByTestId("audio-tier-lanes-hardware-inputs").dispatchEvent("click");
+  await expect(page.getByTestId("audio-inspector-output")).toContainText("Phones 1");
+});
+
+test("aligns audio input hardware controls with UFX III preamps", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  await page.getByTestId("audio-strip-audio-input-9").click();
+  const strip = page.getByTestId("audio-strip-audio-input-9");
+  const inspector = page.getByTestId("audio-inspector-channel");
+
+  await expect(strip.getByRole("button", { name: "48V" })).toHaveCount(0);
+  await expect(strip.getByRole("button", { name: "Hi-Z" })).toHaveCount(0);
+  await expect(strip.getByRole("button", { name: "Polarity" })).toHaveCount(0);
+  await expect(strip.getByRole("button", { name: "AutoSet" })).toHaveCount(0);
+  await expect(strip.getByRole("button", { name: "Pad" })).toHaveCount(0);
+
+  await expect(inspector).toContainText("RME UFX III mic preamp");
+  await expect(inspector).toContainText("48V");
+  await expect(inspector).toContainText("Hi-Z");
+  await expect(inspector).toContainText("Polarity");
+  await expect(inspector).toContainText("AutoSet");
+  await expect(inspector).not.toContainText("Pad");
+
+  const autoSet = inspector.getByRole("button", { name: "AutoSet" });
+  await expect(autoSet).toBeEnabled();
+  await autoSet.click();
+  await expect(autoSet).toHaveAttribute("data-active", "true");
+});
+
+test("supports audio solo chip and clip clearing", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  await expect(page.getByTestId("audio-solo-warning-band")).toBeVisible();
+  await page.getByTestId("audio-solo-warning-band").getByRole("button", { name: /×/ }).click();
+  await expect(page.getByTestId("audio-solo-warning-band")).toHaveCount(0);
+
+  await openFixture(page, "audio-clipped");
+  await expect(page.getByTestId("audio-clip-warning-band")).toBeVisible();
+  await expect(page.getByTestId("audio-clear-clips")).toBeEnabled();
+  await page.getByTestId("audio-clear-clips").click();
+  await expect(page.getByTestId("audio-clip-warning-band")).toHaveCount(0);
+});
+
+test("supports audio snapshot capture save rename and delete", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  const currentSnapshot = page.getByTestId("audio-snapshot-snapshot-show-open");
+  await page.keyboard.press(modifierShortcut("S"));
+  await expect(currentSnapshot.getByTestId("audio-snapshot-thumb-snapshot-show-open")).toHaveAttribute(
+    "data-has-contents",
+    "true"
+  );
+  const savedThumbBefore = await readSnapshotThumbHeights(page, "snapshot-show-open");
+
+  await expect(page.getByTestId("audio-snapshot-capture")).toBeEnabled();
+  await page.getByTestId("audio-snapshot-capture").click();
+  const capturedSlot = page.locator('[data-snapshot-slot="6"][data-slot-state="populated"]');
+  await expect(capturedSlot).toContainText("Snapshot 6");
+  await capturedSlot.hover();
+  await expect(capturedSlot.getByText("No diff from current mix")).toBeVisible();
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Set fader dB");
+    await dialog.accept("-60");
+  });
+  await page.getByRole("slider", { name: "FX 3/4 send level" }).dblclick();
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
+  await currentSnapshot.hover();
+  await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
+  await expect(currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)).toBeVisible();
+
+  await page.keyboard.press(modifierShortcut("S"));
+  const savedThumbAfter = await readSnapshotThumbHeights(page, "snapshot-show-open");
+  expect(savedThumbAfter).not.toEqual(savedThumbBefore);
+  await currentSnapshot.hover();
+  await expect(currentSnapshot.getByText("18 sources saved")).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept("Renamed snapshot"));
+  await capturedSlot.getByRole("button", { name: "Rename" }).click();
+  await expect(capturedSlot).toContainText("Renamed snapshot");
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await capturedSlot.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByTestId("audio-snapshot-empty-6")).toContainText("Empty");
+});
+
+test("audio-no-send fixture marks FX playback as not feeding main", async ({ page }) => {
+  await openFixture(page, "audio-no-send");
+
+  await expect(page.getByTestId("audio-mix-target-audio-mix-main")).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
+  await expect(page.getByTestId("audio-routing-overlay")).toHaveCount(0);
+});
+
+test("shows numeric snapshot before and after preview text", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  const currentSnapshot = page.getByTestId("audio-snapshot-snapshot-show-open");
+  await page.keyboard.press(modifierShortcut("S"));
+
+  page.once("dialog", async (dialog) => {
+    await dialog.accept("-60");
+  });
+  await page.getByRole("slider", { name: "FX 3/4 send level" }).dblclick();
+
+  await currentSnapshot.hover();
+  await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
+  await expect(currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)).toBeVisible();
+});
+
+test("supports engine-backed audio EQ editing", async ({ page }) => {
+  test.slow();
+  await openFixture(page, "audio-populated");
+
+  await page.getByTestId("audio-strip-audio-input-9").click();
+  await page.getByRole("button", { name: "EQ" }).click();
+  await page.getByRole("button", { name: "Enable EQ" }).click();
+  await expect(page.getByRole("button", { name: "Bypass EQ" })).toHaveAttribute("data-active", "true");
+
+  const loBand = page.getByTestId("audio-inspector-eq").getByRole("button", { name: "LO", exact: true });
+  await expect(loBand).toHaveAttribute("data-active", "true");
+  await loBand.click();
+  await expect(loBand).toHaveAttribute("data-active", "false");
+
+  await expect(page.getByRole("slider", { name: /Host .* EQ frequency/ })).toHaveCount(4);
+  await expect(page.getByRole("slider", { name: /Host .* EQ Q/ })).toHaveCount(4);
+  await expect(page.getByRole("slider", { name: /Host .* EQ gain/ })).toHaveCount(4);
+  await expectSliderValueChanges(page, "Host LO EQ frequency");
+  await expectSliderValueChanges(page, "Host LO EQ Q");
+  await expectSliderValueChanges(page, "Host LO EQ gain");
+
+  const midFrequency = page.getByRole("slider", { name: "Host MID EQ frequency" });
+  const midGain = page.getByRole("slider", { name: "Host MID EQ gain" });
+  const midFrequencyBefore = await midFrequency.getAttribute("aria-valuenow");
+  const midGainBefore = await midGain.getAttribute("aria-valuenow");
+  const midPoint = page.getByTestId("audio-eq-point-mid");
+  await expect(midPoint).toHaveAttribute("data-selected", "false");
+  const midPointBox = await midPoint.boundingBox();
+  expect(midPointBox, "MID EQ point should be draggable").not.toBeNull();
+  await page.mouse.move(midPointBox!.x + midPointBox!.width / 2, midPointBox!.y + midPointBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(midPointBox!.x + midPointBox!.width / 2 + 60, midPointBox!.y + midPointBox!.height / 2 - 18, {
+    steps: 6,
+  });
+  await page.mouse.up();
+  await expect(midPoint).toHaveAttribute("data-selected", "true");
+  await expect(midFrequency).not.toHaveAttribute("aria-valuenow", midFrequencyBefore ?? "");
+  await expect(midGain).not.toHaveAttribute("aria-valuenow", midGainBefore ?? "");
+});
+
+test("supports engine-backed audio dynamics editing", async ({ page }) => {
+  test.slow();
+  await openFixture(page, "audio-populated");
+
+  await page.getByTestId("audio-strip-audio-input-9").click();
+  await page.getByRole("button", { name: "Dynamics" }).click();
+  const comp = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp" });
+  await expect(comp).toHaveAttribute("data-active", "false");
+  await comp.click();
+  await expect(comp).toHaveAttribute("data-active", "true");
+
+  await expectSliderValueChanges(page, "Host compressor threshold");
+  await expectSliderValueChanges(page, "Host compressor ratio");
+  await expectSliderValueChanges(page, "Host compressor attack");
+  await expectSliderValueChanges(page, "Host compressor release");
+  await expectSliderValueChanges(page, "Host compressor makeup");
+
+  const gate = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Gate" });
+  await expect(gate).toHaveAttribute("data-active", "false");
+  await gate.click();
+  await expect(gate).toHaveAttribute("data-active", "true");
+  await expectSliderValueChanges(page, "Host gate threshold");
+  await expectSliderValueChanges(page, "Host gate ratio");
+  await expectSliderValueChanges(page, "Host gate attack");
+  await expectSliderValueChanges(page, "Host gate release");
+  await expectSliderValueChanges(page, "Host gate makeup");
+});
+
+test("supports engine-backed audio send mode controls", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  await page.getByTestId("audio-strip-audio-input-9").click();
+  await page.getByRole("button", { name: "Sends" }).click();
+  const sends = page.getByTestId("audio-inspector-sends");
+  const preFader = sends.getByRole("button", { name: "Pre fader" }).first();
+  await expect(preFader).toBeEnabled();
+  await expect(preFader).toHaveAttribute("data-active", "false");
+  await preFader.click();
+  await expect(preFader).toHaveAttribute("data-active", "true");
+
+  const link = sends.getByRole("button", { name: "Link L+R" }).first();
+  await expect(link).toHaveAttribute("data-active", "true");
+  await link.click();
+  await expect(link).toHaveAttribute("data-active", "false");
+});
+
+test("supports audio command palette and shortcut overlay parity", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  await page.keyboard.press(modifierShortcut("K"));
+  const palette = page.getByRole("dialog", { name: "Command palette" });
+  const commandInput = page.getByPlaceholder(/Type a command/i);
+  await commandInput.fill("fx");
+  await expect(palette.getByText("Results", { exact: true })).toHaveCount(0);
+  await expect(palette.getByText("Channels", { exact: true })).toBeVisible();
+  await expect(palette.getByText("Actions", { exact: true })).toBeVisible();
+  await expect(palette.getByText("Select FX 3/4", { exact: true })).toBeVisible();
+  await expect(palette.getByText("Solo FX 3/4", { exact: true })).toBeVisible();
+  await expect(palette.getByText("Mute FX 3/4", { exact: true })).toBeVisible();
+  await commandInput.fill("main out");
+  await expect(palette.getByText("Outputs", { exact: true })).toBeVisible();
+  await expect(palette.getByText("Switch active mix to Main Out", { exact: true })).toBeVisible();
+  await commandInput.fill("snapshot 1");
+  await expect(palette.getByText("Snapshots", { exact: true })).toBeVisible();
+  await expect(palette.getByText("Recall snapshot 1", { exact: true })).toBeVisible();
+  await commandInput.fill("rename selected audio");
+  await expect(page.getByText("Rename selected channel")).toBeVisible();
+  await commandInput.fill("toggle selected polarity");
+  await expect(page.getByText("Toggle selected polarity")).toBeVisible();
+  await commandInput.fill("clear selected channel clip");
+  await expect(page.getByText("Clear selected channel clip")).toBeVisible();
+  await commandInput.fill("toggle master submix");
+  await expect(page.getByText("Toggle Master/Submix view")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.keyboard.press("Shift+/");
+  const shortcuts = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(shortcuts).toBeVisible();
+  await shortcuts.getByPlaceholder(/Filter shortcuts/i).fill("audio");
+  await expect(shortcuts).toContainText("Toggle Audio Master / Submix view");
+  await expect(shortcuts).toContainText("Clear held audio clip indicators");
+  await expect(shortcuts).toContainText("Save the current audio snapshot");
+  await expect(shortcuts).toContainText("Open strip actions");
+});
+
+test("formats audio faders with the prototype TotalMix-style law", () => {
+  expect(normalizedToFaderDb(0)).toBe(Number.NEGATIVE_INFINITY);
+  expect(normalizedToFaderDb(0.7)).toBeCloseTo(-10, 5);
+  expect(normalizedToFaderDb(0.8)).toBeCloseTo(0, 5);
+  expect(normalizedToFaderDb(1)).toBeCloseTo(6, 5);
+  expect(faderDbToNormalized(0)).toBeCloseTo(0.8, 5);
+  expect(formatAudioDb(0.8)).toBe("0.0 dB");
+  expect(formatAudioDb(1)).toBe("+6.0 dB");
+});
+
+test("audio workspace custom faders drag and accept numeric dB entry", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  await page.keyboard.press(modifierShortcut("K"));
+  await page.getByPlaceholder(/Type a command/i).fill("reset selected audio");
+  await expect(page.getByText(/Reset selected fader/i)).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  const fxFader = page.getByRole("slider", { name: "FX 3/4 send level" });
+  await expect(fxFader).toBeVisible();
+  const beforeValue = await fxFader.getAttribute("aria-valuenow");
+  const faderBox = await fxFader.boundingBox();
+  expect(faderBox).not.toBeNull();
+  await page.mouse.move(faderBox!.x + faderBox!.width / 2, faderBox!.y + faderBox!.height - 4);
+  await page.mouse.down();
+  await page.mouse.move(faderBox!.x + faderBox!.width / 2, faderBox!.y + 4, { steps: 12 });
+  await page.mouse.up();
+  await expect.poll(() => fxFader.getAttribute("aria-valuenow")).not.toBe(beforeValue);
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Set fader dB");
+    await dialog.accept("0");
+  });
+  await fxFader.dblclick();
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toContainText("0.0dB");
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Set fader dB");
+    await dialog.accept("-60");
+  });
+  await fxFader.dblclick();
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
+
+  await page.keyboard.press("KeyU");
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toContainText("0.0dB");
+});
+
+test("audio preamp gain control responds to pointer drag", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  const hostGain = page.getByTestId("audio-strip-audio-input-9").getByRole("slider", { name: "Host preamp gain" });
+  const beforeGain = await hostGain.getAttribute("aria-valuenow");
+  const gainBox = await hostGain.boundingBox();
+  expect(gainBox).not.toBeNull();
+  await page.mouse.move(gainBox!.x + gainBox!.width / 2, gainBox!.y + gainBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(gainBox!.x + gainBox!.width / 2, gainBox!.y - 32, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => hostGain.getAttribute("aria-valuenow")).not.toBe(beforeGain);
 });
 
 test("keeps the full audio workspace visible at the 1920x1080 fallback size", async ({ page }) => {
@@ -219,15 +793,16 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
 
   const workspace = page.getByTestId("audio-workspace");
   await expect(workspace).toBeVisible();
-  await expect(workspace.getByText("Submix first")).toBeVisible();
-  await expect(workspace.getByText("Monitor confidence")).toBeVisible();
+  await expect(page.getByTestId("audio-signal-canvas")).toBeVisible();
+  await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
+  await expect(page.getByTestId("audio-hardware-inputs-tier")).toBeVisible();
+  await expect(page.getByTestId("audio-software-playback-tier")).toBeVisible();
+  await expect(page.getByTestId("audio-hardware-outputs-tier")).toBeVisible();
+  await expect(page.getByTestId("audio-health-bar")).toBeVisible();
+  await expect(workspace.getByText("Snapshots")).toBeVisible();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
 
-  const layoutMetrics = await page.evaluate(() => ({
-    documentScrollHeight: document.documentElement.scrollHeight,
-    viewportHeight: window.innerHeight,
-  }));
-  expect(layoutMetrics.documentScrollHeight).toBeLessThanOrEqual(layoutMetrics.viewportHeight + 1);
+  await expectAudioWorkspaceGeometry(page);
 });
 
 test("renders the planning timeline from an engine-backed snapshot and toggles board mode", async ({ page }) => {
