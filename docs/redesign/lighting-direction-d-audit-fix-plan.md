@@ -1,5 +1,7 @@
 # Lighting Direction D — audit fix plan (Waves 16–18)
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Self-contained reference for the 43-item UI/UX/front-end audit raised against
 `fix/lighting-d-wave-1-polish` after Waves 5–15 landed. The audit was made
 against the live source (no prototype reference) thinking like the end-user.

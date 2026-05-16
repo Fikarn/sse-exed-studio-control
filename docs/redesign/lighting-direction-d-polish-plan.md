@@ -1,5 +1,7 @@
 # Lighting Direction D — Post-ship polish plan (Waves 5–15)
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Scope: 21 UX/functional gaps identified after Direction D shipped to `origin/main` at `a392abc`. Plan was authored 2026-04-28 against polish branch `fix/lighting-d-wave-1-polish` (tip `39260b3`, 8 prior commits). Each wave is one focused commit. Validation: `npm run typecheck` + `npm run dev:check` after every wave; `cargo test -p sse-exed-rust-engine lighting::` after Wave 6 (engine touched); full §3.8 validation lanes after all waves land.
 
 ## Locked decisions

@@ -1,5 +1,7 @@
 # Wave 33 - Blind / preview-edit mode design
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Authored 2026-05-01 against `claude/wave-31-cross-cutting-refinements` after Wave 32 fade recall work. Companion docs: [lighting-d-premium-plan.md Wave 33](lighting-d-premium-plan.md#wave-33--blind--preview-edit-mode-architectural), [lighting-d-industry-audit.md#p1](lighting-d-industry-audit.md#p1-blind--preview-edit-mode-eos-blind-grandma3-blind).
 
 This is an approval-gated design doc. Do not implement Wave 33 code until this doc is reviewed and accepted. The feature changes operator trust boundaries: the UI must make it impossible to confuse offline edits with live rig output.

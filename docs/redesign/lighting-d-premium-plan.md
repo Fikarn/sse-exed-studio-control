@@ -1,5 +1,7 @@
 # Lighting Direction D — Premium implementation plan (Waves 24–34)
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Authored 2026-04-30 against `origin/main` at `c285541`. This plan turns the 28 findings in [lighting-d-premium-target.md](lighting-d-premium-target.md) into a concrete, sequenced wave structure that a future Claude Code session can pick up and execute without re-discovery.
 
 The companion docs are the source of truth for **what** to build:

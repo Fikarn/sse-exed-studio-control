@@ -8,6 +8,8 @@ audit_refs:
   - docs/archive/UX_AUDIT.md §C1, §C4, §C5, §C6, §C8, §C9, §C10, §C11
 ---
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 # Dashboard header — delta spec
 
 Reference composite (Directions A / B / C / D): `docs/redesign/assets/dashboard-header/directions-composite.png`.

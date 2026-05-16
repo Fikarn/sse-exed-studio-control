@@ -2,49 +2,64 @@
 
 Status values: `todo`, `in_progress`, `verified`, `blocked:<exact reason>`.
 
-## Baseline
+## Current Remediation Pass
 
 - Date: 2026-05-16
-- Branch: `codex/audio-control-surface-review-fixes`
-- Audit source: local repo plus GitHub repository `Fikarn/sse-exed-studio-control`
-- Baseline tracked status before this plan: clean on `codex/audio-control-surface-review-fixes...origin/codex/audio-control-surface-review-fixes`
+- Branch: `codex/repo-professionalization-remediation`
+- Plan: `docs/superpowers/plans/2026-05-16-repo-professionalization-remediation.md`
+- Tracking issue: https://github.com/Fikarn/sse-exed-studio-control/issues/77
+- Audit source: local repo plus live GitHub repository `Fikarn/sse-exed-studio-control`
+- Baseline tracked status before remediation edits: clean on `main...origin/main`
 
 ## Task Tracker
 
-| Task                                    | Status                                                                                                                                                                       | Evidence / Notes                                                                                                                                                                                                                                                                                                                                                             |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T0 Durable tracking                     | verified                                                                                                                                                                     | Plan and tracker created. GitHub tracking issue: https://github.com/Fikarn/sse-exed-studio-control/issues/77.                                                                                                                                                                                                                                                                |
-| T1 Release acceptance pad drift         | verified                                                                                                                                                                     | `npm run native:acceptance` now exits `0`; acceptance keeps `pad` unchanged because UFX III mic preamps do not expose pad.                                                                                                                                                                                                                                                   |
-| T2 Clippy warning gate                  | verified                                                                                                                                                                     | `cd native && cargo clippy --workspace --all-targets -- -D warnings` exits `0`; `npm run rust:clippy` now denies warnings.                                                                                                                                                                                                                                                   |
-| T3 Documentation drift                  | verified                                                                                                                                                                     | Scoped stale-reference check has no matches in active repo-facing docs; `SECURITY.md`, `CONTRIBUTING.md`, quickstart, and `docs/HANDOFF.md` updated.                                                                                                                                                                                                                         |
-| T4 Stale Dependabot PR hygiene          | verified                                                                                                                                                                     | Commented on and closed stale red Dependabot PRs #51 and #53. Open PR list now contains only draft PR #76.                                                                                                                                                                                                                                                                   |
-| T5 Supported GitHub repository settings | blocked:branch protection requires GitHub Pro or public repo; secret scanning unavailable; code scanning disabled; Dependabot alert #1 open for transitive Linux-only `glib` | Enabled `delete_branch_on_merge`, `allow_update_branch`, vulnerability alerts, and Dependabot security updates. `allow_auto_merge` remains false after typed API update attempts. Code scanning default setup also returns `403`, so a workflow-only change would not enable scanning on this repo.                                                                          |
-| T6 Verification and handoff             | verified                                                                                                                                                                     | `npm run doctor`, `npm run dev:check`, `npm run native:acceptance`, and `npm run release:verify` all completed. Doctor still warns about Node v25 vs Node 24 target, missing QtIFW, and local changes. Release verify exits `0` through macOS staging fallback because QtIFW is not installed; a follow-up vendor chunk split removed the frontend build chunk-size warning. |
+| Task                        | Status   | Evidence / Notes                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R0 Current tracker          | verified | Plan created at `docs/superpowers/plans/2026-05-16-repo-professionalization-remediation.md`; tracker reset to current live state.                                                                                                                                                                                                                                                      |
+| R1 Tauri security PR        | verified | PR #78 merged as `01b0d42291eee03dc289f566913efa1555375f66`; open PR list is empty; Dependabot alert #2 (`tauri`, GHSA-7gmj-67g7-phm9) now reports `fixed`.                                                                                                                                                                                                                            |
+| R2 Linux-only `glib` alert  | verified | Windows and macOS target cargo trees print no `glib` dependency path; `--target all` traces it only through unsupported Linux Tauri GTK/WebKit dependencies. Dependabot alert #1 dismissed as `not_used`.                                                                                                                                                                              |
+| R3 GitHub settings blockers | verified | Supported settings remain enabled: `allow_update_branch=true`, `delete_branch_on_merge=true`, vulnerability alerts return `204`. Blockers remain external/account-level: branch protection requires GitHub Pro or public repo, code scanning is not enabled, secret scanning is unavailable, and `allow_auto_merge=false` remains blocked until branch protection/rules are available. |
+| R4 Branch hygiene           | verified | Deleted 25 merged local branches, deleted 12 stale remote branches, pruned the already-removed Dependabot branch, and deleted three local squash-merged PR heads. Local branches are now only `main` and `codex/repo-professionalization-remediation`; remote branches are now only `origin/main`.                                                                                     |
+| R5 Current screenshots      | verified | `npm run tauri:visual:review -- --fixtures=planning-populated,lighting-populated,audio-populated,setup-ready --sizes=2560x1440 --out=artifacts/visual/repo-professionalization-screenshots` passed with 4 screenshots and 0 failures. The checked-in release screenshots were refreshed from that run, and README now describes them as current Tauri visual-review captures.          |
+| R6 Historical-doc banners   | verified | Added concise design/reference banners to active-looking `docs/redesign/*.md` files that lacked one.                                                                                                                                                                                                                                                                                   |
+| R7 Code-quality ratchet     | verified | Future ratchet items recorded below and in issue #77: tighten permissive ESLint rules incrementally, split large frontend files through scoped feature work, keep routine npm drift on Dependabot, and keep no-new-large-file discipline.                                                                                                                                              |
+| R8 Final verification       | verified | `npm run format:check`, `npm run dev:check`, and `npm run release:check` exit `0`; `npm run doctor` exits `0` with expected host warnings for Node v25 versus Node 24 target, missing QtIFW, and local remediation changes; GitHub issue #77 is updated with final remediation state.                                                                                                  |
 
 ## Command Log
 
-- `npm run native:acceptance` - failed before fix. `audio.channel.update` returned `AUDIO_CHANNEL_FIELD_UNSUPPORTED` because `audio-input-12` does not expose `pad`.
-- GitHub issue create - passed. Created issue #77: `Repository professionalization audit remediation`.
-- `cd native && cargo clippy --workspace --all-targets -- -D warnings` - passed after fixing `audio/helpers.rs`.
-- `npm run native:acceptance` - passed after acceptance fix: import, restart, and rollback deterministic.
-- Scoped stale-doc search - passed. No stale matches in `SECURITY.md`, `CONTRIBUTING.md`, `docs/DEVELOPER_QUICKSTART.md`, `docs/HANDOFF.md`, or `README.md`.
-- Close PR #51 - passed. Commented and closed stale red Dependabot `@types/react-window` PR.
-- Close PR #53 - passed. Commented and closed stale red Dependabot ESLint PR.
-- Open PR verification - passed. GitHub PR search shows only open PR #76 after closing #51 and #53.
-- Repo settings PATCH - partial. `delete_branch_on_merge=true` and `allow_update_branch=true` applied; `allow_auto_merge` remains false.
-- Vulnerability alerts endpoint - passed. Vulnerability alerts enabled; endpoint returns `204 No Content`.
-- Dependabot security updates PATCH - passed. Dependabot security updates enabled.
-- Dependabot alerts list - action needed. One open medium alert: `glib` (`GHSA-wrw7-89jp-8q8g`). `cargo tree --target all -i glib` traces it through Tauri Linux/webkit GTK dependencies; macOS and Windows target trees print nothing for `glib`.
-- Branch protection check - blocked. GitHub returns `403`: upgrade to GitHub Pro or make the repo public to enable branch protection.
-- Secret scanning PATCH - blocked. GitHub returns `422`: secret scanning is not available for this repository.
-- Code scanning alerts endpoint - blocked. GitHub returns `403`: code scanning is not enabled for this repository.
-- GitHub issue #77 update - passed. Issue body reflects completed items and remaining blockers.
-- `npm run doctor` - passed with warnings. Warnings: current Node v25.6.1 vs Node 24 target, QtIFW missing, and local changes present.
-- `npm run dev:check` - passed. Includes format, lint, rustfmt, strict clippy, protocol check, frontend typecheck, native check, and native tests.
-- `npm run native:acceptance` - passed on final run: import, restart, and rollback deterministic.
-- `npm run release:verify` - passed. QtIFW missing triggered macOS native release staging verification. The earlier Vite chunk warning was later resolved with a vendor chunk split; packaged control-surface bind is unavailable in sandbox but nonfatal.
-- Commit and push - passed. Pushed `09cd74e` to `origin/codex/audio-control-surface-review-fixes`.
-- Auto-merge retry - blocked. `gh api repos/Fikarn/sse-exed-studio-control -X PATCH -F allow_auto_merge=true` succeeds but the repository still returns `allow_auto_merge:false`.
-- Code scanning default setup retry - blocked. `PATCH /repos/Fikarn/sse-exed-studio-control/code-scanning/default-setup` returns `403`: code scanning is not enabled for this repository.
-- Frontend vendor chunk split - passed. `npm run build --workspace frontend/app` exits `0`; emitted app entry is ~639 kB and vendor is ~283 kB, with no Vite chunk-size warning.
-- Final PR advisory run - passed. GitHub Actions `dev-checks` run `25961632497` completed with `frontend-typecheck`, `format-protocol`, `lint`, and `rust` all green on head `ee94d1a`.
+- `git status --short --branch` - passed before work: clean on `main...origin/main`.
+- `git switch -c codex/repo-professionalization-remediation` - passed. Work moved off `main`.
+- GitHub PR #78 inspection - passed. Scope was `native/Cargo.lock` and `native/tauri-shell/Cargo.toml`; advisory run `25962999614` passed all four jobs: `format-protocol`, `lint`, `frontend-typecheck`, and `rust`.
+- Merge PR #78 - passed. Squash-merged as `01b0d42291eee03dc289f566913efa1555375f66`.
+- `git fetch origin` - passed. Local `origin/main` advanced to `01b0d42`.
+- Dependabot alerts check - passed. Alert #2 (`tauri`, GHSA-7gmj-67g7-phm9) reports `fixed`; alert #1 (`glib`, GHSA-wrw7-89jp-8q8g) remains open.
+- `git merge --ff-only origin/main` - first attempt failed due sandbox permission on `.git/ORIG_HEAD.lock`; escalated rerun passed and fast-forwarded the remediation branch through PR #78.
+- `cargo tree --target x86_64-pc-windows-msvc -i glib` - passed with no dependency path.
+- `cargo tree --target aarch64-apple-darwin -i glib` - passed with no dependency path.
+- `cargo tree --target all -i glib` - passed and traced `glib` only through Linux Tauri GTK/WebKit dependencies.
+- Dismiss Dependabot alert #1 - passed. Alert dismissed as `not_used` with target-platform evidence.
+- GitHub settings recheck - passed/blocked as expected. `allow_update_branch=true`, `delete_branch_on_merge=true`, vulnerability alerts return `204`; branch protection returns the GitHub Pro/public-repo blocker; code scanning returns `403` disabled.
+- Branch cleanup - passed. Local branch list now contains only `main` and `codex/repo-professionalization-remediation`; remote branch list now contains only `origin/main`.
+- `npm run tauri:visual:review -- --fixtures=planning-populated,lighting-populated,audio-populated,setup-ready --sizes=2560x1440 --out=artifacts/visual/repo-professionalization-screenshots` - passed with 4 screenshots and 0 failures.
+- Release screenshot refresh - passed. Copied current Tauri visual-review captures into `docs/release-assets/`.
+- Historical-doc banners - passed. Added design/reference status banners to `docs/redesign/*.md` files that lacked current-truth guidance.
+- `npm run format:check` - passed. All matched files use Prettier style.
+- `npm run dev:check` - passed. Format, lint, Rust formatting, strict clippy, protocol check, frontend typecheck, native check, and native tests all exit `0`; native tests report 10 Tauri-shell tests and 164 engine tests passing.
+- `npm run release:check` - passed. Release metadata validates for `v2.2.1`.
+- `npm run doctor` - passed with 3 warnings. Warnings are Node v25.6.1 versus Node 24 target baseline, QtIFW missing for installer/update-repository release gates, and the expected dirty remediation branch.
+- GitHub issue #77 update - passed. Issue body now reflects completed remediation, verification, remaining external/account blockers, and future ratchets.
+
+## Future Ratchet Items
+
+- Tighten the intentionally permissive ESLint baseline incrementally. Start by turning `@typescript-eslint/no-unused-vars`, `@typescript-eslint/no-explicit-any`, and React static/memo warnings into errors only after focused cleanup PRs.
+- Split large frontend files through normal feature work rather than broad churn. Current largest files to watch are `frontend/app/src/app/audio/AudioWorkspace.module.css`, `frontend/app/src/app/lighting/LightingWorkspace.tsx`, and `frontend/app/src/app/planning/PlanningWorkspace.tsx`.
+- Keep routine npm updates on Dependabot cadence; `npm audit --json` currently reports zero npm vulnerabilities.
+- Keep branch cleanup recurring. `delete_branch_on_merge=true` is now enabled, but squash-merged bot and historical branches can still require periodic pruning.
+
+## Remaining External Blockers
+
+- Branch protection / rulesets: GitHub returns a plan blocker for this private repo unless it becomes public or the account upgrades to GitHub Pro.
+- Code scanning: GitHub returns `403` because code scanning is not enabled for this repository.
+- Secret scanning: previously returned unavailable for this repository.
+- Auto-merge: repository still reports `allow_auto_merge=false`; revisit after branch protection/rulesets are available.
+- Release-host setup: this local machine is not currently a full release host because `npm run doctor` warns about Node v25 versus Node 24 target and missing QtIFW.

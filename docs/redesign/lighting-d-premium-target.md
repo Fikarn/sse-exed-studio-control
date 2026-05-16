@@ -1,5 +1,7 @@
 # Lighting Direction D — Premium production-ready target
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Authored 2026-04-30 against `origin/main` at `c285541`. Direction D Waves 1–23 + post-merge hygiene PRs all shipped; native test floor 118 engine + 6 shell = 124. This document consolidates every gap between the current state and an ultra-premium, production-ready final state.
 
 The criterion here is **does the absence of this item make the product feel less than premium?** — not LOC, not implementation effort, not impact-per-effort.

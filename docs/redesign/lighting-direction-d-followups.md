@@ -1,5 +1,7 @@
 # Lighting Direction D — Polish follow-ups (post-Waves 19–23)
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Authored 2026-04-29 after Waves 19–22 (PRs #35–#38) and Wave 23 (PRs #39–#41) shipped, closing all 64 audit findings. This document captures industry-standard interaction patterns the lighting workspace **doesn't yet match** but didn't surface in the original 64-finding audit. None of these are bugs; they're "feels like a pro tool" gaps identified by comparing the workspace against Notion, Linear, Figma, Logic Pro, ETC Eos / GrandMA3, Vectorworks, and Ableton.
 
 A future Claude Code session can pick any of these as a focused initiative. Each is sized as a rough indication of LOC.

@@ -8,6 +8,8 @@ prototype: docs/redesign/assets/lighting/Lighting-D-Scene-Desk.html
 authored: 2026-04-27
 ---
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 # Lighting · Direction D — Scene desk · Implementation Plan
 
 > Self-contained plan. A fresh Claude Code session should be able to load `MEMORY.md` (auto), `CLAUDE.md` → `AGENTS.md`, `docs/HANDOFF.md`, then this file, and start coding without further discovery. All file paths verified against the worktree at write time.

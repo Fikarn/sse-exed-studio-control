@@ -9,6 +9,8 @@ supersedes:
   - earlier Ar+ / control-room confidence desk notes
 ---
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 # Audio L1 - Control Room Signal Desk
 
 This is the new Audio direction. Treat older Audio direction documents and prototypes as historical context only. The visual authority is the current implemented Lighting workspace: dark studio canvas, warm green operational state, sharp radius scale, mono data labels, serif workspace title, glass overlay pills, left rail, center work surface, right inspector, and full-width bottom health bar.

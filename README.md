@@ -39,7 +39,7 @@ Productization work and release gates are tracked in [docs/PRODUCTIZATION_PLAN.m
 
 ## Screenshots
 
-All captures below are deterministic native renders at the target `2560x1440` operator-monitor resolution. The checked-in release screenshots remain historical Qt-shell parity captures; current Tauri visual review is produced through the local cutover-readiness lanes described in [docs/archive/FRONTEND_CUTOVER_PLAN.md](docs/archive/FRONTEND_CUTOVER_PLAN.md).
+All captures below are deterministic Tauri native renders at the target `2560x1440` operator-monitor resolution. Current visual review is produced through the local evidence lanes described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 | Planning                                                                                             | Lighting                                                                                                    |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
