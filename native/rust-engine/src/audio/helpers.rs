@@ -31,8 +31,7 @@ pub(super) fn apply_channel_state(
             if let Some(state) = stored_state.get(&channel.id) {
                 if let Some(name) = state
                     .name
-                    .as_ref()
-                    .map(String::as_str)
+                    .as_deref()
                     .map(str::trim)
                     .filter(|value| !value.is_empty())
                 {

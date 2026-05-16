@@ -78,11 +78,12 @@ The highest-value unresolved work is:
 
 The current GitHub execution queue is:
 
-- [Issue #6: Developer readiness: onboarding, workflow, and repo hygiene](https://github.com/Fikarn/sse-exed-studio-control/issues/6) is the active execution item for repository readiness and future-development workflow polish.
+- [Issue #77: Repository professionalization audit remediation](https://github.com/Fikarn/sse-exed-studio-control/issues/77) tracks the May 16, 2026 repository-readiness audit follow-up for release gates, docs drift, dependency PR hygiene, and supported GitHub security settings.
 - release-artwork polish and optional future signing posture remain tracked in `docs/PRODUCTIZATION_PLAN.md` §3 rather than as separate execution items; public distribution is not part of the current deployment goal
 
 Completed rollout record:
 
+- [Issue #6: Developer readiness: onboarding, workflow, and repo hygiene](https://github.com/Fikarn/sse-exed-studio-control/issues/6)
 - [Issue #3: Cutover: Tauri shipping switch evidence and fallback window](https://github.com/Fikarn/sse-exed-studio-control/issues/3)
 - [Issue #4: Rollout: verify v2.2.1 published installer on operator workstation](https://github.com/Fikarn/sse-exed-studio-control/issues/4), executed through [docs/OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md)
 - [Issue #5: Checkpoint D: plan Qt fallback retirement](https://github.com/Fikarn/sse-exed-studio-control/issues/5), executed through [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](./archive/QT_FALLBACK_RETIREMENT_AUDIT.md)
