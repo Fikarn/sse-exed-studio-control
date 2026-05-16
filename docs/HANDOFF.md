@@ -78,7 +78,7 @@ The highest-value unresolved work is:
 
 The current GitHub execution queue is:
 
-- [Issue #77: Repository professionalization audit remediation](https://github.com/Fikarn/sse-exed-studio-control/issues/77) tracks the May 16, 2026 repository-readiness audit follow-up for release gates, docs drift, dependency PR hygiene, and supported GitHub security settings.
+- [Issue #77: Repository professionalization audit remediation](https://github.com/Fikarn/sse-exed-studio-control/issues/77) tracks the May 16, 2026 repository-readiness audit follow-up. Immediate remediation is complete for the stale dependency PR queue, Dependabot alert triage, merged-branch cleanup, current Tauri README screenshots, historical-design-doc status banners, squash-only merge policy, and local release-host setup. Remaining items are GitHub account/visibility blockers and future code-quality ratchets.
 - release-artwork polish and optional future signing posture remain tracked in `docs/PRODUCTIZATION_PLAN.md` §3 rather than as separate execution items; public distribution is not part of the current deployment goal
 
 Completed rollout record:

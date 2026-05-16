@@ -96,9 +96,9 @@ pub fn initialize_database(db_path: &Path) -> EngineResult<StorageBootstrap> {
 
     for (key, value) in default_settings_entries()
         .into_iter()
-        .chain(default_app_settings_entries().into_iter())
-        .chain(default_commissioning_settings_entries().into_iter())
-        .chain(default_planning_settings_entries().into_iter())
+        .chain(default_app_settings_entries())
+        .chain(default_commissioning_settings_entries())
+        .chain(default_planning_settings_entries())
     {
         connection.execute(
             "INSERT INTO app_settings(key, value) VALUES (?1, ?2)

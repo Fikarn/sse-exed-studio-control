@@ -1,5 +1,7 @@
 # Lighting Direction D — Industry-comparator audit
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Authored 2026-04-30 against `origin/main` at `c285541` — post Direction D Waves 1–23 + PR #42 (Wave 23 IPC tests) + PR #43 (eslint/prettier worktree-ignore hardening). Native test floor 118 engine + 6 shell = 124. F1–F12 polish gaps captured separately in [lighting-direction-d-followups.md](lighting-direction-d-followups.md).
 
 This audit looks at the lighting workspace through a different lens than the prior 64-finding audit (which was prototype-vs-implementation) and the F1–F12 follow-ups (which were industry-pattern matches against general productivity tools). Here we compare the workspace against **lighting-specific consoles** (ETC Eos Family, MA Lighting GrandMA3, ChamSys MagicQ, Hog 4 PC, Avolites Titan, Capture, Vectorworks Spotlight, QLab) and **adjacent high-end professional tools** (Logic Pro, Ableton Live, DaVinci Resolve, Figma, Linear, VS Code, Notion). Goal: identify interaction / visual / feature patterns those tools use that would meaningfully raise the lighting workspace toward "shipping-quality professional tool" feel, **without duplicating F1–F12**.

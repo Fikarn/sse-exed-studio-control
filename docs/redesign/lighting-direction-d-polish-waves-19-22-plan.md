@@ -1,5 +1,7 @@
 # Lighting Direction D — Polish plan (Waves 19–22)
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Scope: 64 UI/UX/front-end audit findings against the lighting workspace post-Wave-18 (branch `claude/charming-pare-155614`, base `ca2780e`). Authored 2026-04-29. Each wave is one focused commit; the codebase is shippable at every step. Wave 23 contains items that need explicit user go-ahead and is not part of the standing run.
 
 ## Standing rules carried forward

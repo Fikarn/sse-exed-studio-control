@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -175,6 +175,29 @@ function resolveExecutable(names, envNames) {
   return null;
 }
 
+function resolveLocalQtIfw(names) {
+  const baseDir = path.join(rootDir, ".tools", "qt-ifw", "Tools", "QtInstallerFramework");
+  if (!existsSync(baseDir)) {
+    return null;
+  }
+
+  const versions = readdirSync(baseDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
+
+  for (const version of versions) {
+    for (const name of names) {
+      const candidate = path.join(baseDir, version, "bin", name);
+      if (existsSync(candidate)) {
+        return { source: `.tools/qt-ifw ${version}`, value: candidate };
+      }
+    }
+  }
+
+  return null;
+}
+
 function qtifwInstructions() {
   // Any QtIFW 4.x is acceptable; substitute the installed minor version.
   if (process.platform === "win32") {
@@ -186,17 +209,18 @@ function qtifwInstructions() {
 
   return [
     "Install QtIFW into .tools/qt-ifw or another local path, then export:",
-    'export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.11/bin/binarycreator"',
-    'export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.11/bin/repogen"',
+    'export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"',
+    'export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"',
   ].join("\n");
 }
 
 function checkQtIfw() {
-  const binaryCreator = resolveExecutable(
-    ["binarycreator.exe", "binarycreator"],
-    ["SSE_QT_IFW_BINARYCREATOR", "QT_IFW_BINARYCREATOR"]
-  );
-  const repoGen = resolveExecutable(["repogen.exe", "repogen"], ["SSE_QT_IFW_REPOGEN", "QT_IFW_REPOGEN"]);
+  const binaryCreator =
+    resolveExecutable(["binarycreator.exe", "binarycreator"], ["SSE_QT_IFW_BINARYCREATOR", "QT_IFW_BINARYCREATOR"]) ??
+    resolveLocalQtIfw(["binarycreator.exe", "binarycreator"]);
+  const repoGen =
+    resolveExecutable(["repogen.exe", "repogen"], ["SSE_QT_IFW_REPOGEN", "QT_IFW_REPOGEN"]) ??
+    resolveLocalQtIfw(["repogen.exe", "repogen"]);
 
   if (binaryCreator && repoGen) {
     pass(

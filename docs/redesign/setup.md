@@ -10,6 +10,8 @@ audit_refs:
   - docs/archive/UX_AUDIT.md §C4, §C5, §C6, §C7, §C8, §C10, §C11
 ---
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 # Setup — delta spec
 
 Reference mockup: `docs/redesign/assets/setup/Setup-Redesign.html` (three directions A / B / C; B is the chosen direction).

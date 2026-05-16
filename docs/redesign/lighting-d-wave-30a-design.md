@@ -1,5 +1,7 @@
 # Wave 30a — Engine design pass (rail finish — engine half)
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Authored 2026-05-01 against `origin/main` at `6b0346b4` (Wave 29 merge / PR #55). Native floor 123 engine + 6 shell = 129 (lighting subset 32). Companion docs: [lighting-d-premium-plan.md §"Wave 30"](lighting-d-premium-plan.md), [lighting-direction-d-followups.md#f5](lighting-direction-d-followups.md#f5-drag-reorder-for-groups-parallel-to-scenes), [lighting-d-industry-audit.md#i4](lighting-d-industry-audit.md#i4-color-tags-for-scenes-and-groups--ableton-live-pattern).
 
 This doc locks down the schema, IPC, migration, and test shape for the engine sub-PR. The frontend half (X1 hover, F10 CTAs, P5 mini-graph, ColorPicker primitive, GroupRail dnd-kit, EmptyState extension, hover preview) ships in **30b** as a frontend-only sub-PR after 30a merges. 30a's frontend deliverable is the engine-client TS surface + ts-rs regen so the engine work is visible end-to-end (no UI yet).

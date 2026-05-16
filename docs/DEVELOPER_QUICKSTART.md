@@ -186,7 +186,7 @@ Before release evidence, run:
 npm run doctor:release
 ```
 
-`doctor:release` requires QtIFW paths and a clean worktree. If QtIFW is missing, it prints the exact `SSE_QT_IFW_BINARYCREATOR` and `SSE_QT_IFW_REPOGEN` setup instructions.
+`doctor:release` requires QtIFW tools and a clean worktree. It auto-detects the local `.tools/qt-ifw` layout; if QtIFW is somewhere else, expose it with `SSE_QT_IFW_BINARYCREATOR` and `SSE_QT_IFW_REPOGEN`.
 
 ## QtIFW Setup
 
@@ -197,8 +197,8 @@ python3 -m venv .tools/aqtinstall-venv
 .tools/aqtinstall-venv/bin/python -m pip install --upgrade pip aqtinstall
 mkdir -p .tools/aqt-home
 HOME="$PWD/.tools/aqt-home" .tools/aqtinstall-venv/bin/aqt install-tool mac desktop tools_ifw qt.tools.ifw.47 -O .tools/qt-ifw
-export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.11/bin/binarycreator"
-export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.11/bin/repogen"
+export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"
+export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"
 ```
 
 On Windows, set the equivalent PowerShell environment variables:

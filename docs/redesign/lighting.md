@@ -11,6 +11,8 @@ audit_refs:
   - docs/archive/UX_AUDIT.md §Lighting workspace
 ---
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 # Lighting — Direction D delta spec
 
 > Direction **D — Scene desk** supersedes the locked **Cr — Spatial desk** direction. The visual proposal is the v6 prototype at [Lighting-D-Scene-Desk.html](./assets/lighting/Lighting-D-Scene-Desk.html); render at 2560×1440 on the BetterDisplay review surface for operator-size review. The base 4-PR implementation sequence lives in [lighting-direction-d-implementation-plan.md](./lighting-direction-d-implementation-plan.md), and the completed premium pass lives in [lighting-d-premium-plan.md](./lighting-d-premium-plan.md). This file is the design-spec record — what the workspace _is_ for two operator personas, not how to build it.

@@ -1,5 +1,7 @@
 # Wave 34 - Per-attribute palette pools design
 
+> Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.
+
 Authored 2026-05-01 against `claude/wave-31-cross-cutting-refinements` after Wave 32 fade recall work. Companion docs: [lighting-d-premium-plan.md Wave 34](lighting-d-premium-plan.md#wave-34--per-attribute-palette-pools-architectural), [lighting-d-industry-audit.md#p3](lighting-d-industry-audit.md#p3-per-attribute-palette-pools--cct-and-intensity-presets-hog-4-palettes--grandma3-preset-pools).
 
 This was the approval-gated design doc for Wave 34. Wave 34 added a persisted lighting concept and a storage migration, so the implementation was deliberately reviewed before code landed.
