@@ -18,7 +18,7 @@ tauri-build = { version = "2.6.0", features = [] }
 serde.workspace = true
 serde_json.workspace = true
 studio-control-protocol.workspace = true
-tauri = { version = "2.11.0", features = [] }
+tauri = { version = "2.11.1", features = [] }
 
 [lints]
 workspace = true
