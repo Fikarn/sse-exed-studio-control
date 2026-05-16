@@ -29,7 +29,13 @@ pub(super) fn apply_channel_state(
         .into_iter()
         .map(|mut channel| {
             if let Some(state) = stored_state.get(&channel.id) {
-                if let Some(name) = state.name.as_ref().map(String::as_str).map(str::trim).filter(|value| !value.is_empty()) {
+                if let Some(name) = state
+                    .name
+                    .as_ref()
+                    .map(String::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                {
                     channel.name = String::from(name);
                 }
                 if channel_supports_gain(&channel) {
@@ -56,7 +62,8 @@ pub(super) fn apply_channel_state(
                 }
                 channel.eq = state.eq.clone();
                 channel.dynamics = state.dynamics.clone();
-                channel.send_modes = default_send_modes_for_mix_targets(channel.send_modes, &channel.mix_levels);
+                channel.send_modes =
+                    default_send_modes_for_mix_targets(channel.send_modes, &channel.mix_levels);
                 for (mix_target_id, send_mode) in &state.send_modes {
                     channel
                         .send_modes
@@ -420,10 +427,7 @@ pub(super) fn audio_view_mode(settings: &HashMap<String, String>) -> String {
     }
 }
 
-pub(super) fn audio_capabilities(
-    status: &str,
-    osc_enabled: bool,
-) -> AudioCapabilitySnapshot {
+pub(super) fn audio_capabilities(status: &str, osc_enabled: bool) -> AudioCapabilitySnapshot {
     AudioCapabilitySnapshot {
         can_edit_mixer_state: osc_enabled,
         can_sync: osc_enabled,
@@ -629,12 +633,22 @@ pub(super) fn capture_audio_scene_contents(
         channels: snapshot
             .channels
             .iter()
-            .map(|channel| (channel.id.clone(), stored_channel_state_from_snapshot(channel)))
+            .map(|channel| {
+                (
+                    channel.id.clone(),
+                    stored_channel_state_from_snapshot(channel),
+                )
+            })
             .collect(),
         mix_targets: snapshot
             .mix_targets
             .iter()
-            .map(|target| (target.id.clone(), stored_mix_target_state_from_snapshot(target)))
+            .map(|target| {
+                (
+                    target.id.clone(),
+                    stored_mix_target_state_from_snapshot(target),
+                )
+            })
             .collect(),
     }
 }

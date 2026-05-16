@@ -3763,7 +3763,12 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
         const mixTargetId = asString(params.mixTargetId).trim();
         const sendModes: JsonObject = asRecord(channel.sendModes) ?? buildAudioSendModes();
-        const sendMode = asRecord(sendModes[mixTargetId]) ?? { preFader: false, mute: false, linkStereo: true, solo: false };
+        const sendMode = asRecord(sendModes[mixTargetId]) ?? {
+          preFader: false,
+          mute: false,
+          linkStereo: true,
+          solo: false,
+        };
         if ("preFader" in params) sendMode.preFader = asBoolean(params.preFader, false);
         if ("mute" in params) sendMode.mute = asBoolean(params.mute, false);
         if ("linkStereo" in params) sendMode.linkStereo = asBoolean(params.linkStereo, true);

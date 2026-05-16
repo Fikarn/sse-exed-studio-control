@@ -1,8 +1,4 @@
-import {
-  useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "../AudioWorkspace.module.css";
@@ -887,7 +883,9 @@ export function AudioInspector({
               <button
                 data-active={selectedChannel.eq.enabled}
                 disabled={!viewModel.capabilities.canEditProcessing}
-                onClick={() => onUpdateChannelEq({ channelId: selectedChannel.id, enabled: !selectedChannel.eq.enabled })}
+                onClick={() =>
+                  onUpdateChannelEq({ channelId: selectedChannel.id, enabled: !selectedChannel.eq.enabled })
+                }
                 type="button"
               >
                 {selectedChannel.eq.enabled ? "Bypass EQ" : "Enable EQ"}

@@ -27,7 +27,8 @@ pub fn parse_audio_snapshot_create_request(
         .ok_or_else(|| String::from("name is required"))?;
     let osc_index = optional_integer_range(params.get("oscIndex"), "oscIndex", 0, 7)?
         .ok_or_else(|| String::from("oscIndex is required"))?;
-    let capture_current_state = optional_bool(params.get("captureCurrentState"), "captureCurrentState")?;
+    let capture_current_state =
+        optional_bool(params.get("captureCurrentState"), "captureCurrentState")?;
 
     Ok(AudioSnapshotCreateRequest {
         name,
@@ -49,7 +50,8 @@ pub fn parse_audio_snapshot_update_request(
         .map(|value| validate_audio_snapshot_name(value, "name"))
         .transpose()?;
     let osc_index = optional_integer_range(params.get("oscIndex"), "oscIndex", 0, 7)?;
-    let capture_current_state = optional_bool(params.get("captureCurrentState"), "captureCurrentState")?;
+    let capture_current_state =
+        optional_bool(params.get("captureCurrentState"), "captureCurrentState")?;
 
     if name.is_none() && osc_index.is_none() && capture_current_state.is_none() {
         return Err(String::from(
@@ -193,7 +195,8 @@ pub fn parse_audio_settings_update_request(
     )?;
     let faders_per_bank =
         optional_integer_range(params.get("fadersPerBank"), "fadersPerBank", 1, 24)?;
-    let view_mode = optional_enum_string(params.get("viewMode"), "viewMode", &["submix", "master"])?;
+    let view_mode =
+        optional_enum_string(params.get("viewMode"), "viewMode", &["submix", "master"])?;
 
     if osc_enabled.is_none()
         && send_host.is_none()
@@ -237,7 +240,8 @@ pub fn parse_audio_eq_update_request(params: &Value) -> Result<AudioEqUpdateRequ
     let enabled = optional_bool(params.get("enabled"), "enabled")?;
     let band_id = optional_enum_string(params.get("bandId"), "bandId", &["lc", "lo", "mid", "hi"])?;
     let band_enabled = optional_bool(params.get("bandEnabled"), "bandEnabled")?;
-    let frequency_hz = optional_number_range(params.get("frequencyHz"), "frequencyHz", 20.0, 20_000.0)?;
+    let frequency_hz =
+        optional_number_range(params.get("frequencyHz"), "frequencyHz", 20.0, 20_000.0)?;
     let gain_db = optional_number_range(params.get("gainDb"), "gainDb", -12.0, 12.0)?;
     let q = optional_number_range(params.get("q"), "q", 0.1, 12.0)?;
 
@@ -390,7 +394,10 @@ pub(super) fn optional_enum_string(
             if allowed.contains(&parsed) {
                 Ok(Some(String::from(parsed)))
             } else {
-                Err(format!("{field_name} must be one of: {}", allowed.join(", ")))
+                Err(format!(
+                    "{field_name} must be one of: {}",
+                    allowed.join(", ")
+                ))
             }
         }
         None => Ok(None),

@@ -174,12 +174,7 @@ export function AudioRail({
           <span className={styles.eyebrow}>Audio</span>
         </div>
         <div className={styles.railToolGrid}>
-          <button
-            aria-label="Sync"
-            disabled={!viewModel.actionsAllowed}
-            onClick={onSync}
-            type="button"
-          >
+          <button aria-label="Sync" disabled={!viewModel.actionsAllowed} onClick={onSync} type="button">
             <RefreshCw size={13} strokeWidth={1.8} aria-hidden="true" />
             Sync
           </button>
@@ -201,7 +196,6 @@ export function AudioRail({
           </button>
         </div>
       </div>
-
     </aside>
   );
 }

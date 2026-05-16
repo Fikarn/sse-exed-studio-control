@@ -45,32 +45,32 @@ pub fn recall_audio_snapshot(
         })?;
 
     let mut updates = vec![
-            (
-                String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-                String::from("assumed"),
-            ),
-            (
-                String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),
-                String::from("snapshot"),
-            ),
-            (
-                String::from(AUDIO_LAST_RECALLED_SNAPSHOT_ID_KEY),
-                request.snapshot_id.clone(),
-            ),
-            (
-                String::from(AUDIO_LAST_SNAPSHOT_RECALL_AT_KEY),
-                recalled_at.clone(),
-            ),
-            (
-                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
-                String::from("succeeded"),
-            ),
-            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::new()),
-            (
-                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
-                outcome.summary.clone(),
-            ),
-        ];
+        (
+            String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
+            String::from("assumed"),
+        ),
+        (
+            String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),
+            String::from("snapshot"),
+        ),
+        (
+            String::from(AUDIO_LAST_RECALLED_SNAPSHOT_ID_KEY),
+            request.snapshot_id.clone(),
+        ),
+        (
+            String::from(AUDIO_LAST_SNAPSHOT_RECALL_AT_KEY),
+            recalled_at.clone(),
+        ),
+        (
+            String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+            String::from("succeeded"),
+        ),
+        (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::new()),
+        (
+            String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+            outcome.summary.clone(),
+        ),
+    ];
     if let Some(contents) = recalled_snapshot.contents {
         updates.push((
             String::from(AUDIO_CHANNEL_STATE_KEY),

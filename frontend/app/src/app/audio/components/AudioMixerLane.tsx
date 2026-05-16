@@ -4,11 +4,7 @@ import type { ShellStore } from "@sse/engine-client";
 import styles from "../AudioWorkspace.module.css";
 import { createThrottledCommit } from "../audioContinuousControls";
 import { formatAudioDb, formatMeterDb } from "../audioFormatting";
-import {
-  audioChannelSupportsGain,
-  getAudioChannelGroup,
-  selectedChannelSendLevel,
-} from "../audioViewModel";
+import { audioChannelSupportsGain, getAudioChannelGroup, selectedChannelSendLevel } from "../audioViewModel";
 import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
 import { AudioFader } from "./AudioFader";
 import { AudioPreampControl } from "./AudioPreampControl";

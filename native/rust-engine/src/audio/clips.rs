@@ -20,7 +20,11 @@ pub fn clear_audio_clips(
     }
 
     if let Some(channel_id) = &request.channel_id {
-        if !snapshot.channels.iter().any(|entry| entry.id == *channel_id) {
+        if !snapshot
+            .channels
+            .iter()
+            .any(|entry| entry.id == *channel_id)
+        {
             return Err(AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
                 format!("Audio channel '{channel_id}' is not exposed by the engine."),

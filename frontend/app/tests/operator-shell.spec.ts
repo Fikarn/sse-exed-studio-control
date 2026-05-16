@@ -397,19 +397,17 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await expect.poll(() => stripFill.evaluate((node) => getComputedStyle(node).animationName)).toContain("audioMeter");
 
   const activeMixFill = page.getByTestId("audio-active-mix-meter").locator("i").first();
-  await expect.poll(() => activeMixFill.evaluate((node) => getComputedStyle(node).animationName)).toContain(
-    "audioMeter"
-  );
+  await expect
+    .poll(() => activeMixFill.evaluate((node) => getComputedStyle(node).animationName))
+    .toContain("audioMeter");
 
   await openFixture(page, "audio-hardware-metering");
   await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveCount(0);
   await expect(page.getByTestId("audio-rail-monitor-card")).toContainText("Active mix · live");
   await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Test meter simulation");
-  await expect(
-    page
-      .getByTestId("audio-strip-audio-playback-3-4")
-      .locator('[data-simulated-meter="true"]')
-  ).toHaveCount(0);
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4").locator('[data-simulated-meter="true"]')).toHaveCount(
+    0
+  );
 });
 
 test("supports audio warning-band sync and keyboard mix-target changes", async ({ page }) => {
@@ -560,7 +558,9 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
   await currentSnapshot.hover();
   await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
-  await expect(currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)).toBeVisible();
+  await expect(
+    currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)
+  ).toBeVisible();
 
   await page.keyboard.press(modifierShortcut("S"));
   const savedThumbAfter = await readSnapshotThumbHeights(page, "snapshot-show-open");
@@ -598,7 +598,9 @@ test("shows numeric snapshot before and after preview text", async ({ page }) =>
 
   await currentSnapshot.hover();
   await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
-  await expect(currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)).toBeVisible();
+  await expect(
+    currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)
+  ).toBeVisible();
 });
 
 test("supports engine-backed audio EQ editing", async ({ page }) => {

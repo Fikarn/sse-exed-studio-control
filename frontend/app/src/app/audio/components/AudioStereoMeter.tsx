@@ -72,7 +72,9 @@ export function AudioStereoMeter({
           <span>-∞</span>
         </div>
       ) : null}
-      {showReadout ? <div className={styles.meterReadout}>{clip ? "CLIP" : formatMeterDb(Math.max(left, right))}</div> : null}
+      {showReadout ? (
+        <div className={styles.meterReadout}>{clip ? "CLIP" : formatMeterDb(Math.max(left, right))}</div>
+      ) : null}
     </div>
   );
 }

@@ -113,9 +113,7 @@ export function AudioSignalCanvas({
             data-active={viewModel.viewMode === "master"}
             disabled={!viewModel.capabilities.canUseMasterView}
             onClick={() => onSetViewMode("master")}
-            title={
-              viewModel.capabilities.canUseMasterView ? "Show master view" : "Master view requires engine support"
-            }
+            title={viewModel.capabilities.canUseMasterView ? "Show master view" : "Master view requires engine support"}
             type="button"
           >
             Master

@@ -27,3 +27,4 @@ frontend/**/dist/
 frontend/**/storybook-static/
 frontend/**/playwright-report/
 frontend/**/test-results/
+test-results/

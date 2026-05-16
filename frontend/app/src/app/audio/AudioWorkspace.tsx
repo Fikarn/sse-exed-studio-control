@@ -51,9 +51,8 @@ const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
 export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
   const { register } = usePalette();
   const [density, setDensity] = useState<AudioDensityMode>("desktop");
-  const [activeChannelGroups, setActiveChannelGroups] = useState<AudioChannelGroupSelections>(
-    EMPTY_CHANNEL_GROUP_SELECTIONS
-  );
+  const [activeChannelGroups, setActiveChannelGroups] =
+    useState<AudioChannelGroupSelections>(EMPTY_CHANNEL_GROUP_SELECTIONS);
   const [bankIndex, setBankIndex] = useState(0);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<AudioWorkspaceFeedback | null>(null);
@@ -211,8 +210,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   });
 
   const selectChannelGroup = useLiveCallback(({ group, mode, tierId }: AudioChannelGroupSelectionRequest) => {
-    const availableGroups = (
-      tierId === "hardware-inputs" ? viewModel?.hardwareInputs.chips : viewModel?.softwarePlayback.chips
+    const availableGroups = (tierId === "hardware-inputs"
+      ? viewModel?.hardwareInputs.chips
+      : viewModel?.softwarePlayback.chips
     )?.map((chip) => chip.id as AudioChannelGroup) ?? [group];
     setActiveChannelGroups((current) => {
       const selected = new Set(current[tierId]);
@@ -719,34 +719,32 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           }
         },
       },
-      ...allSelectableChannels.flatMap(
-        (channel): PaletteAction[] => [
-          {
-            id: `audio:solo:${channel.id}`,
-            label: `Solo ${channel.name}`,
-            group: "Actions",
-            keywords: ["audio", "solo", channel.name, channel.shortName, channel.role],
-            action: () => {
-              updateChannel({
-                channelId: channel.id,
-                solo: !channel.solo,
-              });
-            },
+      ...allSelectableChannels.flatMap((channel): PaletteAction[] => [
+        {
+          id: `audio:solo:${channel.id}`,
+          label: `Solo ${channel.name}`,
+          group: "Actions",
+          keywords: ["audio", "solo", channel.name, channel.shortName, channel.role],
+          action: () => {
+            updateChannel({
+              channelId: channel.id,
+              solo: !channel.solo,
+            });
           },
-          {
-            id: `audio:mute:${channel.id}`,
-            label: `Mute ${channel.name}`,
-            group: "Actions",
-            keywords: ["audio", "mute", channel.name, channel.shortName, channel.role],
-            action: () => {
-              updateChannel({
-                channelId: channel.id,
-                mute: !channel.mute,
-              });
-            },
+        },
+        {
+          id: `audio:mute:${channel.id}`,
+          label: `Mute ${channel.name}`,
+          group: "Actions",
+          keywords: ["audio", "mute", channel.name, channel.shortName, channel.role],
+          action: () => {
+            updateChannel({
+              channelId: channel.id,
+              mute: !channel.mute,
+            });
           },
-        ]
-      ),
+        },
+      ]),
     ];
     const audioActions: PaletteAction[] = [...channelActions, ...outputActions, ...snapshotActions, ...actionActions];
 

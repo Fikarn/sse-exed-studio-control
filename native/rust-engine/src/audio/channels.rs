@@ -409,7 +409,10 @@ pub fn update_audio_channel_send_mode(
     if !snapshot.capabilities.can_edit_mixer_state {
         let message = String::from("Audio send controls are unavailable while OSC is disabled.");
         record_audio_action_failure(db_path, "AUDIO_SEND_UNAVAILABLE", &message)?;
-        return Err(AudioCommandError::Rejected("AUDIO_SEND_UNAVAILABLE", message));
+        return Err(AudioCommandError::Rejected(
+            "AUDIO_SEND_UNAVAILABLE",
+            message,
+        ));
     }
     if !snapshot
         .mix_targets

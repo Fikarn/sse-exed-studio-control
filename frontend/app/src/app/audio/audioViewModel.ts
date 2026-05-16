@@ -260,8 +260,7 @@ function audioCapabilities(snapshot: AudioSnapshot): AudioSnapshot["capabilities
     snapshot.capabilities ?? {
       canEditMixerState: snapshot.oscEnabled === true,
       canSync: snapshot.oscEnabled === true,
-      canRecallConsoleSnapshot:
-        snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
+      canRecallConsoleSnapshot: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canEditProcessing: snapshot.oscEnabled === true,
       canClearClips: snapshot.oscEnabled === true,
       canCaptureSnapshot: snapshot.oscEnabled === true,
@@ -309,21 +308,14 @@ export function buildAudioViewModel({
   const softwarePlaybackSourceChannels = channels.filter((entry) => entry.role === "playback-pair");
   const hardwareInputGroups = orderedGroupsForChannels(hardwareSourceChannels);
   const softwarePlaybackGroups = orderedGroupsForChannels(softwarePlaybackSourceChannels);
-  const activeHardwareInputGroups = activeGroupsForTier(
-    activeChannelGroups,
-    "hardware-inputs",
-    hardwareInputGroups
-  );
+  const activeHardwareInputGroups = activeGroupsForTier(activeChannelGroups, "hardware-inputs", hardwareInputGroups);
   const activeSoftwarePlaybackGroups = activeGroupsForTier(
     activeChannelGroups,
     "software-playback",
     softwarePlaybackGroups
   );
   const hardwareInputChannels = filterChannelsByGroups(hardwareSourceChannels, activeHardwareInputGroups);
-  const softwarePlaybackChannels = filterChannelsByGroups(
-    softwarePlaybackSourceChannels,
-    activeSoftwarePlaybackGroups
-  );
+  const softwarePlaybackChannels = filterChannelsByGroups(softwarePlaybackSourceChannels, activeSoftwarePlaybackGroups);
   const totalBanks = Math.max(
     1,
     Math.ceil(hardwareInputChannels.length / hardwareInputBankSize),
