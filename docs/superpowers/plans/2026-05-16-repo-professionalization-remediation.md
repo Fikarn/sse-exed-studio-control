@@ -350,3 +350,128 @@ Expected: exits `0`.
 - [x] **Step 4: Record final status**
 
 Update tracker and issue #77 with command results, remaining GitHub plan blockers, and any unexecuted external-account actions.
+
+## Task R9: Resolve Local Release-Host Setup
+
+**Files:**
+
+- Modify: `scripts/dev-doctor.mjs`
+- Modify: `docs/DEVELOPMENT.md`
+- Modify: `docs/DEVELOPER_QUICKSTART.md`
+- Modify: `docs/repo-professionalization-progress.md`
+
+- [x] **Step 1: Install and link Node 24**
+
+Run:
+
+```bash
+brew install node@24
+brew unlink node
+brew link --overwrite --force node@24
+```
+
+Expected: `node --version` prints Node 24.
+
+- [x] **Step 2: Repair Homebrew Rust/cargo after dependency cleanup**
+
+Run:
+
+```bash
+brew reinstall libgit2
+cargo --version
+rustc --version
+```
+
+Expected: `cargo` and `rustc` both run without dynamic-library errors.
+
+- [x] **Step 3: Auto-detect local QtIFW tools**
+
+Update `scripts/dev-doctor.mjs` so `.tools/qt-ifw/Tools/QtInstallerFramework/*/bin/binarycreator` and `repogen` are accepted after env vars and PATH lookup.
+
+- [x] **Step 4: Correct QtIFW docs path**
+
+Change local macOS QtIFW examples from `4.11` to `4.7`, matching `qt.tools.ifw.47`.
+
+## Task R10: Tighten Safe GitHub Repository Settings
+
+**GitHub:**
+
+- Repository: `Fikarn/sse-exed-studio-control`
+
+- [x] **Step 1: Keep squash-only merge policy**
+
+Run:
+
+```bash
+gh api repos/Fikarn/sse-exed-studio-control \
+  -X PATCH \
+  -F allow_squash_merge=true \
+  -F allow_merge_commit=false \
+  -F allow_rebase_merge=false
+```
+
+Expected: squash merge remains enabled; merge commits and rebase merges are disabled.
+
+## Task R11: Prove Remaining GitHub Blockers
+
+**GitHub:**
+
+- Repository: `Fikarn/sse-exed-studio-control`
+
+- [x] **Step 1: Re-check blocked settings**
+
+Run:
+
+```bash
+gh api -i repos/Fikarn/sse-exed-studio-control/branches/main/protection
+gh api repos/Fikarn/sse-exed-studio-control/rulesets
+gh api repos/Fikarn/sse-exed-studio-control/code-scanning/default-setup -X PATCH -f state=configured -f query_suite=default
+gh api repos/Fikarn/sse-exed-studio-control -X PATCH -F 'security_and_analysis[secret_scanning][status]=enabled'
+```
+
+Expected: GitHub returns plan/account blockers while the repo remains private on the current account.
+
+- [x] **Step 2: Do not change visibility without explicit approval**
+
+Stop before making the repository public. Public visibility is the only non-billing path to these GitHub features, but it exposes the full repository.
+
+## Task R12: Public-Readiness Secret Pattern Scan
+
+**Files:**
+
+- Read-only scan across repo source/docs/config paths.
+
+- [x] **Step 1: Run local secret-pattern scan**
+
+Run:
+
+```bash
+rg -n --hidden --glob '!node_modules/**' --glob '!native/**/target/**' --glob '!release/**' --glob '!artifacts/**' --glob '!frontend/**/dist/**' --glob '!frontend/**/storybook-static/**' --glob '!package-lock.json' --glob '!Cargo.lock' "(ghp_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]+|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN (RSA|OPENSSH|EC|DSA|PRIVATE) KEY-----|(?i)(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][^'\"]{8,})"
+```
+
+Expected: no matches outside generated/build outputs.
+
+## Task R13: Fix Rust 1.95 Strict Clippy Drift
+
+**Files:**
+
+- Modify: `native/rust-engine/src/planning/snapshot.rs`
+- Modify: `native/rust-engine/src/storage.rs`
+
+- [x] **Step 1: Replace descending `sort_by` comparisons**
+
+Use `sort_by_key` with `std::cmp::Reverse` for descending `total_seconds` ordering.
+
+- [x] **Step 2: Remove redundant iterator conversions**
+
+Remove `.into_iter()` calls from `chain(...)` arguments that already accept `IntoIterator`.
+
+- [x] **Step 3: Verify strict clippy through the normal gate**
+
+Run:
+
+```bash
+npm run dev:check
+```
+
+Expected: exits `0`.

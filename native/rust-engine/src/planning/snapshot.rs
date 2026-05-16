@@ -108,7 +108,7 @@ pub fn read_planning_time_report(
     }
 
     let mut by_project = project_totals.into_values().collect::<Vec<_>>();
-    by_project.sort_by(|left, right| right.total_seconds.cmp(&left.total_seconds));
+    by_project.sort_by_key(|entry| std::cmp::Reverse(entry.total_seconds));
 
     let mut by_task = filtered_tasks
         .iter()
@@ -131,7 +131,7 @@ pub fn read_planning_time_report(
             }
         })
         .collect::<Vec<_>>();
-    by_task.sort_by(|left, right| right.total_seconds.cmp(&left.total_seconds));
+    by_task.sort_by_key(|entry| std::cmp::Reverse(entry.total_seconds));
 
     let timer_events = snapshot
         .activity_log
