@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { formatQtIfwToolSummary, qtifwInstructions, resolveQtIfwTools } from "./qt-ifw-tools.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = new Set(process.argv.slice(2));
@@ -155,78 +157,11 @@ function checkTauriScaffold() {
   pass("Tauri scaffold", "Required Tauri shell files are present.");
 }
 
-function resolveExecutable(names, envNames) {
-  for (const envName of envNames) {
-    const value = process.env[envName];
-    if (value && existsSync(value)) {
-      return { source: envName, value };
-    }
-  }
-
-  const lookupCommand = process.platform === "win32" ? "where.exe" : "which";
-  for (const name of names) {
-    const result = run(lookupCommand, [name]);
-    const output = firstLine(result.stdout);
-    if (result.exitCode === 0 && output) {
-      return { source: "PATH", value: output };
-    }
-  }
-
-  return null;
-}
-
-function resolveLocalQtIfw(names) {
-  const baseDir = path.join(rootDir, ".tools", "qt-ifw", "Tools", "QtInstallerFramework");
-  if (!existsSync(baseDir)) {
-    return null;
-  }
-
-  const versions = readdirSync(baseDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort((left, right) => right.localeCompare(left, undefined, { numeric: true }));
-
-  for (const version of versions) {
-    for (const name of names) {
-      const candidate = path.join(baseDir, version, "bin", name);
-      if (existsSync(candidate)) {
-        return { source: `.tools/qt-ifw ${version}`, value: candidate };
-      }
-    }
-  }
-
-  return null;
-}
-
-function qtifwInstructions() {
-  // Any QtIFW 4.x is acceptable; substitute the installed minor version.
-  if (process.platform === "win32") {
-    return [
-      'Set $env:SSE_QT_IFW_BINARYCREATOR = "C:\\Qt\\Tools\\QtInstallerFramework\\4.11\\bin\\binarycreator.exe"',
-      'Set $env:SSE_QT_IFW_REPOGEN = "C:\\Qt\\Tools\\QtInstallerFramework\\4.11\\bin\\repogen.exe"',
-    ].join("\n");
-  }
-
-  return [
-    "Install QtIFW into .tools/qt-ifw or another local path, then export:",
-    'export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"',
-    'export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"',
-  ].join("\n");
-}
-
 function checkQtIfw() {
-  const binaryCreator =
-    resolveExecutable(["binarycreator.exe", "binarycreator"], ["SSE_QT_IFW_BINARYCREATOR", "QT_IFW_BINARYCREATOR"]) ??
-    resolveLocalQtIfw(["binarycreator.exe", "binarycreator"]);
-  const repoGen =
-    resolveExecutable(["repogen.exe", "repogen"], ["SSE_QT_IFW_REPOGEN", "QT_IFW_REPOGEN"]) ??
-    resolveLocalQtIfw(["repogen.exe", "repogen"]);
+  const tools = resolveQtIfwTools({ rootDir });
 
-  if (binaryCreator && repoGen) {
-    pass(
-      "Qt Installer Framework",
-      `binarycreator via ${binaryCreator.source}: ${binaryCreator.value}; repogen via ${repoGen.source}: ${repoGen.value}`
-    );
+  if (tools.complete) {
+    pass("Qt Installer Framework", formatQtIfwToolSummary(tools));
     return;
   }
 

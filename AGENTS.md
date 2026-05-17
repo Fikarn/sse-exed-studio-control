@@ -66,11 +66,12 @@ Code health:
 
 - `npm run format:check` / `npm run format` — Prettier check/write.
 - `npm run lint` / `npm run lint:fix` — ESLint check/fix.
+- `npm run scripts:test` — unit tests for repository maintenance/release helper scripts.
 - `npm run frontend:typecheck` — TypeScript typecheck for all npm workspaces that expose `typecheck`.
 - `npm run rust:fmt:check` — Rust formatting check under `native/`.
 - `npm run rust:clippy` — Rust clippy for the native workspace with warnings denied by the command.
 - `npm run protocol:check` / `npm run protocol:generate` — check or regenerate protocol artifacts from `native/protocol/v1.contract.json`.
-- `npm run dev:check` — full local code-health bundle: format, lint, rustfmt, clippy, protocol, frontend typecheck, native check, native tests.
+- `npm run dev:check` — full local code-health bundle: format, lint, script tests, rustfmt, clippy, protocol, frontend typecheck, native check, native tests.
 - `npm run ci` — repo-local convenience gate: format, release metadata check, native foundation.
 
 Frontend and selected shell:

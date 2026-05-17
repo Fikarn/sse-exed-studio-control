@@ -5,7 +5,7 @@ import type { LightingDmxMonitorSnapshot, LightingSnapshot } from "@sse/engine-c
 
 import styles from "./LightingHealthBar.module.css";
 
-// Driven by Vite's `define` from frontend/app/package.json. Bump the package
+// Driven by Vite's `define` from the root package.json. Bump the release
 // version and the health bar tracks it on next dev/build.
 const APP_VERSION = `v${__APP_VERSION__}`;
 

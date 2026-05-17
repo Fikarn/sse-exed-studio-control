@@ -44,7 +44,7 @@ npm run frontend:foundation
 
 Choose validation based on change risk.
 
-There are intentionally no GitHub Actions acceptance gates. Validation is local and target-host based; record the commands you ran in the PR.
+GitHub Actions `dev-checks` is required merge hygiene where branch protection applies. It is not release acceptance evidence; local and target-host validation still decides release readiness. Record the commands you ran in the PR.
 
 ### Tauri shell, React frontend, or operator layout
 

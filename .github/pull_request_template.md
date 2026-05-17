@@ -12,7 +12,7 @@
 
 ## Validation
 
-> Advisory CI runs format/lint/typecheck/cargo on every PR. **Target-host evidence below remains the acceptance gate** — CI does not gate releases.
+> Required PR CI runs format/lint/typecheck/cargo on every PR. **Target-host evidence below remains the release acceptance gate** — CI does not replace release-host verification.
 
 - [ ] `npm run doctor`
 - [ ] `npm run dev:check`
@@ -26,7 +26,7 @@
 - [ ] Target-host release evidence recorded when packaging/release behavior changed
 - [ ] Manual validation completed for affected hardware / live workflows
 
-GitHub Actions are intentionally not the acceptance gate for this repo. Record local and target-host evidence here.
+GitHub Actions are merge hygiene, not release acceptance evidence. Record local and target-host evidence here.
 
 ## Product Areas
 

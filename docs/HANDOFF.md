@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the top-level engineering handoff for the repository as of `2026-05-03`.
+This is the top-level engineering handoff for the repository as of `2026-05-17`.
 
 Read this first before resuming product, release, or cleanup work. Use it as the entry point into the more detailed documents linked below.
 
@@ -13,7 +13,7 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - The legacy Electron/Next.js runtime was retired in `v2.1.0`. There is no browser-served or Electron-served path left in the repository.
 - Native packaging, installer, update-repository, and release automation lanes exist, produce signed/unsigned operator-ready artifacts, and are driven from tagged releases.
 - Native operator parity is engineering-complete. Acceptance is layered: deterministic offscreen `2560x1440` captures, real-GPU onscreen spot captures, and the install-time first-launch smoke test shipped in the QtIFW installer.
-- Native and replacement-shell verification are target-host gates. GitHub Actions is not the acceptance mechanism for current cutover work; the advisory `dev-checks` workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) runs four jobs on pull requests (format-protocol, lint, frontend-typecheck, rust) but is intentionally not a required status check, and Actions billing is not paid — failed CI runs are expected baseline noise.
+- Native and replacement-shell release verification are target-host gates. The `dev-checks` workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) runs four jobs on pull requests (`format-protocol`, `lint`, `frontend-typecheck`, `rust`) and is required merge hygiene on `main`; target-host evidence remains the release acceptance mechanism.
 - Responsive operator layout support landed in [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71) on `2026-05-03` (`4af7e8b8427cff78837054326478e1a67398154c`). Lighting now has logical CSS-pixel layout modes, mode-keyed column persistence, toolbar priority overflow, a narrow inspector drawer, separate stage zoom controls, shell-owned window layout persistence, and Scaled Studio Preview for current-hardware human review.
 - Lighting fixture catalog implementation landed after the responsive pass. The Rust engine now owns fixture definitions, mode/channel metadata, DMX mapping and validation, persistence compatibility, universe-aware patching, scene `controlValues`, and catalog snapshots. React renders catalog metadata and sends explicit commands only; it is not the source of truth for fixture/DMX policy. Verified catalog entries are selectable in the Add Fixture dialog; `research-needed` entries remain non-selectable tracking metadata.
 - Stage plot fixture identity implementation landed after the catalog pass. The engine-owned catalog now exposes additive visual metadata for existing fixture definitions, and React renders fixture family symbols, output footprints, live drag/rotation/value previews, render modes, and selected-scene previews from snapshots only. Fixture/device policy remains engine-owned; React does not own DMX footprint, persistence, or vendor behavior.
@@ -76,9 +76,11 @@ The highest-value unresolved work is:
 
 ## Execution Queue
 
-The current GitHub execution queue is:
+The current GitHub execution queue is empty as of `2026-05-17`; no open issues or pull requests are waiting for handoff.
 
-- [Issue #77: Repository professionalization audit remediation](https://github.com/Fikarn/sse-exed-studio-control/issues/77) tracks the May 16, 2026 repository-readiness audit follow-up. Immediate remediation is complete for the stale dependency PR queue, Dependabot alert triage, merged-branch cleanup, current Tauri README screenshots, historical-design-doc status banners, squash-only merge policy, and local release-host setup. Remaining items are GitHub account/visibility blockers and future code-quality ratchets.
+Completed repository-readiness record:
+
+- [Issue #77: Repository professionalization audit remediation](https://github.com/Fikarn/sse-exed-studio-control/issues/77) is closed. It records the May 16, 2026 repository-readiness audit follow-up: stale dependency PR queue, Dependabot alert triage, merged-branch cleanup, current Tauri README screenshots, historical-design-doc status banners, squash-only merge policy, local release-host setup, public-repo visibility, branch protection, required PR status checks, auto-merge, code scanning, and secret scanning. Future code-quality ratchets should be opened as focused issues when they are ready to execute.
 - release-artwork polish and optional future signing posture remain tracked in `docs/PRODUCTIZATION_PLAN.md` §3 rather than as separate execution items; public distribution is not part of the current deployment goal
 
 Completed rollout record:
@@ -211,7 +213,7 @@ npm run doctor:release
 npm run release:verify
 ```
 
-GitHub Actions runs the four-job advisory workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request — `format-protocol`, `lint`, `frontend-typecheck`, and `rust` (rustfmt + clippy + cargo check + cargo test). It is **advisory only** and intentionally not a required status check; target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the acceptance mechanism for this repo. CI failures are early signal, never a release gate.
+GitHub Actions runs the four-job workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request: `format-protocol`, `lint`, `frontend-typecheck`, and `rust` (rustfmt + clippy + cargo check + cargo test). These checks are required merge hygiene on `main`. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance mechanism for this repo; CI failures are merge blockers, not release evidence.
 
 ## Repo Hygiene Rules
 

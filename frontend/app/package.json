@@ -1,7 +1,7 @@
 {
   "name": "@sse/frontend-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "2.2.1",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.app.json && vite build",
