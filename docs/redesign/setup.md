@@ -1,8 +1,9 @@
 ---
 workspace: setup
 phase: B (direction locked)
-status: ready-for-phase-c
+status: historical-reference
 chosen_direction: B — runner (5-step wizard + Support dashboard toggle)
+current_truth: docs/HANDOFF.md
 audit_refs:
   - docs/archive/UX_AUDIT.md §Setup workspace
   - docs/archive/UX_AUDIT.md §C1 (modal mode — kept)

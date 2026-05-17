@@ -111,6 +111,10 @@ Every PR should make it easy for a reviewer to answer:
 
 Use the PR template. Include screenshots or short clips for UI changes, and call out hardware/manual validation for lighting, audio, setup, or packaging behavior.
 
+## Conduct
+
+Use [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for expected collaboration behavior and private reporting guidance.
+
 ## Hardware Awareness
 
 This repo is tuned to the current studio installation, not a generic matrix of devices. Before changing audio, lighting, or commissioning flows, read:
