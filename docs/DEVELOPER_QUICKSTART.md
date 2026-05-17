@@ -77,7 +77,7 @@ Run the fast local gate while working:
 npm run dev:check
 ```
 
-`dev:check` is the normal all-around local code-health gate. It runs Prettier check, ESLint, repository script tests, Rust format check, clippy, protocol artifact check, frontend typecheck, native check, and native tests.
+`dev:check` is the normal all-around local code-health gate. It runs Prettier check, ESLint, repository script tests, the tracked-file health guard, Rust format check, clippy, protocol artifact check, frontend typecheck, native check, and native tests.
 
 Launch the selected app for visual review:
 
@@ -114,6 +114,7 @@ Use the smallest gate that covers the risk.
 | Change type                       | Required local checks                                                                    |
 | --------------------------------- | ---------------------------------------------------------------------------------------- |
 | Docs/templates only               | `npm run format:check`                                                                   |
+| New docs/assets or large files    | `npm run format:check`, `npm run file:health`                                            |
 | Frontend package or React UI      | `npm run frontend:typecheck`, `npm run frontend:foundation` when behavior/layout changed |
 | Protocol artifacts                | `npm run protocol:check`                                                                 |
 | Rust engine logic                 | `npm run native:check`, `npm run native:test`                                            |
@@ -139,6 +140,7 @@ npm run format:check
 npm run format
 npm run lint
 npm run lint:fix
+npm run file:health
 npm run frontend:typecheck
 npm run rust:fmt:check
 npm run rust:clippy
@@ -222,7 +224,7 @@ For a deeper ignored-local cleanup before handoff or evidence collection:
 npm run clean:local
 ```
 
-`clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, generated visual/evidence folders, and release output. It does not remove `.tools/`.
+`clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It does not remove `.tools/`.
 
 ## Dependency Policy
 

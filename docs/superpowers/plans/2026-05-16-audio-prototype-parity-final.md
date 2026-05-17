@@ -2,7 +2,7 @@
 
 > For agentic workers: REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` before implementation. Track progress in `docs/audio-prototype-parity-progress.md` after every task.
 
-**Goal:** Finish the actual audio page implementation against the single authoritative prototype at `/Users/EdvinLandvik/Desktop/2/desk-v10.html`.
+**Goal:** Finish the actual audio page implementation against the parity-session prototype `desk-v10.html`.
 
 **Architecture:** Keep the existing two-process boundary. React renders the operator UI only. The Rust engine and protocol remain responsible for state, persistence, device policy, OSC/TotalMix behavior, and validation.
 
@@ -12,8 +12,8 @@
 
 ## Source Of Truth
 
-- Use only `/Users/EdvinLandvik/Desktop/2/desk-v10.html` as the prototype. Ignore all other audio prototypes.
-- Prototype source anchors to inspect before editing:
+- Use only the parity-session `desk-v10.html` as the historical prototype. The durable checked-in reference is `docs/redesign/assets/audio/Audio-Lighting-Aligned-Desk.html`.
+- Prototype source anchors below refer to the historical `desk-v10.html`; if that external reference is unavailable, use the checked-in reference and this plan's behavioral notes instead:
   - Signature moments: lines near `27-31`.
   - App root: line near `10700`, `<main class="app" data-density="desktop" data-view="submix" id="app">`.
   - Rail target rows: lines near `10783-10820`.
@@ -31,8 +31,8 @@
 - Before editing code, update `docs/audio-prototype-parity-progress.md` with:
   - `git status --short`
   - current branch
-  - `wc -l /Users/EdvinLandvik/Desktop/2/desk-v10.html`
-  - note that raw `file://` Browser access is blocked and read-only localhost preview is the approved workaround.
+  - record whether the historical `desk-v10.html` reference is available, or fall back to the checked-in durable reference
+  - note that raw local-file Browser access is blocked and read-only localhost preview is the approved workaround.
 - Update the progress table after every task.
 - Allowed statuses: `todo`, `in_progress`, `verified`, `blocked:<exact reason>`.
 - A task may become `verified` only after its verification command exits `0`.

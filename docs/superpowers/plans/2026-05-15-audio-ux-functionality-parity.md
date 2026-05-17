@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` or `superpowers:subagent-driven-development`. Keep the visible progress tracker updated after every goal. Do not start a goal until the prior goal's acceptance checks pass.
 
-**Goal:** Bring the Audio workspace UX and interaction model to functional parity with `/Users/EdvinLandvik/Desktop/2/desk-v10.html`, using engine-backed state/actions for prototype behaviors.
+**Goal:** Bring the Audio workspace UX and interaction model to functional parity with the parity-session `desk-v10.html`, using engine-backed state/actions for prototype behaviors.
 
 **Architecture:** React remains a view/controller over engine-owned `audio.snapshot` state. New persistent audio behavior belongs in `native/rust-engine` and `native/protocol`; React may hold only short-lived drag drafts. Existing visual parity must be preserved.
 
@@ -117,7 +117,7 @@ Run focused tests after each relevant goal, then the full gate at the end.
 
 - Save path is `docs/superpowers/plans/2026-05-15-audio-ux-functionality-parity.md`.
 - The existing visual parity plan remains unchanged.
-- Prototype authority is `/Users/EdvinLandvik/Desktop/2/desk-v10.html`.
+- Prototype authority is the parity-session `desk-v10.html`; durable checked-in reference is `docs/redesign/assets/audio/Audio-Lighting-Aligned-Desk.html`.
 - Scope is Audio working space only; shared shell/header/branding bar remains unchanged.
 - Engine-backed means state, persistence, and command policy live in Rust/protocol, not React.
 - Real hardware behavior remains truthful: if a feature cannot affect hardware yet, the engine exposes it as native/simulated control state with clear capability status rather than pretending it mutated hardware.

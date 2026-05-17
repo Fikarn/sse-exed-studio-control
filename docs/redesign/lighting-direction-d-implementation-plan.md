@@ -249,7 +249,7 @@ After editing, run:
 npm --prefix frontend/packages/tokens run build
 ```
 
-Verify the output at `src/generated/tokens.css` includes the new variables. **Auto-revert generated artifacts before staging** per project rule (per [project_lighting_workspace_product_model.md](file:///Users/EdvinLandvik/.claude/projects/-Users-EdvinLandvik-Projects-EdvinProjectManagerCodex/memory/feedback_auto_revert_generated_artifacts.md)) — only commit the source edit, the build script regenerates on next CI / dev pass.
+Verify the output at `src/generated/tokens.css` includes the new variables. **Auto-revert generated artifacts before staging** per the generated-artifact rule in [AGENTS.md](../../AGENTS.md) — only commit the source edit, the build script regenerates on next CI / dev pass.
 
 ### 1.2 Fonts
 

@@ -134,6 +134,7 @@ Prerequisites:
 npm install
 npm run doctor
 npm run dev:check
+npm run file:health
 npm run format:check
 npm run release:check
 npm run native:check
@@ -170,6 +171,7 @@ npm run clean:local
 npm run doctor
 npm run doctor:release
 npm run dev:check
+npm run file:health
 npm run format:check
 npm run native:foundation
 npm run frontend:foundation
@@ -186,7 +188,7 @@ npm run ci
 
 The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is complete through issue #5 plus [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete.
 
-`npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated evidence folders, and release output; it does not remove `.tools/`.
+`npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, root test results, local install logs, generated evidence folders, and release output; it does not remove `.tools/`.
 
 ## Release Model
 

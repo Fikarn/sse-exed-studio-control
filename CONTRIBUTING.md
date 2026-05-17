@@ -32,6 +32,7 @@ For a complete cold-start path, use [docs/DEVELOPER_QUICKSTART.md](docs/DEVELOPE
 ```bash
 npm run doctor
 npm run dev:check
+npm run file:health
 npm run format:check
 npm run release:check
 npm run native:check
@@ -92,6 +93,7 @@ Release packaging and installer evidence must run on the relevant target host. m
   - `native/protocol/*` for the transport contract
   - `docs/*` for durable product and engineering documentation
 - Prefer extending the current domain modules over creating cross-cutting "misc" abstractions.
+- Do not add large tracked artifacts or oversized source files without an explicit allowlist reason in `scripts/file-health.mjs`.
 - Avoid accidental hardware writes on mount or view switch.
 - Update docs when supported workflows or hardware assumptions change.
 - Update `CHANGELOG.md` for user-facing changes.

@@ -246,7 +246,7 @@ npm run release:verify
 
 #### Pull Request CI
 
-Every pull request triggers the four-job workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, and `rust` (which runs `rust:fmt:check`, `rust:clippy`, `native:check`, and `native:test`). These jobs are required merge hygiene on `main`. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
+Every pull request triggers the four-job workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, and `rust`. `format-protocol` runs `format:check`, repository script tests, `release:check`, `file:health`, and `protocol:check`; `rust` runs `rust:fmt:check`, `rust:clippy`, `native:check`, and `native:test`. These jobs are required merge hygiene on `main`. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
 
 ### 4a. Cleanup
 
@@ -262,7 +262,7 @@ Use the deeper local cleanup before handoff or evidence collection:
 npm run clean:local
 ```
 
-`clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, generated visual/evidence folders, and release output. It intentionally does not remove `.tools/`.
+`clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It intentionally does not remove `.tools/`.
 
 ## Recommended Development Rules
 

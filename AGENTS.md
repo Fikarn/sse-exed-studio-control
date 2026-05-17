@@ -67,6 +67,7 @@ Code health:
 - `npm run format:check` / `npm run format` — Prettier check/write.
 - `npm run lint` / `npm run lint:fix` — ESLint check/fix.
 - `npm run scripts:test` — unit tests for repository maintenance/release helper scripts.
+- `npm run file:health` — tracked-file size and oversized-source guard.
 - `npm run frontend:typecheck` — TypeScript typecheck for all npm workspaces that expose `typecheck`.
 - `npm run rust:fmt:check` — Rust formatting check under `native/`.
 - `npm run rust:clippy` — Rust clippy for the native workspace with warnings denied by the command.
