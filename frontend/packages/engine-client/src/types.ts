@@ -287,6 +287,7 @@ export interface FixtureScenario {
   lightingFixtureCatalogSnapshot?: JsonObject;
   lightingSnapshot?: JsonObject;
   audioSnapshot?: JsonObject | null;
+  audioMeteringActive?: boolean;
   planningSnapshot?: JsonObject | null;
   supportSnapshot?: JsonObject;
   controlSurfaceSnapshot?: JsonObject;

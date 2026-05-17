@@ -20,16 +20,55 @@ mod support;
 
 use crate::app::EngineApp;
 use crate::bootstrap::{resolve_runtime_paths, validate_protocol_version};
-use crate::protocol::{event_message, RequestEnvelope, EVENT_ENGINE_STARTUP_FAILED};
+use crate::protocol::{
+    event_message, RequestEnvelope, EVENT_AUDIO_CHANGED, EVENT_ENGINE_STARTUP_FAILED,
+};
 use serde::Serialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::io::{self, BufRead, BufReader, Write};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
+use std::time::Duration;
 
 fn write_json<W: Write, T: Serialize>(writer: &mut W, message: &T) -> io::Result<()> {
     serde_json::to_writer(&mut *writer, message)?;
     writer.write_all(b"\n")?;
     writer.flush()?;
     Ok(())
+}
+
+fn spawn_output_writer(receiver: Receiver<Value>) {
+    thread::spawn(move || {
+        let stdout = io::stdout();
+        let mut writer = stdout.lock();
+        for message in receiver {
+            if let Err(error) = write_json(&mut writer, &message) {
+                eprintln!("Engine output writer failed: {error}");
+                break;
+            }
+        }
+    });
+}
+
+fn send_output(sender: &Sender<Value>, message: Value) -> io::Result<()> {
+    sender
+        .send(message)
+        .map_err(|error| io::Error::new(io::ErrorKind::BrokenPipe, error.to_string()))
+}
+
+fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>) {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(83));
+        let event = event_message(
+            EVENT_AUDIO_CHANGED,
+            json!({
+                "reason": "metering-tick",
+            }),
+        );
+        if sender.send(event).is_err() {
+            break;
+        }
+    });
 }
 
 fn main() -> io::Result<()> {
@@ -94,7 +133,14 @@ fn main() -> io::Result<()> {
         }
     };
 
-    write_json(&mut writer, &app.ready_event())?;
+    drop(writer);
+
+    let (output_sender, output_receiver) = mpsc::channel::<Value>();
+    spawn_output_writer(output_receiver);
+    send_output(&output_sender, app.ready_event())?;
+    if app.should_emit_simulated_audio_meter_ticks() {
+        spawn_simulated_audio_meter_ticks(output_sender.clone());
+    }
 
     let mut line = String::new();
     loop {
@@ -117,9 +163,13 @@ fn main() -> io::Result<()> {
         };
 
         let reply = app.handle_request(request);
-        write_json(&mut writer, &reply.response)?;
+        send_output(
+            &output_sender,
+            serde_json::to_value(&reply.response)
+                .map_err(|error| io::Error::other(error.to_string()))?,
+        )?;
         for event in reply.events {
-            write_json(&mut writer, &event)?;
+            send_output(&output_sender, event)?;
         }
     }
 

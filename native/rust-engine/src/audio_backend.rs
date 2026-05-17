@@ -19,6 +19,16 @@ pub struct AudioBackendInventory {
     pub snapshots: Vec<AudioSceneSnapshot>,
 }
 
+struct AudioMeterFrame {
+    meter_left: f64,
+    meter_right: f64,
+    meter_level: f64,
+    peak_hold: f64,
+    peak_hold_left: f64,
+    peak_hold_right: f64,
+    clip: bool,
+}
+
 #[derive(Debug)]
 pub struct AudioSyncOutcome {
     pub summary: String,
@@ -253,6 +263,12 @@ impl AudioBackend for SimulatedAudioBackend {
                     short_name: String::from("MAIN"),
                     role: String::from("main-out"),
                     volume: 0.82,
+                    meter_left: 0.0,
+                    meter_right: 0.0,
+                    meter_level: 0.0,
+                    peak_hold: 0.0,
+                    peak_hold_left: 0.0,
+                    peak_hold_right: 0.0,
                     mute: false,
                     dim: false,
                     mono: false,
@@ -264,6 +280,12 @@ impl AudioBackend for SimulatedAudioBackend {
                     short_name: String::from("HP 1"),
                     role: String::from("phones-a"),
                     volume: 0.64,
+                    meter_left: 0.0,
+                    meter_right: 0.0,
+                    meter_level: 0.0,
+                    peak_hold: 0.0,
+                    peak_hold_left: 0.0,
+                    peak_hold_right: 0.0,
                     mute: false,
                     dim: false,
                     mono: false,
@@ -275,6 +297,12 @@ impl AudioBackend for SimulatedAudioBackend {
                     short_name: String::from("HP 2"),
                     role: String::from("phones-b"),
                     volume: 0.71,
+                    meter_left: 0.0,
+                    meter_right: 0.0,
+                    meter_level: 0.0,
+                    peak_hold: 0.0,
+                    peak_hold_left: 0.0,
+                    peak_hold_right: 0.0,
                     mute: false,
                     dim: false,
                     mono: false,
@@ -520,8 +548,7 @@ fn simulated_channel(
     gain: i64,
     fader: f64,
 ) -> AudioChannelSnapshot {
-    let (meter_left, meter_right, meter_level, peak_hold, clip) =
-        simulated_meter_levels(id, role, stereo);
+    let meter_frame = simulated_meter_frame(id, role, stereo);
 
     AudioChannelSnapshot {
         id: String::from(id),
@@ -531,11 +558,13 @@ fn simulated_channel(
         stereo,
         gain,
         fader,
-        meter_left,
-        meter_right,
-        meter_level,
-        peak_hold,
-        clip,
+        meter_left: meter_frame.meter_left,
+        meter_right: meter_frame.meter_right,
+        meter_level: meter_frame.meter_level,
+        peak_hold: meter_frame.peak_hold,
+        peak_hold_left: meter_frame.peak_hold_left,
+        peak_hold_right: meter_frame.peak_hold_right,
+        clip: meter_frame.clip,
         mix_levels: default_mix_levels(fader, role),
         mute: matches!(id, "audio-input-3" | "audio-input-4"),
         solo: false,
@@ -577,36 +606,189 @@ fn default_send_modes() -> HashMap<String, crate::audio::AudioSendModeSnapshot> 
     ])
 }
 
-fn simulated_meter_levels(id: &str, role: &str, stereo: bool) -> (f64, f64, f64, f64, bool) {
+fn simulated_meter_frame(id: &str, role: &str, stereo: bool) -> AudioMeterFrame {
     let elapsed_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as f64)
         .unwrap_or(0.0);
+    let (meter_left, meter_right) = simulated_body_level_pair_at(elapsed_ms, id, role, stereo);
+    let meter_level = meter_left.max(meter_right);
+    let (peak_hold_left, peak_hold_right) =
+        simulated_peak_hold_pair_at(elapsed_ms, id, role, stereo, meter_left, meter_right);
+    let peak_hold = peak_hold_left.max(peak_hold_right);
+    let clip = simulated_recent_raw_peak_at(elapsed_ms, id, role, stereo, 700.0) >= 0.985;
+
+    AudioMeterFrame {
+        meter_left,
+        meter_right,
+        meter_level,
+        peak_hold,
+        peak_hold_left,
+        peak_hold_right,
+        clip,
+    }
+}
+
+fn simulated_body_level_pair_at(elapsed_ms: f64, id: &str, role: &str, stereo: bool) -> (f64, f64) {
+    let samples = [
+        (0.0, 0.30),
+        (85.0, 0.24),
+        (170.0, 0.18),
+        (270.0, 0.14),
+        (390.0, 0.10),
+        (480.0, 0.04),
+    ];
+    let mut left = 0.0;
+    let mut right = 0.0;
+    let mut total_weight = 0.0;
+    for (age_ms, weight) in samples {
+        let (sample_left, sample_right) =
+            simulated_raw_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
+        left += sample_left * weight;
+        right += sample_right * weight;
+        total_weight += weight;
+    }
+
+    (
+        (left / total_weight).clamp(0.0, 0.96),
+        (right / total_weight).clamp(0.0, 0.96),
+    )
+}
+
+fn simulated_peak_hold_pair_at(
+    elapsed_ms: f64,
+    id: &str,
+    role: &str,
+    stereo: bool,
+    meter_left: f64,
+    meter_right: f64,
+) -> (f64, f64) {
+    let mut peak_left = meter_left;
+    let mut peak_right = meter_right;
+    let mut age_ms = 0.0;
+    while age_ms <= 2_700.0 {
+        let (raw_left, raw_right) =
+            simulated_raw_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
+        let decay = ((age_ms - 1_500.0).max(0.0) / 1000.0) * 0.075;
+        peak_left = peak_left.max((raw_left - decay).max(meter_left));
+        peak_right = peak_right.max((raw_right - decay).max(meter_right));
+        age_ms += 150.0;
+    }
+
+    (
+        peak_left.clamp(meter_left, 1.0),
+        peak_right.clamp(meter_right, 1.0),
+    )
+}
+
+fn simulated_recent_raw_peak_at(
+    elapsed_ms: f64,
+    id: &str,
+    role: &str,
+    stereo: bool,
+    window_ms: f64,
+) -> f64 {
+    let mut peak = 0.0_f64;
+    let mut age_ms = 0.0;
+    while age_ms <= window_ms {
+        let (left, right) =
+            simulated_raw_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
+        peak = peak.max(left.max(right));
+        age_ms += 140.0;
+    }
+    peak
+}
+
+fn simulated_raw_level_pair_at(elapsed_ms: f64, id: &str, role: &str, stereo: bool) -> (f64, f64) {
     let seed = id.bytes().fold(0_u64, |accumulator, byte| {
         accumulator.wrapping_mul(33).wrapping_add(byte as u64)
     }) as f64;
-    let phase = (elapsed_ms / 700.0) + (seed / 97.0);
-    let base = match role {
-        "front-preamp" => 0.18,
-        "rear-line" => 0.10,
-        "playback-pair" => 0.22,
-        _ => 0.08,
-    };
-    let swing = match role {
-        "front-preamp" => 0.26,
-        "rear-line" => 0.18,
-        "playback-pair" => 0.20,
-        _ => 0.12,
+    let t = (elapsed_ms / 1000.0) + seed / 307.0;
+    let channel_index = id
+        .split('-')
+        .next_back()
+        .and_then(|value| value.parse::<f64>().ok())
+        .unwrap_or(seed % 11.0);
+
+    let (left, right) = if role == "front-preamp" {
+        simulated_speech_pair(t, channel_index, 0.34, 0.56)
+    } else if role == "rear-line" {
+        let base = if id.contains("remote") || id.ends_with("-3") || id.ends_with("-4") {
+            0.14
+        } else {
+            0.09
+        };
+        let motion = 0.045 * lfo(t, 0.41, 0.0) + 0.026 * lfo(t, 1.2, 0.7);
+        let level = (base + motion).clamp(0.04, 0.28);
+        (level, level * 0.9)
+    } else if id == "audio-playback-1-2" {
+        let body = 0.48 + 0.065 * lfo(t, 0.22, 0.0) + 0.032 * lfo(t, 1.1, 1.2);
+        let width = 0.04 * lfo(t, 0.53, 0.4);
+        (
+            (body - width).clamp(0.28, 0.72),
+            (body + width).clamp(0.3, 0.74),
+        )
+    } else if id == "audio-playback-3-4" {
+        let sting = pulse(t % 11.0, 1.1, 0.22) + 0.72 * pulse(t % 11.0, 6.7, 0.32);
+        let bed = 0.07 + 0.02 * lfo(t, 0.9, 0.0);
+        let left = (bed + 0.62 * sting).clamp(0.04, 0.84);
+        let right = (bed * 0.92 + 0.56 * sting + 0.02 * lfo(t, 2.1, 0.8)).clamp(0.04, 0.8);
+        (left, right)
+    } else if id == "audio-playback-5-6" {
+        simulated_speech_pair(t + 3.7, channel_index, 0.16, 0.32)
+    } else if id == "audio-playback-7-8" {
+        let groove = 0.34 + 0.12 * lfo(t, 0.36, 0.0) + 0.06 * lfo(t, 1.8, 0.2);
+        let width = 0.08 * lfo(t, 0.71, 1.4);
+        (
+            (groove - width).clamp(0.16, 0.76),
+            (groove + width * 0.86).clamp(0.16, 0.78),
+        )
+    } else if role == "playback-pair" {
+        let level = (0.11 + 0.035 * lfo(t, 0.31, 0.5) + 0.018 * lfo(t, 1.4, 1.1)).clamp(0.04, 0.22);
+        (
+            level,
+            (level * 0.92 + 0.02 * lfo(t, 0.8, 0.6)).clamp(0.04, 0.24),
+        )
+    } else {
+        let level = (0.06 + 0.025 * lfo(t, 0.8, 0.0)).clamp(0.02, 0.16);
+        (level, level * 0.9)
     };
 
-    let left = (base + ((phase.sin() + 1.0) * 0.5 * swing)).clamp(0.0, 0.96);
-    let right_phase = phase + if stereo { 0.8 } else { 0.25 };
-    let right = (base + ((right_phase.cos() + 1.0) * 0.5 * swing)).clamp(0.0, 0.96);
-    let meter_level = left.max(right);
-    let peak_hold = (meter_level + 0.08).clamp(meter_level, 1.0);
-    let clip = meter_level >= 0.94;
+    if stereo {
+        (left.clamp(0.0, 0.96), right.clamp(0.0, 0.96))
+    } else {
+        let mono = left.max(right).clamp(0.0, 0.96);
+        (mono, mono)
+    }
+}
 
-    (left, right, meter_level, peak_hold, clip)
+fn simulated_speech_pair(t: f64, channel_index: f64, floor: f64, range: f64) -> (f64, f64) {
+    let period = 8.7 + (channel_index % 4.0) * 0.9;
+    let phase = (t + channel_index * 1.37).rem_euclid(period);
+    let syllables = pulse(phase, 0.72, 0.28)
+        + 0.92 * pulse(phase, 1.24, 0.22)
+        + 0.78 * pulse(phase, 2.02, 0.34)
+        + 0.68 * pulse(phase, 4.58, 0.4)
+        + 0.86 * pulse(phase, 5.42, 0.3);
+    let breath = 0.032 * lfo(t, 0.62, channel_index * 0.43);
+    let consonants = 0.035 * lfo(t, 5.4, channel_index);
+    let level = (floor + range * (syllables / 1.8).min(1.0) + breath + consonants).clamp(0.08, 0.9);
+    let side_offset = 0.025 * lfo(t, 1.7, channel_index * 0.25);
+    (level, (level * 0.88 + side_offset).clamp(0.05, 0.86))
+}
+
+fn pulse(phase: f64, center: f64, width: f64) -> f64 {
+    let distance = ((phase - center) / width).abs();
+    if distance >= 1.0 {
+        0.0
+    } else {
+        let shaped = 1.0 - distance;
+        shaped * shaped * (3.0 - 2.0 * shaped)
+    }
+}
+
+fn lfo(t: f64, hz: f64, offset: f64) -> f64 {
+    ((t * hz * std::f64::consts::TAU) + offset).sin()
 }
 
 fn default_mix_levels(main: f64, role: &str) -> HashMap<String, f64> {

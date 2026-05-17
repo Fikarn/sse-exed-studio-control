@@ -6,17 +6,19 @@ import type { PaletteAction } from "@sse/design-system";
 import styles from "./AudioWorkspace.module.css";
 import { AUDIO_FADER_UNITY, type AudioDensityMode, type AudioFeedbackTone } from "./audioFormatting";
 import {
+  buildAudioPaletteRegistrationSignature,
   buildAudioViewModel,
   type AudioChannelGroup,
   type AudioChannelGroupSelectionRequest,
   type AudioChannelGroupSelections,
+  type AudioWorkspaceViewModel,
 } from "./audioViewModel";
 import { AudioContextMenu } from "./components/AudioContextMenu";
 import { AudioHealthBar } from "./components/AudioHealthBar";
 import { AudioInspector, type InspectorTab } from "./components/AudioInspector";
 import { AudioRail } from "./components/AudioRail";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
-import { isEditableTarget, type SnapshotRecord } from "../shellData";
+import { isEditableTarget, type AudioChannelEntry, type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { usePalette } from "../shared/paletteContext";
 
@@ -41,6 +43,15 @@ interface AudioContextMenuState {
   channelId: string;
   x: number;
   y: number;
+}
+
+interface AudioPaletteRegistrationModel {
+  allSelectableChannels: AudioChannelEntry[];
+  mixTargets: AudioWorkspaceViewModel["mixTargets"];
+  selectedChannel: AudioWorkspaceViewModel["selectedChannel"];
+  selectedMixTargetId: AudioWorkspaceViewModel["selectedMixTargetId"];
+  selectedSnapshot: AudioWorkspaceViewModel["selectedSnapshot"];
+  snapshots: AudioWorkspaceViewModel["snapshots"];
 }
 
 const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
@@ -361,6 +372,29 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       ...viewModel.mixTargets.map((mixTarget) => ({ id: mixTarget.id, kind: "output" as const })),
     ];
   }, [viewModel]);
+  const paletteRegistrationSignature = viewModel
+    ? buildAudioPaletteRegistrationSignature(viewModel, allSelectableChannels)
+    : "";
+  const paletteRegistrationRef = useRef<{
+    model: AudioPaletteRegistrationModel | null;
+    signature: string;
+  }>({ model: null, signature: "" });
+  if (paletteRegistrationRef.current.signature !== paletteRegistrationSignature) {
+    paletteRegistrationRef.current = {
+      model: viewModel
+        ? {
+            allSelectableChannels,
+            mixTargets: viewModel.mixTargets,
+            selectedChannel: viewModel.selectedChannel,
+            selectedMixTargetId: viewModel.selectedMixTargetId,
+            selectedSnapshot: viewModel.selectedSnapshot,
+            snapshots: viewModel.snapshots,
+          }
+        : null,
+      signature: paletteRegistrationSignature,
+    };
+  }
+  const paletteRegistrationModel = paletteRegistrationRef.current.model;
 
   const handleKeyDown = useLiveCallback((event: KeyboardEvent) => {
     if (!viewModel || event.defaultPrevented) {
@@ -518,9 +552,17 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   }, [handleKeyDown]);
 
   useEffect(() => {
-    if (!viewModel) return;
+    if (!paletteRegistrationModel) return;
+    const {
+      allSelectableChannels: paletteChannels,
+      mixTargets: paletteMixTargets,
+      selectedChannel: paletteSelectedChannel,
+      selectedMixTargetId: paletteSelectedMixTargetId,
+      selectedSnapshot: paletteSelectedSnapshot,
+      snapshots: paletteSnapshots,
+    } = paletteRegistrationModel;
 
-    const channelActions: PaletteAction[] = allSelectableChannels.map((channel, index) => ({
+    const channelActions: PaletteAction[] = paletteChannels.map((channel, index) => ({
       id: `audio:channel:${channel.id}`,
       label: `Select ${channel.name}`,
       group: "Channels",
@@ -529,7 +571,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       action: () => selectChannel(channel.id),
     }));
 
-    const outputActions: PaletteAction[] = viewModel.mixTargets.map((mixTarget) => ({
+    const outputActions: PaletteAction[] = paletteMixTargets.map((mixTarget) => ({
       id: `audio:mix-target:${mixTarget.id}`,
       label: `Switch active mix to ${mixTarget.name}`,
       group: "Outputs",
@@ -540,7 +582,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       },
     }));
 
-    const snapshotActions: PaletteAction[] = viewModel.snapshots.slice(0, 8).map((snapshot, index) => ({
+    const snapshotActions: PaletteAction[] = paletteSnapshots.slice(0, 8).map((snapshot, index) => ({
       id: `audio:snapshot:${snapshot.id}`,
       label: `Recall snapshot ${index + 1}`,
       group: "Snapshots",
@@ -629,11 +671,11 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           "selected",
           "clear selected channel clip",
           "clear selected audio clip",
-          viewModel.selectedChannel?.name ?? "",
+          paletteSelectedChannel?.name ?? "",
         ],
         action: () => {
-          if (viewModel.selectedChannel) {
-            clearClips(viewModel.selectedChannel.id);
+          if (paletteSelectedChannel) {
+            clearClips(paletteSelectedChannel.id);
           }
         },
       },
@@ -648,11 +690,11 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           "selected",
           "rename selected channel",
           "rename selected audio",
-          viewModel.selectedChannel?.name ?? "",
+          paletteSelectedChannel?.name ?? "",
         ],
         action: () => {
-          if (viewModel.selectedChannel) {
-            renameChannel(viewModel.selectedChannel.id, viewModel.selectedChannel.name);
+          if (paletteSelectedChannel) {
+            renameChannel(paletteSelectedChannel.id, paletteSelectedChannel.name);
           }
         },
       },
@@ -668,13 +710,13 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           "selected",
           "toggle selected polarity",
           "toggle selected audio polarity",
-          viewModel.selectedChannel?.name ?? "",
+          paletteSelectedChannel?.name ?? "",
         ],
         action: () => {
-          if (viewModel.selectedChannel) {
+          if (paletteSelectedChannel) {
             updateChannel({
-              channelId: viewModel.selectedChannel.id,
-              phase: !viewModel.selectedChannel.phase,
+              channelId: paletteSelectedChannel.id,
+              phase: !paletteSelectedChannel.phase,
             });
           }
         },
@@ -690,7 +732,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         id: "audio:snapshot:save-current",
         label: "Save current snapshot",
         group: "Actions",
-        keywords: ["audio", "snapshot", "save", viewModel.selectedSnapshot?.name ?? ""],
+        keywords: ["audio", "snapshot", "save", paletteSelectedSnapshot?.name ?? ""],
         shortcut: "⌘S",
         action: saveCurrentSnapshot,
       },
@@ -706,20 +748,20 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           "unity",
           "reset selected fader",
           "reset selected audio",
-          viewModel.selectedChannel?.name ?? "",
+          paletteSelectedChannel?.name ?? "",
         ],
         shortcut: "U",
         action: () => {
-          if (viewModel.selectedChannel && viewModel.selectedMixTargetId) {
+          if (paletteSelectedChannel && paletteSelectedMixTargetId) {
             updateChannel({
-              channelId: viewModel.selectedChannel.id,
+              channelId: paletteSelectedChannel.id,
               fader: AUDIO_FADER_UNITY,
-              mixTargetId: viewModel.selectedMixTargetId,
+              mixTargetId: paletteSelectedMixTargetId,
             });
           }
         },
       },
-      ...allSelectableChannels.flatMap((channel): PaletteAction[] => [
+      ...paletteChannels.flatMap((channel): PaletteAction[] => [
         {
           id: `audio:solo:${channel.id}`,
           label: `Solo ${channel.name}`,
@@ -750,7 +792,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
     return register(audioActions);
   }, [
-    allSelectableChannels,
     clearAllSolo,
     clearClips,
     captureSnapshot,
@@ -766,7 +807,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     syncAudio,
     toggleViewMode,
     updateChannel,
-    viewModel,
+    paletteRegistrationModel,
   ]);
 
   if (!viewModel) {

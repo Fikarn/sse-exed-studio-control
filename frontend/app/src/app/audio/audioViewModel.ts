@@ -9,7 +9,7 @@ import {
   type AudioSnapshotEntry,
   type SnapshotRecord,
 } from "../shellData";
-import { describeAudioStatus, formatAudioDb, type AudioDensityMode } from "./audioFormatting";
+import { describeAudioStatus, formatMeterDb, type AudioDensityMode } from "./audioFormatting";
 
 export type AudioTierId = "hardware-inputs" | "software-playback" | "hardware-outputs";
 export type AudioGroupTierId = Extract<AudioTierId, "hardware-inputs" | "software-playback">;
@@ -109,6 +109,49 @@ export interface AudioWorkspaceViewModel {
   };
   visibleStripCount: number;
   viewMode: "submix" | "master";
+}
+
+export function buildAudioPaletteRegistrationSignature(
+  viewModel: AudioWorkspaceViewModel,
+  selectableChannels: readonly AudioChannelEntry[]
+) {
+  return JSON.stringify({
+    channels: selectableChannels.map((channel) => ({
+      id: channel.id,
+      mute: channel.mute,
+      name: channel.name,
+      role: channel.role,
+      shortName: channel.shortName,
+      solo: channel.solo,
+    })),
+    mixTargets: viewModel.mixTargets.map((mixTarget) => ({
+      id: mixTarget.id,
+      name: mixTarget.name,
+      role: mixTarget.role,
+      shortName: mixTarget.shortName,
+    })),
+    selectedChannel: viewModel.selectedChannel
+      ? {
+          id: viewModel.selectedChannel.id,
+          mute: viewModel.selectedChannel.mute,
+          name: viewModel.selectedChannel.name,
+          phase: viewModel.selectedChannel.phase,
+          solo: viewModel.selectedChannel.solo,
+        }
+      : null,
+    selectedMixTargetId: viewModel.selectedMixTargetId,
+    selectedSnapshot: viewModel.selectedSnapshot
+      ? {
+          id: viewModel.selectedSnapshot.id,
+          name: viewModel.selectedSnapshot.name,
+        }
+      : null,
+    snapshots: viewModel.snapshots.slice(0, 8).map((snapshot) => ({
+      id: snapshot.id,
+      name: snapshot.name,
+      oscIndex: snapshot.oscIndex,
+    })),
+  });
 }
 
 const AUDIO_GROUP_LABELS: Record<AudioChannelGroup, string> = {
@@ -246,6 +289,11 @@ function orderedGroupsForChannels(channels: AudioChannelEntry[]) {
   return AUDIO_GROUP_ORDER.filter((groupId) => present.has(groupId));
 }
 
+function visibleTierGroups(channels: AudioChannelEntry[], activeGroups: readonly AudioChannelGroup[]) {
+  const active = new Set(activeGroups);
+  return orderedGroupsForChannels(channels).filter((groupId) => groupId !== "remote" || active.has(groupId));
+}
+
 function activeGroupsForTier(
   activeChannelGroups: AudioChannelGroupSelections,
   tierId: AudioGroupTierId,
@@ -336,6 +384,12 @@ export function buildAudioViewModel({
 
   const visibleHardwareInputs = bankChannels(hardwareInputChannels, clampedBankIndex, hardwareInputBankSize);
   const visibleSoftwarePlayback = bankChannels(softwarePlaybackChannels, clampedBankIndex, softwarePlaybackBankSize);
+  const defaultVisibleHardwareInputs = bankChannels(hardwareSourceChannels, clampedBankIndex, hardwareInputBankSize);
+  const defaultVisibleSoftwarePlayback = bankChannels(
+    softwarePlaybackSourceChannels,
+    clampedBankIndex,
+    softwarePlaybackBankSize
+  );
   const clippedChannels = channels.filter((entry) => entry.clip);
   const soloedChannel = channels.find((entry) => entry.solo) ?? null;
   const selectedGroup = selectedChannel ? getAudioChannelGroup(selectedChannel) : selectedMixTarget ? "output" : "none";
@@ -346,7 +400,10 @@ export function buildAudioViewModel({
 
   const hardwareInputs: AudioTierViewModel = {
     channels: visibleHardwareInputs,
-    chips: hardwareInputGroups.map((groupId) => ({
+    chips: visibleTierGroups(
+      [...defaultVisibleHardwareInputs, ...visibleHardwareInputs],
+      activeHardwareInputGroups
+    ).map((groupId) => ({
       active: activeHardwareInputGroups.includes(groupId),
       id: groupId,
       label: AUDIO_GROUP_LABELS[groupId],
@@ -360,7 +417,10 @@ export function buildAudioViewModel({
   };
   const softwarePlayback: AudioTierViewModel = {
     channels: visibleSoftwarePlayback,
-    chips: softwarePlaybackGroups.map((groupId) => ({
+    chips: visibleTierGroups(
+      [...defaultVisibleSoftwarePlayback, ...visibleSoftwarePlayback],
+      activeSoftwarePlaybackGroups
+    ).map((groupId) => ({
       active: activeSoftwarePlaybackGroups.includes(groupId),
       id: groupId,
       label: AUDIO_GROUP_LABELS[groupId],
@@ -375,10 +435,10 @@ export function buildAudioViewModel({
 
   return {
     activeMixReadout: {
-      db: formatAudioDb(selectedMixTarget?.volume ?? 0),
+      db: formatMeterDb(selectedMixTarget?.meterLevel ?? 0),
       lufs: "n/a",
-      meterLeft: selectedMixTarget?.volume ?? 0,
-      meterRight: (selectedMixTarget?.volume ?? 0) * 0.94,
+      meterLeft: selectedMixTarget?.meterLeft ?? 0,
+      meterRight: selectedMixTarget?.meterRight ?? 0,
     },
     actionsAllowed: capabilities.canEditMixerState,
     activeChannelGroups: {

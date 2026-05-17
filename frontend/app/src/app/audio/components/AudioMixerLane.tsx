@@ -49,7 +49,6 @@ export function AudioChannelLane({
   setDraftValue,
   selected,
   selectedMixTargetId,
-  simulatedMeters,
 }: {
   actionsAllowed: boolean;
   channel: AudioChannelEntry;
@@ -65,7 +64,6 @@ export function AudioChannelLane({
   setDraftValue: (key: string, value: number) => void;
   selected: boolean;
   selectedMixTargetId: string | null;
-  simulatedMeters: boolean;
 }) {
   const sendDraftKey = `channel:${channel.id}:send:${selectedMixTargetId ?? "none"}`;
   const sendLevel = getDraftValue(sendDraftKey, selectedChannelSendLevel(channel, selectedMixTargetId));
@@ -146,10 +144,9 @@ export function AudioChannelLane({
         <AudioStereoMeter
           clip={channel.clip}
           left={channel.meterLeft}
-          peak={channel.peakHold}
-          right={channel.stereo ? channel.meterRight : channel.meterLevel * 0.84}
-          simulated={simulatedMeters}
-          simulationIndex={index}
+          peakLeft={channel.peakHoldLeft}
+          peakRight={channel.stereo ? channel.peakHoldRight : channel.peakHoldLeft}
+          right={channel.stereo ? channel.meterRight : channel.meterLeft}
           showPeakReadout={supportsPreamp || channel.role === "playback-pair"}
           showReadout={false}
           showScale
@@ -228,7 +225,6 @@ export function AudioOutputLane({
   onUpdateMixTarget,
   setDraftValue,
   selected,
-  simulatedMeters,
 }: {
   actionsAllowed: boolean;
   clearDraftValue: (key: string) => void;
@@ -240,7 +236,6 @@ export function AudioOutputLane({
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
   setDraftValue: (key: string, value: number) => void;
   selected: boolean;
-  simulatedMeters: boolean;
 }) {
   const volumeDraftKey = `mixTarget:${mixTarget.id}:volume`;
   const volume = getDraftValue(volumeDraftKey, mixTarget.volume);
@@ -270,11 +265,10 @@ export function AudioOutputLane({
 
       <div className={styles.outputBody}>
         <AudioStereoMeter
-          left={volume}
-          peak={volume}
-          right={volume * 0.96}
-          simulated={simulatedMeters}
-          simulationIndex={index + 12}
+          left={mixTarget.meterLeft}
+          peakLeft={mixTarget.peakHoldLeft}
+          peakRight={mixTarget.peakHoldRight}
+          right={mixTarget.mono ? mixTarget.meterLevel : mixTarget.meterRight}
           showReadout={false}
           showScale
         />
@@ -303,8 +297,8 @@ export function AudioOutputLane({
             <span>
               <small>Peak hold</small>
               <strong>
-                L {formatMeterDb(volume)}
-                <em>R {formatMeterDb(volume * 0.96)}</em>
+                L {formatMeterDb(mixTarget.peakHoldLeft)}
+                <em>R {formatMeterDb(mixTarget.peakHoldRight)}</em>
               </strong>
             </span>
             <span>

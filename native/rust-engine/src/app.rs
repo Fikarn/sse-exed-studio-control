@@ -136,6 +136,18 @@ impl EngineApp {
         )
     }
 
+    pub fn should_emit_simulated_audio_meter_ticks(&self) -> bool {
+        self.read_audio_snapshot()
+            .ok()
+            .and_then(|snapshot| {
+                snapshot
+                    .get("adapterMode")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned)
+            })
+            .is_some_and(|adapter_mode| adapter_mode == "simulated")
+    }
+
     pub fn handle_request(&self, request: RequestEnvelope) -> EngineReply {
         let _ = append_log(
             &self.runtime.log_file_path,

@@ -18,6 +18,10 @@ function mixTargetMeta(role: string, talkback: boolean) {
 
 const PROTOTYPE_MONITOR_LEVEL = faderDbToNormalized(-12);
 
+function meterPercent(value: number) {
+  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
+}
+
 export function AudioRail({
   clearDraftValue,
   commitMixTargetContinuous,
@@ -87,13 +91,9 @@ export function AudioRail({
                 <span className={styles.mixTargetName}>{mixTarget.name}</span>
                 <span className={styles.mixTargetMeta}>{mixTargetMeta(mixTarget.role, mixTarget.talkback)}</span>
               </span>
-              <span
-                className={styles.mixTargetMiniMeter}
-                data-simulated-meter={viewModel.meterSimulationActive}
-                aria-hidden="true"
-              >
-                <i style={{ width: `${Math.max(8, Math.round(mixTarget.volume * 100))}%` }} />
-                <i style={{ width: `${Math.max(8, Math.round(mixTarget.volume * 86))}%` }} />
+              <span className={styles.mixTargetMiniMeter} aria-hidden="true">
+                <i style={{ "--meter-level": meterPercent(mixTarget.meterLeft) } as CSSProperties} />
+                <i style={{ "--meter-level": meterPercent(mixTarget.meterRight) } as CSSProperties} />
               </span>
               <span className={styles.mixTargetFlags}>
                 {mixTarget.mute ? <span>Mute</span> : null}

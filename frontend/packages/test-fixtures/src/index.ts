@@ -165,6 +165,10 @@ function buildAudioNoSendFixture(): FixtureScenarioRecord {
 
 const derivedFixtureMap: FixtureMap = {
   ...fixtureMap,
+  "audio-populated": {
+    ...cloneFixture(fixtureMap["audio-populated"]),
+    audioMeteringActive: true,
+  } as FixtureScenarioRecord,
   "audio-clipped": buildAudioClippedFixture(),
   "audio-hardware-metering": buildAudioHardwareMeteringFixture(),
   "audio-no-send": buildAudioNoSendFixture(),

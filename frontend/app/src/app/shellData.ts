@@ -121,6 +121,8 @@ export interface AudioChannelEntry {
   name: string;
   pad: boolean;
   peakHold: number;
+  peakHoldLeft: number;
+  peakHoldRight: number;
   phase: boolean;
   phantom: boolean;
   role: string;
@@ -135,9 +137,15 @@ export interface AudioChannelEntry {
 export interface AudioMixTargetEntry {
   dim: boolean;
   id: string;
+  meterLeft: number;
+  meterLevel: number;
+  meterRight: number;
   mono: boolean;
   mute: boolean;
   name: string;
+  peakHold: number;
+  peakHoldLeft: number;
+  peakHoldRight: number;
   role: string;
   shortName: string;
   talkback: boolean;
@@ -458,6 +466,8 @@ export function getAudioChannels(snapshot: AudioSnapshot | null): AudioChannelEn
     name: c.name,
     pad: c.pad,
     peakHold: c.peakHold,
+    peakHoldLeft: c.peakHoldLeft,
+    peakHoldRight: c.peakHoldRight,
     phase: c.phase,
     phantom: c.phantom,
     role: c.role,
@@ -474,9 +484,15 @@ export function getAudioMixTargets(snapshot: AudioSnapshot | null): AudioMixTarg
   return (snapshot?.mixTargets ?? []).map((m: AudioMixTargetSnapshot) => ({
     dim: m.dim,
     id: m.id,
+    meterLeft: m.meterLeft,
+    meterLevel: m.meterLevel,
+    meterRight: m.meterRight,
     mono: m.mono,
     mute: m.mute,
     name: m.name,
+    peakHold: m.peakHold,
+    peakHoldLeft: m.peakHoldLeft,
+    peakHoldRight: m.peakHoldRight,
     role: m.role,
     shortName: m.shortName,
     talkback: m.talkback,

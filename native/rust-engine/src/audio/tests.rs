@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 struct TestDir {
     path: PathBuf,
@@ -68,6 +68,165 @@ fn audio_snapshot_reports_ready_when_probe_passed() {
     assert_eq!(snapshot.channels.len(), 18);
     assert_eq!(snapshot.mix_targets.len(), 3);
     assert_eq!(snapshot.snapshots.len(), 3);
+}
+
+#[test]
+fn simulated_audio_metering_models_inputs_playback_and_mix_outputs() {
+    let settings = HashMap::from([
+        (
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        ),
+        (String::from(AUDIO_SEND_HOST_KEY), String::from("127.0.0.1")),
+    ]);
+
+    let first = read_audio_snapshot(&settings);
+    let mut second = first.clone();
+    let mut host_meter_changed = false;
+    for _ in 0..8 {
+        std::thread::sleep(Duration::from_millis(140));
+        second = read_audio_snapshot(&settings);
+        let first_level = first
+            .channels
+            .iter()
+            .find(|entry| entry.id == "audio-input-9")
+            .map(|entry| entry.meter_level)
+            .unwrap_or_default();
+        let next_level = second
+            .channels
+            .iter()
+            .find(|entry| entry.id == "audio-input-9")
+            .map(|entry| entry.meter_level)
+            .unwrap_or_default();
+        if (first_level - next_level).abs() > 0.0001 {
+            host_meter_changed = true;
+            break;
+        }
+    }
+
+    let host_second = second
+        .channels
+        .iter()
+        .find(|entry| entry.id == "audio-input-9")
+        .expect("host preamp should be present after refresh");
+    assert!(host_meter_changed);
+    assert!(!host_second.stereo);
+    assert_eq!(host_second.meter_left, host_second.meter_right);
+    assert!(host_second.peak_hold >= host_second.meter_level);
+    assert_eq!(host_second.peak_hold_left, host_second.peak_hold_right);
+
+    let program = second
+        .channels
+        .iter()
+        .find(|entry| entry.id == "audio-playback-1-2")
+        .expect("program playback should be present");
+    let fx = second
+        .channels
+        .iter()
+        .find(|entry| entry.id == "audio-playback-3-4")
+        .expect("fx playback should be present");
+    assert!(program.stereo);
+    assert!(fx.stereo);
+    assert!((program.meter_left - program.meter_right).abs() > f64::EPSILON);
+    assert!((program.meter_level - fx.meter_level).abs() > f64::EPSILON);
+
+    let main_mix = second
+        .mix_targets
+        .iter()
+        .find(|entry| entry.id == "audio-mix-main")
+        .expect("main mix target should be present");
+    assert!(main_mix.meter_level > 0.0);
+    assert!(main_mix.peak_hold >= main_mix.meter_level);
+}
+
+#[test]
+fn simulated_audio_metering_uses_professional_ballistics() {
+    let settings = HashMap::from([
+        (
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        ),
+        (String::from(AUDIO_SEND_HOST_KEY), String::from("127.0.0.1")),
+    ]);
+
+    let mut samples = Vec::new();
+    for _ in 0..8 {
+        let snapshot = read_audio_snapshot(&settings);
+        let host = snapshot
+            .channels
+            .iter()
+            .find(|entry| entry.id == "audio-input-9")
+            .expect("host preamp should be present");
+        samples.push((
+            host.meter_level,
+            host.peak_hold,
+            host.peak_hold_left,
+            host.peak_hold_right,
+            host.clip,
+        ));
+        std::thread::sleep(Duration::from_millis(90));
+    }
+
+    assert!(
+        samples
+            .windows(2)
+            .any(|pair| (pair[0].0 - pair[1].0).abs() > 0.0001),
+        "speech body meter should still move between metering ticks"
+    );
+    for pair in samples.windows(2) {
+        assert!(
+            (pair[0].0 - pair[1].0).abs() <= 0.18,
+            "speech body meter should not make distracting tick-to-tick jumps: {:?}",
+            pair
+        );
+    }
+    for (meter_level, peak_hold, peak_hold_left, peak_hold_right, clip) in samples {
+        assert!(peak_hold >= meter_level);
+        assert!(peak_hold_left >= meter_level);
+        assert!(peak_hold_right >= meter_level * 0.84);
+        assert!(!clip, "normal speech simulation should avoid clip state");
+    }
+}
+
+#[test]
+fn simulated_stereo_sources_and_outputs_expose_independent_peak_holds() {
+    let settings = HashMap::from([
+        (
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        ),
+        (String::from(AUDIO_SEND_HOST_KEY), String::from("127.0.0.1")),
+    ]);
+
+    let snapshot = read_audio_snapshot(&settings);
+    let music = snapshot
+        .channels
+        .iter()
+        .find(|entry| entry.id == "audio-playback-7-8")
+        .expect("music playback should be present");
+    assert!(music.stereo);
+    assert!(music.peak_hold_left >= music.meter_left);
+    assert!(music.peak_hold_right >= music.meter_right);
+    assert!(
+        (music.peak_hold_left - music.peak_hold_right).abs() > 0.0001,
+        "stereo peak holds should be independently computed"
+    );
+    assert_eq!(
+        music.peak_hold,
+        music.peak_hold_left.max(music.peak_hold_right)
+    );
+
+    let main_mix = snapshot
+        .mix_targets
+        .iter()
+        .find(|entry| entry.id == "audio-mix-main")
+        .expect("main mix target should be present");
+    assert!(main_mix.peak_hold_left >= main_mix.meter_left);
+    assert!(main_mix.peak_hold_right >= main_mix.meter_right);
+    assert_eq!(
+        main_mix.peak_hold,
+        main_mix.peak_hold_left.max(main_mix.peak_hold_right)
+    );
 }
 
 #[test]
