@@ -8,9 +8,9 @@ on:
 permissions:
   contents: read
 
-# Advisory only. Never a required check, never a release gate.
+# Required merge hygiene on protected branches. Never a release gate.
 # Target-host release evidence on macOS Apple Silicon and Windows 11 x64
-# remains the acceptance mechanism for this repo (see AGENTS.md).
+# remains the release acceptance mechanism for this repo (see AGENTS.md).
 jobs:
   format-protocol:
     runs-on: ubuntu-latest

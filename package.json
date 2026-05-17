@@ -33,11 +33,12 @@
     "clean:local": "node scripts/clean.mjs --local",
     "doctor": "node scripts/dev-doctor.mjs",
     "doctor:release": "node scripts/dev-doctor.mjs --release",
-    "dev:check": "npm run format:check && npm run lint && npm run rust:fmt:check && npm run rust:clippy && npm run protocol:check && npm run frontend:typecheck && npm run native:check && npm run native:test",
+    "dev:check": "npm run format:check && npm run lint && npm run scripts:test && npm run rust:fmt:check && npm run rust:clippy && npm run protocol:check && npm run frontend:typecheck && npm run native:check && npm run native:test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "scripts:test": "node --test scripts/disk-space.test.mjs scripts/qt-ifw-tools.test.mjs scripts/release/validate-release.test.mjs",
     "rust:fmt:check": "cd native && cargo fmt --all -- --check",
     "rust:clippy": "cd native && cargo clippy --workspace --all-targets -- -D warnings",
     "protocol:generate": "node scripts/protocol/generate-protocol-artifacts.mjs",
@@ -136,18 +137,18 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{js,mjs,json,yml,yaml,md,css}": [
+    "*.{js,mjs,ts,tsx,json,yml,yaml,md,css}": [
       "prettier --write"
     ]
   },
   "devDependencies": {
-    "@eslint-react/eslint-plugin": "^5.7.1",
+    "@eslint-react/eslint-plugin": "^5.7.10",
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.3.0",
+    "eslint": "^10.4.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.5",
     "prettier": "^3.8.3",
-    "typescript-eslint": "^8.59.1"
+    "typescript-eslint": "^8.59.3"
   }
 }

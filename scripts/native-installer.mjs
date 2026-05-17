@@ -3,6 +3,8 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writ
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveQtIfwTools } from "./qt-ifw-tools.mjs";
+
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 
@@ -135,30 +137,6 @@ function renderPackageXml({ version, releaseDate }) {
 `;
 }
 
-function resolveBinaryCreator() {
-  const envCandidates = [process.env.SSE_QT_IFW_BINARYCREATOR, process.env.QT_IFW_BINARYCREATOR].filter(Boolean);
-
-  for (const candidate of envCandidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  const pathCommand = process.platform === "win32" ? "where" : "which";
-  const pathResult = spawnSync(pathCommand, ["binarycreator"], { cwd: rootDir, encoding: "utf8" });
-  if ((pathResult.status ?? 1) === 0) {
-    const discovered = pathResult.stdout
-      .split(/\r?\n/)
-      .map((value) => value.trim())
-      .find(Boolean);
-    if (discovered) {
-      return discovered;
-    }
-  }
-
-  return null;
-}
-
 const target = parseTarget(readFlag("--target"));
 const prepareOnly = hasFlag("--prepare-only");
 const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
@@ -206,19 +184,20 @@ if (prepareOnly) {
   process.exit(0);
 }
 
-const binarycreator = resolveBinaryCreator();
-if (!binarycreator) {
+const binaryCreator = resolveQtIfwTools({ rootDir }).binaryCreator;
+if (!binaryCreator) {
   throw new Error(
-    "Qt Installer Framework binarycreator was not found. Set SSE_QT_IFW_BINARYCREATOR or install QtIFW to build the installer."
+    "Qt Installer Framework binarycreator was not found. Set SSE_QT_IFW_BINARYCREATOR, put binarycreator on PATH, or install QtIFW into .tools/qt-ifw."
   );
 }
 
+console.log(`Using QtIFW binarycreator via ${binaryCreator.source}: ${binaryCreator.value}`);
 mkdirSync(path.dirname(installerPath), { recursive: true });
 rmSync(installerPath, { force: true, recursive: true });
 if (archivePath) {
   rmSync(archivePath, { force: true, recursive: true });
 }
-run(binarycreator, [
+run(binaryCreator.value, [
   "--offline-only",
   "-c",
   path.join(configDir, "config.xml"),

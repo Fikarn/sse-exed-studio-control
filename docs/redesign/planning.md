@@ -1,8 +1,9 @@
 ---
 workspace: planning
 phase: B (direction locked)
-status: ready-for-phase-c
+status: historical-reference
 chosen_direction: D — Run-of-show timeline (lanes × time, kanban behind ⇧B)
+current_truth: docs/HANDOFF.md
 audit_refs:
   - docs/archive/UX_AUDIT.md §Planning workspace
   - docs/archive/UX_AUDIT.md §C8 (identity/hero stack — closed)

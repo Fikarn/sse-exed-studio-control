@@ -1,9 +1,10 @@
 ---
 workspace: audio
 phase: lighting-aligned redesign plan
-status: ready-for-implementation
+status: historical-reference
 chosen_direction: Audio L1 - Control Room Signal Desk
 prototype: docs/redesign/assets/audio/Audio-Lighting-Aligned-Desk.html
+current_truth: docs/HANDOFF.md
 supersedes:
   - docs/redesign/assets/audio/Audio-Redesign.html
   - earlier Ar+ / control-room confidence desk notes

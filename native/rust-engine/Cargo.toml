@@ -1,6 +1,6 @@
 [package]
 name = "studio-control-engine"
-version = "0.1.0"
+version = "2.2.1"
 edition.workspace = true
 rust-version.workspace = true
 

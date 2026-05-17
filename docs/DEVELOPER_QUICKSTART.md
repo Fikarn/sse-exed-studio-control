@@ -1,6 +1,6 @@
 # Developer Quickstart
 
-This is the cold-start path for a senior engineer joining the project. It assumes no prior context beyond access to this private repository.
+This is the cold-start path for a senior engineer joining the project. It assumes no prior context beyond access to this repository.
 
 ## Goal
 
@@ -40,7 +40,7 @@ Required for release packaging and target-host evidence:
 - macOS Apple Silicon host for macOS release evidence
 - Windows 11 `x64` host for Windows release evidence
 
-Public signing, notarization, and GitHub Actions are intentionally out of scope for this repo's current deployment model.
+Public signing and notarization are intentionally out of scope for this repo's current deployment model. GitHub Actions provides required pull-request hygiene; tagged release acceptance remains local and target-host based.
 
 ## First Clone
 
@@ -77,7 +77,7 @@ Run the fast local gate while working:
 npm run dev:check
 ```
 
-`dev:check` is the normal all-around local code-health gate. It runs Prettier check, ESLint, Rust format check, clippy, protocol artifact check, frontend typecheck, native check, and native tests.
+`dev:check` is the normal all-around local code-health gate. It runs Prettier check, ESLint, repository script tests, Rust format check, clippy, protocol artifact check, frontend typecheck, native check, and native tests.
 
 Launch the selected app for visual review:
 
@@ -249,5 +249,5 @@ For major upgrades:
 - Do not move device policy, persistence, or product state into React.
 - Do not reintroduce a Qt shell/fallback runtime without a new architecture decision.
 - Do not change on-disk formats without an explicit migration and rollback plan.
-- Do not introduce GitHub Actions gates; release evidence is local/target-host based.
+- Do not treat GitHub Actions as release evidence; tagged release acceptance is local/target-host based.
 - Do not add public signing/notarization as part of normal feature work.

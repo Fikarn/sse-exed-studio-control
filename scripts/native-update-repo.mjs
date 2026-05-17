@@ -3,6 +3,8 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writ
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveQtIfwTools } from "./qt-ifw-tools.mjs";
+
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 
@@ -125,30 +127,6 @@ function renderPackageXml({ version, releaseDate }) {
 `;
 }
 
-function resolveRepogen() {
-  const envCandidates = [process.env.SSE_QT_IFW_REPOGEN, process.env.QT_IFW_REPOGEN].filter(Boolean);
-
-  for (const candidate of envCandidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  const pathCommand = process.platform === "win32" ? "where" : "which";
-  const pathResult = spawnSync(pathCommand, ["repogen"], { cwd: rootDir, encoding: "utf8" });
-  if ((pathResult.status ?? 1) === 0) {
-    const discovered = pathResult.stdout
-      .split(/\r?\n/)
-      .map((value) => value.trim())
-      .find(Boolean);
-    if (discovered) {
-      return discovered;
-    }
-  }
-
-  return null;
-}
-
 const target = parseTarget(readFlag("--target"));
 const prepareOnly = hasFlag("--prepare-only");
 const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
@@ -185,16 +163,19 @@ if (prepareOnly) {
   process.exit(0);
 }
 
-const repogen = resolveRepogen();
-if (!repogen) {
-  throw new Error("Qt Installer Framework repogen was not found. Set SSE_QT_IFW_REPOGEN or install QtIFW.");
+const repoGen = resolveQtIfwTools({ rootDir }).repoGen;
+if (!repoGen) {
+  throw new Error(
+    "Qt Installer Framework repogen was not found. Set SSE_QT_IFW_REPOGEN, put repogen on PATH, or install QtIFW into .tools/qt-ifw."
+  );
 }
 
+console.log(`Using QtIFW repogen via ${repoGen.source}: ${repoGen.value}`);
 rmSync(repositoryPath, { force: true, recursive: true });
 mkdirSync(path.dirname(repositoryPath), { recursive: true });
 rmSync(archivePath, { force: true, recursive: true });
 
-run(repogen, ["-p", path.join(buildRoot, "packages"), repositoryPath]);
+run(repoGen.value, ["-p", path.join(buildRoot, "packages"), repositoryPath]);
 
 if (target === "macos") {
   archiveMacPath(repositoryPath, archivePath);

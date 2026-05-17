@@ -244,9 +244,9 @@ npm run doctor:release
 npm run release:verify
 ```
 
-#### Advisory CI
+#### Pull Request CI
 
-Every pull request triggers a four-job advisory workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, and `rust` (which runs `rust:fmt:check`, `rust:clippy`, `native:check`, and `native:test`). The workflow is advisory only — it provides early signal on PRs but is not a required check, and target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
+Every pull request triggers the four-job workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, and `rust` (which runs `rust:fmt:check`, `rust:clippy`, `native:check`, and `native:test`). These jobs are required merge hygiene on `main`. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
 
 ### 4a. Cleanup
 

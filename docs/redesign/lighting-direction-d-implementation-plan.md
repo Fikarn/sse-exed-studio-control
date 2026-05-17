@@ -1,11 +1,12 @@
 ---
 workspace: lighting
 phase: D (direction locked, implementation queued)
-status: ready-to-implement
+status: historical-reference
 chosen_direction: D — Scene desk
 supersedes: Cr — Spatial desk (docs/redesign/lighting.md)
 prototype: docs/redesign/assets/lighting/Lighting-D-Scene-Desk.html
 authored: 2026-04-27
+current_truth: docs/HANDOFF.md
 ---
 
 > Design/reference record. Current implementation truth lives in `README.md`, `docs/HANDOFF.md`, and `docs/ARCHITECTURE.md`; use this file for rationale and historical context, not as an active implementation contract.

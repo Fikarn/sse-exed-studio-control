@@ -1,7 +1,7 @@
 {
   "name": "@sse/frontend-app",
   "private": true,
-  "version": "0.1.0",
+  "version": "2.2.1",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.app.json && vite build",
@@ -29,22 +29,22 @@
     "@sse/tokens": "file:../packages/tokens",
     "@tauri-apps/api": "^2.11.0",
     "fuzzysort": "^3.1.0",
-    "lucide-react": "^1.14.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "react-virtualized-auto-sizer": "^2.0.3",
     "react-window": "^2.2.7"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
-    "@storybook/react-vite": "^10.3.6",
-    "@tauri-apps/cli": "^2.11.0",
-    "@types/node": "^24.12.2",
+    "@playwright/test": "^1.60.0",
+    "@storybook/react-vite": "^10.4.0",
+    "@tauri-apps/cli": "^2.11.2",
+    "@types/node": "^24.12.4",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "@vitejs/plugin-react": "^6.0.1",
-    "storybook": "^10.3.6",
+    "@vitejs/plugin-react": "^6.0.2",
+    "storybook": "^10.4.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.10"
+    "vite": "^8.0.13"
   }
 }

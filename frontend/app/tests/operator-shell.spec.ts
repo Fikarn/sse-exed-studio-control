@@ -80,6 +80,14 @@ async function readSnapshotThumbHeights(page: Page, snapshotId: string) {
     .evaluateAll((bars) => bars.map((bar) => (bar as HTMLElement).style.height));
 }
 
+async function saveAudioSnapshot(page: Page, snapshotId: string) {
+  const saveButton = page
+    .getByTestId(`audio-snapshot-${snapshotId}`)
+    .getByRole("button", { exact: true, name: "Save" });
+  await expect(saveButton).toBeEnabled();
+  await saveButton.click();
+}
+
 async function expectSliderValueChanges(page: Page, label: string) {
   const slider = page.getByRole("slider", { name: label });
   const before = await slider.getAttribute("aria-valuenow");
@@ -536,7 +544,7 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
   await openFixture(page, "audio-populated");
 
   const currentSnapshot = page.getByTestId("audio-snapshot-snapshot-show-open");
-  await page.keyboard.press(modifierShortcut("S"));
+  await saveAudioSnapshot(page, "snapshot-show-open");
   await expect(currentSnapshot.getByTestId("audio-snapshot-thumb-snapshot-show-open")).toHaveAttribute(
     "data-has-contents",
     "true"
@@ -562,9 +570,12 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
     currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)
   ).toBeVisible();
 
-  await page.keyboard.press(modifierShortcut("S"));
-  const savedThumbAfter = await readSnapshotThumbHeights(page, "snapshot-show-open");
-  expect(savedThumbAfter).not.toEqual(savedThumbBefore);
+  await saveAudioSnapshot(page, "snapshot-show-open");
+  await expect
+    .poll(async () => readSnapshotThumbHeights(page, "snapshot-show-open"), {
+      message: "saved snapshot thumbnail should reflect the changed mix",
+    })
+    .not.toEqual(savedThumbBefore);
   await currentSnapshot.hover();
   await expect(currentSnapshot.getByText("18 sources saved")).toBeVisible();
 
@@ -589,7 +600,7 @@ test("shows numeric snapshot before and after preview text", async ({ page }) =>
   await openFixture(page, "audio-populated");
 
   const currentSnapshot = page.getByTestId("audio-snapshot-snapshot-show-open");
-  await page.keyboard.press(modifierShortcut("S"));
+  await saveAudioSnapshot(page, "snapshot-show-open");
 
   page.once("dialog", async (dialog) => {
     await dialog.accept("-60");

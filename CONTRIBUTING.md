@@ -44,7 +44,7 @@ npm run frontend:foundation
 
 Choose validation based on change risk.
 
-There are intentionally no GitHub Actions acceptance gates. Validation is local and target-host based; record the commands you ran in the PR.
+GitHub Actions `dev-checks` is required merge hygiene where branch protection applies. It is not release acceptance evidence; local and target-host validation still decides release readiness. Record the commands you ran in the PR.
 
 ### Tauri shell, React frontend, or operator layout
 
@@ -110,6 +110,10 @@ Every PR should make it easy for a reviewer to answer:
 4. How was it validated?
 
 Use the PR template. Include screenshots or short clips for UI changes, and call out hardware/manual validation for lighting, audio, setup, or packaging behavior.
+
+## Conduct
+
+Use [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for expected collaboration behavior and private reporting guidance.
 
 ## Hardware Awareness
 
