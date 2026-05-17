@@ -129,7 +129,7 @@ Order: **merge → retarget next → merge → retarget next → … → batch-d
 
 ### 6. Windows target-host (engine-touching waves only)
 
-After landing on `origin/main`, hand off to a Windows-Claude session against the new HEAD with the [windows_target_host_validation.md](https://github.com/Fikarn/sse-exed-studio-control/blob/main/windows_target_host_validation.md) flow:
+After landing on `origin/main`, hand off to a Windows-Claude session against the new HEAD with the [WINDOWS_TARGET_HOST_EVIDENCE.md](../WINDOWS_TARGET_HOST_EVIDENCE.md) flow:
 
 ```
 npm ci

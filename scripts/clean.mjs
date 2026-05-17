@@ -15,7 +15,7 @@ const targets = [
   "release",
 ];
 
-const localTargets = [".swift-module-cache", "artifacts"];
+const localTargets = [".swift-module-cache", "artifacts", "test-results", "aqtinstall.log"];
 
 const dsStoreSkipDirs = new Set([".git", ".tools", "node_modules", "release", "artifacts", "target"]);
 

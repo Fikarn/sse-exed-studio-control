@@ -32,7 +32,7 @@ Validation recorded for PR #71:
 ## Fresh Codex Prompt
 
 ```text
-We are in /Users/EdvinLandvik/Projects/EdvinProjectManagerCodex.
+Work from the repository root.
 
 Please implement the responsive/resizable operator layout plan for SSE ExEd Studio Control, with primary focus on the Lighting page. First read AGENTS.md and follow repo instructions. Inspect the current implementation before editing.
 

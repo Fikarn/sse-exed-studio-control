@@ -7,9 +7,8 @@ const reactRecommendedErrorRules = Object.fromEntries(
   Object.entries(eslintReact.configs.recommended.rules).filter(([, severity]) => severity === "error")
 );
 
-// Initial baseline lint config. Intentionally permissive so the existing
-// 17k-line frontend corpus and the build/release scripts pass; tighten in
-// follow-up PRs after Phase 2 / Phase 3 splits.
+// Repo hygiene ratchet. Keep generated and local evidence output ignored, but
+// make source-level cleanup categories fail fast instead of drifting as warnings.
 //
 // Notes:
 // - `no-undef` is disabled globally because TypeScript already enforces it
@@ -44,10 +43,10 @@ export default [
   {
     rules: {
       "no-undef": "off",
-      "no-empty": ["warn", { allowEmptyCatch: true }],
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-empty-object-type": "warn",
+      "no-empty": ["error", { allowEmptyCatch: true }],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-empty-object-type": "error",
     },
   },
   {
@@ -63,11 +62,11 @@ export default [
       "@eslint-react/no-context-provider": "off",
       "@eslint-react/no-forward-ref": "off",
       "@eslint-react/rules-of-hooks": "off",
-      "@eslint-react/static-components": "warn",
-      "@eslint-react/unsupported-syntax": "warn",
+      "@eslint-react/static-components": "error",
+      "@eslint-react/unsupported-syntax": "error",
       "@eslint-react/no-use-context": "off",
-      "@eslint-react/use-memo": "warn",
-      "react-hooks/exhaustive-deps": "warn",
+      "@eslint-react/use-memo": "error",
+      "react-hooks/exhaustive-deps": "error",
       "react-hooks/rules-of-hooks": "error",
     },
   },

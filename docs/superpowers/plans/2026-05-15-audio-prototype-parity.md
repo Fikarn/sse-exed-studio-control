@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` when explicitly authorized, otherwise use `superpowers:executing-plans`. Keep the progress tracker updated after every goal. Do not skip acceptance checks.
 
-**Goal:** Bring the real Tauri Audio working space to visual parity with `/Users/EdvinLandvik/Desktop/2/desk-v10.html`, excluding the shared shell/header/branding bar.
+**Goal:** Bring the real Tauri Audio working space to visual parity with the parity-session `desk-v10.html`, excluding the shared shell/header/branding bar.
 
 **Architecture:** Keep Audio as a React view over engine-owned `audio.snapshot` state and existing mutation commands. Render prototype-equivalent UI states when engine or fixture data exposes them, but do not invent persistent audio policy, hardware truth, EQ, dynamics, LUFS, PFL, clip reset, snapshot capture, or master-view behavior in React.
 
@@ -12,7 +12,7 @@
 
 ## Summary
 
-Bring the real Tauri Audio working space to visual parity with `/Users/EdvinLandvik/Desktop/2/desk-v10.html`, excluding the shared shell/header/branding bar.
+Bring the real Tauri Audio working space to visual parity with the parity-session `desk-v10.html`, excluding the shared shell/header/branding bar.
 
 The implementation must match prototype layout, density, tier structure, warning surfaces, inspector variants, snapshot deck shape, and footer treatment. It must not force live Audio to default to prototype demo data. Real values such as selected channel, snapshot names, meter levels, and verification state may differ, but the UI must render the prototype-equivalent state whenever engine or fixture data exposes it.
 
@@ -204,7 +204,7 @@ npm run tauri:visual:review -- --fixtures=audio-populated,audio-state-assumed,au
 ## Assumptions Locked
 
 - Save target: replace `docs/superpowers/plans/2026-05-15-audio-prototype-parity.md`.
-- Prototype authority: `/Users/EdvinLandvik/Desktop/2/desk-v10.html`.
+- Prototype authority: parity-session `desk-v10.html`; durable checked-in reference is `docs/redesign/assets/audio/Audio-Lighting-Aligned-Desk.html`.
 - Scope: Audio working space only; shared header/branding bar remains unchanged.
 - Data policy: layout/component parity only. Do not force exact prototype demo values into live state.
 - Architecture boundary: no device policy, persistence, or fake hardware truth moves into React.
