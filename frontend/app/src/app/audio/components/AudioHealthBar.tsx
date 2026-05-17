@@ -1,4 +1,4 @@
-import { Clock3, Command, Gauge, Keyboard, Radio, Route, ShieldCheck, TimerReset } from "lucide-react";
+import { Clock3, Gauge, Radio, ShieldCheck, TimerReset } from "lucide-react";
 
 import styles from "../AudioWorkspace.module.css";
 import { formatAudioTimestamp } from "../audioFormatting";
@@ -35,29 +35,24 @@ export function AudioHealthBar({ viewModel }: { viewModel: AudioWorkspaceViewMod
           <span>Last sync</span>
           <strong>{formatAudioTimestamp(snapshot.lastConsoleSyncAt)}</strong>
         </div>
-        <div className={styles.healthItem}>
-          <Route size={15} strokeWidth={1.8} aria-hidden="true" />
-          <span>Selected</span>
-          <strong>{viewModel.selectedSourceLabel}</strong>
-        </div>
       </div>
       <div className={styles.healthShortcutGroup} data-testid="audio-footer-shortcuts">
         <span className={styles.healthCommand}>
-          <Command size={14} strokeWidth={1.8} aria-hidden="true" />
-          Palette
+          <kbd>⌘K</kbd>
+          Command palette
         </span>
         <span className={styles.healthCommand}>
-          <Keyboard size={14} strokeWidth={1.8} aria-hidden="true" />
-          <kbd>[</kbd>
-          <kbd>]</kbd>
-          Bank
+          <kbd>?</kbd>
+          Shortcuts
         </span>
-        <span className={styles.healthShortcut}>1-8 select</span>
-        <span className={styles.healthShortcut}>Shift 1-8 recall</span>
-        <span className={styles.healthShortcut}>V view</span>
-        <span className={styles.healthShortcut}>Alt C clips</span>
-        <span className={styles.healthShortcut}>Cmd S save</span>
-        <span className={styles.healthShortcut}>Esc clear</span>
+        <span className={styles.healthCommand}>
+          <kbd>[</kbd>
+          Bank prev
+        </span>
+        <span className={styles.healthCommand}>
+          Bank next
+          <kbd>]</kbd>
+        </span>
       </div>
     </footer>
   );

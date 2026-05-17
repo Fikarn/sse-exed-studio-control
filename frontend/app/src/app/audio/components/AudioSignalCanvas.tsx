@@ -11,6 +11,10 @@ import { AudioTieredMixer } from "./AudioTieredMixer";
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
+function meterLevelPercent(value: number) {
+  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
+}
+
 export function AudioSignalCanvas({
   busyAction,
   clearDraftValue,
@@ -135,19 +139,10 @@ export function AudioSignalCanvas({
           </span>
         </div>
         <span className={styles.canvasSpacer} />
-        <div
-          className={styles.canvasActiveMixMeter}
-          aria-label="Active mix level"
-          data-simulated-meter={viewModel.meterSimulationActive}
-          data-testid="audio-active-mix-meter"
-        >
+        <div className={styles.canvasActiveMixMeter} aria-label="Active mix level" data-testid="audio-active-mix-meter">
           <span>Active mix</span>
-          <i
-            style={{ "--meter-level": `${Math.round(viewModel.activeMixReadout.meterLeft * 100)}%` } as CSSProperties}
-          />
-          <i
-            style={{ "--meter-level": `${Math.round(viewModel.activeMixReadout.meterRight * 100)}%` } as CSSProperties}
-          />
+          <i style={{ "--meter-level": meterLevelPercent(viewModel.activeMixReadout.meterLeft) } as CSSProperties} />
+          <i style={{ "--meter-level": meterLevelPercent(viewModel.activeMixReadout.meterRight) } as CSSProperties} />
           <strong>{viewModel.activeMixReadout.db}</strong>
         </div>
         <span className={styles.canvasSpacer} />

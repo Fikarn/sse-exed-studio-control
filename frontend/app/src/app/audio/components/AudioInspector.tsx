@@ -25,6 +25,10 @@ type SelectedAudioChannel = NonNullable<AudioWorkspaceViewModel["selectedChannel
 type AudioEqBand = SelectedAudioChannel["eq"]["bands"][number];
 export type InspectorTab = "channel" | "eq" | "dynamics" | "sends";
 
+function meterPercent(value: number) {
+  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
+}
+
 const EQ_FREQUENCY_MIN = 20;
 const EQ_FREQUENCY_MAX = 20000;
 const EQ_GAIN_MIN = -12;
@@ -188,13 +192,21 @@ export function AudioInspector({
   const selectedRightMeter = selectedChannel
     ? selectedChannel.stereo
       ? selectedChannel.meterRight
-      : selectedChannel.meterLevel * 0.84
+      : selectedChannel.meterLeft
     : 0;
-  const selectedPeak = selectedChannel
-    ? Math.max(selectedChannel.peakHold, selectedChannel.meterLeft, selectedRightMeter)
+  const selectedPeakLeft = selectedChannel ? Math.max(selectedChannel.peakHoldLeft, selectedChannel.meterLeft) : 0;
+  const selectedPeakRight = selectedChannel
+    ? Math.max(
+        selectedChannel.stereo ? selectedChannel.peakHoldRight : selectedChannel.peakHoldLeft,
+        selectedRightMeter
+      )
     : 0;
-  const outputRightMeter = monitorValue * 0.96;
-  const outputPeak = Math.max(monitorValue, outputRightMeter);
+  const outputLeftMeter = selectedMixTarget?.meterLeft ?? 0;
+  const outputRightMeter = selectedMixTarget?.mono
+    ? (selectedMixTarget?.meterLevel ?? 0)
+    : (selectedMixTarget?.meterRight ?? 0);
+  const outputPeakLeft = selectedMixTarget ? Math.max(selectedMixTarget.peakHoldLeft, outputLeftMeter) : 0;
+  const outputPeakRight = selectedMixTarget ? Math.max(selectedMixTarget.peakHoldRight, outputRightMeter) : 0;
   const eqGraphPath = selectedChannel
     ? selectedChannel.eq.bands
         .map((band, index) => {
@@ -256,19 +268,23 @@ export function AudioInspector({
               <strong>{selectedMixTarget?.name ?? "No output"}</strong>
             </div>
 
-            <div
-              className={styles.bigMeterCard}
-              data-simulated-meter={viewModel.meterSimulationActive}
-              data-testid="audio-inspector-metering"
-            >
+            <div className={styles.bigMeterCard} data-testid="audio-inspector-metering">
               <div className={styles.bigMeter} aria-hidden="true">
                 <span>
-                  <i style={{ height: `${Math.round(selectedChannel.meterLeft * 100)}%` }} />
-                  <b style={{ bottom: `${Math.round(selectedChannel.peakHold * 100)}%` }} />
+                  <i style={{ "--audio-meter-level": meterPercent(selectedChannel.meterLeft) } as CSSProperties} />
+                  <b
+                    data-meter-peak="left"
+                    data-side="left"
+                    style={{ bottom: `${Math.round(selectedPeakLeft * 100)}%` }}
+                  />
                 </span>
                 <span>
-                  <i style={{ height: `${Math.round(selectedRightMeter * 100)}%` }} />
-                  <b style={{ bottom: `${Math.round(selectedPeak * 96)}%` }} />
+                  <i style={{ "--audio-meter-level": meterPercent(selectedRightMeter) } as CSSProperties} />
+                  <b
+                    data-meter-peak="right"
+                    data-side="right"
+                    style={{ bottom: `${Math.round(selectedPeakRight * 100)}%` }}
+                  />
                 </span>
               </div>
               <div className={styles.bigMeterInfo}>
@@ -286,7 +302,7 @@ export function AudioInspector({
                   <span>
                     <small>Hold</small>
                     <strong data-tone={selectedChannel.clip ? "clip" : "warn"}>
-                      {formatMeterDb(selectedPeak)}
+                      {formatMeterDb(selectedPeakLeft)} / {formatMeterDb(selectedPeakRight)}
                       <em>dB</em>
                     </strong>
                   </span>
@@ -399,19 +415,23 @@ export function AudioInspector({
               {outputRouteText(selectedMixTarget.role)} · Hardware output → <strong>Active mix</strong>
             </div>
 
-            <div
-              className={styles.bigMeterCard}
-              data-simulated-meter={viewModel.meterSimulationActive}
-              data-testid="audio-inspector-output-metering"
-            >
+            <div className={styles.bigMeterCard} data-testid="audio-inspector-output-metering">
               <div className={styles.bigMeter} aria-hidden="true">
                 <span>
-                  <i style={{ height: `${Math.round(monitorValue * 100)}%` }} />
-                  <b style={{ bottom: `${Math.round(outputPeak * 100)}%` }} />
+                  <i style={{ "--audio-meter-level": meterPercent(outputLeftMeter) } as CSSProperties} />
+                  <b
+                    data-meter-peak="left"
+                    data-side="left"
+                    style={{ bottom: `${Math.round(outputPeakLeft * 100)}%` }}
+                  />
                 </span>
                 <span>
-                  <i style={{ height: `${Math.round(outputRightMeter * 100)}%` }} />
-                  <b style={{ bottom: `${Math.round(outputPeak * 96)}%` }} />
+                  <i style={{ "--audio-meter-level": meterPercent(outputRightMeter) } as CSSProperties} />
+                  <b
+                    data-meter-peak="right"
+                    data-side="right"
+                    style={{ bottom: `${Math.round(outputPeakRight * 100)}%` }}
+                  />
                 </span>
               </div>
               <div className={styles.bigMeterInfo}>
@@ -422,13 +442,16 @@ export function AudioInspector({
                   <span>
                     <small>Peak L / R</small>
                     <strong>
-                      {formatMeterDb(monitorValue)} / {formatMeterDb(outputRightMeter)}
+                      {formatMeterDb(outputLeftMeter)} / {formatMeterDb(outputRightMeter)}
                       <em>dB</em>
                     </strong>
                   </span>
                   <span>
                     <small>Hold</small>
-                    <strong>{formatMeterDb(outputPeak)}dB</strong>
+                    <strong>
+                      {formatMeterDb(outputPeakLeft)} / {formatMeterDb(outputPeakRight)}
+                      <em>dB</em>
+                    </strong>
                   </span>
                 </div>
                 <div className={styles.bigMeterRow}>

@@ -6,6 +6,12 @@ export type AudioMixTargetSnapshot = {
   shortName: string;
   role: string;
   volume: number;
+  meterLeft: number;
+  meterRight: number;
+  meterLevel: number;
+  peakHold: number;
+  peakHoldLeft: number;
+  peakHoldRight: number;
   mute: boolean;
   dim: boolean;
   mono: boolean;

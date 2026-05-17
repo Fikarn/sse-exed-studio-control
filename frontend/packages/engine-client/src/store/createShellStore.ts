@@ -169,6 +169,8 @@ export function createShellStore(transport: EngineTransport): ShellStore {
   let initializePromise: Promise<void> | null = null;
   let pendingStartupGate: PendingStartupGate | null = null;
   let bootstrapGeneration = 0;
+  let audioRefreshInFlight = false;
+  let audioRefreshQueued = false;
 
   const setState = (nextState: ShellState) => {
     state = nextState;
@@ -290,6 +292,33 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     });
   };
 
+  const refreshAudioSnapshot = async (eventName: EventName) => {
+    if (audioRefreshInFlight) {
+      audioRefreshQueued = true;
+      return;
+    }
+
+    audioRefreshInFlight = true;
+    try {
+      const audioSnapshot = await transport
+        .request("audio.snapshot")
+        .then((value) => coerceSnapshot<AudioSnapshot>(value));
+      setState({
+        ...state,
+        lifecycle: "ready",
+        audioSnapshot,
+        lastEvent: eventName,
+        errorSummary: null,
+      });
+    } finally {
+      audioRefreshInFlight = false;
+      if (audioRefreshQueued) {
+        audioRefreshQueued = false;
+        void refreshAudioSnapshot(eventName);
+      }
+    }
+  };
+
   const handleTransportEvent = (event: EventEnvelope<EventName>) => {
     if (event.event === "engine.ready") {
       pendingStartupGate?.resolve(event.payload);
@@ -313,6 +342,11 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     }
 
     if (state.lifecycle === "ready") {
+      const payload = asRecord(event.payload);
+      if (event.event === "audio.changed" && payload?.reason === "metering-tick") {
+        void refreshAudioSnapshot(event.event);
+        return;
+      }
       void refreshDomain(event.event);
     }
   };

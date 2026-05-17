@@ -249,7 +249,7 @@ export function AudioSnapshotDeck({
                   )}
                 </span>
               </button>
-              <span className={styles.snapshotTileActions}>
+              <span className={styles.snapshotTileActions} data-testid={`audio-snapshot-actions-${snapshot.id}`}>
                 <button
                   disabled={!actionsAllowed || busyAction === `audio-snapshot-save-${snapshot.id}`}
                   onClick={() => onSaveSnapshot(snapshot.id)}

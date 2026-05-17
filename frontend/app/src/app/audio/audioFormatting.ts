@@ -13,6 +13,8 @@ export interface AudioStatusDescriptor {
 }
 
 const METER_DB_RANGE = 60;
+const METER_AMBER_DBFS = -12;
+const METER_RED_DBFS = -1;
 
 function clamp01(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -100,8 +102,8 @@ export function formatAudioTimestamp(value: string | number | null | undefined) 
 }
 
 export function meterTone(value: number, clip = false) {
-  if (clip || value >= 0.97) return "red";
-  if (value >= 0.78) return "amber";
+  if (clip || normalizedToDbfs(value) >= METER_RED_DBFS) return "red";
+  if (normalizedToDbfs(value) >= METER_AMBER_DBFS) return "amber";
   return "green";
 }
 

@@ -1,13 +1,9 @@
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
 import { ArrowRight, Mic, Play } from "lucide-react";
 
 import styles from "../AudioWorkspace.module.css";
-import {
-  selectedChannelSendLevel,
-  type AudioChannelGroupSelectionRequest,
-  type AudioWorkspaceViewModel,
-} from "../audioViewModel";
+import { type AudioChannelGroupSelectionRequest, type AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioChannelLane, AudioOutputLane } from "./AudioMixerLane";
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
@@ -32,34 +28,6 @@ function TierIcon({ tierId }: { tierId: string }) {
       <Icon size={18} strokeWidth={1.6} aria-hidden="true" />
     </span>
   ) : null;
-}
-
-function AudioRoutingOverlay({ viewModel }: { viewModel: AudioWorkspaceViewModel }) {
-  const channel = viewModel.selectedChannel;
-  const mixTarget = viewModel.selectedMixTarget;
-  if (!channel || !mixTarget || !viewModel.feedingChannelIds.includes(channel.id)) {
-    return null;
-  }
-
-  const sendLevel = selectedChannelSendLevel(channel, viewModel.selectedMixTargetId);
-  const sourceY = channel.role === "playback-pair" ? 55 : 22;
-  const outputY = 86;
-  const strength = Math.max(0.18, Math.min(1, sendLevel));
-
-  return (
-    <svg
-      className={styles.routingOverlay}
-      data-source-channel-id={channel.id}
-      data-target-mix-id={mixTarget.id}
-      data-testid="audio-routing-overlay"
-      style={{ "--routing-strength": strength.toFixed(3) } as CSSProperties}
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-    >
-      <path d={`M 12 ${sourceY} C 42 ${sourceY}, 58 ${outputY}, 88 ${outputY}`} />
-      <circle cx="88" cy={outputY} r="1.6" />
-    </svg>
-  );
 }
 
 export function AudioTieredMixer({
@@ -93,7 +61,6 @@ export function AudioTieredMixer({
 }) {
   return (
     <div className={styles.tieredMixer} data-testid="audio-tiered-mixer">
-      <AudioRoutingOverlay viewModel={viewModel} />
       {viewModel.sourceTiers.map((tier) => (
         <section className={styles.mixerTier} data-testid={tier.testId} data-tier={tier.id} key={tier.id}>
           <div
@@ -164,7 +131,6 @@ export function AudioTieredMixer({
                   setDraftValue={setDraftValue}
                   selected={channel.id === viewModel.selectedChannelId}
                   selectedMixTargetId={viewModel.selectedMixTargetId}
-                  simulatedMeters={viewModel.meterSimulationActive}
                 />
               ))
             ) : (
@@ -216,7 +182,6 @@ export function AudioTieredMixer({
               onUpdateMixTarget={onUpdateMixTarget}
               setDraftValue={setDraftValue}
               selected={mixTarget.id === viewModel.selectedMixTargetId}
-              simulatedMeters={viewModel.meterSimulationActive}
             />
           ))}
         </div>

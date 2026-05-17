@@ -15,6 +15,8 @@ export type AudioChannelSnapshot = {
   meterRight: number;
   meterLevel: number;
   peakHold: number;
+  peakHoldLeft: number;
+  peakHoldRight: number;
   clip: boolean;
   mixLevels: { [key in string]: number };
   mute: boolean;

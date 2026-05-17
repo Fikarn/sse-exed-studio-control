@@ -21,8 +21,10 @@
   --audio-talk: #74e3a3;
   --audio-meter-low: #36ce71;
   --audio-meter-low-hot: #6cf99d;
-  --audio-meter-warn: #ffd33d;
-  --audio-meter-hot: #ff9f1a;
+  --audio-meter-warn: #f4c443;
+  --audio-meter-hot: #f59f2a;
+  --audio-meter-peak-hold: #ffd35a;
+  --audio-meter-over: #ff3b30;
   --audio-meter-bg: #050608;
   --audio-group-talent: #d8c483;
   --audio-group-line: #b9b29a;
@@ -581,10 +583,30 @@
 }
 
 .mixTargetMiniMeter i {
+  --meter-level: 0%;
+  position: relative;
   display: block;
+  width: 100%;
   height: 4px;
+  overflow: hidden;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--target-accent), var(--audio-hot));
+  background: var(--audio-meter-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-border) 72%, transparent);
+}
+
+.mixTargetMiniMeter i::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--audio-meter-low) 0 78%,
+    var(--audio-meter-warn) 78% 92%,
+    var(--audio-meter-hot) 92% 100%
+  );
+  clip-path: inset(0 calc(100% - var(--meter-level)) 0 0);
+  transition: clip-path 120ms cubic-bezier(0.2, 0, 0.1, 1);
+  will-change: clip-path;
 }
 
 .mixTargetFlags span,
@@ -944,35 +966,30 @@
 
 .canvasActiveMixMeter i {
   --meter-level: 0%;
+  position: relative;
   display: block;
   height: 6px;
   overflow: hidden;
   border-radius: 1px;
-  background:
-    linear-gradient(
-        90deg,
-        var(--audio-meter-low) 0,
-        var(--audio-meter-low-hot) 54%,
-        var(--audio-meter-warn) 78%,
-        var(--audio-meter-hot) 92%,
-        var(--audio-clip) 100%
-      )
-      0 / var(--meter-level) 100% no-repeat,
-    var(--audio-meter-bg);
+  background: var(--audio-meter-bg);
   box-shadow: inset 0 0 0 1px var(--audio-border);
 }
 
-.canvasActiveMixMeter[data-simulated-meter="true"] i,
-.mixTargetMiniMeter[data-simulated-meter="true"] i {
-  transform-origin: left center;
-  animation: audioMeterHorizontal 1180ms ease-in-out infinite;
-  will-change: transform, filter;
-}
-
-.canvasActiveMixMeter[data-simulated-meter="true"] i:nth-of-type(2),
-.mixTargetMiniMeter[data-simulated-meter="true"] i:nth-of-type(2) {
-  animation-delay: -360ms;
-  animation-duration: 1340ms;
+.canvasActiveMixMeter i::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--audio-meter-low) 0,
+    var(--audio-meter-low-hot) 78%,
+    var(--audio-meter-warn) 78%,
+    var(--audio-meter-hot) 92%,
+    var(--audio-meter-over) 100%
+  );
+  clip-path: inset(0 calc(100% - var(--meter-level)) 0 0);
+  transition: clip-path 120ms cubic-bezier(0.2, 0, 0.1, 1);
+  will-change: clip-path;
 }
 
 .canvasWarningStack {
@@ -1147,33 +1164,6 @@
   gap: 8px;
   min-height: 0;
   padding: 8px;
-}
-
-.routingOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.routingOverlay path {
-  fill: none;
-  stroke: var(--audio-accent);
-  stroke-width: calc(1.2px + var(--routing-strength, 0.3) * 1.4px);
-  stroke-linecap: round;
-  stroke-dasharray: 4 8;
-  opacity: calc(0.28 + var(--routing-strength, 0.3) * 0.44);
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--audio-accent) 42%, transparent));
-  animation: audioRouteShimmer 1100ms linear infinite;
-}
-
-.routingOverlay circle {
-  fill: var(--audio-accent);
-  opacity: calc(0.34 + var(--routing-strength, 0.3) * 0.5);
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--audio-accent) 54%, transparent));
 }
 
 .mixerTier {
@@ -1651,51 +1641,67 @@
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.58);
 }
 
+.meterTrack[data-tone="amber"] {
+  border-color: color-mix(in srgb, var(--audio-meter-warn) 28%, var(--audio-border));
+}
+
+.meterTrack[data-tone="red"] {
+  border-color: color-mix(in srgb, var(--audio-meter-over) 62%, var(--audio-border));
+}
+
 .meterFill {
   position: absolute;
   right: 2px;
+  top: 2px;
   bottom: 2px;
   left: 2px;
-  min-height: 2px;
   border-radius: 1px;
   background: linear-gradient(
     180deg,
-    var(--audio-hot) 0 12%,
-    var(--audio-meter-warn) 12% 26%,
-    var(--audio-meter-low-hot) 26% 100%
+    var(--audio-meter-hot) 0 10%,
+    var(--audio-meter-warn) 10% 20%,
+    var(--audio-meter-low-hot) 20% 100%
+  );
+  transition: clip-path 120ms cubic-bezier(0.2, 0, 0.1, 1);
+  will-change: clip-path;
+}
+
+.meterTrack[data-tone="red"] .meterFill {
+  background: linear-gradient(
+    180deg,
+    var(--audio-meter-over) 0 3%,
+    var(--audio-meter-hot) 3% 12%,
+    var(--audio-meter-warn) 12% 22%,
+    var(--audio-meter-low-hot) 22% 100%
   );
 }
 
 .meterFill[data-side="left"] {
-  height: var(--audio-meter-left);
+  clip-path: inset(calc(100% - var(--audio-meter-left)) 0 0 0);
 }
 
 .meterFill[data-side="right"] {
-  height: var(--audio-meter-right);
-}
-
-.stereoMeter[data-simulated-meter="true"] .meterFill {
-  transform-origin: center bottom;
-  will-change: transform, filter;
-}
-
-.stereoMeter[data-simulated-meter="true"] .meterFill[data-side="left"] {
-  animation: audioMeterVerticalLeft var(--audio-meter-sim-duration, 1100ms) ease-in-out
-    var(--audio-meter-sim-delay, 0ms) infinite;
-}
-
-.stereoMeter[data-simulated-meter="true"] .meterFill[data-side="right"] {
-  animation: audioMeterVerticalRight var(--audio-meter-sim-duration, 1100ms) ease-in-out
-    calc(var(--audio-meter-sim-delay, 0ms) - 180ms) infinite;
+  clip-path: inset(calc(100% - var(--audio-meter-right)) 0 0 0);
 }
 
 .meterPeak {
   position: absolute;
   right: 1px;
-  bottom: var(--audio-meter-peak);
   left: 1px;
   height: 2px;
-  background: color-mix(in srgb, white 84%, transparent);
+  background: var(--audio-meter-peak-hold);
+  background-color: var(--audio-meter-peak-hold);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--audio-meter-peak-hold) 20%, transparent),
+    0 0 7px color-mix(in srgb, var(--audio-meter-peak-hold) 28%, transparent);
+}
+
+.meterPeak[data-side="left"] {
+  bottom: var(--audio-meter-peak-left);
+}
+
+.meterPeak[data-side="right"] {
+  bottom: var(--audio-meter-peak-right);
 }
 
 .stereoMeter[data-clip="true"] .meterTrack {
@@ -2384,13 +2390,17 @@
   z-index: 2;
   display: flex;
   gap: 3px;
+  visibility: hidden;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 120ms ease;
 }
 
 .snapshotTile:hover .snapshotTileActions,
 .snapshotTile:focus-within .snapshotTileActions {
+  visibility: visible;
   opacity: 1;
+  pointer-events: auto;
 }
 
 .snapshotTileActions button {
@@ -2669,24 +2679,21 @@
 }
 
 .bigMeter i {
+  --audio-meter-level: 0%;
   position: absolute;
   right: 1px;
+  top: 1px;
   bottom: 1px;
   left: 1px;
-  min-height: 2px;
-  background: linear-gradient(180deg, var(--audio-meter-warn), var(--audio-meter-low-hot));
-}
-
-.bigMeterCard[data-simulated-meter="true"] .bigMeter i {
-  transform-origin: center bottom;
-  animation: audioMeterVerticalLeft 1120ms ease-in-out infinite;
-  will-change: transform, filter;
-}
-
-.bigMeterCard[data-simulated-meter="true"] .bigMeter span:nth-child(2) i {
-  animation-name: audioMeterVerticalRight;
-  animation-delay: -220ms;
-  animation-duration: 1280ms;
+  background: linear-gradient(
+    180deg,
+    var(--audio-meter-hot) 0 10%,
+    var(--audio-meter-warn) 10% 20%,
+    var(--audio-meter-low-hot) 20% 100%
+  );
+  clip-path: inset(calc(100% - var(--audio-meter-level)) 0 0 0);
+  transition: clip-path 120ms cubic-bezier(0.2, 0, 0.1, 1);
+  will-change: clip-path;
 }
 
 .bigMeter b {
@@ -2694,7 +2701,11 @@
   right: 1px;
   left: 1px;
   height: 2px;
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--audio-meter-peak-hold);
+  background-color: var(--audio-meter-peak-hold);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--audio-meter-peak-hold) 20%, transparent),
+    0 0 7px color-mix(in srgb, var(--audio-meter-peak-hold) 28%, transparent);
 }
 
 .bigMeterInfo {
@@ -3653,82 +3664,6 @@ button.inspectorMiniCard {
 
   100% {
     box-shadow: 0 0 0 14px transparent;
-  }
-}
-
-@keyframes audioMeterVerticalLeft {
-  0% {
-    filter: brightness(0.9);
-    transform: scaleY(0.72);
-  }
-
-  38% {
-    filter: brightness(1.12);
-    transform: scaleY(1.08);
-  }
-
-  70% {
-    filter: brightness(0.98);
-    transform: scaleY(0.86);
-  }
-
-  100% {
-    filter: brightness(1.06);
-    transform: scaleY(0.96);
-  }
-}
-
-@keyframes audioMeterVerticalRight {
-  0% {
-    filter: brightness(0.95);
-    transform: scaleY(0.82);
-  }
-
-  45% {
-    filter: brightness(1.1);
-    transform: scaleY(1.03);
-  }
-
-  76% {
-    filter: brightness(0.92);
-    transform: scaleY(0.74);
-  }
-
-  100% {
-    filter: brightness(1.08);
-    transform: scaleY(0.94);
-  }
-}
-
-@keyframes audioMeterHorizontal {
-  0% {
-    filter: brightness(0.94);
-    transform: scaleX(0.76);
-  }
-
-  42% {
-    filter: brightness(1.13);
-    transform: scaleX(1.04);
-  }
-
-  74% {
-    filter: brightness(0.97);
-    transform: scaleX(0.84);
-  }
-
-  100% {
-    filter: brightness(1.06);
-    transform: scaleX(0.98);
-  }
-}
-
-@keyframes audioRouteShimmer {
-  from {
-    stroke-dashoffset: 0;
-  }
-
-  to {
-    stroke-dashoffset: -24;
   }
 }
 

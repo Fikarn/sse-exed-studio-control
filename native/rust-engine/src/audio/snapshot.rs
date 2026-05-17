@@ -40,7 +40,8 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
     let last_action_code = read_optional_setting(settings, AUDIO_LAST_ACTION_CODE_KEY);
     let last_action_message = read_optional_setting(settings, AUDIO_LAST_ACTION_MESSAGE_KEY);
     let channels = apply_channel_state(settings, inventory.channels);
-    let mix_targets = apply_mix_target_state(settings, inventory.mix_targets);
+    let mut mix_targets = apply_mix_target_state(settings, inventory.mix_targets);
+    apply_mix_target_metering(&channels, &mut mix_targets);
     let selected_channel_id = audio_selected_channel_id(settings, &channels);
     let selected_mix_target_id = audio_selected_mix_target_id(settings, &mix_targets);
     let expected_peak_data = audio_expected_peak_data(settings);
@@ -122,6 +123,101 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
         channels,
         mix_targets,
         snapshots,
+    }
+}
+
+fn apply_mix_target_metering(
+    channels: &[AudioChannelSnapshot],
+    mix_targets: &mut [AudioMixTargetSnapshot],
+) {
+    for mix_target in mix_targets {
+        if mix_target.mute {
+            mix_target.meter_left = 0.0;
+            mix_target.meter_right = 0.0;
+            mix_target.meter_level = 0.0;
+            mix_target.peak_hold = 0.0;
+            mix_target.peak_hold_left = 0.0;
+            mix_target.peak_hold_right = 0.0;
+            continue;
+        }
+
+        let mut left_energy = 0.0_f64;
+        let mut right_energy = 0.0_f64;
+        let mut peak_left_energy = 0.0_f64;
+        let mut peak_right_energy = 0.0_f64;
+        for channel in channels {
+            if channel.mute {
+                continue;
+            }
+
+            let send_mode = channel.send_modes.get(&mix_target.id);
+            if send_mode.is_some_and(|mode| mode.mute) {
+                continue;
+            }
+
+            let send_level = channel
+                .mix_levels
+                .get(&mix_target.id)
+                .copied()
+                .unwrap_or(channel.fader)
+                .clamp(0.0, 1.0);
+            if send_level <= 0.01 {
+                continue;
+            }
+
+            let source_left = if channel.stereo {
+                channel.meter_left
+            } else {
+                channel.meter_level
+            };
+            let source_right = if channel.stereo {
+                channel.meter_right
+            } else {
+                channel.meter_level
+            };
+            let source_peak_left = if channel.stereo {
+                channel.peak_hold_left
+            } else {
+                channel.peak_hold_left.max(channel.peak_hold)
+            };
+            let source_peak_right = if channel.stereo {
+                channel.peak_hold_right
+            } else {
+                channel.peak_hold_right.max(channel.peak_hold)
+            };
+            let dim_scale = if mix_target.dim { 0.42 } else { 1.0 };
+            let gain = (send_level * mix_target.volume * dim_scale * 0.5).clamp(0.0, 1.0);
+            left_energy += (source_left * gain).powi(2);
+            right_energy += (source_right * gain).powi(2);
+            peak_left_energy += (source_peak_left * gain).powi(2);
+            peak_right_energy += (source_peak_right * gain).powi(2);
+        }
+
+        let mut meter_left = left_energy.sqrt().clamp(0.0, 0.98);
+        let mut meter_right = right_energy.sqrt().clamp(0.0, 0.98);
+        let mut peak_hold_left = (peak_left_energy.sqrt() * 0.98)
+            .max(meter_left)
+            .clamp(meter_left, 1.0);
+        let mut peak_hold_right = (peak_right_energy.sqrt() * 0.98)
+            .max(meter_right)
+            .clamp(meter_right, 1.0);
+        if mix_target.mono {
+            let mono = ((meter_left + meter_right) * 0.5).clamp(0.0, 0.98);
+            meter_left = mono;
+            meter_right = mono;
+            let mono_peak = peak_hold_left.max(peak_hold_right).max(mono);
+            peak_hold_left = mono_peak;
+            peak_hold_right = mono_peak;
+        }
+        let meter_level = meter_left.max(meter_right);
+        let peak_hold = peak_hold_left.max(peak_hold_right).max(meter_level);
+
+        mix_target.meter_left = meter_left;
+        mix_target.meter_right = meter_right;
+        mix_target.meter_level = meter_level;
+        mix_target.peak_hold = peak_hold;
+        mix_target.peak_hold_left = peak_hold_left;
+        mix_target.peak_hold_right = peak_hold_right;
     }
 }
 

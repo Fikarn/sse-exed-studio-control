@@ -1,11 +1,47 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { AudioSnapshot } from "@sse/engine-client";
+import { readFileSync } from "node:fs";
 
 import { faderDbToNormalized, formatAudioDb, normalizedToFaderDb } from "../src/app/audio/audioFormatting";
+import { buildAudioPaletteRegistrationSignature, buildAudioViewModel } from "../src/app/audio/audioViewModel";
+import {
+  calculateNextFixturePeakHold,
+  createFixtureTransport,
+} from "../../packages/engine-client/src/transports/fixtureTransport";
 
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
+const EMPTY_AUDIO_GROUP_SELECTIONS = {
+  "hardware-inputs": [],
+  "software-playback": [],
+};
+const fixtureMap = JSON.parse(
+  readFileSync(new URL("../../packages/test-fixtures/src/fixtures.json", import.meta.url), "utf-8")
+) as Record<string, { audioSnapshot?: AudioSnapshot }>;
 
 function modifierShortcut(key: string) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+${key}`;
+}
+
+function cloneValue<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function buildAudioTestViewModel(audioSnapshot: AudioSnapshot) {
+  return buildAudioViewModel({
+    activeChannelGroups: EMPTY_AUDIO_GROUP_SELECTIONS,
+    appSnapshot: null,
+    audioSnapshot,
+    bankIndex: 0,
+    density: "desktop",
+  });
+}
+
+function audioPaletteSignatureForSnapshot(audioSnapshot: AudioSnapshot) {
+  const viewModel = buildAudioTestViewModel(audioSnapshot);
+  return buildAudioPaletteRegistrationSignature(viewModel, [
+    ...viewModel.hardwareInputs.channels,
+    ...viewModel.softwarePlayback.channels,
+  ]);
 }
 
 async function openFixture(page: Page, fixtureId: string) {
@@ -81,9 +117,9 @@ async function readSnapshotThumbHeights(page: Page, snapshotId: string) {
 }
 
 async function saveAudioSnapshot(page: Page, snapshotId: string) {
-  const saveButton = page
-    .getByTestId(`audio-snapshot-${snapshotId}`)
-    .getByRole("button", { exact: true, name: "Save" });
+  const snapshotTile = page.getByTestId(`audio-snapshot-${snapshotId}`);
+  await snapshotTile.hover();
+  const saveButton = snapshotTile.getByRole("button", { exact: true, name: "Save" });
   await expect(saveButton).toBeEnabled();
   await saveButton.click();
 }
@@ -235,12 +271,16 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-health-bar")).toBeVisible();
   await expectAudioWorkspaceGeometry(page);
   await expect(page.getByTestId("audio-master-halo")).toBeVisible();
-  await expect(page.getByTestId("audio-routing-overlay")).toBeVisible();
+  await expect(page.getByTestId("audio-routing-overlay")).toHaveCount(0);
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Endpoint");
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Metering");
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Clock");
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Palette");
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank");
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Command palette");
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Shortcuts");
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank prev");
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank next");
+  await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Shift 1-8 recall");
+  await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Esc clear");
   await expect(page.getByTestId("audio-rail-monitor-card")).toBeVisible();
   await expect(page.getByTestId("audio-rail-tools")).toContainText("Sync");
   await expect(page.getByTestId("audio-solo-warning-band")).toContainText("Solo engaged");
@@ -254,7 +294,10 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await page.getByRole("button", { name: "Clear all solo" }).click();
   await expect(page.getByTestId("audio-solo-warning-band")).toHaveCount(0);
   await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toBeVisible();
+  await expect(page.getByTestId("audio-tier-chip-inputs-line")).toHaveCount(0);
+  await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveCount(0);
   await expect(page.getByTestId("audio-tier-chip-playback-bed")).toBeVisible();
+  await expect(page.getByTestId("audio-tier-chip-playback-remote")).toHaveCount(0);
   await expect(page.getByTestId("audio-snapshot-capture")).toBeEnabled();
   await expect(page.locator("[data-snapshot-slot]")).toHaveCount(8);
   await expect(page.getByTestId("audio-snapshot-empty-6")).toContainText("Empty");
@@ -397,25 +440,173 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Test meter simulation");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST STAGE");
 
-  const stripFill = page
-    .getByTestId("audio-strip-audio-playback-3-4")
-    .locator('[data-simulated-meter="true"] [data-meter-fill="left"]')
-    .first();
+  const hostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
+  await expect(hostMeter).toHaveCount(1);
+  const stripFill = hostMeter.locator('[data-meter-fill="left"]').first();
   await expect(stripFill).toBeVisible();
-  await expect.poll(() => stripFill.evaluate((node) => getComputedStyle(node).animationName)).toContain("audioMeter");
+  expect(await stripFill.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
+  expect(await stripFill.evaluate((node) => getComputedStyle(node).transitionDuration)).not.toBe("0s");
+  expect(await stripFill.evaluate((node) => getComputedStyle(node).clipPath)).toContain("inset");
+  const firstHostMeterVars = await hostMeter.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      left: style.getPropertyValue("--audio-meter-left").trim(),
+      right: style.getPropertyValue("--audio-meter-right").trim(),
+      peakLeft: style.getPropertyValue("--audio-meter-peak-left").trim(),
+      peakRight: style.getPropertyValue("--audio-meter-peak-right").trim(),
+    };
+  });
+  expect(firstHostMeterVars.right).toBe(firstHostMeterVars.left);
+  expect(firstHostMeterVars.peakRight).toBe(firstHostMeterVars.peakLeft);
+  const stripPeak = hostMeter.locator('[data-meter-peak="left"]').first();
+  await expect(stripPeak).toBeVisible();
+  expect(await stripPeak.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
+  expect(await stripPeak.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe("0s");
+  const stripPeakColor = await stripPeak.evaluate((node) => getComputedStyle(node).backgroundColor);
+  expect(stripPeakColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(stripPeakColor).not.toContain("255, 255, 255");
+  const hostPeakVars = await hostMeter.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      left: style.getPropertyValue("--audio-meter-peak-left").trim(),
+      right: style.getPropertyValue("--audio-meter-peak-right").trim(),
+    };
+  });
+  expect(hostPeakVars.left).not.toBe("");
+  expect(hostPeakVars.right).not.toBe("");
+  expect(hostPeakVars.right).toBe(hostPeakVars.left);
 
+  const inspectorPeak = page.getByTestId("audio-inspector-metering").locator('[data-meter-peak="left"]').first();
+  await expect(inspectorPeak).toBeVisible();
+  expect(await inspectorPeak.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
+  expect(await inspectorPeak.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe("0s");
+
+  await expect(page.getByTestId("audio-strip-audio-input-10").locator('[data-meter-component="stereo"]')).toHaveCount(
+    1
+  );
+  await expect(page.getByTestId("audio-strip-audio-input-11").locator('[data-meter-component="stereo"]')).toHaveCount(
+    1
+  );
+  await expect(page.getByTestId("audio-strip-audio-input-12").locator('[data-meter-component="stereo"]')).toHaveCount(
+    1
+  );
+  const speechLevels: number[] = [];
+  for (const testId of [
+    "audio-strip-audio-input-9",
+    "audio-strip-audio-input-10",
+    "audio-strip-audio-input-11",
+    "audio-strip-audio-input-12",
+  ]) {
+    const seededLevel = await page
+      .getByTestId(testId)
+      .locator('[data-meter-component="stereo"]')
+      .evaluate((node) => Number.parseFloat(getComputedStyle(node).getPropertyValue("--audio-meter-left")));
+    expect(seededLevel).toBeGreaterThanOrEqual(20);
+    expect(seededLevel).toBeLessThanOrEqual(96);
+    speechLevels.push(seededLevel);
+  }
+  expect(new Set(speechLevels.map((value) => Math.round(value))).size).toBeGreaterThan(1);
+
+  const programPlaybackMeter = page
+    .getByTestId("audio-strip-audio-playback-1-2")
+    .locator('[data-meter-component="stereo"]');
+  await expect(programPlaybackMeter).toHaveCount(1);
   const activeMixFill = page.getByTestId("audio-active-mix-meter").locator("i").first();
-  await expect
-    .poll(() => activeMixFill.evaluate((node) => getComputedStyle(node).animationName))
-    .toContain("audioMeter");
+  expect(await activeMixFill.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
+  const firstActiveMixLevel = await activeMixFill.evaluate((node) =>
+    getComputedStyle(node).getPropertyValue("--meter-level")
+  );
+  await page.waitForTimeout(900);
+  const nextHostMeterVars = await hostMeter.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      left: style.getPropertyValue("--audio-meter-left").trim(),
+      peakLeft: style.getPropertyValue("--audio-meter-peak-left").trim(),
+    };
+  });
+  const nextActiveMixLevel = await activeMixFill.evaluate((node) =>
+    getComputedStyle(node).getPropertyValue("--meter-level")
+  );
+  expect([nextHostMeterVars.left, nextHostMeterVars.peakLeft]).not.toEqual([
+    firstHostMeterVars.left,
+    firstHostMeterVars.peakLeft,
+  ]);
+  expect(nextActiveMixLevel).not.toBe(firstActiveMixLevel);
 
   await openFixture(page, "audio-hardware-metering");
   await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveCount(0);
   await expect(page.getByTestId("audio-rail-monitor-card")).toContainText("Active mix · live");
   await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Test meter simulation");
-  await expect(page.getByTestId("audio-strip-audio-playback-3-4").locator('[data-simulated-meter="true"]')).toHaveCount(
-    0
+  await expect(page.locator("[data-simulated-meter]")).toHaveCount(0);
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4").locator("[data-simulation-profile]")).toHaveCount(0);
+});
+
+test("holds fixture peak markers until the hold window expires", () => {
+  const first = calculateNextFixturePeakHold({
+    body: 0.36,
+    deltaSeconds: 0.083,
+    elapsedMs: 1_000,
+    holdUntilMs: 0,
+    previousPeak: 0.4,
+    raw: 0.68,
+  });
+  expect(first.peakHold).toBe(0.68);
+  expect(first.holdUntilMs).toBe(2_500);
+
+  const smallerTransientDuringHold = calculateNextFixturePeakHold({
+    body: 0.38,
+    deltaSeconds: 0.25,
+    elapsedMs: 1_250,
+    holdUntilMs: first.holdUntilMs,
+    previousPeak: first.peakHold,
+    raw: 0.46,
+  });
+  expect(smallerTransientDuringHold.peakHold).toBe(first.peakHold);
+  expect(smallerTransientDuringHold.holdUntilMs).toBe(first.holdUntilMs);
+
+  const decayedAfterHold = calculateNextFixturePeakHold({
+    body: 0.39,
+    deltaSeconds: 0.5,
+    elapsedMs: 2_800,
+    holdUntilMs: first.holdUntilMs,
+    previousPeak: smallerTransientDuringHold.peakHold,
+    raw: 0.42,
+  });
+  expect(decayedAfterHold.peakHold).toBeLessThan(smallerTransientDuringHold.peakHold);
+  expect(decayedAfterHold.peakHold).toBeGreaterThanOrEqual(0.39);
+});
+
+test("keeps audio command palette registration stable during metering ticks", async () => {
+  const transport = createFixtureTransport({ ...fixtureMap["audio-populated"], audioMeteringActive: true });
+  const baseline = (await transport.request("audio.snapshot")) as AudioSnapshot;
+  const meteringTick = cloneValue(baseline);
+  meteringTick.channels = meteringTick.channels.map((channel, index) => ({
+    ...channel,
+    meterLeft: Math.min(0.98, channel.meterLeft + 0.03 + index * 0.001),
+    meterLevel: Math.min(0.98, channel.meterLevel + 0.02),
+    meterRight: Math.min(0.98, channel.meterRight + 0.025 + index * 0.001),
+    peakHold: Math.min(1, channel.peakHold + 0.04),
+    peakHoldLeft: Math.min(1, channel.peakHoldLeft + 0.04),
+    peakHoldRight: Math.min(1, channel.peakHoldRight + 0.04),
+  }));
+  meteringTick.mixTargets = meteringTick.mixTargets.map((mixTarget) => ({
+    ...mixTarget,
+    meterLeft: Math.min(0.98, mixTarget.meterLeft + 0.02),
+    meterLevel: Math.min(0.98, mixTarget.meterLevel + 0.02),
+    meterRight: Math.min(0.98, mixTarget.meterRight + 0.02),
+    peakHold: Math.min(1, mixTarget.peakHold + 0.04),
+    peakHoldLeft: Math.min(1, mixTarget.peakHoldLeft + 0.04),
+    peakHoldRight: Math.min(1, mixTarget.peakHoldRight + 0.04),
+  }));
+
+  expect(audioPaletteSignatureForSnapshot(meteringTick)).toBe(audioPaletteSignatureForSnapshot(baseline));
+
+  const muteChange = cloneValue(baseline);
+  muteChange.channels = muteChange.channels.map((channel) =>
+    channel.id === "audio-input-9" ? { ...channel, mute: !channel.mute } : channel
   );
+  expect(audioPaletteSignatureForSnapshot(muteChange)).not.toBe(audioPaletteSignatureForSnapshot(baseline));
+  await transport.dispose();
 });
 
 test("supports audio warning-band sync and keyboard mix-target changes", async ({ page }) => {
@@ -447,17 +638,8 @@ test("supports audio group filtering and source/output selection flow", async ({
   await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toHaveAttribute("data-active", "false");
   await expect(page.getByTestId("audio-strip-audio-input-9")).toBeVisible();
 
-  await page.getByTestId("audio-tier-chip-inputs-line").click();
-  await page.getByTestId("audio-tier-chip-inputs-remote").click({ modifiers: ["Shift"] });
-  await expect(page.getByTestId("audio-tier-chip-inputs-line")).toHaveAttribute("data-active", "true");
-  await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveAttribute("data-active", "true");
-  await expect(page.getByTestId("audio-strip-audio-input-1")).toBeVisible();
-  await expect(page.getByTestId("audio-strip-audio-input-3")).toBeVisible();
-
-  await page.getByTestId("audio-tier-chip-inputs-line").click({ modifiers: ["Alt"] });
-  await expect(page.getByTestId("audio-tier-chip-inputs-line")).toHaveAttribute("data-active", "false");
-  await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveAttribute("data-active", "false");
-  await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-tier-chip-inputs-line")).toHaveCount(0);
+  await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveCount(0);
 
   await page.getByTestId("audio-tier-chip-playback-fx").click();
   await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "true");
@@ -576,14 +758,20 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
       message: "saved snapshot thumbnail should reflect the changed mix",
     })
     .not.toEqual(savedThumbBefore);
+  await page.mouse.move(1, 1);
+  const snapshotActions = currentSnapshot.getByTestId("audio-snapshot-actions-snapshot-show-open");
+  await expect(snapshotActions).toBeHidden();
   await currentSnapshot.hover();
+  await expect(snapshotActions).toBeVisible();
   await expect(currentSnapshot.getByText("18 sources saved")).toBeVisible();
 
   page.once("dialog", (dialog) => dialog.accept("Renamed snapshot"));
+  await capturedSlot.hover();
   await capturedSlot.getByRole("button", { name: "Rename" }).click();
   await expect(capturedSlot).toContainText("Renamed snapshot");
 
   page.once("dialog", (dialog) => dialog.accept());
+  await capturedSlot.hover();
   await capturedSlot.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByTestId("audio-snapshot-empty-6")).toContainText("Empty");
 });

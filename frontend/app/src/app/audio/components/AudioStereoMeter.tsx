@@ -9,58 +9,63 @@ function formatPeakReadout(value: number) {
   return db.toFixed(1);
 }
 
+function meterPercent(value: number) {
+  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
+}
+
 export function AudioStereoMeter({
   clip,
   left,
   peak,
+  peakLeft,
+  peakRight,
   right,
-  simulated = false,
-  simulationIndex = 0,
   showPeakReadout = false,
   showReadout = true,
   showScale = false,
 }: {
   clip?: boolean;
   left: number;
-  peak: number;
+  peak?: number;
+  peakLeft?: number;
+  peakRight?: number;
   right: number;
-  simulated?: boolean;
-  simulationIndex?: number;
   showPeakReadout?: boolean;
   showReadout?: boolean;
   showScale?: boolean;
 }) {
+  const leftPeak = peakLeft ?? peak ?? Math.max(left, right);
+  const rightPeak = peakRight ?? peak ?? Math.max(left, right);
   const style = {
-    "--audio-meter-left": `${Math.round(Math.max(0, Math.min(1, left)) * 100)}%`,
-    "--audio-meter-right": `${Math.round(Math.max(0, Math.min(1, right)) * 100)}%`,
-    "--audio-meter-peak": `${Math.round(Math.max(0, Math.min(1, peak)) * 100)}%`,
-    "--audio-meter-sim-duration": `${980 + (simulationIndex % 5) * 130}ms`,
-    "--audio-meter-sim-delay": `${(simulationIndex % 7) * -110}ms`,
+    "--audio-meter-left": meterPercent(left),
+    "--audio-meter-right": meterPercent(right),
+    "--audio-meter-peak-left": meterPercent(leftPeak),
+    "--audio-meter-peak-right": meterPercent(rightPeak),
   } as CSSProperties;
 
   return (
     <div
       className={styles.stereoMeter}
       data-clip={clip === true}
+      data-meter-component="stereo"
       data-peak-readout={showPeakReadout}
       data-readout={showReadout}
-      data-simulated-meter={simulated}
       style={style}
     >
       {showPeakReadout ? (
         <div className={styles.meterPeakReadout} aria-hidden="true">
-          <span>{formatPeakReadout(left)}</span>
-          <span>{formatPeakReadout(right)}</span>
+          <span>{formatPeakReadout(leftPeak)}</span>
+          <span>{formatPeakReadout(rightPeak)}</span>
         </div>
       ) : null}
       <div className={styles.meterPair}>
         <span className={styles.meterTrack} data-tone={meterTone(left, clip)}>
           <span className={styles.meterFill} data-meter-fill="left" data-side="left" />
-          <span className={styles.meterPeak} />
+          <span className={styles.meterPeak} data-meter-peak="left" data-side="left" />
         </span>
         <span className={styles.meterTrack} data-tone={meterTone(right, clip)}>
           <span className={styles.meterFill} data-meter-fill="right" data-side="right" />
-          <span className={styles.meterPeak} />
+          <span className={styles.meterPeak} data-meter-peak="right" data-side="right" />
         </span>
       </div>
       {showScale ? (
