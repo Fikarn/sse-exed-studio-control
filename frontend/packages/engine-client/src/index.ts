@@ -1,4 +1,6 @@
 export { createShellStore, useShellSnapshot } from "./store/createShellStore";
+export { createMeterStore, useChannelMeterSample, useMixTargetMeterSample } from "./store/createMeterStore";
+export type { MeterSample, MeterStore, MeterStoreState } from "./store/createMeterStore";
 export { createFixtureTransport } from "./transports/fixtureTransport";
 export { createTauriTransport } from "./transports/tauriTransport";
 export type {

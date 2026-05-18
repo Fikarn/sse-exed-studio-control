@@ -327,6 +327,7 @@ export interface ShellState {
 }
 
 export interface ShellStore {
+  meterStore: import("./store/createMeterStore").MeterStore;
   initialize(): Promise<void>;
   getSnapshot(): ShellState;
   refresh(): Promise<void>;

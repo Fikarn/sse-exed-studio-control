@@ -19,9 +19,10 @@ mod storage;
 mod support;
 
 use crate::app::EngineApp;
+use crate::audio_backend::build_simulated_audio_meters_payload;
 use crate::bootstrap::{resolve_runtime_paths, validate_protocol_version};
 use crate::protocol::{
-    event_message, RequestEnvelope, EVENT_AUDIO_CHANGED, EVENT_ENGINE_STARTUP_FAILED,
+    event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -58,13 +59,8 @@ fn send_output(sender: &Sender<Value>, message: Value) -> io::Result<()> {
 
 fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>) {
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(83));
-        let event = event_message(
-            EVENT_AUDIO_CHANGED,
-            json!({
-                "reason": "metering-tick",
-            }),
-        );
+        thread::sleep(Duration::from_millis(33));
+        let event = event_message(EVENT_AUDIO_METERS, build_simulated_audio_meters_payload());
         if sender.send(event).is_err() {
             break;
         }
