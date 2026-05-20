@@ -1,7 +1,7 @@
 import { useEffect, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioSignalCanvas.module.css";
 import type { AudioArmedAction } from "../audioArming";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import type { AudioChannelGroupSelectionRequest, AudioWorkspaceViewModel } from "../audioViewModel";
