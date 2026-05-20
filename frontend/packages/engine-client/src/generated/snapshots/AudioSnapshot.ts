@@ -14,6 +14,7 @@ export type AudioSnapshot = {
   oscEnabled: boolean;
   connected: boolean;
   verified: boolean;
+  meteringSource: string;
   meteringState: string;
   selectedChannelId: string | null;
   selectedMixTargetId: string;

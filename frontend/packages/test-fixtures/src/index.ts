@@ -148,6 +148,8 @@ function buildAudioHardwareMeteringFixture(): FixtureScenarioRecord {
   scenario.audioSnapshot = {
     ...scenario.audioSnapshot,
     adapterMode: "totalmix",
+    meteringSource: "rme-totalmix-osc",
+    meteringState: "live",
   };
   return scenario;
 }
@@ -167,6 +169,10 @@ const derivedFixtureMap: FixtureMap = {
   ...fixtureMap,
   "audio-populated": {
     ...cloneFixture(fixtureMap["audio-populated"]),
+    audioMeteringActive: true,
+  } as FixtureScenarioRecord,
+  "audio-selected-channel": {
+    ...cloneFixture(fixtureMap["audio-selected-channel"]),
     audioMeteringActive: true,
   } as FixtureScenarioRecord,
   "audio-clipped": buildAudioClippedFixture(),

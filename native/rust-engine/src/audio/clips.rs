@@ -75,6 +75,7 @@ pub fn clear_audio_clips(
             (String::from(AUDIO_LAST_ACTION_MESSAGE_KEY), summary.clone()),
         ],
     )?;
+    crate::rme_totalmix_osc::clear_shared_clip_latches(request.channel_id.as_deref());
 
     Ok(AudioClipClearResult {
         cleared: true,

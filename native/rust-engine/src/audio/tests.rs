@@ -59,6 +59,10 @@ fn audio_snapshot_reports_ready_when_probe_passed() {
             String::from("passed"),
         ),
         (String::from(AUDIO_SEND_HOST_KEY), String::from("127.0.0.1")),
+        (
+            String::from(AUDIO_METERING_SOURCE_KEY),
+            String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+        ),
     ]);
 
     let snapshot = read_audio_snapshot(&settings);
@@ -71,6 +75,119 @@ fn audio_snapshot_reports_ready_when_probe_passed() {
 }
 
 #[test]
+fn default_audio_eq_uses_totalmix_low_cut_and_three_peq_bands() {
+    let eq = default_audio_eq_snapshot();
+    assert!(!eq.low_cut.enabled);
+    assert_eq!(eq.low_cut.frequency_hz, 80.0);
+    assert_eq!(eq.low_cut.slope_db_per_octave, 12);
+    assert_eq!(
+        eq.bands
+            .iter()
+            .map(|band| band.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["1", "2", "3"]
+    );
+    assert!(eq.bands.iter().all(|band| band.enabled));
+    assert_eq!(eq.bands[2].band_type, "high-shelf");
+    assert_eq!(eq.hardware_status, "local");
+}
+
+#[test]
+fn audio_eq_parser_enforces_totalmix_ranges_and_band_ids() {
+    let request = parse_audio_eq_update_request(&serde_json::json!({
+        "channelId": "audio-input-9",
+        "enabled": true,
+        "lowCutEnabled": true,
+        "lowCutFrequencyHz": 120.0,
+        "lowCutSlopeDbPerOctave": 18,
+        "bandId": "1",
+        "bandType": "low-shelf",
+        "frequencyHz": 240.0,
+        "gainDb": -18.0,
+        "q": 0.4
+    }))
+    .expect("RME EQ request should parse");
+    assert_eq!(request.band_id.as_deref(), Some("1"));
+    assert_eq!(request.band_type.as_deref(), Some("low-shelf"));
+    assert_eq!(request.low_cut_slope_db_per_octave, Some(18));
+
+    assert!(parse_audio_eq_update_request(&serde_json::json!({
+        "channelId": "audio-input-9",
+        "bandId": "lo",
+        "frequencyHz": 240.0
+    }))
+    .is_err());
+    assert!(parse_audio_eq_update_request(&serde_json::json!({
+        "channelId": "audio-input-9",
+        "lowCutSlopeDbPerOctave": 10
+    }))
+    .is_err());
+    assert!(parse_audio_eq_update_request(&serde_json::json!({
+        "channelId": "audio-input-9",
+        "gainDb": 21.0
+    }))
+    .is_err());
+}
+
+#[test]
+fn audio_eq_normalizes_legacy_lc_lo_mid_hi_state() {
+    let legacy = AudioEqSnapshot {
+        enabled: true,
+        low_cut: default_audio_low_cut_snapshot(),
+        hardware_status: String::from("unknown"),
+        bands: vec![
+            AudioEqBandSnapshot {
+                id: String::from("lc"),
+                label: String::from("LC"),
+                enabled: true,
+                frequency_hz: 640.0,
+                gain_db: 0.0,
+                q: 0.7,
+                band_type: String::from("low-cut"),
+            },
+            AudioEqBandSnapshot {
+                id: String::from("lo"),
+                label: String::from("LO"),
+                enabled: true,
+                frequency_hz: 180.0,
+                gain_db: -16.0,
+                q: 0.2,
+                band_type: String::from("bell"),
+            },
+            AudioEqBandSnapshot {
+                id: String::from("mid"),
+                label: String::from("MID"),
+                enabled: true,
+                frequency_hz: 1600.0,
+                gain_db: 0.0,
+                q: 1.2,
+                band_type: String::from("bell"),
+            },
+            AudioEqBandSnapshot {
+                id: String::from("hi"),
+                label: String::from("HI"),
+                enabled: true,
+                frequency_hz: 8500.0,
+                gain_db: 24.0,
+                q: 0.8,
+                band_type: String::from("shelf"),
+            },
+        ],
+    };
+
+    let normalized = super::helpers::normalize_audio_eq_snapshot(&legacy);
+    assert!(normalized.low_cut.enabled);
+    assert_eq!(normalized.low_cut.frequency_hz, 500.0);
+    assert_eq!(normalized.hardware_status, "local");
+    assert_eq!(normalized.bands[0].id, "1");
+    assert_eq!(normalized.bands[0].q, 0.4);
+    assert_eq!(normalized.bands[2].id, "3");
+    assert!(normalized.bands.iter().all(|band| band.enabled));
+    assert_eq!(normalized.bands[2].gain_db, 20.0);
+    assert_eq!(normalized.bands[2].band_type, "high-shelf");
+}
+
+#[test]
 fn simulated_audio_metering_models_inputs_playback_and_mix_outputs() {
     let settings = HashMap::from([
         (
@@ -78,6 +195,10 @@ fn simulated_audio_metering_models_inputs_playback_and_mix_outputs() {
             String::from("passed"),
         ),
         (String::from(AUDIO_SEND_HOST_KEY), String::from("127.0.0.1")),
+        (
+            String::from(AUDIO_METERING_SOURCE_KEY),
+            String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+        ),
     ]);
 
     let first = read_audio_snapshot(&settings);
@@ -147,6 +268,10 @@ fn simulated_audio_metering_uses_professional_ballistics() {
             String::from("passed"),
         ),
         (String::from(AUDIO_SEND_HOST_KEY), String::from("127.0.0.1")),
+        (
+            String::from(AUDIO_METERING_SOURCE_KEY),
+            String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+        ),
     ]);
 
     let mut samples = Vec::new();
@@ -196,6 +321,10 @@ fn simulated_stereo_sources_and_outputs_expose_independent_peak_holds() {
             String::from("passed"),
         ),
         (String::from(AUDIO_SEND_HOST_KEY), String::from("127.0.0.1")),
+        (
+            String::from(AUDIO_METERING_SOURCE_KEY),
+            String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+        ),
     ]);
 
     let snapshot = read_audio_snapshot(&settings);
@@ -226,6 +355,187 @@ fn simulated_stereo_sources_and_outputs_expose_independent_peak_holds() {
     assert_eq!(
         main_mix.peak_hold,
         main_mix.peak_hold_left.max(main_mix.peak_hold_right)
+    );
+}
+
+#[test]
+fn simulated_output_submix_uses_totalmix_fader_gain_curve() {
+    let mut channels = vec![meter_test_channel(
+        "audio-input-9",
+        "front-preamp",
+        false,
+        0.25,
+        0.25,
+        0.8,
+    )];
+    let mut mix_targets = vec![meter_test_mix_target(0.8)];
+
+    super::snapshot::apply_mix_target_metering(&channels, &mut mix_targets);
+    assert_meter_close(mix_targets[0].meter_left, 0.25);
+    assert_meter_close(mix_targets[0].meter_right, 0.25);
+
+    channels[0]
+        .mix_levels
+        .insert(String::from("audio-mix-main"), 0.7);
+    channels[0].fader = 0.7;
+    super::snapshot::apply_mix_target_metering(&channels, &mut mix_targets);
+    let minus_ten_db_gain = 10.0_f64.powf(-10.0 / 20.0);
+    assert_meter_close(mix_targets[0].meter_left, 0.25 * minus_ten_db_gain);
+    assert_meter_close(mix_targets[0].meter_right, 0.25 * minus_ten_db_gain);
+
+    mix_targets[0].dim = true;
+    super::snapshot::apply_mix_target_metering(&channels, &mut mix_targets);
+    assert_meter_close(mix_targets[0].meter_left, 0.25 * minus_ten_db_gain * 0.42);
+    assert_meter_close(mix_targets[0].meter_right, 0.25 * minus_ten_db_gain * 0.42);
+}
+
+#[test]
+fn audio_clip_clear_resets_live_rme_clip_latch() {
+    crate::rme_totalmix_osc::with_shared_meter_state_for_test(|shared| {
+        let test_dir = TestDir::new("clip-clear-rme-latch");
+        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        set_settings_owned(
+            test_dir.db_path().as_path(),
+            &[
+                (
+                    String::from("app.commissioning.check.audio.status"),
+                    String::from("passed"),
+                ),
+                (String::from(AUDIO_SEND_HOST_KEY), String::from("127.0.0.1")),
+                (
+                    String::from(AUDIO_METERING_SOURCE_KEY),
+                    String::from(crate::rme_totalmix_osc::RME_TOTALMIX_OSC_SOURCE),
+                ),
+            ],
+        )
+        .expect("ready RME audio settings should persist");
+
+        {
+            let mut state = shared.lock().expect("shared meter state should lock");
+            state.apply_message(
+                crate::rme_totalmix_osc::RmeTotalMixBus::Input,
+                &rosc::OscMessage {
+                    addr: "/1/level9LeftVal".to_string(),
+                    args: vec![rosc::OscType::String("0.0 dB".to_string())],
+                },
+                1_000,
+            );
+            state.apply_message(
+                crate::rme_totalmix_osc::RmeTotalMixBus::Input,
+                &rosc::OscMessage {
+                    addr: "/1/level9LeftVal".to_string(),
+                    args: vec![rosc::OscType::String("-24.0 dB".to_string())],
+                },
+                1_033,
+            );
+        }
+
+        let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+            .expect("settings should load");
+        let mut latched_snapshot = read_audio_snapshot(&settings);
+        shared
+            .lock()
+            .expect("shared meter state should lock")
+            .apply_to_snapshot(&mut latched_snapshot, 1_033);
+        assert!(
+            latched_snapshot
+                .channels
+                .iter()
+                .find(|channel| channel.id == "audio-input-9")
+                .expect("host input should exist")
+                .clip,
+            "clip should remain latched after the live level falls"
+        );
+
+        clear_audio_clips(
+            test_dir.db_path().as_path(),
+            &AudioClipClearRequest {
+                channel_id: Some(String::from("audio-input-9")),
+            },
+        )
+        .expect("clip clear should succeed");
+
+        let mut cleared_snapshot = read_audio_snapshot(&settings);
+        shared
+            .lock()
+            .expect("shared meter state should lock")
+            .apply_to_snapshot(&mut cleared_snapshot, 1_034);
+        assert!(
+            !cleared_snapshot
+                .channels
+                .iter()
+                .find(|channel| channel.id == "audio-input-9")
+                .expect("host input should exist")
+                .clip,
+            "audio.clip.clear should reset the live RME clip latch"
+        );
+    });
+}
+
+fn meter_test_channel(
+    id: &str,
+    role: &str,
+    stereo: bool,
+    meter_left: f64,
+    meter_right: f64,
+    send_level: f64,
+) -> AudioChannelSnapshot {
+    AudioChannelSnapshot {
+        id: String::from(id),
+        name: String::from("Test Source"),
+        short_name: String::from("SRC"),
+        role: String::from(role),
+        stereo,
+        gain: 0,
+        fader: send_level,
+        meter_left,
+        meter_right,
+        meter_level: meter_left.max(meter_right),
+        peak_hold: meter_left.max(meter_right),
+        peak_hold_left: meter_left,
+        peak_hold_right: meter_right,
+        clip: false,
+        mix_levels: HashMap::from([(String::from("audio-mix-main"), send_level)]),
+        mute: false,
+        solo: false,
+        phantom: false,
+        phase: false,
+        pad: false,
+        instrument: false,
+        auto_set: false,
+        eq: default_audio_eq_snapshot(),
+        dynamics: default_audio_dynamics_snapshot(),
+        send_modes: HashMap::from([(
+            String::from("audio-mix-main"),
+            default_audio_send_mode_snapshot(),
+        )]),
+    }
+}
+
+fn meter_test_mix_target(volume: f64) -> AudioMixTargetSnapshot {
+    AudioMixTargetSnapshot {
+        id: String::from("audio-mix-main"),
+        name: String::from("Main Out"),
+        short_name: String::from("MAIN"),
+        role: String::from("main-out"),
+        volume,
+        meter_left: 0.0,
+        meter_right: 0.0,
+        meter_level: 0.0,
+        peak_hold: 0.0,
+        peak_hold_left: 0.0,
+        peak_hold_right: 0.0,
+        mute: false,
+        dim: false,
+        mono: false,
+        talkback: false,
+    }
+}
+
+fn assert_meter_close(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() < 0.000_001,
+        "expected {actual:.6} to be close to {expected:.6}"
     );
 }
 
@@ -449,6 +759,47 @@ fn audio_channel_update_persists_front_preamp_controls() {
     assert!(refreshed.auto_set);
     assert_eq!(snapshot.last_action_status, "succeeded");
     assert_eq!(snapshot.console_state_confidence, "aligned");
+}
+
+#[test]
+fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
+    let test_dir = TestDir::new("clear-all-solo");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+
+    for channel_id in ["audio-input-9", "audio-playback-3-4"] {
+        update_audio_channel(
+            test_dir.db_path().as_path(),
+            &AudioChannelUpdateRequest {
+                auto_set: None,
+                channel_id: String::from(channel_id),
+                fader: None,
+                gain: None,
+                instrument: None,
+                mix_target_id: None,
+                mute: None,
+                name: None,
+                pad: None,
+                phantom: None,
+                phase: None,
+                solo: Some(true),
+            },
+        )
+        .expect("solo setup should succeed");
+    }
+
+    let cleared =
+        clear_all_audio_solo(test_dir.db_path().as_path()).expect("clear all solo should succeed");
+    assert!(cleared.channels.iter().all(|entry| !entry.solo));
+    assert_eq!(cleared.last_action_status, "succeeded");
+    assert_eq!(cleared.console_state_confidence, "aligned");
+
+    let idempotent = clear_all_audio_solo(test_dir.db_path().as_path())
+        .expect("idempotent clear all solo should succeed");
+    assert!(idempotent.channels.iter().all(|entry| !entry.solo));
+    assert_eq!(
+        idempotent.last_action_message.as_deref(),
+        Some("No soloed audio channels to clear.")
+    );
 }
 
 #[test]

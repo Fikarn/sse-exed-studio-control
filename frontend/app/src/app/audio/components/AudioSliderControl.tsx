@@ -1,7 +1,10 @@
 import {
+  useEffect,
   useRef,
+  useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
@@ -27,9 +30,12 @@ export interface AudioSliderControlProps {
 }
 
 interface DragState {
+  axisSize: number;
   fine: boolean;
   latestValue: number;
   pointerId: number;
+  rectLeft: number;
+  rectTop: number;
   startPointer: number;
   startValue: number;
 }
@@ -69,10 +75,27 @@ export function AudioSliderControl({
   valueText,
 }: AudioSliderControlProps) {
   const dragRef = useRef<DragState | null>(null);
+  const lastPointerDownAtRef = useRef(0);
+  const localClearTimerRef = useRef<number | null>(null);
+  const [localDraftValue, setLocalDraftValue] = useState<number | null>(null);
   const span = Math.max(0.00001, max - min);
-  const currentValue = clamp(value, min, max);
+  const currentValue = clamp(localDraftValue ?? value, min, max);
   const effectiveFineStep = fineStep ?? step;
   const pct = ((currentValue - min) / span) * 100;
+
+  useEffect(() => {
+    if (dragRef.current) return;
+    setLocalDraftValue(null);
+  }, [value]);
+
+  useEffect(
+    () => () => {
+      if (localClearTimerRef.current !== null) {
+        window.clearTimeout(localClearTimerRef.current);
+      }
+    },
+    []
+  );
 
   const normalizeValue = (nextValue: number, { shouldSnap, valueStep }: { shouldSnap: boolean; valueStep: number }) => {
     const stepped = quantize(nextValue, valueStep, min, max);
@@ -80,35 +103,64 @@ export function AudioSliderControl({
   };
 
   const preview = (nextValue: number) => {
+    setLocalDraftValue(nextValue);
     onPreview?.(nextValue);
   };
 
   const previewAndCommit = (nextValue: number) => {
     preview(nextValue);
     onCommit(nextValue);
+    if (localClearTimerRef.current !== null) {
+      window.clearTimeout(localClearTimerRef.current);
+    }
+    localClearTimerRef.current = window.setTimeout(() => {
+      localClearTimerRef.current = null;
+      setLocalDraftValue(null);
+    }, 250);
   };
 
-  const valueFromPointer = (event: ReactPointerEvent<HTMLElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (orientation === "vertical") {
-      return min + (1 - (event.clientY - rect.top) / Math.max(1, rect.height)) * span;
+  const requestNumericEntry = () => {
+    if (!onRequestNumericValue) return;
+    const nextValue = onRequestNumericValue(currentValue);
+    if (typeof nextValue === "number") {
+      previewAndCommit(quantize(nextValue, step, min, max));
     }
-    return min + ((event.clientX - rect.left) / Math.max(1, rect.width)) * span;
+  };
+
+  const valueFromPointer = (event: ReactPointerEvent<HTMLElement>, drag?: DragState) => {
+    const rectLeft = drag?.rectLeft ?? event.currentTarget.getBoundingClientRect().left;
+    const rectTop = drag?.rectTop ?? event.currentTarget.getBoundingClientRect().top;
+    const axisSize =
+      drag?.axisSize ??
+      (orientation === "vertical"
+        ? Math.max(1, event.currentTarget.getBoundingClientRect().height)
+        : Math.max(1, event.currentTarget.getBoundingClientRect().width));
+    if (orientation === "vertical") {
+      return min + (1 - (event.clientY - rectTop) / axisSize) * span;
+    }
+    return min + ((event.clientX - rectLeft) / axisSize) * span;
   };
 
   const valueFromFineDrag = (event: ReactPointerEvent<HTMLElement>, drag: DragState) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const axisSize = orientation === "vertical" ? Math.max(1, rect.height) : Math.max(1, rect.width);
     const pointer = orientation === "vertical" ? event.clientY : event.clientX;
     const direction = orientation === "vertical" ? -1 : 1;
-    const delta = ((pointer - drag.startPointer) / axisSize) * direction * span * 0.1;
+    const delta = ((pointer - drag.startPointer) / drag.axisSize) * direction * span * 0.1;
     return drag.startValue + delta;
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (disabled) return;
     event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.focus();
+
+    const now = performance.now();
+    if (onRequestNumericValue && now - lastPointerDownAtRef.current <= 360) {
+      lastPointerDownAtRef.current = 0;
+      requestNumericEntry();
+      return;
+    }
+    lastPointerDownAtRef.current = now;
 
     if (snapUnity && event.shiftKey) {
       const unity = clamp(AUDIO_FADER_UNITY, min, max);
@@ -117,14 +169,31 @@ export function AudioSliderControl({
     }
 
     const fine = event.metaKey || event.ctrlKey;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const axisSize = orientation === "vertical" ? Math.max(1, rect.height) : Math.max(1, rect.width);
     const nextValue = fine
       ? currentValue
-      : normalizeValue(valueFromPointer(event), { shouldSnap: snapUnity, valueStep: step });
+      : normalizeValue(
+          valueFromPointer(event, {
+            axisSize,
+            fine,
+            latestValue: currentValue,
+            pointerId: event.pointerId,
+            rectLeft: rect.left,
+            rectTop: rect.top,
+            startPointer: orientation === "vertical" ? event.clientY : event.clientX,
+            startValue: currentValue,
+          }),
+          { shouldSnap: snapUnity, valueStep: step }
+        );
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
+      axisSize,
       fine,
       latestValue: nextValue,
       pointerId: event.pointerId,
+      rectLeft: rect.left,
+      rectTop: rect.top,
       startPointer: orientation === "vertical" ? event.clientY : event.clientX,
       startValue: currentValue,
     };
@@ -135,7 +204,8 @@ export function AudioSliderControl({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId || disabled) return;
     event.preventDefault();
-    const rawValue = drag.fine ? valueFromFineDrag(event, drag) : valueFromPointer(event);
+    event.stopPropagation();
+    const rawValue = drag.fine ? valueFromFineDrag(event, drag) : valueFromPointer(event, drag);
     const nextValue = normalizeValue(rawValue, {
       shouldSnap: snapUnity,
       valueStep: drag.fine ? effectiveFineStep : step,
@@ -148,6 +218,7 @@ export function AudioSliderControl({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     event.preventDefault();
+    event.stopPropagation();
     dragRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -158,6 +229,7 @@ export function AudioSliderControl({
   const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    event.stopPropagation();
     dragRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -171,6 +243,12 @@ export function AudioSliderControl({
     let nextValue: number;
 
     switch (event.key) {
+      case "Enter":
+        if (onRequestNumericValue) {
+          event.preventDefault();
+          requestNumericEntry();
+        }
+        return;
       case "ArrowUp":
       case "ArrowRight":
         nextValue = currentValue + step * multiplier;
@@ -199,17 +277,31 @@ export function AudioSliderControl({
     previewAndCommit(quantize(nextValue, step, min, max));
   };
 
-  const handleDoubleClick = () => {
+  const handleDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (disabled || !onRequestNumericValue) return;
-    const nextValue = onRequestNumericValue(currentValue);
-    if (nextValue === null) return;
-    previewAndCommit(quantize(nextValue, step, min, max));
+    event.preventDefault();
+    event.stopPropagation();
+    requestNumericEntry();
+  };
+
+  const handleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.detail === 2) {
+      handleDoubleClick(event);
+    }
+  };
+
+  const handleMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.detail < 2 || disabled || !onRequestNumericValue) return;
+    event.preventDefault();
+    event.stopPropagation();
+    requestNumericEntry();
   };
 
   return (
     <div
       aria-disabled={disabled ? true : undefined}
       aria-label={label}
+      aria-orientation={orientation}
       aria-valuemax={max}
       aria-valuemin={min}
       aria-valuenow={Number(formatAriaNumber(currentValue))}
@@ -218,8 +310,9 @@ export function AudioSliderControl({
       data-orientation={orientation}
       data-testid={testId}
       data-unity={snapUnity && currentValue === AUDIO_FADER_UNITY ? "true" : undefined}
-      onDoubleClick={handleDoubleClick}
+      onClick={handleClick}
       onKeyDown={handleKeyDown}
+      onMouseDownCapture={handleMouseDown}
       onPointerCancel={handlePointerCancel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

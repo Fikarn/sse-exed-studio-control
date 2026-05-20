@@ -42,8 +42,23 @@ This document describes runtime behavior and operator recovery for the native `S
 
 1. Open the Audio workspace.
 2. Review the native health and audio summaries.
-3. Re-run the audio commissioning probe if needed.
-4. If the console is still unavailable, restart the app and confirm the failure is not limited to one session.
+3. Confirm the TotalMix OSC metering checklist below still matches the workstation.
+4. Re-run the audio commissioning probe if needed.
+5. If the console is still unavailable, restart the app and confirm the failure is not limited to one session.
+
+### RME TotalMix OSC Metering Checklist
+
+The audio page is a control surface for the fixed RME Fireface UFX III workstation. Production meters are trusted only when live TotalMix OSC peak packets arrive.
+
+1. In TotalMix, configure three OSC remote slots for the app:
+   - slot 1: hardware inputs, outgoing to the app base receive port, incoming from the app base send port
+   - slot 2: software playback, outgoing to app receive `+1`, incoming from app send `+1`
+   - slot 3: hardware outputs, outgoing to app receive `+2`, incoming from app send `+2`
+2. Enable `Send Peak Level` on all three TotalMix OSC slots.
+3. Keep each slot on the expected bank/bus with enough faders per bank for the fixed surface mapping.
+4. Run the audio commissioning probe. It passes only after mapped meter packets are received; a successful UDP bind alone is not verification.
+5. If the app reports `STALE` or `OFFLINE`, treat the displayed meters as unavailable until packet flow is restored. Do not trust simulated movement unless the UI explicitly shows simulated input mode.
+6. Treat audio-page meters as live console channel-strip meters: the visible reference is `-18 dBFS`, meter-point over is separate from the latched channel clip state, and the operator can toggle or reset the held peak marks from the audio canvas peak controls.
 
 ### Control-surface bridge stops responding
 
@@ -96,8 +111,9 @@ This document describes runtime behavior and operator recovery for the native `S
 1. Launch the packaged native app and confirm it reaches the expected target surface.
 2. Confirm lighting, audio, and support summaries show the expected ready state.
 3. Trigger a test light scene recall if lighting is in scope.
-4. Trigger an audio sync or snapshot recall if audio is in scope.
-5. Export a manual support backup before the session starts.
+4. Confirm the audio page reports live RME TotalMix OSC metering, not simulated, stale, or offline metering.
+5. Trigger an audio sync or snapshot recall if audio is in scope.
+6. Export a manual support backup before the session starts.
 
 ## Bridge Qualification
 

@@ -33,7 +33,8 @@ Official external references used for behavior only:
 - RME TotalMix channel strip: numerical RMS/Peak display, green RMS/average bar, yellow peak line, red over indication, configurable peak hold / over detection / RMS reference.
 - RME TotalMix control strip: Submix mode is the default/preferred operation; selecting a hardware output darkens other outputs and points source-row routing fields to that destination.
 - RME TotalMix submix tools: copy, paste, mirror, clear, and loopback are hardware-output/submix operations, not generic channel operations.
-- RME hardware metering: green for normal signal, yellow around `-5 dBFS`, orange around `-4 dBFS`, red around `-1 dBFS`, and fast red flash at `0 dBFS`.
+- Live console metering target: one truthful channel meter per live source/output, `-60..0 dBFS` scale, prominent `-18 dBFS` nominal reference, peak warning at `-3 dBFS`, explicit `input`/`playback`/`post-fader` tap labels, separate meter-point over, and latched channel-path clip/over at `0 dBFS`.
+- RME/TotalMix OSC metering: source point from RME peak-level packets, green below nominal, yellow above `-18 dBFS`, orange/hot above `-6 dBFS`, red warning at `-3 dBFS`, operator-controlled display peak hold, and latched clip/over at `0 dBFS` until operator clear. These are live channel meters, not LUFS/loudness meters.
 - Allen & Heath SQ/dLive metering: default colors mimic traditional meters; meters have independent source points and red channel-name/meter activity for muted or active processing states.
 - RME TotalMix FX: independent submixes, Control Room, snapshots, groups, OSC/Mackie remote, real-time meter state.
 - RME MIDI remote: fader bank movement, selected output bus/submix selection, Main Out, Dim, Talkback, Mono, Mute, Solo, Select, and Snapshot 1-8 mappings.
@@ -473,7 +474,7 @@ Verified design-system primitives available from `@sse/design-system`:
 Use local primitives:
 
 - `AudioFader`: vertical or horizontal fader, display-oriented, maps `0..1` to existing command values.
-- `AudioStereoMeter`: SVG or div meter with dBFS scale marks, dB-scaled fill, yellow peak-hold line, clip/over indication, and disabled treatment.
+- `AudioStereoMeter`: live-console dBFS meter with `-60..0 dBFS` scale marks, prominent `-18 dBFS` nominal reference, dB-scaled fill, yellow held peak line, `-3 dBFS` warning, latched clip/over indication, and disabled treatment. LUFS, LRA, and delivery-compliance loudness meters are out of scope for this surface.
 - `AudioMixTargetPill`: active mix overlay matching Lighting's `PlotPill` language.
 
 Do not promote Audio primitives into the design system in the first implementation unless a second workspace consumes them.

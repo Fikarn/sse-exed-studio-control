@@ -12,9 +12,11 @@ export interface AudioStatusDescriptor {
   warningTitle: string | null;
 }
 
-const METER_DB_RANGE = 60;
-const METER_AMBER_DBFS = -12;
-const METER_RED_DBFS = -1;
+export const METER_FLOOR_DBFS = -60;
+export const METER_NOMINAL_DBFS = -18;
+export const METER_HOT_DBFS = -6;
+export const METER_PEAK_WARNING_DBFS = -3;
+export const METER_OVER_DBFS = 0;
 
 function clamp01(value: number) {
   if (!Number.isFinite(value)) return 0;
@@ -49,12 +51,16 @@ export function snapFaderValue(value: number) {
 export function normalizedToDbfs(value: number) {
   const normalized = clamp01(value);
   if (normalized <= 0) return Number.NEGATIVE_INFINITY;
-  return normalized * METER_DB_RANGE - METER_DB_RANGE;
+  return 20 * Math.log10(normalized);
 }
 
 export function dbfsToMeterPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(100, ((value + METER_DB_RANGE) / METER_DB_RANGE) * 100));
+  return Math.max(0, Math.min(100, ((value - METER_FLOOR_DBFS) / Math.abs(METER_FLOOR_DBFS)) * 100));
+}
+
+export function formatMeterPercent(value: number) {
+  return `${dbfsToMeterPercent(normalizedToDbfs(value)).toFixed(1)}%`;
 }
 
 export function formatAudioDb(value: number) {
@@ -102,8 +108,11 @@ export function formatAudioTimestamp(value: string | number | null | undefined) 
 }
 
 export function meterTone(value: number, clip = false) {
-  if (clip || normalizedToDbfs(value) >= METER_RED_DBFS) return "red";
-  if (normalizedToDbfs(value) >= METER_AMBER_DBFS) return "amber";
+  const dbfs = normalizedToDbfs(value);
+  const roundedDbfs = Number.isFinite(dbfs) ? Number(dbfs.toFixed(3)) : dbfs;
+  if (clip || roundedDbfs >= METER_PEAK_WARNING_DBFS) return "red";
+  if (roundedDbfs >= METER_HOT_DBFS) return "hot";
+  if (roundedDbfs >= METER_NOMINAL_DBFS) return "amber";
   return "green";
 }
 
@@ -125,6 +134,8 @@ function formatAudioActionFailureTitle(snapshot: AudioSnapshot | null) {
 
 export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatusDescriptor {
   const lastActionFailed = String(snapshot?.lastActionStatus ?? "idle") === "failed";
+  const meteringSource = String(snapshot?.meteringSource ?? snapshot?.adapterMode ?? "").toLowerCase();
+  const meteringState = String(snapshot?.meteringState ?? "unknown").toLowerCase();
 
   if (snapshot?.oscEnabled === false) {
     return {
@@ -156,6 +167,24 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     };
   }
 
+  if (meteringSource === "rme-totalmix-osc" && meteringState === "stale") {
+    return {
+      label: "STALE",
+      tone: "attention" satisfies StatusToneLike,
+      warningBody: "RME METERING STALE - no recent TotalMix OSC meter packets are arriving.",
+      warningTitle: "RME METERING STALE",
+    };
+  }
+
+  if (meteringSource === "rme-totalmix-osc" && meteringState === "offline") {
+    return {
+      label: "OFFLINE",
+      tone: "error" satisfies StatusToneLike,
+      warningBody: "RME METERING OFFLINE - configure TotalMix OSC Send Peak Level and rerun the audio probe.",
+      warningTitle: "RME METERING OFFLINE",
+    };
+  }
+
   if (String(snapshot?.consoleStateConfidence ?? "unknown") === "assumed") {
     return {
       label: "ASSUMED",
@@ -179,6 +208,15 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       tone: "error" satisfies StatusToneLike,
       warningBody: actionCode ? `${actionCode} · ${actionMessage}` : actionMessage,
       warningTitle,
+    };
+  }
+
+  if (meteringSource === "simulated" || meteringSource === "fixture") {
+    return {
+      label: "SIMULATED",
+      tone: "attention" satisfies StatusToneLike,
+      warningBody: null,
+      warningTitle: null,
     };
   }
 

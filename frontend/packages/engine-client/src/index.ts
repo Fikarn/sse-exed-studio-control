@@ -1,6 +1,4 @@
-export { createShellStore, useShellSnapshot } from "./store/createShellStore";
-export { createMeterStore, useChannelMeterSample, useMixTargetMeterSample } from "./store/createMeterStore";
-export type { MeterSample, MeterStore, MeterStoreState } from "./store/createMeterStore";
+export { createShellStore, useAudioMeterFrame, useShellSnapshot } from "./store/createShellStore";
 export { createFixtureTransport } from "./transports/fixtureTransport";
 export { createTauriTransport } from "./transports/tauriTransport";
 export type {
@@ -11,6 +9,8 @@ export type {
   EngineTransport,
   FixtureScenario,
   AudioClipClearRequest,
+  AudioMeterEntry,
+  AudioMeterFrame,
   AudioDynamicsUpdateRequest,
   AudioEqUpdateRequest,
   AudioSendModeUpdateRequest,
@@ -57,6 +57,7 @@ export type { AudioDynamicsProcessorSnapshot } from "./generated/snapshots/Audio
 export type { AudioDynamicsSnapshot } from "./generated/snapshots/AudioDynamicsSnapshot";
 export type { AudioEqBandSnapshot } from "./generated/snapshots/AudioEqBandSnapshot";
 export type { AudioEqSnapshot } from "./generated/snapshots/AudioEqSnapshot";
+export type { AudioLowCutSnapshot } from "./generated/snapshots/AudioLowCutSnapshot";
 export type { AudioMixTargetSnapshot } from "./generated/snapshots/AudioMixTargetSnapshot";
 export type { AudioSceneContentsSnapshot } from "./generated/snapshots/AudioSceneContentsSnapshot";
 export type { AudioScenePreviewSnapshot } from "./generated/snapshots/AudioScenePreviewSnapshot";

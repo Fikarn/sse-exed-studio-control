@@ -21,6 +21,7 @@ const AUDIO_EXPECTED_SUBMIX_LOCK_KEY: &str = "app.audio.expected_submix_lock";
 const AUDIO_EXPECTED_COMPATIBILITY_MODE_KEY: &str = "app.audio.expected_compatibility_mode";
 const AUDIO_FADERS_PER_BANK_KEY: &str = "app.audio.faders_per_bank";
 const AUDIO_VIEW_MODE_KEY: &str = "app.audio.view_mode";
+const AUDIO_METERING_SOURCE_KEY: &str = "app.audio.metering_source";
 const AUDIO_CUSTOM_SNAPSHOT_ID_PREFIX: &str = "audio-snapshot-custom-";
 
 const DEFAULT_AUDIO_OSC_ENABLED: bool = true;
@@ -28,6 +29,7 @@ const DEFAULT_AUDIO_EXPECTED_PEAK_DATA: bool = true;
 const DEFAULT_AUDIO_EXPECTED_SUBMIX_LOCK: bool = true;
 const DEFAULT_AUDIO_EXPECTED_COMPATIBILITY_MODE: bool = false;
 const DEFAULT_AUDIO_FADERS_PER_BANK: i64 = 12;
+const DEFAULT_AUDIO_METERING_SOURCE: &str = crate::rme_totalmix_osc::RME_TOTALMIX_OSC_SOURCE;
 
 mod channels;
 mod clips;

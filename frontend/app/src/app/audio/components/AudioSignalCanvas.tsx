@@ -1,9 +1,10 @@
-import type { CSSProperties, MouseEvent as ReactMouseEvent, RefObject } from "react";
+import { useEffect, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "../AudioWorkspace.module.css";
-import type { AudioDensityMode } from "../audioFormatting";
+import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import type { AudioChannelGroupSelectionRequest, AudioWorkspaceViewModel } from "../audioViewModel";
+import { AudioLiveActiveMixMeter } from "./AudioLiveMeterReadout";
 import { AudioSnapshotDeck } from "./AudioSnapshotDeck";
 import { AudioTargetPicker } from "./AudioTargetPicker";
 import { AudioTieredMixer } from "./AudioTieredMixer";
@@ -11,16 +12,13 @@ import { AudioTieredMixer } from "./AudioTieredMixer";
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
-function meterLevelPercent(value: number) {
-  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
-}
-
 export function AudioSignalCanvas({
+  armedActionKey,
   busyAction,
-  clearDraftValue,
+  clearDraftValueLater,
   commitChannelContinuous,
   commitMixTargetContinuous,
-  density,
+  draftStore,
   getDraftValue,
   onOpenChannelMenu,
   onClearAllSolo,
@@ -28,26 +26,32 @@ export function AudioSignalCanvas({
   onClearSolo,
   onCaptureSnapshot,
   onDeleteSnapshot,
+  onOpenSetup,
   onRecallSnapshot,
   onRenameSnapshot,
   onSaveSnapshot,
   onSelectChannel,
   onSelectChannelGroup,
   onSelectMixTarget,
-  onSetDensity,
-  onSetViewMode,
+  onSelectOutputMixTarget,
+  onSync,
+  onTogglePeakHold,
+  onResetPeakHolds,
   setDraftValue,
   onUpdateChannel,
   onUpdateMixTarget,
+  peakHoldEnabled,
   recentlyRecalledSnapshotId,
   statusWarningRef,
+  store,
   viewModel,
 }: {
+  armedActionKey: string | null;
   busyAction: string | null;
-  clearDraftValue: (key: string) => void;
+  clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
-  density: AudioDensityMode;
+  draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   onOpenChannelMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
   onClearAllSolo: () => void;
@@ -55,22 +59,41 @@ export function AudioSignalCanvas({
   onClearSolo: (channelId: string) => void;
   onCaptureSnapshot: () => void;
   onDeleteSnapshot: (snapshotId: string, snapshotName: string) => void;
+  onOpenSetup: () => void;
   onRecallSnapshot: (snapshotId: string) => void;
   onRenameSnapshot: (snapshotId: string, snapshotName: string) => void;
   onSaveSnapshot: (snapshotId: string) => void;
   onSelectChannel: (channelId: string | null) => void;
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
   onSelectMixTarget: (mixTargetId: string) => void;
-  onSetDensity: (density: AudioDensityMode) => void;
-  onSetViewMode: (viewMode: "submix" | "master") => void;
+  onSelectOutputMixTarget: (mixTargetId: string) => void;
+  onSync: () => void;
+  onTogglePeakHold: () => void;
+  onResetPeakHolds: () => void;
   setDraftValue: (key: string, value: number) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
+  peakHoldEnabled: boolean;
   recentlyRecalledSnapshotId: string | null;
   statusWarningRef: RefObject<HTMLDivElement | null>;
+  store: ShellStore;
   viewModel: AudioWorkspaceViewModel;
 }) {
-  const soloedChannel = viewModel.soloedChannel ?? viewModel.selectedChannel ?? viewModel.channels[0] ?? null;
+  useEffect(() => {
+    if (!window.__SSE_TEST_RENDER_COUNTS__) return;
+    window.__SSE_TEST_RENDER_COUNTS__.audioSignalCanvas =
+      (window.__SSE_TEST_RENDER_COUNTS__.audioSignalCanvas ?? 0) + 1;
+  });
+
+  const soloedChannels = viewModel.soloedChannels;
+  const soloedChannel = soloedChannels[0] ?? null;
+  const soloSummary =
+    soloedChannels.length <= 1
+      ? soloedChannel?.name
+      : `${soloedChannels
+          .slice(0, 3)
+          .map((channel) => channel.name)
+          .join(", ")}${soloedChannels.length > 3 ? ` +${soloedChannels.length - 3}` : ""}`;
 
   return (
     <section className={styles.signalCanvas} data-testid="audio-signal-canvas">
@@ -85,7 +108,21 @@ export function AudioSignalCanvas({
         >
           <strong>{viewModel.status.warningTitle}</strong>
           <span>{viewModel.status.warningBody}</span>
-          <small>Enter sync · V view · Esc clear</small>
+          <span className={styles.warningRecoveryActions}>
+            <button
+              disabled={!viewModel.capabilities.canSync}
+              onClick={onSync}
+              title={
+                viewModel.capabilities.canSync ? "Run audio sync" : "Audio sync is unavailable until OSC is enabled"
+              }
+              type="button"
+            >
+              Sync now
+            </button>
+            <button onClick={onOpenSetup} type="button">
+              Setup
+            </button>
+          </span>
         </div>
       ) : null}
 
@@ -97,7 +134,9 @@ export function AudioSignalCanvas({
           selectedMixTargetId={viewModel.selectedMixTargetId}
           selectionLabel={`${viewModel.selectedSourceLabel} selected`}
         />
-        <span className={styles.canvasSelectedMeta}>{viewModel.selectedSourceMeta}</span>
+        <span className={styles.canvasSelectedMeta} title={viewModel.selectedSourceMeta}>
+          {viewModel.selectedSourceMeta}
+        </span>
         {viewModel.meterSimulationActive ? (
           <span
             className={styles.meterSimulationChip}
@@ -108,22 +147,27 @@ export function AudioSignalCanvas({
           </span>
         ) : null}
         <span className={styles.canvasDivider} />
-        <span className={styles.canvasBarLabel}>View</span>
-        <div className={styles.canvasModeSwitch} aria-label="Audio canvas view">
-          <button data-active={viewModel.viewMode === "submix"} onClick={() => onSetViewMode("submix")} type="button">
-            Submix
-          </button>
+        <span className={styles.canvasBarLabel}>Peak</span>
+        <div className={styles.canvasModeSwitch} aria-label="Meter peak hold">
           <button
-            data-active={viewModel.viewMode === "master"}
-            disabled={!viewModel.capabilities.canUseMasterView}
-            onClick={() => onSetViewMode("master")}
-            title={viewModel.capabilities.canUseMasterView ? "Show master view" : "Master view requires engine support"}
+            aria-pressed={peakHoldEnabled}
+            data-active={peakHoldEnabled}
+            data-testid="audio-peak-hold-toggle"
+            onClick={onTogglePeakHold}
+            title={peakHoldEnabled ? "Disable held peak marks" : "Enable held peak marks"}
             type="button"
           >
-            Master
+            Hold
+          </button>
+          <button
+            data-testid="audio-peak-hold-reset"
+            onClick={onResetPeakHolds}
+            title="Reset held peak marks"
+            type="button"
+          >
+            Reset
           </button>
         </div>
-        <span className={styles.canvasDivider} />
         <div className={styles.canvasStatPills}>
           <span>
             <strong>{viewModel.hardwareInputs.channels.length}</strong> in
@@ -134,38 +178,40 @@ export function AudioSignalCanvas({
           <span>
             <strong>{viewModel.hardwareOutputs.mixTargets.length}</strong> out
           </span>
-          <span>
-            <strong>{viewModel.activeMixReadout.lufs}</strong> LUFS-i
+          <span className={styles.canvasMeterStatus} title={viewModel.activeMixReadout.label}>
+            <strong>{viewModel.activeMixReadout.meterSource}</strong>
+            <em>tap</em>
+            <strong>{viewModel.activeMixReadout.meterPoint}</strong>
+            <em>ref</em>
+            <strong>{viewModel.activeMixReadout.nominalReference}</strong>
+            <em>peak</em>
+            <strong>{viewModel.activeMixReadout.peakStatus}</strong>
           </span>
         </div>
         <span className={styles.canvasSpacer} />
-        <div className={styles.canvasActiveMixMeter} aria-label="Active mix level" data-testid="audio-active-mix-meter">
-          <span>Active mix</span>
-          <i style={{ "--meter-level": meterLevelPercent(viewModel.activeMixReadout.meterLeft) } as CSSProperties} />
-          <i style={{ "--meter-level": meterLevelPercent(viewModel.activeMixReadout.meterRight) } as CSSProperties} />
-          <strong>{viewModel.activeMixReadout.db}</strong>
-        </div>
-        <span className={styles.canvasSpacer} />
-        <span className={styles.canvasBarLabel}>Density</span>
-        <div className={styles.canvasModeSwitch} aria-label="Audio density">
-          <button data-active={density === "desktop"} onClick={() => onSetDensity("desktop")} type="button">
-            Desktop
-          </button>
-          <button data-active={density === "touch"} onClick={() => onSetDensity("touch")} type="button">
-            Touch
-          </button>
-        </div>
+        <AudioLiveActiveMixMeter
+          fallbackLeft={viewModel.activeMixReadout.meterLeft}
+          fallbackRight={viewModel.activeMixReadout.meterRight}
+          selectedMixTargetId={viewModel.selectedMixTargetId}
+          store={store}
+        />
       </div>
 
       {viewModel.healthStats.soloedChannels > 0 || viewModel.healthStats.clippedChannels > 0 ? (
         <div className={styles.canvasWarningStack}>
           {viewModel.healthStats.soloedChannels > 0 ? (
             <div className={styles.canvasWarningBand} data-kind="solo" data-testid="audio-solo-warning-band">
-              <strong>Solo engaged</strong>
+              <strong>{viewModel.healthStats.soloedChannels} solo engaged</strong>
               <span>
-                on <b>{soloedChannel?.name ?? "A channel"}</b> · the mix you're hearing isn't the mix you're seeing
+                {soloSummary ? (
+                  <>
+                    on <b>{soloSummary}</b> · the mix you're hearing isn't the mix you're seeing
+                  </>
+                ) : (
+                  "The mix you're hearing isn't the mix you're seeing"
+                )}
               </span>
-              {soloedChannel ? (
+              {soloedChannels.length === 1 && soloedChannel ? (
                 <button
                   className={styles.canvasWarningChip}
                   onClick={() => onClearSolo(soloedChannel.id)}
@@ -203,15 +249,16 @@ export function AudioSignalCanvas({
       ) : null}
 
       <AudioTieredMixer
-        clearDraftValue={clearDraftValue}
+        clearDraftValueLater={clearDraftValueLater}
         commitChannelContinuous={commitChannelContinuous}
         commitMixTargetContinuous={commitMixTargetContinuous}
+        draftStore={draftStore}
         getDraftValue={getDraftValue}
         onOpenChannelMenu={onOpenChannelMenu}
         onClearClip={onClearClips}
         onSelectChannel={onSelectChannel}
         onSelectChannelGroup={onSelectChannelGroup}
-        onSelectMixTarget={onSelectMixTarget}
+        onSelectOutputMixTarget={onSelectOutputMixTarget}
         setDraftValue={setDraftValue}
         onUpdateChannel={onUpdateChannel}
         onUpdateMixTarget={onUpdateMixTarget}
@@ -220,6 +267,7 @@ export function AudioSignalCanvas({
 
       <AudioSnapshotDeck
         actionsAllowed={viewModel.capabilities.canCaptureSnapshot}
+        armedActionKey={armedActionKey}
         busyAction={busyAction}
         channels={viewModel.channels}
         mixTargets={viewModel.mixTargets}

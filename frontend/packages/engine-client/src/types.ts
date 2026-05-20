@@ -120,8 +120,12 @@ export interface AudioClipClearRequest {
 export interface AudioEqUpdateRequest {
   channelId: string;
   enabled?: boolean;
-  bandId?: "lc" | "lo" | "mid" | "hi";
+  lowCutEnabled?: boolean;
+  lowCutFrequencyHz?: number;
+  lowCutSlopeDbPerOctave?: 6 | 12 | 18 | 24;
+  bandId?: "1" | "2" | "3";
   bandEnabled?: boolean;
+  bandType?: "bell" | "low-shelf" | "high-shelf" | "high-pass" | "low-pass";
   frequencyHz?: number;
   gainDb?: number;
   q?: number;
@@ -302,6 +306,48 @@ export interface EngineTransport {
   dispose?(): Promise<void>;
 }
 
+export interface AudioMeterEntry {
+  channelPathClip?: boolean;
+  channelPathClipHold?: boolean;
+  clip?: boolean;
+  clipHold?: boolean;
+  levelLeftDbfs: number;
+  levelRightDbfs: number;
+  lufs?: number | null;
+  meterPointOver?: boolean;
+  meterPointOverLeft?: boolean;
+  meterPointOverRight?: boolean;
+  meterPoint?: string | null;
+  over?: boolean;
+  overLeft?: boolean;
+  overRight?: boolean;
+  peakHoldLeftDbfs: number;
+  peakHoldRightDbfs: number;
+  peakLeftDbfs: number;
+  peakRightDbfs: number;
+  peakWarning?: boolean;
+  rmsLeftDbfs: number;
+  rmsRightDbfs: number;
+  meterLeft: number;
+  meterLevel?: number;
+  meterRight: number;
+  peakHoldLeft: number;
+  peakHoldRight: number;
+}
+
+export interface AudioMeterFrame {
+  activeMixTargetId: string | null;
+  cadenceHz: number | null;
+  channels: Record<string, AudioMeterEntry>;
+  diagnostics?: JsonObject | null;
+  lastPacketAgeMs: number | null;
+  meteringSource: string | null;
+  meteringState: string | null;
+  mixTargets: Record<string, AudioMeterEntry>;
+  monotonicTimestampMs: number | null;
+  sequence: number;
+}
+
 export interface ShellState {
   lifecycle: StartupLifecycleState;
   recovery: RecoveryState;
@@ -327,11 +373,12 @@ export interface ShellState {
 }
 
 export interface ShellStore {
-  meterStore: import("./store/createMeterStore").MeterStore;
   initialize(): Promise<void>;
   getSnapshot(): ShellState;
+  getAudioMeterFrame(): AudioMeterFrame;
   refresh(): Promise<void>;
   restart(): Promise<void>;
+  subscribeAudioMeters(listener: () => void): () => void;
   setWorkspace(workspaceId: WorkspaceId): Promise<JsonValue>;
   setSetupSection(section: SetupSection): Promise<JsonValue>;
   setLightingSection(sectionId: string | null): Promise<JsonValue>;
@@ -345,6 +392,7 @@ export interface ShellStore {
   updateAudioSnapshot(request: AudioSnapshotUpdateRequest): Promise<JsonValue>;
   deleteAudioSnapshot(request: AudioSnapshotDeleteRequest): Promise<JsonValue>;
   clearAudioClips(request?: AudioClipClearRequest): Promise<JsonValue>;
+  clearAllAudioSolo(): Promise<JsonValue>;
   updateAudioChannel(request: AudioChannelUpdateRequest): Promise<JsonValue>;
   updateAudioChannelEq(request: AudioEqUpdateRequest): Promise<JsonValue>;
   updateAudioChannelDynamics(request: AudioDynamicsUpdateRequest): Promise<JsonValue>;
@@ -391,6 +439,8 @@ export interface ShellStore {
   exportSupportBackup(): Promise<JsonValue>;
   restoreSupportBackup(path: string): Promise<JsonValue>;
   exportCompanionConfig(baseUrl?: string): Promise<JsonValue>;
+  getAudioMeterFrame(): AudioMeterFrame;
+  subscribeAudioMeters(listener: () => void): () => void;
   subscribe(listener: () => void): () => void;
   dispose(): Promise<void>;
 }
