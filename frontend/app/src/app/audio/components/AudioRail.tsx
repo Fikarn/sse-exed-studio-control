@@ -2,7 +2,7 @@ import { useEffect, type CSSProperties } from "react";
 import type { ShellStore } from "@sse/engine-client";
 import { RefreshCw, RotateCcw, Settings } from "lucide-react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioRail.module.css";
 import { PROTOTYPE_MONITOR_LEVEL_DB } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { faderDbToNormalized, formatAudioDb, formatAudioTimestamp, formatMeterPercent } from "../audioFormatting";

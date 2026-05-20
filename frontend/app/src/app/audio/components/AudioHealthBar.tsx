@@ -1,6 +1,6 @@
 import { Clock3, TimerReset } from "lucide-react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioHealthBar.module.css";
 import { formatAudioTimestamp } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 

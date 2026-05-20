@@ -1,7 +1,7 @@
 import { Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { IconButton } from "@sse/design-system";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioSnapshotDeck.module.css";
 import type { AudioArmedAction } from "../audioArming";
 import { SNAPSHOT_PLACEHOLDER_LEVELS, SNAPSHOT_THUMB_BAR_COUNT } from "../audioConstants";
 import { formatAudioDb } from "../audioFormatting";

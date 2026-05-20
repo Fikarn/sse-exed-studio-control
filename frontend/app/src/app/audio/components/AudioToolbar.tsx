@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal } from "lucide-
 
 import { Button, StatusBadge } from "@sse/design-system";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioToolbar.module.css";
 import { formatAudioTimestamp, type AudioDensityMode } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 import { mapStatusBadgeTone } from "../../shellData";

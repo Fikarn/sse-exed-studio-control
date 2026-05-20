@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import { useAudioMeterFrame, type AudioMeterEntry, type ShellStore } from "@sse/engine-client";
 
 import styles from "../AudioWorkspace.module.css";
+import railStyles from "./AudioRail.module.css";
 import { INSPECTOR_DB_HYSTERESIS, INSPECTOR_READOUT_INTERVAL_MS } from "../audioConstants";
 import { formatMeterDb, formatMeterPercent } from "../audioFormatting";
 import {
@@ -218,7 +219,7 @@ export function AudioLiveMasterHalo({
   const masterGlow = Math.max(left, right);
   return (
     <span
-      className={styles.masterHalo}
+      className={railStyles.masterHalo}
       data-testid="audio-master-halo"
       aria-hidden="true"
       style={{ "--master-glow": masterGlow.toFixed(3) } as CSSProperties}

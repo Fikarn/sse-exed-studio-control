@@ -1,0 +1,421 @@
+.snapshotDeck {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 4px;
+  min-height: 82px;
+  margin: 0;
+  padding: 8px 16px;
+  border-top: 1px solid var(--audio-border);
+  border-radius: 0;
+  background: linear-gradient(180deg, var(--audio-panel), var(--audio-canvas));
+}
+
+.snapshotDeckHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.snapshotDeckHeader h2 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-ui);
+  letter-spacing: 0;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.snapshotGrid {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.snapshotCapture,
+.snapshotTile {
+  --snapshot-action-strip-width: 34px;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 2px;
+  align-items: start;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 66px;
+  padding: 7px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-800) 72%, transparent);
+  color: inherit;
+  text-align: left;
+}
+
+.snapshotTile[data-armed="true"] {
+  border-color: color-mix(in srgb, var(--audio-hot) 70%, var(--audio-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 18%, transparent), transparent),
+    color-mix(in srgb, var(--audio-panel) 90%, transparent);
+  color: var(--audio-hot);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--audio-hot) 28%, transparent),
+    0 0 18px color-mix(in srgb, var(--audio-hot) 18%, transparent);
+}
+
+.snapshotPreview {
+  position: absolute;
+  z-index: 20;
+  right: calc(var(--snapshot-action-strip-width) + 4px);
+  bottom: calc(100% + 6px);
+  display: none;
+  width: 180px;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid var(--audio-border-strong);
+  border-radius: 8px;
+  background: var(--audio-panel-strong);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.54);
+}
+
+.snapshotTile:hover .snapshotPreview,
+.snapshotTile:focus-within .snapshotPreview {
+  display: grid;
+}
+
+.snapshotPreview strong,
+.snapshotPreview small {
+  color: var(--audio-text-default);
+  font: var(--font-weight-medium) 10px / 1.15 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.snapshotPreview strong {
+  color: var(--audio-text-strong);
+}
+
+.snapshotPreviewLine {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.snapshotPreviewLine span {
+  overflow: hidden;
+  color: var(--audio-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshotPreviewLine strong {
+  color: var(--audio-accent);
+  white-space: nowrap;
+}
+
+.snapshotPreviewOverflow {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 9px / 1.2 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.snapshotCapture {
+  align-content: center;
+  justify-items: start;
+  flex: 0 0 118px;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--audio-accent) 48%, var(--audio-border));
+  color: var(--color-text-muted);
+  font: var(--font-weight-semibold) 11px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.snapshotCapture:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.snapshotRecallSurface {
+  position: absolute;
+  inset: 0 var(--snapshot-action-strip-width) 0 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 2px;
+  padding: 7px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.snapshotRecallSurface:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.snapshotRecallSurface:focus,
+.snapshotRecallSurface:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--audio-accent) 82%, white);
+  outline-offset: -3px;
+}
+
+.snapshotTileActions {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transform: translateY(-50%);
+  visibility: visible;
+  opacity: 0.84;
+  pointer-events: auto;
+  transition: opacity 120ms ease;
+}
+
+.snapshotTile:hover .snapshotTileActions,
+.snapshotTile:focus-within .snapshotTileActions {
+  opacity: 1;
+}
+
+.snapshotActionButton {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--audio-border-strong) 78%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--audio-panel-strong) 92%, transparent);
+  color: var(--audio-text-default);
+  cursor: pointer;
+}
+
+.snapshotActionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.snapshotTile[data-current="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 14%, transparent), transparent),
+    color-mix(in srgb, var(--color-surface-800) 76%, transparent);
+}
+
+.snapshotTile[data-flash="true"] {
+  animation: snapshotPulse 1.5s ease-out;
+}
+
+.snapshotSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.snapshotName {
+  grid-column: 1;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: clip;
+  text-transform: none;
+  white-space: normal;
+}
+
+.snapshotName[data-kind="capture"]::after {
+  content: " snapshot";
+}
+
+.snapshotThumb {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-items: end;
+  gap: 2px;
+  min-height: 22px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 74%, transparent);
+  border-radius: 6px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--audio-border) 26%, transparent) 1px, transparent 1px),
+    color-mix(in srgb, var(--color-surface-900) 58%, transparent);
+  background-size: 100% 50%;
+}
+
+.snapshotThumb i {
+  display: block;
+  min-height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: color-mix(in srgb, var(--audio-accent) 66%, transparent);
+}
+
+.snapshotEmpty {
+  opacity: 0.66;
+}
+
+.snapshotEmpty .snapshotThumb i {
+  height: 20%;
+  background: color-mix(in srgb, var(--color-text-subtle) 24%, transparent);
+}
+
+.snapshotMeta {
+  grid-column: 1 / -1;
+  align-self: end;
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 10px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.snapshotShortcut {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface-700) 76%, transparent);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+@keyframes snapshotPulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--audio-accent) 54%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snapshotTile[data-flash="true"] {
+    animation: none !important;
+  }
+
+  .snapshotTileActions {
+    transition: none !important;
+  }
+}
+
+@container operator-root (min-width: 2200px) and (min-height: 1250px) {
+  .snapshotDeck {
+    min-height: 118px;
+  }
+
+  .snapshotTile,
+  .snapshotCapture {
+    min-height: 92px;
+  }
+
+  .snapshotThumb {
+    min-height: 30px;
+  }
+}
+
+@container operator-root (max-width: 2100px) {
+  .snapshotMeta {
+    font-size: 9px;
+  }
+
+  .snapshotGrid {
+    grid-template-columns: 1.05fr repeat(8, minmax(0, 1fr));
+  }
+
+  .snapshotTile,
+  .snapshotCapture {
+    padding: 6px;
+  }
+}
+
+[data-layout-mode="studioFull"] .snapshotDeck {
+  grid-template-columns: 108px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 118px;
+  padding: 10px 16px;
+}
+
+[data-layout-mode="studioFull"] .snapshotTile,
+[data-layout-mode="studioFull"] .snapshotCapture {
+  min-height: 92px;
+}
+
+[data-layout-mode="studioFull"] .snapshotThumb {
+  min-height: 30px;
+}
+
+@container operator-root (max-height: 1100px) {
+  [data-layout-mode="studioFull"] .snapshotDeck {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 6px;
+    min-height: 82px;
+    padding: 8px 12px;
+  }
+
+  [data-layout-mode="studioFull"] .snapshotTile,
+  [data-layout-mode="studioFull"] .snapshotCapture {
+    min-height: 66px;
+    padding: 6px;
+  }
+
+  [data-layout-mode="studioFull"] .snapshotTile {
+    --snapshot-action-strip-width: 28px;
+  }
+
+  [data-layout-mode="studioFull"] .snapshotTileActions {
+    right: 4px;
+    gap: 2px;
+  }
+
+  [data-layout-mode="studioFull"] .snapshotActionButton {
+    width: 19px;
+    min-width: 19px;
+    height: 19px;
+    min-height: 19px;
+    border-radius: 4px;
+  }
+
+  [data-layout-mode="studioFull"] .snapshotActionButton svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  [data-layout-mode="studioFull"] .snapshotThumb {
+    min-height: 18px;
+  }
+}

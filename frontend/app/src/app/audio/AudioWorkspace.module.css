@@ -59,7 +59,6 @@
   opacity: 0;
 }
 
-.audioShell[data-canvas-metering="true"] .mixTargetMiniMeter i::before,
 .audioShell[data-canvas-metering="true"] .canvasActiveMixMeter i::before {
   opacity: 0;
 }
@@ -70,7 +69,6 @@
    degraded state. The warning band remains the truthful surface. */
 .audioShell[data-canvas-metering="false"] .stereoMeter [data-meter-fill],
 .audioShell[data-canvas-metering="false"] .stereoMeter [data-meter-peak],
-.audioShell[data-canvas-metering="false"] .mixTargetMiniMeter i::before,
 .audioShell[data-canvas-metering="false"] .canvasActiveMixMeter i::before {
   opacity: 0;
 }
@@ -90,6 +88,22 @@
   text-transform: uppercase;
 }
 
+.masterHalo {
+  position: absolute;
+  inset: -28px;
+  z-index: 0;
+  border-radius: 999px;
+  background: radial-gradient(
+    220px 180px at 50% 22%,
+    color-mix(in srgb, var(--audio-accent) 46%, transparent) 0%,
+    transparent 70%
+  );
+  opacity: calc(0.18 + var(--master-glow, 0) * 0.55);
+  filter: blur(2px);
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
 /* Shared panel surface. Audio surfaces import this via CSS Modules
    `composes: shellPanel from "./AudioWorkspace.module.css"` so the shared
    background / border treatment stays single-sourced even after the
@@ -104,34 +118,13 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
 }
 
-.audioToolbar,
-.railPanel,
-.railToolsPanel,
 .signalCanvas,
 .inspector,
-.healthBar,
 .loadingPanel {
   composes: shellPanel;
 }
 
-.audioToolbar {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto auto auto minmax(220px, auto);
-  align-items: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 8px 12px;
-}
-
-.toolbarIdentity {
-  min-width: 0;
-}
-
-.toolbarIdentity h1,
-.railHeader h2,
 .canvasHeader h2,
-.snapshotDeckHeader h2,
 .inspectorHeader h2,
 .outputInspector h3,
 .emptyInspector h3,
@@ -142,7 +135,6 @@
   letter-spacing: 0;
 }
 
-.toolbarIdentity p,
 .inspectorHeader p,
 .placeholderPanel p,
 .emptyInspector p,
@@ -153,71 +145,14 @@
   letter-spacing: 0;
 }
 
-.toolbarCluster {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: 0;
-}
-
-.toolbarMeta,
-.bankPill,
-.snapshotStatusName,
-.snapshotShortcut,
-.railCount,
 .meterReadout,
-.faderValue,
-.snapshotSlot {
+.faderValue {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.bankPill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  min-width: 92px;
-  padding: 0 10px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-900) 86%, transparent);
-  color: var(--color-text-strong);
-}
-
-.iconButton {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-800) 82%, transparent);
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.iconButton:disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
-}
-
-.densityToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 36px;
-  padding: 3px 5px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-900) 88%, transparent);
-  color: var(--color-text-muted);
-}
-
-.densityToggle button,
 .viewModeButton,
 .inspectorTabs button {
   border: 0;
@@ -230,34 +165,10 @@
   cursor: pointer;
 }
 
-.densityToggle button {
-  min-height: 28px;
-  padding: 0 10px;
-}
-
-.densityToggle button[data-active="true"],
 .viewModeButton[data-active="true"],
 .inspectorTabs button[data-active="true"] {
   background: color-mix(in srgb, var(--audio-accent) 16%, var(--color-surface-700));
   color: var(--color-text-strong);
-}
-
-.snapshotStatus {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 4px 8px;
-  justify-self: end;
-  min-width: 230px;
-}
-
-.snapshotStatus .eyebrow {
-  grid-column: 1 / -1;
-}
-
-.snapshotStatusName {
-  color: var(--color-text-strong);
-  text-transform: none;
 }
 
 .warningBand,
@@ -359,437 +270,11 @@
   overflow: hidden;
 }
 
-.audioRail,
 .signalCanvas,
 .inspector {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-}
-
-.audioRail {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.railPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-  padding: 12px;
-}
-
-.railMonitorCard {
-  flex: 0 0 auto;
-  position: relative;
-  overflow: hidden;
-}
-
-.railMonitorCard > :not(.masterHalo) {
-  position: relative;
-  z-index: 1;
-}
-
-.masterHalo {
-  position: absolute;
-  inset: -28px;
-  z-index: 0;
-  border-radius: 999px;
-  background: radial-gradient(
-    220px 180px at 50% 22%,
-    color-mix(in srgb, var(--audio-accent) 46%, transparent) 0%,
-    transparent 70%
-  );
-  opacity: calc(0.18 + var(--master-glow, 0) * 0.55);
-  filter: blur(2px);
-  pointer-events: none;
-  transition: opacity 220ms ease;
-}
-
-.railMonitorCard .railHeader h2 {
-  font-size: 27px;
-}
-
-.monitorCardStatus,
-.monitorMeta {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.statusDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--audio-accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--audio-accent) 16%, transparent);
-}
-
-.monitorLevel {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 7px;
-  padding: 8px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-900) 72%, transparent);
-}
-
-.monitorLevel span,
-.monitorLevel strong {
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.monitorLevel strong {
-  color: var(--color-text-strong);
-  text-transform: none;
-}
-
-.monitorLevel .sliderControl {
-  grid-column: 1 / -1;
-  width: 100%;
-}
-
-.monitorButtonGrid,
-.railToolGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.monitorButtonGrid button,
-.railToolGrid button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-width: 0;
-  min-height: 28px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.monitorButtonGrid button[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-accent) 16%, var(--color-surface-800));
-  color: var(--color-text-strong);
-}
-
-.monitorButtonGrid button:disabled,
-.railToolGrid button:disabled {
-  opacity: 0.46;
-  cursor: not-allowed;
-}
-
-.railToolsPanel {
-  flex: 0 0 auto;
-  display: grid;
-  gap: 10px;
-  padding: 10px;
-}
-
-.railAuxPanel {
-  display: none;
-}
-
-.railFactGrid {
-  display: grid;
-  /* Why: auto-fit keeps the trust panel readable when the rail narrows under
-     studio-full sizing rules. Each fact stays at least 96 px wide so the
-     `Console`, `OSC`, `Metering`, `Endpoint`, `Solo`, `Clips` headings are
-     never cut mid-word. */
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 7px;
-  min-height: 0;
-}
-
-.railFactGrid span,
-.railSnapshotCard {
-  display: grid;
-  align-content: center;
-  gap: 4px;
-  min-width: 0;
-  min-height: 0;
-  padding: 8px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-900) 72%, transparent);
-}
-
-.railFactGrid small,
-.railSnapshotCard span,
-.railSnapshotCard small {
-  overflow: hidden;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 9px / 1.15 var(--font-family-mono);
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.railFactGrid strong,
-.railSnapshotCard strong {
-  overflow: hidden;
-  color: var(--color-text-strong);
-  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.railFactGrid span[data-rail-fact="endpoint"],
-.railFactGrid span[data-rail-fact="last-sync"] {
-  grid-column: 1 / -1;
-}
-
-.railSnapshotCard {
-  align-content: start;
-  gap: 7px;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 10%, transparent), transparent),
-    color-mix(in srgb, var(--color-surface-900) 74%, transparent);
-}
-
-.railSnapshotCard strong {
-  font: var(--font-weight-semibold) 18px / 1.08 var(--font-family-display);
-}
-
-.railToolGrid {
-  grid-template-columns: 1fr 1fr;
-}
-
-.railHeader,
-.canvasHeader,
-.snapshotDeckHeader,
-.inspectorHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.railCount {
-  display: inline-grid;
-  place-items: center;
-  min-width: 28px;
-  height: 28px;
-  border: 1px solid var(--audio-border);
-  border-radius: 999px;
-}
-
-.railCaret {
-  margin-left: 6px;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 12px / 1 var(--font-family-mono);
-}
-
-.mixTargetList {
-  display: grid;
-  gap: 8px;
-  min-height: 0;
-}
-
-.mixTargetButton {
-  --target-accent: var(--audio-accent);
-  display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) 48px;
-  gap: 8px;
-  align-items: center;
-  min-height: 50px;
-  padding: 7px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-900) 70%, transparent);
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.mixTargetButton[data-role="main-out"],
-.outputLane[data-role="main-out"] {
-  --target-accent: #5dc5e8;
-}
-
-.mixTargetButton[data-role="phones-a"],
-.outputLane[data-role="phones-a"] {
-  --target-accent: #e8a341;
-}
-
-.mixTargetButton[data-role="phones-b"],
-.outputLane[data-role="phones-b"] {
-  --target-accent: #b388f5;
-}
-
-.mixTargetButton[data-selected="true"] {
-  border-color: color-mix(in srgb, var(--target-accent) 54%, var(--audio-border));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--target-accent) 18%, transparent), transparent),
-    color-mix(in srgb, var(--color-surface-800) 84%, transparent);
-  overflow: hidden;
-}
-
-.mixTargetStripe {
-  align-self: stretch;
-  width: 8px;
-  border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    var(--target-accent),
-    color-mix(in srgb, var(--target-accent) 58%, var(--audio-hot))
-  );
-  box-shadow: 0 0 14px color-mix(in srgb, var(--target-accent) 32%, transparent);
-}
-
-.mixTargetCopy,
-.laneNameBlock,
-.channelSummaryText {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.mixTargetName,
-.laneName,
-.snapshotName {
-  overflow: hidden;
-  color: var(--color-text-strong);
-  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mixTargetMeta,
-.laneMeta,
-.snapshotMeta,
-.tierLabel small,
-.lineModule small {
-  overflow: hidden;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 10px / 1.1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.mixTargetFlags {
-  display: none;
-}
-
-.mixTargetMiniMeter {
-  grid-column: 3;
-  grid-row: 1 / span 2;
-  display: grid;
-  align-content: center;
-  gap: 4px;
-  min-width: 0;
-  contain: paint;
-}
-
-.mixTargetMiniMeter i {
-  --meter-level: 0%;
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--audio-meter-bg);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-border) 72%, transparent);
-}
-
-.mixTargetMiniMeter i::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: var(--meter-level);
-  background: linear-gradient(
-    90deg,
-    var(--audio-meter-low) 0 78%,
-    var(--audio-meter-warn) 78% 92%,
-    var(--audio-meter-hot) 92% 100%
-  );
-}
-
-.mixTargetFlags span,
-.outputAccent,
-.laneBadge,
-.miniToggle,
-.snapshotShortcut {
-  display: inline-flex;
-  align-items: center;
-  min-height: 18px;
-  padding: 0 6px;
-  border: 1px solid var(--audio-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-surface-700) 76%, transparent);
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.viewModeStack {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 4px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-900) 78%, transparent);
-}
-
-.viewModeButton {
-  min-height: 30px;
-}
-
-.viewModeButton:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.railStatsGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.railStatsGrid span {
-  display: grid;
-  gap: 4px;
-  min-height: 48px;
-  padding: 8px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-900) 72%, transparent);
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 10px / 1.1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.railStatsGrid strong {
-  color: var(--color-text-strong);
-  font-size: 17px;
 }
 
 .signalCanvas {
@@ -2390,8 +1875,7 @@
   color: var(--audio-solo);
 }
 
-.audioShell button[data-armed="true"],
-.snapshotTile[data-armed="true"] {
+.audioShell button[data-armed="true"] {
   border-color: color-mix(in srgb, var(--audio-hot) 70%, var(--audio-border));
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 18%, transparent), transparent),
@@ -2410,15 +1894,12 @@
   color: var(--audio-mute);
 }
 
-.monitorButtonGrid button[data-control="talk"][data-active="true"],
 .laneToggle[data-control="talk"][data-active="true"] {
   border-color: color-mix(in srgb, var(--audio-talk) 55%, var(--audio-border));
   background: color-mix(in srgb, var(--audio-talk) 18%, var(--audio-panel));
   color: var(--audio-talk);
 }
 
-.monitorButtonGrid button[data-control="dim"][data-active="true"],
-.monitorButtonGrid button[data-control="mono"][data-active="true"],
 .laneToggle[data-control="dim"][data-active="true"],
 .laneToggle[data-control="mono"][data-active="true"] {
   border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
@@ -2469,282 +1950,6 @@
   min-width: 0;
   padding: 0 4px;
   cursor: pointer;
-}
-
-.snapshotDeck {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
-  gap: 4px;
-  min-height: 82px;
-  margin: 0;
-  padding: 8px 16px;
-  border-top: 1px solid var(--audio-border);
-  border-radius: 0;
-  background: linear-gradient(180deg, var(--audio-panel), var(--audio-canvas));
-}
-
-.snapshotDeckHeader {
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.snapshotDeckHeader h2 {
-  margin: 0;
-  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-ui);
-}
-
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.snapshotGrid {
-  display: flex;
-  gap: 4px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.snapshotCapture,
-.snapshotTile {
-  --snapshot-action-strip-width: 34px;
-  position: relative;
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 2px;
-  align-items: start;
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 66px;
-  padding: 7px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-800) 72%, transparent);
-  color: inherit;
-  text-align: left;
-}
-
-.snapshotPreview {
-  position: absolute;
-  z-index: 20;
-  right: calc(var(--snapshot-action-strip-width) + 4px);
-  bottom: calc(100% + 6px);
-  display: none;
-  width: 180px;
-  gap: 5px;
-  padding: 8px;
-  border: 1px solid var(--audio-border-strong);
-  border-radius: 8px;
-  background: var(--audio-panel-strong);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.54);
-}
-
-.snapshotTile:hover .snapshotPreview,
-.snapshotTile:focus-within .snapshotPreview {
-  display: grid;
-}
-
-.snapshotPreview strong,
-.snapshotPreview small {
-  color: var(--audio-text-default);
-  font: var(--font-weight-medium) 10px / 1.15 var(--font-family-mono);
-  letter-spacing: 0;
-}
-
-.snapshotPreview strong {
-  color: var(--audio-text-strong);
-}
-
-.snapshotPreviewLine {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: baseline;
-}
-
-.snapshotPreviewLine span {
-  overflow: hidden;
-  color: var(--audio-text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.snapshotPreviewLine strong {
-  color: var(--audio-accent);
-  white-space: nowrap;
-}
-
-.snapshotPreviewOverflow {
-  color: var(--audio-text-muted);
-  font: var(--font-weight-medium) 9px / 1.2 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.snapshotCapture {
-  align-content: center;
-  justify-items: start;
-  flex: 0 0 118px;
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--audio-accent) 48%, var(--audio-border));
-  color: var(--color-text-muted);
-  font: var(--font-weight-semibold) 11px / 1.1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-align: left;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.snapshotCapture:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.snapshotRecallSurface {
-  position: absolute;
-  inset: 0 var(--snapshot-action-strip-width) 0 0;
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 2px;
-  padding: 7px;
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.snapshotRecallSurface:disabled {
-  cursor: not-allowed;
-  opacity: 0.62;
-}
-
-.snapshotRecallSurface:focus,
-.snapshotRecallSurface:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--audio-accent) 82%, white);
-  outline-offset: -3px;
-}
-
-.snapshotTileActions {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transform: translateY(-50%);
-  visibility: visible;
-  opacity: 0.84;
-  pointer-events: auto;
-  transition: opacity 120ms ease;
-}
-
-.snapshotTile:hover .snapshotTileActions,
-.snapshotTile:focus-within .snapshotTileActions {
-  opacity: 1;
-}
-
-.snapshotActionButton {
-  width: 24px;
-  min-width: 24px;
-  height: 24px;
-  min-height: 24px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--audio-border-strong) 78%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--audio-panel-strong) 92%, transparent);
-  color: var(--audio-text-default);
-  cursor: pointer;
-}
-
-.snapshotActionButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.46;
-}
-
-.snapshotTile[data-current="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 14%, transparent), transparent),
-    color-mix(in srgb, var(--color-surface-800) 76%, transparent);
-}
-
-.snapshotTile[data-flash="true"] {
-  animation: snapshotPulse 1.5s ease-out;
-}
-
-.snapshotSlot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: auto;
-  height: auto;
-  border: 0;
-  border-radius: 0;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.snapshotName {
-  grid-column: 1;
-  overflow: visible;
-  overflow-wrap: anywhere;
-  text-overflow: clip;
-  text-transform: none;
-  white-space: normal;
-}
-
-.snapshotName[data-kind="capture"]::after {
-  content: " snapshot";
-}
-
-.snapshotThumb {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  align-items: end;
-  gap: 2px;
-  min-height: 22px;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--audio-border) 74%, transparent);
-  border-radius: 6px;
-  background:
-    linear-gradient(color-mix(in srgb, var(--audio-border) 26%, transparent) 1px, transparent 1px),
-    color-mix(in srgb, var(--color-surface-900) 58%, transparent);
-  background-size: 100% 50%;
-}
-
-.snapshotThumb i {
-  display: block;
-  min-height: 3px;
-  border-radius: 999px 999px 0 0;
-  background: color-mix(in srgb, var(--audio-accent) 66%, transparent);
-}
-
-.snapshotEmpty {
-  opacity: 0.66;
-}
-
-.snapshotEmpty .snapshotThumb i {
-  height: 20%;
-  background: color-mix(in srgb, var(--color-text-subtle) 24%, transparent);
-}
-
-.snapshotMeta {
-  grid-column: 1 / -1;
-  align-self: end;
-  text-transform: none;
 }
 
 .inspector {
@@ -4145,16 +3350,6 @@ button.inspectorMiniCard {
   background: color-mix(in srgb, var(--color-surface-900) 68%, transparent);
 }
 
-.healthBar {
-  flex: 0 0 44px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 14px;
-}
-
 .contextMenu {
   position: fixed;
   z-index: 40;
@@ -4192,80 +3387,6 @@ button.inspectorMiniCard {
   opacity: 0.54;
 }
 
-.healthItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.healthItem strong {
-  overflow: hidden;
-  max-width: 170px;
-  color: var(--color-text-strong);
-  font: inherit;
-  text-overflow: ellipsis;
-}
-
-.healthTelemetry,
-.healthShortcutGroup {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.healthTelemetry {
-  gap: 12px;
-}
-
-.healthShortcutGroup {
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.healthCommand,
-.healthShortcut {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 24px;
-  padding: 0 8px;
-  border: 1px solid color-mix(in srgb, var(--audio-border) 76%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--audio-panel-strong) 62%, transparent);
-  color: var(--audio-text-subtle);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.healthCommand {
-  color: var(--audio-text-default);
-}
-
-.healthCommand kbd {
-  display: inline-grid;
-  place-items: center;
-  min-width: 16px;
-  height: 16px;
-  border: 1px solid var(--audio-border);
-  border-radius: 4px;
-  color: var(--audio-text-strong);
-  font: inherit;
-}
-
-.healthShortcut {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .loadingPanel {
   display: grid;
   align-content: start;
@@ -4293,16 +3414,6 @@ button.inspectorMiniCard {
   border: 1px solid var(--audio-border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--color-surface-700) 72%, transparent);
-}
-
-@keyframes snapshotPulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--audio-accent) 54%, transparent);
-  }
-
-  100% {
-    box-shadow: 0 0 0 14px transparent;
-  }
 }
 
 .audioDialogForm {
@@ -4374,12 +3485,7 @@ button.inspectorMiniCard {
     transition-duration: 0s !important;
   }
 
-  .snapshotTile[data-flash="true"] {
-    animation: none !important;
-  }
-
-  .masterHalo,
-  .snapshotTileActions {
+  .masterHalo {
     transition: none !important;
   }
 
@@ -4856,38 +3962,9 @@ button.inspectorMiniCard {
     min-height: 34px;
     font-size: 11px;
   }
-
-  .snapshotDeck {
-    min-height: 118px;
-  }
-
-  .snapshotTile,
-  .snapshotCapture {
-    min-height: 92px;
-  }
-
-  .snapshotThumb {
-    min-height: 30px;
-  }
 }
 
 @container operator-root (max-width: 2100px) {
-  .audioToolbar {
-    grid-template-columns: minmax(220px, 1fr) auto auto auto minmax(210px, auto);
-  }
-
-  .snapshotStatus {
-    grid-column: auto;
-    justify-self: end;
-    min-width: 210px;
-    padding-top: 0;
-    border-top: 0;
-  }
-
-  .snapshotStatus .eyebrow {
-    grid-column: 1 / -1;
-  }
-
   .audioBody {
     grid-template-columns: 276px minmax(0, 1fr) 364px;
   }
@@ -5009,7 +4086,6 @@ button.inspectorMiniCard {
   }
 
   .laneMeta,
-  .snapshotMeta,
   .tierLabel small,
   .lineModule small {
     font-size: 9px;
@@ -5097,15 +4173,6 @@ button.inspectorMiniCard {
     font-size: 9px;
   }
 
-  .snapshotGrid {
-    grid-template-columns: 1.05fr repeat(8, minmax(0, 1fr));
-  }
-
-  .snapshotTile,
-  .snapshotCapture {
-    padding: 6px;
-  }
-
   .canvasContextBar {
     padding-inline: 10px;
   }
@@ -5129,14 +4196,6 @@ button.inspectorMiniCard {
     padding: 0 7px;
     font-size: 8px;
   }
-
-  .healthBar {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .healthTelemetry .healthItem:nth-child(6) {
-    display: none;
-  }
 }
 
 @container operator-root (max-width: 1600px) {
@@ -5144,9 +4203,7 @@ button.inspectorMiniCard {
     grid-template-columns: 196px minmax(0, 1fr) 280px;
   }
 
-  .toolbarMeta,
-  .canvasLegend,
-  .healthTelemetry .healthItem:nth-child(5) {
+  .canvasLegend {
     display: none;
   }
 
@@ -5164,19 +4221,7 @@ button.inspectorMiniCard {
   gap: 0;
 }
 
-[data-layout-mode="studioFull"] .audioShell .toolbarMeta,
-[data-layout-mode="studioFull"] .audioShell .canvasLegend,
-[data-layout-mode="studioFull"] .audioShell .healthItem:nth-child(5),
-[data-layout-mode="studioFull"] .audioShell .healthItem:nth-child(6) {
-  display: inline-flex;
-}
-
-[data-layout-mode="studioFull"] .audioShell .healthBar {
-  grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 44px;
-}
-
-[data-layout-mode="studioFull"] .audioShell .healthTelemetry .healthItem {
+[data-layout-mode="studioFull"] .audioShell .canvasLegend {
   display: inline-flex;
 }
 
@@ -5515,57 +4560,7 @@ button.inspectorMiniCard {
   font-size: 12px;
 }
 
-[data-layout-mode="studioFull"] .audioShell .snapshotDeck {
-  grid-template-columns: 108px minmax(0, 1fr);
-  gap: 10px;
-  min-height: 118px;
-  padding: 10px 16px;
-}
-
-[data-layout-mode="studioFull"] .audioShell .snapshotTile,
-[data-layout-mode="studioFull"] .audioShell .snapshotCapture {
-  min-height: 92px;
-}
-
-[data-layout-mode="studioFull"] .audioShell .snapshotThumb {
-  min-height: 30px;
-}
-
 @container operator-root (min-width: 2200px) and (min-height: 1250px) {
-  [data-layout-mode="studioFull"] .audioShell .audioRail {
-    display: grid;
-    grid-template-rows: minmax(0, 1.18fr) auto minmax(0, 0.72fr) minmax(0, 0.72fr);
-    gap: 10px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railMonitorCard,
-  [data-layout-mode="studioFull"] .audioShell .railAuxPanel {
-    min-height: 0;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railAuxPanel {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    overflow: hidden;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railAuxPanel[data-testid="audio-rail-snapshot-panel"] {
-    grid-template-rows: auto auto minmax(0, 1fr);
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railFactGrid {
-    align-content: stretch;
-    min-height: 0;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railFactGrid span {
-    align-content: center;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railSnapshotCard {
-    min-height: 82px;
-  }
-
   [data-layout-mode="studioFull"] .audioShell .inspectorPanel {
     min-height: 0;
   }
@@ -5618,57 +4613,6 @@ button.inspectorMiniCard {
 }
 
 @container operator-root (max-height: 1100px) {
-  [data-layout-mode="studioFull"] .audioShell .audioRail {
-    display: grid;
-    grid-template-rows: minmax(382px, 1fr) auto minmax(104px, 0.34fr) minmax(118px, 0.38fr);
-    gap: 6px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railMonitorCard,
-  [data-layout-mode="studioFull"] .audioShell .railAuxPanel {
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railAuxPanel {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: 6px;
-    padding: 8px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railAuxPanel[data-testid="audio-rail-snapshot-panel"] {
-    grid-template-rows: auto auto minmax(0, 1fr);
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railFactGrid {
-    gap: 4px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railFactGrid span,
-  [data-layout-mode="studioFull"] .audioShell .railSnapshotCard {
-    gap: 2px;
-    padding: 5px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railFactGrid small,
-  [data-layout-mode="studioFull"] .audioShell .railSnapshotCard span,
-  [data-layout-mode="studioFull"] .audioShell .railSnapshotCard small {
-    font-size: 8px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railFactGrid strong {
-    font-size: 10px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railSnapshotCard {
-    min-height: 0;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .railSnapshotCard strong {
-    font-size: 13px;
-  }
-
   [data-layout-mode="studioFull"] .audioShell .tieredMixer {
     grid-template-rows: minmax(212px, 1.06fr) minmax(132px, 0.76fr) minmax(122px, 0.72fr);
     gap: 8px;
@@ -5800,44 +4744,5 @@ button.inspectorMiniCard {
   [data-layout-mode="studioFull"] .audioShell .outputLane .laneToggle {
     min-height: 24px;
     font-size: 9px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .snapshotDeck {
-    grid-template-columns: 88px minmax(0, 1fr);
-    gap: 6px;
-    min-height: 82px;
-    padding: 8px 12px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .snapshotTile,
-  [data-layout-mode="studioFull"] .audioShell .snapshotCapture {
-    min-height: 66px;
-    padding: 6px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .snapshotTile {
-    --snapshot-action-strip-width: 28px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .snapshotTileActions {
-    right: 4px;
-    gap: 2px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .snapshotActionButton {
-    width: 19px;
-    min-width: 19px;
-    height: 19px;
-    min-height: 19px;
-    border-radius: 4px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .snapshotActionButton svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  [data-layout-mode="studioFull"] .audioShell .snapshotThumb {
-    min-height: 18px;
   }
 }
