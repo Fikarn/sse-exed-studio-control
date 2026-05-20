@@ -656,9 +656,14 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expectAudioWorkspaceGeometry(page);
   await expect(page.getByTestId("audio-master-halo")).toBeVisible();
   await expect(page.getByTestId("audio-routing-overlay")).toHaveCount(0);
-  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Endpoint");
-  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Metering");
+  // GS-AUD-45: OSC / Endpoint / Metering moved to the rail Trust panel
+  // (canonical surface). The footer keeps only the temporal facts.
+  await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("OSC");
+  await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Endpoint");
+  await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Metering");
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Clock");
+  await expect(page.getByTestId("audio-rail-trust-panel")).toContainText("Endpoint");
+  await expect(page.getByTestId("audio-rail-trust-panel")).toContainText("Metering");
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Command palette");
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Shortcuts");
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank prev");
@@ -1118,7 +1123,8 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
 
   await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveText("TEST METER SIMULATION");
   await expect(page.getByTestId("audio-rail-monitor-card")).toContainText("test meters");
-  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Test meter simulation");
+  // GS-AUD-45: simulated metering label now lives on the rail Trust panel.
+  await expect(page.getByTestId("audio-rail-trust-panel")).toContainText("test simulation");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST STAGE");
 
   const hostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
@@ -1208,7 +1214,8 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await openFixture(page, "audio-hardware-metering");
   await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveCount(0);
   await expect(page.getByTestId("audio-rail-monitor-card")).toContainText("Active mix · live");
-  await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Test meter simulation");
+  // GS-AUD-45: the simulated badge moved to the rail Trust panel.
+  await expect(page.getByTestId("audio-rail-trust-panel")).not.toContainText("test simulation");
   await expect(page.locator("[data-simulated-meter]")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-playback-3-4").locator("[data-simulation-profile]")).toHaveCount(0);
   const hardwareHostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
@@ -1595,9 +1602,7 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
   await currentSnapshot.hover();
   await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
-  await expect(
-    currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)
-  ).toBeVisible();
+  await expect(currentSnapshot.getByText(/-∞ dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)).toBeVisible();
 
   await saveAudioSnapshot(page, "snapshot-show-open");
   await expect
@@ -1667,9 +1672,7 @@ test("shows numeric snapshot before and after preview text", async ({ page }) =>
 
   await currentSnapshot.hover();
   await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
-  await expect(
-    currentSnapshot.getByText(/[+-]?inf dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)
-  ).toBeVisible();
+  await expect(currentSnapshot.getByText(/-∞ dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)).toBeVisible();
 });
 
 test("supports engine-backed audio EQ editing", async ({ page }) => {

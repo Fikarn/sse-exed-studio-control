@@ -12,6 +12,12 @@ import preampKnobBody from "../assets/preamp/preamp-knob-body.png";
 import preampPanelCompact from "../assets/preamp/preamp-panel-compact.png";
 import preampPanelNarrow from "../assets/preamp/preamp-panel-narrow.png";
 import styles from "../AudioWorkspace.module.css";
+import {
+  AUDIO_DRAFT_CLEAR_MS,
+  PREAMP_GAIN_MAX_DB,
+  PREAMP_ROTATION_ORIGIN_DEG,
+  PREAMP_ROTATION_RANGE_DEG,
+} from "../audioConstants";
 import { AudioNumberDialog } from "./AudioNumberDialog";
 
 interface AudioPreampControlProps {
@@ -95,7 +101,7 @@ const PREAMP_LED_SOCKET_MAPS = {
 
 function clampGain(value: number) {
   if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(75, value));
+  return Math.max(0, Math.min(PREAMP_GAIN_MAX_DB, value));
 }
 
 function quantizeGain(value: number, step: number) {
@@ -113,7 +119,7 @@ function preampNumber(channelId: string) {
 
 function PreampLedRing({ gain, variant }: { gain: number; variant: AudioPreampControlProps["variant"] }) {
   const map = PREAMP_LED_SOCKET_MAPS[variant];
-  const activeLed = Math.round((clampGain(gain) / 75) * (map.sockets.length - 1));
+  const activeLed = Math.round((clampGain(gain) / PREAMP_GAIN_MAX_DB) * (map.sockets.length - 1));
 
   return (
     <svg
@@ -160,8 +166,11 @@ export function AudioPreampControl({
   const [numberDialogOpen, setNumberDialogOpen] = useState(false);
   const [localDraftGain, setLocalDraftGain] = useState<number | null>(null);
   const currentGain = clampGain(localDraftGain ?? gain);
-  const gainPct = (currentGain / 75) * 100;
-  const rotation = (currentGain / 75) * 250 - 125;
+  const gainPct = (currentGain / PREAMP_GAIN_MAX_DB) * 100;
+  // Why: the preamp knob asset sweeps PREAMP_ROTATION_RANGE_DEG (250°) total,
+  // centred so 0 dB sits at PREAMP_ROTATION_ORIGIN_DEG (-125°) — the asset's
+  // pointing-up midpoint.
+  const rotation = (currentGain / PREAMP_GAIN_MAX_DB) * PREAMP_ROTATION_RANGE_DEG + PREAMP_ROTATION_ORIGIN_DEG;
 
   useEffect(() => {
     if (dragRef.current) return;
@@ -192,7 +201,7 @@ export function AudioPreampControl({
     clearTimerRef.current = window.setTimeout(() => {
       clearTimerRef.current = null;
       setLocalDraftGain(null);
-    }, 250);
+    }, AUDIO_DRAFT_CLEAR_MS);
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -284,7 +293,7 @@ export function AudioPreampControl({
         nextGain = 0;
         break;
       case "End":
-        nextGain = 75;
+        nextGain = PREAMP_GAIN_MAX_DB;
         break;
       default:
         return;
@@ -327,7 +336,7 @@ export function AudioPreampControl({
         aria-disabled={disabled ? true : undefined}
         aria-label={label}
         aria-orientation="vertical"
-        aria-valuemax={75}
+        aria-valuemax={PREAMP_GAIN_MAX_DB}
         aria-valuemin={0}
         aria-valuenow={commitGainValue(currentGain)}
         aria-valuetext={`${commitGainValue(currentGain)} dB`}
@@ -347,7 +356,7 @@ export function AudioPreampControl({
           {
             "--gain-pct": `${gainPct}%`,
             "--gain-rotation": `${rotation}deg`,
-            "--gain-sweep": `${(currentGain / 75) * 270}deg`,
+            "--gain-sweep": `${(currentGain / PREAMP_GAIN_MAX_DB) * 270}deg`,
           } as CSSProperties
         }
         tabIndex={disabled ? -1 : 0}
@@ -370,7 +379,7 @@ export function AudioPreampControl({
         <AudioNumberDialog
           fieldLabel="Preamp gain"
           initialValue={commitGainValue(currentGain)}
-          max={75}
+          max={PREAMP_GAIN_MAX_DB}
           min={0}
           onCancel={() => setNumberDialogOpen(false)}
           onConfirm={(nextGain) => {

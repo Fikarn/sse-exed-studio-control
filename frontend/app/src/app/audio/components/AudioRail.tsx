@@ -3,6 +3,7 @@ import type { ShellStore } from "@sse/engine-client";
 import { RefreshCw, RotateCcw, Settings } from "lucide-react";
 
 import styles from "../AudioWorkspace.module.css";
+import { PROTOTYPE_MONITOR_LEVEL_DB } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { faderDbToNormalized, formatAudioDb, formatAudioTimestamp, formatMeterPercent } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
@@ -18,7 +19,7 @@ function mixTargetMeta(role: string, talkback: boolean) {
   return "Stereo";
 }
 
-const PROTOTYPE_MONITOR_LEVEL = faderDbToNormalized(-12);
+const PROTOTYPE_MONITOR_LEVEL = faderDbToNormalized(PROTOTYPE_MONITOR_LEVEL_DB);
 
 function compactPortRange(start: string, end: string) {
   const compactEnd = start.length === end.length && start.slice(0, -2) === end.slice(0, -2) ? end.slice(-2) : end;
@@ -134,29 +135,42 @@ export function AudioRail({
                   <span className={styles.mixTargetName}>{mixTarget.name}</span>
                   <span className={styles.mixTargetMeta}>{mixTargetMeta(mixTarget.role, mixTarget.talkback)}</span>
                 </span>
-                <span className={styles.mixTargetMiniMeter} aria-hidden="true">
-                  <i
-                    data-mini-meter-id={mixTarget.id}
-                    data-mini-meter-kind="mixTarget"
-                    data-mini-meter-side="left"
-                    style={
-                      {
-                        "--meter-level": formatMeterPercent(mixTarget.meterLeft),
-                      } as CSSProperties
-                    }
-                  />
-                  <i
-                    data-mini-meter-id={mixTarget.id}
-                    data-mini-meter-kind="mixTarget"
-                    data-mini-meter-side="right"
-                    style={
-                      {
-                        "--meter-level": formatMeterPercent(
-                          mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight
-                        ),
-                      } as CSSProperties
-                    }
-                  />
+                <span className={styles.mixTargetMiniMeter}>
+                  {(() => {
+                    const leftPercent = Math.round(
+                      Math.min(100, Math.max(0, Number(formatMeterPercent(mixTarget.meterLeft).replace("%", ""))))
+                    );
+                    const rightSourceValue = mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight;
+                    const rightPercent = Math.round(
+                      Math.min(100, Math.max(0, Number(formatMeterPercent(rightSourceValue).replace("%", ""))))
+                    );
+                    return (
+                      <>
+                        <i
+                          aria-label={`${mixTarget.name} L meter ${leftPercent}%`}
+                          aria-valuemax={100}
+                          aria-valuemin={0}
+                          aria-valuenow={leftPercent}
+                          data-mini-meter-id={mixTarget.id}
+                          data-mini-meter-kind="mixTarget"
+                          data-mini-meter-side="left"
+                          role="meter"
+                          style={{ "--meter-level": `${leftPercent}%` } as CSSProperties}
+                        />
+                        <i
+                          aria-label={`${mixTarget.name} R meter ${rightPercent}%`}
+                          aria-valuemax={100}
+                          aria-valuemin={0}
+                          aria-valuenow={rightPercent}
+                          data-mini-meter-id={mixTarget.id}
+                          data-mini-meter-kind="mixTarget"
+                          data-mini-meter-side="right"
+                          role="meter"
+                          style={{ "--meter-level": `${rightPercent}%` } as CSSProperties}
+                        />
+                      </>
+                    );
+                  })()}
                 </span>
                 <span className={styles.mixTargetFlags}>
                   {mixTarget.mute ? <span>Mute</span> : null}

@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import { useAudioMeterFrame, type AudioMeterEntry, type ShellStore } from "@sse/engine-client";
 
 import styles from "../AudioWorkspace.module.css";
+import { INSPECTOR_DB_HYSTERESIS, INSPECTOR_READOUT_INTERVAL_MS } from "../audioConstants";
 import { formatMeterDb, formatMeterPercent } from "../audioFormatting";
 import {
   clampMeterDbfs,
@@ -14,9 +15,6 @@ import {
 
 type MeterKind = "channel" | "mixTarget";
 type StableMeterMode = "level" | "peakHold";
-
-const INSPECTOR_READOUT_INTERVAL_MS = 150;
-const INSPECTOR_DB_HYSTERESIS = 0.75;
 
 interface MeterReadoutSlot {
   text: string;

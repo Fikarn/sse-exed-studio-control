@@ -425,6 +425,26 @@ export function AudioMeterCanvasOverlay({
       const deltaSeconds = Math.min(0.1, Math.max(0.001, (nowMs - lastPaintedAtMs) / 1000));
       lastPaintedAtMs = nowMs;
       const visibleStateKeys = new Set<string>();
+      // Why: when the workspace flags metering as gated (OSC disabled, console
+      // state unverified, last action failed) the simulated tick would be a
+      // lie. Clear every meter rect this frame and skip the draw loop so the
+      // canvas stays empty while the warning band tells the operator what is
+      // wrong. dataset is read fresh each frame so a state change is picked up
+      // without invalidating the rAF loop.
+      const gated = root.dataset.canvasMetering === "false";
+      if (gated) {
+        for (const meterGeometry of geometry) {
+          clearMeterGeometry(ctx, meterGeometry);
+        }
+        displayStates.clear();
+        datasetSet(canvas, "meterBallistics", "gated");
+        datasetSet(canvas, "meterPeakHoldEnabled", peakHoldEnabled ? "true" : "false");
+        datasetSet(canvas, "meterPeakHoldResetToken", String(peakHoldResetToken));
+        datasetSet(canvas, "meterSequence", String(latestFrame.sequence));
+        datasetSet(canvas, "meterCount", String(geometry.length));
+        animationFrame = window.requestAnimationFrame(paint);
+        return;
+      }
 
       for (const meterGeometry of geometry) {
         clearMeterGeometry(ctx, meterGeometry);

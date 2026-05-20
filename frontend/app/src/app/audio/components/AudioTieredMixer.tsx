@@ -99,10 +99,14 @@ export function AudioTieredMixer({
                 </button>
               ))}
             </div>
-            <small>
+            <small data-testid={`audio-tier-bank-pill-${tier.id}`}>
               {tier.channels.length > 0
                 ? viewModel.clampedBankIndex > 0
-                  ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks}`
+                  ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks} · ch ${
+                      viewModel.bankStart + 1
+                    }-${Math.min(viewModel.bankStart + viewModel.visibleStripCount, viewModel.channels.length)} of ${
+                      viewModel.channels.length
+                    }`
                   : tier.meta
                 : "No sources in this bank"}
             </small>

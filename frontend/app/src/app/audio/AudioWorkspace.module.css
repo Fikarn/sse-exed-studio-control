@@ -13,25 +13,13 @@
   --audio-text-muted: #908a76;
   --audio-text-subtle: #5e5946;
   --audio-text-disabled: #4a4636;
-  --audio-accent: #5dc5e8;
+  --audio-accent: var(--audio-output-main-out);
   --audio-hot: #ffd33d;
   --audio-clip: #ff2d2d;
   --audio-mute: #ff7d55;
   --audio-solo: #ffd94a;
   --audio-talk: #74e3a3;
-  --audio-meter-low: #36ce71;
-  --audio-meter-low-hot: #6cf99d;
-  --audio-meter-warn: #f4c443;
-  --audio-meter-hot: #f59f2a;
-  --audio-meter-peak-hold: #ffd35a;
-  --audio-meter-over: #ff3b30;
-  --audio-meter-bg: #050608;
-  --audio-group-talent: #d8c483;
-  --audio-group-line: #b9b29a;
-  --audio-group-bed: #b9d2a0;
-  --audio-group-fx: #d6acce;
-  --audio-group-remote: #8fc2d2;
-  --audio-tier-accent: var(--audio-accent);
+  --audio-tier-accent: var(--audio-tier-outputs);
   --audio-lane-accent: var(--audio-tier-accent);
   --color-surface-900: var(--audio-canvas);
   --color-surface-800: var(--audio-panel);
@@ -76,12 +64,23 @@
   opacity: 0;
 }
 
+/* Why: when metering is gated (OSC disabled, console state unverified, last
+   action failed) the canvas paint loop early-returns. The CSS fallback meter
+   bars must also stay dark so the operator never sees a simulated tick in a
+   degraded state. The warning band remains the truthful surface. */
+.audioShell[data-canvas-metering="false"] .stereoMeter [data-meter-fill],
+.audioShell[data-canvas-metering="false"] .stereoMeter [data-meter-peak],
+.audioShell[data-canvas-metering="false"] .mixTargetMiniMeter i::before,
+.audioShell[data-canvas-metering="false"] .canvasActiveMixMeter i::before {
+  opacity: 0;
+}
+
 .audioShell[data-output-role="phones-a"] {
-  --audio-accent: #e8a341;
+  --audio-accent: var(--audio-output-phones-a);
 }
 
 .audioShell[data-output-role="phones-b"] {
-  --audio-accent: #b388f5;
+  --audio-accent: var(--audio-output-phones-b);
 }
 
 .eyebrow {
@@ -91,13 +90,11 @@
   text-transform: uppercase;
 }
 
-.audioToolbar,
-.railPanel,
-.railToolsPanel,
-.signalCanvas,
-.inspector,
-.healthBar,
-.loadingPanel {
+/* Shared panel surface. Audio surfaces import this via CSS Modules
+   `composes: shellPanel from "./AudioWorkspace.module.css"` so the shared
+   background / border treatment stays single-sourced even after the
+   per-component CSS files split out (Slice 5A). */
+.shellPanel {
   border: 1px solid var(--audio-border);
   border-radius: 8px;
   background:
@@ -105,6 +102,16 @@
     radial-gradient(circle at top right, color-mix(in srgb, var(--audio-accent) 9%, transparent), transparent 58%),
     var(--audio-panel);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
+}
+
+.audioToolbar,
+.railPanel,
+.railToolsPanel,
+.signalCanvas,
+.inspector,
+.healthBar,
+.loadingPanel {
+  composes: shellPanel;
 }
 
 .audioToolbar {
@@ -502,7 +509,11 @@
 
 .railFactGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Why: auto-fit keeps the trust panel readable when the rail narrows under
+     studio-full sizing rules. Each fact stays at least 96 px wide so the
+     `Console`, `OSC`, `Metering`, `Endpoint`, `Solo`, `Clips` headings are
+     never cut mid-word. */
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 7px;
   min-height: 0;
 }
@@ -1316,7 +1327,7 @@
 }
 
 .mixerTier {
-  --audio-tier-accent: var(--audio-accent);
+  --audio-tier-accent: var(--audio-tier-outputs);
   position: relative;
   z-index: 2;
   display: grid;
@@ -1324,24 +1335,40 @@
   gap: 6px;
   min-height: 0;
   padding: 8px;
-  border: 1px solid var(--audio-border);
-  border-top-color: color-mix(in srgb, var(--audio-tier-accent) 30%, var(--audio-border));
+  border: 1px solid color-mix(in srgb, var(--audio-tier-accent) 52%, var(--audio-border));
+  border-top: 3px solid var(--audio-tier-accent);
   border-radius: 8px;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--audio-tier-accent) 4%, transparent), transparent 38%),
-    color-mix(in srgb, var(--audio-canvas) 76%, var(--audio-panel) 24%);
+    linear-gradient(180deg, color-mix(in srgb, var(--audio-tier-accent) 12%, transparent), transparent 32%),
+    color-mix(in srgb, var(--audio-canvas) 78%, var(--audio-panel) 22%);
+}
+
+/* Why: left-edge identity rail. Operator scans tiers by colour at studio
+   distance — the 3 px top border tells you "this is a tier" and the rail
+   tells you "and this is which one". Inset 14 px so it sits inside the
+   header tint without colliding with the rounded corner. */
+.mixerTier::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--audio-tier-accent);
+  pointer-events: none;
 }
 
 .mixerTier[data-tier="hardware-inputs"] {
-  --audio-tier-accent: #d8c483;
+  --audio-tier-accent: var(--audio-tier-inputs);
 }
 
 .mixerTier[data-tier="software-playback"] {
-  --audio-tier-accent: #d6acce;
+  --audio-tier-accent: var(--audio-tier-playback);
 }
 
 .mixerTier[data-tier="hardware-outputs"] {
-  --audio-tier-accent: var(--audio-accent);
+  --audio-tier-accent: var(--audio-tier-outputs);
 }
 
 .outputTier {
@@ -1359,8 +1386,10 @@
   gap: 14px;
   min-width: 0;
   min-height: 38px;
-  padding: 0;
+  padding: 0 6px;
   border-bottom: 1px solid var(--audio-border);
+  border-radius: 6px 6px 0 0;
+  background: color-mix(in srgb, var(--audio-tier-accent) 8%, transparent);
 }
 
 .tierTitleBlock {
@@ -1519,15 +1548,29 @@
 
 .channelLane[data-selected="true"],
 .outputLane[data-selected="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 62%, var(--audio-border));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-accent) 26%, transparent);
+  border-color: color-mix(in srgb, var(--audio-accent) 88%, var(--audio-border));
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--audio-accent) 60%, transparent),
+    0 0 14px color-mix(in srgb, var(--audio-accent) 22%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--audio-accent) 12%, transparent), transparent 42%),
+    color-mix(in srgb, var(--audio-card) 86%, var(--audio-panel) 14%);
+}
+
+/* Why: the existing ::before is the lane identity rail; selection thickens
+   it from 2 → 3 px and pushes it to full opacity so the selected lane reads
+   crisply even when its neighbour is also feeding the bus. */
+.channelLane[data-selected="true"]::before,
+.outputLane[data-selected="true"]::before {
+  height: 3px;
+  opacity: 1;
 }
 
 .channelLane[data-no-send="true"]:not([data-selected="true"]) {
   opacity: 0.58;
 }
 
-.channelLane[data-feeding="true"] {
+.channelLane[data-feeding="true"]:not([data-selected="true"]) {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-accent) 35%, transparent);
 }
 
@@ -1742,7 +1785,7 @@
 
 .outputLane .laneControls {
   position: static;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   pointer-events: auto;
 }
 
@@ -2367,7 +2410,8 @@
   color: var(--audio-mute);
 }
 
-.monitorButtonGrid button[data-control="talk"][data-active="true"] {
+.monitorButtonGrid button[data-control="talk"][data-active="true"],
+.laneToggle[data-control="talk"][data-active="true"] {
   border-color: color-mix(in srgb, var(--audio-talk) 55%, var(--audio-border));
   background: color-mix(in srgb, var(--audio-talk) 18%, var(--audio-panel));
   color: var(--audio-talk);
@@ -2375,7 +2419,8 @@
 
 .monitorButtonGrid button[data-control="dim"][data-active="true"],
 .monitorButtonGrid button[data-control="mono"][data-active="true"],
-.laneToggle[data-control="dim"][data-active="true"] {
+.laneToggle[data-control="dim"][data-active="true"],
+.laneToggle[data-control="mono"][data-active="true"] {
   border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
   background: color-mix(in srgb, var(--audio-accent) 16%, var(--audio-panel));
   color: var(--audio-accent);
@@ -2533,6 +2578,13 @@
 .snapshotPreviewLine strong {
   color: var(--audio-accent);
   white-space: nowrap;
+}
+
+.snapshotPreviewOverflow {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 9px / 1.2 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .snapshotCapture {
@@ -4330,6 +4382,35 @@ button.inspectorMiniCard {
   .snapshotTileActions {
     transition: none !important;
   }
+
+  .armCountdownBar {
+    animation: none !important;
+    background: var(--audio-meter-hot);
+    opacity: 0.6;
+    transform: scaleX(1);
+  }
+}
+
+.armCountdownBar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(90deg, var(--audio-meter-hot), var(--audio-warning-band-action-failed));
+  transform-origin: left;
+  animation: audioArmCountdown var(--audio-arm-duration, 4500ms) linear forwards;
+  pointer-events: none;
+}
+
+@keyframes audioArmCountdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
 }
 
 @container operator-root (max-height: 1120px) {
@@ -4767,13 +4848,13 @@ button.inspectorMiniCard {
     right: 8px;
     bottom: 8px;
     left: 136px;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 5px;
   }
 
   .outputLane .laneToggle {
-    min-height: 40px;
-    font-size: 12px;
+    min-height: 34px;
+    font-size: 11px;
   }
 
   .snapshotDeck {
@@ -4896,7 +4977,7 @@ button.inspectorMiniCard {
   }
 
   .outputLane .laneControls {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 3px;
   }
 
@@ -5425,7 +5506,7 @@ button.inspectorMiniCard {
   right: 8px;
   bottom: 8px;
   left: 136px;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 5px;
 }
 

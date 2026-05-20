@@ -2,11 +2,11 @@ import { Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { IconButton } from "@sse/design-system";
 
 import styles from "../AudioWorkspace.module.css";
+import type { AudioArmedAction } from "../audioArming";
+import { SNAPSHOT_PLACEHOLDER_LEVELS, SNAPSHOT_THUMB_BAR_COUNT } from "../audioConstants";
 import { formatAudioDb } from "../audioFormatting";
 import type { AudioChannelEntry, AudioMixTargetEntry, AudioSnapshotEntry } from "../../shellData";
-
-const SNAPSHOT_THUMB_BAR_COUNT = 12;
-const SNAPSHOT_PLACEHOLDER_LEVELS = [0.26, 0.2, 0.32, 0.18, 0.28, 0.22, 0.3, 0.16, 0.24, 0.2, 0.28, 0.18];
+import { AudioArmCountdown } from "./AudioArmCountdown";
 
 function formatSnapshotTime(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === "") return "-";
@@ -40,6 +40,13 @@ function snapshotThumbLevels(snapshot: AudioSnapshotEntry, selectedMixTargetId: 
   });
 }
 
+const SNAPSHOT_DIFF_SHOWN_LIMIT = 2;
+
+interface SnapshotDiffSummary {
+  shown: Array<{ after: number; before: number; label: string }>;
+  total: number;
+}
+
 function snapshotPreviewDiffs({
   channels,
   mixTargets,
@@ -50,8 +57,8 @@ function snapshotPreviewDiffs({
   mixTargets: AudioMixTargetEntry[];
   selectedMixTargetId: string | null;
   snapshot: AudioSnapshotEntry;
-}) {
-  if (!snapshot.contents) return [];
+}): SnapshotDiffSummary {
+  if (!snapshot.contents) return { shown: [], total: 0 };
   const channelDiffs = channels.flatMap((channel) => {
     const stored = snapshot.contents?.channels[channel.id];
     if (!stored) return [];
@@ -68,12 +75,13 @@ function snapshotPreviewDiffs({
     if (Math.abs(current - next) < 0.005) return [];
     return [{ after: next, before: current, label: mixTarget.name }];
   });
-  return [...channelDiffs, ...mixTargetDiffs].slice(0, 2);
+  const combined = [...channelDiffs, ...mixTargetDiffs];
+  return { shown: combined.slice(0, SNAPSHOT_DIFF_SHOWN_LIMIT), total: combined.length };
 }
 
 export function AudioSnapshotDeck({
   actionsAllowed,
-  armedActionKey,
+  armedAction,
   busyAction,
   channels,
   mixTargets,
@@ -87,7 +95,7 @@ export function AudioSnapshotDeck({
   snapshots,
 }: {
   actionsAllowed: boolean;
-  armedActionKey: string | null;
+  armedAction: AudioArmedAction | null;
   busyAction: string | null;
   channels: AudioChannelEntry[];
   mixTargets: AudioMixTargetEntry[];
@@ -165,8 +173,11 @@ export function AudioSnapshotDeck({
           const hasContents = Boolean(snapshot.contents && thumbLevels);
           const recallActionKey = `snapshot-recall:${snapshot.id}`;
           const saveActionKey = `snapshot-save:${snapshot.id}`;
-          const recallArmed = armedActionKey === recallActionKey;
-          const saveArmed = armedActionKey === saveActionKey;
+          const armedKey = armedAction?.key ?? null;
+          const recallArmed = armedKey === recallActionKey;
+          const saveArmed = armedKey === saveActionKey;
+          const tileArmed = recallArmed || saveArmed;
+          const tileArmedTimeoutMs = tileArmed ? (armedAction?.timeoutMs ?? null) : null;
 
           return (
             <div
@@ -219,15 +230,25 @@ export function AudioSnapshotDeck({
                           : "Console slot only"}
                       </small>
                       {hasContents ? (
-                        previewDiffs.length > 0 ? (
-                          previewDiffs.map((diff) => (
-                            <small className={styles.snapshotPreviewLine} key={`${snapshot.id}-${diff.label}`}>
-                              <span>{diff.label}</span>
-                              <strong>
-                                {formatAudioDb(diff.before)} -&gt; {formatAudioDb(diff.after)}
-                              </strong>
-                            </small>
-                          ))
+                        previewDiffs.total > 0 ? (
+                          <>
+                            {previewDiffs.shown.map((diff) => (
+                              <small className={styles.snapshotPreviewLine} key={`${snapshot.id}-${diff.label}`}>
+                                <span>{diff.label}</span>
+                                <strong>
+                                  {formatAudioDb(diff.before)} -&gt; {formatAudioDb(diff.after)}
+                                </strong>
+                              </small>
+                            ))}
+                            {previewDiffs.total > previewDiffs.shown.length ? (
+                              <small
+                                className={styles.snapshotPreviewOverflow}
+                                data-testid={`audio-snapshot-diff-overflow-${snapshot.id}`}
+                              >
+                                +{previewDiffs.total - previewDiffs.shown.length} more changes
+                              </small>
+                            ) : null}
+                          </>
                         ) : (
                           <small>No diff from current mix</small>
                         )
@@ -245,15 +266,25 @@ export function AudioSnapshotDeck({
                         {hasContents ? `${snapshot.preview.channelCount} sources saved` : "No captured contents"}
                       </small>
                       {hasContents ? (
-                        previewDiffs.length > 0 ? (
-                          previewDiffs.map((diff) => (
-                            <small className={styles.snapshotPreviewLine} key={`${snapshot.id}-${diff.label}`}>
-                              <span>{diff.label}</span>
-                              <strong>
-                                {formatAudioDb(diff.before)} -&gt; {formatAudioDb(diff.after)}
-                              </strong>
-                            </small>
-                          ))
+                        previewDiffs.total > 0 ? (
+                          <>
+                            {previewDiffs.shown.map((diff) => (
+                              <small className={styles.snapshotPreviewLine} key={`${snapshot.id}-${diff.label}`}>
+                                <span>{diff.label}</span>
+                                <strong>
+                                  {formatAudioDb(diff.before)} -&gt; {formatAudioDb(diff.after)}
+                                </strong>
+                              </small>
+                            ))}
+                            {previewDiffs.total > previewDiffs.shown.length ? (
+                              <small
+                                className={styles.snapshotPreviewOverflow}
+                                data-testid={`audio-snapshot-diff-overflow-${snapshot.id}`}
+                              >
+                                +{previewDiffs.total - previewDiffs.shown.length} more changes
+                              </small>
+                            ) : null}
+                          </>
                         ) : (
                           <small>No diff from current mix</small>
                         )
@@ -290,6 +321,12 @@ export function AudioSnapshotDeck({
                   tone="danger"
                 />
               </span>
+              {tileArmedTimeoutMs !== null ? (
+                <AudioArmCountdown
+                  durationMs={tileArmedTimeoutMs}
+                  key={`${snapshot.id}-${armedAction?.armedAt ?? 0}`}
+                />
+              ) : null}
             </div>
           );
         })}

@@ -1,6 +1,8 @@
+import { AUDIO_THROTTLE_FADER_MS } from "./audioConstants";
+
 export type ContinuousCommit<T> = (value: T) => void;
 
-export function createThrottledCommit<T>(commit: ContinuousCommit<T>, delayMs = 75) {
+export function createThrottledCommit<T>(commit: ContinuousCommit<T>, delayMs = AUDIO_THROTTLE_FADER_MS) {
   let timer: number | null = null;
   let latest: T | null = null;
 

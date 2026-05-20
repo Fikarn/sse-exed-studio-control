@@ -5,6 +5,9 @@ import { ConfirmDialog, ContextMenu, type ContextMenuItem, type PaletteAction } 
 import { Pencil, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import styles from "./AudioWorkspace.module.css";
+import { AUDIO_ARM_TIMEOUT_MS, AUDIO_DRAFT_CLEAR_MS, AUDIO_RECALL_PULSE_MS } from "./audioConstants";
+import { useAudioArming } from "./hooks/useAudioArming";
+import { type OptimisticAudioSettings, useAudioOptimisticSettings } from "./hooks/useAudioOptimisticSettings";
 import { createAudioControlDraftStore } from "./audioControlDraftStore";
 import { AUDIO_FADER_UNITY, type AudioFeedbackTone } from "./audioFormatting";
 import {
@@ -72,14 +75,6 @@ interface AudioDeleteSnapshotState {
   name: string;
 }
 
-interface AudioArmedAction {
-  key: string;
-  label: string;
-  targetId: string;
-  targetKind: "phantom" | "snapshot-recall" | "snapshot-save";
-  timeoutMs: number;
-}
-
 interface AudioPaletteRegistrationModel {
   allSelectableChannels: AudioChannelEntry[];
   mixTargets: AudioWorkspaceViewModel["mixTargets"];
@@ -89,18 +84,11 @@ interface AudioPaletteRegistrationModel {
   snapshots: AudioWorkspaceViewModel["snapshots"];
 }
 
-interface OptimisticAudioSettings {
-  selectedChannelId?: string | null;
-  selectedMixTargetId?: string;
-  viewMode?: "submix" | "master";
-}
-
 const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
   "hardware-inputs": [],
   "software-playback": [],
 };
 
-const AUDIO_ARM_TIMEOUT_MS = 4500;
 const AUDIO_DENSITY_MODE = "desktop";
 
 export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
@@ -112,7 +100,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [feedback, setFeedback] = useState<AudioWorkspaceFeedback | null>(null);
   const [recentlyRecalledSnapshotId, setRecentlyRecalledSnapshotId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<AudioContextMenuState | null>(null);
-  const [armedAction, setArmedAction] = useState<AudioArmedAction | null>(null);
   const draftStoreRef = useRef<ReturnType<typeof createAudioControlDraftStore> | null>(null);
   if (!draftStoreRef.current) {
     draftStoreRef.current = createAudioControlDraftStore();
@@ -121,12 +108,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [textDialog, setTextDialog] = useState<AudioTextDialogState | null>(null);
   const [deleteSnapshotDialog, setDeleteSnapshotDialog] = useState<AudioDeleteSnapshotState | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("channel");
-  const [optimisticSettings, setOptimisticSettings] = useState<OptimisticAudioSettings | null>(null);
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
   const warningBandRef = useRef<HTMLDivElement | null>(null);
   const recallPulseTimerRef = useRef<number | null>(null);
-  const armedActionTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!window.__SSE_TEST_RENDER_COUNTS__) {
@@ -135,19 +120,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace = (window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace ?? 0) + 1;
   });
 
-  const audioSnapshotForView = useMemo(() => {
-    if (!audioSnapshot || !optimisticSettings) return audioSnapshot;
-
-    const hasSelectedChannel = Object.prototype.hasOwnProperty.call(optimisticSettings, "selectedChannelId");
-    return {
-      ...audioSnapshot,
-      selectedChannelId: hasSelectedChannel
-        ? (optimisticSettings.selectedChannelId ?? null)
-        : audioSnapshot.selectedChannelId,
-      selectedMixTargetId: optimisticSettings.selectedMixTargetId ?? audioSnapshot.selectedMixTargetId,
-      viewMode: optimisticSettings.viewMode ?? audioSnapshot.viewMode,
-    };
-  }, [audioSnapshot, optimisticSettings]);
+  const { audioSnapshotForView, applyOptimistic, clearOptimistic } = useAudioOptimisticSettings(audioSnapshot);
 
   const viewModel = useMemo(() => {
     if (!audioSnapshotForView) return null;
@@ -160,28 +133,15 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex]);
 
-  useEffect(() => {
-    if (!optimisticSettings || !audioSnapshot) return;
-
-    const hasSelectedChannel = Object.prototype.hasOwnProperty.call(optimisticSettings, "selectedChannelId");
-    const selectedChannelMatches =
-      !hasSelectedChannel || audioSnapshot.selectedChannelId === (optimisticSettings.selectedChannelId ?? null);
-    const selectedMixTargetMatches =
-      optimisticSettings.selectedMixTargetId === undefined ||
-      audioSnapshot.selectedMixTargetId === optimisticSettings.selectedMixTargetId;
-    const viewModeMatches =
-      optimisticSettings.viewMode === undefined || audioSnapshot.viewMode === optimisticSettings.viewMode;
-
-    if (selectedChannelMatches && selectedMixTargetMatches && viewModeMatches) {
-      setOptimisticSettings(null);
-    }
-  }, [audioSnapshot, optimisticSettings]);
-
-  useEffect(() => {
-    if (!optimisticSettings) return;
-    const timeoutId = window.setTimeout(() => setOptimisticSettings(null), 2500);
-    return () => window.clearTimeout(timeoutId);
-  }, [optimisticSettings]);
+  const { armedAction, armOrApplyAction, cancelArmedAction, clearArmedAction } = useAudioArming({
+    setFeedback,
+    resetTriggers: {
+      lastRecalledSnapshotId: audioSnapshot?.lastRecalledSnapshotId,
+      lastSnapshotRecallAt: audioSnapshot?.lastSnapshotRecallAt,
+      selectedChannelId: viewModel?.selectedChannelId,
+      selectedMixTargetId: viewModel?.selectedMixTargetId,
+    },
+  });
 
   useEffect(() => {
     if (!viewModel || bankIndex === viewModel.clampedBankIndex) {
@@ -205,45 +165,13 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     recallPulseTimerRef.current = window.setTimeout(() => {
       setRecentlyRecalledSnapshotId(null);
       recallPulseTimerRef.current = null;
-    }, 1500);
+    }, AUDIO_RECALL_PULSE_MS);
   }, [audioSnapshot?.lastRecalledSnapshotId, audioSnapshot?.lastSnapshotRecallAt]);
-
-  useEffect(() => {
-    if (armedActionTimerRef.current !== null) {
-      window.clearTimeout(armedActionTimerRef.current);
-      armedActionTimerRef.current = null;
-    }
-    if (!armedAction) return;
-
-    armedActionTimerRef.current = window.setTimeout(() => {
-      setArmedAction(null);
-      armedActionTimerRef.current = null;
-    }, armedAction.timeoutMs);
-
-    return () => {
-      if (armedActionTimerRef.current !== null) {
-        window.clearTimeout(armedActionTimerRef.current);
-        armedActionTimerRef.current = null;
-      }
-    };
-  }, [armedAction]);
-
-  useEffect(() => {
-    setArmedAction(null);
-  }, [
-    audioSnapshot?.lastRecalledSnapshotId,
-    audioSnapshot?.lastSnapshotRecallAt,
-    viewModel?.selectedChannelId,
-    viewModel?.selectedMixTargetId,
-  ]);
 
   useEffect(() => {
     return () => {
       if (recallPulseTimerRef.current !== null) {
         window.clearTimeout(recallPulseTimerRef.current);
-      }
-      if (armedActionTimerRef.current !== null) {
-        window.clearTimeout(armedActionTimerRef.current);
       }
       draftStore.dispose();
     };
@@ -251,7 +179,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
   const performAction = useLiveCallback(async (actionId: string, runner: () => Promise<void>) => {
     setBusyAction(actionId);
-    setArmedAction(null);
+    clearArmedAction();
     setFeedback(null);
     try {
       await runner();
@@ -265,31 +193,13 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     }
   });
 
-  const cancelArmedAction = useLiveCallback(() => {
-    if (!armedAction) return false;
-    setArmedAction(null);
-    setFeedback({ message: "Armed audio action canceled.", tone: "info" });
-    return true;
-  });
-
-  const armOrApplyAction = useLiveCallback((candidate: AudioArmedAction, apply: () => void) => {
-    if (armedAction?.key === candidate.key) {
-      setArmedAction(null);
-      apply();
-      return;
-    }
-
-    setArmedAction(candidate);
-    setFeedback({ message: `Armed: ${candidate.label}. Repeat the same action to apply.`, tone: "info" });
-  });
-
   const getDraftValue = useLiveCallback((key: string, fallback: number) => draftStore.get(key) ?? fallback);
 
   const setDraftValue = useLiveCallback((key: string, value: number) => {
     draftStore.set(key, value);
   });
 
-  const clearDraftValueLater = useLiveCallback((key: string, delayMs: number = 250) => {
+  const clearDraftValueLater = useLiveCallback((key: string, delayMs: number = AUDIO_DRAFT_CLEAR_MS) => {
     draftStore.clearLater(key, delayMs);
   });
 
@@ -306,9 +216,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   });
 
   const updateAudioSettings = useLiveCallback((request: AudioSettingsUpdate, optimistic: OptimisticAudioSettings) => {
-    setOptimisticSettings((current) => ({ ...(current ?? {}), ...optimistic }));
+    applyOptimistic(optimistic);
     void store.updateAudioSettings(request).catch((error) => {
-      setOptimisticSettings(null);
+      clearOptimistic();
       setFeedback({
         message: error instanceof Error ? error.message : "The audio setting could not be updated.",
         tone: "error",
@@ -1090,7 +1000,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     <div
       className={styles.audioShell}
       data-density={AUDIO_DENSITY_MODE}
-      data-canvas-metering="true"
+      data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
+      data-meter-simulation-state={viewModel.meterSimulationState}
       data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}
       data-testid="audio-workspace"
       data-view-mode={viewModel.viewMode}
@@ -1117,7 +1028,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           viewModel={viewModel}
         />
         <AudioSignalCanvas
-          armedActionKey={armedAction?.key ?? null}
+          armedAction={armedAction}
           busyAction={busyAction}
           clearDraftValueLater={clearDraftValueLater}
           commitChannelContinuous={commitChannelContinuous}

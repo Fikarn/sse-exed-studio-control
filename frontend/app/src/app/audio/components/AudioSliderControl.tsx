@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import styles from "../AudioWorkspace.module.css";
+import { AUDIO_DRAFT_CLEAR_MS } from "../audioConstants";
 import { AUDIO_FADER_UNITY, snapFaderValue } from "../audioFormatting";
 
 export interface AudioSliderControlProps {
@@ -116,7 +117,7 @@ export function AudioSliderControl({
     localClearTimerRef.current = window.setTimeout(() => {
       localClearTimerRef.current = null;
       setLocalDraftValue(null);
-    }, 250);
+    }, AUDIO_DRAFT_CLEAR_MS);
   };
 
   const requestNumericEntry = () => {
