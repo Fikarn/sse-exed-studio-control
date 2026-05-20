@@ -113,6 +113,7 @@
   "events": [
     "app.changed",
     "audio.changed",
+    "audio.meters",
     "commissioning.changed",
     "engine.ready",
     "engine.startupFailed",

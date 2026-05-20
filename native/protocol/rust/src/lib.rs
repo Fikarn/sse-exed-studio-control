@@ -5,6 +5,7 @@ pub const PROTOCOL_VERSION: &str = "1";
 
 pub const EVENT_APP_CHANGED: &str = "app.changed";
 pub const EVENT_AUDIO_CHANGED: &str = "audio.changed";
+pub const EVENT_AUDIO_METERS: &str = "audio.meters";
 pub const EVENT_COMMISSIONING_CHANGED: &str = "commissioning.changed";
 pub const EVENT_ENGINE_READY: &str = "engine.ready";
 pub const EVENT_ENGINE_STARTUP_FAILED: &str = "engine.startupFailed";
@@ -16,6 +17,7 @@ pub const EVENT_SUPPORT_CHANGED: &str = "support.changed";
 pub const EVENT_NAMES: &[&str] = &[
     EVENT_APP_CHANGED,
     EVENT_AUDIO_CHANGED,
+    EVENT_AUDIO_METERS,
     EVENT_COMMISSIONING_CHANGED,
     EVENT_ENGINE_READY,
     EVENT_ENGINE_STARTUP_FAILED,

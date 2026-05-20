@@ -41,7 +41,7 @@ interface AudioMeterState {
   updatedAtMs: number;
 }
 
-const AUDIO_METERING_TICK_MS = 83;
+const AUDIO_METERING_TICK_MS = 33;
 const SIMULATED_AUDIO_ADAPTER_MODES = new Set(["fixture", "simulated"]);
 
 function fixtureEvent<TEvent extends EventName>(event: TEvent, payload: JsonObject = {}) {
@@ -710,6 +710,56 @@ function refreshFixtureAudioMetering(state: MutableFixtureState) {
   applyFixtureMixTargetMetering(audioSnapshot);
   state.audioSnapshot = audioSnapshot;
   return true;
+}
+
+function buildFixtureAudioMetersPayload(state: MutableFixtureState): JsonObject {
+  const audioSnapshot = asRecord(state.audioSnapshot);
+  if (!audioSnapshot) {
+    return { timestampMs: Date.now(), channels: [], mixTargets: [] };
+  }
+  const channels = asArray(audioSnapshot.channels)
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is JsonObject => entry !== null)
+    .map((channel) => {
+      const left = asNumber(channel.meterLeft, 0);
+      const right = asBoolean(channel.stereo, false) ? asNumber(channel.meterRight, left) : left;
+      const peakL = asNumber(channel.peakHoldLeft, asNumber(channel.peakHold, left));
+      const peakR = asBoolean(channel.stereo, false)
+        ? asNumber(channel.peakHoldRight, asNumber(channel.peakHold, right))
+        : peakL;
+      return {
+        id: asString(channel.id),
+        l: left,
+        r: right,
+        peakL,
+        peakR,
+        clip: asBoolean(channel.clip, false),
+      };
+    });
+  const mixTargets = asArray(audioSnapshot.mixTargets)
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is JsonObject => entry !== null)
+    .map((mixTarget) => {
+      const left = asNumber(mixTarget.meterLeft, 0);
+      const right = asBoolean(mixTarget.mono, false) ? left : asNumber(mixTarget.meterRight, left);
+      const peakL = asNumber(mixTarget.peakHoldLeft, asNumber(mixTarget.peakHold, left));
+      const peakR = asBoolean(mixTarget.mono, false)
+        ? peakL
+        : asNumber(mixTarget.peakHoldRight, asNumber(mixTarget.peakHold, right));
+      return {
+        id: asString(mixTarget.id),
+        l: left,
+        r: right,
+        peakL,
+        peakR,
+        clip: asBoolean(mixTarget.clip, false),
+      };
+    });
+  return {
+    timestampMs: Date.now(),
+    channels,
+    mixTargets,
+  };
 }
 
 function buildAudioSnapshotPreview(hasContents = false) {
@@ -3508,7 +3558,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
     }
     audioMeteringIntervalId = window.setInterval(() => {
       if (refreshFixtureAudioMetering(state)) {
-        emit("audio.changed", { reason: "metering-tick" });
+        emit("audio.meters", buildFixtureAudioMetersPayload(state));
       }
     }, AUDIO_METERING_TICK_MS);
   };

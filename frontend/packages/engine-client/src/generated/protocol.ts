@@ -87,6 +87,7 @@ export type RequestMethod = (typeof REQUEST_METHODS)[number];
 export const EVENT_NAMES = [
   "app.changed",
   "audio.changed",
+  "audio.meters",
   "commissioning.changed",
   "engine.ready",
   "engine.startupFailed",

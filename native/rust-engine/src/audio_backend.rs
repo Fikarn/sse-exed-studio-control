@@ -3,8 +3,33 @@ use crate::audio::{
     AudioChannelSnapshot, AudioChannelUpdateRequest, AudioMixTargetSnapshot,
     AudioMixTargetUpdateRequest, AudioScenePreviewSnapshot, AudioSceneSnapshot,
 };
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+const SIMULATED_AUDIO_METER_CHANNELS: &[(&str, &str, bool)] = &[
+    ("audio-input-9", "front-preamp", false),
+    ("audio-input-10", "front-preamp", false),
+    ("audio-input-11", "front-preamp", false),
+    ("audio-input-12", "front-preamp", false),
+    ("audio-input-1", "rear-line", false),
+    ("audio-input-2", "rear-line", false),
+    ("audio-input-3", "rear-line", false),
+    ("audio-input-4", "rear-line", false),
+    ("audio-input-5", "rear-line", false),
+    ("audio-input-6", "rear-line", false),
+    ("audio-input-7", "rear-line", false),
+    ("audio-input-8", "rear-line", false),
+    ("audio-playback-1-2", "playback-pair", true),
+    ("audio-playback-3-4", "playback-pair", true),
+    ("audio-playback-5-6", "playback-pair", true),
+    ("audio-playback-7-8", "playback-pair", true),
+    ("audio-playback-9-10", "playback-pair", true),
+    ("audio-playback-11-12", "playback-pair", true),
+];
+
+const SIMULATED_AUDIO_METER_MIX_TARGETS: &[&str] =
+    &["audio-mix-main", "audio-mix-phones-a", "audio-mix-phones-b"];
 
 pub struct AudioBackendConfig {
     pub send_host: String,
@@ -604,6 +629,48 @@ fn default_send_modes() -> HashMap<String, crate::audio::AudioSendModeSnapshot> 
             default_audio_send_mode_snapshot(),
         ),
     ])
+}
+
+pub fn build_simulated_audio_meters_payload() -> Value {
+    let timestamp_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0);
+
+    let channels: Vec<Value> = SIMULATED_AUDIO_METER_CHANNELS
+        .iter()
+        .map(|(id, role, stereo)| {
+            let frame = simulated_meter_frame(id, role, *stereo);
+            json!({
+                "id": id,
+                "l": frame.meter_left,
+                "r": frame.meter_right,
+                "peakL": frame.peak_hold_left,
+                "peakR": frame.peak_hold_right,
+                "clip": frame.clip,
+            })
+        })
+        .collect();
+
+    let mix_targets: Vec<Value> = SIMULATED_AUDIO_METER_MIX_TARGETS
+        .iter()
+        .map(|id| {
+            json!({
+                "id": id,
+                "l": 0.0,
+                "r": 0.0,
+                "peakL": 0.0,
+                "peakR": 0.0,
+                "clip": false,
+            })
+        })
+        .collect();
+
+    json!({
+        "timestampMs": timestamp_ms,
+        "channels": channels,
+        "mixTargets": mix_targets,
+    })
 }
 
 fn simulated_meter_frame(id: &str, role: &str, stereo: bool) -> AudioMeterFrame {

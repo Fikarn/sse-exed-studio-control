@@ -8,7 +8,7 @@ import { audioChannelSupportsGain, getAudioChannelGroup, selectedChannelSendLeve
 import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
 import { AudioFader } from "./AudioFader";
 import { AudioPreampControl } from "./AudioPreampControl";
-import { AudioStereoMeter } from "./AudioStereoMeter";
+import { LiveAudioStereoMeter } from "./LiveAudioStereoMeter";
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
@@ -141,12 +141,8 @@ export function AudioChannelLane({
       ) : null}
 
       <div className={styles.laneBody}>
-        <AudioStereoMeter
-          clip={channel.clip}
-          left={channel.meterLeft}
-          peakLeft={channel.peakHoldLeft}
-          peakRight={channel.stereo ? channel.peakHoldRight : channel.peakHoldLeft}
-          right={channel.stereo ? channel.meterRight : channel.meterLeft}
+        <LiveAudioStereoMeter
+          channelId={channel.id}
           showPeakReadout={supportsPreamp || channel.role === "playback-pair"}
           showReadout={false}
           showScale
@@ -264,14 +260,7 @@ export function AudioOutputLane({
       </div>
 
       <div className={styles.outputBody}>
-        <AudioStereoMeter
-          left={mixTarget.meterLeft}
-          peakLeft={mixTarget.peakHoldLeft}
-          peakRight={mixTarget.peakHoldRight}
-          right={mixTarget.mono ? mixTarget.meterLevel : mixTarget.meterRight}
-          showReadout={false}
-          showScale
-        />
+        <LiveAudioStereoMeter mixTargetId={mixTarget.id} showReadout={false} showScale />
         <AudioFader
           disabled={!actionsAllowed}
           label={`${mixTarget.name} output level`}

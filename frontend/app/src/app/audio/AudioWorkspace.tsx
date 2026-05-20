@@ -18,6 +18,7 @@ import { AudioHealthBar } from "./components/AudioHealthBar";
 import { AudioInspector, type InspectorTab } from "./components/AudioInspector";
 import { AudioRail } from "./components/AudioRail";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
+import { MeterStoreProvider } from "./components/meterStoreContext";
 import { isEditableTarget, type AudioChannelEntry, type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { usePalette } from "../shared/paletteContext";
@@ -827,94 +828,96 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   }
 
   return (
-    <div
-      className={styles.audioShell}
-      data-density={density}
-      data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}
-      data-testid="audio-workspace"
-      data-view-mode={viewModel.viewMode}
-    >
-      {feedback ? (
-        <div className={styles.feedbackBanner} data-tone={feedback.tone} role="status">
-          {feedback.message}
+    <MeterStoreProvider store={store.meterStore}>
+      <div
+        className={styles.audioShell}
+        data-density={density}
+        data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}
+        data-testid="audio-workspace"
+        data-view-mode={viewModel.viewMode}
+      >
+        {feedback ? (
+          <div className={styles.feedbackBanner} data-tone={feedback.tone} role="status">
+            {feedback.message}
+          </div>
+        ) : null}
+
+        <div className={styles.audioBody}>
+          <AudioRail
+            clearDraftValue={clearDraftValue}
+            commitMixTargetContinuous={commitMixTargetContinuous}
+            getDraftValue={getDraftValue}
+            onRecallCurrentSnapshot={recallCurrentSnapshot}
+            onSelectMixTarget={selectMixTarget}
+            onSync={syncAudio}
+            setDraftValue={setDraftValue}
+            onUpdateMixTarget={updateMixTarget}
+            viewModel={viewModel}
+          />
+          <AudioSignalCanvas
+            busyAction={busyAction}
+            clearDraftValue={clearDraftValue}
+            commitChannelContinuous={commitChannelContinuous}
+            commitMixTargetContinuous={commitMixTargetContinuous}
+            density={density}
+            getDraftValue={getDraftValue}
+            onOpenChannelMenu={openChannelContextMenu}
+            onClearAllSolo={clearAllSolo}
+            onClearClips={clearClips}
+            onClearSolo={clearSolo}
+            onCaptureSnapshot={captureSnapshot}
+            onDeleteSnapshot={deleteSnapshot}
+            onRecallSnapshot={recallSnapshot}
+            onRenameSnapshot={renameSnapshot}
+            onSaveSnapshot={saveSnapshot}
+            onSelectChannel={selectChannel}
+            onSelectChannelGroup={selectChannelGroup}
+            onSelectMixTarget={selectMixTarget}
+            onSetDensity={setDensity}
+            onSetViewMode={setViewMode}
+            setDraftValue={setDraftValue}
+            onUpdateChannel={updateChannel}
+            onUpdateMixTarget={updateMixTarget}
+            recentlyRecalledSnapshotId={recentlyRecalledSnapshotId}
+            statusWarningRef={warningBandRef}
+            viewModel={viewModel}
+          />
+          <AudioInspector
+            clearDraftValue={clearDraftValue}
+            commitChannelContinuous={commitChannelContinuous}
+            commitMixTargetContinuous={commitMixTargetContinuous}
+            getDraftValue={getDraftValue}
+            activeTab={inspectorTab}
+            onActiveTabChange={setInspectorTab}
+            onSelectMixTarget={selectMixTarget}
+            setDraftValue={setDraftValue}
+            onUpdateChannelDynamics={updateChannelDynamics}
+            onUpdateChannelEq={updateChannelEq}
+            onUpdateChannelSendMode={updateChannelSendMode}
+            onUpdateChannel={updateChannel}
+            onUpdateMixTarget={updateMixTarget}
+            viewModel={viewModel}
+          />
         </div>
-      ) : null}
 
-      <div className={styles.audioBody}>
-        <AudioRail
-          clearDraftValue={clearDraftValue}
-          commitMixTargetContinuous={commitMixTargetContinuous}
-          getDraftValue={getDraftValue}
-          onRecallCurrentSnapshot={recallCurrentSnapshot}
-          onSelectMixTarget={selectMixTarget}
-          onSync={syncAudio}
-          setDraftValue={setDraftValue}
-          onUpdateMixTarget={updateMixTarget}
-          viewModel={viewModel}
+        <AudioContextMenu
+          actionsAllowed={viewModel.actionsAllowed}
+          channel={viewModel.channels.find((entry) => entry.id === contextMenu?.channelId) ?? null}
+          onClose={() => setContextMenu(null)}
+          onRename={renameChannel}
+          onResetUnity={(channelId) =>
+            updateChannel({
+              channelId,
+              fader: AUDIO_FADER_UNITY,
+              mixTargetId: viewModel.selectedMixTargetId ?? undefined,
+            })
+          }
+          onTogglePhase={(channelId, next) => updateChannel({ channelId, phase: next })}
+          position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : null}
         />
-        <AudioSignalCanvas
-          busyAction={busyAction}
-          clearDraftValue={clearDraftValue}
-          commitChannelContinuous={commitChannelContinuous}
-          commitMixTargetContinuous={commitMixTargetContinuous}
-          density={density}
-          getDraftValue={getDraftValue}
-          onOpenChannelMenu={openChannelContextMenu}
-          onClearAllSolo={clearAllSolo}
-          onClearClips={clearClips}
-          onClearSolo={clearSolo}
-          onCaptureSnapshot={captureSnapshot}
-          onDeleteSnapshot={deleteSnapshot}
-          onRecallSnapshot={recallSnapshot}
-          onRenameSnapshot={renameSnapshot}
-          onSaveSnapshot={saveSnapshot}
-          onSelectChannel={selectChannel}
-          onSelectChannelGroup={selectChannelGroup}
-          onSelectMixTarget={selectMixTarget}
-          onSetDensity={setDensity}
-          onSetViewMode={setViewMode}
-          setDraftValue={setDraftValue}
-          onUpdateChannel={updateChannel}
-          onUpdateMixTarget={updateMixTarget}
-          recentlyRecalledSnapshotId={recentlyRecalledSnapshotId}
-          statusWarningRef={warningBandRef}
-          viewModel={viewModel}
-        />
-        <AudioInspector
-          clearDraftValue={clearDraftValue}
-          commitChannelContinuous={commitChannelContinuous}
-          commitMixTargetContinuous={commitMixTargetContinuous}
-          getDraftValue={getDraftValue}
-          activeTab={inspectorTab}
-          onActiveTabChange={setInspectorTab}
-          onSelectMixTarget={selectMixTarget}
-          setDraftValue={setDraftValue}
-          onUpdateChannelDynamics={updateChannelDynamics}
-          onUpdateChannelEq={updateChannelEq}
-          onUpdateChannelSendMode={updateChannelSendMode}
-          onUpdateChannel={updateChannel}
-          onUpdateMixTarget={updateMixTarget}
-          viewModel={viewModel}
-        />
+
+        <AudioHealthBar viewModel={viewModel} />
       </div>
-
-      <AudioContextMenu
-        actionsAllowed={viewModel.actionsAllowed}
-        channel={viewModel.channels.find((entry) => entry.id === contextMenu?.channelId) ?? null}
-        onClose={() => setContextMenu(null)}
-        onRename={renameChannel}
-        onResetUnity={(channelId) =>
-          updateChannel({
-            channelId,
-            fader: AUDIO_FADER_UNITY,
-            mixTargetId: viewModel.selectedMixTargetId ?? undefined,
-          })
-        }
-        onTogglePhase={(channelId, next) => updateChannel({ channelId, phase: next })}
-        position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : null}
-      />
-
-      <AudioHealthBar viewModel={viewModel} />
-    </div>
+    </MeterStoreProvider>
   );
 }
