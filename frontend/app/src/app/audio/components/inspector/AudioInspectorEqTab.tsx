@@ -2,39 +2,21 @@ import type { CSSProperties, MutableRefObject, PointerEvent as ReactPointerEvent
 
 import styles from "../AudioInspector.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
-import { AudioSliderControl } from "../AudioSliderControl";
+import { AudioInspectorEqBandTray } from "./AudioInspectorEqBandTray";
+import { AudioInspectorEqLowCutTray } from "./AudioInspectorEqLowCutTray";
 import {
   EQ_FREQUENCY_MARKERS,
-  EQ_FREQUENCY_MAX,
-  EQ_FREQUENCY_MIN,
   EQ_GAIN_MARKERS,
-  EQ_GAIN_MAX,
-  EQ_GAIN_MIN,
-  EQ_Q_MAX,
-  EQ_Q_MIN,
-  eqBandId,
-  eqBandType,
   eqPointX,
   eqPointY,
-  formatEqBandType,
-  formatEqFrequency,
-  LOW_CUT_FREQUENCY_MAX,
-  LOW_CUT_FREQUENCY_MIN,
   LOW_CUT_HANDLE_ID,
-  LOW_CUT_SLOPES,
   type AudioEqBand,
   type AudioEqUpdate,
+  type EqDragRef,
   type SelectedAudioChannel,
 } from "./audioInspectorHelpers";
 
-export interface EqDragRef {
-  bandId: string;
-  height: number;
-  left: number;
-  pointerId: number;
-  top: number;
-  width: number;
-}
+export type { EqDragRef };
 
 interface AudioInspectorEqTabProps {
   // Per-band draft keys/values resolved in the parent so the EQ tab + Overview
@@ -289,194 +271,34 @@ export function AudioInspectorEqTab({
       </div>
       <div className={`${styles.sendCardFull} ${styles.eqControlTray}`} data-testid="audio-eq-control-tray">
         {activeEqHandleId === LOW_CUT_HANDLE_ID ? (
-          <>
-            <div className={styles.sendCardHead}>
-              <strong>Low Cut</strong>
-              <span className={styles.sendCardTag}>
-                {selectedChannel.eq.lowCut.enabled ? "In" : "Out"} · {selectedChannel.eq.lowCut.slopeDbPerOctave} dB/oct
-              </span>
-            </div>
-            <div className={styles.eqModeRow}>
-              <button
-                aria-pressed={selectedChannel.eq.lowCut.enabled}
-                data-active={selectedChannel.eq.lowCut.enabled}
-                disabled={!viewModel.capabilities.canEditProcessing}
-                onClick={() =>
-                  onUpdateChannelEq({
-                    channelId: selectedChannel.id,
-                    lowCutEnabled: !selectedChannel.eq.lowCut.enabled,
-                  })
-                }
-                type="button"
-              >
-                {selectedChannel.eq.lowCut.enabled ? "Bypass Low Cut" : "Enable Low Cut"}
-              </button>
-              {LOW_CUT_SLOPES.map((slope) => (
-                <button
-                  aria-pressed={selectedChannel.eq.lowCut.slopeDbPerOctave === slope}
-                  data-active={selectedChannel.eq.lowCut.slopeDbPerOctave === slope}
-                  disabled={!viewModel.capabilities.canEditProcessing}
-                  key={slope}
-                  onClick={() =>
-                    onUpdateChannelEq({
-                      channelId: selectedChannel.id,
-                      lowCutSlopeDbPerOctave: slope,
-                    })
-                  }
-                  type="button"
-                >
-                  {slope}
-                </button>
-              ))}
-            </div>
-            <div className={styles.processingControlGrid}>
-              <label className={styles.processingControl}>
-                <span>Cutoff</span>
-                <AudioSliderControl
-                  disabled={!viewModel.capabilities.canEditProcessing}
-                  label={`${selectedChannel.name} Low Cut frequency`}
-                  max={LOW_CUT_FREQUENCY_MAX}
-                  min={LOW_CUT_FREQUENCY_MIN}
-                  onCommit={(value) => {
-                    setSelectedEqBandId(LOW_CUT_HANDLE_ID);
-                    setDraftValue(lowCutFrequencyKey, value);
-                    onUpdateChannelEq({
-                      channelId: selectedChannel.id,
-                      lowCutFrequencyHz: value,
-                    });
-                    clearDraftValueLater(lowCutFrequencyKey);
-                  }}
-                  onPreview={(value) => setDraftValue(lowCutFrequencyKey, value)}
-                  orientation="horizontal"
-                  step={1}
-                  value={lowCutFrequencyValue}
-                  valueText={formatEqFrequency(lowCutFrequencyValue)}
-                />
-                <strong>{formatEqFrequency(lowCutFrequencyValue)}</strong>
-              </label>
-            </div>
-          </>
+          <AudioInspectorEqLowCutTray
+            clearDraftValueLater={clearDraftValueLater}
+            lowCutFrequencyKey={lowCutFrequencyKey}
+            lowCutFrequencyValue={lowCutFrequencyValue}
+            onUpdateChannelEq={onUpdateChannelEq}
+            selectedChannel={selectedChannel}
+            setDraftValue={setDraftValue}
+            setSelectedEqBandId={setSelectedEqBandId}
+            viewModel={viewModel}
+          />
         ) : activeEqBand ? (
-          <>
-            <div className={styles.sendCardHead}>
-              <strong>Band {activeEqBand.label}</strong>
-              <span className={styles.sendCardTag}>
-                {formatEqBandType(activeEqBand.bandType)} · {selectedChannel.eq.enabled ? "PEQ in" : "PEQ bypassed"}
-              </span>
-            </div>
-            <div className={styles.eqModeRow}>
-              <button
-                aria-pressed={selectedChannel.eq.enabled}
-                data-active={selectedChannel.eq.enabled}
-                disabled={!viewModel.capabilities.canEditProcessing}
-                onClick={() =>
-                  onUpdateChannelEq({ channelId: selectedChannel.id, enabled: !selectedChannel.eq.enabled })
-                }
-                type="button"
-              >
-                {selectedChannel.eq.enabled ? "Bypass PEQ" : "Enable PEQ"}
-              </button>
-              {activeEqBandTypeOptions.map((option) => (
-                <button
-                  aria-pressed={activeEqBand.bandType === option}
-                  data-active={activeEqBand.bandType === option}
-                  // Why: TotalMix Band 2 is fixed to Bell — operator cannot change
-                  // its band type. The capability flag keeps that decision in one
-                  // place and lets future Rust contract changes (eg. unlocking the
-                  // shape) collapse to a single update site.
-                  disabled={!viewModel.capabilities.canEditProcessing || !canChangeBandType}
-                  key={option}
-                  onClick={() =>
-                    onUpdateChannelEq({
-                      bandId: eqBandId(activeEqBand.id),
-                      bandType: eqBandType(option),
-                      channelId: selectedChannel.id,
-                    })
-                  }
-                  type="button"
-                >
-                  {formatEqBandType(option)}
-                </button>
-              ))}
-            </div>
-            <div className={styles.processingControlGrid}>
-              <label className={styles.processingControl}>
-                <span>Freq</span>
-                <AudioSliderControl
-                  disabled={!viewModel.capabilities.canEditProcessing}
-                  label={`${selectedChannel.name} Band ${activeEqBand.label} EQ frequency`}
-                  max={EQ_FREQUENCY_MAX}
-                  min={EQ_FREQUENCY_MIN}
-                  onCommit={(value) => {
-                    setSelectedEqBandId(activeEqBand.id);
-                    setDraftValue(activeEqBandFrequencyKey, value);
-                    onUpdateChannelEq({
-                      bandId: eqBandId(activeEqBand.id),
-                      channelId: selectedChannel.id,
-                      frequencyHz: value,
-                    });
-                    clearDraftValueLater(activeEqBandFrequencyKey);
-                  }}
-                  onPreview={(value) => setDraftValue(activeEqBandFrequencyKey, value)}
-                  orientation="horizontal"
-                  step={10}
-                  value={activeEqBandFrequencyValue}
-                  valueText={formatEqFrequency(activeEqBandFrequencyValue)}
-                />
-                <strong>{formatEqFrequency(activeEqBandFrequencyValue)}</strong>
-              </label>
-              <label className={styles.processingControl}>
-                <span>Gain</span>
-                <AudioSliderControl
-                  disabled={!viewModel.capabilities.canEditProcessing}
-                  label={`${selectedChannel.name} Band ${activeEqBand.label} EQ gain`}
-                  max={EQ_GAIN_MAX}
-                  min={EQ_GAIN_MIN}
-                  onCommit={(value) => {
-                    setSelectedEqBandId(activeEqBand.id);
-                    setDraftValue(activeEqBandGainKey, value);
-                    onUpdateChannelEq({
-                      bandId: eqBandId(activeEqBand.id),
-                      channelId: selectedChannel.id,
-                      gainDb: value,
-                    });
-                    clearDraftValueLater(activeEqBandGainKey);
-                  }}
-                  onPreview={(value) => setDraftValue(activeEqBandGainKey, value)}
-                  orientation="horizontal"
-                  step={0.5}
-                  value={activeEqBandGainValue}
-                  valueText={`${activeEqBandGainValue.toFixed(1)} dB`}
-                />
-                <strong>{activeEqBandGainValue.toFixed(1)} dB</strong>
-              </label>
-              <label className={styles.processingControl}>
-                <span>Q</span>
-                <AudioSliderControl
-                  disabled={!viewModel.capabilities.canEditProcessing}
-                  label={`${selectedChannel.name} Band ${activeEqBand.label} EQ Q`}
-                  max={EQ_Q_MAX}
-                  min={EQ_Q_MIN}
-                  onCommit={(value) => {
-                    setSelectedEqBandId(activeEqBand.id);
-                    setDraftValue(activeEqBandQKey, value);
-                    onUpdateChannelEq({
-                      bandId: eqBandId(activeEqBand.id),
-                      channelId: selectedChannel.id,
-                      q: value,
-                    });
-                    clearDraftValueLater(activeEqBandQKey);
-                  }}
-                  onPreview={(value) => setDraftValue(activeEqBandQKey, value)}
-                  orientation="horizontal"
-                  step={0.1}
-                  value={activeEqBandQValue}
-                  valueText={`Q ${activeEqBandQValue.toFixed(1)}`}
-                />
-                <strong>Q {activeEqBandQValue.toFixed(1)}</strong>
-              </label>
-            </div>
-          </>
+          <AudioInspectorEqBandTray
+            activeEqBand={activeEqBand}
+            activeEqBandFrequencyKey={activeEqBandFrequencyKey}
+            activeEqBandFrequencyValue={activeEqBandFrequencyValue}
+            activeEqBandGainKey={activeEqBandGainKey}
+            activeEqBandGainValue={activeEqBandGainValue}
+            activeEqBandQKey={activeEqBandQKey}
+            activeEqBandQValue={activeEqBandQValue}
+            activeEqBandTypeOptions={activeEqBandTypeOptions}
+            canChangeBandType={canChangeBandType}
+            clearDraftValueLater={clearDraftValueLater}
+            onUpdateChannelEq={onUpdateChannelEq}
+            selectedChannel={selectedChannel}
+            setDraftValue={setDraftValue}
+            setSelectedEqBandId={setSelectedEqBandId}
+            viewModel={viewModel}
+          />
         ) : null}
       </div>
     </div>

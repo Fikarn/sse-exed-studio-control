@@ -1,76 +1,23 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { useEffect } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioInspector.module.css";
-import { AUDIO_DRAFT_CLEAR_MS, AUDIO_THROTTLE_EQ_MS } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
-import { createThrottledCommit } from "../audioContinuousControls";
-import { AUDIO_DB_NEG_INFINITY, AUDIO_FADER_UNITY, deriveSendStatusLabel, formatAudioDb } from "../audioFormatting";
-import {
-  audioChannelSupportsAutoSet,
-  audioChannelSupportsGain,
-  audioChannelSupportsInstrument,
-  audioChannelSupportsPhantom,
-  audioChannelSupportsPhase,
-  getAudioChannelGroup,
-  selectedChannelSendLevel,
-  type AudioWorkspaceViewModel,
-} from "../audioViewModel";
-import { AudioPreampControl } from "./AudioPreampControl";
-import { AudioStableMeterDbPair } from "./AudioLiveMeterReadout";
-import { AudioSliderControl } from "./AudioSliderControl";
-import { AudioStereoMeter } from "./AudioStereoMeter";
+import { getAudioChannelGroup, selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../audioViewModel";
+import { useAudioInspectorEqState } from "../hooks/useAudioInspectorEqState";
 import { AudioInspectorChannelHeader } from "./inspector/AudioInspectorChannelHeader";
 import { AudioInspectorDynamicsTab } from "./inspector/AudioInspectorDynamicsTab";
-import { AudioInspectorEqTab, type EqDragRef } from "./inspector/AudioInspectorEqTab";
+import { AudioInspectorEqTab } from "./inspector/AudioInspectorEqTab";
 import { AudioInspectorOutputView } from "./inspector/AudioInspectorOutputView";
 import { AudioInspectorOverviewCards } from "./inspector/AudioInspectorOverviewCards";
 import { AudioInspectorSendsTab } from "./inspector/AudioInspectorSendsTab";
+import { AudioInspectorTabStrip } from "./inspector/AudioInspectorTabStrip";
 import {
-  channelOrdinalLabel,
-  channelRoutingSourceText,
-  channelTypeLabel,
   dynamicsCurvePath,
   dynamicsPoint,
-  dynamicsStatusText,
   dynamicsThresholdPercent,
-  EQ_FREQUENCY_MARKERS,
-  EQ_FREQUENCY_MAX,
-  EQ_FREQUENCY_MIN,
-  EQ_GAIN_MARKERS,
-  EQ_GAIN_MAX,
-  EQ_GAIN_MIN,
-  EQ_Q_MAX,
-  EQ_Q_MIN,
-  eqBandId,
-  eqBandType,
-  eqFrequencyFromPointX,
-  eqGainFromPointY,
-  eqPointX,
-  eqPointY,
-  eqResponsePath,
-  eqStatusText,
-  formatEqBandType,
-  formatEqFrequency,
-  INSPECTOR_TABS,
-  LOW_CUT_FREQUENCY_MAX,
-  LOW_CUT_FREQUENCY_MIN,
-  LOW_CUT_HANDLE_ID,
-  LOW_CUT_SLOPES,
-  lowCutFrequencyFromPointX,
-  lowCutShadePath,
-  outputRouteText,
-  outputTypeLabel,
   type AudioChannelUpdate,
   type AudioDynamicsUpdate,
-  type AudioEqBand,
   type AudioEqUpdate,
   type AudioMixTargetUpdate,
   type AudioSendModeUpdate,
@@ -124,20 +71,6 @@ export function AudioInspector({
   store: ShellStore;
   viewModel: AudioWorkspaceViewModel;
 }) {
-  const [selectedEqBandId, setSelectedEqBandId] = useState<string | null>(LOW_CUT_HANDLE_ID);
-  const [eqGraphDraft, setEqGraphDraft] = useState<{
-    bandId: string;
-    frequencyHz: number;
-    gainDb: number;
-  } | null>(null);
-  const eqDragRef = useRef<EqDragRef | null>(null);
-  const throttledEqCommit = useMemo(
-    () => createThrottledCommit<AudioEqUpdate>(commitChannelEqContinuous, AUDIO_THROTTLE_EQ_MS),
-    [commitChannelEqContinuous]
-  );
-
-  useEffect(() => () => throttledEqCommit.cancel(), [throttledEqCommit]);
-
   useEffect(() => {
     if (!window.__SSE_TEST_RENDER_COUNTS__) return;
     window.__SSE_TEST_RENDER_COUNTS__.audioInspector = (window.__SSE_TEST_RENDER_COUNTS__.audioInspector ?? 0) + 1;
@@ -146,14 +79,18 @@ export function AudioInspector({
   const selectedChannel = viewModel.selectedChannel;
   const selectedMixTarget = viewModel.selectedMixTarget;
   const outputSelectionOnly = !selectedChannel && Boolean(selectedMixTarget);
+
+  const eqState = useAudioInspectorEqState({
+    clearDraftValueLater,
+    commitChannelEqContinuous,
+    getDraftValue,
+    onUpdateChannelEq,
+    selectedChannel,
+    setDraftValue,
+    viewModel,
+  });
+
   const selectedClip = selectedChannel?.clip ?? false;
-  const activeEqHandleId =
-    selectedEqBandId === LOW_CUT_HANDLE_ID
-      ? LOW_CUT_HANDLE_ID
-      : (selectedChannel?.eq.bands.find((band) => band.id === selectedEqBandId)?.id ??
-        selectedChannel?.eq.bands[0]?.id ??
-        LOW_CUT_HANDLE_ID);
-  const activeEqBand = selectedChannel?.eq.bands.find((band) => band.id === activeEqHandleId) ?? null;
   const gainDraftKey = selectedChannel ? `channel:${selectedChannel.id}:gain` : "channel:none:gain";
   const selectedGain = useAudioControlDraftValue(
     draftStore,
@@ -189,63 +126,6 @@ export function AudioInspector({
   const outputRightMeter = selectedMixTarget?.mono
     ? (selectedMixTarget?.meterLevel ?? 0)
     : (selectedMixTarget?.meterRight ?? 0);
-  const lowCutFrequencyKey = selectedChannel
-    ? `channel:${selectedChannel.id}:eq:lowCut:frequency`
-    : "channel:none:eq:lowCut:frequency";
-  const lowCutFrequencyValue = selectedChannel
-    ? getDraftValue(lowCutFrequencyKey, selectedChannel.eq.lowCut.frequencyHz)
-    : 80;
-  const activeEqBandFrequencyKey =
-    selectedChannel && activeEqBand
-      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:frequency`
-      : "channel:none:eq:none:frequency";
-  const activeEqBandFrequencyValue = activeEqBand
-    ? getDraftValue(activeEqBandFrequencyKey, activeEqBand.frequencyHz)
-    : 0;
-  const activeEqBandGainKey =
-    selectedChannel && activeEqBand
-      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:gain`
-      : "channel:none:eq:none:gain";
-  const activeEqBandGainValue = activeEqBand ? getDraftValue(activeEqBandGainKey, activeEqBand.gainDb) : 0;
-  const activeEqBandQKey =
-    selectedChannel && activeEqBand
-      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:q`
-      : "channel:none:eq:none:q";
-  const activeEqBandQValue = activeEqBand ? getDraftValue(activeEqBandQKey, activeEqBand.q) : 0;
-  const activeEqBandTypeOptions =
-    activeEqBand?.id === "1"
-      ? ["bell", "low-shelf", "high-pass", "low-pass"]
-      : activeEqBand?.id === "3"
-        ? ["bell", "high-shelf", "low-pass", "high-pass"]
-        : ["bell"];
-  // Why: TotalMix Band 2 is fixed-Bell; do not surface band-type toggles for
-  // it. Future RME firmware changes that unlock the shape land here as a
-  // single capability swap.
-  const canChangeBandType = activeEqBand?.id !== "2";
-  const eqBands = selectedChannel
-    ? selectedChannel.eq.bands.map((band) =>
-        eqGraphDraft?.bandId === band.id
-          ? { ...band, frequencyHz: eqGraphDraft.frequencyHz, gainDb: eqGraphDraft.gainDb }
-          : band
-      )
-    : [];
-  const visualEq = selectedChannel
-    ? {
-        ...selectedChannel.eq,
-        lowCut: { ...selectedChannel.eq.lowCut, frequencyHz: lowCutFrequencyValue },
-        bands: eqBands,
-      }
-    : null;
-  const eqGraphPath = visualEq ? eqResponsePath(visualEq) : "";
-  const lowCutShade = visualEq?.lowCut.enabled ? lowCutShadePath(visualEq.lowCut) : "";
-  const activeEqLabel =
-    activeEqHandleId === LOW_CUT_HANDLE_ID ? "Low Cut" : activeEqBand ? `Band ${activeEqBand.label}` : "EQ";
-  const activeEqValue =
-    activeEqHandleId === LOW_CUT_HANDLE_ID
-      ? `${formatEqFrequency(lowCutFrequencyValue)} · ${selectedChannel?.eq.lowCut.slopeDbPerOctave ?? 12} dB/oct`
-      : activeEqBand
-        ? `${formatEqFrequency(activeEqBand.frequencyHz)} · ${activeEqBand.gainDb.toFixed(1)} dB · Q ${activeEqBand.q.toFixed(1)}`
-        : "No band selected";
   const dynamicsCurve = selectedChannel ? dynamicsCurvePath(selectedChannel.dynamics.compressor) : "";
   const dynamicsCurvePoint = selectedChannel ? dynamicsPoint(selectedChannel.dynamics.compressor) : { x: 0, y: 100 };
   const gateThresholdX = selectedChannel ? dynamicsThresholdPercent(selectedChannel.dynamics.gate.thresholdDb) : 0;
@@ -259,106 +139,13 @@ export function AudioInspector({
     }
   }, [activeTab, onActiveTabChange, outputSelectionOnly]);
 
-  const commitEqPointFromPointer = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    band: AudioEqBand,
-    mode: "schedule" | "flush" = "schedule"
-  ) => {
-    if (!selectedChannel || !viewModel.capabilities.canEditProcessing) return;
-    // Why: re-read the EQ graph rect every pointer event. Caching the rect at
-    // pointerDown drifted when the inspector resized mid-drag (eg. window
-    // resize, scaled-preview toggle, virtual-keyboard reflow on touch hosts);
-    // the cached width/left lagged and the drag jumped sideways. The
-    // `eqDragRef` still anchors the active band identity and the pointer id,
-    // but rect numbers are now always live.
-    const graph = event.currentTarget.closest("[data-eq-graph]");
-    if (!(graph instanceof HTMLElement)) return;
-
-    const rect = graph.getBoundingClientRect();
-    const frequencyPercent = (event.clientX - rect.left) / Math.max(1, rect.width);
-    const gainPercent = (event.clientY - rect.top) / Math.max(1, rect.height);
-    const frequencyHz = eqFrequencyFromPointX(frequencyPercent);
-    const gainDb = eqGainFromPointY(gainPercent);
-    const frequencyKey = `channel:${selectedChannel.id}:eq:${band.id}:frequency`;
-    const gainKey = `channel:${selectedChannel.id}:eq:${band.id}:gain`;
-    setSelectedEqBandId(band.id);
-    setEqGraphDraft({ bandId: band.id, frequencyHz, gainDb });
-    setDraftValue(frequencyKey, frequencyHz);
-    setDraftValue(gainKey, gainDb);
-    if (mode === "flush") {
-      throttledEqCommit.schedule({
-        bandId: eqBandId(band.id),
-        channelId: selectedChannel.id,
-        frequencyHz,
-        gainDb,
-      });
-      throttledEqCommit.flush();
-      clearDraftValueLater(frequencyKey);
-      clearDraftValueLater(gainKey);
-      window.setTimeout(() => setEqGraphDraft(null), AUDIO_DRAFT_CLEAR_MS);
-    }
-  };
-
-  const commitLowCutFromPointer = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    mode: "schedule" | "flush" = "schedule"
-  ) => {
-    if (!selectedChannel || !viewModel.capabilities.canEditProcessing) return;
-    const graph = event.currentTarget.closest("[data-eq-graph]");
-    if (!(graph instanceof HTMLElement)) return;
-
-    const rect = graph.getBoundingClientRect();
-    const frequencyPercent = (event.clientX - rect.left) / Math.max(1, rect.width);
-    const frequencyHz = lowCutFrequencyFromPointX(frequencyPercent);
-    const frequencyKey = `channel:${selectedChannel.id}:eq:lowCut:frequency`;
-    setSelectedEqBandId(LOW_CUT_HANDLE_ID);
-    setDraftValue(frequencyKey, frequencyHz);
-    if (mode === "flush") {
-      onUpdateChannelEq({
-        channelId: selectedChannel.id,
-        lowCutFrequencyHz: frequencyHz,
-      });
-      clearDraftValueLater(frequencyKey);
-    }
-  };
-
   return (
     <aside className={styles.inspector} data-source-tier={viewModel.selectedSourceTier}>
-      {outputSelectionOnly ? (
-        <div
-          className={`${styles.inspectorTabs} ${styles.inspectorOutputTabs}`}
-          aria-label="Audio output inspector"
-          role="tablist"
-        >
-          <button
-            aria-controls="audio-inspector-output-panel"
-            aria-selected="true"
-            data-active="true"
-            id="audio-inspector-output-tab"
-            role="tab"
-            type="button"
-          >
-            Output
-          </button>
-        </div>
-      ) : (
-        <div className={styles.inspectorTabs} aria-label="Audio inspector tabs" role="tablist">
-          {INSPECTOR_TABS.map((tab) => (
-            <button
-              aria-controls={`${tab.testId}-panel`}
-              aria-selected={tab.id === activeTab}
-              data-active={tab.id === activeTab}
-              id={`${tab.testId}-tab`}
-              key={tab.id}
-              onClick={() => onActiveTabChange(tab.id)}
-              role="tab"
-              type="button"
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <AudioInspectorTabStrip
+        activeTab={activeTab}
+        onActiveTabChange={onActiveTabChange}
+        outputSelectionOnly={outputSelectionOnly}
+      />
 
       <div className={styles.inspectorSticky}>
         {selectedChannel ? (
@@ -418,13 +205,10 @@ export function AudioInspector({
           role="tabpanel"
         >
           <AudioInspectorOverviewCards
-            activeEqHandleId={activeEqHandleId}
+            {...eqState}
             dynamicsCurve={dynamicsCurve}
             dynamicsCurvePoint={dynamicsCurvePoint}
-            eqBands={eqBands}
-            eqGraphPath={eqGraphPath}
             gateThresholdX={gateThresholdX}
-            lowCutShade={lowCutShade}
             monitorValue={monitorValue}
             onActiveTabChange={onActiveTabChange}
             selectedChannel={selectedChannel}
@@ -445,31 +229,11 @@ export function AudioInspector({
         >
           {selectedChannel ? (
             <AudioInspectorEqTab
-              activeEqBand={activeEqBand}
-              activeEqBandFrequencyKey={activeEqBandFrequencyKey}
-              activeEqBandFrequencyValue={activeEqBandFrequencyValue}
-              activeEqBandGainKey={activeEqBandGainKey}
-              activeEqBandGainValue={activeEqBandGainValue}
-              activeEqBandQKey={activeEqBandQKey}
-              activeEqBandQValue={activeEqBandQValue}
-              activeEqBandTypeOptions={activeEqBandTypeOptions}
-              activeEqHandleId={activeEqHandleId}
-              activeEqLabel={activeEqLabel}
-              activeEqValue={activeEqValue}
-              canChangeBandType={canChangeBandType}
+              {...eqState}
               clearDraftValueLater={clearDraftValueLater}
-              commitEqPointFromPointer={commitEqPointFromPointer}
-              commitLowCutFromPointer={commitLowCutFromPointer}
-              eqBands={eqBands}
-              eqDragRef={eqDragRef}
-              eqGraphPath={eqGraphPath}
-              lowCutFrequencyKey={lowCutFrequencyKey}
-              lowCutFrequencyValue={lowCutFrequencyValue}
-              lowCutShade={lowCutShade}
               onUpdateChannelEq={onUpdateChannelEq}
               selectedChannel={selectedChannel}
               setDraftValue={setDraftValue}
-              setSelectedEqBandId={setSelectedEqBandId}
               viewModel={viewModel}
             />
           ) : (

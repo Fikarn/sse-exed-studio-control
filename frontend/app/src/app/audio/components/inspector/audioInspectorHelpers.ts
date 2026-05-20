@@ -21,6 +21,20 @@ export type AudioEqBand = SelectedAudioChannel["eq"]["bands"][number];
 export type AudioLowCut = SelectedAudioChannel["eq"]["lowCut"];
 export type InspectorTab = "channel" | "eq" | "dynamics" | "sends";
 
+/**
+ * Pointer-drag anchor used by the EQ graph. Lives in the shared helpers so
+ * the `useAudioInspectorEqState` hook can own the ref while the EQ tab body
+ * still imports the type without pulling in the hook module.
+ */
+export interface EqDragRef {
+  bandId: string;
+  height: number;
+  left: number;
+  pointerId: number;
+  top: number;
+  width: number;
+}
+
 export const EQ_FREQUENCY_MIN = 20;
 export const EQ_FREQUENCY_MAX = 20000;
 export const EQ_GAIN_MIN = -20;
