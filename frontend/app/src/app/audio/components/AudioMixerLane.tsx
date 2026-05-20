@@ -2,7 +2,7 @@ import { useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
 import { Tooltip } from "@sse/design-system";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioMixerLane.module.css";
 import { AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { createThrottledCommit } from "../audioContinuousControls";
