@@ -1,8 +1,17 @@
-import { useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "../AudioWorkspace.module.css";
-import { AUDIO_FADER_UNITY, formatAudioDb, formatAudioRole, formatMeterDb } from "../audioFormatting";
+import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
+import { createThrottledCommit } from "../audioContinuousControls";
+import { AUDIO_FADER_UNITY, formatAudioDb, formatAudioRole } from "../audioFormatting";
 import {
   audioChannelSupportsAutoSet,
   audioChannelSupportsGain,
@@ -14,7 +23,9 @@ import {
   type AudioWorkspaceViewModel,
 } from "../audioViewModel";
 import { AudioPreampControl } from "./AudioPreampControl";
+import { AudioStableMeterDbPair } from "./AudioLiveMeterReadout";
 import { AudioSliderControl } from "./AudioSliderControl";
+import { AudioStereoMeter } from "./AudioStereoMeter";
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioDynamicsUpdate = Parameters<ShellStore["updateAudioChannelDynamics"]>[0];
@@ -23,18 +34,36 @@ type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 type SelectedAudioChannel = NonNullable<AudioWorkspaceViewModel["selectedChannel"]>;
 type AudioEqBand = SelectedAudioChannel["eq"]["bands"][number];
+type AudioLowCut = SelectedAudioChannel["eq"]["lowCut"];
 export type InspectorTab = "channel" | "eq" | "dynamics" | "sends";
-
-function meterPercent(value: number) {
-  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
-}
 
 const EQ_FREQUENCY_MIN = 20;
 const EQ_FREQUENCY_MAX = 20000;
-const EQ_GAIN_MIN = -12;
-const EQ_GAIN_MAX = 12;
-const EQ_Q_MIN = 0.1;
-const EQ_Q_MAX = 12;
+const EQ_GAIN_MIN = -20;
+const EQ_GAIN_MAX = 20;
+const EQ_Q_MIN = 0.4;
+const EQ_Q_MAX = 9.9;
+const LOW_CUT_FREQUENCY_MIN = 20;
+const LOW_CUT_FREQUENCY_MAX = 500;
+const LOW_CUT_SLOPES = [6, 12, 18, 24] as const;
+const LOW_CUT_HANDLE_ID = "lowCut";
+const EQ_FREQUENCY_MARKERS = [
+  { frequencyHz: 20, label: "20 Hz", major: true },
+  { frequencyHz: 50, label: "50", major: false },
+  { frequencyHz: 100, label: "100", major: true },
+  { frequencyHz: 200, label: "200", major: false },
+  { frequencyHz: 500, label: "500", major: false },
+  { frequencyHz: 1000, label: "1 k", major: true },
+  { frequencyHz: 2000, label: "2 k", major: false },
+  { frequencyHz: 5000, label: "5 k", major: false },
+  { frequencyHz: 10000, label: "10 k", major: true },
+  { frequencyHz: 20000, label: "20 kHz", major: true },
+] as const;
+const EQ_GAIN_MARKERS = [
+  { gainDb: 20, label: "+20 dB" },
+  { gainDb: 0, label: "0 dB" },
+  { gainDb: -20, label: "-20 dB" },
+] as const;
 
 function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
@@ -60,6 +89,10 @@ function eqBandId(value: string) {
   return value as AudioEqUpdate["bandId"];
 }
 
+function eqBandType(value: string) {
+  return value as AudioEqUpdate["bandType"];
+}
+
 function eqPointX(frequencyHz: number) {
   const min = Math.log10(EQ_FREQUENCY_MIN);
   const max = Math.log10(EQ_FREQUENCY_MAX);
@@ -81,8 +114,65 @@ function eqGainFromPointY(percent: number) {
   return Number((EQ_GAIN_MAX - clamp(percent, 0, 1) * (EQ_GAIN_MAX - EQ_GAIN_MIN)).toFixed(1));
 }
 
+function lowCutFrequencyFromPointX(percent: number) {
+  const min = Math.log10(LOW_CUT_FREQUENCY_MIN);
+  const max = Math.log10(LOW_CUT_FREQUENCY_MAX);
+  return Math.round(10 ** (min + clamp(percent, 0, 1) * (max - min)));
+}
+
+function eqOctaves(frequency: number, center: number) {
+  return Math.log2(
+    clamp(frequency, EQ_FREQUENCY_MIN, EQ_FREQUENCY_MAX) / clamp(center, EQ_FREQUENCY_MIN, EQ_FREQUENCY_MAX)
+  );
+}
+
+function eqBandContribution(band: AudioEqBand, frequencyHz: number) {
+  if (!band.enabled) return 0;
+  const distance = eqOctaves(frequencyHz, band.frequencyHz);
+  if (band.bandType === "low-shelf") {
+    const transition = 1 / (1 + Math.exp(distance * Math.max(1.4, band.q * 1.1)));
+    return band.gainDb * transition;
+  }
+  if (band.bandType === "high-shelf") {
+    const transition = 1 / (1 + Math.exp(-distance * Math.max(1.4, band.q * 1.1)));
+    return band.gainDb * transition;
+  }
+  if (band.bandType === "high-pass") {
+    return frequencyHz < band.frequencyHz ? Math.max(EQ_GAIN_MIN, -12 * Math.abs(distance)) : 0;
+  }
+  if (band.bandType === "low-pass") {
+    return frequencyHz > band.frequencyHz ? Math.max(EQ_GAIN_MIN, -12 * Math.abs(distance)) : 0;
+  }
+  const width = 1 / Math.max(0.36, band.q * 0.42);
+  return band.gainDb * Math.exp(-(distance * distance) / (2 * width * width));
+}
+
+function lowCutContribution(lowCut: AudioLowCut, frequencyHz: number) {
+  if (!lowCut.enabled || frequencyHz >= lowCut.frequencyHz) return 0;
+  return Math.max(EQ_GAIN_MIN, -lowCut.slopeDbPerOctave * Math.abs(eqOctaves(frequencyHz, lowCut.frequencyHz)));
+}
+
+function eqResponseAt(eq: SelectedAudioChannel["eq"], frequencyHz: number) {
+  const bandGain = eq.enabled ? eq.bands.reduce((sum, band) => sum + eqBandContribution(band, frequencyHz), 0) : 0;
+  return clamp(lowCutContribution(eq.lowCut, frequencyHz) + bandGain, EQ_GAIN_MIN, EQ_GAIN_MAX);
+}
+
+function eqResponsePath(eq: SelectedAudioChannel["eq"], points = 96) {
+  return Array.from({ length: points }, (_, index) => {
+    const percent = points <= 1 ? 0 : index / (points - 1);
+    const frequencyHz = eqFrequencyFromPointX(percent);
+    const command = index === 0 ? "M" : "L";
+    return `${command} ${eqPointX(frequencyHz).toFixed(2)} ${eqPointY(eqResponseAt(eq, frequencyHz)).toFixed(2)}`;
+  }).join(" ");
+}
+
+function lowCutShadePath(lowCut: AudioLowCut) {
+  const x = eqPointX(lowCut.frequencyHz);
+  return `M 0 100 L 0 0 L ${x.toFixed(2)} 0 C ${(x * 0.92).toFixed(2)} 28 ${(x * 0.86).toFixed(2)} 72 ${x.toFixed(2)} 100 Z`;
+}
+
 const TABS: Array<{ id: InspectorTab; label: string; testId: string }> = [
-  { id: "channel", label: "Channel", testId: "audio-inspector-channel" },
+  { id: "channel", label: "Overview", testId: "audio-inspector-channel" },
   { id: "eq", label: "EQ", testId: "audio-inspector-eq" },
   { id: "dynamics", label: "Dynamics", testId: "audio-inspector-dynamics" },
   { id: "sends", label: "Sends", testId: "audio-inspector-sends" },
@@ -93,13 +183,6 @@ function channelTypeLabel(role: string) {
   if (role === "front-preamp") return "Channel";
   if (role === "rear-line") return "Line";
   return formatAudioRole(role);
-}
-
-function channelSourceText(role: string) {
-  if (role === "playback-pair") return "Playback engine";
-  if (role === "front-preamp") return "RME UFX III mic preamp";
-  if (role === "rear-line") return "Rear line input";
-  return "Audio source";
 }
 
 function channelRoutingSourceText(role: string) {
@@ -118,12 +201,6 @@ function channelOrdinalLabel(
   return String(Math.max(0, index) + 1).padStart(2, "0");
 }
 
-function channelDriverText(role: string) {
-  if (role === "playback-pair") return "Driver: n/a · playback bus";
-  if (role === "front-preamp") return "Driver: RME UFX III · mic preamp";
-  return "Driver: Core Audio";
-}
-
 function outputTypeLabel(role: string) {
   if (role === "main-out") return "Main";
   if (role === "phones-a") return "Cue A";
@@ -138,10 +215,43 @@ function outputRouteText(role: string) {
   return "Hardware output";
 }
 
+function dynamicsThresholdPercent(thresholdDb: number) {
+  return clamp(((thresholdDb + 80) / 80) * 100, 0, 100);
+}
+
+function dynamicsCurvePath(processor: SelectedAudioChannel["dynamics"]["compressor"]) {
+  if (!processor.enabled) {
+    return "M 0 92 L 100 8";
+  }
+  const threshold = dynamicsThresholdPercent(processor.thresholdDb);
+  const ratio = Math.max(1, processor.ratio);
+  const endOutput = threshold + (100 - threshold) / ratio;
+  return `M 0 100 L ${threshold.toFixed(1)} ${(100 - threshold).toFixed(1)} L 100 ${(100 - endOutput).toFixed(1)}`;
+}
+
+function dynamicsPoint(processor: SelectedAudioChannel["dynamics"]["compressor"]) {
+  const x = dynamicsThresholdPercent(processor.thresholdDb);
+  return { x, y: 100 - x };
+}
+
+function dynamicsStatusText(channel: SelectedAudioChannel) {
+  const comp = channel.dynamics.compressor.enabled ? "Comp in" : "Comp bypassed";
+  const gate = channel.dynamics.gate.enabled ? "Gate in" : "Gate bypassed";
+  return `${comp} · ${gate}`;
+}
+
+function eqStatusText(channel: SelectedAudioChannel) {
+  const lowCut = channel.eq.lowCut.enabled ? "LC in" : "LC out";
+  return `${channel.eq.enabled ? "PEQ in" : "PEQ bypassed"} · ${lowCut} · ${channel.eq.bands.length} bands`;
+}
+
 export function AudioInspector({
-  clearDraftValue,
+  armedActionKey,
+  clearDraftValueLater,
   commitChannelContinuous,
+  commitChannelEqContinuous,
   commitMixTargetContinuous,
+  draftStore,
   getDraftValue,
   activeTab,
   onActiveTabChange,
@@ -150,13 +260,20 @@ export function AudioInspector({
   onUpdateChannelDynamics,
   onUpdateChannelEq,
   onUpdateChannelSendMode,
+  onTogglePhantom,
   onUpdateChannel,
   onUpdateMixTarget,
+  peakHoldEnabled,
+  peakHoldResetToken,
+  store,
   viewModel,
 }: {
-  clearDraftValue: (key: string) => void;
+  armedActionKey: string | null;
+  clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
+  commitChannelEqContinuous: (request: AudioEqUpdate) => void;
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
+  draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   activeTab: InspectorTab;
   onActiveTabChange: (tab: InspectorTab) => void;
@@ -165,88 +282,247 @@ export function AudioInspector({
   onUpdateChannelDynamics: (request: AudioDynamicsUpdate) => void;
   onUpdateChannelEq: (request: AudioEqUpdate) => void;
   onUpdateChannelSendMode: (request: AudioSendModeUpdate) => void;
+  onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
+  peakHoldEnabled: boolean;
+  peakHoldResetToken: number;
+  store: ShellStore;
   viewModel: AudioWorkspaceViewModel;
 }) {
-  const [selectedEqBandId, setSelectedEqBandId] = useState<string | null>(null);
+  const [selectedEqBandId, setSelectedEqBandId] = useState<string | null>(LOW_CUT_HANDLE_ID);
+  const [eqGraphDraft, setEqGraphDraft] = useState<{
+    bandId: string;
+    frequencyHz: number;
+    gainDb: number;
+  } | null>(null);
+  const eqDragRef = useRef<{
+    bandId: string;
+    height: number;
+    left: number;
+    pointerId: number;
+    top: number;
+    width: number;
+  } | null>(null);
+  const throttledEqCommit = useMemo(
+    () => createThrottledCommit<AudioEqUpdate>(commitChannelEqContinuous, 500),
+    [commitChannelEqContinuous]
+  );
+
+  useEffect(() => () => throttledEqCommit.cancel(), [throttledEqCommit]);
+
+  useEffect(() => {
+    if (!window.__SSE_TEST_RENDER_COUNTS__) return;
+    window.__SSE_TEST_RENDER_COUNTS__.audioInspector = (window.__SSE_TEST_RENDER_COUNTS__.audioInspector ?? 0) + 1;
+  });
+
   const selectedChannel = viewModel.selectedChannel;
   const selectedMixTarget = viewModel.selectedMixTarget;
-  const activeEqBandId =
-    selectedChannel?.eq.bands.find((band) => band.id === selectedEqBandId)?.id ??
-    selectedChannel?.eq.bands[0]?.id ??
-    null;
+  const outputSelectionOnly = !selectedChannel && Boolean(selectedMixTarget);
+  const selectedClip = selectedChannel?.clip ?? false;
+  const activeEqHandleId =
+    selectedEqBandId === LOW_CUT_HANDLE_ID
+      ? LOW_CUT_HANDLE_ID
+      : (selectedChannel?.eq.bands.find((band) => band.id === selectedEqBandId)?.id ??
+        selectedChannel?.eq.bands[0]?.id ??
+        LOW_CUT_HANDLE_ID);
+  const activeEqBand = selectedChannel?.eq.bands.find((band) => band.id === activeEqHandleId) ?? null;
   const gainDraftKey = selectedChannel ? `channel:${selectedChannel.id}:gain` : "channel:none:gain";
-  const selectedGain = selectedChannel ? getDraftValue(gainDraftKey, selectedChannel.gain) : 0;
+  const selectedGain = useAudioControlDraftValue(
+    draftStore,
+    gainDraftKey,
+    selectedChannel ? getDraftValue(gainDraftKey, selectedChannel.gain) : 0
+  );
   const selectedSendDraftKey = selectedChannel
     ? `channel:${selectedChannel.id}:send:${viewModel.selectedMixTargetId ?? "none"}`
     : "channel:none:send:none";
-  const selectedSendLevel = selectedChannel
-    ? getDraftValue(selectedSendDraftKey, selectedChannelSendLevel(selectedChannel, viewModel.selectedMixTargetId))
-    : 0;
+  const selectedSendLevel = useAudioControlDraftValue(
+    draftStore,
+    selectedSendDraftKey,
+    selectedChannel
+      ? getDraftValue(selectedSendDraftKey, selectedChannelSendLevel(selectedChannel, viewModel.selectedMixTargetId))
+      : 0
+  );
   const monitorDraftKey = selectedMixTarget
     ? `mixTarget:${selectedMixTarget.id}:inspector-volume`
     : "mixTarget:none:inspector-volume";
-  const monitorValue = getDraftValue(monitorDraftKey, selectedMixTarget?.volume ?? 0);
+  const monitorValue = useAudioControlDraftValue(
+    draftStore,
+    monitorDraftKey,
+    getDraftValue(monitorDraftKey, selectedMixTarget?.volume ?? 0)
+  );
   const selectedGroup = selectedChannel ? getAudioChannelGroup(selectedChannel) : "";
+  const selectedLeftMeter = selectedChannel?.meterLeft ?? 0;
   const selectedRightMeter = selectedChannel
     ? selectedChannel.stereo
       ? selectedChannel.meterRight
-      : selectedChannel.meterLeft
-    : 0;
-  const selectedPeakLeft = selectedChannel ? Math.max(selectedChannel.peakHoldLeft, selectedChannel.meterLeft) : 0;
-  const selectedPeakRight = selectedChannel
-    ? Math.max(
-        selectedChannel.stereo ? selectedChannel.peakHoldRight : selectedChannel.peakHoldLeft,
-        selectedRightMeter
-      )
+      : selectedLeftMeter
     : 0;
   const outputLeftMeter = selectedMixTarget?.meterLeft ?? 0;
   const outputRightMeter = selectedMixTarget?.mono
     ? (selectedMixTarget?.meterLevel ?? 0)
     : (selectedMixTarget?.meterRight ?? 0);
-  const outputPeakLeft = selectedMixTarget ? Math.max(selectedMixTarget.peakHoldLeft, outputLeftMeter) : 0;
-  const outputPeakRight = selectedMixTarget ? Math.max(selectedMixTarget.peakHoldRight, outputRightMeter) : 0;
-  const eqGraphPath = selectedChannel
-    ? selectedChannel.eq.bands
-        .map((band, index) => {
-          const command = index === 0 ? "M" : "L";
-          return `${command} ${eqPointX(band.frequencyHz).toFixed(2)} ${eqPointY(band.gainDb).toFixed(2)}`;
-        })
-        .join(" ")
-    : "";
+  const lowCutFrequencyKey = selectedChannel
+    ? `channel:${selectedChannel.id}:eq:lowCut:frequency`
+    : "channel:none:eq:lowCut:frequency";
+  const lowCutFrequencyValue = selectedChannel
+    ? getDraftValue(lowCutFrequencyKey, selectedChannel.eq.lowCut.frequencyHz)
+    : 80;
+  const activeEqBandFrequencyKey =
+    selectedChannel && activeEqBand
+      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:frequency`
+      : "channel:none:eq:none:frequency";
+  const activeEqBandFrequencyValue = activeEqBand
+    ? getDraftValue(activeEqBandFrequencyKey, activeEqBand.frequencyHz)
+    : 0;
+  const activeEqBandGainKey =
+    selectedChannel && activeEqBand
+      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:gain`
+      : "channel:none:eq:none:gain";
+  const activeEqBandGainValue = activeEqBand ? getDraftValue(activeEqBandGainKey, activeEqBand.gainDb) : 0;
+  const activeEqBandQKey =
+    selectedChannel && activeEqBand
+      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:q`
+      : "channel:none:eq:none:q";
+  const activeEqBandQValue = activeEqBand ? getDraftValue(activeEqBandQKey, activeEqBand.q) : 0;
+  const activeEqBandTypeOptions =
+    activeEqBand?.id === "1"
+      ? ["bell", "low-shelf", "high-pass", "low-pass"]
+      : activeEqBand?.id === "3"
+        ? ["bell", "high-shelf", "low-pass", "high-pass"]
+        : ["bell"];
+  const eqBands = selectedChannel
+    ? selectedChannel.eq.bands.map((band) =>
+        eqGraphDraft?.bandId === band.id
+          ? { ...band, frequencyHz: eqGraphDraft.frequencyHz, gainDb: eqGraphDraft.gainDb }
+          : band
+      )
+    : [];
+  const visualEq = selectedChannel
+    ? {
+        ...selectedChannel.eq,
+        lowCut: { ...selectedChannel.eq.lowCut, frequencyHz: lowCutFrequencyValue },
+        bands: eqBands,
+      }
+    : null;
+  const eqGraphPath = visualEq ? eqResponsePath(visualEq) : "";
+  const lowCutShade = visualEq?.lowCut.enabled ? lowCutShadePath(visualEq.lowCut) : "";
+  const activeEqLabel =
+    activeEqHandleId === LOW_CUT_HANDLE_ID ? "Low Cut" : activeEqBand ? `Band ${activeEqBand.label}` : "EQ";
+  const activeEqValue =
+    activeEqHandleId === LOW_CUT_HANDLE_ID
+      ? `${formatEqFrequency(lowCutFrequencyValue)} · ${selectedChannel?.eq.lowCut.slopeDbPerOctave ?? 12} dB/oct`
+      : activeEqBand
+        ? `${formatEqFrequency(activeEqBand.frequencyHz)} · ${activeEqBand.gainDb.toFixed(1)} dB · Q ${activeEqBand.q.toFixed(1)}`
+        : "No band selected";
+  const dynamicsCurve = selectedChannel ? dynamicsCurvePath(selectedChannel.dynamics.compressor) : "";
+  const dynamicsCurvePoint = selectedChannel ? dynamicsPoint(selectedChannel.dynamics.compressor) : { x: 0, y: 100 };
+  const gateThresholdX = selectedChannel ? dynamicsThresholdPercent(selectedChannel.dynamics.gate.thresholdDb) : 0;
+  const nextPhantomState = selectedChannel ? !selectedChannel.phantom : false;
+  const phantomArmed = selectedChannel ? armedActionKey === `phantom:${selectedChannel.id}:${nextPhantomState}` : false;
+  const phantomLabel = phantomArmed ? (nextPhantomState ? "Confirm 48V" : "Confirm Off") : "48V";
 
-  const commitEqPointFromPointer = (event: ReactPointerEvent<HTMLButtonElement>, band: AudioEqBand) => {
+  useEffect(() => {
+    if (outputSelectionOnly && activeTab !== "channel") {
+      onActiveTabChange("channel");
+    }
+  }, [activeTab, onActiveTabChange, outputSelectionOnly]);
+
+  const commitEqPointFromPointer = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    band: AudioEqBand,
+    mode: "schedule" | "flush" = "schedule"
+  ) => {
+    if (!selectedChannel || !viewModel.capabilities.canEditProcessing) return;
+    const cachedRect = eqDragRef.current?.bandId === band.id ? eqDragRef.current : null;
+    const graph = cachedRect ? null : event.currentTarget.closest("[data-eq-graph]");
+    if (!cachedRect && !(graph instanceof HTMLElement)) return;
+
+    const rect = cachedRect ?? graph!.getBoundingClientRect();
+    const frequencyPercent = (event.clientX - rect.left) / Math.max(1, rect.width);
+    const gainPercent = (event.clientY - rect.top) / Math.max(1, rect.height);
+    const frequencyHz = eqFrequencyFromPointX(frequencyPercent);
+    const gainDb = eqGainFromPointY(gainPercent);
+    const frequencyKey = `channel:${selectedChannel.id}:eq:${band.id}:frequency`;
+    const gainKey = `channel:${selectedChannel.id}:eq:${band.id}:gain`;
+    setSelectedEqBandId(band.id);
+    setEqGraphDraft({ bandId: band.id, frequencyHz, gainDb });
+    setDraftValue(frequencyKey, frequencyHz);
+    setDraftValue(gainKey, gainDb);
+    if (mode === "flush") {
+      throttledEqCommit.schedule({
+        bandId: eqBandId(band.id),
+        channelId: selectedChannel.id,
+        frequencyHz,
+        gainDb,
+      });
+      throttledEqCommit.flush();
+      clearDraftValueLater(frequencyKey);
+      clearDraftValueLater(gainKey);
+      window.setTimeout(() => setEqGraphDraft(null), 250);
+    }
+  };
+
+  const commitLowCutFromPointer = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    mode: "schedule" | "flush" = "schedule"
+  ) => {
     if (!selectedChannel || !viewModel.capabilities.canEditProcessing) return;
     const graph = event.currentTarget.closest("[data-eq-graph]");
     if (!(graph instanceof HTMLElement)) return;
 
     const rect = graph.getBoundingClientRect();
     const frequencyPercent = (event.clientX - rect.left) / Math.max(1, rect.width);
-    const gainPercent = (event.clientY - rect.top) / Math.max(1, rect.height);
-    setSelectedEqBandId(band.id);
-    onUpdateChannelEq({
-      bandId: eqBandId(band.id),
-      channelId: selectedChannel.id,
-      frequencyHz: eqFrequencyFromPointX(frequencyPercent),
-      gainDb: eqGainFromPointY(gainPercent),
-    });
+    const frequencyHz = lowCutFrequencyFromPointX(frequencyPercent);
+    const frequencyKey = `channel:${selectedChannel.id}:eq:lowCut:frequency`;
+    setSelectedEqBandId(LOW_CUT_HANDLE_ID);
+    setDraftValue(frequencyKey, frequencyHz);
+    if (mode === "flush") {
+      onUpdateChannelEq({
+        channelId: selectedChannel.id,
+        lowCutFrequencyHz: frequencyHz,
+      });
+      clearDraftValueLater(frequencyKey);
+    }
   };
 
   return (
     <aside className={styles.inspector} data-source-tier={viewModel.selectedSourceTier}>
-      <div className={styles.inspectorTabs} aria-label="Audio inspector tabs">
-        {TABS.map((tab) => (
+      {outputSelectionOnly ? (
+        <div
+          className={`${styles.inspectorTabs} ${styles.inspectorOutputTabs}`}
+          aria-label="Audio output inspector"
+          role="tablist"
+        >
           <button
-            data-active={tab.id === activeTab}
-            key={tab.id}
-            onClick={() => onActiveTabChange(tab.id)}
+            aria-controls="audio-inspector-output-panel"
+            aria-selected="true"
+            data-active="true"
+            id="audio-inspector-output-tab"
+            role="tab"
             type="button"
           >
-            {tab.label}
+            Output
           </button>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className={styles.inspectorTabs} aria-label="Audio inspector tabs" role="tablist">
+          {TABS.map((tab) => (
+            <button
+              aria-controls={`${tab.testId}-panel`}
+              aria-selected={tab.id === activeTab}
+              data-active={tab.id === activeTab}
+              id={`${tab.testId}-tab`}
+              key={tab.id}
+              onClick={() => onActiveTabChange(tab.id)}
+              role="tab"
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className={styles.inspectorSticky}>
         {selectedChannel ? (
@@ -269,58 +545,167 @@ export function AudioInspector({
             </div>
 
             <div className={styles.bigMeterCard} data-testid="audio-inspector-metering">
-              <div className={styles.bigMeter} aria-hidden="true">
-                <span>
-                  <i style={{ "--audio-meter-level": meterPercent(selectedChannel.meterLeft) } as CSSProperties} />
-                  <b
-                    data-meter-peak="left"
-                    data-side="left"
-                    style={{ bottom: `${Math.round(selectedPeakLeft * 100)}%` }}
-                  />
-                </span>
-                <span>
-                  <i style={{ "--audio-meter-level": meterPercent(selectedRightMeter) } as CSSProperties} />
-                  <b
-                    data-meter-peak="right"
-                    data-side="right"
-                    style={{ bottom: `${Math.round(selectedPeakRight * 100)}%` }}
-                  />
-                </span>
-              </div>
+              <AudioStereoMeter
+                clip={selectedChannel.clip}
+                left={selectedChannel.meterLeft}
+                meterId={selectedChannel.id}
+                meterKind="channel"
+                mirrorRight={!selectedChannel.stereo}
+                peakLeft={selectedChannel.peakHoldLeft}
+                peakRight={selectedChannel.stereo ? selectedChannel.peakHoldRight : selectedChannel.peakHoldLeft}
+                right={selectedChannel.stereo ? selectedChannel.meterRight : selectedChannel.meterLeft}
+                showReadout={false}
+                showScale
+              />
               <div className={styles.bigMeterInfo}>
                 {viewModel.meterSimulationActive ? (
                   <span className={styles.meterSimulationBadge}>TEST STAGE</span>
                 ) : null}
                 <div className={styles.bigMeterRow}>
                   <span>
-                    <small>Peak L / R</small>
+                    <small>Level L / R</small>
                     <strong>
-                      {formatMeterDb(selectedChannel.meterLeft)} / {formatMeterDb(selectedRightMeter)}
+                      <AudioStableMeterDbPair
+                        fallbackLeft={selectedLeftMeter}
+                        fallbackRight={selectedRightMeter}
+                        kind="channel"
+                        mirrorRight={!selectedChannel.stereo}
+                        meterId={selectedChannel.id}
+                        mode="level"
+                        peakHoldEnabled={peakHoldEnabled}
+                        peakHoldResetToken={peakHoldResetToken}
+                        store={store}
+                        testId="audio-inspector-level-readout"
+                      />
                       <em>dB</em>
                     </strong>
                   </span>
                   <span>
-                    <small>Hold</small>
-                    <strong data-tone={selectedChannel.clip ? "clip" : "warn"}>
-                      {formatMeterDb(selectedPeakLeft)} / {formatMeterDb(selectedPeakRight)}
+                    <small>Peak hold</small>
+                    <strong data-tone={selectedClip ? "clip" : "warn"}>
+                      <AudioStableMeterDbPair
+                        fallbackLeft={selectedLeftMeter}
+                        fallbackRight={selectedRightMeter}
+                        kind="channel"
+                        mirrorRight={!selectedChannel.stereo}
+                        meterId={selectedChannel.id}
+                        mode="peakHold"
+                        peakHoldEnabled={peakHoldEnabled}
+                        peakHoldResetToken={peakHoldResetToken}
+                        store={store}
+                        testId="audio-inspector-peak-hold-readout"
+                      />
                       <em>dB</em>
                     </strong>
                   </span>
                 </div>
-                <div className={styles.bigMeterRow}>
+                <div className={styles.bigMeterReferenceRow}>
                   <span>
-                    <small>LUFS short</small>
+                    <small>Nominal ref</small>
                     <strong>
-                      n/a<em>LU</em>
+                      -18<em>dBFS</em>
                     </strong>
                   </span>
                   <span>
-                    <small>Correlation</small>
-                    <strong>n/a</strong>
+                    <small>Peak warn</small>
+                    <strong>-3 dBFS</strong>
                   </span>
                 </div>
               </div>
             </div>
+
+            <section
+              className={`${styles.inspectorMiniCard} ${styles.sourceCard} ${styles.inspectorStickyHardwareCard}`}
+              data-testid="audio-inspector-hardware-mini"
+            >
+              <span className={styles.eyebrow}>
+                {audioChannelSupportsGain(selectedChannel) ? "Hardware" : "Software"}
+              </span>
+              {audioChannelSupportsGain(selectedChannel) ? (
+                <div className={styles.inspectorHardwareGrid}>
+                  <AudioPreampControl
+                    channelId={selectedChannel.id}
+                    disabled={!viewModel.actionsAllowed}
+                    gain={selectedGain}
+                    label={`${selectedChannel.name} preamp gain`}
+                    onCommit={(nextGain) => {
+                      setDraftValue(gainDraftKey, nextGain);
+                      commitChannelContinuous({ channelId: selectedChannel.id, gain: nextGain });
+                      clearDraftValueLater(gainDraftKey);
+                    }}
+                    onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
+                    variant="narrow"
+                  />
+                  <div className={styles.unsupportedToggleRow}>
+                    <button
+                      aria-label={`${selectedChannel.phantom ? "Disable" : "Enable"} 48V on ${selectedChannel.name}`}
+                      aria-pressed={selectedChannel.phantom}
+                      data-armed={phantomArmed}
+                      data-active={selectedChannel.phantom}
+                      disabled={!audioChannelSupportsPhantom(selectedChannel) || !viewModel.actionsAllowed}
+                      onClick={() =>
+                        onTogglePhantom({
+                          channelId: selectedChannel.id,
+                          channelName: selectedChannel.name,
+                          phantom: !selectedChannel.phantom,
+                        })
+                      }
+                      type="button"
+                    >
+                      {phantomLabel}
+                    </button>
+                    <button
+                      aria-pressed={selectedChannel.instrument}
+                      data-active={selectedChannel.instrument}
+                      disabled={!audioChannelSupportsInstrument(selectedChannel) || !viewModel.actionsAllowed}
+                      onClick={() =>
+                        onUpdateChannel({ channelId: selectedChannel.id, instrument: !selectedChannel.instrument })
+                      }
+                      type="button"
+                    >
+                      Hi-Z
+                    </button>
+                    <button
+                      aria-pressed={selectedChannel.phase}
+                      data-active={selectedChannel.phase}
+                      disabled={!audioChannelSupportsPhase(selectedChannel) || !viewModel.actionsAllowed}
+                      onClick={() => onUpdateChannel({ channelId: selectedChannel.id, phase: !selectedChannel.phase })}
+                      type="button"
+                    >
+                      Polarity
+                    </button>
+                    <button
+                      aria-pressed={selectedChannel.autoSet}
+                      data-active={selectedChannel.autoSet}
+                      disabled={!audioChannelSupportsAutoSet(selectedChannel) || !viewModel.actionsAllowed}
+                      onClick={() =>
+                        onUpdateChannel({ channelId: selectedChannel.id, autoSet: !selectedChannel.autoSet })
+                      }
+                      type="button"
+                    >
+                      AutoSet
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.softwarePanelStack}>
+                  <div className={styles.unavailableTelemetry} data-testid="audio-playback-telemetry-unavailable">
+                    <strong>Playback telemetry not reported</strong>
+                    <span>Driver buffer and latency are not exposed by the current engine snapshot.</span>
+                  </div>
+                  <div className={styles.detailGrid}>
+                    <span>
+                      <small>Stereo link</small>
+                      <strong>{selectedChannel.stereo ? "Linked" : "Mono"}</strong>
+                    </span>
+                    <span>
+                      <small>Auto fade</small>
+                      <strong>Off</strong>
+                    </span>
+                  </div>
+                </div>
+              )}
+            </section>
 
             <div className={styles.inspectorFaderCard}>
               <div className={styles.inspectorFaderHead}>
@@ -348,7 +733,7 @@ export function AudioInspector({
                     fader: value,
                     mixTargetId: viewModel.selectedMixTargetId ?? undefined,
                   });
-                  window.setTimeout(() => clearDraftValue(selectedSendDraftKey), 250);
+                  clearDraftValueLater(selectedSendDraftKey);
                 }}
                 onPreview={(value) => setDraftValue(selectedSendDraftKey, value)}
                 orientation="horizontal"
@@ -360,6 +745,8 @@ export function AudioInspector({
 
             <div className={styles.inspectorActionRow}>
               <button
+                aria-label={`Mute ${selectedChannel.name}`}
+                aria-pressed={selectedChannel.mute}
                 data-control="mute"
                 data-active={selectedChannel.mute}
                 disabled={!viewModel.actionsAllowed}
@@ -369,6 +756,8 @@ export function AudioInspector({
                 Mute
               </button>
               <button
+                aria-label={`Solo ${selectedChannel.name}`}
+                aria-pressed={selectedChannel.solo}
                 data-control="solo"
                 data-active={selectedChannel.solo}
                 disabled={!viewModel.actionsAllowed}
@@ -377,11 +766,9 @@ export function AudioInspector({
               >
                 Solo
               </button>
-              <button data-control="pfl" disabled type="button">
-                PFL
-              </button>
               <button
-                data-control="reset"
+                aria-label={`Set ${selectedChannel.name} send to unity`}
+                data-control="unity"
                 disabled={!viewModel.actionsAllowed}
                 onClick={() =>
                   onUpdateChannel({
@@ -392,7 +779,7 @@ export function AudioInspector({
                 }
                 type="button"
               >
-                Reset
+                Unity
               </button>
             </div>
           </>
@@ -416,54 +803,69 @@ export function AudioInspector({
             </div>
 
             <div className={styles.bigMeterCard} data-testid="audio-inspector-output-metering">
-              <div className={styles.bigMeter} aria-hidden="true">
-                <span>
-                  <i style={{ "--audio-meter-level": meterPercent(outputLeftMeter) } as CSSProperties} />
-                  <b
-                    data-meter-peak="left"
-                    data-side="left"
-                    style={{ bottom: `${Math.round(outputPeakLeft * 100)}%` }}
-                  />
-                </span>
-                <span>
-                  <i style={{ "--audio-meter-level": meterPercent(outputRightMeter) } as CSSProperties} />
-                  <b
-                    data-meter-peak="right"
-                    data-side="right"
-                    style={{ bottom: `${Math.round(outputPeakRight * 100)}%` }}
-                  />
-                </span>
-              </div>
+              <AudioStereoMeter
+                left={selectedMixTarget.meterLeft}
+                meterId={selectedMixTarget.id}
+                meterKind="mixTarget"
+                mirrorRight={selectedMixTarget.mono}
+                peakLeft={selectedMixTarget.peakHoldLeft}
+                peakRight={selectedMixTarget.peakHoldRight}
+                right={selectedMixTarget.mono ? selectedMixTarget.meterLevel : selectedMixTarget.meterRight}
+                showReadout={false}
+                showScale
+              />
               <div className={styles.bigMeterInfo}>
                 {viewModel.meterSimulationActive ? (
                   <span className={styles.meterSimulationBadge}>TEST STAGE</span>
                 ) : null}
                 <div className={styles.bigMeterRow}>
                   <span>
-                    <small>Peak L / R</small>
+                    <small>Level L / R</small>
                     <strong>
-                      {formatMeterDb(outputLeftMeter)} / {formatMeterDb(outputRightMeter)}
+                      <AudioStableMeterDbPair
+                        fallbackLeft={outputLeftMeter}
+                        fallbackRight={outputRightMeter}
+                        kind="mixTarget"
+                        mirrorRight={selectedMixTarget.mono}
+                        meterId={selectedMixTarget.id}
+                        mode="level"
+                        peakHoldEnabled={peakHoldEnabled}
+                        peakHoldResetToken={peakHoldResetToken}
+                        store={store}
+                        testId="audio-inspector-output-level-readout"
+                      />
                       <em>dB</em>
                     </strong>
                   </span>
                   <span>
-                    <small>Hold</small>
+                    <small>Peak hold</small>
                     <strong>
-                      {formatMeterDb(outputPeakLeft)} / {formatMeterDb(outputPeakRight)}
+                      <AudioStableMeterDbPair
+                        fallbackLeft={outputLeftMeter}
+                        fallbackRight={outputRightMeter}
+                        kind="mixTarget"
+                        mirrorRight={selectedMixTarget.mono}
+                        meterId={selectedMixTarget.id}
+                        mode="peakHold"
+                        peakHoldEnabled={peakHoldEnabled}
+                        peakHoldResetToken={peakHoldResetToken}
+                        store={store}
+                        testId="audio-inspector-output-peak-hold-readout"
+                      />
                       <em>dB</em>
                     </strong>
                   </span>
                 </div>
-                <div className={styles.bigMeterRow}>
+                <div className={styles.bigMeterReferenceRow}>
                   <span>
-                    <small>LUFS short</small>
+                    <small>Nominal ref</small>
                     <strong>
-                      n/a<em>LU</em>
+                      -18<em>dBFS</em>
                     </strong>
                   </span>
                   <span>
-                    <small>Correlation</small>
-                    <strong>n/a</strong>
+                    <small>Peak warn</small>
+                    <strong>-3 dBFS</strong>
                   </span>
                 </div>
               </div>
@@ -491,7 +893,7 @@ export function AudioInspector({
                 onCommit={(value) => {
                   setDraftValue(monitorDraftKey, value);
                   commitMixTargetContinuous({ mixTargetId: selectedMixTarget.id, volume: value });
-                  window.setTimeout(() => clearDraftValue(monitorDraftKey), 250);
+                  clearDraftValueLater(monitorDraftKey);
                 }}
                 onPreview={(value) => setDraftValue(monitorDraftKey, value)}
                 orientation="horizontal"
@@ -503,6 +905,8 @@ export function AudioInspector({
 
             <div className={styles.inspectorActionRow}>
               <button
+                aria-label={`Mute ${selectedMixTarget.name}`}
+                aria-pressed={selectedMixTarget.mute}
                 data-control="mute"
                 data-active={selectedMixTarget.mute}
                 disabled={!viewModel.actionsAllowed}
@@ -511,19 +915,14 @@ export function AudioInspector({
               >
                 Mute
               </button>
-              <button data-control="cue" disabled type="button">
-                Cue
-              </button>
-              <button data-control="pfl" disabled type="button">
-                PFL
-              </button>
               <button
-                data-control="reset"
+                aria-label={`Set ${selectedMixTarget.name} monitor level to unity`}
+                data-control="unity"
                 disabled={!viewModel.actionsAllowed}
                 onClick={() => onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, volume: AUDIO_FADER_UNITY })}
                 type="button"
               >
-                Reset
+                Unity
               </button>
             </div>
           </div>
@@ -536,65 +935,25 @@ export function AudioInspector({
       </div>
 
       {activeTab === "channel" ? (
-        <section className={styles.inspectorPanel} data-testid="audio-inspector-channel">
+        <section
+          aria-labelledby={outputSelectionOnly ? "audio-inspector-output-tab" : "audio-inspector-channel-tab"}
+          className={styles.inspectorPanel}
+          data-testid={outputSelectionOnly ? "audio-inspector-output-panel" : "audio-inspector-channel"}
+          id={outputSelectionOnly ? "audio-inspector-output-panel" : "audio-inspector-channel-panel"}
+          role="tabpanel"
+        >
           {selectedChannel ? (
             <>
-              <div className={styles.inspectorMiniGrid}>
+              <div className={`${styles.inspectorMiniGrid} ${styles.channelOverviewGrid}`}>
                 <button
-                  aria-label="Open tone tab"
-                  className={`${styles.inspectorMiniCard} ${styles.inspectorGraphCard}`}
-                  data-testid="audio-inspector-eq-mini"
-                  onClick={() => onActiveTabChange("eq")}
-                  type="button"
-                >
-                  <span className={styles.graphCardHead}>
-                    <span className={styles.eyebrow}>EQ · TotalMix FX</span>
-                    <span className={styles.eqBandRow}>
-                      <i>LC</i>
-                      <i data-active="true">LO</i>
-                      <i data-active="true">MID</i>
-                      <i>HI</i>
-                    </span>
-                  </span>
-                  <span className={styles.eqGraphMini} aria-hidden="true">
-                    <svg viewBox="0 0 120 42" preserveAspectRatio="none">
-                      <path d="M0 25 C24 25 25 16 38 18 C52 21 70 29 86 20 C95 14 97 16 104 20 C111 25 116 24 120 24" />
-                    </svg>
-                  </span>
-                </button>
-
-                <button
-                  aria-label="Open processing tab"
-                  className={`${styles.inspectorMiniCard} ${styles.inspectorGraphCard}`}
-                  data-testid="audio-inspector-dynamics-mini"
-                  onClick={() => onActiveTabChange("dynamics")}
-                  type="button"
-                >
-                  <span className={styles.graphCardHead}>
-                    <span className={styles.eyebrow}>Dynamics</span>
-                    <span className={styles.dynamicsPills}>
-                      <i>Comp</i>
-                      <i>Gate</i>
-                    </span>
-                  </span>
-                  <span className={styles.dynamicsGraphMini} aria-hidden="true">
-                    <svg viewBox="0 0 120 42" preserveAspectRatio="none">
-                      <path d="M2 39 L56 23 L118 8" />
-                      <circle cx="74" cy="18" r="3" />
-                    </svg>
-                    <i />
-                  </span>
-                </button>
-
-                <button
-                  aria-label="Open routing tab"
-                  className={`${styles.inspectorMiniCard} ${styles.routingMiniCard}`}
+                  aria-label="Open sends tab"
+                  className={`${styles.inspectorMiniCard} ${styles.routingMiniCard} ${styles.overviewPrimaryCard} ${styles.overviewRouteCard}`}
                   data-testid="audio-inspector-sends-mini"
                   onClick={() => onActiveTabChange("sends")}
                   type="button"
                 >
                   <span className={styles.graphCardHead}>
-                    <span className={styles.eyebrow}>Sends from this channel</span>
+                    <span className={styles.eyebrow}>Route · Sends from this source</span>
                     <span>{viewModel.mixTargets.length} destinations</span>
                   </span>
                   <span className={styles.routingGraphMini} aria-hidden="true">
@@ -615,14 +974,18 @@ export function AudioInspector({
                     <span className={styles.routingTargetStack}>
                       {viewModel.mixTargets.map((mixTarget) => {
                         const value = selectedChannelSendLevel(selectedChannel, mixTarget.id);
+                        const sendMode = selectedChannel.sendModes[mixTarget.id];
+                        const muted = selectedChannel.mute || sendMode?.mute === true;
+                        const noSend = value <= 0.01;
                         return (
                           <span
                             className={styles.routingTargetNode}
                             data-active={mixTarget.id === viewModel.selectedMixTargetId}
+                            data-send-state={muted ? "muted" : noSend ? "none" : "sending"}
                             key={mixTarget.id}
                           >
                             <strong>{mixTarget.name}</strong>
-                            <small>{formatAudioDb(value)}</small>
+                            <small>{muted ? "muted" : formatAudioDb(value)}</small>
                           </span>
                         );
                       })}
@@ -630,192 +993,140 @@ export function AudioInspector({
                   </span>
                 </button>
 
-                <section className={`${styles.inspectorMiniCard} ${styles.sourceCard}`}>
-                  <span className={styles.eyebrow}>Source</span>
-                  <strong>
-                    {channelSourceText(selectedChannel.role)} · {selectedChannel.name}
-                  </strong>
-                  <span>{channelDriverText(selectedChannel.role)}</span>
-                  <div className={styles.detailGrid}>
-                    <span>
-                      <small>Group</small>
-                      <strong>{selectedGroup}</strong>
+                <button
+                  aria-label="Open EQ tab"
+                  className={`${styles.inspectorMiniCard} ${styles.inspectorGraphCard} ${styles.overviewEqCard}`}
+                  data-testid="audio-inspector-eq-mini"
+                  onClick={() => onActiveTabChange("eq")}
+                  type="button"
+                >
+                  <span className={styles.graphCardHead}>
+                    <span className={styles.eyebrow}>EQ · {eqStatusText(selectedChannel)}</span>
+                    <span className={styles.eqBandRow}>
+                      <i
+                        data-active={selectedChannel.eq.lowCut.enabled}
+                        data-selected={activeEqHandleId === LOW_CUT_HANDLE_ID}
+                      >
+                        LC
+                      </i>
+                      {eqBands.map((band) => (
+                        <i
+                          data-active={selectedChannel.eq.enabled}
+                          data-selected={band.id === activeEqHandleId}
+                          key={band.id}
+                        >
+                          {band.label}
+                        </i>
+                      ))}
                     </span>
-                    <span>
-                      <small>Polarity</small>
-                      <strong>{selectedChannel.phase ? "Flipped" : "Normal"}</strong>
-                    </span>
-                  </div>
-                </section>
-
-                <section className={`${styles.inspectorMiniCard} ${styles.sourceCard}`}>
-                  <span className={styles.eyebrow}>
-                    {audioChannelSupportsGain(selectedChannel) ? "Hardware" : "Software"}
                   </span>
-                  {audioChannelSupportsGain(selectedChannel) ? (
-                    <div className={styles.inspectorHardwareGrid}>
-                      <AudioPreampControl
-                        channelId={selectedChannel.id}
-                        disabled={!viewModel.actionsAllowed}
-                        gain={selectedGain}
-                        label={`${selectedChannel.name} preamp gain`}
-                        onCommit={(nextGain) => {
-                          setDraftValue(gainDraftKey, nextGain);
-                          commitChannelContinuous({ channelId: selectedChannel.id, gain: nextGain });
-                          window.setTimeout(() => clearDraftValue(gainDraftKey), 250);
-                        }}
-                        onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
-                        variant="narrow"
-                      />
-                      <div className={styles.unsupportedToggleRow}>
-                        <button
-                          data-active={selectedChannel.phantom}
-                          disabled={!audioChannelSupportsPhantom(selectedChannel) || !viewModel.actionsAllowed}
-                          onClick={() =>
-                            onUpdateChannel({ channelId: selectedChannel.id, phantom: !selectedChannel.phantom })
-                          }
-                          type="button"
-                        >
-                          48V
-                        </button>
-                        <button
-                          data-active={selectedChannel.instrument}
-                          disabled={!audioChannelSupportsInstrument(selectedChannel) || !viewModel.actionsAllowed}
-                          onClick={() =>
-                            onUpdateChannel({ channelId: selectedChannel.id, instrument: !selectedChannel.instrument })
-                          }
-                          type="button"
-                        >
-                          Hi-Z
-                        </button>
-                        <button
-                          data-active={selectedChannel.phase}
-                          disabled={!audioChannelSupportsPhase(selectedChannel) || !viewModel.actionsAllowed}
-                          onClick={() =>
-                            onUpdateChannel({ channelId: selectedChannel.id, phase: !selectedChannel.phase })
-                          }
-                          type="button"
-                        >
-                          Polarity
-                        </button>
-                        <button
-                          data-active={selectedChannel.autoSet}
-                          disabled={!audioChannelSupportsAutoSet(selectedChannel) || !viewModel.actionsAllowed}
-                          onClick={() =>
-                            onUpdateChannel({ channelId: selectedChannel.id, autoSet: !selectedChannel.autoSet })
-                          }
-                          type="button"
-                        >
-                          AutoSet
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={styles.softwarePanelStack}>
-                      <div className={styles.detailGrid}>
-                        <span>
-                          <small>Buffer status</small>
-                          <strong>n/a</strong>
-                        </span>
-                        <span>
-                          <small>Latency</small>
-                          <strong>n/a</strong>
-                        </span>
-                      </div>
-                      <div className={styles.unsupportedToggleRow}>
-                        <button data-active={selectedChannel.stereo} data-readonly="true" type="button">
-                          Stereo link
-                        </button>
-                        <button aria-label="Auto fade" data-active={false} data-readonly="true" type="button">
-                          Auto fade <small>off</small>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </section>
+                  <span className={styles.eqGraphMini} aria-hidden="true">
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                      {lowCutShade ? <path className={styles.eqLowCutShade} d={lowCutShade} /> : null}
+                      <path d={eqGraphPath} />
+                    </svg>
+                  </span>
+                </button>
+
+                <button
+                  aria-label="Open processing tab"
+                  className={`${styles.inspectorMiniCard} ${styles.inspectorGraphCard} ${styles.overviewDynamicsCard}`}
+                  data-testid="audio-inspector-dynamics-mini"
+                  onClick={() => onActiveTabChange("dynamics")}
+                  type="button"
+                >
+                  <span className={styles.graphCardHead}>
+                    <span className={styles.eyebrow}>Dynamics · {dynamicsStatusText(selectedChannel)}</span>
+                    <span className={styles.dynamicsPills}>
+                      <i data-active={selectedChannel.dynamics.compressor.enabled}>Comp</i>
+                      <i data-active={selectedChannel.dynamics.gate.enabled}>Gate</i>
+                    </span>
+                  </span>
+                  <span
+                    className={styles.dynamicsGraphMini}
+                    data-active={selectedChannel.dynamics.compressor.enabled}
+                    aria-hidden="true"
+                  >
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                      <path d={dynamicsCurve} />
+                      <circle cx={dynamicsCurvePoint.x} cy={dynamicsCurvePoint.y} r="3" />
+                    </svg>
+                    <i
+                      data-active={selectedChannel.dynamics.gate.enabled}
+                      style={{ "--dynamics-gate-x": `${gateThresholdX}%` } as CSSProperties}
+                    />
+                  </span>
+                </button>
               </div>
             </>
           ) : selectedMixTarget ? (
-            <div className={styles.inspectorMiniGrid}>
-              <button
-                aria-label="Open output EQ tab"
-                className={`${styles.inspectorMiniCard} ${styles.inspectorGraphCard}`}
-                data-testid="audio-inspector-eq-mini"
-                onClick={() => onActiveTabChange("eq")}
-                type="button"
-              >
-                <span className={styles.graphCardHead}>
-                  <span className={styles.eyebrow}>Output EQ</span>
-                  <span className={styles.eqBandRow}>
-                    <i>LC</i>
-                    <i>LO</i>
-                    <i>MID</i>
-                    <i>HI</i>
-                  </span>
-                </span>
-                <span className={styles.eqGraphMini} aria-hidden="true">
-                  <svg viewBox="0 0 120 42" preserveAspectRatio="none">
-                    <path d="M0 28 C26 28 35 26 48 26 C65 26 72 30 88 24 C101 19 108 22 120 22" />
-                  </svg>
-                </span>
-              </button>
-
-              <button
-                aria-label="Open output dynamics tab"
-                className={`${styles.inspectorMiniCard} ${styles.inspectorGraphCard}`}
-                data-testid="audio-inspector-dynamics-mini"
-                onClick={() => onActiveTabChange("dynamics")}
-                type="button"
-              >
-                <span className={styles.graphCardHead}>
-                  <span className={styles.eyebrow}>Output dynamics</span>
-                  <span className={styles.dynamicsPills}>
-                    <i>Comp</i>
-                    <i>Lim</i>
-                  </span>
-                </span>
-                <span className={styles.dynamicsGraphMini} aria-hidden="true">
-                  <svg viewBox="0 0 120 42" preserveAspectRatio="none">
-                    <path d="M2 36 L62 22 L118 18" />
-                    <circle cx="82" cy="20" r="3" />
-                  </svg>
-                  <i />
-                </span>
-              </button>
-
+            <div className={`${styles.inspectorMiniGrid} ${styles.outputInspectorGrid}`}>
               <section className={`${styles.inspectorMiniCard} ${styles.sourceCard}`}>
                 <span className={styles.eyebrow}>Output</span>
                 <strong>
                   {outputRouteText(selectedMixTarget.role)} · {selectedMixTarget.name}
                 </strong>
-                <span>Hardware telemetry unavailable</span>
+                <span>Active monitor mix · TotalMix output state from the engine snapshot.</span>
                 <div className={styles.detailGrid}>
-                  <span>
+                  <span data-fact-size="long">
                     <small>Clock</small>
-                    <strong>{viewModel.footerTelemetry.clock}</strong>
+                    <strong title={viewModel.footerTelemetry.clock}>{viewModel.footerTelemetry.clock}</strong>
                   </span>
-                  <span>
+                  <span data-fact-size="long">
                     <small>Metering</small>
-                    <strong>{viewModel.footerTelemetry.metering}</strong>
+                    <strong title={viewModel.footerTelemetry.metering}>{viewModel.footerTelemetry.metering}</strong>
                   </span>
                 </div>
               </section>
 
               <section className={`${styles.inspectorMiniCard} ${styles.sourceCard}`}>
-                <span className={styles.eyebrow}>Unavailable controls</span>
-                <div className={styles.unsupportedToggleRow}>
-                  <button disabled type="button">
-                    PFL
-                  </button>
-                  <button disabled type="button">
-                    Cue solo
-                  </button>
-                  <button disabled type="button">
-                    Clip reset
-                  </button>
-                  <button disabled type="button">
-                    Capture
-                  </button>
+                <span className={styles.eyebrow}>Output state</span>
+                <strong>{selectedMixTarget.mute ? "Muted" : "Passing signal"}</strong>
+                <span>Monitor level and safety toggles are live controls for this output.</span>
+                <div className={styles.detailGrid}>
+                  <span>
+                    <small>Level</small>
+                    <strong>{formatAudioDb(monitorValue)}</strong>
+                  </span>
+                  <span>
+                    <small>Dim</small>
+                    <strong>{selectedMixTarget.dim ? "On" : "Off"}</strong>
+                  </span>
+                  <span>
+                    <small>Mono</small>
+                    <strong>{selectedMixTarget.mono ? "On" : "Off"}</strong>
+                  </span>
+                  <span>
+                    <small>Talkback</small>
+                    <strong>{selectedMixTarget.talkback ? "On" : "Off"}</strong>
+                  </span>
+                </div>
+              </section>
+
+              <section className={`${styles.inspectorMiniCard} ${styles.sourceCard} ${styles.subduedInspectorCard}`}>
+                <span className={styles.eyebrow}>Output processing</span>
+                <strong>Monitor controls active</strong>
+                <span>
+                  EQ, dynamics, send solo, PFL, and level test stay hidden until the engine exposes real output
+                  commands.
+                </span>
+              </section>
+
+              <section className={`${styles.inspectorMiniCard} ${styles.sourceCard}`}>
+                <span className={styles.eyebrow}>Trust</span>
+                <strong>{viewModel.status.label}</strong>
+                <span title={viewModel.status.warningBody ?? viewModel.footerTelemetry.metering}>
+                  {viewModel.status.warningBody ?? viewModel.footerTelemetry.metering}
+                </span>
+                <div className={styles.detailGrid}>
+                  <span>
+                    <small>Solo</small>
+                    <strong>{viewModel.healthStats.soloedChannels}</strong>
+                  </span>
+                  <span>
+                    <small>Clips</small>
+                    <strong>{viewModel.healthStats.clippedChannels}</strong>
+                  </span>
                 </div>
               </section>
             </div>
@@ -829,24 +1140,34 @@ export function AudioInspector({
       ) : null}
 
       {activeTab === "eq" ? (
-        <section className={styles.inspectorPanel} data-testid="audio-inspector-eq">
+        <section
+          aria-labelledby="audio-inspector-eq-tab"
+          className={styles.inspectorPanel}
+          data-testid="audio-inspector-eq"
+          id="audio-inspector-eq-panel"
+          role="tabpanel"
+        >
           {selectedChannel ? (
             <div className={`${styles.placeholderPanel} ${styles.inspectorFullGraphPanel}`}>
               <div className={styles.graphCardHead}>
-                <span className={styles.eyebrow}>Parametric EQ · TotalMix FX</span>
+                <span className={styles.eyebrow}>TotalMix FX EQ · Low Cut + 3-band PEQ</span>
                 <span className={styles.eqBandRow}>
-                  {selectedChannel.eq.bands.map((band) => (
+                  <button
+                    aria-pressed={activeEqHandleId === LOW_CUT_HANDLE_ID}
+                    data-active={selectedChannel.eq.lowCut.enabled}
+                    data-selected={activeEqHandleId === LOW_CUT_HANDLE_ID}
+                    onClick={() => setSelectedEqBandId(LOW_CUT_HANDLE_ID)}
+                    type="button"
+                  >
+                    LC
+                  </button>
+                  {eqBands.map((band) => (
                     <button
-                      data-active={band.enabled}
-                      data-selected={band.id === activeEqBandId}
+                      aria-pressed={band.id === activeEqHandleId}
+                      data-active={selectedChannel.eq.enabled}
+                      data-selected={band.id === activeEqHandleId}
                       key={band.id}
-                      onClick={() =>
-                        onUpdateChannelEq({
-                          bandEnabled: !band.enabled,
-                          bandId: eqBandId(band.id),
-                          channelId: selectedChannel.id,
-                        })
-                      }
+                      onClick={() => setSelectedEqBandId(band.id)}
                       type="button"
                     >
                       {band.label}
@@ -854,27 +1175,118 @@ export function AudioInspector({
                   ))}
                 </span>
               </div>
-              <div className={styles.eqGraphFull} data-eq-graph="true">
+              <div className={styles.eqGraphFull} data-eq-graph="true" data-testid="audio-eq-graph">
+                <div className={styles.eqGraphGuideLayer} aria-hidden="true">
+                  <div className={styles.eqGraphDbMarkers} data-testid="audio-eq-db-scale">
+                    {EQ_GAIN_MARKERS.map((marker) => (
+                      <span
+                        className={styles.eqGraphDbLabel}
+                        key={marker.label}
+                        style={{ "--eq-marker-y": `${eqPointY(marker.gainDb)}%` } as CSSProperties}
+                      >
+                        {marker.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className={styles.eqGraphFrequencyMarkers} data-testid="audio-eq-frequency-markers">
+                    {EQ_FREQUENCY_MARKERS.map((marker) => (
+                      <span
+                        className={styles.eqGraphFrequencyMarker}
+                        data-major={marker.major}
+                        key={marker.frequencyHz}
+                        style={{ "--eq-marker-x": `${eqPointX(marker.frequencyHz)}%` } as CSSProperties}
+                      >
+                        <i />
+                        <small>{marker.label}</small>
+                      </span>
+                    ))}
+                  </div>
+                </div>
                 <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {lowCutShade ? (
+                    <path className={styles.eqLowCutShade} d={lowCutShade} data-testid="audio-eq-low-cut-shade" />
+                  ) : null}
                   <path d={eqGraphPath} />
                 </svg>
+                <div className={styles.eqValueBadge} data-testid="audio-eq-value-badge">
+                  <strong>{activeEqLabel}</strong>
+                  <span>{activeEqValue}</span>
+                </div>
                 <div className={styles.eqPointLayer} aria-label="EQ graph band points">
-                  {selectedChannel.eq.bands.map((band) => (
+                  <button
+                    aria-label={`${selectedChannel.name} Low Cut EQ point`}
+                    className={`${styles.eqPoint} ${styles.eqLowCutPoint}`}
+                    data-active={selectedChannel.eq.lowCut.enabled}
+                    data-selected={activeEqHandleId === LOW_CUT_HANDLE_ID}
+                    data-testid="audio-eq-point-low-cut"
+                    disabled={!viewModel.capabilities.canEditProcessing}
+                    onClick={() => setSelectedEqBandId(LOW_CUT_HANDLE_ID)}
+                    onPointerCancel={(event) => {
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                        event.currentTarget.releasePointerCapture(event.pointerId);
+                      }
+                    }}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      event.currentTarget.focus();
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      commitLowCutFromPointer(event);
+                    }}
+                    onPointerMove={(event) => {
+                      if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      commitLowCutFromPointer(event);
+                    }}
+                    onPointerUp={(event) => {
+                      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        commitLowCutFromPointer(event, "flush");
+                        event.currentTarget.releasePointerCapture(event.pointerId);
+                      }
+                    }}
+                    style={
+                      {
+                        "--eq-point-x": `${eqPointX(lowCutFrequencyValue)}%`,
+                        "--eq-point-y": `${eqPointY(0)}%`,
+                      } as CSSProperties
+                    }
+                    type="button"
+                  >
+                    <span>LC</span>
+                  </button>
+                  {eqBands.map((band) => (
                     <button
-                      aria-label={`${selectedChannel.name} ${band.label} EQ point`}
+                      aria-label={`${selectedChannel.name} Band ${band.label} EQ point`}
                       className={styles.eqPoint}
-                      data-selected={band.id === activeEqBandId}
+                      data-selected={band.id === activeEqHandleId}
                       data-testid={`audio-eq-point-${band.id}`}
                       disabled={!viewModel.capabilities.canEditProcessing}
                       key={band.id}
                       onClick={() => setSelectedEqBandId(band.id)}
                       onPointerCancel={(event) => {
+                        eqDragRef.current = null;
                         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
                           event.currentTarget.releasePointerCapture(event.pointerId);
                         }
                       }}
                       onPointerDown={(event) => {
                         event.preventDefault();
+                        event.stopPropagation();
+                        const graph = event.currentTarget.closest("[data-eq-graph]");
+                        if (graph instanceof HTMLElement) {
+                          const rect = graph.getBoundingClientRect();
+                          eqDragRef.current = {
+                            bandId: band.id,
+                            height: Math.max(1, rect.height),
+                            left: rect.left,
+                            pointerId: event.pointerId,
+                            top: rect.top,
+                            width: Math.max(1, rect.width),
+                          };
+                        }
                         event.currentTarget.focus();
                         event.currentTarget.setPointerCapture(event.pointerId);
                         commitEqPointFromPointer(event, band);
@@ -882,13 +1294,17 @@ export function AudioInspector({
                       onPointerMove={(event) => {
                         if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
                         event.preventDefault();
+                        event.stopPropagation();
                         commitEqPointFromPointer(event, band);
                       }}
                       onPointerUp={(event) => {
                         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                          commitEqPointFromPointer(event, band);
+                          event.preventDefault();
+                          event.stopPropagation();
+                          commitEqPointFromPointer(event, band, "flush");
                           event.currentTarget.releasePointerCapture(event.pointerId);
                         }
+                        eqDragRef.current = null;
                       }}
                       style={
                         {
@@ -903,112 +1319,202 @@ export function AudioInspector({
                   ))}
                 </div>
               </div>
-              <button
-                data-active={selectedChannel.eq.enabled}
-                disabled={!viewModel.capabilities.canEditProcessing}
-                onClick={() =>
-                  onUpdateChannelEq({ channelId: selectedChannel.id, enabled: !selectedChannel.eq.enabled })
-                }
-                type="button"
-              >
-                {selectedChannel.eq.enabled ? "Bypass EQ" : "Enable EQ"}
-              </button>
-              <div className={styles.sendStack}>
-                {selectedChannel.eq.bands.map((band) => {
-                  const frequencyKey = `channel:${selectedChannel.id}:eq:${band.id}:frequency`;
-                  const frequencyValue = getDraftValue(frequencyKey, band.frequencyHz);
-                  const gainKey = `channel:${selectedChannel.id}:eq:${band.id}:gain`;
-                  const gainValue = getDraftValue(gainKey, band.gainDb);
-                  const qKey = `channel:${selectedChannel.id}:eq:${band.id}:q`;
-                  const qValue = getDraftValue(qKey, band.q);
-                  return (
-                    <div className={styles.sendCardFull} data-active={band.id === activeEqBandId} key={band.id}>
-                      <div className={styles.sendCardHead}>
-                        <strong>{band.label}</strong>
-                        <span className={styles.sendCardTag}>
-                          {formatEqBandType(band.bandType)} · {band.enabled ? "In" : "Out"} · slope fixed
-                        </span>
-                      </div>
-                      <div className={styles.processingControlGrid}>
-                        <label className={styles.processingControl}>
-                          <span>Freq</span>
-                          <AudioSliderControl
-                            disabled={!viewModel.capabilities.canEditProcessing}
-                            label={`${selectedChannel.name} ${band.label} EQ frequency`}
-                            max={EQ_FREQUENCY_MAX}
-                            min={EQ_FREQUENCY_MIN}
-                            onCommit={(value) => {
-                              setSelectedEqBandId(band.id);
-                              setDraftValue(frequencyKey, value);
-                              onUpdateChannelEq({
-                                bandId: eqBandId(band.id),
-                                channelId: selectedChannel.id,
-                                frequencyHz: value,
-                              });
-                              window.setTimeout(() => clearDraftValue(frequencyKey), 250);
-                            }}
-                            onPreview={(value) => setDraftValue(frequencyKey, value)}
-                            orientation="horizontal"
-                            step={10}
-                            value={frequencyValue}
-                            valueText={formatEqFrequency(frequencyValue)}
-                          />
-                          <strong>{formatEqFrequency(frequencyValue)}</strong>
-                        </label>
-                        <label className={styles.processingControl}>
-                          <span>Q</span>
-                          <AudioSliderControl
-                            disabled={!viewModel.capabilities.canEditProcessing}
-                            label={`${selectedChannel.name} ${band.label} EQ Q`}
-                            max={EQ_Q_MAX}
-                            min={EQ_Q_MIN}
-                            onCommit={(value) => {
-                              setSelectedEqBandId(band.id);
-                              setDraftValue(qKey, value);
-                              onUpdateChannelEq({
-                                bandId: eqBandId(band.id),
-                                channelId: selectedChannel.id,
-                                q: value,
-                              });
-                              window.setTimeout(() => clearDraftValue(qKey), 250);
-                            }}
-                            onPreview={(value) => setDraftValue(qKey, value)}
-                            orientation="horizontal"
-                            step={0.1}
-                            value={qValue}
-                            valueText={`Q ${qValue.toFixed(1)}`}
-                          />
-                          <strong>Q {qValue.toFixed(1)}</strong>
-                        </label>
-                        <label className={styles.processingControl}>
-                          <span>Gain</span>
-                          <AudioSliderControl
-                            disabled={!viewModel.capabilities.canEditProcessing}
-                            label={`${selectedChannel.name} ${band.label} EQ gain`}
-                            max={EQ_GAIN_MAX}
-                            min={EQ_GAIN_MIN}
-                            onCommit={(value) => {
-                              setSelectedEqBandId(band.id);
-                              setDraftValue(gainKey, value);
-                              onUpdateChannelEq({
-                                bandId: eqBandId(band.id),
-                                channelId: selectedChannel.id,
-                                gainDb: value,
-                              });
-                              window.setTimeout(() => clearDraftValue(gainKey), 250);
-                            }}
-                            onPreview={(value) => setDraftValue(gainKey, value)}
-                            orientation="horizontal"
-                            step={0.5}
-                            value={gainValue}
-                            valueText={`${gainValue.toFixed(1)} dB`}
-                          />
-                          <strong>{gainValue.toFixed(1)} dB</strong>
-                        </label>
-                      </div>
+              <div className={styles.graphRangeRow} data-testid="audio-eq-range">
+                <span>20 Hz</span>
+                <strong>
+                  {activeEqLabel} · {selectedChannel.eq.hardwareStatus}
+                </strong>
+                <span>20 kHz · ±20 dB</span>
+              </div>
+              <div className={`${styles.sendCardFull} ${styles.eqControlTray}`} data-testid="audio-eq-control-tray">
+                {activeEqHandleId === LOW_CUT_HANDLE_ID ? (
+                  <>
+                    <div className={styles.sendCardHead}>
+                      <strong>Low Cut</strong>
+                      <span className={styles.sendCardTag}>
+                        {selectedChannel.eq.lowCut.enabled ? "In" : "Out"} ·{" "}
+                        {selectedChannel.eq.lowCut.slopeDbPerOctave} dB/oct
+                      </span>
                     </div>
-                  );
-                })}
+                    <div className={styles.eqModeRow}>
+                      <button
+                        aria-pressed={selectedChannel.eq.lowCut.enabled}
+                        data-active={selectedChannel.eq.lowCut.enabled}
+                        disabled={!viewModel.capabilities.canEditProcessing}
+                        onClick={() =>
+                          onUpdateChannelEq({
+                            channelId: selectedChannel.id,
+                            lowCutEnabled: !selectedChannel.eq.lowCut.enabled,
+                          })
+                        }
+                        type="button"
+                      >
+                        {selectedChannel.eq.lowCut.enabled ? "Bypass Low Cut" : "Enable Low Cut"}
+                      </button>
+                      {LOW_CUT_SLOPES.map((slope) => (
+                        <button
+                          aria-pressed={selectedChannel.eq.lowCut.slopeDbPerOctave === slope}
+                          data-active={selectedChannel.eq.lowCut.slopeDbPerOctave === slope}
+                          disabled={!viewModel.capabilities.canEditProcessing}
+                          key={slope}
+                          onClick={() =>
+                            onUpdateChannelEq({
+                              channelId: selectedChannel.id,
+                              lowCutSlopeDbPerOctave: slope,
+                            })
+                          }
+                          type="button"
+                        >
+                          {slope}
+                        </button>
+                      ))}
+                    </div>
+                    <div className={styles.processingControlGrid}>
+                      <label className={styles.processingControl}>
+                        <span>Cutoff</span>
+                        <AudioSliderControl
+                          disabled={!viewModel.capabilities.canEditProcessing}
+                          label={`${selectedChannel.name} Low Cut frequency`}
+                          max={LOW_CUT_FREQUENCY_MAX}
+                          min={LOW_CUT_FREQUENCY_MIN}
+                          onCommit={(value) => {
+                            setSelectedEqBandId(LOW_CUT_HANDLE_ID);
+                            setDraftValue(lowCutFrequencyKey, value);
+                            onUpdateChannelEq({
+                              channelId: selectedChannel.id,
+                              lowCutFrequencyHz: value,
+                            });
+                            clearDraftValueLater(lowCutFrequencyKey);
+                          }}
+                          onPreview={(value) => setDraftValue(lowCutFrequencyKey, value)}
+                          orientation="horizontal"
+                          step={1}
+                          value={lowCutFrequencyValue}
+                          valueText={formatEqFrequency(lowCutFrequencyValue)}
+                        />
+                        <strong>{formatEqFrequency(lowCutFrequencyValue)}</strong>
+                      </label>
+                    </div>
+                  </>
+                ) : activeEqBand ? (
+                  <>
+                    <div className={styles.sendCardHead}>
+                      <strong>Band {activeEqBand.label}</strong>
+                      <span className={styles.sendCardTag}>
+                        {formatEqBandType(activeEqBand.bandType)} ·{" "}
+                        {selectedChannel.eq.enabled ? "PEQ in" : "PEQ bypassed"}
+                      </span>
+                    </div>
+                    <div className={styles.eqModeRow}>
+                      <button
+                        aria-pressed={selectedChannel.eq.enabled}
+                        data-active={selectedChannel.eq.enabled}
+                        disabled={!viewModel.capabilities.canEditProcessing}
+                        onClick={() =>
+                          onUpdateChannelEq({ channelId: selectedChannel.id, enabled: !selectedChannel.eq.enabled })
+                        }
+                        type="button"
+                      >
+                        {selectedChannel.eq.enabled ? "Bypass PEQ" : "Enable PEQ"}
+                      </button>
+                      {activeEqBandTypeOptions.map((option) => (
+                        <button
+                          aria-pressed={activeEqBand.bandType === option}
+                          data-active={activeEqBand.bandType === option}
+                          disabled={!viewModel.capabilities.canEditProcessing || activeEqBand.id === "2"}
+                          key={option}
+                          onClick={() =>
+                            onUpdateChannelEq({
+                              bandId: eqBandId(activeEqBand.id),
+                              bandType: eqBandType(option),
+                              channelId: selectedChannel.id,
+                            })
+                          }
+                          type="button"
+                        >
+                          {formatEqBandType(option)}
+                        </button>
+                      ))}
+                    </div>
+                    <div className={styles.processingControlGrid}>
+                      <label className={styles.processingControl}>
+                        <span>Freq</span>
+                        <AudioSliderControl
+                          disabled={!viewModel.capabilities.canEditProcessing}
+                          label={`${selectedChannel.name} Band ${activeEqBand.label} EQ frequency`}
+                          max={EQ_FREQUENCY_MAX}
+                          min={EQ_FREQUENCY_MIN}
+                          onCommit={(value) => {
+                            setSelectedEqBandId(activeEqBand.id);
+                            setDraftValue(activeEqBandFrequencyKey, value);
+                            onUpdateChannelEq({
+                              bandId: eqBandId(activeEqBand.id),
+                              channelId: selectedChannel.id,
+                              frequencyHz: value,
+                            });
+                            clearDraftValueLater(activeEqBandFrequencyKey);
+                          }}
+                          onPreview={(value) => setDraftValue(activeEqBandFrequencyKey, value)}
+                          orientation="horizontal"
+                          step={10}
+                          value={activeEqBandFrequencyValue}
+                          valueText={formatEqFrequency(activeEqBandFrequencyValue)}
+                        />
+                        <strong>{formatEqFrequency(activeEqBandFrequencyValue)}</strong>
+                      </label>
+                      <label className={styles.processingControl}>
+                        <span>Gain</span>
+                        <AudioSliderControl
+                          disabled={!viewModel.capabilities.canEditProcessing}
+                          label={`${selectedChannel.name} Band ${activeEqBand.label} EQ gain`}
+                          max={EQ_GAIN_MAX}
+                          min={EQ_GAIN_MIN}
+                          onCommit={(value) => {
+                            setSelectedEqBandId(activeEqBand.id);
+                            setDraftValue(activeEqBandGainKey, value);
+                            onUpdateChannelEq({
+                              bandId: eqBandId(activeEqBand.id),
+                              channelId: selectedChannel.id,
+                              gainDb: value,
+                            });
+                            clearDraftValueLater(activeEqBandGainKey);
+                          }}
+                          onPreview={(value) => setDraftValue(activeEqBandGainKey, value)}
+                          orientation="horizontal"
+                          step={0.5}
+                          value={activeEqBandGainValue}
+                          valueText={`${activeEqBandGainValue.toFixed(1)} dB`}
+                        />
+                        <strong>{activeEqBandGainValue.toFixed(1)} dB</strong>
+                      </label>
+                      <label className={styles.processingControl}>
+                        <span>Q</span>
+                        <AudioSliderControl
+                          disabled={!viewModel.capabilities.canEditProcessing}
+                          label={`${selectedChannel.name} Band ${activeEqBand.label} EQ Q`}
+                          max={EQ_Q_MAX}
+                          min={EQ_Q_MIN}
+                          onCommit={(value) => {
+                            setSelectedEqBandId(activeEqBand.id);
+                            setDraftValue(activeEqBandQKey, value);
+                            onUpdateChannelEq({
+                              bandId: eqBandId(activeEqBand.id),
+                              channelId: selectedChannel.id,
+                              q: value,
+                            });
+                            clearDraftValueLater(activeEqBandQKey);
+                          }}
+                          onPreview={(value) => setDraftValue(activeEqBandQKey, value)}
+                          orientation="horizontal"
+                          step={0.1}
+                          value={activeEqBandQValue}
+                          valueText={`Q ${activeEqBandQValue.toFixed(1)}`}
+                        />
+                        <strong>Q {activeEqBandQValue.toFixed(1)}</strong>
+                      </label>
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -1021,13 +1527,20 @@ export function AudioInspector({
       ) : null}
 
       {activeTab === "dynamics" ? (
-        <section className={styles.inspectorPanel} data-testid="audio-inspector-dynamics">
+        <section
+          aria-labelledby="audio-inspector-dynamics-tab"
+          className={styles.inspectorPanel}
+          data-testid="audio-inspector-dynamics"
+          id="audio-inspector-dynamics-panel"
+          role="tabpanel"
+        >
           {selectedChannel ? (
             <div className={`${styles.placeholderPanel} ${styles.inspectorFullGraphPanel}`}>
               <div className={styles.graphCardHead}>
                 <span className={styles.eyebrow}>Dynamics · TotalMix FX</span>
                 <span className={styles.dynamicsPills}>
                   <button
+                    aria-pressed={selectedChannel.dynamics.compressor.enabled}
                     data-active={selectedChannel.dynamics.compressor.enabled}
                     onClick={() =>
                       onUpdateChannelDynamics({
@@ -1041,6 +1554,7 @@ export function AudioInspector({
                     Comp
                   </button>
                   <button
+                    aria-pressed={selectedChannel.dynamics.gate.enabled}
                     data-active={selectedChannel.dynamics.gate.enabled}
                     onClick={() =>
                       onUpdateChannelDynamics({
@@ -1055,12 +1569,25 @@ export function AudioInspector({
                   </button>
                 </span>
               </div>
-              <div className={styles.dynamicsGraphFull} aria-hidden="true">
-                <svg viewBox="0 0 120 80" preserveAspectRatio="none">
-                  <path d="M4 74 L54 44 L116 22" />
-                  <circle cx="78" cy="33" r="3" />
+              <div
+                className={styles.dynamicsGraphFull}
+                data-active={selectedChannel.dynamics.compressor.enabled}
+                data-testid="audio-dynamics-curve"
+                aria-hidden="true"
+              >
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <path d={dynamicsCurve} />
+                  <circle cx={dynamicsCurvePoint.x} cy={dynamicsCurvePoint.y} r="3" />
                 </svg>
-                <i />
+                <i
+                  data-active={selectedChannel.dynamics.gate.enabled}
+                  style={{ "--dynamics-gate-x": `${gateThresholdX}%` } as CSSProperties}
+                />
+              </div>
+              <div className={styles.graphRangeRow} data-testid="audio-dynamics-range">
+                <span>Gate {selectedChannel.dynamics.gate.thresholdDb.toFixed(0)} dB</span>
+                <strong>{dynamicsStatusText(selectedChannel)}</strong>
+                <span>Comp {selectedChannel.dynamics.compressor.thresholdDb.toFixed(0)} dB</span>
               </div>
               <div className={styles.sendStack}>
                 {(["compressor", "gate"] as const).map((section) => {
@@ -1096,7 +1623,7 @@ export function AudioInspector({
                                 section,
                                 thresholdDb: value,
                               });
-                              window.setTimeout(() => clearDraftValue(thresholdKey), 250);
+                              clearDraftValueLater(thresholdKey);
                             }}
                             onPreview={(value) => setDraftValue(thresholdKey, value)}
                             orientation="horizontal"
@@ -1120,7 +1647,7 @@ export function AudioInspector({
                                 ratio: value,
                                 section,
                               });
-                              window.setTimeout(() => clearDraftValue(ratioKey), 250);
+                              clearDraftValueLater(ratioKey);
                             }}
                             onPreview={(value) => setDraftValue(ratioKey, value)}
                             orientation="horizontal"
@@ -1144,7 +1671,7 @@ export function AudioInspector({
                                 channelId: selectedChannel.id,
                                 section,
                               });
-                              window.setTimeout(() => clearDraftValue(attackKey), 250);
+                              clearDraftValueLater(attackKey);
                             }}
                             onPreview={(value) => setDraftValue(attackKey, value)}
                             orientation="horizontal"
@@ -1168,7 +1695,7 @@ export function AudioInspector({
                                 releaseMs: value,
                                 section,
                               });
-                              window.setTimeout(() => clearDraftValue(releaseKey), 250);
+                              clearDraftValueLater(releaseKey);
                             }}
                             onPreview={(value) => setDraftValue(releaseKey, value)}
                             orientation="horizontal"
@@ -1192,7 +1719,7 @@ export function AudioInspector({
                                 makeupDb: value,
                                 section,
                               });
-                              window.setTimeout(() => clearDraftValue(makeupKey), 250);
+                              clearDraftValueLater(makeupKey);
                             }}
                             onPreview={(value) => setDraftValue(makeupKey, value)}
                             orientation="horizontal"
@@ -1218,7 +1745,13 @@ export function AudioInspector({
       ) : null}
 
       {activeTab === "sends" ? (
-        <section className={styles.inspectorPanel} data-testid="audio-inspector-sends">
+        <section
+          aria-labelledby="audio-inspector-sends-tab"
+          className={styles.inspectorPanel}
+          data-testid="audio-inspector-sends"
+          id="audio-inspector-sends-panel"
+          role="tabpanel"
+        >
           {selectedChannel ? (
             <div className={styles.sendStack}>
               {viewModel.mixTargets.map((mixTarget) => {
@@ -1230,14 +1763,32 @@ export function AudioInspector({
                   preFader: false,
                   solo: false,
                 };
+                const sendMuted = selectedChannel.mute || sendMode.mute;
+                const noSend = value <= 0.01;
+                const sendState = sendMuted ? "muted" : noSend ? "none" : "sending";
+                const sendStatus =
+                  mixTarget.id === viewModel.selectedMixTargetId
+                    ? sendMuted
+                      ? "Active mix muted"
+                      : noSend
+                        ? "Active mix no send"
+                        : "Active mix"
+                    : sendMuted
+                      ? "Muted"
+                      : noSend
+                        ? "No send"
+                        : "Send";
                 return (
                   <div
                     className={styles.sendCardFull}
                     data-active={mixTarget.id === viewModel.selectedMixTargetId}
+                    data-send-state={sendState}
+                    data-testid={`audio-send-destination-${mixTarget.id}`}
                     key={mixTarget.id}
                   >
                     <div className={styles.sendCardHead}>
                       <button
+                        aria-pressed={mixTarget.id === viewModel.selectedMixTargetId}
                         className={styles.sendTargetButton}
                         data-active={mixTarget.id === viewModel.selectedMixTargetId}
                         onClick={(event) => {
@@ -1248,9 +1799,12 @@ export function AudioInspector({
                       >
                         {mixTarget.name}
                       </button>
-                      <span className={styles.sendCardTag}>
-                        {mixTarget.id === viewModel.selectedMixTargetId ? "Active mix" : "Send"}
-                      </span>
+                      <span className={styles.sendCardTag}>{sendStatus}</span>
+                    </div>
+                    <div className={styles.sendCardRoute}>
+                      <strong>{selectedChannel.name}</strong>
+                      <span>→</span>
+                      <strong>{mixTarget.name}</strong>
                     </div>
                     <AudioSliderControl
                       disabled={!viewModel.actionsAllowed}
@@ -1262,7 +1816,7 @@ export function AudioInspector({
                           fader: nextValue,
                           mixTargetId: mixTarget.id,
                         });
-                        window.setTimeout(() => clearDraftValue(sendDraftKey), 250);
+                        clearDraftValueLater(sendDraftKey);
                       }}
                       onPreview={(nextValue) => setDraftValue(sendDraftKey, nextValue)}
                       orientation="horizontal"
@@ -1273,6 +1827,7 @@ export function AudioInspector({
                     <strong className={styles.sendCardValue}>{formatAudioDb(value)}</strong>
                     <div className={styles.sendModeRow}>
                       <button
+                        aria-pressed={sendMode.preFader}
                         data-active={sendMode.preFader}
                         disabled={!viewModel.actionsAllowed}
                         onClick={() =>
@@ -1287,6 +1842,7 @@ export function AudioInspector({
                         Pre fader
                       </button>
                       <button
+                        aria-pressed={sendMode.mute}
                         data-active={sendMode.mute}
                         disabled={!viewModel.actionsAllowed}
                         onClick={() =>
@@ -1301,6 +1857,7 @@ export function AudioInspector({
                         Mute send
                       </button>
                       <button
+                        aria-pressed={sendMode.linkStereo}
                         data-active={sendMode.linkStereo}
                         disabled={!viewModel.actionsAllowed}
                         onClick={() =>
@@ -1315,6 +1872,7 @@ export function AudioInspector({
                         Link L+R
                       </button>
                       <button
+                        aria-pressed={sendMode.solo}
                         data-active={sendMode.solo}
                         disabled={!viewModel.actionsAllowed}
                         onClick={() =>

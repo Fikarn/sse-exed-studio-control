@@ -238,16 +238,33 @@ pub fn parse_audio_clip_clear_request(params: &Value) -> Result<AudioClipClearRe
 pub fn parse_audio_eq_update_request(params: &Value) -> Result<AudioEqUpdateRequest, String> {
     let channel_id = required_trimmed_string(params, "channelId")?;
     let enabled = optional_bool(params.get("enabled"), "enabled")?;
-    let band_id = optional_enum_string(params.get("bandId"), "bandId", &["lc", "lo", "mid", "hi"])?;
+    let low_cut_enabled = optional_bool(params.get("lowCutEnabled"), "lowCutEnabled")?;
+    let low_cut_frequency_hz = optional_number_range(
+        params.get("lowCutFrequencyHz"),
+        "lowCutFrequencyHz",
+        20.0,
+        500.0,
+    )?;
+    let low_cut_slope_db_per_octave = optional_low_cut_slope(params.get("lowCutSlopeDbPerOctave"))?;
+    let band_id = optional_enum_string(params.get("bandId"), "bandId", &["1", "2", "3"])?;
     let band_enabled = optional_bool(params.get("bandEnabled"), "bandEnabled")?;
+    let band_type = optional_enum_string(
+        params.get("bandType"),
+        "bandType",
+        &["bell", "low-shelf", "high-shelf", "high-pass", "low-pass"],
+    )?;
     let frequency_hz =
         optional_number_range(params.get("frequencyHz"), "frequencyHz", 20.0, 20_000.0)?;
-    let gain_db = optional_number_range(params.get("gainDb"), "gainDb", -12.0, 12.0)?;
-    let q = optional_number_range(params.get("q"), "q", 0.1, 12.0)?;
+    let gain_db = optional_number_range(params.get("gainDb"), "gainDb", -20.0, 20.0)?;
+    let q = optional_number_range(params.get("q"), "q", 0.4, 9.9)?;
 
     if enabled.is_none()
+        && low_cut_enabled.is_none()
+        && low_cut_frequency_hz.is_none()
+        && low_cut_slope_db_per_octave.is_none()
         && band_id.is_none()
         && band_enabled.is_none()
+        && band_type.is_none()
         && frequency_hz.is_none()
         && gain_db.is_none()
         && q.is_none()
@@ -260,12 +277,26 @@ pub fn parse_audio_eq_update_request(params: &Value) -> Result<AudioEqUpdateRequ
     Ok(AudioEqUpdateRequest {
         channel_id,
         enabled,
+        low_cut_enabled,
+        low_cut_frequency_hz,
+        low_cut_slope_db_per_octave,
         band_id,
         band_enabled,
+        band_type,
         frequency_hz,
         gain_db,
         q,
     })
+}
+
+fn optional_low_cut_slope(value: Option<&Value>) -> Result<Option<i64>, String> {
+    match optional_integer_range(value, "lowCutSlopeDbPerOctave", 6, 24)? {
+        Some(value @ (6 | 12 | 18 | 24)) => Ok(Some(value)),
+        Some(_) => Err(String::from(
+            "lowCutSlopeDbPerOctave must be one of: 6, 12, 18, 24",
+        )),
+        None => Ok(None),
+    }
 }
 
 pub fn parse_audio_dynamics_update_request(

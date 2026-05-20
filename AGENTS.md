@@ -36,6 +36,8 @@ Rule: if a change would move product state, persistence, or device policy into R
 
 When developing on a Retina MacBook, enforce the built-in-display review workflow from `docs/DEVELOPMENT.md`: use the app-owned Scaled Studio Preview for proportional `2560×1440` studio review, and do not judge studio-full fit/layout from the default Retina logical desktop.
 
+Scaled Studio Preview is a scaled `2560×1440` studio canvas, not a compact host viewport. Operator-density rules must key off the logical operator surface so the preview matches native `2560×1440` after scaling.
+
 Authoritative source: `docs/HARDWARE_PROFILE.md`.
 
 ## Design system
@@ -104,6 +106,8 @@ Every operator-visible change to the selected Tauri surface must:
 3. inspect the result with Scaled Studio Preview or on the fixed studio monitor when human fit judgment matters.
 
 Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/archive/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Historical Qt parity screenshots were retired in Checkpoint D.
+
+When the selected Tauri shell is open for user inspection, that exact running shell is the authoritative surface for visual feedback. Treat user callouts as referring to the live `sse-exed-tauri-shell` / `SSE ExEd Studio Control` window unless they explicitly name another artifact. See `docs/HARDWARE_PROFILE.md`.
 
 ## Testing posture
 

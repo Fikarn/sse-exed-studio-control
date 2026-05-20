@@ -1,7 +1,10 @@
 import {
+  useEffect,
   useRef,
+  useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
@@ -9,6 +12,7 @@ import preampKnobBody from "../assets/preamp/preamp-knob-body.png";
 import preampPanelCompact from "../assets/preamp/preamp-panel-compact.png";
 import preampPanelNarrow from "../assets/preamp/preamp-panel-narrow.png";
 import styles from "../AudioWorkspace.module.css";
+import { AudioNumberDialog } from "./AudioNumberDialog";
 
 interface AudioPreampControlProps {
   channelId: string;
@@ -151,11 +155,30 @@ export function AudioPreampControl({
   variant,
 }: AudioPreampControlProps) {
   const dragRef = useRef<PreampDragState | null>(null);
-  const currentGain = clampGain(gain);
+  const clearTimerRef = useRef<number | null>(null);
+  const lastPointerDownAtRef = useRef(0);
+  const [numberDialogOpen, setNumberDialogOpen] = useState(false);
+  const [localDraftGain, setLocalDraftGain] = useState<number | null>(null);
+  const currentGain = clampGain(localDraftGain ?? gain);
   const gainPct = (currentGain / 75) * 100;
   const rotation = (currentGain / 75) * 250 - 125;
 
+  useEffect(() => {
+    if (dragRef.current) return;
+    setLocalDraftGain(null);
+  }, [gain]);
+
+  useEffect(
+    () => () => {
+      if (clearTimerRef.current !== null) {
+        window.clearTimeout(clearTimerRef.current);
+      }
+    },
+    []
+  );
+
   const preview = (nextGain: number) => {
+    setLocalDraftGain(nextGain);
     onPreview?.(nextGain);
   };
 
@@ -163,12 +186,29 @@ export function AudioPreampControl({
     const committed = commitGainValue(nextGain);
     preview(committed);
     onCommit(committed);
+    if (clearTimerRef.current !== null) {
+      window.clearTimeout(clearTimerRef.current);
+    }
+    clearTimerRef.current = window.setTimeout(() => {
+      clearTimerRef.current = null;
+      setLocalDraftGain(null);
+    }, 250);
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (disabled) return;
     event.preventDefault();
+    event.stopPropagation();
     event.currentTarget.focus();
+
+    const now = performance.now();
+    if (now - lastPointerDownAtRef.current <= 360) {
+      lastPointerDownAtRef.current = 0;
+      setNumberDialogOpen(true);
+      return;
+    }
+    lastPointerDownAtRef.current = now;
+
     event.currentTarget.setPointerCapture(event.pointerId);
 
     const step = event.metaKey || event.ctrlKey ? 0.25 : event.shiftKey ? 5 : 1;
@@ -187,6 +227,7 @@ export function AudioPreampControl({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId || disabled) return;
     event.preventDefault();
+    event.stopPropagation();
     const pixelsPerDb = drag.fine ? 16 : 4;
     const rawGain = drag.startGain + (drag.startY - event.clientY) / pixelsPerDb;
     const nextGain = quantizeGain(rawGain, drag.step);
@@ -198,6 +239,7 @@ export function AudioPreampControl({
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     event.preventDefault();
+    event.stopPropagation();
     dragRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -208,6 +250,7 @@ export function AudioPreampControl({
   const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    event.stopPropagation();
     dragRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -219,6 +262,10 @@ export function AudioPreampControl({
     let nextGain: number;
 
     switch (event.key) {
+      case "Enter":
+        event.preventDefault();
+        setNumberDialogOpen(true);
+        return;
       case "ArrowUp":
       case "ArrowRight":
         nextGain = currentGain + 1;
@@ -247,55 +294,93 @@ export function AudioPreampControl({
     previewAndCommit(nextGain);
   };
 
-  const handleDoubleClick = () => {
+  const handleKeyDownCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" || disabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setNumberDialogOpen(true);
+  };
+
+  const handleDoubleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (disabled) return;
-    const raw = window.prompt("Set preamp gain dB, 0 to 75", String(commitGainValue(currentGain)));
-    if (raw === null || raw.trim() === "") return;
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed)) return;
-    previewAndCommit(parsed);
+    event.preventDefault();
+    event.stopPropagation();
+    setNumberDialogOpen(true);
+  };
+
+  const handleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.detail === 2) {
+      handleDoubleClick(event);
+    }
+  };
+
+  const handleMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.detail < 2 || disabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setNumberDialogOpen(true);
   };
 
   return (
-    <div
-      aria-disabled={disabled ? true : undefined}
-      aria-label={label}
-      aria-valuemax={75}
-      aria-valuemin={0}
-      aria-valuenow={commitGainValue(currentGain)}
-      aria-valuetext={`${commitGainValue(currentGain)} dB`}
-      className={`${styles.preampModule} ${styles.preampControl}`}
-      data-channel={channelId}
-      data-variant={variant}
-      onDoubleClick={handleDoubleClick}
-      onKeyDown={handleKeyDown}
-      onPointerCancel={handlePointerCancel}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      role="slider"
-      style={
-        {
-          "--gain-pct": `${gainPct}%`,
-          "--gain-rotation": `${rotation}deg`,
-          "--gain-sweep": `${(currentGain / 75) * 270}deg`,
-        } as CSSProperties
-      }
-      tabIndex={disabled ? -1 : 0}
-    >
-      <img
-        alt=""
-        className={styles.preampPanel}
-        draggable={false}
-        src={variant === "narrow" ? preampPanelNarrow : preampPanelCompact}
-      />
-      <PreampLedRing gain={currentGain} variant={variant} />
-      <img alt="" className={styles.preampKnob} draggable={false} src={preampKnobBody} />
-      <span className={styles.preampNumber}>Pre {preampNumber(channelId)}</span>
-      <span className={styles.preampGainLabel}>
-        +{commitGainValue(currentGain)}
-        <i>dB</i>
-      </span>
-    </div>
+    <>
+      <div
+        aria-disabled={disabled ? true : undefined}
+        aria-label={label}
+        aria-orientation="vertical"
+        aria-valuemax={75}
+        aria-valuemin={0}
+        aria-valuenow={commitGainValue(currentGain)}
+        aria-valuetext={`${commitGainValue(currentGain)} dB`}
+        className={`${styles.preampModule} ${styles.preampControl}`}
+        data-channel={channelId}
+        data-variant={variant}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        onKeyDownCapture={handleKeyDownCapture}
+        onMouseDownCapture={handleMouseDown}
+        onPointerCancel={handlePointerCancel}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        role="slider"
+        style={
+          {
+            "--gain-pct": `${gainPct}%`,
+            "--gain-rotation": `${rotation}deg`,
+            "--gain-sweep": `${(currentGain / 75) * 270}deg`,
+          } as CSSProperties
+        }
+        tabIndex={disabled ? -1 : 0}
+      >
+        <img
+          alt=""
+          className={styles.preampPanel}
+          draggable={false}
+          src={variant === "narrow" ? preampPanelNarrow : preampPanelCompact}
+        />
+        <PreampLedRing gain={currentGain} variant={variant} />
+        <img alt="" className={styles.preampKnob} draggable={false} src={preampKnobBody} />
+        <span className={styles.preampNumber}>Pre {preampNumber(channelId)}</span>
+        <span className={styles.preampGainLabel}>
+          +{commitGainValue(currentGain)}
+          <i>dB</i>
+        </span>
+      </div>
+      {numberDialogOpen ? (
+        <AudioNumberDialog
+          fieldLabel="Preamp gain"
+          initialValue={commitGainValue(currentGain)}
+          max={75}
+          min={0}
+          onCancel={() => setNumberDialogOpen(false)}
+          onConfirm={(nextGain) => {
+            setNumberDialogOpen(false);
+            previewAndCommit(nextGain);
+          }}
+          suffix="dB"
+          title={`Set ${label}`}
+        />
+      ) : null}
+    </>
   );
 }

@@ -9,6 +9,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Engine-owned lighting fixture catalog with a `lighting.fixtureCatalog.snapshot` protocol method, additive fixture identity fields (`definitionId`, `modeId`, `universe`, `controlValues`), universe-aware DMX validation/monitoring, scene `controlValues` capture/recall, and a catalog-backed compatibility bridge for legacy `Astra`, `Infinibar`, and `Apollo Bridge` fixture instances.
 - Catalog-backed Lighting UI for adding verified fixtures by manufacturer/family/model/mode, rendering catalog visual shapes and pixel layouts in the stage plot, surfacing generated catalog controls in the inspector, and showing multi-universe DMX output without moving DMX policy into React.
+- Audio gold-standard pass through finding `GS-AUD-34`: truthful controls (placeholder/no-op affordances removed), arm-then-apply safety for high-risk actions (48V, snapshot recall, palette recall, snapshot overwrite), ARIA semantics on toggles/tabs/sliders, truthful multi-solo warning summary, and `canSync`-gated warning recovery copy. Progress preserved at [docs/plans/audio-ui-gold-standard-progress.md](docs/plans/audio-ui-gold-standard-progress.md).
+- RME TotalMix OSC adapter for live meter polling and Page 2 EQ/Low Cut command path. Engine-side `rme_totalmix_osc` module parses real TotalMix level/dB messages, applies console-grade peak hold/decay ballistics, and routes EQ edits through the documented OSC controls. Inventory continues to fall back to deterministic simulator output when no real packets arrive, and the new `audio_meter_fixture` module keeps fixture-driven review surfaces deterministic.
+- Pro-Q-inspired EQ inspector with RME-accurate Low Cut + 3-band PEQ snapshot/request model (separate `AudioLowCutSnapshot`), smooth response curve with log frequency markers and `+20/0/-20` dB cues, distinct Low Cut handle, selected-band badge, and a single control tray. Disabled Low Cut now renders inactive instead of painting an active left-side curtain.
+- Frontend display-ballistics model for inspector meter readouts (`audioMeterDisplayModel`), with fixed-width Peak L/R/Hold readouts (`AudioLiveMeterReadout`) and a compositor-accelerated meter canvas overlay (`AudioMeterCanvasOverlay`) so the inspector text and meter marks share one stabilization model.
+- Audio number and text input dialogs (`AudioNumberDialog`, `AudioTextDialog`) and an `audioControlDraftStore` for arm-then-apply control drafts.
 
 ### Changed
 
@@ -17,6 +22,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Routine direct npm dependencies were refreshed to current Node 24-compatible releases, leaving the intentionally deferred `@types/node` 25 major upgrade out of scope.
 - Added a repository code of conduct and marked active-looking completed redesign documents as historical/reference material.
 - `main` branch protection now enforces restrictions for administrators as well as regular contributors.
+- Selected-channel inspector rebuilt as an operator-first Overview: sticky identity/route, meter, Hardware/Software card, send fader, Mute/Solo/Unity above the panel, with stacked full-width EQ and Dynamics previews below and the Source card removed. Output selection now renders an output-specific inspector with no disabled false tabs.
+- Audio compact/dense CSS now keys off the operator root, so Scaled Studio Preview emulates the native `2560x1440` studio surface exactly after scaling instead of inheriting host MacBook viewport media queries. Preamp bitmaps preserve their aspect ratio (`640/213` compact, `426/640` inspector).
+- `tauri:visual:review` captures Scaled Studio Preview screenshots and records fidelity metrics for Audio fixtures alongside native viewport captures.
 
 ### Fixed
 

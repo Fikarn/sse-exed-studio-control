@@ -7,6 +7,7 @@ if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
+  workers: 3,
   use: {
     baseURL: "http://127.0.0.1:4173",
     viewport: { width: 2560, height: 1440 },

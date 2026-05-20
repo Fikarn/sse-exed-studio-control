@@ -59,7 +59,7 @@ pub(super) fn apply_channel_state(
                 if channel_supports_auto_set(&channel) {
                     channel.auto_set = state.auto_set;
                 }
-                channel.eq = state.eq.clone();
+                channel.eq = normalize_audio_eq_snapshot(&state.eq);
                 channel.dynamics = state.dynamics.clone();
                 channel.send_modes =
                     default_send_modes_for_mix_targets(channel.send_modes, &channel.mix_levels);
@@ -244,11 +244,24 @@ pub(super) fn resolve_audio_config(settings: &HashMap<String, String>) -> AudioB
         .and_then(|value| value.parse::<i64>().ok())
         .filter(|value| (1..=65535).contains(value))
         .unwrap_or(DEFAULT_RECEIVE_PORT);
+    let simulated_env_enabled = std::env::var("SSE_AUDIO_SIMULATED_INPUT_MODE")
+        .map(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false);
+    let metering_source = if simulated_env_enabled {
+        String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE)
+    } else {
+        settings
+            .get(AUDIO_METERING_SOURCE_KEY)
+            .filter(|value| value.as_str() == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE)
+            .cloned()
+            .unwrap_or_else(|| String::from(DEFAULT_AUDIO_METERING_SOURCE))
+    };
 
     AudioBackendConfig {
         send_host,
         send_port,
         receive_port,
+        metering_source,
     }
 }
 
@@ -486,11 +499,103 @@ pub(super) fn clamp_eq_frequency(value: f64) -> f64 {
 }
 
 pub(super) fn clamp_eq_gain(value: f64) -> f64 {
-    value.clamp(-12.0, 12.0)
+    value.clamp(-20.0, 20.0)
 }
 
 pub(super) fn clamp_eq_q(value: f64) -> f64 {
-    value.clamp(0.1, 12.0)
+    value.clamp(0.4, 9.9)
+}
+
+pub(super) fn clamp_low_cut_frequency(value: f64) -> f64 {
+    value.clamp(20.0, 500.0)
+}
+
+pub(super) fn normalize_low_cut_slope(value: i64) -> i64 {
+    match value {
+        6 | 12 | 18 | 24 => value,
+        _ if value < 9 => 6,
+        _ if value < 15 => 12,
+        _ if value < 21 => 18,
+        _ => 24,
+    }
+}
+
+pub(super) fn normalize_audio_eq_snapshot(eq: &AudioEqSnapshot) -> AudioEqSnapshot {
+    let defaults = default_audio_eq_snapshot();
+    let old_low_cut = eq.bands.iter().find(|band| band.id == "lc");
+    let low_cut = AudioLowCutSnapshot {
+        enabled: old_low_cut
+            .map(|band| band.enabled)
+            .unwrap_or(eq.low_cut.enabled),
+        frequency_hz: clamp_low_cut_frequency(
+            old_low_cut
+                .map(|band| band.frequency_hz)
+                .unwrap_or(eq.low_cut.frequency_hz),
+        ),
+        slope_db_per_octave: normalize_low_cut_slope(eq.low_cut.slope_db_per_octave),
+    };
+
+    let mut bands = Vec::with_capacity(3);
+    for default_band in defaults.bands {
+        let legacy_id = match default_band.id.as_str() {
+            "1" => "lo",
+            "2" => "mid",
+            "3" => "hi",
+            _ => default_band.id.as_str(),
+        };
+        let source = eq
+            .bands
+            .iter()
+            .find(|band| band.id == default_band.id || band.id == legacy_id);
+        let source_enabled = source.map(|band| band.enabled).unwrap_or(true);
+        let mut band = source.cloned().unwrap_or(default_band.clone());
+        band.id = default_band.id;
+        band.label = default_band.label;
+        band.frequency_hz = clamp_eq_frequency(band.frequency_hz);
+        band.gain_db = clamp_eq_gain(band.gain_db);
+        if !source_enabled {
+            band.gain_db = 0.0;
+        }
+        band.q = clamp_eq_q(band.q);
+        band.band_type = normalize_eq_band_type(&band.id, &band.band_type);
+        band.enabled = true;
+        bands.push(band);
+    }
+
+    AudioEqSnapshot {
+        enabled: eq.enabled,
+        low_cut,
+        hardware_status: match eq.hardware_status.as_str() {
+            "pending" | "confirmed" => eq.hardware_status.clone(),
+            _ => String::from("local"),
+        },
+        bands,
+    }
+}
+
+pub(super) fn normalize_eq_band_type(band_id: &str, band_type: &str) -> String {
+    match band_id {
+        "1" => match band_type {
+            "low-shelf" | "high-pass" | "low-pass" => String::from(band_type),
+            _ => String::from("bell"),
+        },
+        "2" => String::from("bell"),
+        "3" => match band_type {
+            "high-shelf" | "low-pass" | "high-pass" => String::from(band_type),
+            "shelf" => String::from("high-shelf"),
+            _ => String::from("bell"),
+        },
+        _ => String::from("bell"),
+    }
+}
+
+pub(super) fn eq_band_type_supported(band_id: &str, band_type: &str) -> bool {
+    match band_id {
+        "1" => matches!(band_type, "bell" | "low-shelf" | "high-pass" | "low-pass"),
+        "2" => band_type == "bell",
+        "3" => matches!(band_type, "bell" | "high-shelf" | "low-pass" | "high-pass"),
+        _ => false,
+    }
 }
 
 pub(super) fn clamp_dynamics_threshold(value: f64) -> f64 {
@@ -773,6 +878,7 @@ pub(super) struct AudioSummaryContext<'a> {
     pub(super) status: &'a str,
     pub(super) config: &'a AudioBackendConfig,
     pub(super) osc_enabled: bool,
+    pub(super) metering_source: &'a str,
     pub(super) channel_count: usize,
     pub(super) mix_target_count: usize,
     pub(super) snapshot_count: usize,
@@ -790,6 +896,7 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
         status,
         config,
         osc_enabled,
+        metering_source,
         channel_count,
         mix_target_count,
         snapshot_count,
@@ -804,22 +911,44 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
 
     let transport_summary = if !osc_enabled {
         format!(
-            "OSC transport is disabled in native audio settings. Last configured endpoint is {}:{} with receive port {}. Simulated inventory still exposes {} channels, {} mix targets, and {} snapshots.",
-            config.send_host, config.send_port, config.receive_port, channel_count, mix_target_count, snapshot_count
+            "OSC transport is disabled in native audio settings. Last configured endpoint is {}:{} with receive ports {}-{}.",
+            config.send_host,
+            config.send_port,
+            config.receive_port,
+            config.receive_port.saturating_add(2)
+        )
+    } else if metering_source == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE {
+        format!(
+            "Audio metering is in explicit simulated input mode. Simulated inventory exposes {} channels, {} mix targets, and {} snapshots for UI testing.",
+            channel_count, mix_target_count, snapshot_count
         )
     } else {
         match status {
             "ready" => format!(
-                "OSC transport is configured for {}:{} with receive port {}. Simulated inventory exposes {} channels, {} mix targets, and {} snapshots for native audio development.",
-                config.send_host, config.send_port, config.receive_port, channel_count, mix_target_count, snapshot_count
+                "RME TotalMix OSC metering is live for {} with send ports {}-{} and receive ports {}-{}. Inventory exposes {} channels, {} mix targets, and {} snapshots.",
+                config.send_host,
+                config.send_port,
+                config.send_port.saturating_add(2),
+                config.receive_port,
+                config.receive_port.saturating_add(2),
+                channel_count,
+                mix_target_count,
+                snapshot_count
             ),
             "attention" => format!(
-                "OSC transport check failed for {}:{} / {}. Simulated inventory still exposes {} channels, {} mix targets, and {} snapshots while connectivity is corrected.",
-                config.send_host, config.send_port, config.receive_port, channel_count, mix_target_count, snapshot_count
+                "RME TotalMix OSC metering is offline for {}. Verify the three OSC remote slots and Send Peak Level settings for send ports {}-{} and receive ports {}-{}.",
+                config.send_host,
+                config.send_port,
+                config.send_port.saturating_add(2),
+                config.receive_port,
+                config.receive_port.saturating_add(2)
             ),
             _ => format!(
-                "OSC transport is configured for {}:{} with receive port {}. Simulated inventory exposes {} channels, {} mix targets, and {} snapshots before the native audio probe runs.",
-                config.send_host, config.send_port, config.receive_port, channel_count, mix_target_count, snapshot_count
+                "RME TotalMix OSC metering is not verified. Configure three TotalMix OSC remotes for send ports {}-{} and receive ports {}-{}, enable Send Peak Level, then rerun the audio probe.",
+                config.send_port,
+                config.send_port.saturating_add(2),
+                config.receive_port,
+                config.receive_port.saturating_add(2)
             ),
         }
     };

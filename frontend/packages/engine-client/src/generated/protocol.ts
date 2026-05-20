@@ -12,6 +12,7 @@ export const REQUEST_METHODS = [
   "audio.clip.clear",
   "audio.mixTarget.update",
   "audio.settings.update",
+  "audio.solo.clearAll",
   "audio.snapshot",
   "audio.snapshot.create",
   "audio.snapshot.delete",

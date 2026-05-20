@@ -1,4 +1,5 @@
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { IconButton } from "@sse/design-system";
 
 import styles from "../AudioWorkspace.module.css";
 import { formatAudioDb } from "../audioFormatting";
@@ -72,6 +73,7 @@ function snapshotPreviewDiffs({
 
 export function AudioSnapshotDeck({
   actionsAllowed,
+  armedActionKey,
   busyAction,
   channels,
   mixTargets,
@@ -85,6 +87,7 @@ export function AudioSnapshotDeck({
   snapshots,
 }: {
   actionsAllowed: boolean;
+  armedActionKey: string | null;
   busyAction: string | null;
   channels: AudioChannelEntry[];
   mixTargets: AudioMixTargetEntry[];
@@ -160,10 +163,15 @@ export function AudioSnapshotDeck({
           const thumbLevels = snapshotThumbLevels(snapshot, selectedMixTargetId);
           const previewDiffs = snapshotPreviewDiffs({ channels, mixTargets, selectedMixTargetId, snapshot });
           const hasContents = Boolean(snapshot.contents && thumbLevels);
+          const recallActionKey = `snapshot-recall:${snapshot.id}`;
+          const saveActionKey = `snapshot-save:${snapshot.id}`;
+          const recallArmed = armedActionKey === recallActionKey;
+          const saveArmed = armedActionKey === saveActionKey;
 
           return (
             <div
               className={styles.snapshotTile}
+              data-armed={recallArmed}
               data-current={snapshot.lastRecalled}
               data-flash={recentlyRecalledSnapshotId === snapshot.id}
               data-snapshot-slot={index + 1}
@@ -172,13 +180,18 @@ export function AudioSnapshotDeck({
               key={snapshot.id}
             >
               <button
+                aria-label={`${recallArmed ? "Apply recall" : "Arm recall"} ${snapshot.name}`}
                 className={styles.snapshotRecallSurface}
+                data-armed={recallArmed}
+                data-testid={`audio-snapshot-recall-${snapshot.id}`}
                 disabled={!actionsAllowed || busyAction === `audio-snapshot-${snapshot.id}`}
                 onClick={() => onRecallSnapshot(snapshot.id)}
                 type="button"
               >
                 <span className={styles.snapshotSlot}>Slot {snapshot.oscIndex + 1}</span>
-                <span className={styles.snapshotName}>{snapshot.name}</span>
+                <span className={styles.snapshotName} data-testid={`audio-snapshot-name-${snapshot.id}`}>
+                  {snapshot.name}
+                </span>
                 <span
                   className={styles.snapshotThumb}
                   data-has-contents={hasContents}
@@ -192,8 +205,8 @@ export function AudioSnapshotDeck({
                     />
                   ))}
                 </span>
-                <span className={styles.snapshotMeta}>
-                  {snapshot.lastRecalledAt ? formatSnapshotTime(snapshot.lastRecalledAt) : "-"}
+                <span className={styles.snapshotMeta} data-testid={`audio-snapshot-meta-${snapshot.id}`}>
+                  {recallArmed ? "armed" : snapshot.lastRecalledAt ? formatSnapshotTime(snapshot.lastRecalledAt) : "-"}
                 </span>
                 <span className={styles.snapshotPreview}>
                   {snapshot.lastRecalled ? (
@@ -250,27 +263,32 @@ export function AudioSnapshotDeck({
                 </span>
               </button>
               <span className={styles.snapshotTileActions} data-testid={`audio-snapshot-actions-${snapshot.id}`}>
-                <button
+                <IconButton
+                  className={styles.snapshotActionButton}
+                  data-armed={saveArmed}
                   disabled={!actionsAllowed || busyAction === `audio-snapshot-save-${snapshot.id}`}
+                  icon={Save}
+                  label={`${saveArmed ? "Apply save" : "Arm save"} ${snapshot.name}`}
                   onClick={() => onSaveSnapshot(snapshot.id)}
-                  type="button"
-                >
-                  Save
-                </button>
-                <button
+                  size="sm"
+                />
+                <IconButton
+                  className={styles.snapshotActionButton}
                   disabled={!actionsAllowed || busyAction === `audio-snapshot-rename-${snapshot.id}`}
+                  icon={Pencil}
+                  label={`Rename ${snapshot.name}`}
                   onClick={() => onRenameSnapshot(snapshot.id, snapshot.name)}
-                  type="button"
-                >
-                  Rename
-                </button>
-                <button
+                  size="sm"
+                />
+                <IconButton
+                  className={styles.snapshotActionButton}
                   disabled={!actionsAllowed || busyAction === `audio-snapshot-delete-${snapshot.id}`}
+                  icon={Trash2}
+                  label={`Delete ${snapshot.name}`}
                   onClick={() => onDeleteSnapshot(snapshot.id, snapshot.name)}
-                  type="button"
-                >
-                  Delete
-                </button>
+                  size="sm"
+                  tone="danger"
+                />
               </span>
             </div>
           );

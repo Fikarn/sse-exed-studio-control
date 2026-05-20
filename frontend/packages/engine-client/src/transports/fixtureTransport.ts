@@ -20,6 +20,12 @@ interface MutableFixtureState {
   controlSurfaceSnapshot: JsonObject;
 }
 
+declare global {
+  interface Window {
+    __SSE_TEST_ENGINE_REQUEST_COUNTS__?: Record<string, number>;
+  }
+}
+
 interface AudioMeterFrame {
   clip: boolean;
   meterLeft: number;
@@ -42,6 +48,16 @@ interface AudioMeterState {
 }
 
 const AUDIO_METERING_TICK_MS = 33;
+const AUDIO_METERING_CADENCE_HZ = 30;
+const AUDIO_FADER_UNITY = 0.8;
+const AUDIO_METER_FLOOR_DBFS = -60;
+const AUDIO_METER_PEAK_WARNING_DBFS = -3;
+const AUDIO_METER_OVER_DBFS = 0;
+const AUDIO_METER_POINT_INPUT = "input";
+const AUDIO_METER_POINT_PLAYBACK = "playback";
+const AUDIO_METER_POINT_POST_FADER = "post-fader";
+const FAIRLIGHT_PEAK_HOLD_MS = 1500;
+const FAIRLIGHT_PEAK_FALL_DB_PER_SECOND = 20;
 const SIMULATED_AUDIO_ADAPTER_MODES = new Set(["fixture", "simulated"]);
 
 function fixtureEvent<TEvent extends EventName>(event: TEvent, payload: JsonObject = {}) {
@@ -78,6 +94,33 @@ function asNumber(value: unknown, fallback = 0) {
 
 function asBoolean(value: unknown, fallback = false) {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizedToDbfs(value: number) {
+  const normalized = Math.max(0, Math.min(1, value));
+  if (normalized <= 0) return AUDIO_METER_FLOOR_DBFS;
+  return Math.max(AUDIO_METER_FLOOR_DBFS, Math.min(0, 20 * Math.log10(normalized)));
+}
+
+function dbfsToNormalized(dbfs: number) {
+  if (!Number.isFinite(dbfs)) return 0;
+  return 10 ** (Math.max(AUDIO_METER_FLOOR_DBFS, Math.min(0, dbfs)) / 20);
+}
+
+function totalMixFaderGain(value: number) {
+  const normalized = clampNumber(value, 0, 1);
+  if (normalized <= 0) return 0;
+
+  const db =
+    normalized >= 1
+      ? 6
+      : normalized <= 0.7
+        ? -60 + (normalized / 0.7) * 50
+        : normalized <= AUDIO_FADER_UNITY
+          ? -10 + ((normalized - 0.7) / 0.1) * 10
+          : ((normalized - AUDIO_FADER_UNITY) / 0.2) * 6;
+
+  return 10 ** (db / 20);
 }
 
 function normalizeTalentMarks(value: unknown): JsonObject[] {
@@ -342,13 +385,87 @@ function buildAudioMixLevels(main: number, phonesA: number, phonesB: number) {
 function buildAudioEq() {
   return {
     enabled: false,
+    lowCut: { enabled: false, frequencyHz: 80, slopeDbPerOctave: 12 },
+    hardwareStatus: "local",
     bands: [
-      { id: "lc", label: "LC", enabled: false, frequencyHz: 80, gainDb: 0, q: 0.7, bandType: "low-cut" },
-      { id: "lo", label: "LO", enabled: true, frequencyHz: 180, gainDb: 0, q: 0.9, bandType: "bell" },
-      { id: "mid", label: "MID", enabled: true, frequencyHz: 1600, gainDb: 0, q: 1.2, bandType: "bell" },
-      { id: "hi", label: "HI", enabled: false, frequencyHz: 8500, gainDb: 0, q: 0.8, bandType: "shelf" },
+      { id: "1", label: "1", enabled: true, frequencyHz: 180, gainDb: 0, q: 0.9, bandType: "bell" },
+      { id: "2", label: "2", enabled: true, frequencyHz: 1600, gainDb: 0, q: 1.2, bandType: "bell" },
+      { id: "3", label: "3", enabled: true, frequencyHz: 8500, gainDb: 0, q: 0.8, bandType: "high-shelf" },
     ],
   };
+}
+
+function normalizeAudioEq(value: JsonObject | null) {
+  const defaults = buildAudioEq();
+  if (!value) return defaults;
+  const sourceBands = asArray(value.bands)
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is JsonObject => entry !== null);
+  const legacyLowCut = sourceBands.find((entry) => asString(entry.id) === "lc");
+  const sourceLowCut = asRecord(value.lowCut);
+  const lowCut = {
+    enabled: legacyLowCut ? asBoolean(legacyLowCut.enabled, false) : asBoolean(sourceLowCut?.enabled, false),
+    frequencyHz: clampNumber(
+      typeof legacyLowCut?.frequencyHz === "number"
+        ? legacyLowCut.frequencyHz
+        : typeof sourceLowCut?.frequencyHz === "number"
+          ? sourceLowCut.frequencyHz
+          : 80,
+      20,
+      500
+    ),
+    slopeDbPerOctave: normalizeLowCutSlope(
+      typeof sourceLowCut?.slopeDbPerOctave === "number" ? sourceLowCut.slopeDbPerOctave : 12
+    ),
+  };
+
+  const bands = (defaults.bands as JsonObject[]).map((defaultBand) => {
+    const id = asString(defaultBand.id);
+    const legacyId = id === "1" ? "lo" : id === "2" ? "mid" : id === "3" ? "hi" : id;
+    const source = sourceBands.find((entry) => asString(entry.id) === id || asString(entry.id) === legacyId);
+    const bandType = normalizeEqBandType(id, asString(source?.bandType, asString(defaultBand.bandType)));
+    const sourceEnabled = asBoolean(source?.enabled, true);
+    const gainDb = clampNumber(
+      typeof source?.gainDb === "number" ? source.gainDb : Number(defaultBand.gainDb),
+      -20,
+      20
+    );
+    return {
+      ...defaultBand,
+      enabled: true,
+      frequencyHz: clampNumber(
+        typeof source?.frequencyHz === "number" ? source.frequencyHz : Number(defaultBand.frequencyHz),
+        20,
+        20_000
+      ),
+      gainDb: sourceEnabled ? gainDb : 0,
+      q: clampNumber(typeof source?.q === "number" ? source.q : Number(defaultBand.q), 0.4, 9.9),
+      bandType,
+    };
+  });
+
+  const hardwareStatus = ["pending", "confirmed"].includes(asString(value.hardwareStatus))
+    ? asString(value.hardwareStatus)
+    : "local";
+  return { enabled: asBoolean(value.enabled, false), lowCut, hardwareStatus, bands };
+}
+
+function normalizeLowCutSlope(value: number) {
+  if (value <= 9) return 6;
+  if (value <= 15) return 12;
+  if (value <= 21) return 18;
+  return 24;
+}
+
+function normalizeEqBandType(bandId: string, bandType: string) {
+  if (bandId === "1") {
+    return ["bell", "low-shelf", "high-pass", "low-pass"].includes(bandType) ? bandType : "bell";
+  }
+  if (bandId === "3") {
+    if (bandType === "shelf") return "high-shelf";
+    return ["bell", "high-shelf", "low-pass", "high-pass"].includes(bandType) ? bandType : "bell";
+  }
+  return "bell";
 }
 
 function buildAudioDynamics() {
@@ -548,15 +665,19 @@ export function calculateNextFixturePeakHold({
   const instantaneousPeak = clampNumber(Math.max(raw, body), body, 1);
   const heldPeak = clampNumber(Math.max(previousPeak, body), body, 1);
   if (instantaneousPeak >= heldPeak) {
-    return { holdUntilMs: elapsedMs + 1500, peakHold: instantaneousPeak };
+    return { holdUntilMs: elapsedMs + FAIRLIGHT_PEAK_HOLD_MS, peakHold: instantaneousPeak };
   }
   if (elapsedMs < holdUntilMs) {
     return { holdUntilMs, peakHold: heldPeak };
   }
 
-  const decayedPeak = clampNumber(Math.max(body, heldPeak - deltaSeconds * 0.075), body, 1);
+  const decayedPeak = clampNumber(
+    Math.max(body, dbfsToNormalized(normalizedToDbfs(heldPeak) - deltaSeconds * FAIRLIGHT_PEAK_FALL_DB_PER_SECOND)),
+    body,
+    1
+  );
   if (instantaneousPeak >= decayedPeak) {
-    return { holdUntilMs: elapsedMs + 1500, peakHold: instantaneousPeak };
+    return { holdUntilMs: elapsedMs + FAIRLIGHT_PEAK_HOLD_MS, peakHold: instantaneousPeak };
   }
 
   return { holdUntilMs, peakHold: decayedPeak };
@@ -608,6 +729,10 @@ function simulatedBodyLevelPairAt(
 }
 
 function isSimulatedAudioSnapshot(audioSnapshot: JsonObject) {
+  const meteringSource = asString(audioSnapshot.meteringSource, "");
+  if (meteringSource === "simulated" || meteringSource === "fixture") {
+    return true;
+  }
   return SIMULATED_AUDIO_ADAPTER_MODES.has(asString(audioSnapshot.adapterMode, "simulated"));
 }
 
@@ -653,7 +778,7 @@ function applyFixtureMixTargetMetering(audioSnapshot: JsonObject) {
         ? asNumber(channel.peakHoldRight, asNumber(channel.peakHold, sourceRight))
         : Math.max(asNumber(channel.peakHoldRight, sourceRight), asNumber(channel.peakHold, sourceRight));
       const dimScale = asBoolean(mixTarget.dim, false) ? 0.42 : 1;
-      const gain = clampNumber(sendLevel * asNumber(mixTarget.volume, 0) * dimScale * 0.5, 0, 1);
+      const gain = totalMixFaderGain(sendLevel) * totalMixFaderGain(asNumber(mixTarget.volume, 0)) * dimScale;
       leftEnergy += (sourceLeft * gain) ** 2;
       rightEnergy += (sourceRight * gain) ** 2;
       peakLeftEnergy += (sourcePeakLeft * gain) ** 2;
@@ -712,53 +837,81 @@ function refreshFixtureAudioMetering(state: MutableFixtureState) {
   return true;
 }
 
-function buildFixtureAudioMetersPayload(state: MutableFixtureState): JsonObject {
-  const audioSnapshot = asRecord(state.audioSnapshot);
-  if (!audioSnapshot) {
-    return { timestampMs: Date.now(), channels: [], mixTargets: [] };
-  }
-  const channels = asArray(audioSnapshot.channels)
-    .map((entry) => asRecord(entry))
-    .filter((entry): entry is JsonObject => entry !== null)
-    .map((channel) => {
-      const left = asNumber(channel.meterLeft, 0);
-      const right = asBoolean(channel.stereo, false) ? asNumber(channel.meterRight, left) : left;
-      const peakL = asNumber(channel.peakHoldLeft, asNumber(channel.peakHold, left));
-      const peakR = asBoolean(channel.stereo, false)
-        ? asNumber(channel.peakHoldRight, asNumber(channel.peakHold, right))
-        : peakL;
-      return {
-        id: asString(channel.id),
-        l: left,
-        r: right,
-        peakL,
-        peakR,
-        clip: asBoolean(channel.clip, false),
-      };
-    });
-  const mixTargets = asArray(audioSnapshot.mixTargets)
-    .map((entry) => asRecord(entry))
-    .filter((entry): entry is JsonObject => entry !== null)
-    .map((mixTarget) => {
-      const left = asNumber(mixTarget.meterLeft, 0);
-      const right = asBoolean(mixTarget.mono, false) ? left : asNumber(mixTarget.meterRight, left);
-      const peakL = asNumber(mixTarget.peakHoldLeft, asNumber(mixTarget.peakHold, left));
-      const peakR = asBoolean(mixTarget.mono, false)
-        ? peakL
-        : asNumber(mixTarget.peakHoldRight, asNumber(mixTarget.peakHold, right));
-      return {
-        id: asString(mixTarget.id),
-        l: left,
-        r: right,
-        peakL,
-        peakR,
-        clip: asBoolean(mixTarget.clip, false),
-      };
-    });
+function meterPointForFixtureChannel(record: JsonObject) {
+  return asString(record.role) === "playback-pair" ? AUDIO_METER_POINT_PLAYBACK : AUDIO_METER_POINT_INPUT;
+}
+
+function audioMeterPayloadFromSnapshot(audioSnapshot: JsonObject, sequence: number, startedAtMs: number): JsonObject {
+  const compactMeter = (entry: JsonValue, meterPoint: string) => {
+    const record = asRecord(entry) ?? {};
+    const meterLeft = asNumber(record.meterLeft, 0);
+    const meterRight = asNumber(record.meterRight, 0);
+    const meterLevel = asNumber(record.meterLevel, 0);
+    const peakHoldLeft = asNumber(record.peakHoldLeft, 0);
+    const peakHoldRight = asNumber(record.peakHoldRight, 0);
+    const rmsLeft = meterLeft;
+    const rmsRight = meterRight;
+    const levelLeftDbfs = normalizedToDbfs(rmsLeft);
+    const levelRightDbfs = normalizedToDbfs(rmsRight);
+    const peakLeft = Math.max(peakHoldLeft, meterLeft);
+    const peakRight = Math.max(peakHoldRight, meterRight);
+    const clip = asBoolean(record.clip, false);
+    const overLeft = levelLeftDbfs >= AUDIO_METER_OVER_DBFS;
+    const overRight = levelRightDbfs >= AUDIO_METER_OVER_DBFS;
+    const meterPointOver = overLeft || overRight;
+
+    return {
+      channelPathClip: clip,
+      channelPathClipHold: clip,
+      clip,
+      clipHold: clip,
+      id: asString(record.id),
+      lufsIntegrated: asNumber(record.lufsIntegrated, 0),
+      levelLeftDbfs,
+      levelRightDbfs,
+      meterPoint,
+      meterLeft,
+      meterLevel,
+      meterRight,
+      meterPointOver,
+      meterPointOverLeft: overLeft,
+      meterPointOverRight: overRight,
+      over: meterPointOver,
+      overLeft,
+      overRight,
+      peakHold: asNumber(record.peakHold, 0),
+      peakHoldLeft,
+      peakHoldRight,
+      peakLeftDbfs: normalizedToDbfs(peakLeft),
+      peakRightDbfs: normalizedToDbfs(peakRight),
+      peakWarning:
+        levelLeftDbfs >= AUDIO_METER_PEAK_WARNING_DBFS || levelRightDbfs >= AUDIO_METER_PEAK_WARNING_DBFS || clip,
+      rmsLeftDbfs: levelLeftDbfs,
+      rmsRightDbfs: levelRightDbfs,
+      peakHoldLeftDbfs: normalizedToDbfs(peakHoldLeft),
+      peakHoldRightDbfs: normalizedToDbfs(peakHoldRight),
+    };
+  };
+
   return {
-    timestampMs: Date.now(),
-    channels,
-    mixTargets,
+    cadenceHz: AUDIO_METERING_CADENCE_HZ,
+    channels: asArray(audioSnapshot.channels).map((entry) =>
+      compactMeter(entry, meterPointForFixtureChannel(asRecord(entry) ?? {}))
+    ),
+    diagnostics: {
+      mappedEntryCount: asArray(audioSnapshot.channels).length + asArray(audioSnapshot.mixTargets).length,
+      mappedPacketCount: sequence,
+      packetCount: sequence,
+      unknownPacketCount: 0,
+    },
+    lastPacketAgeMs: null,
+    meteringSource: asString(audioSnapshot.meteringSource, "simulated"),
+    meteringState: asString(audioSnapshot.meteringState, "simulated"),
+    mixTargets: asArray(audioSnapshot.mixTargets).map((entry) => compactMeter(entry, AUDIO_METER_POINT_POST_FADER)),
+    monotonicTimestampMs: Math.max(0, performance.now() - startedAtMs),
+    reason: "metering-tick",
+    sequence,
+    selectedMixTargetId: asString(audioSnapshot.selectedMixTargetId, ""),
   };
 }
 
@@ -827,7 +980,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
     oscEnabled: true,
     connected: true,
     verified: true,
-    meteringState: "transport-only",
+    meteringSource: "simulated",
+    meteringState: "simulated",
     selectedChannelId: "audio-playback-3-4",
     selectedMixTargetId: "audio-mix-main",
     expectedPeakData: true,
@@ -3204,6 +3358,10 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   const audioFailed = asString(audioCheck?.status) === "failed" || asString(audioCheck?.status) === "error";
 
   audioSnapshotRecord.adapterMode = asString(audioSnapshotRecord.adapterMode, "simulated");
+  audioSnapshotRecord.meteringSource = asString(
+    audioSnapshotRecord.meteringSource,
+    SIMULATED_AUDIO_ADAPTER_MODES.has(audioSnapshotRecord.adapterMode) ? "simulated" : "rme-totalmix-osc"
+  );
   audioSnapshotRecord.sendHost = asString(
     audioSnapshotRecord.sendHost,
     asString(state.commissioningSnapshot.audio.sendHost, "127.0.0.1")
@@ -3228,11 +3386,13 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   audioSnapshotRecord.verified = audioSnapshotRecord.status === "ready";
   audioSnapshotRecord.meteringState = !audioSnapshotRecord.oscEnabled
     ? "disabled"
-    : audioSnapshotRecord.verified
-      ? "transport-only"
-      : audioFailed
-        ? "offline"
-        : "disabled";
+    : audioSnapshotRecord.meteringSource === "simulated"
+      ? "simulated"
+      : audioSnapshotRecord.verified
+        ? "live"
+        : audioFailed
+          ? "offline"
+          : "offline";
   audioSnapshotRecord.expectedPeakData = asBoolean(audioSnapshotRecord.expectedPeakData, true);
   audioSnapshotRecord.expectedSubmixLock = asBoolean(audioSnapshotRecord.expectedSubmixLock, true);
   audioSnapshotRecord.expectedCompatibilityMode = asBoolean(audioSnapshotRecord.expectedCompatibilityMode, false);
@@ -3278,7 +3438,7 @@ function synchronizeFixtureState(state: MutableFixtureState) {
         1
       ),
       pad: false,
-      eq: asRecord(channel.eq) ?? buildAudioEq(),
+      eq: normalizeAudioEq(asRecord(channel.eq)),
       dynamics: asRecord(channel.dynamics) ?? buildAudioDynamics(),
       sendModes: asRecord(channel.sendModes) ?? buildAudioSendModes(),
     }));
@@ -3333,12 +3493,14 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     return channels.some((entry) => asString(entry.id) === selected) ? selected : null;
   })();
   audioSnapshotRecord.summary = !audioSnapshotRecord.oscEnabled
-    ? `OSC transport is disabled in native audio settings. Last configured endpoint is ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} with receive port ${audioSnapshotRecord.receivePort}.`
-    : audioSnapshotRecord.status === "ready"
-      ? `OSC transport is configured for ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} with receive port ${audioSnapshotRecord.receivePort}.`
-      : audioSnapshotRecord.status === "attention"
-        ? `OSC transport check failed for ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} / ${audioSnapshotRecord.receivePort}.`
-        : `OSC transport is configured for ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} with receive port ${audioSnapshotRecord.receivePort} before the native audio probe runs.`;
+    ? `OSC transport is disabled in native audio settings. Last configured endpoint is ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} with receive ports ${audioSnapshotRecord.receivePort}-${audioSnapshotRecord.receivePort + 2}.`
+    : audioSnapshotRecord.meteringSource === "simulated"
+      ? `Audio fixture metering is in explicit simulated input mode for UI testing.`
+      : audioSnapshotRecord.status === "ready"
+        ? `RME TotalMix OSC metering is live for ${audioSnapshotRecord.sendHost} with send ports ${audioSnapshotRecord.sendPort}-${audioSnapshotRecord.sendPort + 2} and receive ports ${audioSnapshotRecord.receivePort}-${audioSnapshotRecord.receivePort + 2}.`
+        : audioSnapshotRecord.status === "attention"
+          ? `RME TotalMix OSC metering is offline for ${audioSnapshotRecord.sendHost}.`
+          : `RME TotalMix OSC metering is not verified for ${audioSnapshotRecord.sendHost}.`;
   refreshAudioCapabilities(audioSnapshotRecord, state);
   state.audioSnapshot = audioSnapshotRecord;
   refreshFixtureAudioMetering(state);
@@ -3493,7 +3655,7 @@ function captureFixtureAudioScene(audioSnapshot: JsonObject) {
       pad: false,
       instrument: asBoolean(channel.instrument, false),
       autoSet: asBoolean(channel.autoSet, false),
-      eq: cloneJson(asRecord(channel.eq) ?? buildAudioEq()),
+      eq: cloneJson(normalizeAudioEq(asRecord(channel.eq))),
       dynamics: cloneJson(asRecord(channel.dynamics) ?? buildAudioDynamics()),
       sendModes: cloneJson(asRecord(channel.sendModes) ?? buildAudioSendModes()),
     };
@@ -3530,6 +3692,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
   let startupResolved = startupDelayMs <= 0 && startupFailure === null;
   let startupTimeoutId: number | null = null;
   let audioMeteringIntervalId: number | null = null;
+  let audioMeteringSequence = 0;
+  let audioMeteringStartedAtMs = performance.now();
   let resolveStartupGate = () => {};
   let rejectStartupGate = (_error: unknown) => {};
   const startupGate = new Promise<void>((resolve, reject) => {
@@ -3556,9 +3720,19 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
     if (!refreshFixtureAudioMetering(state)) {
       return;
     }
+    audioMeteringSequence = 0;
+    audioMeteringStartedAtMs = performance.now();
     audioMeteringIntervalId = window.setInterval(() => {
       if (refreshFixtureAudioMetering(state)) {
-        emit("audio.meters", buildFixtureAudioMetersPayload(state));
+        audioMeteringSequence += 1;
+        emit(
+          "audio.meters",
+          audioMeterPayloadFromSnapshot(
+            asRecord(state.audioSnapshot) ?? {},
+            audioMeteringSequence,
+            audioMeteringStartedAtMs
+          )
+        );
       }
     }, AUDIO_METERING_TICK_MS);
   };
@@ -4138,6 +4312,24 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         emit("audio.changed", { reason: "audio-clips-cleared" });
         return { cleared: true, channelId, summary: audioSnapshot.lastActionMessage };
       }
+      case "audio.solo.clearAll": {
+        const audioSnapshot = ensureAudioEditAllowed(state);
+        let cleared = 0;
+        for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
+          if (!channel || !asBoolean(channel.solo, false)) continue;
+          channel.solo = false;
+          cleared += 1;
+        }
+        audioSnapshot.lastActionStatus = "succeeded";
+        audioSnapshot.lastActionCode = null;
+        audioSnapshot.lastActionMessage = cleared
+          ? `Cleared solo on ${cleared} audio channel(s)`
+          : "No soloed audio channels to clear";
+        state.audioSnapshot = audioSnapshot;
+        synchronizeFixtureState(state);
+        emit("audio.changed", { reason: "solo-cleared" });
+        return cloneJson(state.audioSnapshot);
+      }
       case "audio.channel.update": {
         const audioSnapshot = ensureAudioEditAllowed(state);
         const channelId = asString(params.channelId).trim();
@@ -4216,8 +4408,15 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       case "audio.channel.eq.update": {
         const audioSnapshot = ensureAudioEditAllowed(state);
         const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
-        const eq = asRecord(channel.eq) ?? buildAudioEq();
+        const eq = normalizeAudioEq(asRecord(channel.eq));
         if ("enabled" in params) eq.enabled = asBoolean(params.enabled, false);
+        if ("lowCutEnabled" in params) eq.lowCut.enabled = asBoolean(params.lowCutEnabled, false);
+        if (typeof params.lowCutFrequencyHz === "number") {
+          eq.lowCut.frequencyHz = clampNumber(params.lowCutFrequencyHz, 20, 500);
+        }
+        if (typeof params.lowCutSlopeDbPerOctave === "number") {
+          eq.lowCut.slopeDbPerOctave = normalizeLowCutSlope(params.lowCutSlopeDbPerOctave);
+        }
         if (typeof params.bandId === "string") {
           const bands = asArray(eq.bands)
             .map((entry) => asRecord(entry))
@@ -4225,10 +4424,17 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           const band = bands.find((entry) => asString(entry.id) === params.bandId);
           if (!band) throw new Error(`Audio EQ band '${params.bandId}' is not exposed by the fixture transport.`);
           if ("bandEnabled" in params) band.enabled = asBoolean(params.bandEnabled, false);
+          if (typeof params.bandType === "string") {
+            const nextType = normalizeEqBandType(params.bandId, params.bandType);
+            if (nextType !== params.bandType) {
+              throw new Error(`Audio EQ band '${params.bandId}' does not support type '${params.bandType}'.`);
+            }
+            band.bandType = nextType;
+          }
           if (typeof params.frequencyHz === "number") band.frequencyHz = clampNumber(params.frequencyHz, 20, 20_000);
-          if (typeof params.gainDb === "number") band.gainDb = clampNumber(params.gainDb, -12, 12);
-          if (typeof params.q === "number") band.q = clampNumber(params.q, 0.1, 12);
-          eq.bands = bands;
+          if (typeof params.gainDb === "number") band.gainDb = clampNumber(params.gainDb, -20, 20);
+          if (typeof params.q === "number") band.q = clampNumber(params.q, 0.4, 9.9);
+          eq.bands = bands as typeof eq.bands;
         }
         channel.eq = eq;
         state.audioSnapshot = audioSnapshot;
@@ -6120,6 +6326,10 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       startupTimeoutId = window.setTimeout(emitStartupEvent, 0);
     },
     async request(method, params = {}) {
+      if (typeof window !== "undefined" && window.__SSE_TEST_ENGINE_REQUEST_COUNTS__) {
+        window.__SSE_TEST_ENGINE_REQUEST_COUNTS__[method] =
+          (window.__SSE_TEST_ENGINE_REQUEST_COUNTS__[method] ?? 0) + 1;
+      }
       if (method === "engine.ping" && !startupResolved) {
         await startupGate;
       }

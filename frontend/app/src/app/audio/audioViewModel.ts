@@ -43,9 +43,13 @@ export interface AudioOutputTierViewModel {
 export interface AudioWorkspaceViewModel {
   activeMixReadout: {
     db: string;
-    lufs: string;
+    label: string;
+    meterSource: string;
     meterLeft: number;
+    meterPoint: string;
     meterRight: number;
+    nominalReference: string;
+    peakStatus: string;
   };
   actionsAllowed: boolean;
   activeChannelGroups: AudioChannelGroupSelections;
@@ -90,6 +94,7 @@ export interface AudioWorkspaceViewModel {
   selectedSnapshot: AudioSnapshotEntry | null;
   silentChannelIds: string[];
   soloedChannel: AudioChannelEntry | null;
+  soloedChannels: AudioChannelEntry[];
   snapshots: AudioSnapshotEntry[];
   softwarePlayback: AudioTierViewModel;
   softwarePlaybackBankSize: number;
@@ -243,12 +248,14 @@ function selectedSourceMeta(
   selectedMixTarget: AudioMixTargetEntry | null,
   selectedMixTargetId: string | null
 ) {
-  if (!channel) return selectedMixTarget ? `Selected output · ${selectedMixTarget.name}` : "No source selected";
+  if (!channel)
+    return selectedMixTarget ? `Selected output · ${selectedMixTarget.name} · tap post-fader` : "No source selected";
   const targetName = selectedMixTarget?.name ?? "selected output";
   const sendLevel = selectedChannelSendLevel(channel, selectedMixTargetId);
   const tier =
     channel.role === "playback-pair" ? "Playback bus" : channel.role === "front-preamp" ? "Mic preamp" : "Line input";
-  return `${tier} · ${channel.stereo ? "stereo" : "mono"} · ${sendLevel <= 0 ? "no send" : `routed to ${targetName}`}`;
+  const meterPoint = channel.role === "playback-pair" ? "tap playback" : "tap input";
+  return `${tier} · ${channel.stereo ? "stereo" : "mono"} · ${meterPoint} · ${sendLevel <= 0 ? "no send" : `routed to ${targetName}`}`;
 }
 
 function footerEndpoint(snapshot: AudioSnapshot) {
@@ -256,12 +263,14 @@ function footerEndpoint(snapshot: AudioSnapshot) {
   const receive = typeof snapshot.receivePort === "number" ? snapshot.receivePort : null;
   const send = typeof snapshot.sendPort === "number" ? snapshot.sendPort : null;
   if (receive === null && send === null) return host;
-  if (receive === null) return `${host} · ${send}`;
-  if (send === null) return `${host} · ${receive}`;
-  return `${host} · ${receive}/${send}`;
+  if (receive === null) return `${host} · send ${send}`;
+  if (send === null) return `${host} · recv ${receive}`;
+  return `${host} · recv ${receive}-${receive + 2} · send ${send}-${send + 2}`;
 }
 
 function usesSimulatedMetering(snapshot: AudioSnapshot) {
+  const meteringSource = String(snapshot.meteringSource ?? "").toLowerCase();
+  if (meteringSource === "simulated" || meteringSource === "fixture") return true;
   const adapterMode = String(snapshot.adapterMode ?? "").toLowerCase();
   return adapterMode.includes("simulated") || adapterMode === "fixture";
 }
@@ -391,7 +400,8 @@ export function buildAudioViewModel({
     softwarePlaybackBankSize
   );
   const clippedChannels = channels.filter((entry) => entry.clip);
-  const soloedChannel = channels.find((entry) => entry.solo) ?? null;
+  const soloedChannels = channels.filter((entry) => entry.solo);
+  const soloedChannel = soloedChannels[0] ?? null;
   const selectedGroup = selectedChannel ? getAudioChannelGroup(selectedChannel) : selectedMixTarget ? "output" : "none";
   const selectedTier = selectedSourceTier(selectedChannel, selectedMixTarget);
   const meterSimulationActive = usesSimulatedMetering(audioSnapshot);
@@ -436,9 +446,18 @@ export function buildAudioViewModel({
   return {
     activeMixReadout: {
       db: formatMeterDb(selectedMixTarget?.meterLevel ?? 0),
-      lufs: "n/a",
+      label: `Meter ${audioSnapshot.meteringSource === "rme-totalmix-osc" ? "RME" : meterSimulationActive ? "SIM" : audioSnapshot.meteringSource} · tap post-fader · reference -18 dBFS · peak ${clippedChannels.length > 0 ? "CLIP" : "-3 dBFS"}`,
+      meterSource:
+        audioSnapshot.meteringSource === "rme-totalmix-osc"
+          ? "RME"
+          : meterSimulationActive
+            ? "SIM"
+            : audioSnapshot.meteringSource,
       meterLeft: selectedMixTarget?.meterLeft ?? 0,
+      meterPoint: "post-fader",
       meterRight: selectedMixTarget?.meterRight ?? 0,
+      nominalReference: "-18",
+      peakStatus: clippedChannels.length > 0 ? "CLIP" : "-3",
     },
     actionsAllowed: capabilities.canEditMixerState,
     activeChannelGroups: {
@@ -461,9 +480,7 @@ export function buildAudioViewModel({
       lastSync: audioSnapshot.lastConsoleSyncAt ?? "not yet",
       metering: meterSimulationActive
         ? meterSimulationDetail
-        : `${String(audioSnapshot.meteringState ?? "unknown")} · ${
-            audioSnapshot.expectedPeakData ? "peak expected" : "peak n/a"
-          }`,
+        : `${String(audioSnapshot.meteringSource ?? "unknown")} · ${String(audioSnapshot.meteringState ?? "unknown")}`,
       osc: audioSnapshot.oscEnabled ? "enabled" : "disabled",
     },
     hardwareInputs,
@@ -497,6 +514,7 @@ export function buildAudioViewModel({
     selectedSnapshot,
     silentChannelIds,
     soloedChannel,
+    soloedChannels,
     snapshots,
     softwarePlayback,
     softwarePlaybackBankSize,

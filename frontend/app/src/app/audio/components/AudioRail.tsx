@@ -1,10 +1,12 @@
-import type { CSSProperties } from "react";
+import { useEffect, type CSSProperties } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { RefreshCw, RotateCcw, Settings, SlidersVertical } from "lucide-react";
+import { RefreshCw, RotateCcw, Settings } from "lucide-react";
 
 import styles from "../AudioWorkspace.module.css";
-import { faderDbToNormalized, formatAudioDb } from "../audioFormatting";
+import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
+import { faderDbToNormalized, formatAudioDb, formatAudioTimestamp, formatMeterPercent } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
+import { AudioLiveMasterHalo } from "./AudioLiveMeterReadout";
 import { AudioSliderControl } from "./AudioSliderControl";
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
@@ -18,46 +20,86 @@ function mixTargetMeta(role: string, talkback: boolean) {
 
 const PROTOTYPE_MONITOR_LEVEL = faderDbToNormalized(-12);
 
-function meterPercent(value: number) {
-  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
+function compactPortRange(start: string, end: string) {
+  const compactEnd = start.length === end.length && start.slice(0, -2) === end.slice(0, -2) ? end.slice(-2) : end;
+  return `${start}-${compactEnd}`;
+}
+
+function compactRailEndpoint(value: string) {
+  return value
+    .replace(/\brecv\s+(\d+)-(\d+)\b/gi, (_match, start: string, end: string) => `rx ${compactPortRange(start, end)}`)
+    .replace(/\bsend\s+(\d+)-(\d+)\b/gi, (_match, start: string, end: string) => `tx ${compactPortRange(start, end)}`);
+}
+
+function compactRailTimestamp(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === "") return "not yet";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return formatAudioTimestamp(value);
+  return new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+  }).format(parsed);
 }
 
 export function AudioRail({
-  clearDraftValue,
+  clearDraftValueLater,
   commitMixTargetContinuous,
+  draftStore,
   getDraftValue,
   onRecallCurrentSnapshot,
+  onOpenSetup,
   onSync,
   onSelectMixTarget,
+  store,
   setDraftValue,
   onUpdateMixTarget,
   viewModel,
 }: {
-  clearDraftValue: (key: string) => void;
+  clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
+  draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   onRecallCurrentSnapshot: () => void;
+  onOpenSetup: () => void;
   onSync: () => void;
   onSelectMixTarget: (mixTargetId: string) => void;
+  store: ShellStore;
   setDraftValue: (key: string, value: number) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
   viewModel: AudioWorkspaceViewModel;
 }) {
+  useEffect(() => {
+    if (!window.__SSE_TEST_RENDER_COUNTS__) return;
+    window.__SSE_TEST_RENDER_COUNTS__.audioRail = (window.__SSE_TEST_RENDER_COUNTS__.audioRail ?? 0) + 1;
+  });
+
   const selectedMixTarget = viewModel.selectedMixTarget;
   const monitorDraftKey = selectedMixTarget
     ? `mixTarget:${selectedMixTarget.id}:rail-volume`
     : "mixTarget:none:rail-volume";
-  const monitorValue = getDraftValue(monitorDraftKey, PROTOTYPE_MONITOR_LEVEL);
-  const masterGlow = Math.max(viewModel.activeMixReadout.meterLeft, viewModel.activeMixReadout.meterRight);
+  const monitorValue = useAudioControlDraftValue(
+    draftStore,
+    monitorDraftKey,
+    getDraftValue(monitorDraftKey, selectedMixTarget?.volume ?? PROTOTYPE_MONITOR_LEVEL)
+  );
+  const currentSnapshot = viewModel.selectedSnapshot;
+  const populatedSnapshotCount = viewModel.snapshots.length;
+  const fullEndpoint = viewModel.footerTelemetry.endpoint;
+  const fullLastSync = formatAudioTimestamp(viewModel.audioSnapshot.lastConsoleSyncAt);
+  const compactEndpoint = compactRailEndpoint(fullEndpoint);
+  const compactLastSync = compactRailTimestamp(viewModel.audioSnapshot.lastConsoleSyncAt);
 
   return (
     <aside className={styles.audioRail}>
-      <div
-        className={`${styles.railPanel} ${styles.railMonitorCard}`}
-        data-testid="audio-rail-monitor-card"
-        style={{ "--master-glow": masterGlow.toFixed(3) } as CSSProperties}
-      >
-        <span className={styles.masterHalo} data-testid="audio-master-halo" aria-hidden="true" />
+      <div className={`${styles.railPanel} ${styles.railMonitorCard}`} data-testid="audio-rail-monitor-card">
+        <AudioLiveMasterHalo
+          fallbackLeft={viewModel.activeMixReadout.meterLeft}
+          fallbackRight={viewModel.activeMixReadout.meterRight}
+          mixTargetId={viewModel.selectedMixTargetId}
+          store={store}
+        />
         <div className={styles.monitorCardStatus}>
           <span className={styles.statusDot} />
           <span>{viewModel.meterSimulationActive ? "Active mix · test meters" : "Active mix · live"}</span>
@@ -76,32 +118,54 @@ export function AudioRail({
         <div className={styles.monitorMeta}>Stereo monitor · 24-bit / 48 kHz</div>
 
         <div className={styles.mixTargetList}>
-          {viewModel.mixTargets.map((mixTarget) => (
-            <button
-              className={styles.mixTargetButton}
-              data-role={mixTarget.role}
-              data-selected={mixTarget.id === viewModel.selectedMixTargetId}
-              data-testid={`audio-mix-target-${mixTarget.id}`}
-              key={mixTarget.id}
-              onClick={() => onSelectMixTarget(mixTarget.id)}
-              type="button"
-            >
-              <span className={styles.mixTargetStripe} aria-hidden="true" />
-              <span className={styles.mixTargetCopy}>
-                <span className={styles.mixTargetName}>{mixTarget.name}</span>
-                <span className={styles.mixTargetMeta}>{mixTargetMeta(mixTarget.role, mixTarget.talkback)}</span>
-              </span>
-              <span className={styles.mixTargetMiniMeter} aria-hidden="true">
-                <i style={{ "--meter-level": meterPercent(mixTarget.meterLeft) } as CSSProperties} />
-                <i style={{ "--meter-level": meterPercent(mixTarget.meterRight) } as CSSProperties} />
-              </span>
-              <span className={styles.mixTargetFlags}>
-                {mixTarget.mute ? <span>Mute</span> : null}
-                {mixTarget.dim ? <span>Dim</span> : null}
-                {mixTarget.talkback ? <span>TB</span> : null}
-              </span>
-            </button>
-          ))}
+          {viewModel.mixTargets.map((mixTarget) => {
+            return (
+              <button
+                className={styles.mixTargetButton}
+                data-role={mixTarget.role}
+                data-selected={mixTarget.id === viewModel.selectedMixTargetId}
+                data-testid={`audio-mix-target-${mixTarget.id}`}
+                key={mixTarget.id}
+                onClick={() => onSelectMixTarget(mixTarget.id)}
+                type="button"
+              >
+                <span className={styles.mixTargetStripe} aria-hidden="true" />
+                <span className={styles.mixTargetCopy}>
+                  <span className={styles.mixTargetName}>{mixTarget.name}</span>
+                  <span className={styles.mixTargetMeta}>{mixTargetMeta(mixTarget.role, mixTarget.talkback)}</span>
+                </span>
+                <span className={styles.mixTargetMiniMeter} aria-hidden="true">
+                  <i
+                    data-mini-meter-id={mixTarget.id}
+                    data-mini-meter-kind="mixTarget"
+                    data-mini-meter-side="left"
+                    style={
+                      {
+                        "--meter-level": formatMeterPercent(mixTarget.meterLeft),
+                      } as CSSProperties
+                    }
+                  />
+                  <i
+                    data-mini-meter-id={mixTarget.id}
+                    data-mini-meter-kind="mixTarget"
+                    data-mini-meter-side="right"
+                    style={
+                      {
+                        "--meter-level": formatMeterPercent(
+                          mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight
+                        ),
+                      } as CSSProperties
+                    }
+                  />
+                </span>
+                <span className={styles.mixTargetFlags}>
+                  {mixTarget.mute ? <span>Mute</span> : null}
+                  {mixTarget.dim ? <span>Dim</span> : null}
+                  {mixTarget.talkback ? <span>TB</span> : null}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         <label className={styles.monitorLevel}>
@@ -114,7 +178,7 @@ export function AudioRail({
               if (!selectedMixTarget) return;
               setDraftValue(monitorDraftKey, value);
               commitMixTargetContinuous({ mixTargetId: selectedMixTarget.id, volume: value });
-              window.setTimeout(() => clearDraftValue(monitorDraftKey), 250);
+              clearDraftValueLater(monitorDraftKey);
             }}
             onPreview={(value) => {
               setDraftValue(monitorDraftKey, value);
@@ -128,6 +192,7 @@ export function AudioRail({
 
         <div className={styles.monitorButtonGrid}>
           <button
+            aria-pressed={selectedMixTarget?.dim === true}
             data-control="dim"
             data-active={selectedMixTarget?.dim === true}
             disabled={!selectedMixTarget || !viewModel.actionsAllowed}
@@ -140,6 +205,7 @@ export function AudioRail({
             Dim
           </button>
           <button
+            aria-pressed={selectedMixTarget?.mono === true}
             data-control="mono"
             data-active={selectedMixTarget?.mono === true}
             disabled={!selectedMixTarget || !viewModel.actionsAllowed}
@@ -152,6 +218,7 @@ export function AudioRail({
             Mono
           </button>
           <button
+            aria-pressed={selectedMixTarget?.talkback === true}
             data-control="talk"
             data-active={selectedMixTarget?.talkback === true}
             disabled={!selectedMixTarget || !viewModel.actionsAllowed}
@@ -174,17 +241,13 @@ export function AudioRail({
           <span className={styles.eyebrow}>Audio</span>
         </div>
         <div className={styles.railToolGrid}>
-          <button aria-label="Sync" disabled={!viewModel.actionsAllowed} onClick={onSync} type="button">
+          <button aria-label="Sync" disabled={!viewModel.capabilities.canSync} onClick={onSync} type="button">
             <RefreshCw size={13} strokeWidth={1.8} aria-hidden="true" />
             Sync
           </button>
-          <button disabled title="Audio setup is managed by the Setup workspace" type="button">
+          <button onClick={onOpenSetup} title="Open Setup / Support" type="button">
             <Settings size={13} strokeWidth={1.8} aria-hidden="true" />
             Setup
-          </button>
-          <button disabled title="Level test is not exposed by the audio engine yet" type="button">
-            <SlidersVertical size={13} strokeWidth={1.8} aria-hidden="true" />
-            Levels
           </button>
           <button
             disabled={!viewModel.selectedSnapshot || !viewModel.actionsAllowed}
@@ -194,6 +257,77 @@ export function AudioRail({
             <RotateCcw size={13} strokeWidth={1.8} aria-hidden="true" />
             Recall
           </button>
+        </div>
+      </div>
+
+      <div className={`${styles.railPanel} ${styles.railAuxPanel}`} data-testid="audio-rail-trust-panel">
+        <div className={styles.railHeader}>
+          <div>
+            <h2>Trust</h2>
+          </div>
+          <span className={styles.eyebrow}>State</span>
+        </div>
+        <div className={styles.railFactGrid}>
+          <span>
+            <small>Console</small>
+            <strong>{viewModel.status.label}</strong>
+          </span>
+          <span>
+            <small>OSC</small>
+            <strong>{viewModel.footerTelemetry.osc}</strong>
+          </span>
+          <span data-rail-fact="metering">
+            <small>Metering</small>
+            <strong>{viewModel.meterSimulationActive ? "test simulation" : viewModel.footerTelemetry.metering}</strong>
+          </span>
+          <span data-rail-fact="endpoint">
+            <small>Endpoint</small>
+            <strong title={fullEndpoint}>{compactEndpoint}</strong>
+          </span>
+          <span>
+            <small>Solo</small>
+            <strong>{viewModel.healthStats.soloedChannels}</strong>
+          </span>
+          <span>
+            <small>Clips</small>
+            <strong>{viewModel.healthStats.clippedChannels}</strong>
+          </span>
+        </div>
+      </div>
+
+      <div className={`${styles.railPanel} ${styles.railAuxPanel}`} data-testid="audio-rail-snapshot-panel">
+        <div className={styles.railHeader}>
+          <div>
+            <h2>Snapshot</h2>
+          </div>
+          <span className={styles.eyebrow}>{populatedSnapshotCount} saved</span>
+        </div>
+        <div className={styles.railSnapshotCard}>
+          <span>Current recall</span>
+          <strong>{currentSnapshot?.name ?? "None loaded"}</strong>
+          <small>
+            {currentSnapshot
+              ? `Slot ${currentSnapshot.oscIndex + 1} · ${formatAudioTimestamp(currentSnapshot.lastRecalledAt)}`
+              : "Recall is armed before apply"}
+          </small>
+        </div>
+        <div className={styles.railFactGrid}>
+          <span>
+            <small>Sources</small>
+            <strong>{viewModel.channels.length}</strong>
+          </span>
+          <span>
+            <small>Dest</small>
+            <strong>{viewModel.mixTargets.length}</strong>
+          </span>
+          <span data-rail-fact="active-sends">
+            <small>Active sends</small>
+            <strong>{viewModel.healthStats.activeSends}</strong>
+          </span>
+          <span data-rail-fact="last-sync">
+            <small>Last sync</small>
+            <strong title={fullLastSync}>{compactLastSync}</strong>
+          </span>
         </div>
       </div>
     </aside>

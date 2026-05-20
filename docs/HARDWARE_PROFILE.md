@@ -12,6 +12,14 @@ This repository is built around a specific studio installation. The product and 
 - Dense, fixed-height operator surfaces preferred over document-style layouts
 - Layout decisions are based on logical viewport/CSS pixels. Physical monitor pixels and backing scale are diagnostics, not layout thresholds.
 
+## Live Visual Verification
+
+When the user has the selected Tauri shell open for inspection, that exact running shell is the definitive visual verification surface for operator-visible feedback. In local development this is typically launched with `npm run tauri:dev`, process `sse-exed-tauri-shell`, window `SSE ExEd Studio Control`.
+
+If the user points out visual issues, interpret those comments against the live shell they are looking at unless they explicitly name a different artifact. Do not substitute redesign documents, browser-only views, historical screenshots, or retired shell paths as the source of truth. Automated screenshots and `npm run tauri:visual:review` remain required evidence, but live operator inspection refers to the open selected Tauri shell.
+
+On the built-in MacBook display, use the app-owned Scaled Studio Preview as the normal human review surface for the fixed studio monitor. The preview must emulate the `2560x1440` studio canvas exactly after scaling: layout mode, proportions, density decisions, canvas metadata, and control aspect ratios should match native `2560x1440` evidence. Do not let host-window compact media queries leak into Scaled Studio Preview; operator layout breakpoints should key off the logical operator surface, not the physical preview window.
+
 ## Audio
 
 ### Interface
@@ -27,6 +35,7 @@ This repository is built around a specific studio installation. The product and 
   - Main XLR monitors
   - Phones 1
   - Phones 2
+- Production metering is sourced from RME TotalMix OSC peak-level packets. The fixed workstation uses three TotalMix OSC remote slots: hardware inputs on the base ports, software playback on `+1`, and hardware outputs on `+2`, all with `Send Peak Level` enabled.
 
 ### Design Implication
 

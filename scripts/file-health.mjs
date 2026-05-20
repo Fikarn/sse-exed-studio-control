@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 
 const MAX_SOURCE_LINES = 2_000;
 const MAX_TRACKED_FILE_BYTES = 1_500_000;
@@ -17,6 +17,10 @@ const oversizedSourceAllowlist = new Map(
     [
       "native/rust-engine/src/lighting/tests.rs",
       "lighting integration tests deliberately cover engine-owned fixture, scene, preview, and DMX behavior together",
+    ],
+    [
+      "frontend/app/tests/operator-shell.spec.ts",
+      "operator shell integration coverage still spans shared workspace flows; split audio-specific cases into a dedicated spec on the next Playwright expansion",
     ],
     [
       "frontend/app/src/app/lighting/LightingWorkspace.tsx",
@@ -57,6 +61,10 @@ const allowedLargeSources = [];
 const allowedLargeFiles = [];
 
 for (const filePath of gitTrackedFiles()) {
+  if (!existsSync(filePath)) {
+    continue;
+  }
+
   const size = statSync(filePath).size;
 
   if (size > MAX_TRACKED_FILE_BYTES) {

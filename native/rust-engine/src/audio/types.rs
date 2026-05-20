@@ -19,6 +19,8 @@ pub struct AudioSnapshot {
     pub osc_enabled: bool,
     pub connected: bool,
     pub verified: bool,
+    #[serde(rename = "meteringSource")]
+    pub metering_source: String,
     #[serde(rename = "meteringState")]
     pub metering_state: String,
     #[serde(rename = "selectedChannelId")]
@@ -124,7 +126,24 @@ pub struct AudioCapabilitySnapshot {
 #[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct AudioEqSnapshot {
     pub enabled: bool,
+    #[serde(rename = "lowCut")]
+    #[serde(default = "default_audio_low_cut_snapshot")]
+    pub low_cut: AudioLowCutSnapshot,
+    #[serde(rename = "hardwareStatus")]
+    #[serde(default = "default_audio_eq_hardware_status")]
+    pub hardware_status: String,
     pub bands: Vec<AudioEqBandSnapshot>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct AudioLowCutSnapshot {
+    pub enabled: bool,
+    #[serde(rename = "frequencyHz")]
+    pub frequency_hz: f64,
+    #[serde(rename = "slopeDbPerOctave")]
+    pub slope_db_per_octave: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -314,6 +333,8 @@ pub struct AudioHealthCheck {
     #[serde(rename = "receivePort")]
     pub receive_port: i64,
     pub verified: bool,
+    #[serde(rename = "meteringSource")]
+    pub metering_source: String,
     #[serde(rename = "meteringState")]
     pub metering_state: String,
 }
@@ -451,8 +472,12 @@ pub struct AudioClipClearResult {
 pub struct AudioEqUpdateRequest {
     pub channel_id: String,
     pub enabled: Option<bool>,
+    pub low_cut_enabled: Option<bool>,
+    pub low_cut_frequency_hz: Option<f64>,
+    pub low_cut_slope_db_per_octave: Option<i64>,
     pub band_id: Option<String>,
     pub band_enabled: Option<bool>,
+    pub band_type: Option<String>,
     pub frequency_hz: Option<f64>,
     pub gain_db: Option<f64>,
     pub q: Option<f64>,
@@ -483,19 +508,12 @@ pub struct AudioSendModeUpdateRequest {
 pub fn default_audio_eq_snapshot() -> AudioEqSnapshot {
     AudioEqSnapshot {
         enabled: false,
+        low_cut: default_audio_low_cut_snapshot(),
+        hardware_status: default_audio_eq_hardware_status(),
         bands: vec![
             AudioEqBandSnapshot {
-                id: String::from("lc"),
-                label: String::from("LC"),
-                enabled: false,
-                frequency_hz: 80.0,
-                gain_db: 0.0,
-                q: 0.7,
-                band_type: String::from("low-cut"),
-            },
-            AudioEqBandSnapshot {
-                id: String::from("lo"),
-                label: String::from("LO"),
+                id: String::from("1"),
+                label: String::from("1"),
                 enabled: true,
                 frequency_hz: 180.0,
                 gain_db: 0.0,
@@ -503,8 +521,8 @@ pub fn default_audio_eq_snapshot() -> AudioEqSnapshot {
                 band_type: String::from("bell"),
             },
             AudioEqBandSnapshot {
-                id: String::from("mid"),
-                label: String::from("MID"),
+                id: String::from("2"),
+                label: String::from("2"),
                 enabled: true,
                 frequency_hz: 1600.0,
                 gain_db: 0.0,
@@ -512,15 +530,27 @@ pub fn default_audio_eq_snapshot() -> AudioEqSnapshot {
                 band_type: String::from("bell"),
             },
             AudioEqBandSnapshot {
-                id: String::from("hi"),
-                label: String::from("HI"),
-                enabled: false,
+                id: String::from("3"),
+                label: String::from("3"),
+                enabled: true,
                 frequency_hz: 8500.0,
                 gain_db: 0.0,
                 q: 0.8,
-                band_type: String::from("shelf"),
+                band_type: String::from("high-shelf"),
             },
         ],
+    }
+}
+
+pub fn default_audio_eq_hardware_status() -> String {
+    String::from("local")
+}
+
+pub fn default_audio_low_cut_snapshot() -> AudioLowCutSnapshot {
+    AudioLowCutSnapshot {
+        enabled: false,
+        frequency_hz: 80.0,
+        slope_db_per_octave: 12,
     }
 }
 

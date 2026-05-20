@@ -3,6 +3,7 @@ use crate::bootstrap::RuntimeContext;
 use crate::legacy_import::{ImportLegacyError, LegacyImportRequest};
 use crate::planning::{read_planning_context, PlanningContextSnapshot};
 use crate::planning_settings::PLANNING_SETTINGS_PREFIX;
+use crate::rme_totalmix_osc;
 use crate::shell_settings::{SHELL_SETTINGS_PREFIX, WORKSPACE_KEY};
 use crate::storage::{
     import_legacy_db, list_settings_by_prefix, open_connection, set_settings_owned, EngineResult,
@@ -717,14 +718,6 @@ fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Resul
         format!("{host}:{send_port}")
     };
 
-    let receive_socket = UdpSocket::bind(("0.0.0.0", receive_port)).map_err(|error| {
-        format!(
-            "Audio OSC probe could not bind receive port {}: {}",
-            receive_port, error
-        )
-    })?;
-    drop(receive_socket);
-
     let send_socket = UdpSocket::bind(("0.0.0.0", 0)).map_err(|error| {
         format!(
             "Audio OSC probe could not allocate a send socket: {}",
@@ -739,10 +732,25 @@ fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Resul
     })?;
     let _ = send_socket.send(b"/native/probe");
 
-    Ok(format!(
-        "OSC transport config accepted for {} (send {}, receive {}). Live meter verification will attach when the audio adapter lands.",
-        host, send_port, receive_port
-    ))
+    if rme_totalmix_osc::wait_for_live_metering(Duration::from_millis(1_500)) {
+        Ok(format!(
+            "RME TotalMix OSC metering verified for {}. Configure slots with send ports {}-{} and receive ports {}-{}; live meter packets are arriving.",
+            host,
+            send_port,
+            send_port.saturating_add(2),
+            receive_port,
+            receive_port.saturating_add(2)
+        ))
+    } else {
+        Err(format!(
+            "No RME TotalMix OSC meter packets were received for {}. Configure three TotalMix OSC remote slots, set their outgoing ports to {}-{}, incoming ports to {}-{}, enable Send Peak Level, then rerun this probe.",
+            host,
+            receive_port,
+            receive_port.saturating_add(2),
+            send_port,
+            send_port.saturating_add(2)
+        ))
+    }
 }
 
 fn is_valid_ipv4(value: &str) -> bool {
@@ -924,6 +932,51 @@ mod tests {
             }
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn audio_probe_fails_without_live_rme_meter_packets() {
+        crate::rme_totalmix_osc::with_shared_meter_state_for_test(|_| {
+            let test_dir = TestDir::new("commissioning-audio-no-meter-packets");
+            let runtime = runtime_for(&test_dir);
+            initialize_database(&runtime.db_path).expect("database should initialize");
+
+            let snapshot = run_commissioning_check(
+                &runtime.db_path,
+                &CommissioningCheckRequest {
+                    target: CommissioningCheckTarget::Audio,
+                    lighting_bridge_ip: None,
+                    lighting_universe: None,
+                    audio_send_host: Some(String::from("127.0.0.1")),
+                    audio_send_port: Some(7_001),
+                    audio_receive_port: Some(19_001),
+                },
+            )
+            .expect("audio probe should record failed status, not reject valid params");
+
+            let audio_check = snapshot
+                .checks
+                .iter()
+                .find(|check| check.id == AUDIO_CHECK_ID)
+                .expect("audio check should be present");
+            assert_eq!(audio_check.status, "failed");
+            assert!(
+                audio_check
+                    .message
+                    .contains("No RME TotalMix OSC meter packets")
+                    || audio_check
+                        .message
+                        .contains("Audio OSC probe could not allocate a send socket"),
+                "unexpected audio probe message: {}",
+                audio_check.message
+            );
+            if audio_check
+                .message
+                .contains("No RME TotalMix OSC meter packets")
+            {
+                assert!(audio_check.message.contains("19001-19003"));
+            }
+        });
     }
 
     #[test]

@@ -1,40 +1,26 @@
 use crate::audio::{
     default_audio_dynamics_snapshot, default_audio_eq_snapshot, default_audio_send_mode_snapshot,
-    AudioChannelSnapshot, AudioChannelUpdateRequest, AudioMixTargetSnapshot,
+    AudioChannelSnapshot, AudioChannelUpdateRequest, AudioEqUpdateRequest, AudioMixTargetSnapshot,
     AudioMixTargetUpdateRequest, AudioScenePreviewSnapshot, AudioSceneSnapshot,
 };
-use serde_json::{json, Value};
+use crate::audio_meter_fixture::{real_speech_body_level_at, real_speech_peak_level_at};
+use crate::rme_totalmix_osc::{
+    send_totalmix_eq_update, RME_TOTALMIX_OSC_SOURCE, SIMULATED_AUDIO_SOURCE,
+};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const SIMULATED_AUDIO_METER_CHANNELS: &[(&str, &str, bool)] = &[
-    ("audio-input-9", "front-preamp", false),
-    ("audio-input-10", "front-preamp", false),
-    ("audio-input-11", "front-preamp", false),
-    ("audio-input-12", "front-preamp", false),
-    ("audio-input-1", "rear-line", false),
-    ("audio-input-2", "rear-line", false),
-    ("audio-input-3", "rear-line", false),
-    ("audio-input-4", "rear-line", false),
-    ("audio-input-5", "rear-line", false),
-    ("audio-input-6", "rear-line", false),
-    ("audio-input-7", "rear-line", false),
-    ("audio-input-8", "rear-line", false),
-    ("audio-playback-1-2", "playback-pair", true),
-    ("audio-playback-3-4", "playback-pair", true),
-    ("audio-playback-5-6", "playback-pair", true),
-    ("audio-playback-7-8", "playback-pair", true),
-    ("audio-playback-9-10", "playback-pair", true),
-    ("audio-playback-11-12", "playback-pair", true),
-];
-
-const SIMULATED_AUDIO_METER_MIX_TARGETS: &[&str] =
-    &["audio-mix-main", "audio-mix-phones-a", "audio-mix-phones-b"];
+const AUDIO_METER_FLOOR_DBFS: f64 = -60.0;
+const FAIRLIGHT_PEAK_HOLD_MS: f64 = 1_500.0;
+const FAIRLIGHT_PEAK_HISTORY_MS: f64 = 3_500.0;
+const FAIRLIGHT_PEAK_SCAN_STEP_MS: f64 = 33.0;
+const FAIRLIGHT_PEAK_FALL_DB_PER_SECOND: f64 = 20.0;
 
 pub struct AudioBackendConfig {
     pub send_host: String,
     pub send_port: i64,
     pub receive_port: i64,
+    pub metering_source: String,
 }
 
 pub struct AudioBackendInventory {
@@ -75,6 +61,12 @@ pub struct AudioMixTargetUpdateOutcome {
     pub summary: String,
 }
 
+#[derive(Debug)]
+pub struct AudioEqUpdateOutcome {
+    pub summary: String,
+    pub hardware_status: String,
+}
+
 pub trait AudioBackend {
     fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory;
     fn sync_console(
@@ -100,9 +92,17 @@ pub trait AudioBackend {
         inventory: &AudioBackendInventory,
         request: &AudioMixTargetUpdateRequest,
     ) -> Result<AudioMixTargetUpdateOutcome, String>;
+    fn update_eq(
+        &self,
+        config: &AudioBackendConfig,
+        inventory: &AudioBackendInventory,
+        request: &AudioEqUpdateRequest,
+    ) -> Result<AudioEqUpdateOutcome, String>;
 }
 
 pub struct SimulatedAudioBackend;
+
+pub struct RmeTotalMixOscBackend;
 
 impl AudioBackend for SimulatedAudioBackend {
     fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory {
@@ -546,6 +546,189 @@ impl AudioBackend for SimulatedAudioBackend {
             ),
         })
     }
+
+    fn update_eq(
+        &self,
+        config: &AudioBackendConfig,
+        inventory: &AudioBackendInventory,
+        request: &AudioEqUpdateRequest,
+    ) -> Result<AudioEqUpdateOutcome, String> {
+        ensure_transport_configured(config)?;
+        let channel = inventory
+            .channels
+            .iter()
+            .find(|entry| entry.id == request.channel_id)
+            .ok_or_else(|| {
+                format!(
+                    "Audio channel '{}' is not exposed by the backend.",
+                    request.channel_id
+                )
+            })?;
+
+        Ok(AudioEqUpdateOutcome {
+            summary: format!(
+                "Simulated audio EQ state for '{}' was updated.",
+                channel.name
+            ),
+            hardware_status: String::from("local"),
+        })
+    }
+}
+
+impl AudioBackend for RmeTotalMixOscBackend {
+    fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory {
+        let mut inventory = SimulatedAudioBackend.read_inventory(config);
+        inventory.adapter_mode = String::from(RME_TOTALMIX_OSC_SOURCE);
+        for channel in &mut inventory.channels {
+            clear_channel_meter(channel);
+        }
+        for mix_target in &mut inventory.mix_targets {
+            clear_mix_target_meter(mix_target);
+        }
+        inventory
+    }
+
+    fn sync_console(
+        &self,
+        config: &AudioBackendConfig,
+        inventory: &AudioBackendInventory,
+    ) -> Result<AudioSyncOutcome, String> {
+        ensure_transport_configured(config)?;
+
+        if inventory.channels.is_empty() || inventory.mix_targets.is_empty() {
+            return Err(String::from(
+                "Audio inventory is empty, so the RME TotalMix OSC backend cannot prepare the console surface.",
+            ));
+        }
+
+        Ok(AudioSyncOutcome {
+            summary: format!(
+                "RME TotalMix OSC metering is configured for {} channels and {} mix targets over receive ports {}-{}.",
+                inventory.channels.len(),
+                inventory.mix_targets.len(),
+                config.receive_port,
+                config.receive_port + 2
+            ),
+        })
+    }
+
+    fn recall_snapshot(
+        &self,
+        config: &AudioBackendConfig,
+        inventory: &AudioBackendInventory,
+        snapshot_id: &str,
+    ) -> Result<AudioSnapshotRecallOutcome, String> {
+        ensure_transport_configured(config)?;
+
+        let snapshot = inventory
+            .snapshots
+            .iter()
+            .find(|entry| entry.id == snapshot_id)
+            .ok_or_else(|| {
+                format!("Audio snapshot '{snapshot_id}' is not exposed by the backend.")
+            })?;
+
+        Ok(AudioSnapshotRecallOutcome {
+            snapshot_name: snapshot.name.clone(),
+            summary: format!(
+                "Native audio snapshot '{}' was recalled. RME OSC snapshot-write control is outside this metering pass.",
+                snapshot.name
+            ),
+        })
+    }
+
+    fn update_channel(
+        &self,
+        config: &AudioBackendConfig,
+        inventory: &AudioBackendInventory,
+        request: &AudioChannelUpdateRequest,
+    ) -> Result<AudioChannelUpdateOutcome, String> {
+        SimulatedAudioBackend.update_channel(config, inventory, request)?;
+        let channel = inventory
+            .channels
+            .iter()
+            .find(|entry| entry.id == request.channel_id)
+            .ok_or_else(|| {
+                format!(
+                    "Audio channel '{}' is not exposed by the backend.",
+                    request.channel_id
+                )
+            })?;
+
+        Ok(AudioChannelUpdateOutcome {
+            summary: format!(
+                "Native audio state for '{}' was updated. Live meter truth remains sourced from RME TotalMix OSC packets.",
+                channel.name
+            ),
+        })
+    }
+
+    fn update_mix_target(
+        &self,
+        config: &AudioBackendConfig,
+        inventory: &AudioBackendInventory,
+        request: &AudioMixTargetUpdateRequest,
+    ) -> Result<AudioMixTargetUpdateOutcome, String> {
+        SimulatedAudioBackend.update_mix_target(config, inventory, request)?;
+        let mix_target = inventory
+            .mix_targets
+            .iter()
+            .find(|entry| entry.id == request.mix_target_id)
+            .ok_or_else(|| {
+                format!(
+                    "Audio mix target '{}' is not exposed by the backend.",
+                    request.mix_target_id
+                )
+            })?;
+
+        Ok(AudioMixTargetUpdateOutcome {
+            summary: format!(
+                "Native audio state for '{}' was updated. Live meter truth remains sourced from RME TotalMix OSC packets.",
+                mix_target.name
+            ),
+        })
+    }
+
+    fn update_eq(
+        &self,
+        config: &AudioBackendConfig,
+        inventory: &AudioBackendInventory,
+        request: &AudioEqUpdateRequest,
+    ) -> Result<AudioEqUpdateOutcome, String> {
+        ensure_transport_configured(config)?;
+        let channel = inventory
+            .channels
+            .iter()
+            .find(|entry| entry.id == request.channel_id)
+            .ok_or_else(|| {
+                format!(
+                    "Audio channel '{}' is not exposed by the backend.",
+                    request.channel_id
+                )
+            })?;
+        let sent =
+            send_totalmix_eq_update(&config.send_host, config.send_port, &channel.id, request)?;
+
+        if sent == 0 {
+            return Ok(AudioEqUpdateOutcome {
+                summary: format!(
+                    "Updated local EQ state for '{}'; TotalMix exposes no OSC command for that field.",
+                    channel.name
+                ),
+                hardware_status: String::from("local"),
+            });
+        }
+
+        Ok(AudioEqUpdateOutcome {
+            summary: format!(
+                "Sent {} TotalMix EQ command{} for '{}'; hardware confirmation is pending.",
+                sent,
+                if sent == 1 { "" } else { "s" },
+                channel.name
+            ),
+            hardware_status: String::from("pending"),
+        })
+    }
 }
 
 fn ensure_transport_configured(config: &AudioBackendConfig) -> Result<(), String> {
@@ -604,6 +787,25 @@ fn simulated_channel(
     }
 }
 
+fn clear_channel_meter(channel: &mut AudioChannelSnapshot) {
+    channel.meter_left = 0.0;
+    channel.meter_right = 0.0;
+    channel.meter_level = 0.0;
+    channel.peak_hold = 0.0;
+    channel.peak_hold_left = 0.0;
+    channel.peak_hold_right = 0.0;
+    channel.clip = false;
+}
+
+fn clear_mix_target_meter(mix_target: &mut AudioMixTargetSnapshot) {
+    mix_target.meter_left = 0.0;
+    mix_target.meter_right = 0.0;
+    mix_target.meter_level = 0.0;
+    mix_target.peak_hold = 0.0;
+    mix_target.peak_hold_left = 0.0;
+    mix_target.peak_hold_right = 0.0;
+}
+
 fn empty_audio_scene_preview() -> AudioScenePreviewSnapshot {
     AudioScenePreviewSnapshot {
         has_contents: false,
@@ -629,48 +831,6 @@ fn default_send_modes() -> HashMap<String, crate::audio::AudioSendModeSnapshot> 
             default_audio_send_mode_snapshot(),
         ),
     ])
-}
-
-pub fn build_simulated_audio_meters_payload() -> Value {
-    let timestamp_ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0);
-
-    let channels: Vec<Value> = SIMULATED_AUDIO_METER_CHANNELS
-        .iter()
-        .map(|(id, role, stereo)| {
-            let frame = simulated_meter_frame(id, role, *stereo);
-            json!({
-                "id": id,
-                "l": frame.meter_left,
-                "r": frame.meter_right,
-                "peakL": frame.peak_hold_left,
-                "peakR": frame.peak_hold_right,
-                "clip": frame.clip,
-            })
-        })
-        .collect();
-
-    let mix_targets: Vec<Value> = SIMULATED_AUDIO_METER_MIX_TARGETS
-        .iter()
-        .map(|id| {
-            json!({
-                "id": id,
-                "l": 0.0,
-                "r": 0.0,
-                "peakL": 0.0,
-                "peakR": 0.0,
-                "clip": false,
-            })
-        })
-        .collect();
-
-    json!({
-        "timestampMs": timestamp_ms,
-        "channels": channels,
-        "mixTargets": mix_targets,
-    })
 }
 
 fn simulated_meter_frame(id: &str, role: &str, stereo: bool) -> AudioMeterFrame {
@@ -710,7 +870,7 @@ fn simulated_body_level_pair_at(elapsed_ms: f64, id: &str, role: &str, stereo: b
     let mut total_weight = 0.0;
     for (age_ms, weight) in samples {
         let (sample_left, sample_right) =
-            simulated_raw_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
+            simulated_raw_body_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
         left += sample_left * weight;
         right += sample_right * weight;
         total_weight += weight;
@@ -733,19 +893,43 @@ fn simulated_peak_hold_pair_at(
     let mut peak_left = meter_left;
     let mut peak_right = meter_right;
     let mut age_ms = 0.0;
-    while age_ms <= 2_700.0 {
+    while age_ms <= FAIRLIGHT_PEAK_HISTORY_MS {
         let (raw_left, raw_right) =
-            simulated_raw_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
-        let decay = ((age_ms - 1_500.0).max(0.0) / 1000.0) * 0.075;
-        peak_left = peak_left.max((raw_left - decay).max(meter_left));
-        peak_right = peak_right.max((raw_right - decay).max(meter_right));
-        age_ms += 150.0;
+            simulated_raw_peak_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
+        peak_left = peak_left.max(fairlight_held_peak_at_age(raw_left, meter_left, age_ms));
+        peak_right = peak_right.max(fairlight_held_peak_at_age(raw_right, meter_right, age_ms));
+        age_ms += FAIRLIGHT_PEAK_SCAN_STEP_MS;
     }
 
     (
         peak_left.clamp(meter_left, 1.0),
         peak_right.clamp(meter_right, 1.0),
     )
+}
+
+fn fairlight_held_peak_at_age(raw: f64, body: f64, age_ms: f64) -> f64 {
+    if !raw.is_finite() || raw <= 0.0 {
+        return body.clamp(0.0, 1.0);
+    }
+
+    let fall_db =
+        ((age_ms - FAIRLIGHT_PEAK_HOLD_MS).max(0.0) / 1000.0) * FAIRLIGHT_PEAK_FALL_DB_PER_SECOND;
+    let dbfs = normalized_to_dbfs(raw) - fall_db;
+    dbfs_to_normalized(dbfs).max(body).clamp(body, 1.0)
+}
+
+fn normalized_to_dbfs(value: f64) -> f64 {
+    if !value.is_finite() || value <= 0.0 {
+        return AUDIO_METER_FLOOR_DBFS;
+    }
+    (20.0 * value.clamp(0.0, 1.0).log10()).clamp(AUDIO_METER_FLOOR_DBFS, 0.0)
+}
+
+fn dbfs_to_normalized(dbfs: f64) -> f64 {
+    if !dbfs.is_finite() {
+        return 0.0;
+    }
+    10.0_f64.powf(dbfs.clamp(AUDIO_METER_FLOOR_DBFS, 0.0) / 20.0)
 }
 
 fn simulated_recent_raw_peak_at(
@@ -759,42 +943,68 @@ fn simulated_recent_raw_peak_at(
     let mut age_ms = 0.0;
     while age_ms <= window_ms {
         let (left, right) =
-            simulated_raw_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
+            simulated_raw_peak_level_pair_at((elapsed_ms - age_ms).max(0.0), id, role, stereo);
         peak = peak.max(left.max(right));
         age_ms += 140.0;
     }
     peak
 }
 
-fn simulated_raw_level_pair_at(elapsed_ms: f64, id: &str, role: &str, stereo: bool) -> (f64, f64) {
+fn simulated_raw_body_level_pair_at(
+    elapsed_ms: f64,
+    id: &str,
+    role: &str,
+    stereo: bool,
+) -> (f64, f64) {
+    simulated_raw_level_pair_at(elapsed_ms, id, role, stereo, SimulatedMeterDetector::Body)
+}
+
+fn simulated_raw_peak_level_pair_at(
+    elapsed_ms: f64,
+    id: &str,
+    role: &str,
+    stereo: bool,
+) -> (f64, f64) {
+    simulated_raw_level_pair_at(elapsed_ms, id, role, stereo, SimulatedMeterDetector::Peak)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SimulatedMeterDetector {
+    Body,
+    Peak,
+}
+
+fn simulated_raw_level_pair_at(
+    elapsed_ms: f64,
+    id: &str,
+    role: &str,
+    stereo: bool,
+    detector: SimulatedMeterDetector,
+) -> (f64, f64) {
     let seed = id.bytes().fold(0_u64, |accumulator, byte| {
         accumulator.wrapping_mul(33).wrapping_add(byte as u64)
-    }) as f64;
-    let t = (elapsed_ms / 1000.0) + seed / 307.0;
+    });
+    let phase_offset_seconds = ((seed % 100_000) as f64 / 100_000.0) * 17.0;
+    let t = (elapsed_ms / 1000.0) + phase_offset_seconds;
     let channel_index = id
         .split('-')
         .next_back()
         .and_then(|value| value.parse::<f64>().ok())
-        .unwrap_or(seed % 11.0);
+        .unwrap_or((seed % 11) as f64);
 
     let (left, right) = if role == "front-preamp" {
-        simulated_speech_pair(t, channel_index, 0.34, 0.56)
+        recorded_speech_pair(t, channel_index, 1.0, detector)
     } else if role == "rear-line" {
-        let base = if id.contains("remote") || id.ends_with("-3") || id.ends_with("-4") {
-            0.14
+        if id.contains("remote") || id.ends_with("-3") || id.ends_with("-4") {
+            recorded_speech_pair(t + 21.0, channel_index, 0.42, detector)
         } else {
-            0.09
-        };
-        let motion = 0.045 * lfo(t, 0.41, 0.0) + 0.026 * lfo(t, 1.2, 0.7);
-        let level = (base + motion).clamp(0.04, 0.28);
-        (level, level * 0.9)
+            let room = real_speech_profile_at(t + channel_index * 3.1, detector) * 0.12;
+            let floor = 0.004 + 0.004 * lfo(t, 0.41, 0.0).max(0.0);
+            let level = (floor + room).clamp(0.003, 0.12);
+            (level, level * 0.9)
+        }
     } else if id == "audio-playback-1-2" {
-        let body = 0.48 + 0.065 * lfo(t, 0.22, 0.0) + 0.032 * lfo(t, 1.1, 1.2);
-        let width = 0.04 * lfo(t, 0.53, 0.4);
-        (
-            (body - width).clamp(0.28, 0.72),
-            (body + width).clamp(0.3, 0.74),
-        )
+        recorded_program_pair(t, channel_index, 0.92, detector)
     } else if id == "audio-playback-3-4" {
         let sting = pulse(t % 11.0, 1.1, 0.22) + 0.72 * pulse(t % 11.0, 6.7, 0.32);
         let bed = 0.07 + 0.02 * lfo(t, 0.9, 0.0);
@@ -802,7 +1012,7 @@ fn simulated_raw_level_pair_at(elapsed_ms: f64, id: &str, role: &str, stereo: bo
         let right = (bed * 0.92 + 0.56 * sting + 0.02 * lfo(t, 2.1, 0.8)).clamp(0.04, 0.8);
         (left, right)
     } else if id == "audio-playback-5-6" {
-        simulated_speech_pair(t + 3.7, channel_index, 0.16, 0.32)
+        recorded_program_pair(t + 37.0, channel_index, 0.58, detector)
     } else if id == "audio-playback-7-8" {
         let groove = 0.34 + 0.12 * lfo(t, 0.36, 0.0) + 0.06 * lfo(t, 1.8, 0.2);
         let width = 0.08 * lfo(t, 0.71, 1.4);
@@ -829,19 +1039,43 @@ fn simulated_raw_level_pair_at(elapsed_ms: f64, id: &str, role: &str, stereo: bo
     }
 }
 
-fn simulated_speech_pair(t: f64, channel_index: f64, floor: f64, range: f64) -> (f64, f64) {
-    let period = 8.7 + (channel_index % 4.0) * 0.9;
-    let phase = (t + channel_index * 1.37).rem_euclid(period);
-    let syllables = pulse(phase, 0.72, 0.28)
-        + 0.92 * pulse(phase, 1.24, 0.22)
-        + 0.78 * pulse(phase, 2.02, 0.34)
-        + 0.68 * pulse(phase, 4.58, 0.4)
-        + 0.86 * pulse(phase, 5.42, 0.3);
-    let breath = 0.032 * lfo(t, 0.62, channel_index * 0.43);
-    let consonants = 0.035 * lfo(t, 5.4, channel_index);
-    let level = (floor + range * (syllables / 1.8).min(1.0) + breath + consonants).clamp(0.08, 0.9);
-    let side_offset = 0.025 * lfo(t, 1.7, channel_index * 0.25);
-    (level, (level * 0.88 + side_offset).clamp(0.05, 0.86))
+fn real_speech_profile_at(seconds: f64, detector: SimulatedMeterDetector) -> f64 {
+    match detector {
+        SimulatedMeterDetector::Body => real_speech_body_level_at(seconds),
+        SimulatedMeterDetector::Peak => real_speech_peak_level_at(seconds),
+    }
+}
+
+fn recorded_speech_pair(
+    t: f64,
+    channel_index: f64,
+    gain: f64,
+    detector: SimulatedMeterDetector,
+) -> (f64, f64) {
+    let offset = channel_index * 11.9;
+    let left = real_speech_profile_at(t + offset, detector) * gain;
+    let right = real_speech_profile_at(t + offset + 0.11, detector) * gain * 0.96;
+
+    (left.clamp(0.0, 0.96), right.clamp(0.0, 0.96))
+}
+
+fn recorded_program_pair(
+    t: f64,
+    channel_index: f64,
+    gain: f64,
+    detector: SimulatedMeterDetector,
+) -> (f64, f64) {
+    let offset = channel_index * 4.7;
+    let host = real_speech_profile_at(t + offset, detector);
+    let guest = real_speech_profile_at(t + offset + 23.0, detector);
+    let remote = real_speech_profile_at(t + offset + 51.0, detector);
+    let host_right = real_speech_profile_at(t + offset + 1.3, detector);
+    let guest_right = real_speech_profile_at(t + offset + 24.8, detector);
+    let bed = 0.006;
+    let left = bed + gain * (host * 0.72 + guest * 0.34 + remote * 0.08);
+    let right = bed + gain * (host_right * 0.62 + guest_right * 0.42 + remote * 0.07);
+
+    (left.clamp(0.0, 0.96), right.clamp(0.0, 0.96))
 }
 
 fn pulse(phase: f64, center: f64, width: f64) -> f64 {
@@ -879,14 +1113,22 @@ fn default_mix_levels(main: f64, role: &str) -> HashMap<String, f64> {
 }
 
 pub fn read_default_audio_inventory(config: &AudioBackendConfig) -> AudioBackendInventory {
-    SimulatedAudioBackend.read_inventory(config)
+    if config.metering_source == SIMULATED_AUDIO_SOURCE {
+        SimulatedAudioBackend.read_inventory(config)
+    } else {
+        RmeTotalMixOscBackend.read_inventory(config)
+    }
 }
 
 pub fn sync_default_audio_console(
     config: &AudioBackendConfig,
     inventory: &AudioBackendInventory,
 ) -> Result<AudioSyncOutcome, String> {
-    SimulatedAudioBackend.sync_console(config, inventory)
+    if config.metering_source == SIMULATED_AUDIO_SOURCE {
+        SimulatedAudioBackend.sync_console(config, inventory)
+    } else {
+        RmeTotalMixOscBackend.sync_console(config, inventory)
+    }
 }
 
 pub fn recall_default_audio_snapshot(
@@ -894,7 +1136,11 @@ pub fn recall_default_audio_snapshot(
     inventory: &AudioBackendInventory,
     snapshot_id: &str,
 ) -> Result<AudioSnapshotRecallOutcome, String> {
-    SimulatedAudioBackend.recall_snapshot(config, inventory, snapshot_id)
+    if config.metering_source == SIMULATED_AUDIO_SOURCE {
+        SimulatedAudioBackend.recall_snapshot(config, inventory, snapshot_id)
+    } else {
+        RmeTotalMixOscBackend.recall_snapshot(config, inventory, snapshot_id)
+    }
 }
 
 pub fn update_default_audio_channel(
@@ -902,7 +1148,11 @@ pub fn update_default_audio_channel(
     inventory: &AudioBackendInventory,
     request: &AudioChannelUpdateRequest,
 ) -> Result<AudioChannelUpdateOutcome, String> {
-    SimulatedAudioBackend.update_channel(config, inventory, request)
+    if config.metering_source == SIMULATED_AUDIO_SOURCE {
+        SimulatedAudioBackend.update_channel(config, inventory, request)
+    } else {
+        RmeTotalMixOscBackend.update_channel(config, inventory, request)
+    }
 }
 
 pub fn update_default_audio_mix_target(
@@ -910,7 +1160,23 @@ pub fn update_default_audio_mix_target(
     inventory: &AudioBackendInventory,
     request: &AudioMixTargetUpdateRequest,
 ) -> Result<AudioMixTargetUpdateOutcome, String> {
-    SimulatedAudioBackend.update_mix_target(config, inventory, request)
+    if config.metering_source == SIMULATED_AUDIO_SOURCE {
+        SimulatedAudioBackend.update_mix_target(config, inventory, request)
+    } else {
+        RmeTotalMixOscBackend.update_mix_target(config, inventory, request)
+    }
+}
+
+pub fn update_default_audio_eq(
+    config: &AudioBackendConfig,
+    inventory: &AudioBackendInventory,
+    request: &AudioEqUpdateRequest,
+) -> Result<AudioEqUpdateOutcome, String> {
+    if config.metering_source == SIMULATED_AUDIO_SOURCE {
+        SimulatedAudioBackend.update_eq(config, inventory, request)
+    } else {
+        RmeTotalMixOscBackend.update_eq(config, inventory, request)
+    }
 }
 
 #[cfg(test)]
@@ -922,6 +1188,7 @@ mod tests {
             send_host: String::from("127.0.0.1"),
             send_port: 7001,
             receive_port: 9001,
+            metering_source: String::from(SIMULATED_AUDIO_SOURCE),
         }
     }
 
@@ -931,6 +1198,7 @@ mod tests {
             send_host: String::new(),
             send_port: 0,
             receive_port: 0,
+            metering_source: String::from(SIMULATED_AUDIO_SOURCE),
         });
 
         assert_eq!(inventory.adapter_mode, "simulated");
@@ -1021,5 +1289,167 @@ mod tests {
 
         assert!(outcome.summary.contains("Main Out"));
         assert!(outcome.summary.contains("dim -> on"));
+    }
+
+    #[test]
+    fn simulated_meter_seed_does_not_quantize_thirty_hz_motion() {
+        let base_epoch_ms = 1_768_563_000_000.0;
+        let mut previous_level: Option<f64> = None;
+        let mut current_unchanged_run = 0;
+        let mut longest_unchanged_run = 0;
+
+        for tick in 0..90 {
+            let (level, _) = simulated_body_level_pair_at(
+                base_epoch_ms + f64::from(tick) * 33.0,
+                "audio-input-9",
+                "front-preamp",
+                false,
+            );
+            if previous_level.is_some_and(|previous| (previous - level).abs() < 0.000_001) {
+                current_unchanged_run += 1;
+                longest_unchanged_run = longest_unchanged_run.max(current_unchanged_run);
+            } else {
+                current_unchanged_run = 0;
+            }
+            previous_level = Some(level);
+        }
+
+        assert!(
+            longest_unchanged_run <= 3,
+            "simulated meter body should not hold the exact same value for long 30 Hz runs; longest unchanged run was {longest_unchanged_run}"
+        );
+    }
+
+    #[test]
+    fn simulated_front_preamp_meter_has_speech_like_dynamics_and_pauses() {
+        let levels = sampled_meter_levels("audio-input-9", "front-preamp", false, 60_000.0);
+        let p05 = percentile(&levels, 0.05);
+        let p50 = percentile(&levels, 0.50);
+        let p95 = percentile(&levels, 0.95);
+        let low_count = levels.iter().filter(|level| **level <= 0.018).count();
+        let hot_count = levels.iter().filter(|level| **level >= 0.50).count();
+
+        assert!(
+            p05 < 0.04,
+            "speech simulation should regularly fall back toward room/noise-floor levels; p05={p05:.3}"
+        );
+        assert!(
+            p95 > 0.10 && p95 < 0.22,
+            "speech simulation should produce a true RMS speech body without behaving like pinned program audio; p95={p95:.3}"
+        );
+        assert!(
+            p50 > 0.04 && p50 < 0.14,
+            "speech simulation should sit in a plausible spoken-word RMS body range; p50={p50:.3}"
+        );
+        assert!(
+            low_count * 20 > levels.len(),
+            "speech simulation should include real rests and low-level gaps; low_count={low_count}, total={}",
+            levels.len()
+        );
+        assert!(
+            hot_count * 20 < levels.len(),
+            "speech simulation should almost never sit at -6 dBFS or hotter; hot_count={hot_count}, total={}",
+            levels.len()
+        );
+    }
+
+    #[test]
+    fn simulated_program_playback_has_stereo_width_without_meter_lockstep() {
+        let base_epoch_ms = 1_768_563_000_000.0;
+        let mut left_levels = Vec::new();
+        let mut right_levels = Vec::new();
+
+        for tick in 0..900 {
+            let (left, right) = simulated_body_level_pair_at(
+                base_epoch_ms + f64::from(tick) * 33.0,
+                "audio-playback-1-2",
+                "playback-pair",
+                true,
+            );
+            left_levels.push(left);
+            right_levels.push(right);
+        }
+
+        let median_side_delta = median(
+            left_levels
+                .iter()
+                .zip(&right_levels)
+                .map(|(left, right)| (left - right).abs())
+                .collect(),
+        );
+        assert!(
+            median_side_delta > 0.025,
+            "stereo program simulation should not move as two locked mono bars"
+        );
+        assert!(
+            correlation(&left_levels, &right_levels) < 0.985,
+            "stereo program simulation should have related but not identical channel movement"
+        );
+    }
+
+    #[test]
+    fn simulated_peak_hold_falls_in_db_after_fairlight_hold_window() {
+        let raw = 0.80;
+        let body = 0.01;
+        let held = fairlight_held_peak_at_age(raw, body, FAIRLIGHT_PEAK_HOLD_MS);
+        let decayed = fairlight_held_peak_at_age(raw, body, FAIRLIGHT_PEAK_HOLD_MS + 1_000.0);
+
+        assert!((held - raw).abs() < 0.000_001);
+        assert!(
+            (normalized_to_dbfs(decayed) - (normalized_to_dbfs(raw) - 20.0)).abs() < 0.001,
+            "peak hold should fall by 20 dB after one second past the hold window"
+        );
+    }
+
+    fn sampled_meter_levels(id: &str, role: &str, stereo: bool, duration_ms: f64) -> Vec<f64> {
+        let base_epoch_ms = 1_768_563_000_000.0;
+        let ticks = (duration_ms / 33.0).round() as i32;
+        (0..ticks)
+            .map(|tick| {
+                let (left, right) = simulated_body_level_pair_at(
+                    base_epoch_ms + f64::from(tick) * 33.0,
+                    id,
+                    role,
+                    stereo,
+                );
+                left.max(right)
+            })
+            .collect()
+    }
+
+    fn percentile(levels: &[f64], quantile: f64) -> f64 {
+        let mut sorted = levels.to_vec();
+        sorted.sort_by(f64::total_cmp);
+        let index = ((sorted.len() - 1) as f64 * quantile).round() as usize;
+        sorted[index]
+    }
+
+    fn median(levels: Vec<f64>) -> f64 {
+        percentile(&levels, 0.5)
+    }
+
+    fn correlation(left: &[f64], right: &[f64]) -> f64 {
+        let left_mean = left.iter().sum::<f64>() / left.len() as f64;
+        let right_mean = right.iter().sum::<f64>() / right.len() as f64;
+        let covariance = left
+            .iter()
+            .zip(right)
+            .map(|(left, right)| (left - left_mean) * (right - right_mean))
+            .sum::<f64>()
+            / left.len() as f64;
+        let left_std = (left
+            .iter()
+            .map(|level| (level - left_mean).powi(2))
+            .sum::<f64>()
+            / left.len() as f64)
+            .sqrt();
+        let right_std = (right
+            .iter()
+            .map(|level| (level - right_mean).powi(2))
+            .sum::<f64>()
+            / right.len() as f64)
+            .sqrt();
+
+        covariance / (left_std * right_std)
     }
 }
