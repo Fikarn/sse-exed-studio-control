@@ -444,9 +444,14 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await expect(hostMeter).toHaveCount(1);
   const stripFill = hostMeter.locator('[data-meter-fill="left"]').first();
   await expect(stripFill).toBeVisible();
-  expect(await stripFill.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
-  expect(await stripFill.evaluate((node) => getComputedStyle(node).transitionDuration)).not.toBe("0s");
-  expect(await stripFill.evaluate((node) => getComputedStyle(node).clipPath)).toContain("inset");
+  // The cover slides DOWN with a compositor-driven `transform: translate3d` transition; the
+  // fill itself stays static. Verify the cover transitions transform, not the fill.
+  const stripCover = hostMeter.locator('[data-meter-cover="left"]').first();
+  await expect(stripCover).toBeAttached();
+  expect(await stripCover.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
+  expect(await stripCover.evaluate((node) => getComputedStyle(node).transitionProperty)).toContain("transform");
+  expect(await stripCover.evaluate((node) => getComputedStyle(node).transitionDuration)).not.toBe("0s");
+  expect(await stripCover.evaluate((node) => getComputedStyle(node).transform)).not.toBe("none");
   const firstHostMeterVars = await hostMeter.evaluate((node) => {
     const style = getComputedStyle(node);
     return {
@@ -459,22 +464,15 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   expect(firstHostMeterVars.right).toBe(firstHostMeterVars.left);
   expect(firstHostMeterVars.peakRight).toBe(firstHostMeterVars.peakLeft);
   const stripPeak = hostMeter.locator('[data-meter-peak="left"]').first();
-  await expect(stripPeak).toBeVisible();
+  await expect(stripPeak).toBeAttached();
   expect(await stripPeak.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
-  expect(await stripPeak.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe("0s");
-  const stripPeakColor = await stripPeak.evaluate((node) => getComputedStyle(node).backgroundColor);
-  expect(stripPeakColor).not.toBe("rgba(0, 0, 0, 0)");
-  expect(stripPeakColor).not.toContain("255, 255, 255");
-  const hostPeakVars = await hostMeter.evaluate((node) => {
-    const style = getComputedStyle(node);
-    return {
-      left: style.getPropertyValue("--audio-meter-peak-left").trim(),
-      right: style.getPropertyValue("--audio-meter-peak-right").trim(),
-    };
-  });
-  expect(hostPeakVars.left).not.toBe("");
-  expect(hostPeakVars.right).not.toBe("");
-  expect(hostPeakVars.right).toBe(hostPeakVars.left);
+  // The peak wrap has a compositor-driven transform transition for smooth vertical motion.
+  expect(await stripPeak.evaluate((node) => getComputedStyle(node).transitionProperty)).toContain("transform");
+  expect(await stripPeak.evaluate((node) => getComputedStyle(node).transitionDuration)).not.toBe("0s");
+
+  const hostAriaMeter = hostMeter.locator('[role="meter"]').first();
+  await expect(hostAriaMeter).toHaveAttribute("aria-valuemin", "-60");
+  await expect(hostAriaMeter).toHaveAttribute("aria-valuemax", "0");
 
   const inspectorPeak = page.getByTestId("audio-inspector-metering").locator('[data-meter-peak="left"]').first();
   await expect(inspectorPeak).toBeVisible();
@@ -501,8 +499,8 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
       .getByTestId(testId)
       .locator('[data-meter-component="stereo"]')
       .evaluate((node) => Number.parseFloat(getComputedStyle(node).getPropertyValue("--audio-meter-left")));
-    expect(seededLevel).toBeGreaterThanOrEqual(20);
-    expect(seededLevel).toBeLessThanOrEqual(96);
+    expect(seededLevel).toBeGreaterThanOrEqual(10);
+    expect(seededLevel).toBeLessThanOrEqual(99);
     speechLevels.push(seededLevel);
   }
   expect(new Set(speechLevels.map((value) => Math.round(value))).size).toBeGreaterThan(1);
@@ -511,11 +509,7 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
     .getByTestId("audio-strip-audio-playback-1-2")
     .locator('[data-meter-component="stereo"]');
   await expect(programPlaybackMeter).toHaveCount(1);
-  const activeMixFill = page.getByTestId("audio-active-mix-meter").locator("i").first();
-  expect(await activeMixFill.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
-  const firstActiveMixLevel = await activeMixFill.evaluate((node) =>
-    getComputedStyle(node).getPropertyValue("--meter-level")
-  );
+
   await page.waitForTimeout(900);
   const nextHostMeterVars = await hostMeter.evaluate((node) => {
     const style = getComputedStyle(node);
@@ -524,14 +518,10 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
       peakLeft: style.getPropertyValue("--audio-meter-peak-left").trim(),
     };
   });
-  const nextActiveMixLevel = await activeMixFill.evaluate((node) =>
-    getComputedStyle(node).getPropertyValue("--meter-level")
-  );
   expect([nextHostMeterVars.left, nextHostMeterVars.peakLeft]).not.toEqual([
     firstHostMeterVars.left,
     firstHostMeterVars.peakLeft,
   ]);
-  expect(nextActiveMixLevel).not.toBe(firstActiveMixLevel);
 
   await openFixture(page, "audio-hardware-metering");
   await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveCount(0);

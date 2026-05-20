@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent as ReactMouseEvent, RefObject } from "react";
+import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "../AudioWorkspace.module.css";
@@ -10,10 +10,6 @@ import { AudioTieredMixer } from "./AudioTieredMixer";
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
-
-function meterLevelPercent(value: number) {
-  return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
-}
 
 export function AudioSignalCanvas({
   busyAction,
@@ -137,13 +133,6 @@ export function AudioSignalCanvas({
           <span>
             <strong>{viewModel.activeMixReadout.lufs}</strong> LUFS-i
           </span>
-        </div>
-        <span className={styles.canvasSpacer} />
-        <div className={styles.canvasActiveMixMeter} aria-label="Active mix level" data-testid="audio-active-mix-meter">
-          <span>Active mix</span>
-          <i style={{ "--meter-level": meterLevelPercent(viewModel.activeMixReadout.meterLeft) } as CSSProperties} />
-          <i style={{ "--meter-level": meterLevelPercent(viewModel.activeMixReadout.meterRight) } as CSSProperties} />
-          <strong>{viewModel.activeMixReadout.db}</strong>
         </div>
         <span className={styles.canvasSpacer} />
         <span className={styles.canvasBarLabel}>Density</span>

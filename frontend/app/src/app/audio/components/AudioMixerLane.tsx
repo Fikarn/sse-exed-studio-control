@@ -143,6 +143,8 @@ export function AudioChannelLane({
       <div className={styles.laneBody}>
         <LiveAudioStereoMeter
           channelId={channel.id}
+          label={`${channel.name} meter`}
+          stereo={channel.stereo}
           showPeakReadout={supportsPreamp || channel.role === "playback-pair"}
           showReadout={false}
           showScale
@@ -260,7 +262,13 @@ export function AudioOutputLane({
       </div>
 
       <div className={styles.outputBody}>
-        <LiveAudioStereoMeter mixTargetId={mixTarget.id} showReadout={false} showScale />
+        <LiveAudioStereoMeter
+          mixTargetId={mixTarget.id}
+          label={`${mixTarget.name} meter`}
+          stereo={!mixTarget.mono}
+          showReadout={false}
+          showScale
+        />
         <AudioFader
           disabled={!actionsAllowed}
           label={`${mixTarget.name} output level`}

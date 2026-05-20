@@ -7,29 +7,170 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const SIMULATED_AUDIO_METER_CHANNELS: &[(&str, &str, bool)] = &[
-    ("audio-input-9", "front-preamp", false),
-    ("audio-input-10", "front-preamp", false),
-    ("audio-input-11", "front-preamp", false),
-    ("audio-input-12", "front-preamp", false),
-    ("audio-input-1", "rear-line", false),
-    ("audio-input-2", "rear-line", false),
-    ("audio-input-3", "rear-line", false),
-    ("audio-input-4", "rear-line", false),
-    ("audio-input-5", "rear-line", false),
-    ("audio-input-6", "rear-line", false),
-    ("audio-input-7", "rear-line", false),
-    ("audio-input-8", "rear-line", false),
-    ("audio-playback-1-2", "playback-pair", true),
-    ("audio-playback-3-4", "playback-pair", true),
-    ("audio-playback-5-6", "playback-pair", true),
-    ("audio-playback-7-8", "playback-pair", true),
-    ("audio-playback-9-10", "playback-pair", true),
-    ("audio-playback-11-12", "playback-pair", true),
+struct SimulatedMeterChannel {
+    id: &'static str,
+    role: &'static str,
+    stereo: bool,
+    fader: f64,
+    mute: bool,
+}
+
+const SIMULATED_AUDIO_METER_CHANNELS: &[SimulatedMeterChannel] = &[
+    SimulatedMeterChannel {
+        id: "audio-input-9",
+        role: "front-preamp",
+        stereo: false,
+        fader: 0.78,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-10",
+        role: "front-preamp",
+        stereo: false,
+        fader: 0.78,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-11",
+        role: "front-preamp",
+        stereo: false,
+        fader: 0.76,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-12",
+        role: "front-preamp",
+        stereo: false,
+        fader: 0.76,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-1",
+        role: "rear-line",
+        stereo: false,
+        fader: 0.68,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-2",
+        role: "rear-line",
+        stereo: false,
+        fader: 0.68,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-3",
+        role: "rear-line",
+        stereo: false,
+        fader: 0.66,
+        mute: true,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-4",
+        role: "rear-line",
+        stereo: false,
+        fader: 0.66,
+        mute: true,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-5",
+        role: "rear-line",
+        stereo: false,
+        fader: 0.64,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-6",
+        role: "rear-line",
+        stereo: false,
+        fader: 0.64,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-7",
+        role: "rear-line",
+        stereo: false,
+        fader: 0.62,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-input-8",
+        role: "rear-line",
+        stereo: false,
+        fader: 0.62,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-playback-1-2",
+        role: "playback-pair",
+        stereo: true,
+        fader: 0.58,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-playback-3-4",
+        role: "playback-pair",
+        stereo: true,
+        fader: 0.56,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-playback-5-6",
+        role: "playback-pair",
+        stereo: true,
+        fader: 0.54,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-playback-7-8",
+        role: "playback-pair",
+        stereo: true,
+        fader: 0.52,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-playback-9-10",
+        role: "playback-pair",
+        stereo: true,
+        fader: 0.52,
+        mute: false,
+    },
+    SimulatedMeterChannel {
+        id: "audio-playback-11-12",
+        role: "playback-pair",
+        stereo: true,
+        fader: 0.50,
+        mute: false,
+    },
 ];
 
-const SIMULATED_AUDIO_METER_MIX_TARGETS: &[&str] =
-    &["audio-mix-main", "audio-mix-phones-a", "audio-mix-phones-b"];
+struct SimulatedMeterMixTarget {
+    id: &'static str,
+    volume: f64,
+    mono: bool,
+    mute: bool,
+}
+
+const SIMULATED_AUDIO_METER_MIX_TARGETS: &[SimulatedMeterMixTarget] = &[
+    SimulatedMeterMixTarget {
+        id: "audio-mix-main",
+        volume: 0.82,
+        mono: false,
+        mute: false,
+    },
+    SimulatedMeterMixTarget {
+        id: "audio-mix-phones-a",
+        volume: 0.64,
+        mono: false,
+        mute: false,
+    },
+    SimulatedMeterMixTarget {
+        id: "audio-mix-phones-b",
+        volume: 0.71,
+        mono: false,
+        mute: false,
+    },
+];
 
 pub struct AudioBackendConfig {
     pub send_host: String,
@@ -51,6 +192,8 @@ struct AudioMeterFrame {
     peak_hold: f64,
     peak_hold_left: f64,
     peak_hold_right: f64,
+    raw_left: f64,
+    raw_right: f64,
     clip: bool,
 }
 
@@ -637,14 +780,24 @@ pub fn build_simulated_audio_meters_payload() -> Value {
         .map(|duration| duration.as_millis() as u64)
         .unwrap_or(0);
 
-    let channels: Vec<Value> = SIMULATED_AUDIO_METER_CHANNELS
+    let channel_frames: Vec<(&SimulatedMeterChannel, AudioMeterFrame)> =
+        SIMULATED_AUDIO_METER_CHANNELS
+            .iter()
+            .map(|channel| {
+                (
+                    channel,
+                    simulated_meter_frame(channel.id, channel.role, channel.stereo),
+                )
+            })
+            .collect();
+
+    let channels: Vec<Value> = channel_frames
         .iter()
-        .map(|(id, role, stereo)| {
-            let frame = simulated_meter_frame(id, role, *stereo);
+        .map(|(channel, frame)| {
             json!({
-                "id": id,
-                "l": frame.meter_left,
-                "r": frame.meter_right,
+                "id": channel.id,
+                "l": frame.raw_left,
+                "r": frame.raw_right,
                 "peakL": frame.peak_hold_left,
                 "peakR": frame.peak_hold_right,
                 "clip": frame.clip,
@@ -654,14 +807,26 @@ pub fn build_simulated_audio_meters_payload() -> Value {
 
     let mix_targets: Vec<Value> = SIMULATED_AUDIO_METER_MIX_TARGETS
         .iter()
-        .map(|id| {
+        .map(|mix_target| {
+            if mix_target.mute {
+                return json!({
+                    "id": mix_target.id,
+                    "l": 0.0,
+                    "r": 0.0,
+                    "peakL": 0.0,
+                    "peakR": 0.0,
+                    "clip": false,
+                });
+            }
+            let (raw_l, raw_r, peak_l, peak_r, clip) =
+                mix_target_meter_levels(mix_target, &channel_frames);
             json!({
-                "id": id,
-                "l": 0.0,
-                "r": 0.0,
-                "peakL": 0.0,
-                "peakR": 0.0,
-                "clip": false,
+                "id": mix_target.id,
+                "l": raw_l,
+                "r": raw_r,
+                "peakL": peak_l,
+                "peakR": peak_r,
+                "clip": clip,
             })
         })
         .collect();
@@ -673,11 +838,69 @@ pub fn build_simulated_audio_meters_payload() -> Value {
     })
 }
 
+fn mix_target_meter_levels(
+    mix_target: &SimulatedMeterMixTarget,
+    channel_frames: &[(&SimulatedMeterChannel, AudioMeterFrame)],
+) -> (f64, f64, f64, f64, bool) {
+    let mut raw_left_energy = 0.0_f64;
+    let mut raw_right_energy = 0.0_f64;
+    let mut peak_left_energy = 0.0_f64;
+    let mut peak_right_energy = 0.0_f64;
+    let mut clip = false;
+    for (channel, frame) in channel_frames {
+        if channel.mute {
+            continue;
+        }
+        let send_level = mix_send_for(channel, mix_target.id);
+        if send_level <= 0.01 {
+            continue;
+        }
+        let gain = (send_level * mix_target.volume * 0.5).clamp(0.0, 1.0);
+        raw_left_energy += (frame.raw_left * gain).powi(2);
+        raw_right_energy += (frame.raw_right * gain).powi(2);
+        peak_left_energy += (frame.peak_hold_left * gain).powi(2);
+        peak_right_energy += (frame.peak_hold_right * gain).powi(2);
+        if frame.clip {
+            clip = true;
+        }
+    }
+    let mut raw_l = raw_left_energy.sqrt().clamp(0.0, 0.99);
+    let mut raw_r = raw_right_energy.sqrt().clamp(0.0, 0.99);
+    let mut peak_l = peak_left_energy.sqrt().clamp(0.0, 1.0).max(raw_l);
+    let mut peak_r = peak_right_energy.sqrt().clamp(0.0, 1.0).max(raw_r);
+    if mix_target.mono {
+        let mono_raw = ((raw_l + raw_r) * 0.5).clamp(0.0, 0.99);
+        raw_l = mono_raw;
+        raw_r = mono_raw;
+        let mono_peak = peak_l.max(peak_r);
+        peak_l = mono_peak;
+        peak_r = mono_peak;
+    }
+    (raw_l, raw_r, peak_l, peak_r, clip)
+}
+
+fn mix_send_for(channel: &SimulatedMeterChannel, mix_target_id: &str) -> f64 {
+    let (phones_a_pad, phones_b_pad) = if channel.role == "playback-pair" {
+        (0.04, 0.08)
+    } else {
+        (0.06, 0.10)
+    };
+    let value = match mix_target_id {
+        "audio-mix-main" => channel.fader,
+        "audio-mix-phones-a" => channel.fader - phones_a_pad,
+        "audio-mix-phones-b" => channel.fader - phones_b_pad,
+        _ => 0.0,
+    };
+    value.clamp(0.0, 1.0)
+}
+
 fn simulated_meter_frame(id: &str, role: &str, stereo: bool) -> AudioMeterFrame {
     let elapsed_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as f64)
         .unwrap_or(0.0);
+    let (raw_left_value, raw_right_value) =
+        simulated_raw_level_pair_at(elapsed_ms, id, role, stereo);
     let (meter_left, meter_right) = simulated_body_level_pair_at(elapsed_ms, id, role, stereo);
     let meter_level = meter_left.max(meter_right);
     let (peak_hold_left, peak_hold_right) =
@@ -692,6 +915,12 @@ fn simulated_meter_frame(id: &str, role: &str, stereo: bool) -> AudioMeterFrame 
         peak_hold,
         peak_hold_left,
         peak_hold_right,
+        raw_left: raw_left_value.clamp(0.0, 0.99),
+        raw_right: if stereo {
+            raw_right_value.clamp(0.0, 0.99)
+        } else {
+            raw_left_value.clamp(0.0, 0.99)
+        },
         clip,
     }
 }

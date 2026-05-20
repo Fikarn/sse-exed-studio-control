@@ -28,6 +28,8 @@ interface AudioMeterFrame {
   peakHold: number;
   peakHoldLeft: number;
   peakHoldRight: number;
+  rawLeft: number;
+  rawRight: number;
 }
 
 interface AudioMeterState {
@@ -521,6 +523,8 @@ function simulatedMeterFrame(
     peakHold,
     peakHoldLeft,
     peakHoldRight,
+    rawLeft,
+    rawRight: stereo ? rawRight : rawLeft,
   };
 }
 
@@ -627,6 +631,8 @@ function applyFixtureMixTargetMetering(audioSnapshot: JsonObject) {
       mixTarget.peakHold = 0;
       mixTarget.peakHoldLeft = 0;
       mixTarget.peakHoldRight = 0;
+      mixTarget.rawLeft = 0;
+      mixTarget.rawRight = 0;
       continue;
     }
 
@@ -634,6 +640,8 @@ function applyFixtureMixTargetMetering(audioSnapshot: JsonObject) {
     let rightEnergy = 0;
     let peakLeftEnergy = 0;
     let peakRightEnergy = 0;
+    let rawLeftEnergy = 0;
+    let rawRightEnergy = 0;
     const mixTargetId = asString(mixTarget.id);
     for (const channel of channels) {
       if (asBoolean(channel.mute, false)) continue;
@@ -652,18 +660,24 @@ function applyFixtureMixTargetMetering(audioSnapshot: JsonObject) {
       const sourcePeakRight = stereo
         ? asNumber(channel.peakHoldRight, asNumber(channel.peakHold, sourceRight))
         : Math.max(asNumber(channel.peakHoldRight, sourceRight), asNumber(channel.peakHold, sourceRight));
+      const sourceRawLeft = stereo ? asNumber(channel.rawLeft, sourceLeft) : asNumber(channel.rawLeft, sourceLeft);
+      const sourceRawRight = stereo ? asNumber(channel.rawRight, sourceRight) : asNumber(channel.rawRight, sourceRight);
       const dimScale = asBoolean(mixTarget.dim, false) ? 0.42 : 1;
       const gain = clampNumber(sendLevel * asNumber(mixTarget.volume, 0) * dimScale * 0.5, 0, 1);
       leftEnergy += (sourceLeft * gain) ** 2;
       rightEnergy += (sourceRight * gain) ** 2;
       peakLeftEnergy += (sourcePeakLeft * gain) ** 2;
       peakRightEnergy += (sourcePeakRight * gain) ** 2;
+      rawLeftEnergy += (sourceRawLeft * gain) ** 2;
+      rawRightEnergy += (sourceRawRight * gain) ** 2;
     }
 
     let meterLeft = clampNumber(Math.sqrt(leftEnergy), 0, 0.98);
     let meterRight = clampNumber(Math.sqrt(rightEnergy), 0, 0.98);
     let peakHoldLeft = clampNumber(Math.max(meterLeft, Math.sqrt(peakLeftEnergy) * 0.98), meterLeft, 1);
     let peakHoldRight = clampNumber(Math.max(meterRight, Math.sqrt(peakRightEnergy) * 0.98), meterRight, 1);
+    let rawLeft = clampNumber(Math.sqrt(rawLeftEnergy), 0, 0.99);
+    let rawRight = clampNumber(Math.sqrt(rawRightEnergy), 0, 0.99);
     if (asBoolean(mixTarget.mono, false)) {
       const mono = clampNumber((meterLeft + meterRight) * 0.5, 0, 0.98);
       meterLeft = mono;
@@ -671,6 +685,9 @@ function applyFixtureMixTargetMetering(audioSnapshot: JsonObject) {
       const monoPeak = Math.max(mono, peakHoldLeft, peakHoldRight);
       peakHoldLeft = monoPeak;
       peakHoldRight = monoPeak;
+      const monoRaw = clampNumber((rawLeft + rawRight) * 0.5, 0, 0.99);
+      rawLeft = monoRaw;
+      rawRight = monoRaw;
     }
     const meterLevel = Math.max(meterLeft, meterRight);
     const peakHold = Math.max(meterLevel, peakHoldLeft, peakHoldRight);
@@ -680,6 +697,8 @@ function applyFixtureMixTargetMetering(audioSnapshot: JsonObject) {
     mixTarget.peakHold = peakHold;
     mixTarget.peakHoldLeft = peakHoldLeft;
     mixTarget.peakHoldRight = peakHoldRight;
+    mixTarget.rawLeft = rawLeft;
+    mixTarget.rawRight = rawRight;
   }
 
   audioSnapshot.mixTargets = mixTargets;
@@ -721,16 +740,17 @@ function buildFixtureAudioMetersPayload(state: MutableFixtureState): JsonObject 
     .map((entry) => asRecord(entry))
     .filter((entry): entry is JsonObject => entry !== null)
     .map((channel) => {
-      const left = asNumber(channel.meterLeft, 0);
-      const right = asBoolean(channel.stereo, false) ? asNumber(channel.meterRight, left) : left;
-      const peakL = asNumber(channel.peakHoldLeft, asNumber(channel.peakHold, left));
-      const peakR = asBoolean(channel.stereo, false)
-        ? asNumber(channel.peakHoldRight, asNumber(channel.peakHold, right))
-        : peakL;
+      const stereo = asBoolean(channel.stereo, false);
+      const bodyLeft = asNumber(channel.meterLeft, 0);
+      const bodyRight = stereo ? asNumber(channel.meterRight, bodyLeft) : bodyLeft;
+      const rawLeft = asNumber(channel.rawLeft, bodyLeft);
+      const rawRight = stereo ? asNumber(channel.rawRight, bodyRight) : rawLeft;
+      const peakL = asNumber(channel.peakHoldLeft, asNumber(channel.peakHold, rawLeft));
+      const peakR = stereo ? asNumber(channel.peakHoldRight, asNumber(channel.peakHold, rawRight)) : peakL;
       return {
         id: asString(channel.id),
-        l: left,
-        r: right,
+        l: rawLeft,
+        r: rawRight,
         peakL,
         peakR,
         clip: asBoolean(channel.clip, false),
@@ -740,16 +760,17 @@ function buildFixtureAudioMetersPayload(state: MutableFixtureState): JsonObject 
     .map((entry) => asRecord(entry))
     .filter((entry): entry is JsonObject => entry !== null)
     .map((mixTarget) => {
-      const left = asNumber(mixTarget.meterLeft, 0);
-      const right = asBoolean(mixTarget.mono, false) ? left : asNumber(mixTarget.meterRight, left);
-      const peakL = asNumber(mixTarget.peakHoldLeft, asNumber(mixTarget.peakHold, left));
-      const peakR = asBoolean(mixTarget.mono, false)
-        ? peakL
-        : asNumber(mixTarget.peakHoldRight, asNumber(mixTarget.peakHold, right));
+      const mono = asBoolean(mixTarget.mono, false);
+      const bodyLeft = asNumber(mixTarget.meterLeft, 0);
+      const bodyRight = mono ? bodyLeft : asNumber(mixTarget.meterRight, bodyLeft);
+      const rawLeft = asNumber(mixTarget.rawLeft, bodyLeft);
+      const rawRight = mono ? rawLeft : asNumber(mixTarget.rawRight, bodyRight);
+      const peakL = asNumber(mixTarget.peakHoldLeft, asNumber(mixTarget.peakHold, rawLeft));
+      const peakR = mono ? peakL : asNumber(mixTarget.peakHoldRight, asNumber(mixTarget.peakHold, rawRight));
       return {
         id: asString(mixTarget.id),
-        l: left,
-        r: right,
+        l: rawLeft,
+        r: rawRight,
         peakL,
         peakR,
         clip: asBoolean(mixTarget.clip, false),

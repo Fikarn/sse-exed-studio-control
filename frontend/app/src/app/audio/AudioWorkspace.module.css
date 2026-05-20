@@ -138,7 +138,6 @@
 .snapshotStatusName,
 .snapshotShortcut,
 .railCount,
-.meterReadout,
 .faderValue,
 .snapshotSlot {
   color: var(--color-text-subtle);
@@ -943,55 +942,6 @@
   font: var(--font-weight-semibold) 15px / 1 var(--font-family-display);
 }
 
-.canvasActiveMixMeter {
-  display: grid;
-  grid-template-columns: auto 64px 64px auto;
-  gap: 6px;
-  align-items: center;
-  min-width: 0;
-}
-
-.canvasActiveMixMeter span,
-.canvasActiveMixMeter strong {
-  color: var(--audio-text-muted);
-  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.canvasActiveMixMeter strong {
-  color: var(--audio-text-strong);
-  text-transform: none;
-}
-
-.canvasActiveMixMeter i {
-  --meter-level: 0%;
-  position: relative;
-  display: block;
-  height: 6px;
-  overflow: hidden;
-  border-radius: 1px;
-  background: var(--audio-meter-bg);
-  box-shadow: inset 0 0 0 1px var(--audio-border);
-}
-
-.canvasActiveMixMeter i::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    var(--audio-meter-low) 0,
-    var(--audio-meter-low-hot) 78%,
-    var(--audio-meter-warn) 78%,
-    var(--audio-meter-hot) 92%,
-    var(--audio-meter-over) 100%
-  );
-  clip-path: inset(0 calc(100% - var(--meter-level)) 0 0);
-  transition: clip-path 120ms cubic-bezier(0.2, 0, 0.1, 1);
-  will-change: clip-path;
-}
-
 .canvasWarningStack {
   flex: 0 0 auto;
   display: grid;
@@ -1605,6 +1555,7 @@
 }
 
 .stereoMeter {
+  position: relative;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
@@ -1613,116 +1564,20 @@
   min-height: 0;
 }
 
+.stereoMeter[data-show-scale="false"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .stereoMeter[data-readout="false"] {
   grid-template-rows: minmax(0, 1fr);
 }
 
-.meterPair {
-  grid-column: 2;
-  grid-row: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  min-height: 0;
-}
-
-.meterPeakReadout {
+.stereoMeter[data-stereo="false"] .meterTrack[data-mono="true"] {
   display: none;
 }
 
-.meterTrack {
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--audio-border) 84%, transparent);
-  border-radius: 2px;
-  background:
-    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 14px), var(--audio-meter-bg);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.58);
-}
-
-.meterTrack[data-tone="amber"] {
-  border-color: color-mix(in srgb, var(--audio-meter-warn) 28%, var(--audio-border));
-}
-
-.meterTrack[data-tone="red"] {
-  border-color: color-mix(in srgb, var(--audio-meter-over) 62%, var(--audio-border));
-}
-
-.meterFill {
-  position: absolute;
-  right: 2px;
-  top: 2px;
-  bottom: 2px;
-  left: 2px;
-  border-radius: 1px;
-  background: linear-gradient(
-    180deg,
-    var(--audio-meter-hot) 0 10%,
-    var(--audio-meter-warn) 10% 20%,
-    var(--audio-meter-low-hot) 20% 100%
-  );
-  transition: clip-path 120ms cubic-bezier(0.2, 0, 0.1, 1);
-  will-change: clip-path;
-}
-
-.meterTrack[data-tone="red"] .meterFill {
-  background: linear-gradient(
-    180deg,
-    var(--audio-meter-over) 0 3%,
-    var(--audio-meter-hot) 3% 12%,
-    var(--audio-meter-warn) 12% 22%,
-    var(--audio-meter-low-hot) 22% 100%
-  );
-}
-
-.meterFill[data-side="left"] {
-  clip-path: inset(calc(100% - var(--audio-meter-left)) 0 0 0);
-}
-
-.meterFill[data-side="right"] {
-  clip-path: inset(calc(100% - var(--audio-meter-right)) 0 0 0);
-}
-
-.meterPeak {
-  position: absolute;
-  right: 1px;
-  left: 1px;
-  height: 2px;
-  background: var(--audio-meter-peak-hold);
-  background-color: var(--audio-meter-peak-hold);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--audio-meter-peak-hold) 20%, transparent),
-    0 0 7px color-mix(in srgb, var(--audio-meter-peak-hold) 28%, transparent);
-}
-
-.meterPeak[data-side="left"] {
-  bottom: var(--audio-meter-peak-left);
-}
-
-.meterPeak[data-side="right"] {
-  bottom: var(--audio-meter-peak-right);
-}
-
-.stereoMeter[data-clip="true"] .meterTrack {
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.58),
-    inset 0 0 0 1px color-mix(in srgb, var(--audio-clip) 65%, transparent),
-    inset 0 0 14px color-mix(in srgb, var(--audio-clip) 20%, transparent);
-}
-
-.stereoMeter[data-clip="true"] .meterTrack::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--audio-clip) 14%, transparent);
-  pointer-events: none;
-}
-
-.meterReadout {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  text-align: center;
+.stereoMeter[data-stereo="false"] .meterPair {
+  grid-template-columns: 1fr;
 }
 
 .meterScale {
@@ -1743,25 +1598,194 @@
   white-space: nowrap;
 }
 
-.meterScale span:nth-child(1) {
-  bottom: 96%;
+.meterScale span[data-meter-scale-pos="0"] {
+  bottom: calc(100% - 2px);
   color: var(--audio-accent);
 }
 
-.meterScale span:nth-child(2) {
-  bottom: 78%;
+.meterScale span[data-meter-scale-pos="-6"] {
+  bottom: 90%;
 }
 
-.meterScale span:nth-child(3) {
+.meterScale span[data-meter-scale-pos="-12"] {
+  bottom: 80%;
+}
+
+.meterScale span[data-meter-scale-pos="-24"] {
   bottom: 60%;
 }
 
-.meterScale span:nth-child(4) {
-  bottom: 36%;
+.meterScale span[data-meter-scale-pos="-48"] {
+  bottom: 20%;
 }
 
-.meterScale span:nth-child(5) {
-  bottom: 4%;
+.meterScale span[data-meter-scale-pos="-inf"] {
+  bottom: 0%;
+}
+
+.meterPair {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  min-height: 0;
+}
+
+.stereoMeter[data-show-scale="false"] .meterPair {
+  grid-column: 1;
+}
+
+.meterTrack {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 84%, transparent);
+  border-radius: 2px;
+  background: var(--audio-meter-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.58);
+}
+
+/* Static LED-segment gradient. Always rendered at full track size; never animated.
+   The "unlit" portion is hidden by sliding the .meterCover down with `transform: translateY`
+   (compositor-accelerated). Segments stay at fixed pixel positions regardless of level. */
+.meterFill {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  border-radius: 1px;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent calc(100% / 30 - 1px),
+      rgba(0, 0, 0, 0.62) calc(100% / 30 - 1px),
+      rgba(0, 0, 0, 0.62) calc(100% / 30)
+    ),
+    linear-gradient(
+      180deg,
+      var(--audio-meter-over) 0 5%,
+      var(--audio-meter-hot) 5% 15%,
+      var(--audio-meter-warn) 15% 25%,
+      var(--audio-meter-low-hot) 25% 100%
+    );
+  pointer-events: none;
+}
+
+/* Cover slides DOWN to hide the lit portion. translateY is the most reliable compositor-safe
+   property in WebKit — animations run on the GPU, off the main thread. */
+.meterCover {
+  position: absolute;
+  inset: 2px;
+  border-radius: 1px;
+  background: var(--audio-meter-bg);
+  /* `--audio-meter-left` is a percentage string ("70%"). Multiplying a length-percentage
+     by -1 gives the negative — translateY of `-level%` slides the cover up by `level` of
+     its own height, exposing the bottom `level` of the track. */
+  transform: translate3d(0, calc(var(--audio-meter-left, 0%) * -1), 0);
+  transition: transform 80ms cubic-bezier(0.2, 0, 0.1, 1);
+  will-change: transform;
+  pointer-events: none;
+}
+
+.meterCover[data-side="right"] {
+  transform: translate3d(0, calc(var(--audio-meter-right, 0%) * -1), 0);
+}
+
+/* Peak hold sits at the top of a full-track wrapper. The wrapper is translated DOWN so the
+   line appears at `peak`% of the track from the bottom. Compositor-driven via transform. */
+.meterPeakWrap {
+  position: absolute;
+  inset: 1px;
+  pointer-events: none;
+  transform: translate3d(0, calc(100% - var(--audio-meter-peak-left, 0%)), 0);
+  transition: transform 80ms cubic-bezier(0.2, 0, 0.1, 1);
+  will-change: transform;
+}
+
+.meterPeakWrap[data-side="right"] {
+  transform: translate3d(0, calc(100% - var(--audio-meter-peak-right, 0%)), 0);
+}
+
+.meterPeak {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--audio-meter-peak-hold);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--audio-meter-peak-hold) 20%, transparent),
+    0 0 7px color-mix(in srgb, var(--audio-meter-peak-hold) 28%, transparent);
+  pointer-events: none;
+}
+
+.stereoMeter[data-clip="true"] .meterTrack {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.58),
+    inset 0 0 0 1px color-mix(in srgb, var(--audio-clip) 65%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--audio-clip) 20%, transparent);
+}
+
+.stereoMeter[data-clip="true"] .meterTrack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--audio-clip) 14%, transparent);
+  pointer-events: none;
+}
+
+.meterClipPip {
+  position: absolute;
+  top: -4px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--audio-clip);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--audio-clip) 40%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 80ms ease-out;
+}
+
+.stereoMeter[data-clip="true"] .meterClipPip {
+  opacity: 1;
+}
+
+.meterReadout {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  text-align: center;
+  color: var(--color-text-strong);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.meterPeakReadout {
+  display: none;
+}
+
+.meterAriaMirror {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meterCover,
+  .meterPeakWrap,
+  .meterClipPip {
+    transition: none;
+  }
 }
 
 .fader {
