@@ -1658,8 +1658,8 @@
   border-radius: 1px;
   background: linear-gradient(
     180deg,
-    var(--audio-meter-hot) 0 10%,
-    var(--audio-meter-warn) 10% 20%,
+    var(--audio-meter-hot) 0 5%,
+    var(--audio-meter-warn) 5% 20%,
     var(--audio-meter-low-hot) 20% 100%
   );
   transition: clip-path 120ms cubic-bezier(0.2, 0, 0.1, 1);
@@ -1669,10 +1669,9 @@
 .meterTrack[data-tone="red"] .meterFill {
   background: linear-gradient(
     180deg,
-    var(--audio-meter-over) 0 3%,
-    var(--audio-meter-hot) 3% 12%,
-    var(--audio-meter-warn) 12% 22%,
-    var(--audio-meter-low-hot) 22% 100%
+    var(--audio-meter-over) 0 5%,
+    var(--audio-meter-hot) 5% 20%,
+    var(--audio-meter-warn) 20% 100%
   );
 }
 
@@ -1744,24 +1743,30 @@
 }
 
 .meterScale span:nth-child(1) {
-  bottom: 96%;
+  bottom: calc(100% - 3px);
   color: var(--audio-accent);
+  transform: translateY(100%);
 }
 
 .meterScale span:nth-child(2) {
-  bottom: 78%;
+  bottom: calc(90% - 2.4px);
 }
 
 .meterScale span:nth-child(3) {
-  bottom: 60%;
+  bottom: calc(80% - 1.8px);
 }
 
 .meterScale span:nth-child(4) {
-  bottom: 36%;
+  bottom: calc(60% - 0.6px);
 }
 
 .meterScale span:nth-child(5) {
-  bottom: 4%;
+  bottom: calc(20% + 1.8px);
+}
+
+.meterScale span:nth-child(6) {
+  bottom: 3px;
+  transform: translateY(0);
 }
 
 .fader {
