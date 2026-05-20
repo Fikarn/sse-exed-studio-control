@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import styles from "../../AudioWorkspace.module.css";
+import styles from "../AudioInspector.module.css";
 import { formatAudioDb } from "../../audioFormatting";
 import type { AudioMixTargetEntry } from "../../../shellData";
 import { selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../../audioViewModel";

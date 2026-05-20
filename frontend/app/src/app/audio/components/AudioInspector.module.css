@@ -1,0 +1,1537 @@
+/* AudioInspector module — extracted from AudioWorkspace.module.css (Slice 5A).
+ * Hosts every CSS rule that paints the right-rail inspector and its tabs:
+ * channel header, EQ, dynamics, sends, output view, and overview cards.
+ * The shared shellPanel surface and eyebrow eyebrow typography are composed
+ * back from the workspace module so colour/border/typography stay
+ * single-sourced. */
+
+.inspector {
+  composes: shellPanel from "../AudioWorkspace.module.css";
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+
+.inspector::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--audio-accent) 54%, transparent),
+    transparent
+  );
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.eyebrow {
+  composes: eyebrow from "../AudioWorkspace.module.css";
+}
+
+/* Inspector heading + subheading typography. The shell previously combined
+   these with `.inspectorHeader h2` (legacy DOM that is no longer rendered)
+   so this module keeps just the surfaces still in use. */
+.outputInspector h3,
+.emptyInspector h3,
+.placeholderPanel h3 {
+  margin: 3px 0 0;
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-sm, 18px) / 1.12 var(--font-family-display);
+  letter-spacing: 0;
+}
+
+.placeholderPanel p,
+.emptyInspector p {
+  margin: 2px 0 0;
+  color: var(--color-text-muted);
+  font: var(--font-weight-regular) var(--operator-font-size-sm, 13px) / 1.35 var(--font-family-ui);
+  letter-spacing: 0;
+}
+
+.inspectorTabs button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.inspectorPfl {
+  min-width: 46px;
+  min-height: 30px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 78%, transparent);
+  color: var(--color-text-subtle);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.inspectorTabs {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--audio-border);
+  border-radius: 8px 8px 0 0;
+  background: var(--audio-panel-soft);
+  overflow: hidden;
+}
+
+.inspectorOutputTabs {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.inspectorTabs button {
+  position: relative;
+  min-height: 38px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.inspectorTabs button[data-active="true"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--audio-accent) 28%, transparent), transparent);
+  color: var(--audio-text-strong);
+}
+
+.inspectorTabs button:disabled,
+.inspectorTabs button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.inspectorTabs button[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: var(--audio-accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--audio-accent) 62%, transparent);
+}
+
+.inspectorSticky {
+  display: grid;
+  gap: 5px;
+  padding: 6px 12px 7px;
+  border-bottom: 1px solid var(--audio-border);
+  background: linear-gradient(180deg, var(--audio-panel), var(--audio-panel-soft));
+}
+
+.inspectorEyebrowRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.inspectorTagRow {
+  display: inline-flex;
+  gap: 5px;
+}
+
+.inspectorTag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 7px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-card) 70%, transparent);
+  color: var(--audio-text-default);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  text-transform: uppercase;
+}
+
+.inspectorTag[data-group="talent"] {
+  color: var(--audio-group-talent);
+}
+
+.inspectorTag[data-group="line"] {
+  color: var(--audio-group-line);
+}
+
+.inspectorTag[data-group="bed"] {
+  color: var(--audio-group-bed);
+}
+
+.inspectorTag[data-group="fx"] {
+  color: var(--audio-group-fx);
+}
+
+.inspectorTag[data-group="output"] {
+  color: var(--audio-accent);
+}
+
+.inspectorTitle {
+  margin: 0;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 24px / 1.02 var(--font-family-display);
+  letter-spacing: 0;
+  text-shadow: 0 0 22px color-mix(in srgb, var(--audio-accent) 30%, transparent);
+}
+
+.inspectorSubtitle {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-regular) 12px / 1.25 var(--font-family-ui);
+  letter-spacing: 0;
+}
+
+.inspectorSubtitle strong {
+  color: var(--audio-text-strong);
+  font-weight: var(--font-weight-medium);
+}
+
+.bigMeterCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: var(--audio-panel-strong);
+}
+
+/* Inspector relies on the shared AudioStereoMeter component (whose class lives
+   in the shell module). Selector by attribute (data-meter-component) is
+   resilient to CSS-module hashing across files. */
+.bigMeterCard [data-meter-component="stereo"] {
+  width: 58px;
+  min-height: 48px;
+}
+
+.bigMeterInfo {
+  display: grid;
+  gap: 6px;
+  align-content: space-between;
+  min-width: 0;
+}
+
+.bigMeterInfo .meterSimulationBadge {
+  justify-self: start;
+  min-height: 17px;
+  padding: 0 6px;
+}
+
+.bigMeterRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bigMeterReferenceRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding-top: 2px;
+  border-top: 1px solid color-mix(in srgb, var(--audio-border) 62%, transparent);
+}
+
+.bigMeterRow span,
+.bigMeterReferenceRow span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bigMeterRow small,
+.bigMeterReferenceRow small,
+.inspectorFaderHead span,
+.inspectorFaderTicks,
+.graphCardHead,
+.detailGrid small,
+.sendCardTag {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.bigMeterRow strong {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 15px / 1 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bigMeterReferenceRow strong {
+  color: var(--audio-text-default);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+}
+
+.bigMeterRow strong[data-tone="warn"] {
+  color: var(--audio-meter-warn);
+}
+
+.bigMeterRow strong[data-tone="clip"] {
+  color: var(--audio-clip);
+}
+
+.bigMeterRow em,
+.bigMeterReferenceRow em {
+  margin-left: 2px;
+  color: var(--audio-text-subtle);
+  font-style: normal;
+  font-weight: var(--font-weight-regular);
+}
+
+.inspectorFaderCard {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: var(--audio-panel-strong);
+}
+
+.inspectorFaderHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inspectorFaderHead span strong {
+  color: var(--audio-accent);
+}
+
+.inspectorFaderHead > strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 18px / 1 var(--font-family-display);
+}
+
+.inspectorFaderTicks {
+  display: flex;
+  justify-content: space-between;
+  color: var(--audio-text-subtle);
+  font-size: 9px;
+  text-transform: none;
+}
+
+.inspectorPanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 4px 12px 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Inspector send slider tweaks the shared :global(.sliderControl). */
+.inspectorSendSlider[data-orientation="horizontal"] {
+  height: 22px;
+}
+
+.inspectorSendSlider[data-orientation="horizontal"] :global(.sliderTrack) {
+  top: 8px;
+  bottom: 8px;
+  border-color: color-mix(in srgb, var(--audio-accent) 36%, var(--audio-border));
+  background: var(--audio-meter-bg);
+}
+
+.inspectorSendSlider[data-orientation="horizontal"] :global(.sliderFill) {
+  top: 9px;
+  bottom: 9px;
+  left: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 34%, transparent), var(--audio-accent));
+  box-shadow: 0 0 9px color-mix(in srgb, var(--audio-accent) 36%, transparent);
+}
+
+.inspectorSendSlider[data-orientation="horizontal"] :global(.sliderCap) {
+  width: 16px;
+  height: 16px;
+}
+
+.inspectorActionRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 0;
+}
+
+/* Inspector button surfaces (button grid, action row, unsupported toggle,
+   send-mode row, placeholder panel buttons). The shell still owns
+   `.unsupportedToggleRow`/`.sendModeRow` (they affect non-inspector reads
+   too) so we redefine the inspector-side button look here only. */
+.inspectorButtonGrid button,
+.inspectorActionRow button {
+  min-height: 25px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.inspectorButtonGrid button[data-active="true"],
+.inspectorActionRow button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
+  color: var(--audio-solo);
+}
+
+.inspectorButtonGrid button[data-control="mute"][data-active="true"],
+.inspectorActionRow button[data-control="mute"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-mute) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-mute) 18%, var(--audio-panel));
+  color: var(--audio-mute);
+}
+
+.inspectorButtonGrid button:disabled,
+.inspectorActionRow button:disabled,
+.unsupportedToggleRow button:disabled,
+.sendModeRow button:disabled,
+.placeholderPanel button:disabled,
+.inspectorPfl:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.softwarePanelStack {
+  display: grid;
+  gap: 8px;
+}
+
+.unsupportedToggleRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.unsupportedToggleRow button {
+  min-height: 25px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.unsupportedToggleRow button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
+  color: var(--audio-solo);
+}
+
+.unsupportedToggleRow button[data-readonly="true"] {
+  cursor: default;
+}
+
+.unsupportedToggleRow button[data-readonly="true"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 58%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 18%, var(--audio-panel));
+  color: var(--audio-accent);
+}
+
+.unsupportedToggleRow button small {
+  margin-left: 8px;
+  color: var(--audio-text-muted);
+  font: inherit;
+}
+
+.sendModeRow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.sendModeRow button {
+  min-height: 25px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sendModeRow button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
+  color: var(--audio-solo);
+}
+
+.inspectorButtonGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.inspectorMiniGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  margin-top: 0;
+}
+
+.outputInspectorGrid {
+  grid-auto-rows: minmax(0, 1fr);
+  height: 100%;
+}
+
+.channelOverviewGrid {
+  grid-template-areas:
+    "route route"
+    "eq eq"
+    "dynamics dynamics";
+  grid-template-rows: minmax(72px, auto) minmax(110px, auto) minmax(110px, auto);
+}
+
+.overviewRouteCard {
+  grid-area: route;
+}
+
+.overviewEqCard {
+  grid-area: eq;
+}
+
+.overviewDynamicsCard {
+  grid-area: dynamics;
+}
+
+.inspectorMiniCard {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 52px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--audio-panel-strong) 92%, var(--audio-accent) 8%),
+    var(--audio-panel-strong)
+  );
+  color: inherit;
+  text-align: left;
+}
+
+.inspectorStickyHardwareCard {
+  gap: 5px;
+  padding: 6px;
+}
+
+.overviewPrimaryCard {
+  border-color: color-mix(in srgb, var(--audio-accent) 42%, var(--audio-border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--audio-accent) 14%, transparent), transparent 55%),
+    var(--audio-panel-strong);
+}
+
+.subduedInspectorCard {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--audio-panel-strong) 84%, transparent);
+}
+
+button.inspectorMiniCard {
+  cursor: pointer;
+}
+
+.inspectorMiniCard strong {
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 12px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.inspectorMiniCard span:not(.eyebrow) {
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1.15 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.inspectorGraphCard {
+  min-height: 66px;
+}
+
+.overviewEqCard .eqGraphMini,
+.overviewDynamicsCard .dynamicsGraphMini {
+  min-height: 72px;
+}
+
+.inspectorGraphCard,
+.routingMiniCard {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.graphCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eqBandRow,
+.dynamicsPills {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.eqBandRow i,
+.eqBandRow button,
+.dynamicsPills button,
+.dynamicsPills i {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  color: var(--audio-text-subtle);
+  background: transparent;
+  font-style: normal;
+  cursor: pointer;
+}
+
+.eqBandRow i[data-active="true"],
+.eqBandRow button[data-active="true"],
+.dynamicsPills button[data-active="true"],
+.dynamicsPills i[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 50%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 14%, transparent);
+  color: var(--audio-accent);
+}
+
+.eqBandRow i[data-selected="true"],
+.eqBandRow button[data-selected="true"] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--audio-hot) 42%, transparent);
+}
+
+.eqGraphMini,
+.dynamicsGraphMini,
+.eqGraphFull,
+.dynamicsGraphFull {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  min-height: 44px;
+  overflow: hidden;
+  border-radius: 5px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--audio-border) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-border) 18%, transparent) 1px, transparent 1px),
+    var(--audio-meter-bg);
+  background-size:
+    100% 50%,
+    25% 100%,
+    auto;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.54);
+}
+
+.eqGraphMini,
+.dynamicsGraphMini {
+  min-height: 38px;
+}
+
+.eqGraphMini svg,
+.dynamicsGraphMini svg,
+.eqGraphFull svg,
+.dynamicsGraphFull svg {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.eqGraphGuideLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.eqGraphDbMarkers,
+.eqGraphFrequencyMarkers {
+  position: absolute;
+  inset: 0;
+}
+
+.eqGraphDbMarkers::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  content: "";
+  background: color-mix(in srgb, var(--audio-text-strong) 32%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-accent) 10%, transparent);
+}
+
+.eqGraphDbLabel {
+  position: absolute;
+  top: clamp(8px, var(--eq-marker-y), calc(100% - 8px));
+  right: 8px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: color-mix(in srgb, var(--audio-text-muted) 74%, transparent);
+  background: color-mix(in srgb, var(--audio-meter-bg) 62%, transparent);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  transform: translateY(-50%);
+}
+
+.eqGraphFrequencyMarker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--eq-marker-x);
+  width: 1px;
+  background: color-mix(in srgb, var(--audio-border) 24%, transparent);
+  transform: translateX(-50%);
+}
+
+.eqGraphFrequencyMarker[data-major="true"] {
+  background: color-mix(in srgb, var(--audio-text-muted) 26%, transparent);
+}
+
+.eqGraphFrequencyMarker i {
+  display: block;
+  width: 1px;
+  height: 100%;
+}
+
+.eqGraphFrequencyMarker small {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  color: color-mix(in srgb, var(--audio-text-muted) 66%, transparent);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+}
+
+.eqGraphFrequencyMarker:first-child small {
+  left: 0;
+  transform: none;
+}
+
+.eqGraphFrequencyMarker:last-child small {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.eqGraphMini path,
+.eqGraphFull path {
+  fill: none;
+  stroke: var(--audio-accent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.eqGraphMini .eqLowCutShade,
+.eqGraphFull .eqLowCutShade {
+  fill: color-mix(in srgb, var(--audio-hot) 18%, transparent);
+  stroke: none;
+}
+
+.eqValueBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: grid;
+  gap: 3px;
+  min-width: 118px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--audio-accent) 46%, var(--audio-border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--audio-panel-strong) 88%, black 12%);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+.eqValueBadge strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 12px / 1 var(--font-family-display);
+  letter-spacing: 0;
+}
+
+.eqValueBadge span {
+  color: var(--audio-accent);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.eqPointLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+}
+
+.eqPoint {
+  position: absolute;
+  left: var(--eq-point-x);
+  top: var(--eq-point-y);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--audio-accent) 74%, white 12%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.22), transparent 36%),
+    color-mix(in srgb, var(--audio-panel-strong) 74%, var(--audio-accent) 26%);
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.eqPoint[data-selected="true"] {
+  border-color: var(--audio-hot);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.66),
+    0 0 18px color-mix(in srgb, var(--audio-hot) 46%, transparent);
+}
+
+.eqLowCutPoint {
+  border-radius: 8px;
+  border-color: color-mix(in srgb, var(--audio-hot) 70%, white 8%);
+  background:
+    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.2), transparent 36%),
+    color-mix(in srgb, var(--audio-panel-strong) 62%, var(--audio-hot) 38%);
+}
+
+.eqLowCutPoint[data-active="false"] {
+  border-color: color-mix(in srgb, var(--audio-text-subtle) 56%, var(--audio-border));
+  background:
+    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.14), transparent 36%),
+    color-mix(in srgb, var(--audio-panel-strong) 84%, var(--audio-text-subtle) 16%);
+  color: var(--audio-text-muted);
+}
+
+.eqPoint:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.dynamicsGraphMini path,
+.dynamicsGraphFull path {
+  fill: none;
+  stroke: var(--audio-accent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.dynamicsGraphMini[data-active="false"] path,
+.dynamicsGraphFull[data-active="false"] path {
+  stroke: color-mix(in srgb, var(--audio-text-subtle) 62%, transparent);
+  stroke-dasharray: 4 4;
+}
+
+.dynamicsGraphMini circle,
+.dynamicsGraphFull circle {
+  fill: var(--audio-accent);
+}
+
+.dynamicsGraphMini > i,
+.dynamicsGraphFull > i {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: var(--dynamics-gate-x, 100%);
+  width: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--audio-meter-warn) 74%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-meter-warn) 28%, transparent);
+  transform: translateX(-50%);
+}
+
+.dynamicsGraphMini > i[data-active="false"],
+.dynamicsGraphFull > i[data-active="false"] {
+  opacity: 0.38;
+  background: color-mix(in srgb, var(--audio-text-subtle) 56%, transparent);
+  box-shadow: none;
+}
+
+.routingMiniCard {
+  grid-column: 1 / -1;
+  min-height: 82px;
+}
+
+.routingGraphMini {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) 50px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  min-height: 50px;
+}
+
+.routingSourceNode,
+.routingTargetNode {
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  min-height: 32px;
+  padding: 5px 7px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--audio-canvas) 72%, transparent);
+  color: var(--audio-text-strong);
+}
+
+.routingGraphMini i {
+  display: block;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--audio-accent) 70%, transparent),
+    transparent
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-accent) 38%, transparent);
+}
+
+.routingCurve {
+  display: block;
+  width: 50px;
+  height: 50px;
+}
+
+.routingCurve path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--audio-text-subtle) 64%, transparent);
+  stroke-dasharray: 3 3;
+  stroke-linecap: round;
+  stroke-width: 1;
+}
+
+.routingCurve path:nth-child(2) {
+  stroke: color-mix(in srgb, var(--audio-accent) 76%, transparent);
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--audio-accent) 34%, transparent));
+}
+
+.routingTargetStack {
+  display: grid;
+  gap: 4px;
+}
+
+.routingTargetNode {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 23px;
+  padding: 4px 6px;
+  background: color-mix(in srgb, var(--audio-canvas) 62%, transparent);
+}
+
+.routingTargetNode[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 58%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 12%, var(--audio-canvas));
+}
+
+.routingTargetNode[data-send-state="muted"] {
+  color: var(--audio-mute);
+}
+
+.routingTargetNode[data-send-state="none"] {
+  opacity: 0.62;
+}
+
+.routingSourceNode strong,
+.routingTargetNode strong {
+  overflow: hidden;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routingSourceNode small,
+.routingTargetNode small {
+  color: var(--audio-accent);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  text-align: right;
+}
+
+.sourceCard {
+  overflow: hidden;
+}
+
+.sourceCard strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-medium) 13px / 1.2 var(--font-family-ui);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.detailGrid span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--audio-canvas) 62%, transparent);
+}
+
+.detailGrid strong {
+  overflow: hidden;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-medium) 12px / 1.1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unavailableTelemetry {
+  display: grid;
+  gap: 5px;
+  padding: 7px;
+  border: 1px dashed color-mix(in srgb, var(--audio-border) 78%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--audio-canvas) 54%, transparent);
+}
+
+.unavailableTelemetry strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 11px / 1.1 var(--font-family-mono);
+}
+
+.unavailableTelemetry span {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1.2 var(--font-family-mono);
+}
+
+.outputInspectorGrid .detailGrid span[data-fact-size="long"] {
+  grid-column: 1 / -1;
+}
+
+.outputInspectorGrid .detailGrid span[data-fact-size="long"] strong {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.inspectorHardwareGrid {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.inspectorHardwareGrid :global(.preampControl) {
+  --preamp-control-width: 48px;
+  align-self: start;
+  overflow: hidden;
+}
+
+.inspectorHardwareGrid :global(.preampLedRing) {
+  overflow: hidden;
+}
+
+.emptyInspector,
+.placeholderPanel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  height: 100%;
+}
+
+.placeholderPanel button {
+  min-height: 25px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.inspectorFullGraphPanel {
+  align-content: start;
+}
+
+.graphRangeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.graphRangeRow strong {
+  color: var(--audio-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.graphRangeRow span:last-child {
+  text-align: right;
+}
+
+.eqGraphFull,
+.dynamicsGraphFull {
+  min-height: 170px;
+}
+
+.eqControlTray {
+  gap: 10px;
+}
+
+.eqModeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.eqModeRow button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 72%, transparent);
+  color: var(--audio-text-muted);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.eqModeRow button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 58%, var(--audio-border));
+  color: var(--audio-text-strong);
+  background: color-mix(in srgb, var(--audio-accent) 15%, transparent);
+}
+
+.eqModeRow button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.sendTargetButton {
+  min-height: 28px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 76%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sendTargetButton[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 54%, var(--audio-border));
+  color: var(--color-text-strong);
+}
+
+.sendCardFull {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--audio-panel-strong) 90%, var(--audio-accent) 10%),
+    var(--audio-panel-strong)
+  );
+}
+
+.sendCardFull[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+}
+
+.sendCardFull[data-send-state="muted"] {
+  border-color: color-mix(in srgb, var(--audio-mute) 50%, var(--audio-border));
+}
+
+.sendCardFull[data-send-state="none"] {
+  opacity: 0.74;
+}
+
+.sendCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sendCardRoute {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.sendCardRoute strong {
+  overflow: hidden;
+  color: var(--audio-text-default);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sendCardRoute strong:last-child {
+  text-align: right;
+}
+
+.sendStack {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.processingControlGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.processingControl {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.processingControl span {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-semibold) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.processingControl strong {
+  justify-self: end;
+  min-width: 0;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.sendCardValue {
+  justify-self: end;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 18px / 1 var(--font-family-display);
+}
+
+.outputInspector {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--audio-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-900) 68%, transparent);
+}
+
+.outputInspector span {
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 11px / 1.2 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+@container operator-root (max-height: 1120px) {
+  .inspectorSticky {
+    gap: 4px;
+    padding: 5px 10px;
+  }
+
+  .inspectorTitle {
+    font-size: 21px;
+  }
+
+  .inspectorSubtitle {
+    font-size: 11px;
+  }
+
+  .bigMeterCard {
+    gap: 5px;
+    padding: 5px;
+  }
+
+  .bigMeterCard [data-meter-component="stereo"] {
+    min-height: 42px;
+  }
+
+  .bigMeterInfo,
+  .bigMeterRow,
+  .inspectorFaderCard,
+  .processingControlGrid {
+    gap: 5px;
+  }
+
+  .bigMeterRow strong {
+    font-size: 13px;
+  }
+
+  .inspectorPanel {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    padding: 4px 10px 5px;
+  }
+
+  .inspectorMiniGrid {
+    align-content: stretch;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 0.72fr) minmax(0, 0.92fr) minmax(0, 0.72fr);
+    gap: 4px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .channelOverviewGrid {
+    grid-template-areas:
+      "route route"
+      "eq eq"
+      "dynamics dynamics";
+    grid-template-rows: minmax(0, 0.54fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .inspectorMiniCard {
+    align-content: stretch;
+    min-height: 0;
+    padding: 5px;
+    overflow: hidden;
+  }
+
+  .inspectorStickyHardwareCard {
+    padding: 5px;
+  }
+
+  .inspectorGraphCard {
+    min-height: 58px;
+  }
+
+  .routingMiniCard {
+    grid-column: 1 / -1;
+    min-height: 54px;
+  }
+
+  .routingGraphMini {
+    grid-template-columns: minmax(0, 0.9fr) 38px minmax(0, 1fr);
+    height: 100%;
+    min-height: 36px;
+  }
+
+  .routingCurve {
+    width: 38px;
+    height: 36px;
+  }
+
+  .routingSourceNode,
+  .routingTargetNode {
+    min-height: 20px;
+    padding: 3px 5px;
+  }
+
+  .routingTargetStack {
+    gap: 2px;
+  }
+
+  .detailGrid {
+    gap: 4px;
+  }
+
+  .outputInspectorGrid .detailGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .outputInspectorGrid .sourceCard > span:not(.eyebrow) {
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .detailGrid span {
+    padding: 4px;
+  }
+
+  .sourceCard strong {
+    font-size: 11px;
+  }
+
+  .inspectorHardwareGrid {
+    grid-template-columns: 66px minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .inspectorHardwareGrid :global(.preampControl) {
+    --preamp-control-width: 37px;
+  }
+
+  .inspectorHardwareGrid :global(.preampLedRing) {
+    overflow: hidden;
+  }
+
+  .eqGraphMini,
+  .dynamicsGraphMini {
+    min-height: 32px;
+  }
+
+  .channelOverviewGrid .eqGraphMini,
+  .channelOverviewGrid .dynamicsGraphMini {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .eqGraphFull,
+  .dynamicsGraphFull {
+    min-height: 132px;
+  }
+
+  .sendStack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 6px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .sendCardFull {
+    gap: 6px;
+    padding: 7px;
+  }
+
+  .processingControlGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .processingControl {
+    grid-template-columns: 30px minmax(0, 1fr) 54px;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .processingControl strong {
+    justify-self: end;
+    font-size: 10px;
+  }
+
+  .unsupportedToggleRow {
+    margin-top: 2px;
+  }
+
+  .unsupportedToggleRow button {
+    min-height: 23px;
+    padding: 0 4px;
+    font-size: 9px;
+  }
+}
+
+@container operator-root (max-width: 2100px) {
+  .inspectorMiniCard {
+    min-height: 68px;
+  }
+
+  .inspectorButtonGrid button,
+  .unsupportedToggleRow button,
+  .placeholderPanel button {
+    min-height: 23px;
+    font-size: 9px;
+  }
+}
+
+@container operator-root (min-width: 2200px) and (min-height: 1250px) {
+  [data-layout-mode="studioFull"] .inspectorPanel {
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .inspectorMiniGrid {
+    height: 100%;
+    grid-template-rows: minmax(0, 0.64fr) minmax(0, 1fr) minmax(0, 1fr);
+    align-content: stretch;
+  }
+
+  [data-layout-mode="studioFull"] .channelOverviewGrid {
+    grid-template-areas:
+      "route route"
+      "eq eq"
+      "dynamics dynamics";
+    grid-template-rows: minmax(0, 0.58fr) minmax(0, 1.16fr) minmax(0, 1.16fr);
+  }
+
+  [data-layout-mode="studioFull"] .outputInspectorGrid {
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-layout-mode="studioFull"] .inspectorMiniCard,
+  [data-layout-mode="studioFull"] .inspectorGraphCard,
+  [data-layout-mode="studioFull"] .routingMiniCard {
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .inspectorMiniCard {
+    align-content: stretch;
+    padding: 9px;
+  }
+
+  [data-layout-mode="studioFull"] .inspectorGraphCard,
+  [data-layout-mode="studioFull"] .routingMiniCard {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  [data-layout-mode="studioFull"] .eqGraphMini,
+  [data-layout-mode="studioFull"] .dynamicsGraphMini,
+  [data-layout-mode="studioFull"] .routingGraphMini {
+    align-self: stretch;
+    min-height: 0;
+    height: 100%;
+  }
+
+  [data-layout-mode="studioFull"] .sourceCard .detailGrid {
+    align-self: end;
+  }
+}

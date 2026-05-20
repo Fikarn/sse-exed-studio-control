@@ -1,6 +1,6 @@
 import type { CSSProperties, MutableRefObject, PointerEvent as ReactPointerEvent } from "react";
 
-import styles from "../../AudioWorkspace.module.css";
+import styles from "../AudioInspector.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
 import { AudioSliderControl } from "../AudioSliderControl";
 import {

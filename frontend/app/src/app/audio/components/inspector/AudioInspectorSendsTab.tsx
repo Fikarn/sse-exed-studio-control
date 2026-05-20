@@ -1,4 +1,4 @@
-import styles from "../../AudioWorkspace.module.css";
+import styles from "../AudioInspector.module.css";
 import { deriveSendStatusLabel, formatAudioDb } from "../../audioFormatting";
 import { selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../../audioViewModel";
 import { AudioSliderControl } from "../AudioSliderControl";

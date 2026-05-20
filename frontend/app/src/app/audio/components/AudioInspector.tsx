@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioInspector.module.css";
 import { AUDIO_DRAFT_CLEAR_MS, AUDIO_THROTTLE_EQ_MS } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { createThrottledCommit } from "../audioContinuousControls";

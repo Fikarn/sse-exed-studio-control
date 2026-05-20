@@ -1,6 +1,6 @@
 import type { ShellStore } from "@sse/engine-client";
 
-import styles from "../../AudioWorkspace.module.css";
+import styles from "../AudioInspector.module.css";
 import { AUDIO_FADER_UNITY, formatAudioDb } from "../../audioFormatting";
 import type { AudioMixTargetEntry } from "../../../shellData";
 import {
