@@ -1,5 +1,8 @@
+import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+
 import styles from "../AudioWorkspace.module.css";
 import { faderDbToNormalized, formatAudioDb, normalizedToFaderDb } from "../audioFormatting";
+import { AudioNumberDialog } from "./AudioNumberDialog";
 import { AudioSliderControl } from "./AudioSliderControl";
 
 export function AudioFader({
@@ -17,22 +20,28 @@ export function AudioFader({
   showValue?: boolean;
   value: number;
 }) {
+  const [numberDialogOpen, setNumberDialogOpen] = useState(false);
+  const currentDb = normalizedToFaderDb(value);
+  const openNumberDialog = () => {
+    if (!disabled) setNumberDialogOpen(true);
+  };
+  const handleKeyDownCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" || disabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setNumberDialogOpen(true);
+  };
+
   return (
-    <label className={styles.fader}>
+    <div className={styles.fader} onKeyDownCapture={handleKeyDownCapture}>
       <AudioSliderControl
         disabled={disabled}
         label={label}
         onCommit={onCommit}
         onPreview={onPreview}
-        onRequestNumericValue={(currentValue) => {
-          const currentDb = normalizedToFaderDb(currentValue);
-          const raw = window.prompt(
-            "Set fader dB, -60 to +6",
-            Number.isFinite(currentDb) ? currentDb.toFixed(1) : "-60"
-          );
-          if (raw === null || raw.trim() === "") return null;
-          const parsed = Number(raw);
-          return Number.isFinite(parsed) ? faderDbToNormalized(parsed) : null;
+        onRequestNumericValue={() => {
+          openNumberDialog();
+          return null;
         }}
         orientation="vertical"
         snapUnity
@@ -40,6 +49,23 @@ export function AudioFader({
         valueText={formatAudioDb(value)}
       />
       {showValue ? <span className={styles.faderValue}>{formatAudioDb(value)}</span> : null}
-    </label>
+      {numberDialogOpen ? (
+        <AudioNumberDialog
+          fieldLabel="Fader level"
+          initialValue={Number.isFinite(currentDb) ? Number(currentDb.toFixed(1)) : -60}
+          max={6}
+          min={-60}
+          onCancel={() => setNumberDialogOpen(false)}
+          onConfirm={(nextDb) => {
+            setNumberDialogOpen(false);
+            onPreview?.(faderDbToNormalized(nextDb));
+            onCommit(faderDbToNormalized(nextDb));
+          }}
+          step={0.1}
+          suffix="dB"
+          title={`Set ${label}`}
+        />
+      ) : null}
+    </div>
   );
 }

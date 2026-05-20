@@ -13,6 +13,7 @@ ts-rs = ["dep:ts-rs"]
 
 [dependencies]
 rusqlite.workspace = true
+rosc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 studio-control-protocol.workspace = true

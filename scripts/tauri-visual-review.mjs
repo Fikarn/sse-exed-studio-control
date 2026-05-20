@@ -28,6 +28,13 @@ const sizes = readSizeFlag("--sizes", [
   { height: 1080, label: "1920x1080", width: 1920 },
   { height: 1440, label: "2560x1440", width: 2560 },
 ]);
+const studioPreviewFixtures = readListFlag(
+  "--studio-preview-fixtures",
+  fixtures.filter((fixture) => ["audio-populated", "audio-selected-channel"].includes(fixture))
+);
+const studioPreviewHostSizes = readSizeFlag("--studio-preview-host-sizes", [
+  { height: 982, label: "1512x982", width: 1512 },
+]);
 
 function needsCommandShell(command) {
   return process.platform === "win32" && /\.(bat|cmd)$/i.test(command);
@@ -234,7 +241,7 @@ async function closePreview(child) {
   }
 }
 
-async function captureFixture({ browser, fixture, port, size }) {
+async function captureFixture({ browser, fixture, port, reviewSurface = "native", size }) {
   const context = await browser.newContext({
     timezoneId: "Europe/Stockholm",
     viewport: {
@@ -243,12 +250,19 @@ async function captureFixture({ browser, fixture, port, size }) {
     },
   });
   const page = await context.newPage();
-  const url = `http://127.0.0.1:${port}/?fixture=${fixture}&transport=fixture`;
+  const url = `http://127.0.0.1:${port}/?fixture=${fixture}&transport=fixture${
+    reviewSurface === "studioPreview" ? "&operatorReview=studio" : ""
+  }`;
 
   await page.goto(url, { waitUntil: "networkidle" });
   await page.waitForTimeout(500);
 
-  const responsiveAssertions = fixture === "lighting-populated" ? await assertLightingResponsive({ page, size }) : null;
+  const responsiveAssertions =
+    fixture === "lighting-populated" && reviewSurface === "native"
+      ? await assertLightingResponsive({ page, size })
+      : null;
+  const studioPreviewAssertions =
+    reviewSurface === "studioPreview" ? await assertStudioPreviewFidelity({ fixture, page, size }) : null;
 
   const metrics = await page.evaluate(() => ({
     bodyScrollHeight: document.body?.scrollHeight ?? 0,
@@ -262,7 +276,10 @@ async function captureFixture({ browser, fixture, port, size }) {
     overflowX: getComputedStyle(document.documentElement).overflowX,
     overflowY: getComputedStyle(document.documentElement).overflowY,
   }));
-  const file = path.join(outputRoot, `${fixture}-${size.label}.png`);
+  const file =
+    reviewSurface === "studioPreview"
+      ? path.join(outputRoot, `${fixture}-studio-preview-${size.label}.png`)
+      : path.join(outputRoot, `${fixture}-${size.label}.png`);
 
   await page.screenshot({ path: file });
   await context.close();
@@ -277,7 +294,9 @@ async function captureFixture({ browser, fixture, port, size }) {
       metrics.bodyScrollHeight <= metrics.innerHeight,
     metrics,
     responsiveAssertions,
+    reviewSurface,
     size: size.label,
+    studioPreviewAssertions,
   };
 }
 
@@ -397,6 +416,84 @@ async function assertDprIndependentLightingMode({ browser, port }) {
   return modes;
 }
 
+function assertRatioClose({ actual, expected, label, tolerance = 0.06 }) {
+  if (!Number.isFinite(actual) || Math.abs(actual - expected) > tolerance) {
+    throw new Error(`${label} aspect ratio mismatch: expected ${expected.toFixed(3)}, got ${actual}.`);
+  }
+}
+
+async function assertStudioPreviewFidelity({ fixture, page, size }) {
+  const details = await page.evaluate(() => {
+    const root = document.querySelector("[data-operator-layout-root]");
+    const displayFor = (selector) => {
+      const node = document.querySelector(selector);
+      return node ? getComputedStyle(node).display : null;
+    };
+    const ratioFor = (node) => {
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      return rect.height > 0 ? rect.width / rect.height : null;
+    };
+    const compactPreampPanels = Array.from(
+      document.querySelectorAll('[data-testid="audio-workspace"] img[class*="preampPanel"]')
+    )
+      .filter((image) => image.currentSrc.includes("preamp-panel-compact"))
+      .map((image) => {
+        const rect = image.getBoundingClientRect();
+        return {
+          naturalRatio: image.naturalWidth / Math.max(1, image.naturalHeight),
+          renderedRatio: ratioFor(image),
+          size: `${Math.round(rect.width)}x${Math.round(rect.height)}`,
+        };
+      });
+
+    return {
+      canvasBarLabelDisplay: displayFor("[class*=canvasBarLabel]"),
+      canvasSelectedMetaDisplay: displayFor("[class*=canvasSelectedMeta]"),
+      compactPreampPanels,
+      root: root
+        ? {
+            layoutHeight: root.getAttribute("data-layout-height"),
+            layoutMode: root.getAttribute("data-layout-mode"),
+            layoutWidth: root.getAttribute("data-layout-width"),
+            reviewScale: root.getAttribute("data-review-scale"),
+            reviewSurface: root.getAttribute("data-review-surface"),
+          }
+        : null,
+    };
+  });
+
+  if (details.root?.reviewSurface !== "studioPreview") {
+    throw new Error(`Studio Preview expected review surface at ${size.label}, got ${details.root?.reviewSurface}.`);
+  }
+  if (details.root?.layoutMode !== "studioFull") {
+    throw new Error(`Studio Preview expected studioFull at ${size.label}, got ${details.root?.layoutMode}.`);
+  }
+  if (details.root?.layoutWidth !== "2560" || details.root?.layoutHeight !== "1440") {
+    throw new Error(
+      `Studio Preview expected simulated 2560x1440 at ${size.label}, got ${details.root?.layoutWidth}x${details.root?.layoutHeight}.`
+    );
+  }
+
+  if (fixture.startsWith("audio-")) {
+    if (details.canvasBarLabelDisplay === "none" || details.canvasSelectedMetaDisplay === "none") {
+      throw new Error(`Audio Studio Preview is using compact canvas metadata at ${size.label}.`);
+    }
+    if (details.compactPreampPanels.length === 0) {
+      throw new Error(`Audio Studio Preview did not render compact preamp panels at ${size.label}.`);
+    }
+    for (const [index, panel] of details.compactPreampPanels.entries()) {
+      assertRatioClose({
+        actual: panel.renderedRatio,
+        expected: panel.naturalRatio,
+        label: `Audio Studio Preview compact preamp panel ${index + 1} at ${size.label}`,
+      });
+    }
+  }
+
+  return details;
+}
+
 async function main() {
   prepareOutputRoot();
 
@@ -415,6 +512,19 @@ async function main() {
         results.push(await captureFixture({ browser, fixture, port: previewPort, size }));
       }
     }
+    for (const size of studioPreviewHostSizes) {
+      for (const fixture of studioPreviewFixtures) {
+        results.push(
+          await captureFixture({
+            browser,
+            fixture,
+            port: previewPort,
+            reviewSurface: "studioPreview",
+            size,
+          })
+        );
+      }
+    }
     const dprLayoutCheck = await assertDprIndependentLightingMode({ browser, port: previewPort });
     await browser.close();
     const shellWindowRecovery = assertShellWindowRecovery();
@@ -428,6 +538,8 @@ async function main() {
       results,
       shellWindowRecovery,
       sizes: sizes.map((size) => size.label),
+      studioPreviewFixtures,
+      studioPreviewHostSizes: studioPreviewHostSizes.map((size) => size.label),
       source: "Vite preview fixture transport",
     };
     const summaryPath = path.join(outputRoot, "fixture-viewport-summary.json");

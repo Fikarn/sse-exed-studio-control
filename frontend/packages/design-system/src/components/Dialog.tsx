@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { Surface } from "./Surface";
 import styles from "./Dialog.module.css";
@@ -79,7 +80,9 @@ export function Dialog({ actions, body, children, className, labelledBy, onClose
     };
   }, [onClose]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className={styles.overlay} role="presentation">
       <Surface
         aria-labelledby={titleId}
@@ -98,6 +101,7 @@ export function Dialog({ actions, body, children, className, labelledBy, onClose
         {children}
         {actions ? <div className={styles.footer}>{actions}</div> : null}
       </Surface>
-    </div>
+    </div>,
+    document.body
   );
 }

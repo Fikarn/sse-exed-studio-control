@@ -2,13 +2,14 @@ import { useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "../AudioWorkspace.module.css";
+import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { createThrottledCommit } from "../audioContinuousControls";
 import { formatAudioDb, formatMeterDb } from "../audioFormatting";
 import { audioChannelSupportsGain, getAudioChannelGroup, selectedChannelSendLevel } from "../audioViewModel";
 import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
 import { AudioFader } from "./AudioFader";
 import { AudioPreampControl } from "./AudioPreampControl";
-import { LiveAudioStereoMeter } from "./LiveAudioStereoMeter";
+import { AudioStereoMeter } from "./AudioStereoMeter";
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
@@ -37,8 +38,9 @@ function outputHeaderStatus(mixTarget: AudioMixTargetEntry, selected: boolean) {
 export function AudioChannelLane({
   actionsAllowed,
   channel,
-  clearDraftValue,
+  clearDraftValueLater,
   commitChannelContinuous,
+  draftStore,
   feeding,
   getDraftValue,
   index,
@@ -52,8 +54,9 @@ export function AudioChannelLane({
 }: {
   actionsAllowed: boolean;
   channel: AudioChannelEntry;
-  clearDraftValue: (key: string) => void;
+  clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
+  draftStore: AudioControlDraftStore;
   feeding: boolean;
   getDraftValue: (key: string, fallback: number) => number;
   index: number;
@@ -66,9 +69,13 @@ export function AudioChannelLane({
   selectedMixTargetId: string | null;
 }) {
   const sendDraftKey = `channel:${channel.id}:send:${selectedMixTargetId ?? "none"}`;
-  const sendLevel = getDraftValue(sendDraftKey, selectedChannelSendLevel(channel, selectedMixTargetId));
+  const sendLevel = useAudioControlDraftValue(
+    draftStore,
+    sendDraftKey,
+    getDraftValue(sendDraftKey, selectedChannelSendLevel(channel, selectedMixTargetId))
+  );
   const gainDraftKey = `channel:${channel.id}:gain`;
-  const gain = getDraftValue(gainDraftKey, channel.gain);
+  const gain = useAudioControlDraftValue(draftStore, gainDraftKey, getDraftValue(gainDraftKey, channel.gain));
   const supportsPreamp = audioChannelSupportsGain(channel);
   const preampNumber = supportsPreamp ? inputPreampNumber(channel.id) : null;
   const group = getAudioChannelGroup(channel);
@@ -89,7 +96,7 @@ export function AudioChannelLane({
       data-selected={selected}
       data-testid={`audio-strip-${channel.id}`}
       onClick={() => onSelect(channel.id)}
-      onContextMenu={(event) => onOpenContextMenu(event, channel.id)}
+      onContextMenuCapture={(event) => onOpenContextMenu(event, channel.id)}
     >
       <div className={styles.laneHeader}>
         <div className={styles.laneNameBlock}>
@@ -133,7 +140,7 @@ export function AudioChannelLane({
           onCommit={(nextGain) => {
             setDraftValue(gainDraftKey, nextGain);
             commitChannelContinuous({ channelId: channel.id, gain: nextGain });
-            window.setTimeout(() => clearDraftValue(gainDraftKey), 250);
+            clearDraftValueLater(gainDraftKey);
           }}
           onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
           variant="compact"
@@ -141,8 +148,15 @@ export function AudioChannelLane({
       ) : null}
 
       <div className={styles.laneBody}>
-        <LiveAudioStereoMeter
-          channelId={channel.id}
+        <AudioStereoMeter
+          clip={channel.clip}
+          left={channel.meterLeft}
+          meterId={channel.id}
+          meterKind="channel"
+          mirrorRight={!channel.stereo}
+          peakLeft={channel.peakHoldLeft}
+          peakRight={channel.stereo ? channel.peakHoldRight : channel.peakHoldLeft}
+          right={channel.stereo ? channel.meterRight : channel.meterLeft}
           showPeakReadout={supportsPreamp || channel.role === "playback-pair"}
           showReadout={false}
           showScale
@@ -159,7 +173,7 @@ export function AudioChannelLane({
               mixTargetId: selectedMixTargetId ?? undefined,
             });
             throttledSendCommit.flush();
-            window.setTimeout(() => clearDraftValue(sendDraftKey), 250);
+            clearDraftValueLater(sendDraftKey);
           }}
           onPreview={(value) => {
             setDraftValue(sendDraftKey, value);
@@ -178,7 +192,8 @@ export function AudioChannelLane({
 
       <div className={styles.laneControls}>
         <button
-          aria-label="Mute"
+          aria-label={`Mute ${channel.name}`}
+          aria-pressed={channel.mute}
           className={styles.laneToggle}
           data-control="mute"
           data-active={channel.mute}
@@ -192,7 +207,8 @@ export function AudioChannelLane({
           M
         </button>
         <button
-          aria-label="Solo"
+          aria-label={`Solo ${channel.name}`}
+          aria-pressed={channel.solo}
           className={styles.laneToggle}
           data-control="solo"
           data-active={channel.solo}
@@ -212,8 +228,9 @@ export function AudioChannelLane({
 
 export function AudioOutputLane({
   actionsAllowed,
-  clearDraftValue,
+  clearDraftValueLater,
   commitMixTargetContinuous,
+  draftStore,
   getDraftValue,
   index,
   mixTarget,
@@ -223,8 +240,9 @@ export function AudioOutputLane({
   selected,
 }: {
   actionsAllowed: boolean;
-  clearDraftValue: (key: string) => void;
+  clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
+  draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   index: number;
   mixTarget: AudioMixTargetEntry;
@@ -234,7 +252,7 @@ export function AudioOutputLane({
   selected: boolean;
 }) {
   const volumeDraftKey = `mixTarget:${mixTarget.id}:volume`;
-  const volume = getDraftValue(volumeDraftKey, mixTarget.volume);
+  const volume = useAudioControlDraftValue(draftStore, volumeDraftKey, getDraftValue(volumeDraftKey, mixTarget.volume));
   const throttledVolumeCommit = useMemo(
     () => createThrottledCommit<AudioMixTargetUpdate>(commitMixTargetContinuous, 75),
     [commitMixTargetContinuous]
@@ -260,7 +278,17 @@ export function AudioOutputLane({
       </div>
 
       <div className={styles.outputBody}>
-        <LiveAudioStereoMeter mixTargetId={mixTarget.id} showReadout={false} showScale />
+        <AudioStereoMeter
+          left={mixTarget.meterLeft}
+          meterId={mixTarget.id}
+          meterKind="mixTarget"
+          mirrorRight={mixTarget.mono}
+          peakLeft={mixTarget.peakHoldLeft}
+          peakRight={mixTarget.peakHoldRight}
+          right={mixTarget.mono ? mixTarget.meterLevel : mixTarget.meterRight}
+          showReadout={false}
+          showScale
+        />
         <AudioFader
           disabled={!actionsAllowed}
           label={`${mixTarget.name} output level`}
@@ -268,7 +296,7 @@ export function AudioOutputLane({
             setDraftValue(volumeDraftKey, value);
             throttledVolumeCommit.schedule({ mixTargetId: mixTarget.id, volume: value });
             throttledVolumeCommit.flush();
-            window.setTimeout(() => clearDraftValue(volumeDraftKey), 250);
+            clearDraftValueLater(volumeDraftKey);
           }}
           onPreview={(value) => {
             setDraftValue(volumeDraftKey, value);
@@ -291,12 +319,12 @@ export function AudioOutputLane({
               </strong>
             </span>
             <span>
-              <small>LUFS short</small>
-              <strong>n/a</strong>
+              <small>Nominal ref</small>
+              <strong>-18 dBFS</strong>
             </span>
             <span>
-              <small>Correlation</small>
-              <strong>n/a</strong>
+              <small>Peak warn</small>
+              <strong>-3 dBFS</strong>
             </span>
           </div>
         </div>
@@ -304,6 +332,8 @@ export function AudioOutputLane({
 
       <div className={styles.laneControls}>
         <button
+          aria-label={`Mute ${mixTarget.name}`}
+          aria-pressed={mixTarget.mute}
           className={styles.laneToggle}
           data-control="mute"
           data-active={mixTarget.mute}
@@ -315,9 +345,6 @@ export function AudioOutputLane({
           type="button"
         >
           Mute
-        </button>
-        <button className={styles.laneToggle} data-control="cue" disabled type="button">
-          Cue
         </button>
       </div>
     </article>

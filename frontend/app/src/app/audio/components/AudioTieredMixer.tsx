@@ -3,6 +3,7 @@ import type { ShellStore } from "@sse/engine-client";
 import { ArrowRight, Mic, Play } from "lucide-react";
 
 import styles from "../AudioWorkspace.module.css";
+import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import { type AudioChannelGroupSelectionRequest, type AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioChannelLane, AudioOutputLane } from "./AudioMixerLane";
 
@@ -31,29 +32,31 @@ function TierIcon({ tierId }: { tierId: string }) {
 }
 
 export function AudioTieredMixer({
-  clearDraftValue,
+  clearDraftValueLater,
   commitChannelContinuous,
   commitMixTargetContinuous,
+  draftStore,
   getDraftValue,
   onClearClip,
   onOpenChannelMenu,
   onSelectChannel,
   onSelectChannelGroup,
-  onSelectMixTarget,
+  onSelectOutputMixTarget,
   setDraftValue,
   onUpdateChannel,
   onUpdateMixTarget,
   viewModel,
 }: {
-  clearDraftValue: (key: string) => void;
+  clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
+  draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   onClearClip: (channelId: string) => void;
   onOpenChannelMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
   onSelectChannel: (channelId: string | null) => void;
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
-  onSelectMixTarget: (mixTargetId: string) => void;
+  onSelectOutputMixTarget: (mixTargetId: string) => void;
   setDraftValue: (key: string, value: number) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
@@ -76,6 +79,7 @@ export function AudioTieredMixer({
             <div className={styles.tierChipRow}>
               {tier.chips.map((chip) => (
                 <button
+                  aria-pressed={chip.active === true}
                   className={styles.tierChip}
                   data-active={chip.active === true}
                   data-chip={chip.id}
@@ -118,8 +122,9 @@ export function AudioTieredMixer({
                 <AudioChannelLane
                   actionsAllowed={viewModel.actionsAllowed}
                   channel={channel}
-                  clearDraftValue={clearDraftValue}
+                  clearDraftValueLater={clearDraftValueLater}
                   commitChannelContinuous={commitChannelContinuous}
+                  draftStore={draftStore}
                   feeding={viewModel.feedingChannelIds.includes(channel.id)}
                   getDraftValue={getDraftValue}
                   index={index}
@@ -169,16 +174,14 @@ export function AudioTieredMixer({
           {viewModel.hardwareOutputs.mixTargets.map((mixTarget, index) => (
             <AudioOutputLane
               actionsAllowed={viewModel.actionsAllowed}
-              clearDraftValue={clearDraftValue}
+              clearDraftValueLater={clearDraftValueLater}
               commitMixTargetContinuous={commitMixTargetContinuous}
+              draftStore={draftStore}
               getDraftValue={getDraftValue}
               index={index}
               key={mixTarget.id}
               mixTarget={mixTarget}
-              onSelect={(mixTargetId) => {
-                onSelectChannel(null);
-                onSelectMixTarget(mixTargetId);
-              }}
+              onSelect={onSelectOutputMixTarget}
               onUpdateMixTarget={onUpdateMixTarget}
               setDraftValue={setDraftValue}
               selected={mixTarget.id === viewModel.selectedMixTargetId}

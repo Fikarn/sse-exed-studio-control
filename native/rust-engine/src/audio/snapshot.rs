@@ -6,8 +6,11 @@ use super::helpers::*;
 use super::types::*;
 use super::*;
 
+const AUDIO_FADER_UNITY: f64 = 0.8;
+
 pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot {
     let config = resolve_audio_config(settings);
+    let metering_source = config.metering_source.clone();
     let check_status = audio_check_status(settings);
     let osc_enabled = audio_osc_enabled(settings);
     let status = match check_status.as_str() {
@@ -71,12 +74,12 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
         .collect::<Vec<_>>();
     let metering_state = if !osc_enabled {
         String::from("disabled")
+    } else if metering_source == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE {
+        String::from("simulated")
     } else if verified {
-        String::from("transport-only")
-    } else if check_status == "failed" {
-        String::from("offline")
+        String::from("live")
     } else {
-        String::from("disabled")
+        String::from("offline")
     };
 
     AudioSnapshot {
@@ -84,6 +87,7 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
             status: &status,
             config: &config,
             osc_enabled,
+            metering_source: &metering_source,
             channel_count: channels.len(),
             mix_target_count: mix_targets.len(),
             snapshot_count: snapshots.len(),
@@ -103,6 +107,7 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
         osc_enabled,
         connected,
         verified,
+        metering_source,
         metering_state,
         selected_channel_id,
         selected_mix_target_id,
@@ -126,7 +131,7 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
     }
 }
 
-fn apply_mix_target_metering(
+pub(super) fn apply_mix_target_metering(
     channels: &[AudioChannelSnapshot],
     mix_targets: &mut [AudioMixTargetSnapshot],
 ) {
@@ -186,7 +191,9 @@ fn apply_mix_target_metering(
                 channel.peak_hold_right.max(channel.peak_hold)
             };
             let dim_scale = if mix_target.dim { 0.42 } else { 1.0 };
-            let gain = (send_level * mix_target.volume * dim_scale * 0.5).clamp(0.0, 1.0);
+            let gain = totalmix_fader_gain(send_level)
+                * totalmix_fader_gain(mix_target.volume)
+                * dim_scale;
             left_energy += (source_left * gain).powi(2);
             right_energy += (source_right * gain).powi(2);
             peak_left_energy += (source_peak_left * gain).powi(2);
@@ -221,6 +228,55 @@ fn apply_mix_target_metering(
     }
 }
 
+fn totalmix_fader_gain(value: f64) -> f64 {
+    let normalized = if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    if normalized <= 0.0 {
+        return 0.0;
+    }
+
+    let db = if normalized >= 1.0 {
+        6.0
+    } else if normalized <= 0.7 {
+        -60.0 + (normalized / 0.7) * 50.0
+    } else if normalized <= AUDIO_FADER_UNITY {
+        -10.0 + ((normalized - 0.7) / 0.1) * 10.0
+    } else {
+        ((normalized - AUDIO_FADER_UNITY) / 0.2) * 6.0
+    };
+
+    10.0_f64.powf(db / 20.0)
+}
+
+pub fn refresh_audio_snapshot_metering(
+    snapshot: &mut AudioSnapshot,
+    live_channels: &[AudioChannelSnapshot],
+) {
+    let live_channels_by_id = live_channels
+        .iter()
+        .map(|channel| (channel.id.as_str(), channel))
+        .collect::<HashMap<_, _>>();
+
+    for channel in &mut snapshot.channels {
+        let Some(live_channel) = live_channels_by_id.get(channel.id.as_str()) else {
+            continue;
+        };
+
+        channel.meter_left = live_channel.meter_left;
+        channel.meter_right = live_channel.meter_right;
+        channel.meter_level = live_channel.meter_level;
+        channel.peak_hold = live_channel.peak_hold;
+        channel.peak_hold_left = live_channel.peak_hold_left;
+        channel.peak_hold_right = live_channel.peak_hold_right;
+        channel.clip = channel.clip || live_channel.clip;
+    }
+
+    apply_mix_target_metering(&snapshot.channels, &mut snapshot.mix_targets);
+}
+
 pub fn build_audio_health_check(settings: &HashMap<String, String>) -> AudioHealthCheck {
     let snapshot = read_audio_snapshot(settings);
     AudioHealthCheck {
@@ -231,6 +287,7 @@ pub fn build_audio_health_check(settings: &HashMap<String, String>) -> AudioHeal
         send_port: snapshot.send_port,
         receive_port: snapshot.receive_port,
         verified: snapshot.verified,
+        metering_source: snapshot.metering_source,
         metering_state: snapshot.metering_state,
     }
 }

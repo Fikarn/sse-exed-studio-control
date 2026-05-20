@@ -23,5 +23,13 @@ export function createThrottledCommit<T>(commit: ContinuousCommit<T>, delayMs = 
     }
   };
 
-  return { flush, schedule };
+  const cancel = () => {
+    if (timer !== null) {
+      window.clearTimeout(timer);
+      timer = null;
+    }
+    latest = null;
+  };
+
+  return { cancel, flush, schedule };
 }

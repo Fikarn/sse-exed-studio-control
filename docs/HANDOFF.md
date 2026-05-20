@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the top-level engineering handoff for the repository as of `2026-05-17`.
+This is the top-level engineering handoff for the repository as of `2026-05-20`.
 
 Read this first before resuming product, release, or cleanup work. Use it as the entry point into the more detailed documents linked below.
 
@@ -69,6 +69,9 @@ The highest-value unresolved work is:
    GitHub Actions is not the acceptance mechanism for the replacement-shell cutover. `npm run tauri:setup-support:qualify`, `npm run tauri:workspaces:qualify`, and `npm run tauri:visual:review` remain local/manual cutover-readiness gates for future shell changes. The historical `tauri:package:*` lanes remain useful pre-switch evidence under `release/tauri-candidate*`. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`; `npm run native:release:mac:local` passed for published `v2.2.1`, and `npm run native:release:win:evidence` passed on Windows 11 `x64` with evidence bundle `2026-04-24T22-17-55-519Z`. Checkpoint D also passed macOS `npm run native:release:mac:local` and Windows 11 `x64` evidence bundle `2026-04-25T07-32-31-463Z` on commit `d0205baf52ce02d7d4d24699facd202f3bbba217`. [GitHub issue #3](https://github.com/Fikarn/sse-exed-studio-control/issues/3) records the completed Checkpoint C evidence and closed fallback window; [GitHub issue #4](https://github.com/Fikarn/sse-exed-studio-control/issues/4) records the passed `v2.2.1` operator rollout; [GitHub issue #5](https://github.com/Fikarn/sse-exed-studio-control/issues/5) records the completed Checkpoint D / Qt retirement track.
 6. Preserve responsive-layout semantics.
    The studio surface is a logical `2560x1440` operator composition whose layout decisions are driven by CSS viewport size, not physical pixels or `devicePixelRatio`. Aspect-ratio-correct Scaled Studio Preview is the normal current-hardware human review path for studio composition on the built-in MacBook display. The fixed studio monitor remains the final authority for physical-size readability and ergonomics. BetterDisplay is now optional fallback tooling, not the standard workflow.
+
+   Scaled Studio Preview must behave like the native `2560x1440` studio surface after scaling, not like the host MacBook logical viewport. For operator-density and compact-mode CSS, prefer logical operator-root/container sizing over global viewport media queries. Keep global media rules for genuinely global concerns such as `prefers-reduced-motion`.
+
 7. Preserve fixture-catalog ownership.
    Fixture definitions, DMX footprints, DMX labels/encoders, universe-aware overlap validation, scene serialization, and persisted compatibility live in `native/rust-engine/src/lighting/`. Frontend code may mirror catalog metadata for fixture transport tests and render controls/shapes from snapshots, but it must not own device policy. Do not add GDTF import, Sidus Bluetooth discovery, firmware update, or vendor auto-configuration without a new scoped plan.
 8. Preserve stage-plot smoothness.
@@ -76,7 +79,7 @@ The highest-value unresolved work is:
 
 ## Execution Queue
 
-The current GitHub execution queue is empty as of `2026-05-17`; no open issues or pull requests are waiting for handoff.
+The current GitHub execution queue is empty as of `2026-05-20`; no open issues or pull requests are waiting for handoff. Audio meter PRs [#83](https://github.com/Fikarn/sse-exed-studio-control/pull/83) and [#84](https://github.com/Fikarn/sse-exed-studio-control/pull/84) were merged, required checks passed after rebasing #84 onto the updated `main`, and stale remote Claude branches were pruned from GitHub.
 
 Completed repository-readiness record:
 
@@ -91,6 +94,34 @@ Completed rollout record:
 - [Issue #5: Checkpoint D: plan Qt fallback retirement](https://github.com/Fikarn/sse-exed-studio-control/issues/5), executed through [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](./archive/QT_FALLBACK_RETIREMENT_AUDIT.md)
 
 ## Recent Session Record
+
+### Audio page gold-standard and Scaled Studio Preview fidelity
+
+Status: active local Audio gold-standard pass completed through `GS-AUD-26` on `2026-05-19`; progress ledger preserved at [docs/plans/audio-ui-gold-standard-progress.md](./plans/audio-ui-gold-standard-progress.md).
+
+Important facts for future sessions:
+
+- The user confirmed the open selected Tauri shell as the authoritative visual verification surface. Treat feedback as referring to the live `sse-exed-tauri-shell` / `SSE ExEd Studio Control` window and its app-owned Scaled Studio Preview unless another artifact is explicitly named.
+- The Audio audit and implementation were based only on the current implementation and live rendered behavior. Do not use `docs/redesign/**` as source material for follow-up Audio fixes.
+- `2560x1440` is the primary operator target; `1920x1080` must remain no-scroll and usable, but it is not the optimization target.
+- Scaled Studio Preview must emulate native `2560x1440` exactly after scaling. Host-window compact rules must not leak into `[data-review-surface="studioPreview"][data-layout-mode="studioFull"]`.
+- The Audio workspace now uses the operator root as the sizing authority for compact/studio CSS behavior. Future operator-visible CSS should preserve that pattern instead of using raw viewport breakpoints for density decisions.
+- Audio preamp graphics must be aspect-safe: compact input lanes preserve `640 / 213`; narrow inspector preamps preserve `426 / 640`. Avoid non-uniform bitmap stretching.
+- Closed findings `GS-AUD-09` through `GS-AUD-26` cover the current local visual bug queue: rail dead-space fill, output-inspector truth, warning recovery gating by `canSync`, top route clipping, snapshot action overlap, 1920 fallback density, truth-fact readability, inspector internal fill, live shell lane-card bottom clipping, selected-channel Overview hierarchy, output-specific inspector mode, processing graph truth, sends ergonomics, safety/copy/accessibility polish, stabilized inspector meter readouts, unclipped meter scale labels, stacked full-width EQ/Dynamics previews, and sticky Hardware/Software placement directly below the inspector meter.
+- Keep the Playwright invariants added in this pass: Studio Preview reports logical `2560x1440`, selected-route text includes destination without overflow, snapshot actions do not intersect content, 1920 remains no-scroll, output EQ/Dynamics/Sends are not false affordances, compact/inspector preamp aspects hold, lane cards remain inside their tier grids, inspector meter readout boxes stay stable, all dBFS scale labels stay inside meter bounds, EQ/Dynamics Overview previews stack full-width, the Source Overview card remains removed, and Hardware/Software remains in the selected-channel sticky stack below metering.
+- Latest selected-channel inspector shape: sticky identity/route, meter, Hardware/Software card, send fader, Mute/Solo/Unity; Overview panel below is `Route / Sends`, `EQ preview`, `Dynamics preview`. Output inspector remains output-specific and does not expose disabled false tabs.
+- The Tauri visual review script now supports Scaled Studio Preview capture via `operatorReview=studio`; preview screenshots are saved separately and fidelity metrics are recorded in `artifacts/visual/tauri-cutover/fixture-viewport-summary.json`.
+- If a long-running `npm run tauri:dev` shell is on port `4173`, run visual review on an alternate port such as `--port=4174`. If the live shell falls into `ENGINE_READY_TIMEOUT` after broad frontend work, use the shell's own retry flow before judging the surface.
+- Before further Audio edits, add new finding IDs, acceptance criteria, checklist items, validation commands, and artifact targets to [docs/plans/audio-ui-gold-standard-progress.md](./plans/audio-ui-gold-standard-progress.md).
+
+Validation recorded for this pass:
+
+- `npm run frontend:typecheck` passed.
+- `npm run frontend:playwright:test` passed with 75 tests.
+- `npm run tauri:visual:review -- --fixtures=audio-populated,audio-selected-channel,audio-1920-fallback,audio-not-verified --sizes=2560x1440,1920x1080 --port=4174` passed with 10 screenshots, including Scaled Studio Preview captures for Audio fixtures.
+- `git diff --check` passed.
+- Live selected Tauri shell inspection passed after `GS-AUD-26`; Audio rendered in Scaled Studio Preview, Hardware/Software sat directly below the meter card, the Source card was removed, and Route/EQ/Dynamics filled the selected-channel Overview below.
+- Latest live-shell evidence was saved at `artifacts/visual/tauri-cutover/audio-live-studio-preview-after-gs-aud-26.png`; the ledger also records earlier GS-AUD evidence paths.
 
 ### Responsive operator layout, Lighting-first pass
 

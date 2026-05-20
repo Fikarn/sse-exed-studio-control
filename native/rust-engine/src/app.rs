@@ -1,7 +1,7 @@
 use crate::app_state::{build_app_snapshot, parse_commissioning_update, APP_SETTINGS_PREFIX};
 use crate::audio::{
-    build_audio_health_check, clear_audio_clips, create_audio_snapshot, delete_audio_snapshot,
-    parse_audio_channel_update_request, parse_audio_clip_clear_request,
+    build_audio_health_check, clear_all_audio_solo, clear_audio_clips, create_audio_snapshot,
+    delete_audio_snapshot, parse_audio_channel_update_request, parse_audio_clip_clear_request,
     parse_audio_dynamics_update_request, parse_audio_eq_update_request,
     parse_audio_mix_target_update_request, parse_audio_send_mode_update_request,
     parse_audio_settings_update_request, parse_audio_snapshot_create_request,
@@ -141,11 +141,28 @@ impl EngineApp {
             .ok()
             .and_then(|snapshot| {
                 snapshot
-                    .get("adapterMode")
+                    .get("meteringSource")
                     .and_then(serde_json::Value::as_str)
                     .map(str::to_owned)
             })
-            .is_some_and(|adapter_mode| adapter_mode == "simulated")
+            .is_some_and(|metering_source| metering_source == "simulated")
+    }
+
+    pub fn should_emit_rme_totalmix_audio_metering(&self) -> bool {
+        self.read_audio_snapshot()
+            .ok()
+            .and_then(|snapshot| {
+                let osc_enabled = snapshot
+                    .get("oscEnabled")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false);
+                let metering_source = snapshot
+                    .get("meteringSource")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned)?;
+                Some(osc_enabled && metering_source == "rme-totalmix-osc")
+            })
+            .unwrap_or(false)
     }
 
     pub fn handle_request(&self, request: RequestEnvelope) -> EngineReply {
@@ -376,6 +393,9 @@ impl EngineApp {
                 clear_audio_clips,
                 "clips-cleared",
             ),
+            "audio.solo.clearAll" => {
+                self.run_audio_mutate(request.id, clear_all_audio_solo, "solo-cleared")
+            }
             "audio.snapshot.recall" => self.dispatch_audio_mutate(
                 request,
                 parse_audio_snapshot_recall_request,
