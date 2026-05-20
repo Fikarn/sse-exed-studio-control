@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { memo, type CSSProperties } from "react";
 
 import styles from "../AudioWorkspace.module.css";
 import { formatMeterDb, meterTone, normalizedToDbfs } from "../audioFormatting";
@@ -13,17 +13,7 @@ function meterPercent(value: number) {
   return `${(Math.max(0, Math.min(1, value)) * 100).toFixed(1)}%`;
 }
 
-export function AudioStereoMeter({
-  clip,
-  left,
-  peak,
-  peakLeft,
-  peakRight,
-  right,
-  showPeakReadout = false,
-  showReadout = true,
-  showScale = false,
-}: {
+type AudioStereoMeterProps = {
   clip?: boolean;
   left: number;
   peak?: number;
@@ -33,7 +23,19 @@ export function AudioStereoMeter({
   showPeakReadout?: boolean;
   showReadout?: boolean;
   showScale?: boolean;
-}) {
+};
+
+function AudioStereoMeterImpl({
+  clip,
+  left,
+  peak,
+  peakLeft,
+  peakRight,
+  right,
+  showPeakReadout = false,
+  showReadout = true,
+  showScale = false,
+}: AudioStereoMeterProps) {
   const leftPeak = peakLeft ?? peak ?? Math.max(left, right);
   const rightPeak = peakRight ?? peak ?? Math.max(left, right);
   const style = {
@@ -74,6 +76,7 @@ export function AudioStereoMeter({
           <span>-6</span>
           <span>-12</span>
           <span>-24</span>
+          <span>-48</span>
           <span>-∞</span>
         </div>
       ) : null}
@@ -83,3 +86,19 @@ export function AudioStereoMeter({
     </div>
   );
 }
+
+function arePropsEqual(prev: AudioStereoMeterProps, next: AudioStereoMeterProps) {
+  return (
+    prev.left === next.left &&
+    prev.right === next.right &&
+    prev.peak === next.peak &&
+    prev.peakLeft === next.peakLeft &&
+    prev.peakRight === next.peakRight &&
+    prev.clip === next.clip &&
+    prev.showPeakReadout === next.showPeakReadout &&
+    prev.showReadout === next.showReadout &&
+    prev.showScale === next.showScale
+  );
+}
+
+export const AudioStereoMeter = memo(AudioStereoMeterImpl, arePropsEqual);
