@@ -34,12 +34,13 @@ test("idle meter ticks do not bump the audio inspector render counter", async ({
   expect(afterIdle, "audioInspector counter should still be defined after idle").not.toBeNull();
 
   const delta = afterIdle! - baseline!;
-  // Tolerance: a small handful of view-model recomputations is acceptable
-  // (sync-timestamp formatting, optimistic shadow expiry, etc.) but a
-  // meter-frame-driven re-render storm would bump the counter by 100+ in
-  // 1.5 s. 10 is comfortably above the legitimate floor and well below a
-  // regression.
-  expect(delta).toBeLessThanOrEqual(10);
+  // Tolerance: ≤ +2 over the post-Slice-5C baseline. Measured Δ over
+  // 3 runs after the keyboard + palette hook extraction: 1, 1, 1.
+  // Headroom of +2 catches a real regression (a meter-frame-driven
+  // re-render storm bumps the counter by 100+ in 1.5 s) while keeping
+  // the budget tight enough to flag subtle drift the previous ≤ 10
+  // budget would have hidden.
+  expect(delta).toBeLessThanOrEqual(3);
 });
 
 test("switching tabs does not multiply the audio inspector render count", async ({ page }) => {
@@ -53,10 +54,11 @@ test("switching tabs does not multiply the audio inspector render count", async 
   const baseline = await getInspectorRenderCount(page);
   expect(baseline).not.toBeNull();
 
-  // Click through every tab; each click should re-render the inspector at
-  // most a few times. Pre-split this used to be 1–2 renders per tab; the
-  // split's wider prop surface might add another. We allow ≤ 6 renders per
-  // tab transition.
+  // Click through every tab. The inspector re-renders on each tab change
+  // (active-tab state lives in the workspace, but the inspector consumes
+  // it). Post-Slice-5C the measured Δ across the 4 tabs is 4 or 5 over
+  // 3 runs; a +2 headroom catches a real regression while flagging subtle
+  // drift the previous ≤ 24 budget would have hidden.
   for (const tabName of ["EQ", "Dynamics", "Sends", "Overview"]) {
     await page.getByRole("tab", { name: tabName }).click();
     await page.waitForTimeout(120);
@@ -66,5 +68,5 @@ test("switching tabs does not multiply the audio inspector render count", async 
   expect(afterTabs).not.toBeNull();
   const delta = afterTabs! - baseline!;
   expect(delta).toBeGreaterThan(0);
-  expect(delta).toBeLessThanOrEqual(24); // 4 tabs × ≤ 6 renders each.
+  expect(delta).toBeLessThanOrEqual(7);
 });
