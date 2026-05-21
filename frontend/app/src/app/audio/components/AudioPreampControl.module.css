@@ -1,0 +1,183 @@
+.preampModule {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.72),
+    0 2px 5px rgba(0, 0, 0, 0.36);
+}
+
+.preampControl {
+  --gain-pct: 0%;
+  --gain-rotation: -125deg;
+  --preamp-control-width: 195px;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+  justify-self: start;
+  width: min(100%, var(--preamp-control-width));
+  min-height: 0;
+  height: auto;
+  aspect-ratio: 640 / 213;
+}
+
+.preampControl[data-variant="narrow"] {
+  --preamp-control-width: 48px;
+  aspect-ratio: 426 / 640;
+}
+
+.preampControl[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.preampPanel {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.preampLedRing {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.preampLedDot {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 0;
+  filter: none;
+  opacity: 0;
+}
+
+.preampLedDotActive {
+  fill: #5fe7ff;
+  stroke: rgba(213, 252, 255, 0.96);
+  stroke-width: 0.28;
+  filter: drop-shadow(0 0 1.1px rgba(126, 236, 255, 0.9)) drop-shadow(0 0 3.4px rgba(48, 198, 255, 0.54));
+  opacity: 1;
+}
+
+.preampLedDotCurrent {
+  fill: #f3feff;
+  stroke: #fff;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 5px rgba(76, 217, 255, 0.78));
+}
+
+.preampLedArc {
+  position: absolute;
+  left: 18.2%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  pointer-events: none;
+  border-radius: 999px;
+  background: conic-gradient(
+    from -135deg,
+    rgba(86, 222, 255, 0.96) 0 var(--gain-sweep),
+    rgba(242, 250, 255, 0.3) var(--gain-sweep) 270deg,
+    transparent 270deg 360deg
+  );
+  opacity: 0.72;
+  filter: drop-shadow(0 0 4px rgba(66, 214, 255, 0.62));
+  mask: radial-gradient(circle, transparent 0 22px, black 23px 25px, transparent 26px);
+  transform: translate(-50%, -50%);
+}
+
+.preampKnob {
+  position: absolute;
+  z-index: 2;
+  left: 18.2%;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 8px color-mix(in srgb, black 46%, transparent));
+  transform: translate(-50%, -50%) rotate(var(--gain-rotation));
+}
+
+.preampNumber {
+  display: none;
+}
+
+.preampGainLabel {
+  position: absolute;
+  z-index: 4;
+  left: 54.6%;
+  top: 50%;
+  min-width: 66px;
+  pointer-events: none;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #8beaff;
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+  text-shadow: 0 0 5px rgba(75, 217, 255, 0.66);
+  transform: translate(-50%, -50%);
+}
+
+.preampGainLabel i {
+  margin-left: 3px;
+  color: rgba(216, 247, 255, 0.5);
+  font-size: 8px;
+  font-style: normal;
+  text-shadow: none;
+}
+
+.preampControl[data-variant="narrow"] .preampLedArc,
+.preampControl[data-variant="narrow"] .preampKnob {
+  left: 50%;
+  top: 42.5%;
+}
+
+.preampControl[data-variant="narrow"] .preampLedArc {
+  width: 64px;
+  height: 64px;
+  mask: radial-gradient(circle, transparent 0 23px, black 24px 26px, transparent 27px);
+}
+
+.preampControl[data-variant="narrow"] .preampKnob {
+  width: 42px;
+  height: 42px;
+}
+
+.preampControl[data-variant="narrow"] .preampGainLabel {
+  left: 50%;
+  top: 66%;
+  min-width: 68px;
+  font-size: 9px;
+}
+
+@container operator-root (max-width: 2100px) {
+  .preampKnob {
+    width: 24px;
+    height: 24px;
+  }
+
+  .preampGainLabel {
+    right: 3px;
+    bottom: 3px;
+    padding: 2px 4px;
+    font-size: 8px;
+  }
+}

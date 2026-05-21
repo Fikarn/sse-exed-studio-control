@@ -11,7 +11,7 @@ import {
 import preampKnobBody from "../assets/preamp/preamp-knob-body.png";
 import preampPanelCompact from "../assets/preamp/preamp-panel-compact.png";
 import preampPanelNarrow from "../assets/preamp/preamp-panel-narrow.png";
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioPreampControl.module.css";
 import {
   AUDIO_DRAFT_CLEAR_MS,
   PREAMP_GAIN_MAX_DB,

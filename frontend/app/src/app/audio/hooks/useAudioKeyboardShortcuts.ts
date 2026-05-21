@@ -66,22 +66,21 @@ export function useAudioKeyboardShortcuts({
   warningBandRef,
 }: UseAudioKeyboardShortcutsArgs) {
   const handleKeyDown = useLiveCallback((event: KeyboardEvent) => {
-    if (!viewModel || event.defaultPrevented) {
-      return;
-    }
+    if (!viewModel || event.defaultPrevented) return;
+    const plain = !event.metaKey && !event.ctrlKey && !event.altKey;
+    const cmdOrCtrl = event.metaKey || event.ctrlKey;
+    const key = event.key.toLowerCase();
 
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Escape" && cancelArmedAction()) {
+    if (plain && event.key === "Escape" && cancelArmedAction()) {
       event.preventDefault();
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Escape" && contextMenu) {
+    if (plain && event.key === "Escape" && contextMenu) {
       setContextMenu(null);
       event.preventDefault();
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Escape") {
+    if (plain && event.key === "Escape") {
       if (inspectorTab !== "channel") {
         setInspectorTab("channel");
         event.preventDefault();
@@ -94,35 +93,29 @@ export function useAudioKeyboardShortcuts({
       return;
     }
 
-    if (isEditableTarget(event.target)) {
-      return;
-    }
+    if (isEditableTarget(event.target)) return;
 
-    if (!event.metaKey && !event.ctrlKey && event.altKey && event.key.toLowerCase() === "c") {
+    if (!event.metaKey && !event.ctrlKey && event.altKey && key === "c") {
       clearClips();
       event.preventDefault();
       return;
     }
-
-    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "s") {
+    if (cmdOrCtrl && !event.altKey && key === "s") {
       saveCurrentSnapshot();
       event.preventDefault();
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "[") {
+    if (plain && event.key === "[") {
       previousBank();
       event.preventDefault();
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "]") {
+    if (plain && event.key === "]") {
       nextBank();
       event.preventDefault();
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey && /^Digit[1-8]$/.test(event.code)) {
+    if (plain && event.shiftKey && /^Digit[1-8]$/.test(event.code)) {
       const snapshot = viewModel.snapshots[Number(event.code.replace("Digit", "")) - 1];
       if (snapshot) {
         recallSnapshot(snapshot.id);
@@ -130,8 +123,7 @@ export function useAudioKeyboardShortcuts({
       }
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && /^Digit[1-8]$/.test(event.code)) {
+    if (plain && /^Digit[1-8]$/.test(event.code)) {
       const channel = visibleSelectableChannels[Number(event.code.replace("Digit", "")) - 1];
       if (channel) {
         selectChannel(channel.id);
@@ -139,43 +131,22 @@ export function useAudioKeyboardShortcuts({
       }
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "m") {
-      if (viewModel.selectedChannel) {
-        updateChannel({
-          channelId: viewModel.selectedChannel.id,
-          mute: !viewModel.selectedChannel.mute,
-        });
-        event.preventDefault();
-      }
+    if (plain && key === "m" && viewModel.selectedChannel) {
+      updateChannel({ channelId: viewModel.selectedChannel.id, mute: !viewModel.selectedChannel.mute });
+      event.preventDefault();
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "s") {
-      if (viewModel.selectedChannel) {
-        updateChannel({
-          channelId: viewModel.selectedChannel.id,
-          solo: !viewModel.selectedChannel.solo,
-        });
-        event.preventDefault();
-      }
+    if (plain && key === "s" && viewModel.selectedChannel) {
+      updateChannel({ channelId: viewModel.selectedChannel.id, solo: !viewModel.selectedChannel.solo });
+      event.preventDefault();
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "u") {
-      if (viewModel.selectedChannel && viewModel.selectedMixTargetId) {
-        resetChannelFaderToUnity(viewModel.selectedChannel.id, viewModel.selectedMixTargetId);
-        event.preventDefault();
-      }
+    if (plain && key === "u" && viewModel.selectedChannel && viewModel.selectedMixTargetId) {
+      resetChannelFaderToUnity(viewModel.selectedChannel.id, viewModel.selectedMixTargetId);
+      event.preventDefault();
       return;
     }
-
-    if (
-      !event.metaKey &&
-      !event.ctrlKey &&
-      !event.altKey &&
-      ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
-    ) {
+    if (plain && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
       if (orderedSelectableSources.length > 0) {
         const currentIndex = orderedSelectableSources.findIndex((entry) =>
           viewModel.selectedChannelId
@@ -190,26 +161,21 @@ export function useAudioKeyboardShortcuts({
               : orderedSelectableSources.length - 1
             : Math.max(0, Math.min(orderedSelectableSources.length - 1, currentIndex + direction));
         const nextSource = orderedSelectableSources[nextIndex];
-        if (nextSource?.kind === "channel") {
-          selectChannel(nextSource.id);
-        } else if (nextSource?.kind === "output") {
-          selectOutputMixTarget(nextSource.id);
-        }
+        if (nextSource?.kind === "channel") selectChannel(nextSource.id);
+        else if (nextSource?.kind === "output") selectOutputMixTarget(nextSource.id);
         event.preventDefault();
       }
       return;
     }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Enter") {
-      if (
-        warningBandRef.current &&
-        document.activeElement === warningBandRef.current &&
-        viewModel.capabilities.canSync
-      ) {
-        syncAudio();
-        event.preventDefault();
-      }
-      return;
+    if (
+      plain &&
+      event.key === "Enter" &&
+      warningBandRef.current &&
+      document.activeElement === warningBandRef.current &&
+      viewModel.capabilities.canSync
+    ) {
+      syncAudio();
+      event.preventDefault();
     }
   });
 

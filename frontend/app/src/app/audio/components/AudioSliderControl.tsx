@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioSliderControl.module.css";
 import { AUDIO_DRAFT_CLEAR_MS } from "../audioConstants";
 import { AUDIO_FADER_UNITY, snapFaderValue } from "../audioFormatting";
 

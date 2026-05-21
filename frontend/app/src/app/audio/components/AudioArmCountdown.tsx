@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioArmCountdown.module.css";
 
 interface AudioArmCountdownProps {
   durationMs: number;
@@ -12,8 +12,8 @@ interface AudioArmCountdownProps {
  * the polite aria-live toast on the workspace. The bar is `aria-hidden` so
  * screen-readers do not read it as another live region.
  *
- * Reduced-motion variant lives in `AudioWorkspace.module.css`; this component
- * never inspects the user preference itself.
+ * Reduced-motion variant lives in `AudioArmCountdown.module.css`; this
+ * component never inspects the user preference itself.
  */
 export function AudioArmCountdown({ durationMs }: AudioArmCountdownProps) {
   return (

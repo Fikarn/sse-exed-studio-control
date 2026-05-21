@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioStereoMeter.module.css";
 import {
   dbfsToMeterPercent,
   formatMeterDb,

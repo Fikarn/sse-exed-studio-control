@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { AudioMeterEntry, AudioMeterFrame, ShellStore } from "@sse/engine-client";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioMeterCanvasOverlay.module.css";
 import {
   dbfsToMeterPercent,
   METER_FLOOR_DBFS,

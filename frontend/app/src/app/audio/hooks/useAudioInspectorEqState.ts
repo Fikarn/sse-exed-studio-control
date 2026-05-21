@@ -1,14 +1,8 @@
 /**
  * EQ state + derived view-values + pointer commit handlers for the
  * audio inspector. Owned by a hook so the AudioInspector router stays
- * thin while the Channel Overview EQ mini card, the EQ tab body, and
- * the Inspector header can all consume the same draft state.
- *
- * Why a hook (and not just module-scope helpers): the EQ state is
- * stateful (`selectedEqBandId`, `eqGraphDraft`, `eqDragRef`,
- * `throttledEqCommit`) and the commit handlers close over those refs
- * + the draft-store callbacks. A hook is the right boundary because
- * it pairs the state with the handlers that mutate it.
+ * thin while the Channel Overview EQ mini card and the EQ tab body
+ * can consume the same draft state via `{...eqState}` spreads.
  */
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
@@ -63,35 +57,26 @@ export function useAudioInspectorEqState({
 
   useEffect(() => () => throttledEqCommit.cancel(), [throttledEqCommit]);
 
+  const channelId = selectedChannel?.id ?? "none";
   const activeEqHandleId =
     selectedEqBandId === LOW_CUT_HANDLE_ID
       ? LOW_CUT_HANDLE_ID
-      : (selectedChannel?.eq.bands.find((band) => band.id === selectedEqBandId)?.id ??
+      : (selectedChannel?.eq.bands.find((b) => b.id === selectedEqBandId)?.id ??
         selectedChannel?.eq.bands[0]?.id ??
         LOW_CUT_HANDLE_ID);
-  const activeEqBand = selectedChannel?.eq.bands.find((band) => band.id === activeEqHandleId) ?? null;
-  const lowCutFrequencyKey = selectedChannel
-    ? `channel:${selectedChannel.id}:eq:lowCut:frequency`
-    : "channel:none:eq:lowCut:frequency";
+  const activeEqBand = selectedChannel?.eq.bands.find((b) => b.id === activeEqHandleId) ?? null;
+  const activeBandId = activeEqBand?.id ?? "none";
+  const lowCutFrequencyKey = `channel:${channelId}:eq:lowCut:frequency`;
   const lowCutFrequencyValue = selectedChannel
     ? getDraftValue(lowCutFrequencyKey, selectedChannel.eq.lowCut.frequencyHz)
     : 80;
-  const activeEqBandFrequencyKey =
-    selectedChannel && activeEqBand
-      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:frequency`
-      : "channel:none:eq:none:frequency";
+  const activeEqBandFrequencyKey = `channel:${channelId}:eq:${activeBandId}:frequency`;
   const activeEqBandFrequencyValue = activeEqBand
     ? getDraftValue(activeEqBandFrequencyKey, activeEqBand.frequencyHz)
     : 0;
-  const activeEqBandGainKey =
-    selectedChannel && activeEqBand
-      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:gain`
-      : "channel:none:eq:none:gain";
+  const activeEqBandGainKey = `channel:${channelId}:eq:${activeBandId}:gain`;
   const activeEqBandGainValue = activeEqBand ? getDraftValue(activeEqBandGainKey, activeEqBand.gainDb) : 0;
-  const activeEqBandQKey =
-    selectedChannel && activeEqBand
-      ? `channel:${selectedChannel.id}:eq:${activeEqBand.id}:q`
-      : "channel:none:eq:none:q";
+  const activeEqBandQKey = `channel:${channelId}:eq:${activeBandId}:q`;
   const activeEqBandQValue = activeEqBand ? getDraftValue(activeEqBandQKey, activeEqBand.q) : 0;
   const activeEqBandTypeOptions =
     activeEqBand?.id === "1"
@@ -99,9 +84,7 @@ export function useAudioInspectorEqState({
       : activeEqBand?.id === "3"
         ? ["bell", "high-shelf", "low-pass", "high-pass"]
         : ["bell"];
-  // Why: TotalMix Band 2 is fixed-Bell; do not surface band-type toggles for
-  // it. Future RME firmware changes that unlock the shape land here as a
-  // single capability swap.
+  // Why: TotalMix Band 2 is fixed-Bell. Single capability swap if RME unlocks it.
   const canChangeBandType = activeEqBand?.id !== "2";
   const eqBands = selectedChannel
     ? selectedChannel.eq.bands.map((band) =>
@@ -134,12 +117,9 @@ export function useAudioInspectorEqState({
     mode: "schedule" | "flush" = "schedule"
   ) => {
     if (!selectedChannel || !viewModel.capabilities.canEditProcessing) return;
-    // Why: re-read the EQ graph rect every pointer event. Caching the rect at
-    // pointerDown drifted when the inspector resized mid-drag (eg. window
-    // resize, scaled-preview toggle, virtual-keyboard reflow on touch hosts);
-    // the cached width/left lagged and the drag jumped sideways. The
-    // `eqDragRef` still anchors the active band identity and the pointer id,
-    // but rect numbers are now always live.
+    // Why: re-read the EQ graph rect every pointer event so resize mid-drag
+    // (scaled-preview toggle, virtual-keyboard reflow) does not lag the
+    // drag sideways. `eqDragRef` still anchors band+pointer identity.
     const graph = event.currentTarget.closest("[data-eq-graph]");
     if (!(graph instanceof HTMLElement)) return;
 
