@@ -103,7 +103,7 @@
   text-transform: none;
 }
 
-.monitorLevel :global(.sliderControl) {
+.monitorLevel [class*="sliderControl"] {
   grid-column: 1 / -1;
   width: 100%;
 }

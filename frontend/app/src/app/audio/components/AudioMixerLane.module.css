@@ -85,7 +85,7 @@
   grid-template-columns: minmax(0, 1fr) 28px;
 }
 
-.channelLane[data-role="front-preamp"] :global(.preampControl) {
+.channelLane[data-role="front-preamp"] [class*="preampControl"] {
   --preamp-control-width: 195px;
 }
 
@@ -196,8 +196,8 @@
   min-height: 72px;
 }
 
-.laneBody :global(.stereoMeter),
-.laneBody :global(.fader) {
+.laneBody [class*="stereoMeter"],
+.laneBody [class*="fader"] {
   grid-row: 1;
 }
 
@@ -292,7 +292,7 @@
   font-size: 9px;
 }
 
-.outputLane :global(.faderValue) {
+.outputLane [class*="faderValue"] {
   display: none;
 }
 
@@ -379,7 +379,7 @@
     line-height: 1.15;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.preampControl) {
+  .channelLane[data-role="front-preamp"] [class*="preampControl"] {
     grid-area: preamp;
     --preamp-control-width: 246px;
     margin-top: 4px;
@@ -391,13 +391,13 @@
     min-height: 242px;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.stereoMeter[data-peak-readout="true"]),
-  .channelLane[data-role="playback-pair"] :global(.stereoMeter[data-peak-readout="true"]) {
+  .channelLane[data-role="front-preamp"] [class*="stereoMeter"][data-peak-readout="true"],
+  .channelLane[data-role="playback-pair"] [class*="stereoMeter"][data-peak-readout="true"] {
     grid-template-rows: 18px minmax(0, 1fr);
   }
 
-  .channelLane[data-role="front-preamp"] :global(.stereoMeter[data-peak-readout="true"] .meterPeakReadout),
-  .channelLane[data-role="playback-pair"] :global(.stereoMeter[data-peak-readout="true"] .meterPeakReadout) {
+  .channelLane[data-role="front-preamp"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterPeakReadout"],
+  .channelLane[data-role="playback-pair"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterPeakReadout"] {
     grid-column: 2;
     grid-row: 1;
     display: flex;
@@ -408,15 +408,15 @@
     letter-spacing: 0;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.stereoMeter[data-peak-readout="true"] .meterPair),
-  .channelLane[data-role="front-preamp"] :global(.stereoMeter[data-peak-readout="true"] .meterScale),
-  .channelLane[data-role="playback-pair"] :global(.stereoMeter[data-peak-readout="true"] .meterPair),
-  .channelLane[data-role="playback-pair"] :global(.stereoMeter[data-peak-readout="true"] .meterScale) {
+  .channelLane[data-role="front-preamp"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterPair"],
+  .channelLane[data-role="front-preamp"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterScale"],
+  .channelLane[data-role="playback-pair"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterPair"],
+  .channelLane[data-role="playback-pair"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterScale"] {
     grid-row: 2;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.fader),
-  .channelLane[data-role="playback-pair"] :global(.fader) {
+  .channelLane[data-role="front-preamp"] [class*="fader"],
+  .channelLane[data-role="playback-pair"] [class*="fader"] {
     padding-top: 22px;
   }
 
@@ -451,18 +451,18 @@
     min-height: 30px;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.preampKnob) {
+  .channelLane[data-role="front-preamp"] [class*="preampKnob"] {
     width: 44px;
     height: 44px;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.preampLedArc) {
+  .channelLane[data-role="front-preamp"] [class*="preampLedArc"] {
     width: 70px;
     height: 70px;
     mask: radial-gradient(circle, transparent 0 40px, black 41px 45px, transparent 46px);
   }
 
-  .channelLane[data-role="front-preamp"] :global(.preampGainLabel) {
+  .channelLane[data-role="front-preamp"] [class*="preampGainLabel"] {
     min-width: 78px;
     font-size: 13px;
   }
@@ -555,14 +555,14 @@
     min-height: 218px;
   }
 
-  .outputLane :global(.stereoMeter) {
+  .outputLane [class*="stereoMeter"] {
     grid-column: 1;
     grid-row: 1;
     justify-self: start;
     width: 84px;
   }
 
-  .outputLane :global(.fader) {
+  .outputLane [class*="fader"] {
     grid-column: 1;
     grid-row: 1;
     justify-self: end;
@@ -606,7 +606,7 @@
     grid-template-columns: minmax(30px, 0.32fr) 26px minmax(0, 1fr);
   }
 
-  .outputLane :global(.sliderControl[data-orientation="vertical"]) {
+  .outputLane [class*="sliderControl"][data-orientation="vertical"] {
     min-height: 68px;
   }
 
@@ -652,16 +652,16 @@
     height: 52px;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.sliderControl[data-orientation="vertical"]) {
+  .channelLane[data-role="front-preamp"] [class*="sliderControl"][data-orientation="vertical"] {
     min-height: 52px;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.preampKnob) {
+  .channelLane[data-role="front-preamp"] [class*="preampKnob"] {
     width: 36px;
     height: 36px;
   }
 
-  .channelLane[data-role="front-preamp"] :global(.preampGainLabel) {
+  .channelLane[data-role="front-preamp"] [class*="preampGainLabel"] {
     right: auto;
     bottom: auto;
     left: 54.6%;
@@ -687,7 +687,7 @@
     min-height: 48px;
   }
 
-  .channelLane[data-role="playback-pair"] :global(.sliderControl[data-orientation="vertical"]) {
+  .channelLane[data-role="playback-pair"] [class*="sliderControl"][data-orientation="vertical"] {
     min-height: 48px;
   }
 
@@ -719,11 +719,11 @@
 
 [data-layout-mode="studioFull"]
   .channelLane[data-role="front-preamp"]
-  :global(.sliderControl[data-orientation="vertical"]),
+  [class*="sliderControl"][data-orientation="vertical"],
 [data-layout-mode="studioFull"]
   .channelLane[data-role="playback-pair"]
-  :global(.sliderControl[data-orientation="vertical"]),
-[data-layout-mode="studioFull"] .outputLane :global(.sliderControl[data-orientation="vertical"]) {
+  [class*="sliderControl"][data-orientation="vertical"],
+[data-layout-mode="studioFull"] .outputLane [class*="sliderControl"][data-orientation="vertical"] {
   min-height: 0;
 }
 
@@ -764,7 +764,7 @@
   line-height: 1.15;
 }
 
-[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] :global(.preampControl) {
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] [class*="preampControl"] {
   grid-area: preamp;
   --preamp-control-width: 246px;
   margin-top: 4px;
@@ -895,14 +895,14 @@
   min-height: 206px;
 }
 
-[data-layout-mode="studioFull"] .outputLane :global(.stereoMeter) {
+[data-layout-mode="studioFull"] .outputLane [class*="stereoMeter"] {
   grid-column: 1;
   grid-row: 1;
   justify-self: start;
   width: 84px;
 }
 
-[data-layout-mode="studioFull"] .outputLane :global(.fader) {
+[data-layout-mode="studioFull"] .outputLane [class*="fader"] {
   grid-column: 1;
   grid-row: 1;
   justify-self: end;
@@ -945,7 +945,7 @@
     font-size: 14px;
   }
 
-  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] :global(.preampControl) {
+  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] [class*="preampControl"] {
     --preamp-control-width: 150px;
   }
 
@@ -1010,11 +1010,11 @@
     min-height: 0;
   }
 
-  [data-layout-mode="studioFull"] .outputLane :global(.stereoMeter) {
+  [data-layout-mode="studioFull"] .outputLane [class*="stereoMeter"] {
     width: 58px;
   }
 
-  [data-layout-mode="studioFull"] .outputLane :global(.fader) {
+  [data-layout-mode="studioFull"] .outputLane [class*="fader"] {
     width: 24px;
   }
 

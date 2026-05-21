@@ -347,19 +347,19 @@
   background: transparent;
 }
 
-/* Inspector send slider tweaks the shared :global(.sliderControl). */
+/* Inspector send slider tweaks the shared [class*="sliderControl"]. */
 .inspectorSendSlider[data-orientation="horizontal"] {
   height: 22px;
 }
 
-.inspectorSendSlider[data-orientation="horizontal"] :global(.sliderTrack) {
+.inspectorSendSlider[data-orientation="horizontal"] [class*="sliderTrack"] {
   top: 8px;
   bottom: 8px;
   border-color: color-mix(in srgb, var(--audio-accent) 36%, var(--audio-border));
   background: var(--audio-meter-bg);
 }
 
-.inspectorSendSlider[data-orientation="horizontal"] :global(.sliderFill) {
+.inspectorSendSlider[data-orientation="horizontal"] [class*="sliderFill"] {
   top: 9px;
   bottom: 9px;
   left: 2px;
@@ -368,7 +368,7 @@
   box-shadow: 0 0 9px color-mix(in srgb, var(--audio-accent) 36%, transparent);
 }
 
-.inspectorSendSlider[data-orientation="horizontal"] :global(.sliderCap) {
+.inspectorSendSlider[data-orientation="horizontal"] [class*="sliderCap"] {
   width: 16px;
   height: 16px;
 }
@@ -833,13 +833,13 @@ button.inspectorMiniCard {
   align-items: stretch;
 }
 
-.inspectorHardwareGrid :global(.preampControl) {
+.inspectorHardwareGrid [class*="preampControl"] {
   --preamp-control-width: 48px;
   align-self: start;
   overflow: hidden;
 }
 
-.inspectorHardwareGrid :global(.preampLedRing) {
+.inspectorHardwareGrid [class*="preampLedRing"] {
   overflow: hidden;
 }
 
@@ -991,11 +991,11 @@ button.inspectorMiniCard {
     gap: 5px;
   }
 
-  .inspectorHardwareGrid :global(.preampControl) {
+  .inspectorHardwareGrid [class*="preampControl"] {
     --preamp-control-width: 37px;
   }
 
-  .inspectorHardwareGrid :global(.preampLedRing) {
+  .inspectorHardwareGrid [class*="preampLedRing"] {
     overflow: hidden;
   }
 
