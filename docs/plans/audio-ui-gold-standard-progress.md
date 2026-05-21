@@ -3,9 +3,9 @@
 ## Status
 
 - Phase: **Slice 5 closed for refactor scope.** Honest scoring against the plan's acceptance criteria (see Drift Appendix at the bottom of this file for the full breakdown):
-  - **Slice 5B (Inspector router tighten)** — **plan targets MET.** `AudioInspector.tsx` = **293 lines** (≤ 300 target). All 12 `inspector/*.tsx` sub-files ≤ 450 (max `AudioInspectorEqTab.tsx` = 306, down from 484; LowCut and per-band control trays extracted into `AudioInspectorEqLowCutTray.tsx` (112) and `AudioInspectorEqBandTray.tsx` (184)). `AudioInspectorChannelHeader.tsx` = 133 (down from 339; meter card, Hardware/Software mini, and send-fader + action-row extracted into three sub-cards). EQ state lifted into `useAudioInspectorEqState.ts` hook (218 lines — 18 over the ≤ 200 hook budget but matching the plan's "~25-value return surface" target). Tab strip extracted into `AudioInspectorTabStrip.tsx` (60).
-  - **Slice 5C (Workspace hooks)** — **all 4 plan-required hooks extracted.** `useAudioArming` (123), `useAudioOptimisticSettings` (103), `useAudioKeyboardShortcuts` (220), `useAudioPaletteRegistration` (372). The two newly-extracted hooks have fat-args signatures (17 caller-side deps each + viewModel + register) — option (i) from the task prompt. The prior session's judgement-call drift is closed. `AudioWorkspace.tsx` dropped 1132 → 734 lines (-398). The two new hooks are over the ≤ 200 hook budget — useAudioKeyboardShortcuts by 20 (genuinely large key-handler body), useAudioPaletteRegistration by 172 (15 palette actions × ~10 lines each). Trimming below 200 would require splitting or moving action definitions into a pure builder; documented as follow-up drift.
-  - **Slice 5A (CSS split)** — **7 of 7 per-component modules created.** As of 2026-05-20 (final pass): `AudioHealthBar.module.css` (114), `AudioToolbar.module.css` (157), `AudioSnapshotDeck.module.css` (421), `AudioRail.module.css` (472), `AudioSignalCanvas.module.css` (490), `AudioMixerLane.module.css` (1305), `AudioInspector.module.css` (1537). Shell `AudioWorkspace.module.css` = **1345 lines** (from 5843 starting state; net -4498). The file-count target is met. The **≤ 600 shell target is NOT met** (over by 745) — what remains in shell is the audio-shell root container, the shared `.shellPanel`/`.eyebrow` utilities, cross-cutting gates and the eight utility-component class blocks (StereoMeter / Fader / Sliders / Preamp / TargetPicker / MeterCanvas / LiveMeterReadout / ArmCountdown) that the plan did not name as separate modules. The **≤ 1100 per-sub-file target is NOT met for MixerLane (1305, +205) and Inspector (1537, +437)** — each spans multiple TSX consumers and carries the full @container responsive override blocks for its scope; further splitting requires a different TSX boundary.
+  - **Slice 5B (Inspector router tighten)** — **plan targets MET.** `AudioInspector.tsx` = **289 lines** (≤ 300 target). All 12 `inspector/*.tsx` sub-files ≤ 450 (max `AudioInspectorEqTab.tsx` = 306, down from 484; LowCut and per-band control trays extracted into `AudioInspectorEqLowCutTray.tsx` (112) and `AudioInspectorEqBandTray.tsx` (184)). `AudioInspectorChannelHeader.tsx` = 133 (down from 339; meter card, Hardware/Software mini, and send-fader + action-row extracted into three sub-cards). EQ state lifted into `useAudioInspectorEqState.ts` hook (218 lines — 18 over the ≤ 200 hook budget but matching the plan's "~25-value return surface" target). Tab strip extracted into `AudioInspectorTabStrip.tsx` (64).
+  - **Slice 5C (Workspace hooks)** — **all 4 plan-required hooks extracted.** `useAudioArming` (123), `useAudioOptimisticSettings` (103), `useAudioKeyboardShortcuts` (220), `useAudioPaletteRegistration` (369). The two newly-extracted hooks have fat-args signatures (17 caller-side deps for keyboard; 15 for palette + viewModel + register) — option (i) from the task prompt. The prior session's judgement-call drift is closed. `AudioWorkspace.tsx` dropped 1132 → 731 lines (-401). The two new hooks are over the ≤ 200 hook budget — useAudioKeyboardShortcuts by 20 (genuinely large key-handler body), useAudioPaletteRegistration by 169 (15 palette actions × ~10 lines each). Trimming below 200 would require splitting or moving action definitions into a pure builder; documented as follow-up drift. See `refactor-line-counts.txt` § "Plan deviations introduced during Slice 5" for the signature-shape deviation (plan used grouped `handlers`; delivered as flat fat args).
+  - **Slice 5A (CSS split)** — **7 of 7 per-component modules created.** As of 2026-05-21 (audit pass): `AudioHealthBar.module.css` (114), `AudioToolbar.module.css` (157), `AudioSnapshotDeck.module.css` (421), `AudioRail.module.css` (472), `AudioSignalCanvas.module.css` (490), `AudioMixerLane.module.css` (1305), `AudioInspector.module.css` (1537). Shell `AudioWorkspace.module.css` = **1342 lines** (from 5843 starting state; net -4501). The file-count target is met. The **≤ 600 shell target is NOT met** (over by 742) — what remains in shell is the audio-shell root container, the shared `.shellPanel`/`.eyebrow` utilities, cross-cutting gates and the eight utility-component class blocks (StereoMeter / Fader / Sliders / Preamp / TargetPicker / MeterCanvas / LiveMeterReadout / ArmCountdown) that the plan did not name as separate modules. The **≤ 1100 per-sub-file target is NOT met for MixerLane (1305, +205) and Inspector (1537, +437)** — each spans multiple TSX consumers and carries the full @container responsive override blocks for its scope; further splitting requires a different TSX boundary.
   - **Slice 5D (render-budget tightening)** — **plan target MET.** `audio-render-budget.spec.ts` budgets tightened from Δ ≤ 10 idle / Δ ≤ 24 tab-cycle to **Δ ≤ 3 idle / Δ ≤ 7 tab-cycle**, both = post-refactor baseline + 2. Baselines measured across 3 stable runs (idle: 1/1/1; tab-cycle: 4/4/5). Confirmed stable across 4 additional Playwright runs after tightening.
   - **Slice 4 (GS-AUD-43)** — remains deferred pending an RME TotalMix OSC packet capture; resume notes live at `~/.claude/projects/-Users-EdvinLandvik-Projects-EdvinProjectManagerCodex/memory/slice-4-deferred.md`. GS-AUD-46 declined; mono "M" overlay glyph deferred.
 - Last updated: 2026-05-21
@@ -299,17 +299,17 @@
 - [x] Slice 5A pass 4 (2026-05-20): extract `frontend/app/src/app/audio/components/AudioSignalCanvas.module.css` (490 lines). Contiguous canvas block + warningBand/feedbackBanner + canvasWarningBand and its `@container` overrides + canvasLegend studioFull rule + the `(min-width: 2200px) and (min-height: 1250px) .canvasSelectedMeta` flex override (initially missed; restored to the new module after a Playwright failure flagged horizontal route overflow). `AudioSignalCanvas.tsx` switched to the local module.
 - [x] Slice 5A pass 5 (2026-05-20): extract `frontend/app/src/app/audio/components/AudioMixerLane.module.css` (1305 lines, **over the ≤ 1100 sub-file budget by 205 — documented in the Drift Appendix**). Took the contiguous tier + channel-lane + output-lane block + the `[data-layout-mode="studioFull"]` overrides at the top level and inside the `(max-height: 1100px)` container query + the laneToggle cross-cutting compounds split out from shell. `AudioMixerLane.tsx` and `AudioTieredMixer.tsx` switched to the local module. Latent issue surfaced: `:global(.utility)` for cross-module descendants compiles to literal selectors that do not match CSS-module-hashed classes; the dead-code overrides remain at the min-width 2200px breakpoint but aren't load-bearing for current tests.
 - [x] Slice 5A pass 6 (2026-05-20): extract `frontend/app/src/app/audio/components/AudioInspector.module.css` (1537 lines, **over the ≤ 1100 sub-file budget by 437 — documented in the Drift Appendix**). Contiguous inspector block + the cross-cutting `inspectorHeader / outputInspector / emptyInspector h2/h3` typography family + the `inspectorTabs / viewModeButton` and `inspectorButtonGrid / inspectorActionRow` button families + the `:disabled` button compound (bifurcated from `.miniToggle`) + the `(max-height: 1120px)` Inspector @container block + the `[data-layout-mode="studioFull"]` overrides at both top level and inside `(max-height: 1100px)`. Cross-file utility descendant `.bigMeterCard .stereoMeter { width: 58px; ... }` rewritten as `.bigMeterCard [data-meter-component="stereo"]` (data attribute already set by `AudioStereoMeter.tsx`) to side-step CSS-module hashing where the sizing override is test-relevant. Imports updated in `AudioInspector.tsx` plus all six `components/inspector/*.tsx` sub-files. Drop `.inspector` from the shared `composes: shellPanel` compound in shell.
-- [x] Slice 5A complete (2026-05-20): all 7 per-component CSS module files exist. Shell `AudioWorkspace.module.css` 5843 → 1345 lines (net -4498). File-count target met; ≤ 600 shell target NOT met (over by 745); ≤ 1100 per-sub-file target NOT met for MixerLane (1305) and Inspector (1537). Drift Appendix updated with the honest acceptance accounting and the latent `:global()` CSS-module-hashing follow-up.
+- [x] Slice 5A complete (2026-05-20; numbers re-measured 2026-05-21): all 7 per-component CSS module files exist. Shell `AudioWorkspace.module.css` 5843 → 1342 lines (net -4501). File-count target met; ≤ 600 shell target NOT met (over by 742); ≤ 1100 per-sub-file target NOT met for MixerLane (1305) and Inspector (1537). Drift Appendix updated with the honest acceptance accounting and the latent `:global()` CSS-module-hashing follow-up.
 - [x] Slice 5B (2026-05-20): Extract `frontend/app/src/app/audio/hooks/useAudioInspectorEqState.ts` (218 lines) — owns `selectedEqBandId`, `eqGraphDraft`, `eqDragRef`, `throttledEqCommit`, all 11 EQ-derived values, and the two pointer-commit handlers. Returns a 22-value + 2-handler surface that the router spreads into `AudioInspectorEqTab` and `AudioInspectorOverviewCards` via `{...eqState}`. `EqDragRef` type moved from `AudioInspectorEqTab.tsx` to `audioInspectorHelpers.ts` so the hook and the tab body both import from the shared module.
-- [x] Slice 5B (2026-05-20): Extract `frontend/app/src/app/audio/components/inspector/AudioInspectorTabStrip.tsx` (60 lines) — both the four-tab tablist and the single-tab output-only tablist.
+- [x] Slice 5B (2026-05-20): Extract `frontend/app/src/app/audio/components/inspector/AudioInspectorTabStrip.tsx` (64 lines) — both the four-tab tablist and the single-tab output-only tablist.
 - [x] Slice 5B (2026-05-20): Extract `frontend/app/src/app/audio/components/inspector/AudioInspectorEqLowCutTray.tsx` (112 lines) and `AudioInspectorEqBandTray.tsx` (184 lines) from `AudioInspectorEqTab.tsx`. EqTab trimmed 484 → 306 (under ≤ 450 budget).
 - [x] Slice 5B (2026-05-20): Extract `AudioInspectorChannelMeterCard.tsx` (107), `AudioInspectorChannelHardwareCard.tsx` (146), and `AudioInspectorChannelSendActions.tsx` (117) from `AudioInspectorChannelHeader.tsx`. ChannelHeader trimmed 339 → 133.
-- [x] Slice 5B (2026-05-20): `AudioInspector.tsx` trimmed 525 → 293 lines (under ≤ 300 target). Plan target MET.
+- [x] Slice 5B (2026-05-20; numbers re-measured 2026-05-21): `AudioInspector.tsx` trimmed 525 → 289 lines (under ≤ 300 target). Plan target MET.
 - [x] Slice 5B complete (2026-05-20): all sub-files under ≤ 450 budget; router ≤ 300 target met; `useAudioInspectorEqState.ts` slightly over the ≤ 200 hook budget (218); `AudioInspectorChannelHeader.tsx` at 133 (over the plan's "~80, identity strip only" suggestion but well under the 450 sub-file budget after extracting the three sub-cards). All 114 Playwright specs pass; visual review passes 10 captures, 0 failures.
 - [x] Slice 5C (2026-05-21): Extract `frontend/app/src/app/audio/hooks/useAudioKeyboardShortcuts.ts` (220 lines) with a 17-arg fat signature. Owns the workspace's global `handleKeyDown` (Escape / context menu / inspector tab / channel deselect / bank / snapshot recall / channel select / mute / solo / unity / arrow nav / Enter-on-warning-band) plus the `useEffect` that wires it to `window.keydown`. Option (i) from the task prompt — bite the wide signature and document the dependency count.
-- [x] Slice 5C (2026-05-21): Extract `frontend/app/src/app/audio/hooks/useAudioPaletteRegistration.ts` (372 lines) with a 15-arg fat signature + viewModel + register callback. Owns both the palette-registration model derivation (signature-keyed ref) AND the registration effect itself. Returns the model so the caller can pass it through. The 372-line body is dominated by the 14 fixed palette actions + the per-channel solo/mute actions.
-- [x] Slice 5C (2026-05-21): `AudioWorkspace.tsx` 1132 → 734 lines (-398). Imports trimmed (`PaletteAction`, `AudioChannelEntry`, `buildAudioPaletteRegistrationSignature`, `isEditableTarget`, the `AudioPaletteRegistrationModel` interface all moved to the new hooks).
-- [x] Slice 5C complete (2026-05-21): all 4 plan-required hooks extracted. The two newly-extracted hooks are over the ≤ 200 hook budget (useAudioKeyboardShortcuts by 20, useAudioPaletteRegistration by 172); both overruns are documented in the Drift Appendix. All 114 Playwright specs pass; visual review passes 10 captures, 0 failures.
+- [x] Slice 5C (2026-05-21): Extract `frontend/app/src/app/audio/hooks/useAudioPaletteRegistration.ts` (369 lines) with a 15-arg fat signature + viewModel + register callback. Owns both the palette-registration model derivation (signature-keyed ref) AND the registration effect itself. Returns the model so the caller can pass it through. The 369-line body is dominated by the 14 fixed palette actions + the per-channel solo/mute actions. (Signature deviates from the plan's grouped `handlers` sub-object — see `refactor-line-counts.txt` § 5C.1.)
+- [x] Slice 5C (2026-05-21): `AudioWorkspace.tsx` 1132 → 731 lines (-401). Imports trimmed (`PaletteAction`, `AudioChannelEntry`, `buildAudioPaletteRegistrationSignature`, `isEditableTarget`, the `AudioPaletteRegistrationModel` interface all moved to the new hooks).
+- [x] Slice 5C complete (2026-05-21): all 4 plan-required hooks extracted. The two newly-extracted hooks are over the ≤ 200 hook budget (useAudioKeyboardShortcuts by 20, useAudioPaletteRegistration by 169); both overruns are documented in the Drift Appendix, along with the signature-shape deviation (flat fat args vs. plan's grouped `handlers`). All 114 Playwright specs pass; visual review passes 10 captures, 0 failures.
 - [x] Slice 5D (2026-05-21): Capture post-refactor render-count baselines for `audio-render-budget.spec.ts`. Three stable runs: idle Δ = 1, 1, 1; tab cycle Δ = 5, 4, 4. Tighten the budgets from Δ ≤ 10 idle / Δ ≤ 24 tab cycle to **Δ ≤ 3 idle / Δ ≤ 7 tab cycle** (baseline + 2). Confirm stable across 4 additional Playwright runs after tightening.
 - [x] Slice 5D complete (2026-05-21): Plan target MET. The new budgets flag any subtle drift (a single extra re-render per tab transition) while keeping enough headroom for legitimate jitter.
 
@@ -466,9 +466,9 @@ The 2026-05-20 audit comparing what landed against [the Phase 2 plan](/Users/Edv
 ### Slice 5A (CSS split) — file-count met, line-count targets NOT met
 
 - Plan acceptance: `AudioWorkspace.module.css` ≤ 600 lines; 7 new per-component module files (`AudioToolbar.module.css`, `AudioRail.module.css`, `AudioSignalCanvas.module.css`, `AudioMixerLane.module.css`, `AudioInspector.module.css`, `AudioSnapshotDeck.module.css`, `AudioHealthBar.module.css`); no other split file > 1100 lines.
-- Delivered after the final pass (2026-05-20):
+- Delivered after the audit pass (2026-05-21):
   - **7 of 7** per-component module files created. File-count target MET.
-  - `AudioWorkspace.module.css` = **1345 lines** (from 5843 starting state; net **-4498 lines**). Plan target ≤ 600 still **NOT met (over by 745).**
+  - `AudioWorkspace.module.css` = **1342 lines** (from 5843 starting state; net **-4501 lines**). Plan target ≤ 600 still **NOT met (over by 742).**
   - Per-component module sizes:
     - `AudioHealthBar.module.css` = 114
     - `AudioToolbar.module.css` = 157
@@ -478,24 +478,26 @@ The 2026-05-20 audit comparing what landed against [the Phase 2 plan](/Users/Edv
     - **`AudioMixerLane.module.css` = 1305 (over the ≤ 1100 budget by 205)**
     - **`AudioInspector.module.css` = 1537 (over the ≤ 1100 budget by 437)**
   - MixerLane and Inspector each span multiple TSX consumers (MixerLane: `AudioMixerLane.tsx` + `AudioTieredMixer.tsx`; Inspector: `AudioInspector.tsx` + six `inspector/*.tsx` sub-files) and carry the full `@container` responsive override blocks for their scope. Further splitting requires a different TSX boundary (Tier vs Lane; Inspector by tab) — a structural change not on the original plan. Tracked as a follow-up.
-- What remains in the 1345-line shell: the `.audioShell` root container, the `data-canvas-metering` gates, the shared `.shellPanel` foundation, the `.eyebrow` utility, the `.audioBody` layout grid, the `.audioRail .signalCanvas .inspector` overflow compound, `.audioShell button[data-armed]`, the `prefers-reduced-motion` block, the `.audioDialogForm` modal styles, the `.loadingPanel/.loadingGrid` startup posture, and the utility component classes for `AudioStereoMeter`, `AudioFader`, `AudioSliderControl`, `AudioPreampControl`, `AudioTargetPicker`, `AudioMeterCanvasOverlay`, `AudioLiveMeterReadout`, `AudioArmCountdown`. The utility classes were intentionally left in shell — the plan named seven module files, not 15. Reaching ≤ 600 would require either splitting eight more utility modules (plan does not call for that) or accepting an architectural ceiling here.
+- What remains in the 1342-line shell: the `.audioShell` root container, the `data-canvas-metering` gates, the shared `.shellPanel` foundation, the `.eyebrow` utility, the `.audioBody` layout grid, the `.audioRail .signalCanvas .inspector` overflow compound, `.audioShell button[data-armed]`, the `prefers-reduced-motion` block, the `.audioDialogForm` modal styles, the `.loadingPanel/.loadingGrid` startup posture, and the utility component classes for `AudioStereoMeter`, `AudioFader`, `AudioSliderControl`, `AudioPreampControl`, `AudioTargetPicker`, `AudioMeterCanvasOverlay`, `AudioLiveMeterReadout`, `AudioArmCountdown`. The utility classes were intentionally left in shell — the plan named seven module files, not 15. Reaching ≤ 600 would require either splitting eight more utility modules (plan does not call for that) or accepting an architectural ceiling here.
 - Cross-file pattern: when a class is referenced across multiple modules (e.g. `.masterHalo` defined in shell, referenced by `:not(.masterHalo)` in `AudioRail.module.css`, also rendered by `AudioLiveMeterReadout`), the new module uses `composes: classname from "../AudioWorkspace.module.css"` to alias the shell class. Consumers that render the class must import from the new module — `AudioLiveMeterReadout.tsx` imports `railStyles.masterHalo` from `AudioRail.module.css` for that reason (so the rendered DOM carries both hashes and the `:not()` selector in `AudioRail.module.css` correctly excludes the masterHalo).
 - Pattern (validated 7×): move (a) contiguous block, (b) cross-cutting compound selectors split with combined typography redefined in the new module, (c) @container responsive overrides for the component's classes, (d) `[data-layout-mode="studioFull"]` overrides for the component's classes (the `@container (max-height: 1100px)` block is the trap — missing it produces sub-pixel drift on 1920×1080 fallback).
 - Latent issue (surfaced during Inspector extraction): the `:global(.utility)` pattern used by Rail/MixerLane for cross-module descendants (e.g. `.outputLane :global(.stereoMeter)`) compiles to literal `.stereoMeter` selectors that do NOT match the hashed `_stereoMeter_xxx` class the consumer TSX renders via `styles.stereoMeter`. Those rules are effectively dead. All 114 Playwright specs still pass — the visual tweaks they carried at min-width 2200px aren't load-bearing for current assertions. The Inspector extraction switched to a data-attribute selector (`.bigMeterCard [data-meter-component="stereo"]`) where the sizing override IS load-bearing for an inspector test, to side-step CSS-module hashing. If the MixerLane/Rail dead-code overrides become test-relevant in the future, the same data-attribute approach is the fix. Tracked as a follow-up clean-up.
 
 ### Slice 5B (Inspector router tighten) — closed; plan targets MET
 
-| Plan target                             | Delivered                               | Status                   |
-| --------------------------------------- | --------------------------------------- | ------------------------ |
-| Router `AudioInspector.tsx` ≤ 300 lines | **293 lines**                           | ✅ met                   |
-| Each `inspector/*.tsx` ≤ 450 lines      | max `AudioInspectorEqTab.tsx` = 306     | ✅ met                   |
-| `AudioInspectorHeader.tsx` (~80 lines)  | `AudioInspectorChannelHeader.tsx` = 133 | partial — see note       |
-| Each `hooks/*.ts` ≤ 200 lines           | `useAudioInspectorEqState.ts` = 218     | over by 18 — minor drift |
+| Plan target                                                 | Delivered                                                                                                                                           | Status                                                                      |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Router `AudioInspector.tsx` ≤ 300 lines                     | **289 lines**                                                                                                                                       | ✅ met                                                                      |
+| Each `inspector/*.tsx` ≤ 450 lines                          | max `AudioInspectorEqTab.tsx` = 306                                                                                                                 | ✅ met                                                                      |
+| `AudioInspectorHeader.tsx` (~80 lines, identity strip only) | `AudioInspectorChannelHeader.tsx` = 133 (identity strip + 3 child calls)                                                                            | partial — see 5B.2 below                                                    |
+| Each `hooks/*.ts` ≤ 200 lines                               | `useAudioInspectorEqState.ts` = 218                                                                                                                 | over by 18 — minor drift                                                    |
+| Plan: 7 inspector sub-files                                 | **12 sub-files** delivered (7 plan-listed + 5 added: ChannelMeterCard, ChannelHardwareCard, ChannelSendActions, EqLowCutTray, EqBandTray, TabStrip) | ⚠ shape deviation — see 5B.1 below; needed to satisfy ≤ 450 sub-file budget |
+| Plan: router owns `useState<InspectorTab>` + `eqDragRef`    | `inspectorTab` lives in `AudioWorkspace.tsx`; `eqDragRef` lives inside `useAudioInspectorEqState`                                                   | ⚠ state-ownership deviation — see 5B.3 below                                |
 
 Closing edits (2026-05-20):
 
 - **EQ state lifted into `useAudioInspectorEqState` hook** (218 lines, returning 22 values + 2 handlers — matches the plan's "~25-value return surface" estimate). The hook owns `selectedEqBandId`, `eqGraphDraft`, `eqDragRef`, `throttledEqCommit`, all 11 EQ-related derived values, and the two pointer-commit handlers. The router consumes the hook and forwards via `{...eqState}` spreads into `AudioInspectorEqTab` and `AudioInspectorOverviewCards`, which both already had interfaces listing the EQ-derived props.
-- **Tab strip extracted to `AudioInspectorTabStrip.tsx`** (60 lines) — covers both the four-tab tablist and the single-tab output-only tablist.
+- **Tab strip extracted to `AudioInspectorTabStrip.tsx`** (64 lines) — covers both the four-tab tablist and the single-tab output-only tablist.
 - **`AudioInspectorEqTab.tsx` trimmed 484 → 306** by extracting the LowCut and per-band control trays:
   - `AudioInspectorEqLowCutTray.tsx` (112 lines)
   - `AudioInspectorEqBandTray.tsx` (184 lines)
@@ -512,14 +514,20 @@ The plan's file naming was not followed exactly in the prior session, and that n
 - Plan `AudioInspectorOutputPanel.tsx` → delivered `AudioInspectorOutputView.tsx`.
 - Plan `AudioInspectorHeader.tsx` → delivered `AudioInspectorChannelHeader.tsx`.
 
+**Motivated deviations** (full detail in `artifacts/audio-gold/slice-5/refactor-line-counts.txt`):
+
+- **5B.1 — 12 inspector sub-files vs. plan's 7.** The plan's 7-file shape couldn't satisfy both the router ≤ 300 budget and the sub-file ≤ 450 budget at the same time. With only the 7 listed files, `AudioInspectorEqTab.tsx` was 484 (over by 34) and `AudioInspectorChannelHeader.tsx` was 339. The 12-file shape (5 added: ChannelMeterCard, ChannelHardwareCard, ChannelSendActions, EqLowCutTray, EqBandTray, TabStrip) brings every file under budget. Prioritised the budgets over the file-count shape.
+- **5B.2 — `AudioInspectorChannelHeader.tsx` is 133 vs. plan's ~80.** Extracting the identity strip alone would leave 250+ lines in some other file or back in the router. The header now wraps the identity strip + 3 child component calls; trimming to ~80 would mean flattening the wrapper for no real benefit.
+- **5B.3 — Router does NOT own `useState<InspectorTab>` or `eqDragRef`.** `inspectorTab` lives in `AudioWorkspace.tsx` because the command palette mutates it (the palette is owned by the workspace; moving the state into the router would split the source of truth and force a callback bus). `eqDragRef` lives inside `useAudioInspectorEqState` because it belongs with the EQ state it anchors.
+
 ### Slice 5C (Workspace hooks) — closed; all 4 hooks extracted
 
-| Plan-required hook            | Status                                | Lines | Notes                                                            |
-| ----------------------------- | ------------------------------------- | ----- | ---------------------------------------------------------------- |
-| `useAudioArming`              | ✅ extracted (prior session)          | 123   | within ≤ 200 budget                                              |
-| `useAudioOptimisticSettings`  | ✅ extracted (prior session)          | 103   | within budget                                                    |
-| `useAudioKeyboardShortcuts`   | ✅ extracted (Slice 5C, this session) | 220   | over the ≤ 200 budget by 20; 17 fat args                         |
-| `useAudioPaletteRegistration` | ✅ extracted (Slice 5C, this session) | 372   | over the ≤ 200 budget by 172; 15 fat args + viewModel + register |
+| Plan-required hook            | Status                                | Lines | Notes                                                                                                                                                                                                                        |
+| ----------------------------- | ------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useAudioArming`              | ✅ extracted (prior session)          | 123   | within ≤ 200 budget                                                                                                                                                                                                          |
+| `useAudioOptimisticSettings`  | ✅ extracted (prior session)          | 103   | within budget                                                                                                                                                                                                                |
+| `useAudioKeyboardShortcuts`   | ✅ extracted (Slice 5C, this session) | 220   | over the ≤ 200 budget by 20; 17 fat args                                                                                                                                                                                     |
+| `useAudioPaletteRegistration` | ✅ extracted (Slice 5C, this session) | 369   | over the ≤ 200 budget by 169; **flat fat args (15 + viewModel + register); plan specified grouped `handlers` sub-object** — see 5C.1 below; `allSelectableChannels` derived inside (plan put it as top-level arg) — see 5C.2 |
 
 Slice 5C closing edits (2026-05-21):
 
@@ -544,20 +552,56 @@ Slice 5C closing edits (2026-05-21):
   1-8 channel select, M/S/U source mutate, arrows source nav,
   Enter on warning band → sync) plus the `useEffect` that wires it
   to `window.keydown`. Signature: 17 caller-side deps + viewModel.
-- `useAudioPaletteRegistration.ts` (372 lines, 172 over the ≤ 200
+- `useAudioPaletteRegistration.ts` (369 lines, 169 over the ≤ 200
   budget) owns both the palette-registration model derivation
   (signature-keyed ref so the effect doesn't churn on every meter
   frame) AND the registration effect. Returns the model so the
   caller can pass it through to any consumer that needs the same
-  memoised view. The 372-line size is dominated by the 14 fixed
+  memoised view. The 369-line size is dominated by the 14 fixed
   palette actions + the per-channel solo/mute actions (~250 lines
   of action definitions in JSX-like literal form). Trimming below
   200 would mean splitting into a derive-model hook + a
   register-actions hook, or moving the action definitions into a
   separate pure builder. Documented as follow-up drift.
-- `AudioWorkspace.tsx`: 1132 → 734 lines (-398). Plan does not set
+- `AudioWorkspace.tsx`: 1132 → 731 lines (-401). Plan does not set
   a specific target for the workspace router itself; the drop
   reflects the extraction.
+
+**Motivated deviations** (full detail in `artifacts/audio-gold/slice-5/refactor-line-counts.txt`):
+
+- **5C.1 — `useAudioPaletteRegistration` signature shape.** Plan
+  specified `args: { viewModel, allSelectableChannels, handlers: { ... } }`
+  with handlers grouped under a sub-object. Delivered as 15 flat
+  top-level args + viewModel + register. The task prompt's option
+  (i) said "fat args object" without prescribing grouping; flat args
+  give TypeScript stricter inference (no nested `Record<string,
+Function>` weakening).
+- **5C.2 — `allSelectableChannels` not a top-level arg.** The plan
+  put `allSelectableChannels: AudioChannelEntry[]` at the top level
+  of the args. The delivered hook derives it inside from
+  `viewModel.channels`. Removes one piece of caller boilerplate; the
+  hook needs viewModel anyway so the derivation has no additional
+  dependency.
+
+**Slice 5D deviation:**
+
+- **5D.1 — Tolerance is "baseline + 2", plan said "unchanged".** The
+  plan's "unchanged" reading is impossible — three back-to-back runs
+  show 4/4/5 for the tab cycle Δ. The task prompt clarified to ≤ +2
+  over the post-refactor baseline, which is the right reading.
+
+**Process gap (not a plan deviation, but worth recording):**
+
+- The lint-fix commit `de6f795` touched production code
+  (`AudioRail.tsx` — hoisted IIFE values to const declarations). Per
+  the task prompt's "Refactor-only changes still run the lane to
+  catch accidental visual regressions" rule, I should have re-run
+  `tauri:visual:review` then. I ran lint + typecheck + Playwright
+  but skipped visual review. The 2026-05-21 audit re-ran visual
+  review against the current branch tip — 10 captures, 0 failures,
+  no regression. Recording the gap so future sessions remember to
+  run the full lane after every production-code commit, no matter
+  how mechanical.
 
 ### Slice 5D (render-budget tightening) — closed; plan target MET
 
