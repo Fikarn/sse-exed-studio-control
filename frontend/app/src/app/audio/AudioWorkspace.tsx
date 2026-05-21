@@ -18,7 +18,6 @@ import {
   type AudioChannelGroup,
   type AudioChannelGroupSelectionRequest,
   type AudioChannelGroupSelections,
-  type AudioWorkspaceViewModel,
 } from "./audioViewModel";
 import { AudioHealthBar } from "./components/AudioHealthBar";
 import { AudioInspector, type InspectorTab } from "./components/AudioInspector";

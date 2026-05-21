@@ -120,6 +120,17 @@ export function AudioRail({
 
         <div className={styles.mixTargetList}>
           {viewModel.mixTargets.map((mixTarget) => {
+            // Why: hoist the percent computation out of an IIFE in the JSX
+            // body so the React Compiler can optimise the render. The values
+            // are only consumed once each, but extracting them keeps the
+            // markup readable and silences `@eslint-react/unsupported-syntax`.
+            const leftPercent = Math.round(
+              Math.min(100, Math.max(0, Number(formatMeterPercent(mixTarget.meterLeft).replace("%", ""))))
+            );
+            const rightSourceValue = mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight;
+            const rightPercent = Math.round(
+              Math.min(100, Math.max(0, Number(formatMeterPercent(rightSourceValue).replace("%", ""))))
+            );
             return (
               <button
                 className={styles.mixTargetButton}
@@ -136,41 +147,28 @@ export function AudioRail({
                   <span className={styles.mixTargetMeta}>{mixTargetMeta(mixTarget.role, mixTarget.talkback)}</span>
                 </span>
                 <span className={styles.mixTargetMiniMeter}>
-                  {(() => {
-                    const leftPercent = Math.round(
-                      Math.min(100, Math.max(0, Number(formatMeterPercent(mixTarget.meterLeft).replace("%", ""))))
-                    );
-                    const rightSourceValue = mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight;
-                    const rightPercent = Math.round(
-                      Math.min(100, Math.max(0, Number(formatMeterPercent(rightSourceValue).replace("%", ""))))
-                    );
-                    return (
-                      <>
-                        <i
-                          aria-label={`${mixTarget.name} L meter ${leftPercent}%`}
-                          aria-valuemax={100}
-                          aria-valuemin={0}
-                          aria-valuenow={leftPercent}
-                          data-mini-meter-id={mixTarget.id}
-                          data-mini-meter-kind="mixTarget"
-                          data-mini-meter-side="left"
-                          role="meter"
-                          style={{ "--meter-level": `${leftPercent}%` } as CSSProperties}
-                        />
-                        <i
-                          aria-label={`${mixTarget.name} R meter ${rightPercent}%`}
-                          aria-valuemax={100}
-                          aria-valuemin={0}
-                          aria-valuenow={rightPercent}
-                          data-mini-meter-id={mixTarget.id}
-                          data-mini-meter-kind="mixTarget"
-                          data-mini-meter-side="right"
-                          role="meter"
-                          style={{ "--meter-level": `${rightPercent}%` } as CSSProperties}
-                        />
-                      </>
-                    );
-                  })()}
+                  <i
+                    aria-label={`${mixTarget.name} L meter ${leftPercent}%`}
+                    aria-valuemax={100}
+                    aria-valuemin={0}
+                    aria-valuenow={leftPercent}
+                    data-mini-meter-id={mixTarget.id}
+                    data-mini-meter-kind="mixTarget"
+                    data-mini-meter-side="left"
+                    role="meter"
+                    style={{ "--meter-level": `${leftPercent}%` } as CSSProperties}
+                  />
+                  <i
+                    aria-label={`${mixTarget.name} R meter ${rightPercent}%`}
+                    aria-valuemax={100}
+                    aria-valuemin={0}
+                    aria-valuenow={rightPercent}
+                    data-mini-meter-id={mixTarget.id}
+                    data-mini-meter-kind="mixTarget"
+                    data-mini-meter-side="right"
+                    role="meter"
+                    style={{ "--meter-level": `${rightPercent}%` } as CSSProperties}
+                  />
                 </span>
                 <span className={styles.mixTargetFlags}>
                   {mixTarget.mute ? <span>Mute</span> : null}
