@@ -7,7 +7,6 @@
  * Extracted from `AudioInspectorEqTab.tsx` to keep the tab body under the
  * sub-file budget (Slice 5B).
  */
-import styles from "../AudioInspector.module.css";
 import tabStyles from "../AudioInspectorEqTab.module.css";
 import dynamicsStyles from "../AudioInspectorDynamicsTab.module.css";
 import sendStyles from "../AudioInspectorSendsTab.module.css";
