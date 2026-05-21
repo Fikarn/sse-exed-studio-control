@@ -12,7 +12,30 @@
   opacity: 0;
 }
 
+/* GS-AUD inline P2 (Slice 3 deferred → Slice 5 close-out): mono "M" overlay
+   glyph for mirrored meters. Positioned absolutely so the laneBody grid
+   arity stays at 2 columns; the previous attempt added a 3rd grid child
+   and collapsed the fader column. */
+.meterMonoBadge {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--audio-text-subtle) 22%, transparent);
+  color: var(--audio-text-default);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
 .stereoMeter {
+  position: relative;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
