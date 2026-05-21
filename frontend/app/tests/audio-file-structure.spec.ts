@@ -48,6 +48,40 @@ const EXPECTED_AUDIO_SHARED_MODULES = [
   "frontend/app/src/app/audio/components/AudioArmCountdown.tsx",
 ];
 
+// Why: the Slice 5 close-out pass extracted nine utility-component CSS modules
+// to drive shell `AudioWorkspace.module.css` from 1342 → 217 lines (under the
+// plan's ≤ 600 budget). If any of these get reabsorbed back into shell the
+// shell budget breaks silently — these specs flag the regression at the file
+// level before the size assertions catch it at the line level.
+const EXPECTED_UTILITY_CSS_MODULES = [
+  "frontend/app/src/app/audio/components/AudioArmCountdown.module.css",
+  "frontend/app/src/app/audio/components/AudioDialog.module.css",
+  "frontend/app/src/app/audio/components/AudioFader.module.css",
+  "frontend/app/src/app/audio/components/AudioLiveMeterReadout.module.css",
+  "frontend/app/src/app/audio/components/AudioMeterCanvasOverlay.module.css",
+  "frontend/app/src/app/audio/components/AudioPreampControl.module.css",
+  "frontend/app/src/app/audio/components/AudioSliderControl.module.css",
+  "frontend/app/src/app/audio/components/AudioStereoMeter.module.css",
+  "frontend/app/src/app/audio/components/AudioTargetPicker.module.css",
+];
+
+// Why: the Slice 5 close-out pass also split MixerLane along the Tier vs Lane
+// TSX boundary, and Inspector along the per-tab boundary. Those splits brought
+// the two largest modules under the ≤ 1100 per-file budget; the specs guard
+// the file-level shape.
+const EXPECTED_TAB_BOUNDARY_CSS_MODULES = [
+  "frontend/app/src/app/audio/components/AudioInspectorDynamicsTab.module.css",
+  "frontend/app/src/app/audio/components/AudioInspectorEqTab.module.css",
+  "frontend/app/src/app/audio/components/AudioInspectorSendsTab.module.css",
+  "frontend/app/src/app/audio/components/AudioTieredMixer.module.css",
+];
+
+// Why: the palette-registration hook came in at 369 lines on first extract;
+// the 14 fixed palette actions + per-channel solo/mute actions were moved to
+// a pure builder so the hook itself fits under the ≤ 200 hook budget. If the
+// builder gets re-inlined the hook overflows silently.
+const EXPECTED_HOOK_HELPER_FILES = ["frontend/app/src/app/audio/hooks/buildAudioPaletteActions.ts"];
+
 test.describe("audio code-health Slice 5 file structure", () => {
   for (const relative of EXPECTED_INSPECTOR_FILES) {
     test(`inspector split: ${path.basename(relative)} exists`, () => {
@@ -74,6 +108,27 @@ test.describe("audio code-health Slice 5 file structure", () => {
     test(`audio shared module: ${path.basename(relative)} exists`, () => {
       const absolute = path.join(repoRoot, relative);
       expect(existsSync(absolute), `${relative} should exist after the prior slices`).toBe(true);
+    });
+  }
+
+  for (const relative of EXPECTED_UTILITY_CSS_MODULES) {
+    test(`utility CSS module: ${path.basename(relative)} exists`, () => {
+      const absolute = path.join(repoRoot, relative);
+      expect(existsSync(absolute), `${relative} should exist after the Slice 5 close-out`).toBe(true);
+    });
+  }
+
+  for (const relative of EXPECTED_TAB_BOUNDARY_CSS_MODULES) {
+    test(`tab-boundary CSS module: ${path.basename(relative)} exists`, () => {
+      const absolute = path.join(repoRoot, relative);
+      expect(existsSync(absolute), `${relative} should exist after the Slice 5 close-out`).toBe(true);
+    });
+  }
+
+  for (const relative of EXPECTED_HOOK_HELPER_FILES) {
+    test(`hook helper: ${path.basename(relative)} exists`, () => {
+      const absolute = path.join(repoRoot, relative);
+      expect(existsSync(absolute), `${relative} should exist after the Slice 5 close-out`).toBe(true);
     });
   }
 });
