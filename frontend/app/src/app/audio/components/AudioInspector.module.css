@@ -266,8 +266,7 @@
 .inspectorFaderHead span,
 .inspectorFaderTicks,
 .graphCardHead,
-.detailGrid small,
-.sendCardTag {
+.detailGrid small {
   color: var(--audio-text-muted);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
@@ -382,11 +381,12 @@
 }
 
 /* Inspector button surfaces (button grid, action row, unsupported toggle,
-   send-mode row, placeholder panel buttons). The shell still owns
-   `.unsupportedToggleRow`/`.sendModeRow` (they affect non-inspector reads
-   too) so we redefine the inspector-side button look here only. */
+   placeholder panel buttons). `.sendModeRow` lives in
+   AudioInspectorSendsTab.module.css. */
 .inspectorButtonGrid button,
-.inspectorActionRow button {
+.inspectorActionRow button,
+.unsupportedToggleRow button,
+.placeholderPanel button {
   min-height: 25px;
   border: 1px solid var(--audio-border);
   border-radius: 6px;
@@ -399,7 +399,8 @@
 }
 
 .inspectorButtonGrid button[data-active="true"],
-.inspectorActionRow button[data-active="true"] {
+.inspectorActionRow button[data-active="true"],
+.unsupportedToggleRow button[data-active="true"] {
   border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
   background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
   color: var(--audio-solo);
@@ -415,7 +416,6 @@
 .inspectorButtonGrid button:disabled,
 .inspectorActionRow button:disabled,
 .unsupportedToggleRow button:disabled,
-.sendModeRow button:disabled,
 .placeholderPanel button:disabled,
 .inspectorPfl:disabled {
   opacity: 0.46;
@@ -433,24 +433,6 @@
   gap: 5px;
 }
 
-.unsupportedToggleRow button {
-  min-height: 25px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.unsupportedToggleRow button[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
-  color: var(--audio-solo);
-}
-
 .unsupportedToggleRow button[data-readonly="true"] {
   cursor: default;
 }
@@ -465,31 +447,6 @@
   margin-left: 8px;
   color: var(--audio-text-muted);
   font: inherit;
-}
-
-.sendModeRow {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 5px;
-}
-
-.sendModeRow button {
-  min-height: 25px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.sendModeRow button[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
-  color: var(--audio-solo);
 }
 
 .inspectorButtonGrid {
@@ -603,16 +560,13 @@ button.inspectorMiniCard {
   gap: 8px;
 }
 
-.eqBandRow,
-.dynamicsPills {
+.eqBandRow {
   display: inline-flex;
   gap: 4px;
 }
 
 .eqBandRow i,
-.eqBandRow button,
-.dynamicsPills button,
-.dynamicsPills i {
+.eqBandRow button {
   display: inline-flex;
   align-items: center;
   min-height: 18px;
@@ -626,9 +580,7 @@ button.inspectorMiniCard {
 }
 
 .eqBandRow i[data-active="true"],
-.eqBandRow button[data-active="true"],
-.dynamicsPills button[data-active="true"],
-.dynamicsPills i[data-active="true"] {
+.eqBandRow button[data-active="true"] {
   border-color: color-mix(in srgb, var(--audio-accent) 50%, var(--audio-border));
   background: color-mix(in srgb, var(--audio-accent) 14%, transparent);
   color: var(--audio-accent);
@@ -640,13 +592,11 @@ button.inspectorMiniCard {
 }
 
 .eqGraphMini,
-.dynamicsGraphMini,
-.eqGraphFull,
-.dynamicsGraphFull {
+.dynamicsGraphMini {
   position: relative;
   isolation: isolate;
   display: block;
-  min-height: 44px;
+  min-height: 38px;
   overflow: hidden;
   border-radius: 5px;
   background:
@@ -660,15 +610,8 @@ button.inspectorMiniCard {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.54);
 }
 
-.eqGraphMini,
-.dynamicsGraphMini {
-  min-height: 38px;
-}
-
 .eqGraphMini svg,
-.dynamicsGraphMini svg,
-.eqGraphFull svg,
-.dynamicsGraphFull svg {
+.dynamicsGraphMini svg {
   position: relative;
   z-index: 2;
   display: block;
@@ -676,206 +619,35 @@ button.inspectorMiniCard {
   height: 100%;
 }
 
-.eqGraphGuideLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.eqGraphDbMarkers,
-.eqGraphFrequencyMarkers {
-  position: absolute;
-  inset: 0;
-}
-
-.eqGraphDbMarkers::before {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 1px;
-  content: "";
-  background: color-mix(in srgb, var(--audio-text-strong) 32%, transparent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-accent) 10%, transparent);
-}
-
-.eqGraphDbLabel {
-  position: absolute;
-  top: clamp(8px, var(--eq-marker-y), calc(100% - 8px));
-  right: 8px;
-  padding: 2px 4px;
-  border-radius: 4px;
-  color: color-mix(in srgb, var(--audio-text-muted) 74%, transparent);
-  background: color-mix(in srgb, var(--audio-meter-bg) 62%, transparent);
-  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  transform: translateY(-50%);
-}
-
-.eqGraphFrequencyMarker {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--eq-marker-x);
-  width: 1px;
-  background: color-mix(in srgb, var(--audio-border) 24%, transparent);
-  transform: translateX(-50%);
-}
-
-.eqGraphFrequencyMarker[data-major="true"] {
-  background: color-mix(in srgb, var(--audio-text-muted) 26%, transparent);
-}
-
-.eqGraphFrequencyMarker i {
-  display: block;
-  width: 1px;
-  height: 100%;
-}
-
-.eqGraphFrequencyMarker small {
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  color: color-mix(in srgb, var(--audio-text-muted) 66%, transparent);
-  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  white-space: nowrap;
-  text-transform: uppercase;
-  transform: translateX(-50%);
-}
-
-.eqGraphFrequencyMarker:first-child small {
-  left: 0;
-  transform: none;
-}
-
-.eqGraphFrequencyMarker:last-child small {
-  right: 0;
-  left: auto;
-  transform: none;
-}
-
-.eqGraphMini path,
-.eqGraphFull path {
+.eqGraphMini path {
   fill: none;
   stroke: var(--audio-accent);
   stroke-linecap: round;
   stroke-width: 2;
 }
 
-.eqGraphMini .eqLowCutShade,
-.eqGraphFull .eqLowCutShade {
+.eqGraphMini .eqLowCutShade {
   fill: color-mix(in srgb, var(--audio-hot) 18%, transparent);
   stroke: none;
 }
 
-.eqValueBadge {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
-  display: grid;
-  gap: 3px;
-  min-width: 118px;
-  padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--audio-accent) 46%, var(--audio-border));
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--audio-panel-strong) 88%, black 12%);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
-}
-
-.eqValueBadge strong {
-  color: var(--audio-text-strong);
-  font: var(--font-weight-semibold) 12px / 1 var(--font-family-display);
-  letter-spacing: 0;
-}
-
-.eqValueBadge span {
-  color: var(--audio-accent);
-  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-}
-
-.eqPointLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-}
-
-.eqPoint {
-  position: absolute;
-  left: var(--eq-point-x);
-  top: var(--eq-point-y);
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--audio-accent) 74%, white 12%);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.22), transparent 36%),
-    color-mix(in srgb, var(--audio-panel-strong) 74%, var(--audio-accent) 26%);
-  color: var(--audio-text-strong);
-  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  transform: translate(-50%, -50%);
-  cursor: grab;
-  touch-action: none;
-}
-
-.eqPoint[data-selected="true"] {
-  border-color: var(--audio-hot);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.66),
-    0 0 18px color-mix(in srgb, var(--audio-hot) 46%, transparent);
-}
-
-.eqLowCutPoint {
-  border-radius: 8px;
-  border-color: color-mix(in srgb, var(--audio-hot) 70%, white 8%);
-  background:
-    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.2), transparent 36%),
-    color-mix(in srgb, var(--audio-panel-strong) 62%, var(--audio-hot) 38%);
-}
-
-.eqLowCutPoint[data-active="false"] {
-  border-color: color-mix(in srgb, var(--audio-text-subtle) 56%, var(--audio-border));
-  background:
-    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.14), transparent 36%),
-    color-mix(in srgb, var(--audio-panel-strong) 84%, var(--audio-text-subtle) 16%);
-  color: var(--audio-text-muted);
-}
-
-.eqPoint:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-
-.dynamicsGraphMini path,
-.dynamicsGraphFull path {
+.dynamicsGraphMini path {
   fill: none;
   stroke: var(--audio-accent);
   stroke-linecap: round;
   stroke-width: 2;
 }
 
-.dynamicsGraphMini[data-active="false"] path,
-.dynamicsGraphFull[data-active="false"] path {
+.dynamicsGraphMini[data-active="false"] path {
   stroke: color-mix(in srgb, var(--audio-text-subtle) 62%, transparent);
   stroke-dasharray: 4 4;
 }
 
-.dynamicsGraphMini circle,
-.dynamicsGraphFull circle {
+.dynamicsGraphMini circle {
   fill: var(--audio-accent);
 }
 
-.dynamicsGraphMini > i,
-.dynamicsGraphFull > i {
+.dynamicsGraphMini > i {
   position: absolute;
   top: 8px;
   bottom: 8px;
@@ -887,8 +659,7 @@ button.inspectorMiniCard {
   transform: translateX(-50%);
 }
 
-.dynamicsGraphMini > i[data-active="false"],
-.dynamicsGraphFull > i[data-active="false"] {
+.dynamicsGraphMini > i[data-active="false"] {
   opacity: 0.38;
   background: color-mix(in srgb, var(--audio-text-subtle) 56%, transparent);
   box-shadow: none;
@@ -1080,192 +851,6 @@ button.inspectorMiniCard {
   height: 100%;
 }
 
-.placeholderPanel button {
-  min-height: 25px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.inspectorFullGraphPanel {
-  align-content: start;
-}
-
-.graphRangeRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  color: var(--audio-text-muted);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.graphRangeRow strong {
-  color: var(--audio-text-strong);
-  font-weight: var(--font-weight-semibold);
-}
-
-.graphRangeRow span:last-child {
-  text-align: right;
-}
-
-.eqGraphFull,
-.dynamicsGraphFull {
-  min-height: 170px;
-}
-
-.eqControlTray {
-  gap: 10px;
-}
-
-.eqModeRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.eqModeRow button {
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 72%, transparent);
-  color: var(--audio-text-muted);
-  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.eqModeRow button[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 58%, var(--audio-border));
-  color: var(--audio-text-strong);
-  background: color-mix(in srgb, var(--audio-accent) 15%, transparent);
-}
-
-.eqModeRow button:disabled {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-
-.sendTargetButton {
-  min-height: 28px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 76%, transparent);
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-align: center;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.sendTargetButton[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 54%, var(--audio-border));
-  color: var(--color-text-strong);
-}
-
-.sendCardFull {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--audio-border);
-  border-radius: 7px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--audio-panel-strong) 90%, var(--audio-accent) 10%),
-    var(--audio-panel-strong)
-  );
-}
-
-.sendCardFull[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
-}
-
-.sendCardFull[data-send-state="muted"] {
-  border-color: color-mix(in srgb, var(--audio-mute) 50%, var(--audio-border));
-}
-
-.sendCardFull[data-send-state="none"] {
-  opacity: 0.74;
-}
-
-.sendCardHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.sendCardRoute {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 6px;
-  align-items: center;
-  color: var(--audio-text-muted);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-}
-
-.sendCardRoute strong {
-  overflow: hidden;
-  color: var(--audio-text-default);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sendCardRoute strong:last-child {
-  text-align: right;
-}
-
-.sendStack {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.processingControlGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.processingControl {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.processingControl span {
-  color: var(--audio-text-muted);
-  font: var(--font-weight-semibold) 9px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.processingControl strong {
-  justify-self: end;
-  min-width: 0;
-  color: var(--audio-text-strong);
-  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  white-space: nowrap;
-}
-
-.sendCardValue {
-  justify-self: end;
-  color: var(--audio-text-strong);
-  font: var(--font-weight-semibold) 18px / 1 var(--font-family-display);
-}
-
 .outputInspector {
   flex: 0 0 auto;
   display: grid;
@@ -1307,8 +892,7 @@ button.inspectorMiniCard {
 
   .bigMeterInfo,
   .bigMeterRow,
-  .inspectorFaderCard,
-  .processingControlGrid {
+  .inspectorFaderCard {
     gap: 5px;
   }
 
@@ -1424,40 +1008,6 @@ button.inspectorMiniCard {
   .channelOverviewGrid .dynamicsGraphMini {
     min-height: 0;
     height: 100%;
-  }
-
-  .eqGraphFull,
-  .dynamicsGraphFull {
-    min-height: 132px;
-  }
-
-  .sendStack {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-    margin-top: 6px;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .sendCardFull {
-    gap: 6px;
-    padding: 7px;
-  }
-
-  .processingControlGrid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 5px;
-  }
-
-  .processingControl {
-    grid-template-columns: 30px minmax(0, 1fr) 54px;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .processingControl strong {
-    justify-self: end;
-    font-size: 10px;
   }
 
   .unsupportedToggleRow {

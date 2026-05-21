@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import styles from "../AudioInspector.module.css";
+import dynamicsStyles from "../AudioInspectorDynamicsTab.module.css";
 import { formatAudioDb } from "../../audioFormatting";
 import type { AudioMixTargetEntry } from "../../../shellData";
 import { selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../../audioViewModel";
@@ -141,7 +142,7 @@ export function AudioInspectorOverviewCards({
         >
           <span className={styles.graphCardHead}>
             <span className={styles.eyebrow}>Dynamics · {dynamicsStatusText(selectedChannel)}</span>
-            <span className={styles.dynamicsPills}>
+            <span className={dynamicsStyles.dynamicsPills}>
               <i data-active={selectedChannel.dynamics.compressor.enabled}>Comp</i>
               <i data-active={selectedChannel.dynamics.gate.enabled}>Gate</i>
             </span>

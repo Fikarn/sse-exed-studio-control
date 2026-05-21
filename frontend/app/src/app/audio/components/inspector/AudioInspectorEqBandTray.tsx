@@ -8,6 +8,9 @@
  * sub-file budget (Slice 5B).
  */
 import styles from "../AudioInspector.module.css";
+import tabStyles from "../AudioInspectorEqTab.module.css";
+import dynamicsStyles from "../AudioInspectorDynamicsTab.module.css";
+import sendStyles from "../AudioInspectorSendsTab.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
 import { AudioSliderControl } from "../AudioSliderControl";
 import {
@@ -63,13 +66,13 @@ export function AudioInspectorEqBandTray({
 }: AudioInspectorEqBandTrayProps) {
   return (
     <>
-      <div className={styles.sendCardHead}>
+      <div className={sendStyles.sendCardHead}>
         <strong>Band {activeEqBand.label}</strong>
-        <span className={styles.sendCardTag}>
+        <span className={sendStyles.sendCardTag}>
           {formatEqBandType(activeEqBand.bandType)} · {selectedChannel.eq.enabled ? "PEQ in" : "PEQ bypassed"}
         </span>
       </div>
-      <div className={styles.eqModeRow}>
+      <div className={tabStyles.eqModeRow}>
         <button
           aria-pressed={selectedChannel.eq.enabled}
           data-active={selectedChannel.eq.enabled}
@@ -102,8 +105,8 @@ export function AudioInspectorEqBandTray({
           </button>
         ))}
       </div>
-      <div className={styles.processingControlGrid}>
-        <label className={styles.processingControl}>
+      <div className={dynamicsStyles.processingControlGrid}>
+        <label className={dynamicsStyles.processingControl}>
           <span>Freq</span>
           <AudioSliderControl
             disabled={!viewModel.capabilities.canEditProcessing}
@@ -128,7 +131,7 @@ export function AudioInspectorEqBandTray({
           />
           <strong>{formatEqFrequency(activeEqBandFrequencyValue)}</strong>
         </label>
-        <label className={styles.processingControl}>
+        <label className={dynamicsStyles.processingControl}>
           <span>Gain</span>
           <AudioSliderControl
             disabled={!viewModel.capabilities.canEditProcessing}
@@ -153,7 +156,7 @@ export function AudioInspectorEqBandTray({
           />
           <strong>{activeEqBandGainValue.toFixed(1)} dB</strong>
         </label>
-        <label className={styles.processingControl}>
+        <label className={dynamicsStyles.processingControl}>
           <span>Q</span>
           <AudioSliderControl
             disabled={!viewModel.capabilities.canEditProcessing}

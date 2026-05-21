@@ -1,0 +1,141 @@
+/* AudioInspectorSendsTab module — send-card surfaces extracted from
+ * AudioInspector.module.css (Slice 5A). Consumed by
+ * AudioInspectorSendsTab.tsx. The send-card chrome (sendCardFull /
+ * sendCardHead / sendCardTag / sendStack) is canonical here; the EQ tab
+ * and Dynamics tab import this module directly for their placeholder
+ * surfaces. */
+
+.sendCardFull {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--audio-border);
+  border-radius: 7px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--audio-panel-strong) 90%, var(--audio-accent) 10%),
+    var(--audio-panel-strong)
+  );
+}
+
+.sendCardFull[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+}
+
+.sendCardFull[data-send-state="muted"] {
+  border-color: color-mix(in srgb, var(--audio-mute) 50%, var(--audio-border));
+}
+
+.sendCardFull[data-send-state="none"] {
+  opacity: 0.74;
+}
+
+.sendCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sendCardTag {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.sendCardRoute {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.sendCardRoute strong {
+  overflow: hidden;
+  color: var(--audio-text-default);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sendCardRoute strong:last-child {
+  text-align: right;
+}
+
+.sendCardValue {
+  justify-self: end;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 18px / 1 var(--font-family-display);
+}
+
+.sendStack {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sendModeRow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.sendModeRow button {
+  min-height: 25px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sendModeRow button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
+  color: var(--audio-solo);
+}
+
+.sendModeRow button:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.sendTargetButton {
+  min-height: 28px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 76%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sendTargetButton[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 54%, var(--audio-border));
+  color: var(--color-text-strong);
+}
+
+@container operator-root (max-height: 1120px) {
+  .sendStack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 6px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .sendCardFull {
+    gap: 6px;
+    padding: 7px;
+  }
+}

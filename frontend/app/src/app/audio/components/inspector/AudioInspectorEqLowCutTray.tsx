@@ -7,6 +7,9 @@
  * sub-file budget (Slice 5B).
  */
 import styles from "../AudioInspector.module.css";
+import tabStyles from "../AudioInspectorEqTab.module.css";
+import dynamicsStyles from "../AudioInspectorDynamicsTab.module.css";
+import sendStyles from "../AudioInspectorSendsTab.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
 import { AudioSliderControl } from "../AudioSliderControl";
 import {
@@ -42,13 +45,13 @@ export function AudioInspectorEqLowCutTray({
 }: AudioInspectorEqLowCutTrayProps) {
   return (
     <>
-      <div className={styles.sendCardHead}>
+      <div className={sendStyles.sendCardHead}>
         <strong>Low Cut</strong>
-        <span className={styles.sendCardTag}>
+        <span className={sendStyles.sendCardTag}>
           {selectedChannel.eq.lowCut.enabled ? "In" : "Out"} · {selectedChannel.eq.lowCut.slopeDbPerOctave} dB/oct
         </span>
       </div>
-      <div className={styles.eqModeRow}>
+      <div className={tabStyles.eqModeRow}>
         <button
           aria-pressed={selectedChannel.eq.lowCut.enabled}
           data-active={selectedChannel.eq.lowCut.enabled}
@@ -81,8 +84,8 @@ export function AudioInspectorEqLowCutTray({
           </button>
         ))}
       </div>
-      <div className={styles.processingControlGrid}>
-        <label className={styles.processingControl}>
+      <div className={dynamicsStyles.processingControlGrid}>
+        <label className={dynamicsStyles.processingControl}>
           <span>Cutoff</span>
           <AudioSliderControl
             disabled={!viewModel.capabilities.canEditProcessing}

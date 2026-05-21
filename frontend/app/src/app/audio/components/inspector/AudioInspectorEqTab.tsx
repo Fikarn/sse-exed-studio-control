@@ -1,6 +1,8 @@
 import type { CSSProperties, MutableRefObject, PointerEvent as ReactPointerEvent } from "react";
 
 import styles from "../AudioInspector.module.css";
+import tabStyles from "../AudioInspectorEqTab.module.css";
+import sendStyles from "../AudioInspectorSendsTab.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
 import { AudioInspectorEqBandTray } from "./AudioInspectorEqBandTray";
 import { AudioInspectorEqLowCutTray } from "./AudioInspectorEqLowCutTray";
@@ -91,7 +93,7 @@ export function AudioInspectorEqTab({
   viewModel,
 }: AudioInspectorEqTabProps) {
   return (
-    <div className={`${styles.placeholderPanel} ${styles.inspectorFullGraphPanel}`}>
+    <div className={`${styles.placeholderPanel} ${tabStyles.inspectorFullGraphPanel}`}>
       <div className={styles.graphCardHead}>
         <span className={styles.eyebrow}>TotalMix FX EQ · Low Cut + 3-band PEQ</span>
         <span className={styles.eqBandRow}>
@@ -118,12 +120,12 @@ export function AudioInspectorEqTab({
           ))}
         </span>
       </div>
-      <div className={styles.eqGraphFull} data-eq-graph="true" data-testid="audio-eq-graph">
-        <div className={styles.eqGraphGuideLayer} aria-hidden="true">
-          <div className={styles.eqGraphDbMarkers} data-testid="audio-eq-db-scale">
+      <div className={tabStyles.eqGraphFull} data-eq-graph="true" data-testid="audio-eq-graph">
+        <div className={tabStyles.eqGraphGuideLayer} aria-hidden="true">
+          <div className={tabStyles.eqGraphDbMarkers} data-testid="audio-eq-db-scale">
             {EQ_GAIN_MARKERS.map((marker) => (
               <span
-                className={styles.eqGraphDbLabel}
+                className={tabStyles.eqGraphDbLabel}
                 key={marker.label}
                 style={{ "--eq-marker-y": `${eqPointY(marker.gainDb)}%` } as CSSProperties}
               >
@@ -131,10 +133,10 @@ export function AudioInspectorEqTab({
               </span>
             ))}
           </div>
-          <div className={styles.eqGraphFrequencyMarkers} data-testid="audio-eq-frequency-markers">
+          <div className={tabStyles.eqGraphFrequencyMarkers} data-testid="audio-eq-frequency-markers">
             {EQ_FREQUENCY_MARKERS.map((marker) => (
               <span
-                className={styles.eqGraphFrequencyMarker}
+                className={tabStyles.eqGraphFrequencyMarker}
                 data-major={marker.major}
                 key={marker.frequencyHz}
                 style={{ "--eq-marker-x": `${eqPointX(marker.frequencyHz)}%` } as CSSProperties}
@@ -151,14 +153,14 @@ export function AudioInspectorEqTab({
           ) : null}
           <path d={eqGraphPath} />
         </svg>
-        <div className={styles.eqValueBadge} data-testid="audio-eq-value-badge">
+        <div className={tabStyles.eqValueBadge} data-testid="audio-eq-value-badge">
           <strong>{activeEqLabel}</strong>
           <span>{activeEqValue}</span>
         </div>
-        <div className={styles.eqPointLayer} aria-label="EQ graph band points">
+        <div className={tabStyles.eqPointLayer} aria-label="EQ graph band points">
           <button
             aria-label={`${selectedChannel.name} Low Cut EQ point`}
-            className={`${styles.eqPoint} ${styles.eqLowCutPoint}`}
+            className={`${tabStyles.eqPoint} ${tabStyles.eqLowCutPoint}`}
             data-active={selectedChannel.eq.lowCut.enabled}
             data-selected={activeEqHandleId === LOW_CUT_HANDLE_ID}
             data-testid="audio-eq-point-low-cut"
@@ -203,7 +205,7 @@ export function AudioInspectorEqTab({
           {eqBands.map((band) => (
             <button
               aria-label={`${selectedChannel.name} Band ${band.label} EQ point`}
-              className={styles.eqPoint}
+              className={tabStyles.eqPoint}
               data-selected={band.id === activeEqHandleId}
               data-testid={`audio-eq-point-${band.id}`}
               disabled={!viewModel.capabilities.canEditProcessing}
@@ -262,14 +264,14 @@ export function AudioInspectorEqTab({
           ))}
         </div>
       </div>
-      <div className={styles.graphRangeRow} data-testid="audio-eq-range">
+      <div className={tabStyles.graphRangeRow} data-testid="audio-eq-range">
         <span>20 Hz</span>
         <strong>
           {activeEqLabel} · {selectedChannel.eq.hardwareStatus}
         </strong>
         <span>20 kHz · ±20 dB</span>
       </div>
-      <div className={`${styles.sendCardFull} ${styles.eqControlTray}`} data-testid="audio-eq-control-tray">
+      <div className={`${sendStyles.sendCardFull} ${tabStyles.eqControlTray}`} data-testid="audio-eq-control-tray">
         {activeEqHandleId === LOW_CUT_HANDLE_ID ? (
           <AudioInspectorEqLowCutTray
             clearDraftValueLater={clearDraftValueLater}

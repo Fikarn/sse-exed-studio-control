@@ -2,7 +2,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
 import { ArrowRight, Mic, Play } from "lucide-react";
 
-import styles from "./AudioMixerLane.module.css";
+import styles from "./AudioTieredMixer.module.css";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import { type AudioChannelGroupSelectionRequest, type AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioChannelLane, AudioOutputLane } from "./AudioMixerLane";

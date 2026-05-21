@@ -1,6 +1,9 @@
 import type { CSSProperties } from "react";
 
 import styles from "../AudioInspector.module.css";
+import tabStyles from "../AudioInspectorDynamicsTab.module.css";
+import eqStyles from "../AudioInspectorEqTab.module.css";
+import sendStyles from "../AudioInspectorSendsTab.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
 import { AudioSliderControl } from "../AudioSliderControl";
 import {
@@ -50,10 +53,10 @@ export function AudioInspectorDynamicsTab({
   const gateThresholdX = dynamicsThresholdPercent(selectedChannel.dynamics.gate.thresholdDb);
 
   return (
-    <div className={`${styles.placeholderPanel} ${styles.inspectorFullGraphPanel}`}>
+    <div className={`${styles.placeholderPanel} ${eqStyles.inspectorFullGraphPanel}`}>
       <div className={styles.graphCardHead}>
         <span className={styles.eyebrow}>Dynamics · TotalMix FX</span>
-        <span className={styles.dynamicsPills}>
+        <span className={tabStyles.dynamicsPills}>
           <button
             aria-pressed={selectedChannel.dynamics.compressor.enabled}
             data-active={selectedChannel.dynamics.compressor.enabled}
@@ -85,7 +88,7 @@ export function AudioInspectorDynamicsTab({
         </span>
       </div>
       <div
-        className={styles.dynamicsGraphFull}
+        className={tabStyles.dynamicsGraphFull}
         data-active={selectedChannel.dynamics.compressor.enabled}
         data-testid="audio-dynamics-curve"
         aria-hidden="true"
@@ -99,12 +102,12 @@ export function AudioInspectorDynamicsTab({
           style={{ "--dynamics-gate-x": `${gateThresholdX}%` } as CSSProperties}
         />
       </div>
-      <div className={styles.graphRangeRow} data-testid="audio-dynamics-range">
+      <div className={eqStyles.graphRangeRow} data-testid="audio-dynamics-range">
         <span>Gate {selectedChannel.dynamics.gate.thresholdDb.toFixed(0)} dB</span>
         <strong>{dynamicsStatusText(selectedChannel)}</strong>
         <span>Comp {selectedChannel.dynamics.compressor.thresholdDb.toFixed(0)} dB</span>
       </div>
-      <div className={styles.sendStack}>
+      <div className={sendStyles.sendStack}>
         {(["compressor", "gate"] as const).map((section) => {
           const processor = selectedChannel.dynamics[section];
           const attackKey = `channel:${selectedChannel.id}:dynamics:${section}:attack`;
@@ -118,13 +121,13 @@ export function AudioInspectorDynamicsTab({
           const ratioKey = `channel:${selectedChannel.id}:dynamics:${section}:ratio`;
           const ratioValue = getDraftValue(ratioKey, processor.ratio);
           return (
-            <div className={styles.sendCardFull} data-active={processor.enabled} key={section}>
-              <div className={styles.sendCardHead}>
+            <div className={sendStyles.sendCardFull} data-active={processor.enabled} key={section}>
+              <div className={sendStyles.sendCardHead}>
                 <strong>{section === "compressor" ? "Compressor" : "Gate"}</strong>
-                <span className={styles.sendCardTag}>{processor.enabled ? "Enabled" : "Bypassed"}</span>
+                <span className={sendStyles.sendCardTag}>{processor.enabled ? "Enabled" : "Bypassed"}</span>
               </div>
-              <div className={styles.processingControlGrid}>
-                <label className={styles.processingControl}>
+              <div className={tabStyles.processingControlGrid}>
+                <label className={tabStyles.processingControl}>
                   <span>Thresh</span>
                   <AudioSliderControl
                     disabled={!viewModel.capabilities.canEditProcessing}
@@ -148,7 +151,7 @@ export function AudioInspectorDynamicsTab({
                   />
                   <strong>{thresholdValue.toFixed(0)} dB</strong>
                 </label>
-                <label className={styles.processingControl}>
+                <label className={tabStyles.processingControl}>
                   <span>Ratio</span>
                   <AudioSliderControl
                     disabled={!viewModel.capabilities.canEditProcessing}
@@ -172,7 +175,7 @@ export function AudioInspectorDynamicsTab({
                   />
                   <strong>{ratioValue.toFixed(1)}:1</strong>
                 </label>
-                <label className={styles.processingControl}>
+                <label className={tabStyles.processingControl}>
                   <span>Attack</span>
                   <AudioSliderControl
                     disabled={!viewModel.capabilities.canEditProcessing}
@@ -196,7 +199,7 @@ export function AudioInspectorDynamicsTab({
                   />
                   <strong>{attackValue.toFixed(1)} ms</strong>
                 </label>
-                <label className={styles.processingControl}>
+                <label className={tabStyles.processingControl}>
                   <span>Release</span>
                   <AudioSliderControl
                     disabled={!viewModel.capabilities.canEditProcessing}
@@ -220,7 +223,7 @@ export function AudioInspectorDynamicsTab({
                   />
                   <strong>{releaseValue.toFixed(0)} ms</strong>
                 </label>
-                <label className={styles.processingControl}>
+                <label className={tabStyles.processingControl}>
                   <span>Makeup</span>
                   <AudioSliderControl
                     disabled={!viewModel.capabilities.canEditProcessing}

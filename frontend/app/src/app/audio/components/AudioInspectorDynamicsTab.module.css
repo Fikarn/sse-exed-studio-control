@@ -1,0 +1,142 @@
+/* AudioInspectorDynamicsTab module — Dynamics-tab-specific surfaces
+ * extracted from AudioInspector.module.css (Slice 5A). The dynamics
+ * full-size graph, the dynamics pill row, and the per-control labels
+ * (processingControl / processingControlGrid) are canonical here.
+ * The Overview cards import this module to render their dynamics pill
+ * mini row; the EQ trays import for processingControl. */
+
+.dynamicsGraphFull {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  min-height: 170px;
+  overflow: hidden;
+  border-radius: 5px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--audio-border) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-border) 18%, transparent) 1px, transparent 1px),
+    var(--audio-meter-bg);
+  background-size:
+    100% 50%,
+    25% 100%,
+    auto;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.54);
+}
+
+.dynamicsGraphFull svg {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dynamicsGraphFull path {
+  fill: none;
+  stroke: var(--audio-accent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.dynamicsGraphFull[data-active="false"] path {
+  stroke: color-mix(in srgb, var(--audio-text-subtle) 62%, transparent);
+  stroke-dasharray: 4 4;
+}
+
+.dynamicsGraphFull circle {
+  fill: var(--audio-accent);
+}
+
+.dynamicsGraphFull > i {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: var(--dynamics-gate-x, 100%);
+  width: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--audio-meter-warn) 74%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-meter-warn) 28%, transparent);
+  transform: translateX(-50%);
+}
+
+.dynamicsGraphFull > i[data-active="false"] {
+  opacity: 0.38;
+  background: color-mix(in srgb, var(--audio-text-subtle) 56%, transparent);
+  box-shadow: none;
+}
+
+.dynamicsPills {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.dynamicsPills button,
+.dynamicsPills i {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--audio-border);
+  border-radius: 999px;
+  color: var(--audio-text-subtle);
+  background: transparent;
+  font-style: normal;
+  cursor: pointer;
+}
+
+.dynamicsPills button[data-active="true"],
+.dynamicsPills i[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 50%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 14%, transparent);
+  color: var(--audio-accent);
+}
+
+.processingControlGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.processingControl {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.processingControl span {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-semibold) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.processingControl strong {
+  justify-self: end;
+  min-width: 0;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+@container operator-root (max-height: 1120px) {
+  .dynamicsGraphFull {
+    min-height: 132px;
+  }
+
+  .processingControlGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .processingControl {
+    grid-template-columns: 30px minmax(0, 1fr) 54px;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .processingControl strong {
+    justify-self: end;
+    font-size: 10px;
+  }
+}

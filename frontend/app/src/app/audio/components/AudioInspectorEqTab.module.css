@@ -1,0 +1,268 @@
+/* AudioInspectorEqTab module — EQ-tab-specific surfaces extracted from
+ * AudioInspector.module.css (Slice 5A). Consumed by AudioInspectorEqTab.tsx,
+ * AudioInspectorEqLowCutTray.tsx, AudioInspectorEqBandTray.tsx. Classes
+ * shared with the Overview tab (eqBandRow, eqGraphMini, eqLowCutShade)
+ * stay in the router; those are dual-consumed and Overview renders
+ * alongside the EQ tab. */
+
+.eqGraphFull {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  min-height: 170px;
+  overflow: hidden;
+  border-radius: 5px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--audio-border) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-border) 18%, transparent) 1px, transparent 1px),
+    var(--audio-meter-bg);
+  background-size:
+    100% 50%,
+    25% 100%,
+    auto;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.54);
+}
+
+.eqGraphFull svg {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.eqGraphGuideLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.eqGraphDbMarkers,
+.eqGraphFrequencyMarkers {
+  position: absolute;
+  inset: 0;
+}
+
+.eqGraphDbMarkers::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  content: "";
+  background: color-mix(in srgb, var(--audio-text-strong) 32%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-accent) 10%, transparent);
+}
+
+.eqGraphDbLabel {
+  position: absolute;
+  top: clamp(8px, var(--eq-marker-y), calc(100% - 8px));
+  right: 8px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: color-mix(in srgb, var(--audio-text-muted) 74%, transparent);
+  background: color-mix(in srgb, var(--audio-meter-bg) 62%, transparent);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  transform: translateY(-50%);
+}
+
+.eqGraphFrequencyMarker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--eq-marker-x);
+  width: 1px;
+  background: color-mix(in srgb, var(--audio-border) 24%, transparent);
+  transform: translateX(-50%);
+}
+
+.eqGraphFrequencyMarker[data-major="true"] {
+  background: color-mix(in srgb, var(--audio-text-muted) 26%, transparent);
+}
+
+.eqGraphFrequencyMarker i {
+  display: block;
+  width: 1px;
+  height: 100%;
+}
+
+.eqGraphFrequencyMarker small {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  color: color-mix(in srgb, var(--audio-text-muted) 66%, transparent);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+}
+
+.eqGraphFrequencyMarker:first-child small {
+  left: 0;
+  transform: none;
+}
+
+.eqGraphFrequencyMarker:last-child small {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.eqGraphFull path {
+  fill: none;
+  stroke: var(--audio-accent);
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.eqValueBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: grid;
+  gap: 3px;
+  min-width: 118px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--audio-accent) 46%, var(--audio-border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--audio-panel-strong) 88%, black 12%);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+.eqValueBadge strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 12px / 1 var(--font-family-display);
+  letter-spacing: 0;
+}
+
+.eqValueBadge span {
+  color: var(--audio-accent);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+.eqPointLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+}
+
+.eqPoint {
+  position: absolute;
+  left: var(--eq-point-x);
+  top: var(--eq-point-y);
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--audio-accent) 74%, white 12%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.22), transparent 36%),
+    color-mix(in srgb, var(--audio-panel-strong) 74%, var(--audio-accent) 26%);
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  touch-action: none;
+}
+
+.eqPoint[data-selected="true"] {
+  border-color: var(--audio-hot);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.66),
+    0 0 18px color-mix(in srgb, var(--audio-hot) 46%, transparent);
+}
+
+.eqLowCutPoint {
+  border-radius: 8px;
+  border-color: color-mix(in srgb, var(--audio-hot) 70%, white 8%);
+  background:
+    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.2), transparent 36%),
+    color-mix(in srgb, var(--audio-panel-strong) 62%, var(--audio-hot) 38%);
+}
+
+.eqLowCutPoint[data-active="false"] {
+  border-color: color-mix(in srgb, var(--audio-text-subtle) 56%, var(--audio-border));
+  background:
+    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.14), transparent 36%),
+    color-mix(in srgb, var(--audio-panel-strong) 84%, var(--audio-text-subtle) 16%);
+  color: var(--audio-text-muted);
+}
+
+.eqPoint:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.inspectorFullGraphPanel {
+  align-content: start;
+}
+
+.graphRangeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: var(--audio-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.graphRangeRow strong {
+  color: var(--audio-text-strong);
+  font-weight: var(--font-weight-semibold);
+}
+
+.graphRangeRow span:last-child {
+  text-align: right;
+}
+
+.eqControlTray {
+  gap: 10px;
+}
+
+.eqModeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.eqModeRow button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 72%, transparent);
+  color: var(--audio-text-muted);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.eqModeRow button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 58%, var(--audio-border));
+  color: var(--audio-text-strong);
+  background: color-mix(in srgb, var(--audio-accent) 15%, transparent);
+}
+
+.eqModeRow button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+@container operator-root (max-height: 1120px) {
+  .eqGraphFull {
+    min-height: 132px;
+  }
+}

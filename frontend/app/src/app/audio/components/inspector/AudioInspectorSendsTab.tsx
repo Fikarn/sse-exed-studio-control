@@ -1,4 +1,5 @@
 import styles from "../AudioInspector.module.css";
+import tabStyles from "../AudioInspectorSendsTab.module.css";
 import { deriveSendStatusLabel, formatAudioDb } from "../../audioFormatting";
 import { selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../../audioViewModel";
 import { AudioSliderControl } from "../AudioSliderControl";
@@ -42,7 +43,7 @@ export function AudioInspectorSendsTab({
   }
 
   return (
-    <div className={styles.sendStack}>
+    <div className={tabStyles.sendStack}>
       {viewModel.mixTargets.map((mixTarget) => {
         const sendDraftKey = `channel:${selectedChannel.id}:send:${mixTarget.id}`;
         const value = getDraftValue(sendDraftKey, selectedChannelSendLevel(selectedChannel, mixTarget.id));
@@ -59,16 +60,16 @@ export function AudioInspectorSendsTab({
         const sendStatus = deriveSendStatusLabel({ isActive, noSend, sendMuted });
         return (
           <div
-            className={styles.sendCardFull}
+            className={tabStyles.sendCardFull}
             data-active={isActive}
             data-send-state={sendState}
             data-testid={`audio-send-destination-${mixTarget.id}`}
             key={mixTarget.id}
           >
-            <div className={styles.sendCardHead}>
+            <div className={tabStyles.sendCardHead}>
               <button
                 aria-pressed={isActive}
-                className={styles.sendTargetButton}
+                className={tabStyles.sendTargetButton}
                 data-active={isActive}
                 onClick={(event) => {
                   event.preventDefault();
@@ -78,9 +79,9 @@ export function AudioInspectorSendsTab({
               >
                 {mixTarget.name}
               </button>
-              <span className={styles.sendCardTag}>{sendStatus}</span>
+              <span className={tabStyles.sendCardTag}>{sendStatus}</span>
             </div>
-            <div className={styles.sendCardRoute}>
+            <div className={tabStyles.sendCardRoute}>
               <strong>{selectedChannel.name}</strong>
               <span>→</span>
               <strong>{mixTarget.name}</strong>
@@ -103,8 +104,8 @@ export function AudioInspectorSendsTab({
               value={value}
               valueText={formatAudioDb(value)}
             />
-            <strong className={styles.sendCardValue}>{formatAudioDb(value)}</strong>
-            <div className={styles.sendModeRow}>
+            <strong className={tabStyles.sendCardValue}>{formatAudioDb(value)}</strong>
+            <div className={tabStyles.sendModeRow}>
               <button
                 aria-pressed={sendMode.preFader}
                 data-active={sendMode.preFader}
