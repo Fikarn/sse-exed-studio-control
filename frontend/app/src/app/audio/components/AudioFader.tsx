@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioFader.module.css";
 import { faderDbToNormalized, formatAudioDb, normalizedToFaderDb } from "../audioFormatting";
 import { AudioNumberDialog } from "./AudioNumberDialog";
 import { AudioSliderControl } from "./AudioSliderControl";

@@ -1,0 +1,114 @@
+.healthBar {
+  composes: shellPanel from "../AudioWorkspace.module.css";
+  flex: 0 0 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+}
+
+.healthItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.healthItem strong {
+  overflow: hidden;
+  max-width: 170px;
+  color: var(--color-text-strong);
+  font: inherit;
+  text-overflow: ellipsis;
+}
+
+.healthTelemetry,
+.healthShortcutGroup {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.healthTelemetry {
+  gap: 12px;
+}
+
+.healthShortcutGroup {
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.healthCommand,
+.healthShortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 76%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--audio-panel-strong) 62%, transparent);
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.healthCommand {
+  color: var(--audio-text-default);
+}
+
+.healthCommand kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  border: 1px solid var(--audio-border);
+  border-radius: 4px;
+  color: var(--audio-text-strong);
+  font: inherit;
+}
+
+.healthShortcut {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@container operator-root (max-width: 2100px) {
+  .healthBar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .healthTelemetry .healthItem:nth-child(6) {
+    display: none;
+  }
+}
+
+@container operator-root (max-width: 1600px) {
+  .healthTelemetry .healthItem:nth-child(5) {
+    display: none;
+  }
+}
+
+[data-layout-mode="studioFull"] .healthItem:nth-child(5),
+[data-layout-mode="studioFull"] .healthItem:nth-child(6) {
+  display: inline-flex;
+}
+
+[data-layout-mode="studioFull"] .healthBar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 44px;
+}
+
+[data-layout-mode="studioFull"] .healthTelemetry .healthItem {
+  display: inline-flex;
+}

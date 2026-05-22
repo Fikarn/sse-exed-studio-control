@@ -1,7 +1,8 @@
 import { useEffect, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioSignalCanvas.module.css";
+import type { AudioArmedAction } from "../audioArming";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import type { AudioChannelGroupSelectionRequest, AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioLiveActiveMixMeter } from "./AudioLiveMeterReadout";
@@ -13,7 +14,7 @@ type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
 export function AudioSignalCanvas({
-  armedActionKey,
+  armedAction,
   busyAction,
   clearDraftValueLater,
   commitChannelContinuous,
@@ -46,7 +47,7 @@ export function AudioSignalCanvas({
   store,
   viewModel,
 }: {
-  armedActionKey: string | null;
+  armedAction: AudioArmedAction | null;
   busyAction: string | null;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
@@ -267,7 +268,7 @@ export function AudioSignalCanvas({
 
       <AudioSnapshotDeck
         actionsAllowed={viewModel.capabilities.canCaptureSnapshot}
-        armedActionKey={armedActionKey}
+        armedAction={armedAction}
         busyAction={busyAction}
         channels={viewModel.channels}
         mixTargets={viewModel.mixTargets}

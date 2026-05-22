@@ -1,0 +1,210 @@
+/* Why: when metering is gated (OSC disabled, console state unverified, last
+   action failed) the canvas paint loop early-returns. The CSS fallback meter
+   bars must also stay dark so the operator never sees a simulated tick in a
+   degraded state. The warning band remains the truthful surface. The
+   `[data-canvas-metering]` data attribute lives on the operator workspace
+   root, so we scope the rule on the attribute alone — no class ancestor
+   needed. */
+[data-canvas-metering="true"] .stereoMeter [data-meter-fill],
+[data-canvas-metering="true"] .stereoMeter [data-meter-peak],
+[data-canvas-metering="false"] .stereoMeter [data-meter-fill],
+[data-canvas-metering="false"] .stereoMeter [data-meter-peak] {
+  opacity: 0;
+}
+
+/* GS-AUD inline P2 (Slice 3 deferred → Slice 5 close-out): mono "M" overlay
+   glyph for mirrored meters. Positioned absolutely so the laneBody grid
+   arity stays at 2 columns; the previous attempt added a 3rd grid child
+   and collapsed the fader column. */
+.meterMonoBadge {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--audio-text-subtle) 22%, transparent);
+  color: var(--audio-text-default);
+  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.stereoMeter {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 4px 3px;
+  min-width: 0;
+  min-height: 0;
+  contain: paint;
+}
+
+.stereoMeter[data-readout="false"] {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.meterPair {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  min-height: 0;
+}
+
+.meterPeakReadout {
+  display: none;
+}
+
+.meterTrack {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 84%, transparent);
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 14px), var(--audio-meter-bg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.58);
+}
+
+.meterTrack[data-tone="amber"] {
+  border-color: color-mix(in srgb, var(--audio-meter-warn) 28%, var(--audio-border));
+}
+
+.meterTrack[data-tone="hot"] {
+  border-color: color-mix(in srgb, var(--audio-meter-hot) 44%, var(--audio-border));
+}
+
+.meterTrack[data-tone="red"] {
+  border-color: color-mix(in srgb, var(--audio-meter-over) 62%, var(--audio-border));
+}
+
+.meterFill {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    180deg,
+    var(--audio-meter-over) 0 5%,
+    var(--audio-meter-hot) 5% 10%,
+    var(--audio-meter-warn) 10% 30%,
+    var(--audio-meter-low-hot) 30% 100%
+  );
+  will-change: transform;
+}
+
+.meterTrack[data-tone="red"] .meterFill {
+  background: linear-gradient(
+    180deg,
+    var(--audio-meter-over) 0 5%,
+    var(--audio-meter-hot) 5% 10%,
+    var(--audio-meter-warn) 10% 30%,
+    var(--audio-meter-low-hot) 30% 100%
+  );
+}
+
+.meterFill[data-side="left"] {
+  transform: translateY(calc(100% - var(--audio-meter-left)));
+}
+
+.meterFill[data-side="right"] {
+  transform: translateY(calc(100% - var(--audio-meter-right)));
+}
+
+.meterPeak {
+  position: absolute;
+  top: 0;
+  right: 1px;
+  left: 1px;
+  height: 2px;
+  background: var(--audio-meter-peak-hold);
+  background-color: var(--audio-meter-peak-hold);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--audio-meter-peak-hold) 20%, transparent),
+    0 0 7px color-mix(in srgb, var(--audio-meter-peak-hold) 28%, transparent);
+  will-change: transform;
+}
+
+.meterPeak[data-side="left"] {
+  transform: translateY(var(--audio-meter-peak-left-offset));
+}
+
+.meterPeak[data-side="right"] {
+  transform: translateY(var(--audio-meter-peak-right-offset));
+}
+
+.meterNominal {
+  position: absolute;
+  right: 1px;
+  left: 1px;
+  top: var(--audio-meter-nominal-offset);
+  height: 1px;
+  background: var(--audio-meter-warn);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--audio-meter-warn) 16%, transparent);
+  pointer-events: none;
+}
+
+.stereoMeter[data-clip="true"] .meterTrack {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.58),
+    inset 0 0 0 1px color-mix(in srgb, var(--audio-clip) 65%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--audio-clip) 20%, transparent);
+}
+
+.stereoMeter[data-peak-warning="true"] .meterTrack {
+  border-color: color-mix(in srgb, var(--audio-meter-warn) 58%, var(--audio-border));
+}
+
+.stereoMeter[data-meter-point-over="true"] .meterTrack {
+  border-top-color: var(--audio-meter-over);
+}
+
+.stereoMeter[data-clip="true"] .meterTrack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--audio-clip) 14%, transparent);
+  pointer-events: none;
+}
+
+.meterReadout {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.meterScale {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  display: block;
+  min-height: 0;
+}
+
+.meterScale span {
+  position: absolute;
+  right: 2px;
+  bottom: clamp(4px, var(--meter-scale-position, 0%), calc(100% - 4px));
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  transform: translateY(50%);
+  white-space: nowrap;
+}
+
+.meterScale span[data-meter-scale-mark="0"] {
+  color: var(--audio-accent);
+}

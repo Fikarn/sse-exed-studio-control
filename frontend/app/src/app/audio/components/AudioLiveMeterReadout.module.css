@@ -1,0 +1,31 @@
+/* Why: when metering is gated (OSC disabled, console state unverified, last
+   action failed) the canvas paint loop early-returns. The CSS fallback meter
+   bars must also stay dark so the operator never sees a simulated tick in a
+   degraded state. The warning band remains the truthful surface. The
+   `[data-canvas-metering]` data attribute lives on the operator workspace
+   root, so we scope the rule on the attribute alone — no class ancestor
+   needed. */
+[data-canvas-metering="true"] .canvasActiveMixMeter i::before,
+[data-canvas-metering="false"] .canvasActiveMixMeter i::before {
+  opacity: 0;
+}
+
+.meterValuePair {
+  display: inline-grid;
+  grid-template-columns: minmax(3ch, 3ch) max-content minmax(3ch, 3ch);
+  align-items: baseline;
+  column-gap: 0.35ch;
+  min-width: 7.4ch;
+  font-variant-numeric: tabular-nums;
+}
+
+.meterValuePair span {
+  overflow: hidden;
+  text-align: right;
+}
+
+.meterValuePair i {
+  color: var(--audio-text-subtle);
+  font-style: normal;
+  text-align: center;
+}

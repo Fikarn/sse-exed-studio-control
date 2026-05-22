@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal } from "lucide-
 
 import { Button, StatusBadge } from "@sse/design-system";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioToolbar.module.css";
 import { formatAudioTimestamp, type AudioDensityMode } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 import { mapStatusBadgeTone } from "../../shellData";
@@ -60,8 +60,14 @@ export function AudioToolbar({
         >
           <ChevronLeft size={16} strokeWidth={1.85} aria-hidden="true" />
         </button>
-        <span className={styles.bankPill}>
+        <span className={styles.bankPill} data-testid="audio-toolbar-bank-pill">
           Bank {viewModel.clampedBankIndex + 1} / {viewModel.totalBanks}
+          <small>
+            {" "}
+            · ch {viewModel.bankStart + 1}-
+            {Math.min(viewModel.bankStart + viewModel.visibleStripCount, viewModel.channels.length)} of{" "}
+            {viewModel.channels.length}
+          </small>
         </span>
         <button
           aria-label="Next audio bank"

@@ -63,10 +63,18 @@ export function formatMeterPercent(value: number) {
   return `${dbfsToMeterPercent(normalizedToDbfs(value)).toFixed(1)}%`;
 }
 
+// Why: shared infinity glyph so fader-style readouts and meter-style readouts
+// agree on the typography. Previously `formatAudioDb` returned the literal
+// `-inf dB` string while `formatMeterDb` returned `-∞`; the mixer lane patched
+// the divergence with a `.replace("-inf", "-∞")` shim, which broke any reader
+// that bypassed the shim.
+export const AUDIO_DB_NEG_INFINITY = "-∞ dB";
+export const AUDIO_METER_NEG_INFINITY = "-∞";
+
 export function formatAudioDb(value: number) {
   const db = normalizedToFaderDb(value);
   if (!Number.isFinite(db)) {
-    return "-inf dB";
+    return AUDIO_DB_NEG_INFINITY;
   }
   const rounded = Number(db.toFixed(1));
   const sign = rounded > 0 ? "+" : "";
@@ -76,9 +84,34 @@ export function formatAudioDb(value: number) {
 export function formatMeterDb(value: number) {
   const db = normalizedToDbfs(value);
   if (!Number.isFinite(db)) {
-    return "-∞";
+    return AUDIO_METER_NEG_INFINITY;
   }
   return `${db.toFixed(0)}`;
+}
+
+export interface SendStatusInput {
+  isActive: boolean;
+  noSend: boolean;
+  sendMuted: boolean;
+}
+
+/**
+ * Single source of truth for the inspector send-card status label.
+ *
+ * `isActive` means the send routes to the currently selected mix target —
+ * its copy uses the "Active mix" prefix to reinforce that this send IS the
+ * monitor mix. The remaining states (`Muted`, `No send`, `Send`) match the
+ * existing ergonomic plain-language pattern.
+ */
+export function deriveSendStatusLabel({ isActive, noSend, sendMuted }: SendStatusInput): string {
+  if (isActive) {
+    if (sendMuted) return "Active mix muted";
+    if (noSend) return "Active mix no send";
+    return "Active mix";
+  }
+  if (sendMuted) return "Muted";
+  if (noSend) return "No send";
+  return "Send";
 }
 
 export function formatAudioRole(role: string) {

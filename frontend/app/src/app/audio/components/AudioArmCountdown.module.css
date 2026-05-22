@@ -1,0 +1,30 @@
+.armCountdownBar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(90deg, var(--audio-meter-hot), var(--audio-warning-band-action-failed));
+  transform-origin: left;
+  animation: audioArmCountdown var(--audio-arm-duration, 4500ms) linear forwards;
+  pointer-events: none;
+}
+
+@keyframes audioArmCountdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .armCountdownBar {
+    animation: none !important;
+    background: var(--audio-meter-hot);
+    opacity: 0.6;
+    transform: scaleX(1);
+  }
+}

@@ -1,0 +1,25 @@
+/* AudioTargetPicker styling lives in `AudioRail.module.css` (mixTarget* /
+   targetPicker* selectors compose the rail's panel surface). The classes
+   referenced from `AudioTargetPicker.tsx` are intentional dead lookups today —
+   left in place so the component's structural intent is documented; restyling
+   the picker into its own first-class surface is a P2 visual polish item. */
+
+.targetPicker {
+  /* placeholder: see file header */
+}
+
+.targetPickerButton {
+  /* placeholder: see file header */
+}
+
+.targetPickerItem {
+  /* placeholder: see file header */
+}
+
+.targetPickerMenu {
+  /* placeholder: see file header */
+}
+
+.targetPickerSwatch {
+  /* placeholder: see file header */
+}

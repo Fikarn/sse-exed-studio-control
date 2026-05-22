@@ -2,7 +2,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
 import { ArrowRight, Mic, Play } from "lucide-react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioTieredMixer.module.css";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import { type AudioChannelGroupSelectionRequest, type AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioChannelLane, AudioOutputLane } from "./AudioMixerLane";
@@ -99,10 +99,14 @@ export function AudioTieredMixer({
                 </button>
               ))}
             </div>
-            <small>
+            <small data-testid={`audio-tier-bank-pill-${tier.id}`}>
               {tier.channels.length > 0
                 ? viewModel.clampedBankIndex > 0
-                  ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks}`
+                  ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks} · ch ${
+                      viewModel.bankStart + 1
+                    }-${Math.min(viewModel.bankStart + viewModel.visibleStripCount, viewModel.channels.length)} of ${
+                      viewModel.channels.length
+                    }`
                   : tier.meta
                 : "No sources in this bank"}
             </small>

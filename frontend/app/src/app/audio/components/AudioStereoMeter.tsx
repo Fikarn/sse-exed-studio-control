@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioStereoMeter.module.css";
 import {
   dbfsToMeterPercent,
   formatMeterDb,
@@ -166,6 +166,17 @@ export function AudioStereoMeter({
         <div className={styles.meterReadout} data-meter-readout="true">
           {liveClip ? "CLIP" : formatMeterDb(Math.max(liveLeft, liveRight))}
         </div>
+      ) : null}
+      {mirrorRight ? (
+        // Why: GS-AUD inline P2. The right meter mirrors the left for mono
+        // channels (no actual stereo signal). The M glyph overlays the
+        // meter pair to tell the operator at a glance that the second bar
+        // is a mirror, not an independent channel. Position absolute so
+        // the laneBody grid arity stays at 2 columns (previous attempt
+        // collapsed the fader column by adding a 3rd grid child).
+        <span aria-hidden="true" className={styles.meterMonoBadge} data-meter-mono-badge="true">
+          M
+        </span>
       ) : null}
     </div>
   );

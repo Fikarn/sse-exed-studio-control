@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 
+import { AUDIO_DRAFT_CLEAR_MS } from "./audioConstants";
+
 type DraftListener = () => void;
 
 export interface AudioControlDraftStore {
@@ -18,7 +20,16 @@ export function createAudioControlDraftStore(): AudioControlDraftStore {
 
   const notify = (key: string) => {
     for (const listener of listeners.get(key) ?? []) {
-      listener();
+      // Why: listeners are external subscribers (React `useSyncExternalStore`
+      // callbacks today, anything else in future). A throw in one listener
+      // must not stop the rest from being notified, and must not leave the
+      // store with a stale internal map. Log so a misbehaving subscriber is
+      // visible in dev consoles, but never re-raise.
+      try {
+        listener();
+      } catch (error) {
+        console.warn("[audio] draft listener threw; isolated:", error);
+      }
     }
   };
 
@@ -35,7 +46,7 @@ export function createAudioControlDraftStore(): AudioControlDraftStore {
       if (!drafts.delete(key)) return;
       notify(key);
     },
-    clearLater(key, delayMs = 250) {
+    clearLater(key, delayMs = AUDIO_DRAFT_CLEAR_MS) {
       cancelTimer(key);
       timers.set(
         key,

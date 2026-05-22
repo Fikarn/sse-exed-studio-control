@@ -1,30 +1,20 @@
-import { Clock3, Gauge, Radio, ShieldCheck, TimerReset } from "lucide-react";
+import { Clock3, TimerReset } from "lucide-react";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioHealthBar.module.css";
 import { formatAudioTimestamp } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 
 export function AudioHealthBar({ viewModel }: { viewModel: AudioWorkspaceViewModel }) {
   const snapshot = viewModel.audioSnapshot;
 
+  // Why: the Trust panel in the rail is the canonical surface for OSC,
+  // Endpoint, and Metering telemetry. The health bar previously duplicated
+  // those rows, which made small state divergences (eg. metering chip vs rail
+  // chip) read as bugs. The footer keeps the temporal facts (clock, last
+  // sync) and the keyboard shortcut hints — the rail keeps the trust facts.
   return (
     <footer className={styles.healthBar} data-testid="audio-health-bar">
       <div className={styles.healthTelemetry} data-testid="audio-footer-telemetry">
-        <div className={styles.healthItem}>
-          <ShieldCheck size={15} strokeWidth={1.8} aria-hidden="true" />
-          <span>OSC</span>
-          <strong>{viewModel.status.label}</strong>
-        </div>
-        <div className={styles.healthItem}>
-          <Radio size={15} strokeWidth={1.8} aria-hidden="true" />
-          <span>Endpoint</span>
-          <strong>{viewModel.footerTelemetry.endpoint}</strong>
-        </div>
-        <div className={styles.healthItem}>
-          <Gauge size={15} strokeWidth={1.8} aria-hidden="true" />
-          <span>Metering</span>
-          <strong>{viewModel.footerTelemetry.metering}</strong>
-        </div>
         <div className={styles.healthItem}>
           <Clock3 size={15} strokeWidth={1.8} aria-hidden="true" />
           <span>Clock</span>

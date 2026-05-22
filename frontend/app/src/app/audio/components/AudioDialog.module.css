@@ -1,0 +1,45 @@
+.audioDialogForm {
+  display: grid;
+  gap: 8px;
+  min-width: min(360px, 76vw);
+}
+
+.audioDialogForm label,
+.audioDialogForm small {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.audioDialogForm input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--audio-border-strong);
+  border-radius: 6px;
+  background: var(--audio-panel-strong);
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 14px / 1 var(--font-family-ui);
+  letter-spacing: 0;
+  outline: none;
+}
+
+.audioDialogForm input:focus-visible {
+  border-color: color-mix(in srgb, var(--audio-accent) 76%, var(--audio-border-strong));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--audio-accent) 28%, transparent);
+}
+
+.audioDialogNumberField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.audioDialogNumberField span {
+  color: var(--audio-text-muted);
+  font: var(--font-weight-semibold) 12px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}

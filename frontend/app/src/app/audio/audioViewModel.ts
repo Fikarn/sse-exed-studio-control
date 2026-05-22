@@ -82,6 +82,7 @@ export interface AudioWorkspaceViewModel {
   meterSimulationActive: boolean;
   meterSimulationDetail: string;
   meterSimulationLabel: string;
+  meterSimulationState: AudioMeterSimulationState;
   outputAccent: string;
   selectedChannel: AudioChannelEntry | null;
   selectedChannelId: string | null;
@@ -187,11 +188,6 @@ export function audioChannelSupportsPhantom(channel: AudioChannelEntry | null) {
   return channel?.role === "front-preamp";
 }
 
-export function audioChannelSupportsPad(channel: AudioChannelEntry | null) {
-  const _ = channel;
-  return false;
-}
-
 export function audioChannelSupportsInstrument(channel: AudioChannelEntry | null) {
   return channel?.role === "front-preamp";
 }
@@ -273,6 +269,27 @@ function usesSimulatedMetering(snapshot: AudioSnapshot) {
   if (meteringSource === "simulated" || meteringSource === "fixture") return true;
   const adapterMode = String(snapshot.adapterMode ?? "").toLowerCase();
   return adapterMode.includes("simulated") || adapterMode === "fixture";
+}
+
+export type AudioMeterSimulationState = "live" | "simulated" | "gated";
+
+/**
+ * Tri-state classification of what the meter canvas is currently allowed to
+ * show. `"gated"` covers every state in which the simulated tick is a lie —
+ * OSC disabled, console state unverified ("unknown" or "assumed"), or the
+ * last engine action failed. Operator must see no meter motion in any of
+ * those states. `"simulated"` keeps the existing fixture/sim test surface
+ * truthful; `"live"` is the default RME-OSC path.
+ */
+export function audioMeterSimulationState(snapshot: AudioSnapshot): AudioMeterSimulationState {
+  const oscDisabled = snapshot.oscEnabled === false;
+  const confidence = String(snapshot.consoleStateConfidence ?? "").toLowerCase();
+  const notVerified = confidence !== "aligned" && confidence !== "verified";
+  const actionFailed = String(snapshot.lastActionStatus ?? "").toLowerCase() === "failed";
+  if (oscDisabled || notVerified || actionFailed) {
+    return "gated";
+  }
+  return usesSimulatedMetering(snapshot) ? "simulated" : "live";
 }
 
 export function isChannelFeedingMixTarget(channel: AudioChannelEntry, mixTargetId: string | null) {
@@ -404,7 +421,8 @@ export function buildAudioViewModel({
   const soloedChannel = soloedChannels[0] ?? null;
   const selectedGroup = selectedChannel ? getAudioChannelGroup(selectedChannel) : selectedMixTarget ? "output" : "none";
   const selectedTier = selectedSourceTier(selectedChannel, selectedMixTarget);
-  const meterSimulationActive = usesSimulatedMetering(audioSnapshot);
+  const meterSimulationState = audioMeterSimulationState(audioSnapshot);
+  const meterSimulationActive = meterSimulationState === "simulated";
   const meterSimulationLabel = "TEST METER SIMULATION";
   const meterSimulationDetail = "Test meter simulation · not hardware";
 
@@ -502,6 +520,7 @@ export function buildAudioViewModel({
     meterSimulationActive,
     meterSimulationDetail,
     meterSimulationLabel,
+    meterSimulationState,
     outputAccent,
     selectedChannel,
     selectedChannelId,

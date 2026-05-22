@@ -1,0 +1,1034 @@
+/* AudioMixerLane module — channel/output lane surfaces consumed by
+ * AudioMixerLane.tsx. Tier-strip wrapper classes (tieredMixer, mixerTier,
+ * tierLabel, tierChip, *LaneGrid, emptyTier) live in
+ * AudioTieredMixer.module.css since AudioTieredMixer.tsx is the deeper
+ * consumer for those. */
+
+.channelLane,
+.outputLane {
+  --target-accent: var(--audio-accent);
+  --audio-lane-accent: var(--audio-tier-accent);
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(76px, 1fr) auto auto auto;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 82%, transparent);
+  border-top-color: color-mix(in srgb, var(--audio-lane-accent) 48%, var(--audio-border));
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(245, 232, 200, 0.035), transparent 26%),
+    color-mix(in srgb, var(--audio-card) 86%, var(--audio-panel) 14%);
+  cursor: pointer;
+}
+
+.outputLane {
+  --audio-lane-accent: var(--target-accent);
+  grid-template-rows: auto minmax(72px, 1fr) auto;
+}
+
+.channelLane::before,
+.outputLane::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 8px;
+  left: 8px;
+  height: 2px;
+  border-radius: 0 0 999px 999px;
+  background: color-mix(in srgb, var(--audio-lane-accent) 78%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--audio-lane-accent) 38%, transparent);
+  pointer-events: none;
+}
+
+.channelLane[data-selected="true"],
+.outputLane[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 88%, var(--audio-border));
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--audio-accent) 60%, transparent),
+    0 0 14px color-mix(in srgb, var(--audio-accent) 22%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--audio-accent) 12%, transparent), transparent 42%),
+    color-mix(in srgb, var(--audio-card) 86%, var(--audio-panel) 14%);
+}
+
+/* Why: the existing ::before is the lane identity rail; selection thickens
+   it from 2 → 3 px and pushes it to full opacity so the selected lane reads
+   crisply even when its neighbour is also feeding the bus. */
+.channelLane[data-selected="true"]::before,
+.outputLane[data-selected="true"]::before {
+  height: 3px;
+  opacity: 1;
+}
+
+.channelLane[data-no-send="true"]:not([data-selected="true"]) {
+  opacity: 0.58;
+}
+
+.channelLane[data-feeding="true"]:not([data-selected="true"]) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-accent) 35%, transparent);
+}
+
+.channelLane[data-role="front-preamp"] {
+  grid-template-rows: auto 65px minmax(52px, 1fr) auto auto;
+  background: color-mix(in srgb, var(--audio-card) 88%, black 12%);
+}
+
+.channelLane[data-role="front-preamp"] .laneBody {
+  grid-template-columns: minmax(0, 1fr) 26px;
+  min-height: 52px;
+}
+
+.channelLane:not([data-role="front-preamp"]) .laneBody {
+  grid-template-columns: minmax(0, 1fr) 28px;
+}
+
+.channelLane[data-role="front-preamp"] [class*="preampControl"] {
+  --preamp-control-width: 195px;
+}
+
+.channelLane[data-role="front-preamp"] .laneHeader {
+  position: relative;
+  display: grid;
+  min-height: 34px;
+  align-items: start;
+  justify-content: stretch;
+}
+
+.channelLane[data-role="front-preamp"] .laneNameBlock {
+  gap: 2px;
+  width: 100%;
+}
+
+.lanePreampRow,
+.laneIndexRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lanePreampRow span:first-child,
+.laneIndexRow span:first-child {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+}
+
+.channelLane[data-role="front-preamp"][data-clip="true"] .lanePreampRow span:last-child {
+  padding-right: 16px;
+}
+
+.channelLane[data-role="front-preamp"] .laneName {
+  color: var(--color-text-strong);
+  font: var(--font-weight-semibold) 13px / 1.18 var(--font-family-display);
+}
+
+.channelLane[data-role="front-preamp"] .laneHeaderBadges {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.channelLane[data-group="talent"] {
+  --audio-lane-accent: var(--audio-group-talent);
+}
+
+.channelLane[data-group="line"] {
+  --audio-lane-accent: var(--audio-group-line);
+}
+
+.channelLane[data-group="bed"] {
+  --audio-lane-accent: var(--audio-group-bed);
+}
+
+.channelLane[data-group="fx"] {
+  --audio-lane-accent: var(--audio-group-fx);
+}
+
+.channelLane[data-group="remote"] {
+  --audio-lane-accent: var(--audio-group-remote);
+}
+
+.laneHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.laneHeaderBadges {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.laneClipDot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--audio-clip);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-clip) 70%, transparent);
+  cursor: pointer;
+}
+
+.laneBody,
+.outputBody {
+  display: grid;
+  grid-template-columns: minmax(34px, 1fr) 26px minmax(42px, 0.74fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 6px;
+  min-height: 76px;
+}
+
+.outputBody {
+  grid-template-columns: minmax(34px, 0.32fr) 28px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 72px;
+}
+
+.laneBody [class*="stereoMeter"],
+.laneBody [class*="fader"] {
+  grid-row: 1;
+}
+
+.laneReadout {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.channelLane[data-feeding="true"] .laneReadout {
+  color: var(--audio-accent);
+}
+
+.outputBusPanel {
+  grid-column: 3;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-content: start;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+
+.outputBusPanel span {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 78%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-900) 58%, transparent);
+}
+
+.outputBusPanel strong {
+  color: var(--audio-accent);
+  font: var(--font-weight-semibold) 20px / 1 var(--font-family-display);
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.outputBusPanel strong em {
+  margin-left: 16px;
+  color: var(--audio-text-strong);
+  font-style: normal;
+}
+
+.outputBusPanel small {
+  overflow: hidden;
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.outputMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.outputMetricGrid span:first-child {
+  grid-column: 1 / -1;
+}
+
+.outputMetricGrid span {
+  min-height: 48px;
+  padding: 8px 10px;
+}
+
+.outputMetricGrid strong {
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 14px / 1 var(--font-family-mono);
+}
+
+.outputLane .laneControls {
+  position: static;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  pointer-events: auto;
+}
+
+.outputLane .laneToggle {
+  min-height: 24px;
+  padding: 0 5px;
+  font-size: 9px;
+}
+
+.outputLane [class*="faderValue"] {
+  display: none;
+}
+
+/* laneControls grid: shared with sibling button-row utilities in the shell,
+   but the laneControls definition itself belongs here. */
+.laneControls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+/* Base toggle styling. The companion compound in the shell file extends the
+   same surface to .inspectorButtonGrid button, .inspectorActionRow button,
+   .unsupportedToggleRow button, .sendModeRow button, .placeholderPanel
+   button — those continue to be defined there. */
+.laneToggle {
+  min-height: 25px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.laneToggle[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
+  color: var(--audio-solo);
+}
+
+.laneToggle[data-control="mute"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-mute) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-mute) 18%, var(--audio-panel));
+  color: var(--audio-mute);
+}
+
+.laneToggle[data-control="talk"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-talk) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-talk) 18%, var(--audio-panel));
+  color: var(--audio-talk);
+}
+
+.laneToggle[data-control="dim"][data-active="true"],
+.laneToggle[data-control="mono"][data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-accent) 16%, var(--audio-panel));
+  color: var(--audio-accent);
+}
+
+.laneToggle:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+@container operator-root (min-width: 2200px) and (min-height: 1250px) {
+  .channelLane[data-role="front-preamp"] {
+    grid-template-areas:
+      "header header"
+      "body preamp"
+      "body readout"
+      "body controls"
+      "body .";
+    grid-template-columns: 118px minmax(0, 1fr);
+    grid-template-rows: auto 82px auto auto minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 5px;
+    min-height: 330px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneHeader {
+    grid-area: header;
+    min-height: 41px;
+  }
+
+  .channelLane[data-role="front-preamp"] .lanePreampRow {
+    font-size: 11px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneName {
+    font-size: 18px;
+    line-height: 1.15;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="preampControl"] {
+    grid-area: preamp;
+    --preamp-control-width: 246px;
+    margin-top: 4px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneBody {
+    grid-area: body;
+    grid-template-columns: minmax(0, 1fr) 28px;
+    min-height: 242px;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="stereoMeter"][data-peak-readout="true"],
+  .channelLane[data-role="playback-pair"] [class*="stereoMeter"][data-peak-readout="true"] {
+    grid-template-rows: 18px minmax(0, 1fr);
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterPeakReadout"],
+  .channelLane[data-role="playback-pair"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterPeakReadout"] {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--audio-text-subtle);
+    font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+    letter-spacing: 0;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterPair"],
+  .channelLane[data-role="front-preamp"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterScale"],
+  .channelLane[data-role="playback-pair"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterPair"],
+  .channelLane[data-role="playback-pair"] [class*="stereoMeter"][data-peak-readout="true"] [class*="meterScale"] {
+    grid-row: 2;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="fader"],
+  .channelLane[data-role="playback-pair"] [class*="fader"] {
+    padding-top: 22px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneReadout {
+    grid-area: readout;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    justify-self: stretch;
+    width: 100%;
+    margin-top: 8px;
+    min-height: 22px;
+    padding: 0 8px;
+    color: var(--audio-text-strong);
+    font: var(--font-weight-semibold) 16px / 1 var(--font-family-mono);
+    text-align: right;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneReadout::before {
+    content: "FADER";
+    color: var(--audio-text-subtle);
+    font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+    letter-spacing: 0;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneControls {
+    grid-area: controls;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .channelLane[data-role="front-preamp"] .laneToggle {
+    min-height: 30px;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="preampKnob"] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="preampLedArc"] {
+    width: 70px;
+    height: 70px;
+    mask: radial-gradient(circle, transparent 0 40px, black 41px 45px, transparent 46px);
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="preampGainLabel"] {
+    min-width: 78px;
+    font-size: 13px;
+  }
+
+  .channelLane[data-role="playback-pair"] {
+    grid-template-areas:
+      "header header"
+      "body readout"
+      "body ."
+      "body controls";
+    grid-template-columns: 118px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 5px;
+    min-height: 214px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneHeader {
+    grid-area: header;
+    min-height: 39px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneNameBlock {
+    gap: 4px;
+    width: 100%;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneIndexRow {
+    font-size: 11px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneName {
+    font-size: 16px;
+    line-height: 1.15;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneBody {
+    grid-area: body;
+    grid-template-columns: minmax(0, 1fr) 30px;
+    min-height: 151px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneReadout {
+    grid-area: readout;
+    align-self: center;
+    justify-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 31px;
+    color: var(--audio-text-strong);
+    font: var(--font-weight-semibold) 22px / 1 var(--font-family-mono);
+    text-align: right;
+    transform: translateY(18px);
+  }
+
+  .channelLane[data-role="playback-pair"] .laneControls {
+    grid-area: controls;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .channelLane[data-role="playback-pair"] .laneToggle {
+    min-height: 36px;
+    font-size: 12px;
+  }
+
+  .outputLane {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 5px;
+    min-height: 302px;
+  }
+
+  .outputLane .laneNameBlock {
+    gap: 4px;
+    width: 100%;
+  }
+
+  .outputLane .laneIndexRow {
+    font-size: 11px;
+  }
+
+  .outputLane .laneName {
+    font-size: 16px;
+    line-height: 1.15;
+  }
+
+  .outputLane .outputBody {
+    grid-template-columns: 118px minmax(0, 1fr);
+    gap: 10px;
+    min-height: 218px;
+  }
+
+  .outputLane [class*="stereoMeter"] {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+    width: 84px;
+  }
+
+  .outputLane [class*="fader"] {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: end;
+    width: 30px;
+  }
+
+  .outputLane .outputBusPanel {
+    grid-column: 2;
+    grid-row: 1;
+    padding-bottom: 50px;
+  }
+
+  .outputLane .laneControls {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    left: 136px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .outputLane .laneToggle {
+    min-height: 34px;
+    font-size: 11px;
+  }
+}
+
+@container operator-root (max-width: 2100px) {
+  .channelLane,
+  .outputLane {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .laneBody {
+    grid-template-columns: minmax(30px, 1fr) 24px minmax(34px, 0.68fr);
+    gap: 4px;
+  }
+
+  .outputBody {
+    grid-template-columns: minmax(30px, 0.32fr) 26px minmax(0, 1fr);
+  }
+
+  .outputLane [class*="sliderControl"][data-orientation="vertical"] {
+    min-height: 68px;
+  }
+
+  .outputLane .laneControls {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .outputLane .laneToggle {
+    min-height: 18px;
+    font-size: 8px;
+  }
+
+  .outputMetricGrid {
+    gap: 3px;
+  }
+
+  .outputMetricGrid span {
+    gap: 2px;
+    min-height: 18px;
+    padding: 3px;
+  }
+
+  .outputMetricGrid small {
+    display: none;
+  }
+
+  .outputMetricGrid strong {
+    font-size: 9px;
+  }
+
+  .laneName {
+    font-size: 12px;
+  }
+
+  .channelLane[data-role="front-preamp"] {
+    height: 222px;
+    grid-template-rows: 34px 65px 52px 14px 22px;
+  }
+
+  .channelLane[data-role="front-preamp"] .laneBody {
+    min-height: 52px;
+    height: 52px;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="sliderControl"][data-orientation="vertical"] {
+    min-height: 52px;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="preampKnob"] {
+    width: 36px;
+    height: 36px;
+  }
+
+  .channelLane[data-role="front-preamp"] [class*="preampGainLabel"] {
+    right: auto;
+    bottom: auto;
+    left: 54.6%;
+    top: 50%;
+    min-width: 66px;
+    padding: 0;
+    color: #8beaff;
+    font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+    text-align: center;
+    transform: translate(-50%, -50%);
+  }
+
+  .channelLane[data-role="front-preamp"] .laneToggle {
+    min-height: 22px;
+  }
+
+  .channelLane[data-role="playback-pair"] {
+    grid-template-rows: auto minmax(48px, 1fr) 14px 20px;
+    gap: 3px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneBody {
+    min-height: 48px;
+  }
+
+  .channelLane[data-role="playback-pair"] [class*="sliderControl"][data-orientation="vertical"] {
+    min-height: 48px;
+  }
+
+  .channelLane[data-role="playback-pair"] .laneToggle {
+    min-height: 20px;
+  }
+
+  .laneToggle {
+    min-height: 23px;
+    font-size: 9px;
+  }
+}
+
+[data-layout-mode="studioFull"] .channelLane,
+[data-layout-mode="studioFull"] .outputLane {
+  align-self: stretch;
+  height: auto;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] {
+  grid-template-rows: auto 76px minmax(0, 1fr) auto auto;
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneBody {
+  height: auto;
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"]
+  .channelLane[data-role="front-preamp"]
+  [class*="sliderControl"][data-orientation="vertical"],
+[data-layout-mode="studioFull"]
+  .channelLane[data-role="playback-pair"]
+  [class*="sliderControl"][data-orientation="vertical"],
+[data-layout-mode="studioFull"] .outputLane [class*="sliderControl"][data-orientation="vertical"] {
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] {
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneBody {
+  min-height: 0;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] {
+  grid-template-areas:
+    "header header"
+    "body preamp"
+    "body readout"
+    "body controls"
+    "body .";
+  grid-template-columns: 118px minmax(0, 1fr);
+  grid-template-rows: auto 82px auto auto minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 5px;
+  min-height: 318px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneHeader {
+  grid-area: header;
+  min-height: 41px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .lanePreampRow {
+  font-size: 11px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneName {
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] [class*="preampControl"] {
+  grid-area: preamp;
+  --preamp-control-width: 246px;
+  margin-top: 4px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneBody {
+  grid-area: body;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  min-height: 230px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneReadout {
+  grid-area: readout;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  justify-self: stretch;
+  width: 100%;
+  min-height: 22px;
+  margin-top: 8px;
+  padding: 0 8px;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 16px / 1 var(--font-family-mono);
+  text-align: right;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneReadout::before {
+  content: "FADER";
+  color: var(--audio-text-subtle);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneControls {
+  grid-area: controls;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneToggle {
+  min-height: 30px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] {
+  grid-template-areas:
+    "header header"
+    "body readout"
+    "body ."
+    "body controls";
+  grid-template-columns: 118px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 5px;
+  min-height: 204px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneHeader {
+  grid-area: header;
+  min-height: 39px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneNameBlock {
+  gap: 4px;
+  width: 100%;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneIndexRow {
+  font-size: 11px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneName {
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneBody {
+  grid-area: body;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  min-height: 142px;
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneReadout {
+  grid-area: readout;
+  align-self: center;
+  justify-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 31px;
+  color: var(--audio-text-strong);
+  font: var(--font-weight-semibold) 22px / 1 var(--font-family-mono);
+  text-align: right;
+  transform: translateY(12px);
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneControls {
+  grid-area: controls;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+[data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneToggle {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+[data-layout-mode="studioFull"] .outputLane {
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 5px;
+  min-height: 288px;
+}
+
+[data-layout-mode="studioFull"] .outputLane .laneNameBlock {
+  gap: 4px;
+  width: 100%;
+}
+
+[data-layout-mode="studioFull"] .outputLane .laneIndexRow {
+  font-size: 11px;
+}
+
+[data-layout-mode="studioFull"] .outputLane .laneName {
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+[data-layout-mode="studioFull"] .outputLane .outputBody {
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 206px;
+}
+
+[data-layout-mode="studioFull"] .outputLane [class*="stereoMeter"] {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  width: 84px;
+}
+
+[data-layout-mode="studioFull"] .outputLane [class*="fader"] {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  width: 30px;
+}
+
+[data-layout-mode="studioFull"] .outputLane .outputBusPanel {
+  grid-column: 2;
+  grid-row: 1;
+  padding-bottom: 44px;
+}
+
+[data-layout-mode="studioFull"] .outputLane .laneControls {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 136px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+[data-layout-mode="studioFull"] .outputLane .laneToggle {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+@container operator-root (max-height: 1100px) {
+  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] {
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-rows: auto 50px auto auto minmax(0, 1fr);
+    column-gap: 8px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneHeader {
+    min-height: 30px;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneName {
+    font-size: 14px;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] [class*="preampControl"] {
+    --preamp-control-width: 150px;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneBody {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneReadout {
+    min-height: 18px;
+    margin-top: 2px;
+    font-size: 12px;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="front-preamp"] .laneToggle {
+    min-height: 22px;
+    font-size: 9px;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] {
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    column-gap: 8px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneHeader {
+    min-height: 30px;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneName {
+    font-size: 13px;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneBody {
+    grid-template-columns: minmax(0, 1fr) 24px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneReadout {
+    min-height: 20px;
+    font-size: 14px;
+    transform: none;
+  }
+
+  [data-layout-mode="studioFull"] .channelLane[data-role="playback-pair"] .laneToggle {
+    min-height: 22px;
+    font-size: 9px;
+  }
+
+  [data-layout-mode="studioFull"] .outputLane {
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .outputLane .laneName {
+    font-size: 13px;
+  }
+
+  [data-layout-mode="studioFull"] .outputLane .outputBody {
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 8px;
+    min-height: 0;
+  }
+
+  [data-layout-mode="studioFull"] .outputLane [class*="stereoMeter"] {
+    width: 58px;
+  }
+
+  [data-layout-mode="studioFull"] .outputLane [class*="fader"] {
+    width: 24px;
+  }
+
+  [data-layout-mode="studioFull"] .outputLane .outputBusPanel {
+    padding-bottom: 34px;
+  }
+
+  [data-layout-mode="studioFull"] .outputLane .laneControls {
+    left: 100px;
+    gap: 4px;
+  }
+
+  [data-layout-mode="studioFull"] .outputLane .laneToggle {
+    min-height: 24px;
+    font-size: 9px;
+  }
+}

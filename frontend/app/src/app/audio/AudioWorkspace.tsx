@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import type { AudioSnapshot, ShellStore } from "@sse/engine-client";
-import { ConfirmDialog, ContextMenu, type ContextMenuItem, type PaletteAction } from "@sse/design-system";
+import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "@sse/design-system";
 import { Pencil, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import styles from "./AudioWorkspace.module.css";
+import { AUDIO_ARM_TIMEOUT_MS, AUDIO_DRAFT_CLEAR_MS, AUDIO_RECALL_PULSE_MS } from "./audioConstants";
+import { useAudioArming } from "./hooks/useAudioArming";
+import { useAudioKeyboardShortcuts } from "./hooks/useAudioKeyboardShortcuts";
+import { useAudioOptimisticSettings, type OptimisticAudioSettings } from "./hooks/useAudioOptimisticSettings";
+import { useAudioPaletteRegistration } from "./hooks/useAudioPaletteRegistration";
 import { createAudioControlDraftStore } from "./audioControlDraftStore";
 import { AUDIO_FADER_UNITY, type AudioFeedbackTone } from "./audioFormatting";
 import {
   audioChannelSupportsPhase,
-  buildAudioPaletteRegistrationSignature,
   buildAudioViewModel,
   type AudioChannelGroup,
   type AudioChannelGroupSelectionRequest,
   type AudioChannelGroupSelections,
-  type AudioWorkspaceViewModel,
 } from "./audioViewModel";
 import { AudioHealthBar } from "./components/AudioHealthBar";
 import { AudioInspector, type InspectorTab } from "./components/AudioInspector";
@@ -22,7 +25,7 @@ import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
 import { AudioRail } from "./components/AudioRail";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { AudioTextDialog } from "./components/AudioTextDialog";
-import { isEditableTarget, type AudioChannelEntry, type SnapshotRecord } from "../shellData";
+import { type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { usePalette } from "../shared/paletteContext";
 
@@ -72,35 +75,11 @@ interface AudioDeleteSnapshotState {
   name: string;
 }
 
-interface AudioArmedAction {
-  key: string;
-  label: string;
-  targetId: string;
-  targetKind: "phantom" | "snapshot-recall" | "snapshot-save";
-  timeoutMs: number;
-}
-
-interface AudioPaletteRegistrationModel {
-  allSelectableChannels: AudioChannelEntry[];
-  mixTargets: AudioWorkspaceViewModel["mixTargets"];
-  selectedChannel: AudioWorkspaceViewModel["selectedChannel"];
-  selectedMixTargetId: AudioWorkspaceViewModel["selectedMixTargetId"];
-  selectedSnapshot: AudioWorkspaceViewModel["selectedSnapshot"];
-  snapshots: AudioWorkspaceViewModel["snapshots"];
-}
-
-interface OptimisticAudioSettings {
-  selectedChannelId?: string | null;
-  selectedMixTargetId?: string;
-  viewMode?: "submix" | "master";
-}
-
 const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
   "hardware-inputs": [],
   "software-playback": [],
 };
 
-const AUDIO_ARM_TIMEOUT_MS = 4500;
 const AUDIO_DENSITY_MODE = "desktop";
 
 export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
@@ -112,7 +91,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [feedback, setFeedback] = useState<AudioWorkspaceFeedback | null>(null);
   const [recentlyRecalledSnapshotId, setRecentlyRecalledSnapshotId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<AudioContextMenuState | null>(null);
-  const [armedAction, setArmedAction] = useState<AudioArmedAction | null>(null);
   const draftStoreRef = useRef<ReturnType<typeof createAudioControlDraftStore> | null>(null);
   if (!draftStoreRef.current) {
     draftStoreRef.current = createAudioControlDraftStore();
@@ -121,12 +99,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [textDialog, setTextDialog] = useState<AudioTextDialogState | null>(null);
   const [deleteSnapshotDialog, setDeleteSnapshotDialog] = useState<AudioDeleteSnapshotState | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("channel");
-  const [optimisticSettings, setOptimisticSettings] = useState<OptimisticAudioSettings | null>(null);
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
   const warningBandRef = useRef<HTMLDivElement | null>(null);
   const recallPulseTimerRef = useRef<number | null>(null);
-  const armedActionTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!window.__SSE_TEST_RENDER_COUNTS__) {
@@ -135,19 +111,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace = (window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace ?? 0) + 1;
   });
 
-  const audioSnapshotForView = useMemo(() => {
-    if (!audioSnapshot || !optimisticSettings) return audioSnapshot;
-
-    const hasSelectedChannel = Object.prototype.hasOwnProperty.call(optimisticSettings, "selectedChannelId");
-    return {
-      ...audioSnapshot,
-      selectedChannelId: hasSelectedChannel
-        ? (optimisticSettings.selectedChannelId ?? null)
-        : audioSnapshot.selectedChannelId,
-      selectedMixTargetId: optimisticSettings.selectedMixTargetId ?? audioSnapshot.selectedMixTargetId,
-      viewMode: optimisticSettings.viewMode ?? audioSnapshot.viewMode,
-    };
-  }, [audioSnapshot, optimisticSettings]);
+  const { audioSnapshotForView, applyOptimistic, clearOptimistic } = useAudioOptimisticSettings(audioSnapshot);
 
   const viewModel = useMemo(() => {
     if (!audioSnapshotForView) return null;
@@ -160,28 +124,15 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex]);
 
-  useEffect(() => {
-    if (!optimisticSettings || !audioSnapshot) return;
-
-    const hasSelectedChannel = Object.prototype.hasOwnProperty.call(optimisticSettings, "selectedChannelId");
-    const selectedChannelMatches =
-      !hasSelectedChannel || audioSnapshot.selectedChannelId === (optimisticSettings.selectedChannelId ?? null);
-    const selectedMixTargetMatches =
-      optimisticSettings.selectedMixTargetId === undefined ||
-      audioSnapshot.selectedMixTargetId === optimisticSettings.selectedMixTargetId;
-    const viewModeMatches =
-      optimisticSettings.viewMode === undefined || audioSnapshot.viewMode === optimisticSettings.viewMode;
-
-    if (selectedChannelMatches && selectedMixTargetMatches && viewModeMatches) {
-      setOptimisticSettings(null);
-    }
-  }, [audioSnapshot, optimisticSettings]);
-
-  useEffect(() => {
-    if (!optimisticSettings) return;
-    const timeoutId = window.setTimeout(() => setOptimisticSettings(null), 2500);
-    return () => window.clearTimeout(timeoutId);
-  }, [optimisticSettings]);
+  const { armedAction, armOrApplyAction, cancelArmedAction, clearArmedAction } = useAudioArming({
+    setFeedback,
+    resetTriggers: {
+      lastRecalledSnapshotId: audioSnapshot?.lastRecalledSnapshotId,
+      lastSnapshotRecallAt: audioSnapshot?.lastSnapshotRecallAt,
+      selectedChannelId: viewModel?.selectedChannelId,
+      selectedMixTargetId: viewModel?.selectedMixTargetId,
+    },
+  });
 
   useEffect(() => {
     if (!viewModel || bankIndex === viewModel.clampedBankIndex) {
@@ -205,45 +156,13 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     recallPulseTimerRef.current = window.setTimeout(() => {
       setRecentlyRecalledSnapshotId(null);
       recallPulseTimerRef.current = null;
-    }, 1500);
+    }, AUDIO_RECALL_PULSE_MS);
   }, [audioSnapshot?.lastRecalledSnapshotId, audioSnapshot?.lastSnapshotRecallAt]);
-
-  useEffect(() => {
-    if (armedActionTimerRef.current !== null) {
-      window.clearTimeout(armedActionTimerRef.current);
-      armedActionTimerRef.current = null;
-    }
-    if (!armedAction) return;
-
-    armedActionTimerRef.current = window.setTimeout(() => {
-      setArmedAction(null);
-      armedActionTimerRef.current = null;
-    }, armedAction.timeoutMs);
-
-    return () => {
-      if (armedActionTimerRef.current !== null) {
-        window.clearTimeout(armedActionTimerRef.current);
-        armedActionTimerRef.current = null;
-      }
-    };
-  }, [armedAction]);
-
-  useEffect(() => {
-    setArmedAction(null);
-  }, [
-    audioSnapshot?.lastRecalledSnapshotId,
-    audioSnapshot?.lastSnapshotRecallAt,
-    viewModel?.selectedChannelId,
-    viewModel?.selectedMixTargetId,
-  ]);
 
   useEffect(() => {
     return () => {
       if (recallPulseTimerRef.current !== null) {
         window.clearTimeout(recallPulseTimerRef.current);
-      }
-      if (armedActionTimerRef.current !== null) {
-        window.clearTimeout(armedActionTimerRef.current);
       }
       draftStore.dispose();
     };
@@ -251,7 +170,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
   const performAction = useLiveCallback(async (actionId: string, runner: () => Promise<void>) => {
     setBusyAction(actionId);
-    setArmedAction(null);
+    clearArmedAction();
     setFeedback(null);
     try {
       await runner();
@@ -265,31 +184,13 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     }
   });
 
-  const cancelArmedAction = useLiveCallback(() => {
-    if (!armedAction) return false;
-    setArmedAction(null);
-    setFeedback({ message: "Armed audio action canceled.", tone: "info" });
-    return true;
-  });
-
-  const armOrApplyAction = useLiveCallback((candidate: AudioArmedAction, apply: () => void) => {
-    if (armedAction?.key === candidate.key) {
-      setArmedAction(null);
-      apply();
-      return;
-    }
-
-    setArmedAction(candidate);
-    setFeedback({ message: `Armed: ${candidate.label}. Repeat the same action to apply.`, tone: "info" });
-  });
-
   const getDraftValue = useLiveCallback((key: string, fallback: number) => draftStore.get(key) ?? fallback);
 
   const setDraftValue = useLiveCallback((key: string, value: number) => {
     draftStore.set(key, value);
   });
 
-  const clearDraftValueLater = useLiveCallback((key: string, delayMs: number = 250) => {
+  const clearDraftValueLater = useLiveCallback((key: string, delayMs: number = AUDIO_DRAFT_CLEAR_MS) => {
     draftStore.clearLater(key, delayMs);
   });
 
@@ -306,9 +207,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   });
 
   const updateAudioSettings = useLiveCallback((request: AudioSettingsUpdate, optimistic: OptimisticAudioSettings) => {
-    setOptimisticSettings((current) => ({ ...(current ?? {}), ...optimistic }));
+    applyOptimistic(optimistic);
     void store.updateAudioSettings(request).catch((error) => {
-      setOptimisticSettings(null);
+      clearOptimistic();
       setFeedback({
         message: error instanceof Error ? error.message : "The audio setting could not be updated.",
         tone: "error",
@@ -574,14 +475,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     return [...viewModel.hardwareInputs.channels, ...viewModel.softwarePlayback.channels];
   }, [viewModel]);
 
-  const allSelectableChannels = useMemo(() => {
-    if (!viewModel) return [];
-    return [
-      ...viewModel.channels.filter((channel) => channel.role !== "playback-pair"),
-      ...viewModel.channels.filter((channel) => channel.role === "playback-pair"),
-    ];
-  }, [viewModel]);
-
   const orderedSelectableSources = useMemo(() => {
     if (!viewModel) return [];
     return [
@@ -594,430 +487,46 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       ...viewModel.mixTargets.map((mixTarget) => ({ id: mixTarget.id, kind: "output" as const })),
     ];
   }, [viewModel]);
-  const paletteRegistrationSignature = viewModel
-    ? buildAudioPaletteRegistrationSignature(viewModel, allSelectableChannels)
-    : "";
-  const paletteRegistrationRef = useRef<{
-    model: AudioPaletteRegistrationModel | null;
-    signature: string;
-  }>({ model: null, signature: "" });
-  if (paletteRegistrationRef.current.signature !== paletteRegistrationSignature) {
-    paletteRegistrationRef.current = {
-      model: viewModel
-        ? {
-            allSelectableChannels,
-            mixTargets: viewModel.mixTargets,
-            selectedChannel: viewModel.selectedChannel,
-            selectedMixTargetId: viewModel.selectedMixTargetId,
-            selectedSnapshot: viewModel.selectedSnapshot,
-            snapshots: viewModel.snapshots,
-          }
-        : null,
-      signature: paletteRegistrationSignature,
-    };
-  }
-  const paletteRegistrationModel = paletteRegistrationRef.current.model;
-
-  const handleKeyDown = useLiveCallback((event: KeyboardEvent) => {
-    if (!viewModel || event.defaultPrevented) {
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Escape" && cancelArmedAction()) {
-      event.preventDefault();
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Escape" && contextMenu) {
-      setContextMenu(null);
-      event.preventDefault();
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Escape") {
-      if (inspectorTab !== "channel") {
-        setInspectorTab("channel");
-        event.preventDefault();
-        return;
-      }
-      if (viewModel.selectedChannelId) {
-        selectChannel(null);
-        event.preventDefault();
-      }
-      return;
-    }
-
-    if (isEditableTarget(event.target)) {
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && event.altKey && event.key.toLowerCase() === "c") {
-      clearClips();
-      event.preventDefault();
-      return;
-    }
-
-    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "s") {
-      saveCurrentSnapshot();
-      event.preventDefault();
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "[") {
-      previousBank();
-      event.preventDefault();
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "]") {
-      nextBank();
-      event.preventDefault();
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey && /^Digit[1-8]$/.test(event.code)) {
-      const snapshot = viewModel.snapshots[Number(event.code.replace("Digit", "")) - 1];
-      if (snapshot) {
-        recallSnapshot(snapshot.id);
-        event.preventDefault();
-      }
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && /^Digit[1-8]$/.test(event.code)) {
-      const channel = visibleSelectableChannels[Number(event.code.replace("Digit", "")) - 1];
-      if (channel) {
-        selectChannel(channel.id);
-        event.preventDefault();
-      }
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "m") {
-      if (viewModel.selectedChannel) {
-        updateChannel({
-          channelId: viewModel.selectedChannel.id,
-          mute: !viewModel.selectedChannel.mute,
-        });
-        event.preventDefault();
-      }
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "s") {
-      if (viewModel.selectedChannel) {
-        updateChannel({
-          channelId: viewModel.selectedChannel.id,
-          solo: !viewModel.selectedChannel.solo,
-        });
-        event.preventDefault();
-      }
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "u") {
-      if (viewModel.selectedChannel && viewModel.selectedMixTargetId) {
-        resetChannelFaderToUnity(viewModel.selectedChannel.id, viewModel.selectedMixTargetId);
-        event.preventDefault();
-      }
-      return;
-    }
-
-    if (
-      !event.metaKey &&
-      !event.ctrlKey &&
-      !event.altKey &&
-      ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
-    ) {
-      if (orderedSelectableSources.length > 0) {
-        const currentIndex = orderedSelectableSources.findIndex((entry) =>
-          viewModel.selectedChannelId
-            ? entry.kind === "channel" && entry.id === viewModel.selectedChannelId
-            : entry.kind === "output" && entry.id === viewModel.selectedMixTargetId
-        );
-        const direction = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
-        const nextIndex =
-          currentIndex < 0
-            ? direction > 0
-              ? 0
-              : orderedSelectableSources.length - 1
-            : Math.max(0, Math.min(orderedSelectableSources.length - 1, currentIndex + direction));
-        const nextSource = orderedSelectableSources[nextIndex];
-        if (nextSource?.kind === "channel") {
-          selectChannel(nextSource.id);
-        } else if (nextSource?.kind === "output") {
-          selectOutputMixTarget(nextSource.id);
-        }
-        event.preventDefault();
-      }
-      return;
-    }
-
-    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key === "Enter") {
-      if (
-        warningBandRef.current &&
-        document.activeElement === warningBandRef.current &&
-        viewModel.capabilities.canSync
-      ) {
-        syncAudio();
-        event.preventDefault();
-      }
-      return;
-    }
+  useAudioKeyboardShortcuts({
+    cancelArmedAction,
+    clearClips,
+    contextMenu,
+    inspectorTab,
+    nextBank,
+    orderedSelectableSources,
+    previousBank,
+    recallSnapshot,
+    resetChannelFaderToUnity,
+    saveCurrentSnapshot,
+    selectChannel,
+    selectOutputMixTarget,
+    setContextMenu,
+    setInspectorTab,
+    syncAudio,
+    updateChannel,
+    viewModel,
+    visibleSelectableChannels,
+    warningBandRef,
   });
 
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
-
-  useEffect(() => {
-    if (!paletteRegistrationModel) return;
-    const {
-      allSelectableChannels: paletteChannels,
-      mixTargets: paletteMixTargets,
-      selectedChannel: paletteSelectedChannel,
-      selectedMixTargetId: paletteSelectedMixTargetId,
-      selectedSnapshot: paletteSelectedSnapshot,
-      snapshots: paletteSnapshots,
-    } = paletteRegistrationModel;
-
-    const channelActions: PaletteAction[] = paletteChannels.map((channel, index) => ({
-      id: `audio:channel:${channel.id}`,
-      label: `Select ${channel.name}`,
-      group: "Channels",
-      keywords: ["audio", "channel", "source", channel.name, channel.shortName, channel.role],
-      shortcut: index < 8 ? `${index + 1}` : undefined,
-      action: () => selectChannel(channel.id),
-    }));
-
-    const outputActions: PaletteAction[] = paletteMixTargets.map((mixTarget) => ({
-      id: `audio:mix-target:${mixTarget.id}`,
-      label: `Switch active mix to ${mixTarget.name}`,
-      group: "Outputs",
-      keywords: ["audio", "mix", "target", "submix", "output", mixTarget.name, mixTarget.shortName, mixTarget.role],
-      action: () => selectOutputMixTarget(mixTarget.id),
-    }));
-
-    const snapshotActions: PaletteAction[] = paletteSnapshots.slice(0, 8).map((snapshot, index) => ({
-      id: `audio:snapshot:${snapshot.id}`,
-      label: `Recall snapshot ${index + 1}`,
-      group: "Snapshots",
-      keywords: ["audio", "snapshot", "recall", snapshot.name, `${index + 1}`],
-      shortcut: `⇧${index + 1}`,
-      action: () => recallSnapshot(snapshot.id),
-    }));
-
-    const actionActions: PaletteAction[] = [
-      {
-        id: "audio:sync",
-        label: "Sync console",
-        group: "Actions",
-        keywords: ["audio", "osc", "sync", "console"],
-        action: syncAudio,
-      },
-      {
-        id: "audio:bank:previous",
-        label: "Previous bank",
-        group: "Actions",
-        keywords: ["audio", "mixer", "bank", "previous"],
-        shortcut: "[",
-        action: previousBank,
-      },
-      {
-        id: "audio:bank:next",
-        label: "Next bank",
-        group: "Actions",
-        keywords: ["audio", "mixer", "bank", "next"],
-        shortcut: "]",
-        action: nextBank,
-      },
-      {
-        id: "audio:clear-selected-channel",
-        label: "Clear selected channel",
-        group: "Actions",
-        keywords: ["audio", "selection", "clear", "esc"],
-        shortcut: "Esc",
-        action: () => selectChannel(null),
-      },
-      {
-        id: "audio:clear-all-solo",
-        label: "Clear all solo",
-        group: "Actions",
-        keywords: ["audio", "solo", "clear"],
-        action: clearAllSolo,
-      },
-      {
-        id: "audio:clear-clips",
-        label: "Clear clips",
-        group: "Actions",
-        keywords: ["audio", "clip", "clear", "reset"],
-        shortcut: "⌥C",
-        action: () => clearClips(),
-      },
-      {
-        id: "audio:meters:toggle-peak-hold",
-        label: "Toggle meter peak hold",
-        group: "Actions",
-        keywords: ["audio", "meter", "peak", "hold", "toggle"],
-        action: togglePeakHold,
-      },
-      {
-        id: "audio:meters:reset-peak-holds",
-        label: "Reset meter peak holds",
-        group: "Actions",
-        keywords: ["audio", "meter", "peak", "hold", "reset"],
-        action: resetPeakHolds,
-      },
-      {
-        id: "audio:clear-selected-clip",
-        label: "Clear selected channel clip",
-        group: "Actions",
-        keywords: [
-          "audio",
-          "clip",
-          "clear",
-          "selected",
-          "clear selected channel clip",
-          "clear selected audio clip",
-          paletteSelectedChannel?.name ?? "",
-        ],
-        action: () => {
-          if (paletteSelectedChannel) {
-            clearClips(paletteSelectedChannel.id);
-          }
-        },
-      },
-      {
-        id: "audio:rename-selected-channel",
-        label: "Rename selected channel",
-        group: "Actions",
-        keywords: [
-          "audio",
-          "rename",
-          "channel",
-          "selected",
-          "rename selected channel",
-          "rename selected audio",
-          paletteSelectedChannel?.name ?? "",
-        ],
-        action: () => {
-          if (paletteSelectedChannel) {
-            renameChannel(paletteSelectedChannel.id, paletteSelectedChannel.name);
-          }
-        },
-      },
-      {
-        id: "audio:toggle-selected-polarity",
-        label: "Toggle selected polarity",
-        group: "Actions",
-        keywords: [
-          "audio",
-          "phase",
-          "polarity",
-          "invert",
-          "selected",
-          "toggle selected polarity",
-          "toggle selected audio polarity",
-          paletteSelectedChannel?.name ?? "",
-        ],
-        action: () => {
-          if (paletteSelectedChannel) {
-            updateChannel({
-              channelId: paletteSelectedChannel.id,
-              phase: !paletteSelectedChannel.phase,
-            });
-          }
-        },
-      },
-      {
-        id: "audio:snapshot:capture",
-        label: "Capture new snapshot",
-        group: "Actions",
-        keywords: ["audio", "snapshot", "capture", "new"],
-        action: captureSnapshot,
-      },
-      {
-        id: "audio:snapshot:save-current",
-        label: "Save current snapshot",
-        group: "Actions",
-        keywords: ["audio", "snapshot", "save", paletteSelectedSnapshot?.name ?? ""],
-        shortcut: "⌘S",
-        action: saveCurrentSnapshot,
-      },
-      {
-        id: "audio:reset-selected-fader",
-        label: "Reset selected fader to unity",
-        group: "Actions",
-        keywords: [
-          "audio",
-          "reset",
-          "selected",
-          "fader",
-          "unity",
-          "reset selected fader",
-          "reset selected audio",
-          paletteSelectedChannel?.name ?? "",
-        ],
-        shortcut: "U",
-        action: () => {
-          if (paletteSelectedChannel && paletteSelectedMixTargetId) {
-            updateChannel({
-              channelId: paletteSelectedChannel.id,
-              fader: AUDIO_FADER_UNITY,
-              mixTargetId: paletteSelectedMixTargetId,
-            });
-          }
-        },
-      },
-      ...paletteChannels.flatMap((channel): PaletteAction[] => [
-        {
-          id: `audio:solo:${channel.id}`,
-          label: `Solo ${channel.name}`,
-          group: "Actions",
-          keywords: ["audio", "solo", channel.name, channel.shortName, channel.role],
-          action: () => {
-            updateChannel({
-              channelId: channel.id,
-              solo: !channel.solo,
-            });
-          },
-        },
-        {
-          id: `audio:mute:${channel.id}`,
-          label: `Mute ${channel.name}`,
-          group: "Actions",
-          keywords: ["audio", "mute", channel.name, channel.shortName, channel.role],
-          action: () => {
-            updateChannel({
-              channelId: channel.id,
-              mute: !channel.mute,
-            });
-          },
-        },
-      ]),
-    ];
-    const audioActions: PaletteAction[] = [...channelActions, ...outputActions, ...snapshotActions, ...actionActions];
-
-    return register(audioActions);
-  }, [
+  useAudioPaletteRegistration({
+    captureSnapshot,
     clearAllSolo,
     clearClips,
-    captureSnapshot,
-    saveCurrentSnapshot,
     nextBank,
     previousBank,
     recallSnapshot,
     register,
     renameChannel,
     resetPeakHolds,
+    saveCurrentSnapshot,
     selectChannel,
     selectOutputMixTarget,
     syncAudio,
     togglePeakHold,
     updateChannel,
-    paletteRegistrationModel,
-  ]);
+    viewModel,
+  });
 
   const contextMenuChannel = viewModel?.channels.find((entry) => entry.id === contextMenu?.channelId) ?? null;
   const contextMenuItems = useMemo<ContextMenuItem[]>(() => {
@@ -1090,7 +599,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     <div
       className={styles.audioShell}
       data-density={AUDIO_DENSITY_MODE}
-      data-canvas-metering="true"
+      data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
+      data-meter-simulation-state={viewModel.meterSimulationState}
       data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}
       data-testid="audio-workspace"
       data-view-mode={viewModel.viewMode}
@@ -1117,7 +627,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           viewModel={viewModel}
         />
         <AudioSignalCanvas
-          armedActionKey={armedAction?.key ?? null}
+          armedAction={armedAction}
           busyAction={busyAction}
           clearDraftValueLater={clearDraftValueLater}
           commitChannelContinuous={commitChannelContinuous}

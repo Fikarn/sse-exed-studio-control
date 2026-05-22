@@ -1,7 +1,9 @@
 import { useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
+import { Tooltip } from "@sse/design-system";
 
-import styles from "../AudioWorkspace.module.css";
+import styles from "./AudioMixerLane.module.css";
+import { AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { createThrottledCommit } from "../audioContinuousControls";
 import { formatAudioDb, formatMeterDb } from "../audioFormatting";
@@ -21,7 +23,7 @@ function inputPreampNumber(channelId: string) {
 }
 
 function formatLaneReadout(value: number) {
-  return formatAudioDb(value).replace(" dB", "dB").replace("-inf", "-∞");
+  return formatAudioDb(value).replace(" dB", "dB");
 }
 
 function formatLaneNumber(index: number) {
@@ -80,7 +82,7 @@ export function AudioChannelLane({
   const preampNumber = supportsPreamp ? inputPreampNumber(channel.id) : null;
   const group = getAudioChannelGroup(channel);
   const throttledSendCommit = useMemo(
-    () => createThrottledCommit<AudioChannelUpdate>(commitChannelContinuous, 75),
+    () => createThrottledCommit<AudioChannelUpdate>(commitChannelContinuous, AUDIO_THROTTLE_FADER_MS),
     [commitChannelContinuous]
   );
 
@@ -191,36 +193,40 @@ export function AudioChannelLane({
       <div className={styles.laneReadout}>{formatLaneReadout(sendLevel)}</div>
 
       <div className={styles.laneControls}>
-        <button
-          aria-label={`Mute ${channel.name}`}
-          aria-pressed={channel.mute}
-          className={styles.laneToggle}
-          data-control="mute"
-          data-active={channel.mute}
-          disabled={!actionsAllowed}
-          onClick={(event) => {
-            event.stopPropagation();
-            onUpdateChannel({ channelId: channel.id, mute: !channel.mute });
-          }}
-          type="button"
-        >
-          M
-        </button>
-        <button
-          aria-label={`Solo ${channel.name}`}
-          aria-pressed={channel.solo}
-          className={styles.laneToggle}
-          data-control="solo"
-          data-active={channel.solo}
-          disabled={!actionsAllowed}
-          onClick={(event) => {
-            event.stopPropagation();
-            onUpdateChannel({ channelId: channel.id, solo: !channel.solo });
-          }}
-          type="button"
-        >
-          S
-        </button>
+        <Tooltip content={`Mute ${channel.name} (M)`}>
+          <button
+            aria-label={`Mute ${channel.name}`}
+            aria-pressed={channel.mute}
+            className={styles.laneToggle}
+            data-control="mute"
+            data-active={channel.mute}
+            disabled={!actionsAllowed}
+            onClick={(event) => {
+              event.stopPropagation();
+              onUpdateChannel({ channelId: channel.id, mute: !channel.mute });
+            }}
+            type="button"
+          >
+            M
+          </button>
+        </Tooltip>
+        <Tooltip content={`Solo ${channel.name} (S)`}>
+          <button
+            aria-label={`Solo ${channel.name}`}
+            aria-pressed={channel.solo}
+            className={styles.laneToggle}
+            data-control="solo"
+            data-active={channel.solo}
+            disabled={!actionsAllowed}
+            onClick={(event) => {
+              event.stopPropagation();
+              onUpdateChannel({ channelId: channel.id, solo: !channel.solo });
+            }}
+            type="button"
+          >
+            S
+          </button>
+        </Tooltip>
       </div>
     </article>
   );
@@ -254,7 +260,7 @@ export function AudioOutputLane({
   const volumeDraftKey = `mixTarget:${mixTarget.id}:volume`;
   const volume = useAudioControlDraftValue(draftStore, volumeDraftKey, getDraftValue(volumeDraftKey, mixTarget.volume));
   const throttledVolumeCommit = useMemo(
-    () => createThrottledCommit<AudioMixTargetUpdate>(commitMixTargetContinuous, 75),
+    () => createThrottledCommit<AudioMixTargetUpdate>(commitMixTargetContinuous, AUDIO_THROTTLE_FADER_MS),
     [commitMixTargetContinuous]
   );
 
@@ -330,7 +336,7 @@ export function AudioOutputLane({
         </div>
       </div>
 
-      <div className={styles.laneControls}>
+      <div className={styles.laneControls} data-output-controls="true">
         <button
           aria-label={`Mute ${mixTarget.name}`}
           aria-pressed={mixTarget.mute}
@@ -345,6 +351,51 @@ export function AudioOutputLane({
           type="button"
         >
           Mute
+        </button>
+        <button
+          aria-label={`Dim ${mixTarget.name}`}
+          aria-pressed={mixTarget.dim}
+          className={styles.laneToggle}
+          data-control="dim"
+          data-active={mixTarget.dim}
+          disabled={!actionsAllowed}
+          onClick={(event) => {
+            event.stopPropagation();
+            onUpdateMixTarget({ mixTargetId: mixTarget.id, dim: !mixTarget.dim });
+          }}
+          type="button"
+        >
+          Dim
+        </button>
+        <button
+          aria-label={`Mono ${mixTarget.name}`}
+          aria-pressed={mixTarget.mono}
+          className={styles.laneToggle}
+          data-control="mono"
+          data-active={mixTarget.mono}
+          disabled={!actionsAllowed}
+          onClick={(event) => {
+            event.stopPropagation();
+            onUpdateMixTarget({ mixTargetId: mixTarget.id, mono: !mixTarget.mono });
+          }}
+          type="button"
+        >
+          Mono
+        </button>
+        <button
+          aria-label={`Talkback ${mixTarget.name}`}
+          aria-pressed={mixTarget.talkback}
+          className={styles.laneToggle}
+          data-control="talk"
+          data-active={mixTarget.talkback}
+          disabled={!actionsAllowed}
+          onClick={(event) => {
+            event.stopPropagation();
+            onUpdateMixTarget({ mixTargetId: mixTarget.id, talkback: !mixTarget.talkback });
+          }}
+          type="button"
+        >
+          Talk
         </button>
       </div>
     </article>

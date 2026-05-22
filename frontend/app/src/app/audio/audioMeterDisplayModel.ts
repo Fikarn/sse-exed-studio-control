@@ -1,11 +1,26 @@
 import type { AudioMeterEntry } from "@sse/engine-client";
 
+import { METER_PEAK_FALL_DB_PER_SECOND, METER_PEAK_HOLD_MS } from "./audioConstants";
+
+/**
+ * Frontend display-ballistics for the audio meter canvas.
+ *
+ * Peak ballistics target IEC PPM Type IIa hardware behaviour:
+ * - hold ~1.5 s before the peak indicator starts to fall
+ * - decay 12–15 dB·s⁻¹ once falling
+ *
+ * `METER_PEAK_HOLD_MS` and `METER_PEAK_FALL_DB_PER_SECOND` are re-exported from
+ * `audioConstants.ts` so the values stay aligned with the Rust engine's
+ * `CONSOLE_PEAK_HOLD_MS` constant in
+ * `native/rust-engine/src/rme_totalmix_osc.rs:33`. Keep both sides in sync
+ * when the hardware reference changes; the engine drives the same hold window
+ * for OSC meter packets and the UI must not diverge from it visually.
+ */
+export { METER_PEAK_FALL_DB_PER_SECOND, METER_PEAK_HOLD_MS };
 export const METER_FLOOR_DBFS = -60;
 export const METER_NOMINAL_DBFS = -18;
 export const METER_ATTACK_SECONDS = 0.045;
 export const METER_RELEASE_SECONDS = 0.34;
-export const METER_PEAK_HOLD_MS = 900;
-export const METER_PEAK_FALL_DB_PER_SECOND = 18;
 export const METER_MIN_DELTA_DB = 0.03;
 
 export interface MeterDisplayTarget {

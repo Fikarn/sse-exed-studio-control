@@ -125,6 +125,43 @@
       "border": { "$value": "rgba(250, 246, 230, 0.08)" }
     }
   },
+  "audio": {
+    "tier": {
+      "inputs": { "$value": "#d8c483" },
+      "playback": { "$value": "#d6acce" },
+      "outputs": { "$value": "#5dc5e8" }
+    },
+    "output": {
+      "mainOut": { "$value": "#5dc5e8" },
+      "phonesA": { "$value": "#e8a341" },
+      "phonesB": { "$value": "#b388f5" }
+    },
+    "meter": {
+      "low": { "$value": "#36ce71" },
+      "lowHot": { "$value": "#6cf99d" },
+      "warn": { "$value": "#f4c443" },
+      "hot": { "$value": "#f59f2a" },
+      "peakHold": { "$value": "#ffd35a" },
+      "over": { "$value": "#ff3b30" },
+      "bg": { "$value": "#050608" }
+    },
+    "group": {
+      "talent": { "$value": "#d8c483" },
+      "line": { "$value": "#b9b29a" },
+      "bed": { "$value": "#b9d2a0" },
+      "fx": { "$value": "#d6acce" },
+      "remote": { "$value": "#8fc2d2" }
+    },
+    "warningBand": {
+      "verified": { "$value": "#22c55e" },
+      "assumed": { "$value": "#f59e0b" },
+      "notVerified": { "$value": "#f59e0b" },
+      "disabled": { "$value": "#8d8da5" },
+      "offline": { "$value": "#ef4444" },
+      "actionFailed": { "$value": "#ef4444" },
+      "simulated": { "$value": "#f59e0b" }
+    }
+  },
   "font": {
     "family": {
       "sans": { "$value": "{font.family.ui}" },
