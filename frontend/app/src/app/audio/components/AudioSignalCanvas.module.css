@@ -134,10 +134,10 @@
   justify-content: center;
   min-height: 20px;
   padding: 0 7px;
-  border: 1px solid color-mix(in srgb, var(--audio-hot) 58%, var(--audio-border));
+  border: 1px solid color-mix(in srgb, var(--audio-engaged-fill) 58%, var(--audio-border));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--audio-hot) 13%, var(--audio-panel-strong));
-  color: var(--audio-hot);
+  background: color-mix(in srgb, var(--audio-engaged-fill) 13%, var(--audio-panel-strong));
+  color: var(--audio-engaged-fill);
   font: var(--font-weight-semibold) 9px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
