@@ -120,6 +120,17 @@
   --audio-warning-band-offline: #ef4444;
   --audio-warning-band-action-failed: #ef4444;
   --audio-warning-band-simulated: #f59e0b;
+  --audio-warn-fill: #E8D561;
+  --audio-warn-soft: rgba(232, 213, 97, 0.14);
+  --audio-warn-border: rgba(232, 213, 97, 0.5);
+  --audio-warn-glow: rgba(232, 213, 97, 0.06);
+  --audio-warn-dot: #E8D561;
+  --audio-engaged-fill: #D8A95A;
+  --audio-engaged-soft: rgba(216, 169, 90, 0.16);
+  --audio-engaged-border: rgba(216, 169, 90, 0.5);
+  --audio-engaged-glow: rgba(216, 169, 90, 0.10);
+  --audio-engaged-dot: #D8A95A;
+  --audio-peak-hold-calm: #8C978F;
   --font-family-sans: "Inter Variable", "Inter", system-ui, sans-serif;
   --font-family-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --font-family-ui: "Inter Variable", "Inter", system-ui, sans-serif;
@@ -169,6 +180,10 @@
   --shadow-glow-yellow-sm: 0 0 8px rgba(232, 213, 97, 0.35);
   --shadow-glow-yellow-dot: 0 0 5px rgba(232, 213, 97, 0.55);
   --shadow-glow-yellow-dot-subtle: 0 0 6px rgba(232, 213, 97, 0.55);
+  --shadow-glow-amber: 0 0 0 1px #D8A95A, 0 12px 28px rgba(216, 169, 90, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
+  --shadow-glow-amber-sm: 0 0 8px rgba(216, 169, 90, 0.32);
+  --shadow-glow-amber-dot: 0 0 5px rgba(216, 169, 90, 0.52);
+  --shadow-glow-amber-dot-subtle: 0 0 6px rgba(216, 169, 90, 0.52);
   --shadow-thumb-ring: 0 0 0 2px rgba(153, 186, 146, 0.18);
   --motion-duration-fast: 120ms;
   --motion-duration-normal: 180ms;

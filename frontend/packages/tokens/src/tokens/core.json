@@ -160,6 +160,23 @@
       "offline": { "$value": "#ef4444" },
       "actionFailed": { "$value": "#ef4444" },
       "simulated": { "$value": "#f59e0b" }
+    },
+    "warn": {
+      "fill": { "$value": "{color.brand.yellow}" },
+      "soft": { "$value": "{color.brand.yellowSoft}" },
+      "border": { "$value": "{color.brand.yellowBorder}" },
+      "glow": { "$value": "{color.brand.yellowGlow}" },
+      "dot": { "$value": "{color.brand.yellow}" }
+    },
+    "engaged": {
+      "fill": { "$value": "{color.warning.500}" },
+      "soft": { "$value": "rgba(216, 169, 90, 0.16)" },
+      "border": { "$value": "rgba(216, 169, 90, 0.5)" },
+      "glow": { "$value": "rgba(216, 169, 90, 0.10)" },
+      "dot": { "$value": "{color.warning.500}" }
+    },
+    "peakHold": {
+      "calm": { "$value": "{color.text.subtle}" }
     }
   },
   "font": {
@@ -234,6 +251,12 @@
     "glowYellowSm": { "$value": "0 0 8px rgba(232, 213, 97, 0.35)" },
     "glowYellowDot": { "$value": "0 0 5px rgba(232, 213, 97, 0.55)" },
     "glowYellowDotSubtle": { "$value": "0 0 6px rgba(232, 213, 97, 0.55)" },
+    "glowAmber": {
+      "$value": "0 0 0 1px {color.warning.500}, 0 12px 28px rgba(216, 169, 90, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
+    },
+    "glowAmberSm": { "$value": "0 0 8px rgba(216, 169, 90, 0.32)" },
+    "glowAmberDot": { "$value": "0 0 5px rgba(216, 169, 90, 0.52)" },
+    "glowAmberDotSubtle": { "$value": "0 0 6px rgba(216, 169, 90, 0.52)" },
     "thumbRing": { "$value": "0 0 0 2px rgba(153, 186, 146, 0.18)" }
   },
   "motion": {
