@@ -255,10 +255,19 @@
   white-space: nowrap;
 }
 
+/* Slice 7: tighten the right-side status string. Previously the values
+   (4 / 6 / 3 / SIM / POST-FADER / -18 / -3) rendered in 15 px display
+   serif while the surrounding eyebrow labels (IN / PB / OUT / TAP / REF
+   / PEAK) rendered in 9 px mono caps — the size + font-family mismatch
+   read as "two products glued together" inside one tight strip. Mono
+   with tabular numerals keeps the numeric values stable-width and lets
+   the values sit comfortably alongside their eyebrow labels. */
 .canvasStatPills strong {
   flex: 0 0 auto;
   color: var(--audio-text-strong);
-  font: var(--font-weight-semibold) 15px / 1 var(--font-family-display);
+  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 .canvasStatPills .canvasMeterStatus {
