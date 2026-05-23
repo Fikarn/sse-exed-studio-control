@@ -2,6 +2,17 @@ import type { AudioSnapshot } from "@sse/engine-client";
 
 import { formatBackupTimestamp, type StatusToneLike } from "../shellData";
 
+/**
+ * Audio-page level vocabulary — three labels, three meanings, one home each:
+ *
+ *   - "Monitor level"   → rail Main Out monitor card (rail-local monitor send)
+ *   - "Bus level"       → workspace Output card BUS LEVEL readout (the bus's own level)
+ *   - "Send to <bus>"   → inspector send slider (the per-channel send level INTO a bus)
+ *
+ * They look related but are three different values. Keep the labels distinct
+ * so an operator never has to ask "which level am I looking at?". If a future
+ * polish pass wants to unify any pair, do it intentionally — don't drift.
+ */
 export type AudioDensityMode = "desktop" | "touch";
 export type AudioFeedbackTone = "error" | "info" | "ok";
 

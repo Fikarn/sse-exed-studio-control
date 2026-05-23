@@ -32,18 +32,6 @@ function compactRailEndpoint(value: string) {
     .replace(/\bsend\s+(\d+)-(\d+)\b/gi, (_match, start: string, end: string) => `tx ${compactPortRange(start, end)}`);
 }
 
-function compactRailTimestamp(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === "") return "not yet";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return formatAudioTimestamp(value);
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    month: "short",
-  }).format(parsed);
-}
-
 export function AudioRail({
   clearDraftValueLater,
   commitMixTargetContinuous,
@@ -88,9 +76,7 @@ export function AudioRail({
   const currentSnapshot = viewModel.selectedSnapshot;
   const populatedSnapshotCount = viewModel.snapshots.length;
   const fullEndpoint = viewModel.footerTelemetry.endpoint;
-  const fullLastSync = formatAudioTimestamp(viewModel.audioSnapshot.lastConsoleSyncAt);
   const compactEndpoint = compactRailEndpoint(fullEndpoint);
-  const compactLastSync = compactRailTimestamp(viewModel.audioSnapshot.lastConsoleSyncAt);
 
   return (
     <aside className={styles.audioRail}>
@@ -335,10 +321,6 @@ export function AudioRail({
           <span data-rail-fact="active-sends">
             <small>Active sends</small>
             <strong>{viewModel.healthStats.activeSends}</strong>
-          </span>
-          <span data-rail-fact="last-sync">
-            <small>Last sync</small>
-            <strong title={fullLastSync}>{compactLastSync}</strong>
           </span>
         </div>
       </div>

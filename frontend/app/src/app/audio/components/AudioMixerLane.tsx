@@ -336,6 +336,10 @@ export function AudioOutputLane({
         </div>
       </div>
 
+      {/* Why: Dim / Mono / Talkback are room-monitor controls owned by the
+         rail's monitor card — they're global, not per-mix-target. The
+         Output card keeps Mute only (which IS per-target), so the same
+         action no longer renders in two places (rail + lane). */}
       <div className={styles.laneControls} data-output-controls="true">
         <button
           aria-label={`Mute ${mixTarget.name}`}
@@ -351,51 +355,6 @@ export function AudioOutputLane({
           type="button"
         >
           Mute
-        </button>
-        <button
-          aria-label={`Dim ${mixTarget.name}`}
-          aria-pressed={mixTarget.dim}
-          className={styles.laneToggle}
-          data-control="dim"
-          data-active={mixTarget.dim}
-          disabled={!actionsAllowed}
-          onClick={(event) => {
-            event.stopPropagation();
-            onUpdateMixTarget({ mixTargetId: mixTarget.id, dim: !mixTarget.dim });
-          }}
-          type="button"
-        >
-          Dim
-        </button>
-        <button
-          aria-label={`Mono ${mixTarget.name}`}
-          aria-pressed={mixTarget.mono}
-          className={styles.laneToggle}
-          data-control="mono"
-          data-active={mixTarget.mono}
-          disabled={!actionsAllowed}
-          onClick={(event) => {
-            event.stopPropagation();
-            onUpdateMixTarget({ mixTargetId: mixTarget.id, mono: !mixTarget.mono });
-          }}
-          type="button"
-        >
-          Mono
-        </button>
-        <button
-          aria-label={`Talkback ${mixTarget.name}`}
-          aria-pressed={mixTarget.talkback}
-          className={styles.laneToggle}
-          data-control="talk"
-          data-active={mixTarget.talkback}
-          disabled={!actionsAllowed}
-          onClick={(event) => {
-            event.stopPropagation();
-            onUpdateMixTarget({ mixTargetId: mixTarget.id, talkback: !mixTarget.talkback });
-          }}
-          type="button"
-        >
-          Talk
         </button>
       </div>
     </article>
