@@ -837,7 +837,15 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   await expect(page.getByText(/using last synced console state/i)).toBeVisible();
 
   await openFixture(page, "audio-not-verified");
-  await expect(page.getByText("OSC NOT VERIFIED", { exact: true })).toBeVisible();
+  // Slice 7 (Phase 3): "OSC NOT VERIFIED — never attempted" demotes from a
+  // full-width warning banner to an inline attention dot next to the Sync
+  // button. The fixture's `lastConsoleSyncAt: null` puts it in the demoted
+  // state; the dot's title still carries the OSC NOT VERIFIED text for
+  // hover / screen-reader access.
+  const statusDot = page.getByTestId("audio-toolbar-status-dot");
+  await expect(statusDot).toBeVisible();
+  await expect(statusDot).toHaveAttribute("title", /OSC NOT VERIFIED/);
+  await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
   await expect(page.getByTestId("audio-rail-tools").getByRole("button", { name: "Sync" })).toBeEnabled();
   await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).not.toHaveAttribute("aria-disabled", "true");
   await page.getByTestId("audio-rail-tools").getByRole("button", { name: "Sync" }).click();

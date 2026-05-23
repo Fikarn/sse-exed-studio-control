@@ -21,6 +21,19 @@ export interface AudioStatusDescriptor {
   tone: StatusToneLike;
   warningBody: string | null;
   warningTitle: string | null;
+  /**
+   * Whether this status warrants a full-width warning banner. False means
+   * the status is real but not critical enough to consume banner real
+   * estate (e.g. OSC has never been sync'd because the operator hasn't
+   * pressed Sync yet — that's a "pre-flight reminder", not a fault).
+   * AudioSignalCanvas renders the banner only when `true`; AudioToolbar
+   * renders a small attention dot next to the Sync button otherwise.
+   *
+   * Slice 7 of the Phase 3 polish — prevents stacking two yellow banners
+   * (OSC + SOLO) simultaneously when the OSC state isn't actually
+   * operationally critical.
+   */
+  bannerEligible: boolean;
 }
 
 export const METER_FLOOR_DBFS = -60;
@@ -183,6 +196,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
 
   if (snapshot?.oscEnabled === false) {
     return {
+      bannerEligible: true,
       label: "DISABLED",
       tone: "attention" satisfies StatusToneLike,
       warningBody: "Page is read-only until transport is re-enabled.",
@@ -192,6 +206,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
 
   if (String(snapshot?.status ?? "not-verified") === "attention") {
     return {
+      bannerEligible: true,
       label: "OFFLINE",
       tone: "error" satisfies StatusToneLike,
       warningBody:
@@ -203,7 +218,15 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   }
 
   if (String(snapshot?.status ?? "not-verified") !== "ready" || snapshot?.verified !== true) {
+    // Why: when the operator has never pressed Sync, OSC NOT VERIFIED is a
+    // pre-flight reminder, not a fault. Demote to inline indicator next to
+    // the Sync button so it doesn't compete with the SOLO banner for the
+    // operator's eye. Once any sync has been attempted (lastConsoleSyncAt
+    // becomes a non-empty string), promote back to full banner because
+    // the state divergence is now a real operational concern.
+    const everSynced = typeof snapshot?.lastConsoleSyncAt === "string" && snapshot.lastConsoleSyncAt.trim().length > 0;
     return {
+      bannerEligible: everSynced,
       label: "NOT VERIFIED",
       tone: "attention" satisfies StatusToneLike,
       warningBody: "Run Sync before trusting recall or current fader state.",
@@ -213,6 +236,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
 
   if (meteringSource === "rme-totalmix-osc" && meteringState === "stale") {
     return {
+      bannerEligible: true,
       label: "STALE",
       tone: "attention" satisfies StatusToneLike,
       warningBody: "No recent TotalMix OSC meter packets are arriving.",
@@ -222,6 +246,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
 
   if (meteringSource === "rme-totalmix-osc" && meteringState === "offline") {
     return {
+      bannerEligible: true,
       label: "OFFLINE",
       tone: "error" satisfies StatusToneLike,
       warningBody: "Configure TotalMix OSC Send Peak Level and rerun the audio probe.",
@@ -231,6 +256,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
 
   if (String(snapshot?.consoleStateConfidence ?? "unknown") === "assumed") {
     return {
+      bannerEligible: true,
       label: "ASSUMED",
       tone: "attention" satisfies StatusToneLike,
       warningBody: "Using last synced console state. Run Sync before trusting recall or current fader state.",
@@ -247,6 +273,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     const actionMessage =
       String(snapshot?.lastActionMessage ?? "The last audio action failed.") || "The last audio action failed.";
     return {
+      bannerEligible: true,
       label: "ACTION FAILED",
       tone: "error" satisfies StatusToneLike,
       warningBody: actionCode ? `${actionCode} · ${actionMessage}` : actionMessage,
@@ -256,6 +283,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
 
   if (meteringSource === "simulated" || meteringSource === "fixture") {
     return {
+      bannerEligible: false,
       label: "SIMULATED",
       tone: "attention" satisfies StatusToneLike,
       warningBody: null,
@@ -264,6 +292,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   }
 
   return {
+    bannerEligible: false,
     label: "VERIFIED",
     tone: "ok" satisfies StatusToneLike,
     warningBody: null,

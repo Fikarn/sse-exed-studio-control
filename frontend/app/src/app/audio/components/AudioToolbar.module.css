@@ -46,6 +46,21 @@
   text-transform: uppercase;
 }
 
+/* Slice 7 attention dot for "pre-flight" status states that don't earn a
+   full-width banner (specifically OSC NOT VERIFIED before any sync has
+   been attempted). Sits next to the Sync button so the affordance and
+   the cue read together. Uses the engaged amber so the operator
+   distinguishes "armed but unverified" from a critical warn-yellow. */
+.toolbarStatusDot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--audio-engaged-fill);
+  box-shadow: var(--shadow-glow-amber-dot);
+}
+
 .bankPill {
   display: inline-flex;
   align-items: center;

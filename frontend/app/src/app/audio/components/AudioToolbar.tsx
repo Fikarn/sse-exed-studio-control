@@ -39,6 +39,19 @@ export function AudioToolbar({
         <span className={styles.toolbarMeta}>
           Sync {formatAudioTimestamp(viewModel.audioSnapshot.lastConsoleSyncAt)}
         </span>
+        {viewModel.status.warningTitle && !viewModel.status.bannerEligible ? (
+          // Slice 7: demoted "OSC NOT VERIFIED — never attempted" inline
+          // indicator. When the status is real but pre-flight (no sync has
+          // ever run), the full-width banner is too loud; this small amber
+          // dot next to the Sync button is enough.
+          <span
+            className={styles.toolbarStatusDot}
+            data-testid="audio-toolbar-status-dot"
+            role="status"
+            title={`${viewModel.status.warningTitle} — ${viewModel.status.warningBody ?? "press Sync to verify"}`}
+            aria-label={`${viewModel.status.warningTitle}. ${viewModel.status.warningBody ?? ""}`}
+          />
+        ) : null}
         <Button
           disabled={!viewModel.actionsAllowed || busyAction === "audio-sync"}
           onClick={onSync}

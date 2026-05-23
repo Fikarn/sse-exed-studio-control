@@ -98,7 +98,7 @@ export function AudioSignalCanvas({
 
   return (
     <section className={styles.signalCanvas} data-testid="audio-signal-canvas">
-      {viewModel.status.warningBody ? (
+      {viewModel.status.warningBody && viewModel.status.bannerEligible ? (
         <div
           className={styles.warningBand}
           data-variant="compact"
