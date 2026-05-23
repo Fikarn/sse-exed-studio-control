@@ -198,10 +198,16 @@
 .railSnapshotCard strong {
   overflow: hidden;
   color: var(--color-text-strong);
-  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-mono);
+  font: var(--font-weight-semibold) 13px / 1.18 var(--font-family-mono);
   letter-spacing: 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Why: Trust panel cells render status strings like "NOT VERIFIED" and
+     "test simulation" that exceed the 96px min cell width. Numeric facts
+     (Sources, Dest, Active sends, SOLO, CLIPS) are short enough not to
+     wrap, so allowing wrap here only affects Trust — and Trust reads
+     better as two short lines than as a "NOT VERIFI…" ellipsis that hides
+     half the word. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .railFactGrid span[data-rail-fact="endpoint"],
@@ -221,9 +227,11 @@
   font: var(--font-weight-semibold) 18px / 1.08 var(--font-family-display);
 }
 
-.railToolGrid {
-  grid-template-columns: 1fr 1fr;
-}
+/* The parent rule at the top of this file already establishes a 3-up grid
+   for both `.monitorButtonGrid` and `.railToolGrid` (`repeat(3, minmax(0,
+   1fr))`). The Tools panel renders exactly three buttons (Sync, Setup,
+   Recall) so the 3-up parent is the right shape; the previous 2-col
+   override left Recall orphaned alone on a second row. */
 
 .railCount {
   display: inline-grid;

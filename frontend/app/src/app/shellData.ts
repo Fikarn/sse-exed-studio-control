@@ -654,7 +654,12 @@ export function buildMonitorItems(healthSnapshot: SnapshotRecord | null) {
       id: "surface",
       label: "Surface",
       detail: statusLabelFor(checks.controlSurface, "pending"),
-      status: asStatusTone(checks.controlSurface?.status, "info"),
+      // Why: previously fell back to "info" (blue) while sibling subsystems
+      // (lighting, audio) fell back to "attention" — that asymmetry rendered
+      // Surface's pending dot blue and the others yellow on the same page,
+      // even though all three were semantically "pending". Aligning on
+      // "attention" makes the three pills agree on tone for the same state.
+      status: asStatusTone(checks.controlSurface?.status, "attention"),
     },
   ] as const;
 }
