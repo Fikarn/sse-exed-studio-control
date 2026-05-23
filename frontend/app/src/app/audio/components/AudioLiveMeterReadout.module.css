@@ -10,6 +10,31 @@
   opacity: 0;
 }
 
+/* Why: without an explicit layout, the container falls back to block default
+   and the meter-bar `<i>` anchors collapse to zero width, so the canvas
+   painter has nothing to paint over and the eyebrow text abuts the dB readout
+   ("Active mix-28" instead of "Active mix [meters] -28 dB"). The grid below
+   carves out fixed lanes for the two L/R anchors so the overlay has a stable
+   paint target and the label, meters, and value get unambiguous spacing. */
+.canvasActiveMixMeter {
+  display: inline-grid;
+  grid-template-columns: max-content 18px 18px max-content;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvasActiveMixMeter i {
+  --meter-level: 0%;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--audio-meter-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--audio-border) 72%, transparent);
+}
+
 .meterValuePair {
   display: inline-grid;
   grid-template-columns: minmax(3ch, 3ch) max-content minmax(3ch, 3ch);

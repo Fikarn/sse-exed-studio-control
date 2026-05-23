@@ -493,7 +493,7 @@ export function buildAudioViewModel({
     fadersPerBank,
     feedingChannelIds,
     footerTelemetry: {
-      clock: "clock n/a · sr n/a",
+      clock: "n/a · sr n/a",
       endpoint: footerEndpoint(audioSnapshot),
       lastSync: audioSnapshot.lastConsoleSyncAt ?? "not yet",
       metering: meterSimulationActive
