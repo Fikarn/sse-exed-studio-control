@@ -174,7 +174,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     return {
       label: "DISABLED",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "OSC DISABLED - page is read-only until transport is re-enabled.",
+      warningBody: "Page is read-only until transport is re-enabled.",
       warningTitle: "OSC DISABLED",
     };
   }
@@ -186,7 +186,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       warningBody:
         typeof snapshot?.lastActionMessage === "string" && snapshot.lastActionMessage.trim().length > 0
           ? snapshot.lastActionMessage
-          : "CONSOLE UNREACHABLE - audio may still be passing, but control state is not current.",
+          : "Audio may still be passing, but control state is not current.",
       warningTitle: "CONSOLE UNREACHABLE",
     };
   }
@@ -195,7 +195,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     return {
       label: "NOT VERIFIED",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "OSC NOT VERIFIED - run Sync before trusting recall or current fader state.",
+      warningBody: "Run Sync before trusting recall or current fader state.",
       warningTitle: "OSC NOT VERIFIED",
     };
   }
@@ -204,7 +204,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     return {
       label: "STALE",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "RME METERING STALE - no recent TotalMix OSC meter packets are arriving.",
+      warningBody: "No recent TotalMix OSC meter packets are arriving.",
       warningTitle: "RME METERING STALE",
     };
   }
@@ -213,7 +213,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     return {
       label: "OFFLINE",
       tone: "error" satisfies StatusToneLike,
-      warningBody: "RME METERING OFFLINE - configure TotalMix OSC Send Peak Level and rerun the audio probe.",
+      warningBody: "Configure TotalMix OSC Send Peak Level and rerun the audio probe.",
       warningTitle: "RME METERING OFFLINE",
     };
   }
@@ -222,8 +222,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     return {
       label: "ASSUMED",
       tone: "attention" satisfies StatusToneLike,
-      warningBody:
-        "STATE ASSUMED - using last synced console state. Run Sync before trusting recall or current fader state.",
+      warningBody: "Using last synced console state. Run Sync before trusting recall or current fader state.",
       warningTitle: "STATE ASSUMED",
     };
   }
