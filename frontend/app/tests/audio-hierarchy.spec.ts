@@ -20,12 +20,25 @@ test("selected channel lane is visually distinct from its neighbours", async ({ 
   expect(shadow).toMatch(/14px/);
 });
 
-test("output lane exposes inline Dim, Mono and Talk controls", async ({ page }) => {
+test("output lane exposes inline Mute; rail owns Dim / Mono / Talk", async ({ page }) => {
   await openFixture(page, "audio-populated");
+
+  // Slice 3 (Phase 3): Mute is the only per-output toggle on the Output card.
+  // Dim / Mono / Talk are room-monitor controls — single-sourced on the rail.
   const mainOut = page.getByTestId("audio-output-audio-mix-main");
   await expect(mainOut).toBeVisible();
-  for (const control of ["mute", "dim", "mono", "talk"] as const) {
-    const button = mainOut.locator(`[data-control="${control}"]`);
+  const mute = mainOut.locator('[data-control="mute"]');
+  await expect(mute).toBeVisible();
+  await expect(mute).toHaveAttribute("aria-pressed", /true|false/);
+  for (const removed of ["dim", "mono", "talk"] as const) {
+    await expect(mainOut.locator(`[data-control="${removed}"]`)).toHaveCount(0);
+  }
+
+  // The rail's monitor button grid still owns Dim / Mono / Talk.
+  const railMonitor = page.getByTestId("audio-rail-monitor-card");
+  await expect(railMonitor).toBeVisible();
+  for (const control of ["dim", "mono", "talk"] as const) {
+    const button = railMonitor.locator(`[data-control="${control}"]`);
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute("aria-pressed", /true|false/);
   }
@@ -47,30 +60,25 @@ test("each mixer tier renders a coloured identity rail", async ({ page }) => {
   }
 });
 
-test("1920 fallback keeps the output lane controls visible and fits all four toggles", async ({ page }) => {
+test("1920 fallback keeps the output lane Mute control tappable", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openFixture(page, "audio-1920-fallback");
   const mainOut = page.getByTestId("audio-output-audio-mix-main");
   await expect(mainOut).toBeVisible();
   const controls = mainOut.locator('[data-output-controls="true"]');
   await expect(controls).toBeVisible();
-  const summary = await controls.evaluate((el) => {
-    const cs = window.getComputedStyle(el);
-    const buttons = Array.from(el.querySelectorAll("button[data-control]"));
-    return {
-      tracks: cs.gridTemplateColumns.split(" ").length,
-      buttons: buttons.map((button) => ({
-        control: button.getAttribute("data-control"),
-        rect: button.getBoundingClientRect(),
-      })),
-    };
+  // Slice 3 (Phase 3): Output card now exposes Mute only — Dim/Mono/Talk
+  // moved to the rail. At 1920 fallback the surviving Mute must still
+  // measure a tappable height (>= 18 px per the narrowest container-query
+  // override).
+  const buttons = await controls.evaluate((el) => {
+    return Array.from(el.querySelectorAll("button[data-control]")).map((button) => ({
+      control: button.getAttribute("data-control"),
+      rect: button.getBoundingClientRect(),
+    }));
   });
-  // studioFull at 1920 keeps the four toggles in one row; every button must
-  // measure a non-zero width and a tappable height (>= 18 px per the
-  // narrowest container-query override).
-  expect(summary.tracks).toBeGreaterThanOrEqual(2);
-  expect(summary.buttons.map((entry) => entry.control)).toEqual(["mute", "dim", "mono", "talk"]);
-  for (const entry of summary.buttons) {
+  expect(buttons.map((entry) => entry.control)).toEqual(["mute"]);
+  for (const entry of buttons) {
     expect(entry.rect.width).toBeGreaterThan(0);
     expect(entry.rect.height).toBeGreaterThanOrEqual(18);
   }
