@@ -7,6 +7,7 @@ import { PROTOTYPE_MONITOR_LEVEL_DB } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { faderDbToNormalized, formatAudioDb, formatAudioTimestamp, formatMeterPercent } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
+import { AudioHardwareReadout } from "./AudioHardwareReadout";
 import { AudioLiveMasterHalo } from "./AudioLiveMeterReadout";
 import { AudioSliderControl } from "./AudioSliderControl";
 
@@ -168,7 +169,9 @@ export function AudioRail({
 
         <label className={styles.monitorLevel}>
           <span>Monitor level</span>
-          <strong>{formatAudioDb(monitorValue)}</strong>
+          <AudioHardwareReadout>
+            <strong>{formatAudioDb(monitorValue)}</strong>
+          </AudioHardwareReadout>
           <AudioSliderControl
             disabled={!selectedMixTarget || !viewModel.actionsAllowed}
             label="Rail monitor level"

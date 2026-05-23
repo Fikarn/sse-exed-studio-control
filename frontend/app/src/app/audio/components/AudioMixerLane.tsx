@@ -10,6 +10,7 @@ import { formatAudioDb, formatMeterDb } from "../audioFormatting";
 import { audioChannelSupportsGain, getAudioChannelGroup, selectedChannelSendLevel } from "../audioViewModel";
 import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
 import { AudioFader } from "./AudioFader";
+import { AudioHardwareReadout } from "./AudioHardwareReadout";
 import { AudioPreampControl } from "./AudioPreampControl";
 import { AudioStereoMeter } from "./AudioStereoMeter";
 
@@ -314,7 +315,9 @@ export function AudioOutputLane({
         <div className={styles.outputBusPanel}>
           <span>
             <small>Bus level</small>
-            <strong>{formatAudioDb(volume)}</strong>
+            <AudioHardwareReadout>
+              <strong>{formatAudioDb(volume)}</strong>
+            </AudioHardwareReadout>
           </span>
           <div className={styles.outputMetricGrid}>
             <span>

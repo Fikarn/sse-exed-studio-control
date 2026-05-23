@@ -9,6 +9,7 @@ import styles from "../AudioInspector.module.css";
 import { AUDIO_FADER_UNITY, formatAudioDb } from "../../audioFormatting";
 import type { AudioMixTargetEntry } from "../../../shellData";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
+import { AudioHardwareReadout } from "../AudioHardwareReadout";
 import { AudioSliderControl } from "../AudioSliderControl";
 import type { AudioChannelUpdate, SelectedAudioChannel } from "./audioInspectorHelpers";
 
@@ -42,7 +43,9 @@ export function AudioInspectorChannelSendActions({
           <span>
             Send to <strong>{selectedMixTarget?.name ?? "output"}</strong>
           </span>
-          <strong>{formatAudioDb(selectedSendLevel)}</strong>
+          <AudioHardwareReadout>
+            <strong>{formatAudioDb(selectedSendLevel)}</strong>
+          </AudioHardwareReadout>
         </div>
         <div className={styles.inspectorFaderTicks} aria-hidden="true">
           <span>-∞</span>

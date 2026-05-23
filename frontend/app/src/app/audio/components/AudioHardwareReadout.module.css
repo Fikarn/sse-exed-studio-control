@@ -1,0 +1,59 @@
+/* Subtle hardware-readout treatment shared by the audio page's "this is the
+   value the air signal trusts" surfaces (Outputs Bus level, Rail Monitor
+   level, inspector Send-to-<bus> readout, inspector small preamp). Reads as
+   a recessed digital display — thin inset border, faint amber LED-style
+   bleed across the lower half, the existing value typography sitting on
+   top. Subtle enough to coexist with the surrounding flat cards; specific
+   enough that the four canonical level readouts share one hardware
+   vocabulary. */
+.hardwareReadout {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  border: 1px solid color-mix(in srgb, var(--audio-border-strong) 80%, transparent);
+  border-radius: 6px;
+  background: var(--audio-canvas);
+  box-shadow:
+    inset 0 1px 0 rgba(250, 246, 230, 0.045),
+    inset 0 -1px 3px rgba(0, 0, 0, 0.42);
+  font-variant-numeric: tabular-nums;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.hardwareReadoutBacklight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(
+    120% 80% at 50% 78%,
+    color-mix(in srgb, var(--audio-engaged-glow) 80%, transparent),
+    transparent 78%
+  );
+  pointer-events: none;
+}
+
+.hardwareReadoutContent {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hardwareReadout[data-variant="display"] {
+  display: block;
+}
+
+.hardwareReadout[data-variant="display"] .hardwareReadoutContent {
+  display: block;
+}
+
+/* Default padding for the "readout" variant — value badges sized to wrap a
+   short dB number with comfortable air. The "display" variant is left to
+   the caller because graph canvases need to fill their parent without
+   forced padding. */
+.hardwareReadout[data-variant="readout"] {
+  padding: 6px 10px;
+}
