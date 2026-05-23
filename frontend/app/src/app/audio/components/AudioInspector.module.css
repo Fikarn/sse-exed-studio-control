@@ -398,9 +398,19 @@
   cursor: pointer;
 }
 
+/* Engaged-amber default for inspector toggles (48 V, Hi-Z, Polarity, AutoSet,
+   Unity, EQ-in, Comp-in). The more-specific [data-control="solo"] /
+   [data-control="mute"] rules below override for the warn-yellow and
+   mute-coral states respectively. */
 .inspectorButtonGrid button[data-active="true"],
 .inspectorActionRow button[data-active="true"],
 .unsupportedToggleRow button[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-engaged-fill) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-engaged-fill) 18%, var(--audio-panel));
+  color: var(--audio-engaged-fill);
+}
+
+.inspectorActionRow button[data-control="solo"][data-active="true"] {
   border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
   background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
   color: var(--audio-solo);
@@ -588,7 +598,7 @@ button.inspectorMiniCard {
 
 .eqBandRow i[data-selected="true"],
 .eqBandRow button[data-selected="true"] {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--audio-hot) 42%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--audio-engaged-fill) 42%, transparent);
 }
 
 .eqGraphMini,
@@ -627,7 +637,7 @@ button.inspectorMiniCard {
 }
 
 .eqGraphMini .eqLowCutShade {
-  fill: color-mix(in srgb, var(--audio-hot) 18%, transparent);
+  fill: color-mix(in srgb, var(--audio-engaged-fill) 18%, transparent);
   stroke: none;
 }
 

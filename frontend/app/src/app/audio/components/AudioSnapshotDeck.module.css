@@ -63,14 +63,14 @@
 }
 
 .snapshotTile[data-armed="true"] {
-  border-color: color-mix(in srgb, var(--audio-hot) 70%, var(--audio-border));
+  border-color: color-mix(in srgb, var(--audio-engaged-fill) 70%, var(--audio-border));
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 18%, transparent), transparent),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-engaged-fill) 18%, transparent), transparent),
     color-mix(in srgb, var(--audio-panel) 90%, transparent);
-  color: var(--audio-hot);
+  color: var(--audio-engaged-fill);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--audio-hot) 28%, transparent),
-    0 0 18px color-mix(in srgb, var(--audio-hot) 18%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--audio-engaged-fill) 28%, transparent),
+    0 0 18px color-mix(in srgb, var(--audio-engaged-fill) 18%, transparent);
 }
 
 .snapshotPreview {
