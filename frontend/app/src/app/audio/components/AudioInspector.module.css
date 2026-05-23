@@ -234,10 +234,19 @@
   min-width: 0;
 }
 
+/* TEST STAGE indicator demoted from a competing label to an eyebrow-class
+   eyebrow so it stops winning the Level / Peak hold readouts' visual
+   priority. Keeps the engaged amber so the operator still sees that the
+   meter is in test-stage mode, but no longer competes with the dB
+   numerals for attention. */
 .bigMeterInfo .meterSimulationBadge {
   justify-self: start;
-  min-height: 17px;
-  padding: 0 6px;
+  min-height: 12px;
+  padding: 0;
+  color: color-mix(in srgb, var(--audio-engaged-fill) 85%, var(--audio-text-default));
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .bigMeterRow {
@@ -617,7 +626,30 @@ button.inspectorMiniCard {
     100% 50%,
     25% 100%,
     auto;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.54);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.54),
+    inset 0 1px 0 rgba(250, 246, 230, 0.05);
+}
+
+/* Why: at-rest the EQ / Dynamics mini graphs were dark rectangles with a
+   thin grid and a single line — visually "placeholder" at a glance. A faint
+   amber LED-style bleed at the bottom of the canvas anchors each graph as
+   a recessed hardware display, sharing the vocabulary the slice-5
+   `AudioHardwareReadout` wrapper establishes for the level readouts. The
+   `::after` pseudo sits at z-index 0; the existing `.eqGraphMini svg`
+   rule already promotes the SVG curve to z-index 2 so it paints on top. */
+.eqGraphMini::after,
+.dynamicsGraphMini::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    110% 75% at 50% 92%,
+    color-mix(in srgb, var(--audio-engaged-glow) 80%, transparent),
+    transparent 70%
+  );
 }
 
 .eqGraphMini svg,
@@ -662,6 +694,7 @@ button.inspectorMiniCard {
   top: 8px;
   bottom: 8px;
   left: var(--dynamics-gate-x, 100%);
+  z-index: 2;
   width: 2px;
   border-radius: 2px;
   background: color-mix(in srgb, var(--audio-meter-warn) 74%, transparent);
