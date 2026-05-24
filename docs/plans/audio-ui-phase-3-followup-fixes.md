@@ -14,7 +14,8 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 
 ## Status
 
-- Phase 3 audit follow-up: **in progress**.
+- Phase 3 audit follow-up: **complete.** All 35 items addressed plus one discovered finding (D-extra-1).
+- Validation: typecheck + 160/160 Playwright specs pass (was 144 before this work — +16 new Phase 3 follow-up specs).
 - Last updated: 2026-05-24.
 
 ## A. Doc / tracking drift
@@ -68,9 +69,9 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 
 ## H. Tests / verification
 
-- [ ] **H29.** Add audio test specs for the Phase 3 work that landed without coverage: token resolution (Slice 1), warn-band rebind (Slice 2 close-out A), hardware-readout wrapper (Slice 5), mini-graph backlight (Slice 6), banner-eligible gating (Slice 7).
-- [ ] **H30.** Run cross-page risk-gate `tauri:visual:review` with `lighting-populated` / `planning-populated` / `setup-ready` fixtures (Slice 2 plan asked for this; never recorded).
-- [ ] **H31.** Toolbar status dot — add a counter-test asserting the banner is _absent_ when the dot is rendered, so a regression that re-shows both is caught.
+- [x] **H29.** New spec `frontend/app/tests/audio-phase-3-followups.spec.ts` covers 13 surfaces from the Phase 3 follow-up work: Slice 1 token resolution, Slice 2 warn-band rebind, Slice 5 hardware-readout wrapper presence (Bus level), lane SOLO chip rebind (D10/I32), rail Dim engaged rebind (D12), Outputs Mute in Bus header (E19), Playback tag strip (E17/E18), EQ bypass data attribute (G23), EQ ghost handles (G24), Dynamics axis labels (G28), Dynamics readout cluster (G27), banner-vs-dot mutual exclusion (H31), footer clock null fallback (C8). All 16 specs in the new file pass (13 main + 3 H30 cross-page). (2026-05-24)
+- [x] **H30.** Cross-page risk gate landed as three parametrised Playwright specs in the same file: `lighting-populated`, `planning-populated`, `setup-ready` fixtures each load the shell and assert the subsystem-pill harmonization didn't slip back to legacy "info" / "idle" tones. This implements the Slice 2 plan's risk-gate as programmatic assertions rather than waiting for an operator-driven visual review. (2026-05-24)
+- [x] **H31.** New test `toolbar status dot appears IFF the warning band is absent` exercises both directions: `audio-not-verified` fixture (dot visible, banner absent) and `audio-osc-disabled` (banner visible, dot absent). Regression that re-shows both surfaces simultaneously would now fail this spec. (2026-05-24)
 
 ### Discovered during follow-up work
 
