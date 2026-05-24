@@ -320,10 +320,17 @@
   cursor: pointer;
 }
 
+/* Generic active-toggle styling. After Slice 3 the lane only carries Mute
+   and Solo, so this rule catches Solo (Mute is overridden below). Bound to
+   --audio-warn-fill from the Slice 1 token family — Solo is a warn-class
+   state, "the mix you're hearing isn't the mix you're seeing" — rather than
+   the legacy --audio-solo literal. The local --audio-warn-fill override
+   inside .audioShell resolves to --audio-hot, so the rendered color is
+   visually equivalent to the pre-rebind appearance. (D10) */
 .laneToggle[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
-  color: var(--audio-solo);
+  border-color: color-mix(in srgb, var(--audio-warn-fill) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-warn-fill) 18%, var(--audio-panel));
+  color: var(--audio-warn-fill);
 }
 
 .laneToggle[data-control="mute"][data-active="true"] {

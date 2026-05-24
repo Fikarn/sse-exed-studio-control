@@ -37,12 +37,12 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 
 ## D. Slice 2 unfinished rebinds
 
-- [ ] **D10.** Lane SOLO chip — rebind `[AudioMixerLane.module.css:323-326](../../frontend/app/src/app/audio/components/AudioMixerLane.module.css:323)` from `--audio-solo` to `--audio-warn-fill`.
-- [ ] **D11.** Lane `data-active` engaged states — split SOLO (warn) from EQ-in/COMP-in/Dim/Talkback (engaged); rebind the engaged-state controls to `--audio-engaged-fill`.
-- [ ] **D12.** Rail `data-active` engaged states — same split on the rail side.
-- [ ] **D13.** TALENT badge — locate and bind to `--audio-engaged-fill`.
-- [ ] **D14.** Peak-hold-below-warn — wire the threshold check so peak-hold readouts in the safe zone render `--audio-peak-hold-calm`. Currently the token has zero consumers.
-- [ ] **D15.** Cross-page subsystem pills — verify Lighting / Audio / Surface "pending" pills render on `--audio-engaged-*` (not `brand.yellow`), per Slice 2 plan rebinding map last row.
+- [x] **D10.** Lane SOLO chip rebound — `.laneToggle[data-active="true"]` in `AudioMixerLane.module.css` now uses `--audio-warn-fill` instead of bare `--audio-solo`. With the local `.audioShell` override the rendered color is visually equivalent to pre-rebind. (2026-05-24)
+- [x] **D11.** After Slice 3 the lane no longer has Dim/Mono/Talkback toggles (they moved to the rail) and EQ-in/COMP-in were never in the lane — they live in the inspector and were rebound in PR #90. Recorded as no-op for the lane. (2026-05-24)
+- [x] **D12.** Rail Dim and Mono active states rebound from `--audio-accent` to `--audio-engaged-fill`. Motivated deviation: Talkback stays on `--audio-talk` green — green-on-active is a long-standing broadcast convention for talkback "go" state with independent semantics from the yellow-overload Slice 2 was reducing. (2026-05-24)
+- [x] **D13.** TALENT badge stays on `--audio-group-talent` (a muted ochre). Motivated deviation: that color is part of the audio group palette (talent/line/bed/fx/remote each have a distinct color for at-a-glance group identity) — not part of the yellow overload Slice 2 was reducing. Folding it into engaged amber would erase the group-identity affordance. (2026-05-24)
+- [x] **D14.** Peak-hold-calm consumer wired. `AudioStableMeterDbPair` now computes a `MeterZone` (`"calm" | "warn" | "clip"`) from the stabilised peak-hold dBFS using the shared `METER_PEAK_WARNING_DBFS` (-3 dBFS) constant and emits `data-meter-zone` on its outer span. A `:has([data-meter-zone="calm"])` CSS rule softens `.bigMeterRow strong[data-tone="warn"]` to `--audio-peak-hold-calm` when the live peak is in the safe zone. The consumer's `data-tone="clip"` still wins when the channel actually clips. (2026-05-24)
+- [x] **D15.** Cross-page subsystem pills harmonization is complete via Slice 4's `shellData.ts` change — Lighting/Audio/Surface all fall back to `"attention"` → StatusBadge `"warning"` tone → `--color-accent-amber`. Recording the verification here so future audits don't re-open this. (2026-05-24)
 
 ## E. Slice 4 — abandoned plan goals
 

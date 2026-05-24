@@ -301,6 +301,15 @@
   color: var(--audio-meter-warn);
 }
 
+/* When the inner live-meter pair reports its peak-hold zone as "calm" (worst
+   peak < METER_PEAK_WARNING_DBFS, i.e. -3 dBFS) the strong's color softens
+   from warn yellow to the neutral peak-hold-calm grey from the Slice 1
+   tokens. The consumer's data-tone="clip" rule below still wins when the
+   channel actually clips. (D14) */
+.bigMeterRow strong[data-tone="warn"]:has([data-meter-zone="calm"]) {
+  color: var(--audio-peak-hold-calm);
+}
+
 .bigMeterRow strong[data-tone="clip"] {
   color: var(--audio-clip);
 }

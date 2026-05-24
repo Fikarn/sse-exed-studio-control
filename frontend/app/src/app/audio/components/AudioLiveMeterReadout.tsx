@@ -4,7 +4,7 @@ import { useAudioMeterFrame, type AudioMeterEntry, type ShellStore } from "@sse/
 import styles from "./AudioLiveMeterReadout.module.css";
 import railStyles from "./AudioRail.module.css";
 import { INSPECTOR_DB_HYSTERESIS, INSPECTOR_READOUT_INTERVAL_MS } from "../audioConstants";
-import { formatMeterDb, formatMeterPercent } from "../audioFormatting";
+import { formatMeterDb, formatMeterPercent, METER_OVER_DBFS, METER_PEAK_WARNING_DBFS } from "../audioFormatting";
 import {
   clampMeterDbfs,
   METER_FLOOR_DBFS,
@@ -103,6 +103,22 @@ function textPairChanged(current: MeterReadoutPair, next: MeterReadoutPair) {
   return current.left.text !== next.left.text || current.right.text !== next.right.text;
 }
 
+type MeterZone = "calm" | "warn" | "clip";
+
+// Why: the safe-zone "calm" tone for peak-hold readouts (item D14) was
+// deferred during the Phase 3 Slice 4 commit with the rationale that the
+// channel snapshot's peakHold values can be stale. This component already
+// owns a live displayState — derive the zone from the worst (highest) of
+// the two stabilised peak-hold dBFS values. Threshold: METER_PEAK_WARNING_DBFS
+// (-3 dBFS) per the shared constant in audioFormatting.ts; over 0 dBFS is
+// treated as clip even if the upstream `clip` flag hasn't propagated yet.
+function meterZoneFromDbfs(leftDbfs: number, rightDbfs: number): MeterZone {
+  const worst = Math.max(leftDbfs, rightDbfs);
+  if (worst >= METER_OVER_DBFS) return "clip";
+  if (worst >= METER_PEAK_WARNING_DBFS) return "warn";
+  return "calm";
+}
+
 export function AudioStableMeterDbPair({
   fallbackLeft,
   fallbackRight,
@@ -131,6 +147,7 @@ export function AudioStableMeterDbPair({
   const lastPaintedAtRef = useRef(0);
   const quantizedRef = useRef<MeterReadoutPair>(emptyReadoutPair());
   const [readout, setReadout] = useState<MeterReadoutPair>(() => emptyReadoutPair());
+  const [zone, setZone] = useState<MeterZone>("calm");
 
   useEffect(() => {
     const updateLatestEntry = () => {
@@ -180,6 +197,13 @@ export function AudioStableMeterDbPair({
       };
       quantizedRef.current = nextReadout;
       setReadout((current) => (textPairChanged(current, nextReadout) ? nextReadout : current));
+
+      // Why (D14): emit the zone so the consumer can switch the readout color
+      // from warn yellow to peakHold.calm grey when we're in the safe zone.
+      // Only meaningful for peak-hold mode; level mode keeps `calm` as a
+      // benign default since level readouts don't share the warn yellow.
+      const nextZone = mode === "peakHold" && peakHoldEnabled ? meterZoneFromDbfs(leftDbfs, rightDbfs) : "calm";
+      setZone((current) => (current === nextZone ? current : nextZone));
     };
 
     resetReadoutState();
@@ -194,6 +218,7 @@ export function AudioStableMeterDbPair({
       data-meter-peak-hold-enabled={peakHoldEnabled ? "true" : "false"}
       data-meter-peak-hold-reset-token={peakHoldResetToken}
       data-meter-readout-mode={mode}
+      data-meter-zone={zone}
       data-testid={testId}
     >
       <span data-meter-readout-side="left">{readout.left.text}</span>
