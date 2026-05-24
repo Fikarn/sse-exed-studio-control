@@ -27,13 +27,13 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 
 ## B. Uncommitted-state cleanup
 
-- [ ] **B6.** Commit (or revert) the two uncommitted CSS files (`AudioWorkspace.module.css`, `AudioSignalCanvas.module.css`) as the warn-band rebind close-out.
-- [ ] **B7.** Decide on the `--audio-warn-fill = --audio-hot` local override — keep it (with a stronger Why-comment) or drop it and accept the brand.yellow tone.
+- [x] **B6.** Warn-band rebind committed as commit 7ab307c ("audio: phase 3 closeout A — warn-band token rebind"). 16 sites in `AudioSignalCanvas.module.css` rebound from `--audio-hot` → `--audio-warn-fill`. (2026-05-24)
+- [x] **B7.** Decision recorded: keep the local `--audio-warn-fill = --audio-hot` override; strengthen the Why-comment with the trade-off + forward reference to I32. Same commit. (2026-05-24)
 
 ## C. Slice 0 leftovers
 
-- [ ] **C8.** [audioViewModel.ts:496](../../frontend/app/src/app/audio/audioViewModel.ts:496) — make `clock` nullable (or `{clock, sampleRate}` structured) instead of a hardcoded `"n/a · sr n/a"` placeholder.
-- [ ] **C9.** Either restructure `AudioRail.tsx:93` so the appended suffix is a separate `<small>` chip, OR leave a comment pointing at `AudioLiveMeterReadout.module.css` as the actual fix site.
+- [x] **C8.** `footerTelemetry.clock` is now `string | null`; placeholder is `null` instead of `"n/a · sr n/a"`. Two consumers (`AudioHealthBar.tsx`, `AudioInspectorOverviewCards.tsx`) render `—` when null and suppress the `title` tooltip. Comment in `audioViewModel.ts` explains the wire-up point for when the engine starts publishing real clock state. (2026-05-24)
+- [x] **C9.** Comment landed in `AudioRail.tsx:93` documenting that the visible "Active mix-28" defect lived at the canvas overlay layer (`AudioLiveMeterReadout.module.css`) and was fixed there in 32a5815. Future suffix additions should route through a `<small>` chip per the original Slice 0 intent. (2026-05-24)
 
 ## D. Slice 2 unfinished rebinds
 

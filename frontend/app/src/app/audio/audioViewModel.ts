@@ -64,7 +64,7 @@ export interface AudioWorkspaceViewModel {
   fadersPerBank: number;
   feedingChannelIds: string[];
   footerTelemetry: {
-    clock: string;
+    clock: string | null;
     endpoint: string;
     lastSync: string;
     metering: string;
@@ -493,7 +493,11 @@ export function buildAudioViewModel({
     fadersPerBank,
     feedingChannelIds,
     footerTelemetry: {
-      clock: "n/a · sr n/a",
+      // Why: clock telemetry is not yet engine-backed. Returning null lets the
+      // renderer suppress the value side of the row (showing `Clock —`) so the
+      // word "Clock" doesn't double up. When the engine starts publishing real
+      // clock state, replace this with `audioSnapshot.clock ?? null`. (C8)
+      clock: null,
       endpoint: footerEndpoint(audioSnapshot),
       lastSync: audioSnapshot.lastConsoleSyncAt ?? "not yet",
       metering: meterSimulationActive

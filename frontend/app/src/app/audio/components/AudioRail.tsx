@@ -90,6 +90,13 @@ export function AudioRail({
         />
         <div className={styles.monitorCardStatus}>
           <span className={styles.statusDot} />
+          {/* The Phase 3 Slice 0 plan called for restructuring this line into a
+              <small> suffix chip. On inspection the visible "Active mix-28"
+              defect lived in AudioLiveMeterReadout.module.css's canvas overlay
+              grid, not here — the fix landed there in commit 32a5815. This
+              line is intentionally simple; if a future polish pass adds a
+              data-driven suffix to the eyebrow, route it through a separate
+              <small> chip per the original Slice 0 intent. (C9) */}
           <span>{viewModel.meterSimulationActive ? "Active mix · test meters" : "Active mix · live"}</span>
         </div>
         <div className={styles.railHeader}>
