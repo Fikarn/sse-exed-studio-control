@@ -53,9 +53,9 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 
 ## F. Slice 5 hygiene
 
-- [ ] **F20.** [AudioHardwareReadout.module.css](../../frontend/app/src/app/audio/components/AudioHardwareReadout.module.css) — add the explicit highlight layer the plan called out, OR document in the component header that the highlight is folded into the bezel `box-shadow`.
-- [ ] **F21.** [AudioHardwareReadout.tsx](../../frontend/app/src/app/audio/components/AudioHardwareReadout.tsx) `variant="display"` — consume it in Slice 6, or delete the unused variant.
-- [ ] **F22.** Record the inspector small preamp re-skin decision (Slice 5 skipped it with "bezel-in-bezel" reasoning) in a checked-in note.
+- [x] **F20.** Decision recorded: keep the highlight layer folded into the bezel's `inset 0 1px 0 rgba(250, 246, 230, 0.045)` box-shadow (a dedicated `<span>` for a single-pixel inner highlight isn't worth the DOM cost). Comment in `AudioHardwareReadout.module.css` now explicitly enumerates the four plan layers and identifies the implementation choice for the highlight one. (2026-05-24)
+- [ ] **F21.** Will be consumed by Group G (G25, G26 — full EQ/Dynamics graph wraps). Tracked, not yet closed.
+- [x] **F22.** Decision recorded as a Why-comment in `AudioInspectorChannelHardwareCard.tsx` header: the inspector small preamp is intentionally not wrapped in `AudioHardwareReadout` because the preamp is already a fully-detailed skeuomorphic element (bezel-in-bezel would read worse). (2026-05-24)
 
 ## G. Slice 6 — abandoned plan goals
 

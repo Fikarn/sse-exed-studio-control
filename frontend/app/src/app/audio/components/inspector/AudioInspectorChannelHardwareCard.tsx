@@ -7,6 +7,14 @@
  *
  * Extracted from `AudioInspectorChannelHeader.tsx` to keep the header focused
  * on the identity strip (Slice 5B).
+ *
+ * Phase 3 Slice 5 plan note (F22): the small inspector preamp is
+ * INTENTIONALLY not wrapped in `AudioHardwareReadout`. The preamp is already
+ * a fully-detailed skeuomorphic element (raster panel PNGs, LED ring,
+ * digital readout) — adding the hardware-readout bezel around it would
+ * paint a bezel-in-bezel that reads worse, not better. Slice 5 reskin
+ * decision recorded in item F22 of
+ * docs/plans/audio-ui-phase-3-followup-fixes.md.
  */
 import styles from "../AudioInspector.module.css";
 import {

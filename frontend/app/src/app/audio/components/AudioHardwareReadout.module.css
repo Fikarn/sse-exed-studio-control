@@ -5,7 +5,19 @@
    bleed across the lower half, the existing value typography sitting on
    top. Subtle enough to coexist with the surrounding flat cards; specific
    enough that the four canonical level readouts share one hardware
-   vocabulary. */
+   vocabulary.
+
+   Plan layer count (4) vs. implementation:
+   1. Bezel layer       — .hardwareReadout border + inset box-shadow below.
+   2. Backlight layer   — .hardwareReadoutBacklight (separate element).
+   3. Content layer     — .hardwareReadoutContent (the wrapped digit/SVG).
+   4. Highlight layer   — INTENTIONALLY folded into .hardwareReadout's
+                          `inset 0 1px 0 rgba(250, 246, 230, 0.045)`
+                          box-shadow (the first inset shadow below). A
+                          dedicated <span> for a single-pixel inner
+                          highlight isn't worth the DOM cost — box-shadow
+                          renders the same physical top-edge highlight.
+   Item F20 in audio-ui-phase-3-followup-fixes.md records this. */
 .hardwareReadout {
   position: relative;
   display: inline-flex;
