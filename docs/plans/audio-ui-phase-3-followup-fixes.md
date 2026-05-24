@@ -72,6 +72,10 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 - [ ] **H30.** Run cross-page risk-gate `tauri:visual:review` with `lighting-populated` / `planning-populated` / `setup-ready` fixtures (Slice 2 plan asked for this; never recorded).
 - [ ] **H31.** Toolbar status dot — add a counter-test asserting the banner is _absent_ when the dot is rendered, so a regression that re-shows both is caught.
 
+### Discovered during follow-up work
+
+- [x] **D-extra-1 (2026-05-24).** Slice 7's status dot was wired to `AudioToolbar.tsx`, which is dead code (component not mounted anywhere — see Phase 2 GS-AUD-44 drift entry). The plan named the wrong site. The Slice 7 spec `operator-shell.spec.ts:846 "renders audio degraded and loading fixture states"` therefore failed when run against the merged Phase 3 branch. Mirrored the dot's rendering into the live Sync button location in `AudioRail.tsx:252`, with the same `data-testid="audio-toolbar-status-dot"` so the existing spec continues to assert against it. The dead `AudioToolbar.tsx` copy is preserved for symmetry per the Phase 2 GS-AUD-44 precedent. Spec now passes.
+
 ## I. Architectural / longer-horizon
 
 - [ ] **I32.** Two yellows on the audio page (`--audio-hot` #ffd33d and `--audio-solo` #ffd94a) — decide whether the ~3-bit distinction is intentional and document, or collapse to one.

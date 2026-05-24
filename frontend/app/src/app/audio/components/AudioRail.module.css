@@ -167,6 +167,21 @@
   color: var(--audio-engaged-fill);
 }
 
+/* Slice 7 status dot mirrored from AudioToolbar.module.css (which is dead
+   code — its component isn't mounted anywhere). The live Sync button lives
+   in this rail, so the dot is rendered here next to it. Same visual contract
+   as the AudioToolbar copy: 8 px amber dot with an --audio-engaged-fill glow. */
+.toolbarStatusDot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--audio-engaged-fill);
+  box-shadow: var(--shadow-glow-amber-dot);
+}
+
 .railAuxPanel {
   display: none;
 }

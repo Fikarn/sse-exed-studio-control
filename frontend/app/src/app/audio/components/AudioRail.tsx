@@ -252,6 +252,21 @@ export function AudioRail({
           <button aria-label="Sync" disabled={!viewModel.capabilities.canSync} onClick={onSync} type="button">
             <RefreshCw size={13} strokeWidth={1.8} aria-hidden="true" />
             Sync
+            {viewModel.status.warningTitle && !viewModel.status.bannerEligible ? (
+              // Slice 7's status dot was originally added to AudioToolbar.tsx,
+              // but that component is dead code (not mounted in the active
+              // layout — see Phase 2 GS-AUD-44 drift entry). Mirroring the
+              // dot here next to the live Sync button is the actual surface
+              // operators see. The testid stays "audio-toolbar-status-dot"
+              // for spec continuity with the existing operator-shell test.
+              <span
+                className={styles.toolbarStatusDot}
+                data-testid="audio-toolbar-status-dot"
+                role="status"
+                title={`${viewModel.status.warningTitle} — ${viewModel.status.warningBody ?? "press Sync to verify"}`}
+                aria-label={`${viewModel.status.warningTitle}. ${viewModel.status.warningBody ?? ""}`}
+              />
+            ) : null}
           </button>
           <button onClick={onOpenSetup} title="Open Setup / Support" type="button">
             <Settings size={13} strokeWidth={1.8} aria-hidden="true" />
