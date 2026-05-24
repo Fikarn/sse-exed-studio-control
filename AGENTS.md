@@ -149,6 +149,15 @@ A task is done when:
 - docs, release notes, or `CHANGELOG.md` are updated when behavior, setup, release posture, or user-visible behavior changes;
 - the final handoff lists files changed, verification commands and results, blockers/unknowns, and useful follow-up.
 
+## Rescope protocol (sliced plans)
+
+When working through a sliced plan and a slice's premise turns out to be wrong on inspection:
+
+- Do **not** silently substitute different work under the same slice number — that's how the Phase 3 Slice 4 and Slice 6 deltas slipped through the audit. Both shipped non-plan work under their original slice names with no doc trail until the 2026-05-24 follow-up audit.
+- Instead, in the same PR or a follow-up: (1) edit the plan doc to record the rescope reason, (2) re-number or rename the slice so the title matches what landed, (3) open a new follow-up item for the original plan goal if it's still worth doing (or formally drop it with rationale).
+- The commit message should call out the rescope explicitly so a reader scanning `git log --oneline` sees the divergence without opening the diff.
+- If the rescope is large enough to change validation scope, re-run the wider validation lane that the original plan named — don't inherit the narrower lane the rescoped work needs.
+
 ## Where to look
 
 | For…                                    | Go to…                                           |

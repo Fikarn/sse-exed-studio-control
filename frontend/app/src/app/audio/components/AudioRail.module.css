@@ -145,17 +145,41 @@
   cursor: not-allowed;
 }
 
+/* Talkback stays on its own --audio-talk green. The plan's rebinding map
+   listed Talkback under audio.engaged.*, but green-on-active is a long-
+   standing broadcast convention for talkback "go" state — it carries
+   independent semantics rather than being part of the yellow-overload Slice 2
+   was reducing. Recorded as a motivated deviation in item D12. */
 .monitorButtonGrid button[data-control="talk"][data-active="true"] {
   border-color: color-mix(in srgb, var(--audio-talk) 55%, var(--audio-border));
   background: color-mix(in srgb, var(--audio-talk) 18%, var(--audio-panel));
   color: var(--audio-talk);
 }
 
+/* Dim and Mono active states bound to --audio-engaged-fill per the Slice 2
+   plan: persistent engaged monitor states should read as the warm-amber
+   engaged tier, not the cyan --audio-accent (which signals "selected"
+   elsewhere on the page). (D12) */
 .monitorButtonGrid button[data-control="dim"][data-active="true"],
 .monitorButtonGrid button[data-control="mono"][data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-accent) 16%, var(--audio-panel));
-  color: var(--audio-accent);
+  border-color: color-mix(in srgb, var(--audio-engaged-fill) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-engaged-fill) 18%, var(--audio-panel));
+  color: var(--audio-engaged-fill);
+}
+
+/* Slice 7 status dot mirrored from AudioToolbar.module.css (which is dead
+   code — its component isn't mounted anywhere). The live Sync button lives
+   in this rail, so the dot is rendered here next to it. Same visual contract
+   as the AudioToolbar copy: 8 px amber dot with an --audio-engaged-fill glow. */
+.toolbarStatusDot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--audio-engaged-fill);
+  box-shadow: var(--shadow-glow-amber-dot);
 }
 
 .railAuxPanel {

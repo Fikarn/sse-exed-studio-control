@@ -120,7 +120,12 @@ export function AudioInspectorEqTab({
           ))}
         </span>
       </div>
-      <div className={tabStyles.eqGraphFull} data-eq-graph="true" data-testid="audio-eq-graph">
+      <div
+        className={tabStyles.eqGraphFull}
+        data-eq-graph="true"
+        data-eq-enabled={selectedChannel.eq.enabled}
+        data-testid="audio-eq-graph"
+      >
         <div className={tabStyles.eqGraphGuideLayer} aria-hidden="true">
           <div className={tabStyles.eqGraphDbMarkers} data-testid="audio-eq-db-scale">
             {EQ_GAIN_MARKERS.map((marker) => (
@@ -206,6 +211,11 @@ export function AudioInspectorEqTab({
             <button
               aria-label={`${selectedChannel.name} Band ${band.label} EQ point`}
               className={tabStyles.eqPoint}
+              // Phase 3 follow-up G24: band reads as a "ghosted" handle when
+              // the EQ tab is bypassed OR the band itself has no audible
+              // effect (gain ≈ 0). Operator sees "armed but inactive" at a
+              // glance instead of guessing whether each handle is doing work.
+              data-ghost={!selectedChannel.eq.enabled || Math.abs(band.gainDb) < 0.05}
               data-selected={band.id === activeEqHandleId}
               data-testid={`audio-eq-point-${band.id}`}
               disabled={!viewModel.capabilities.canEditProcessing}

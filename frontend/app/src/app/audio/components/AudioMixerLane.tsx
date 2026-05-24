@@ -11,6 +11,7 @@ import { audioChannelSupportsGain, getAudioChannelGroup, selectedChannelSendLeve
 import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
 import { AudioFader } from "./AudioFader";
 import { AudioHardwareReadout } from "./AudioHardwareReadout";
+import { AudioLaneTagStrip } from "./AudioLaneTagStrip";
 import { AudioPreampControl } from "./AudioPreampControl";
 import { AudioStereoMeter } from "./AudioStereoMeter";
 
@@ -148,6 +149,12 @@ export function AudioChannelLane({
           onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
           variant="compact"
         />
+      ) : channel.role === "playback-pair" ? (
+        // Phase 3 follow-up E17/E18: playback strips have no preamp control,
+        // so the same vertical slot used to read as missing content. The
+        // tag strip names the group + format using the already-available
+        // viewModel data — no new engine state required.
+        <AudioLaneTagStrip group={(group ?? "playback").toUpperCase()} stereo={channel.stereo} />
       ) : null}
 
       <div className={styles.laneBody}>
@@ -313,12 +320,34 @@ export function AudioOutputLane({
           value={volume}
         />
         <div className={styles.outputBusPanel}>
-          <span>
-            <small>Bus level</small>
-            <AudioHardwareReadout>
-              <strong>{formatAudioDb(volume)}</strong>
-            </AudioHardwareReadout>
-          </span>
+          <div className={styles.outputBusHeader}>
+            <span>
+              <small>Bus level</small>
+              <AudioHardwareReadout>
+                <strong>{formatAudioDb(volume)}</strong>
+              </AudioHardwareReadout>
+            </span>
+            {/* Phase 3 follow-up E19: Outputs Mute moved into the Bus panel
+                next to the level it gates. After Slice 3 stripped Dim/Mono/
+                Talk out of the lane, the bottom row read as a deserted
+                strip carrying a single button; bringing Mute up next to
+                "Bus level" reads as one coherent output-control cluster. */}
+            <button
+              aria-label={`Mute ${mixTarget.name}`}
+              aria-pressed={mixTarget.mute}
+              className={styles.outputBusMuteButton}
+              data-control="mute"
+              data-active={mixTarget.mute}
+              disabled={!actionsAllowed}
+              onClick={(event) => {
+                event.stopPropagation();
+                onUpdateMixTarget({ mixTargetId: mixTarget.id, mute: !mixTarget.mute });
+              }}
+              type="button"
+            >
+              Mute
+            </button>
+          </div>
           <div className={styles.outputMetricGrid}>
             <span>
               <small>Peak hold</small>
@@ -337,28 +366,6 @@ export function AudioOutputLane({
             </span>
           </div>
         </div>
-      </div>
-
-      {/* Why: Dim / Mono / Talkback are room-monitor controls owned by the
-         rail's monitor card — they're global, not per-mix-target. The
-         Output card keeps Mute only (which IS per-target), so the same
-         action no longer renders in two places (rail + lane). */}
-      <div className={styles.laneControls} data-output-controls="true">
-        <button
-          aria-label={`Mute ${mixTarget.name}`}
-          aria-pressed={mixTarget.mute}
-          className={styles.laneToggle}
-          data-control="mute"
-          data-active={mixTarget.mute}
-          disabled={!actionsAllowed}
-          onClick={(event) => {
-            event.stopPropagation();
-            onUpdateMixTarget({ mixTargetId: mixTarget.id, mute: !mixTarget.mute });
-          }}
-          type="button"
-        >
-          Mute
-        </button>
       </div>
     </article>
   );

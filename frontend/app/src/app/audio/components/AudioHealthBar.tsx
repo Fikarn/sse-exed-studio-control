@@ -18,7 +18,7 @@ export function AudioHealthBar({ viewModel }: { viewModel: AudioWorkspaceViewMod
         <div className={styles.healthItem}>
           <Clock3 size={15} strokeWidth={1.8} aria-hidden="true" />
           <span>Clock</span>
-          <strong>{viewModel.footerTelemetry.clock}</strong>
+          <strong>{viewModel.footerTelemetry.clock ?? "—"}</strong>
         </div>
         <div className={styles.healthItem}>
           <TimerReset size={15} strokeWidth={1.8} aria-hidden="true" />

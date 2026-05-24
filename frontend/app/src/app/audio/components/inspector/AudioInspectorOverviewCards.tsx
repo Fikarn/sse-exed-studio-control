@@ -178,7 +178,9 @@ export function AudioInspectorOverviewCards({
           <div className={styles.detailGrid}>
             <span data-fact-size="long">
               <small>Clock</small>
-              <strong title={viewModel.footerTelemetry.clock}>{viewModel.footerTelemetry.clock}</strong>
+              <strong title={viewModel.footerTelemetry.clock ?? undefined}>
+                {viewModel.footerTelemetry.clock ?? "—"}
+              </strong>
             </span>
             <span data-fact-size="long">
               <small>Metering</small>

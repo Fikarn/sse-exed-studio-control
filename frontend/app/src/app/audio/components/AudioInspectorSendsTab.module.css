@@ -96,10 +96,14 @@
   cursor: pointer;
 }
 
+/* Send mode (pre-fader / post-fader) is an engaged selection state, not a
+   warn — bind to --audio-engaged-fill so it reads as the same engaged amber
+   the other inspector toggle catch-alls use, instead of the legacy
+   --audio-solo yellow that was a Phase 2 holdover. (I32) */
 .sendModeRow button[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
-  color: var(--audio-solo);
+  border-color: color-mix(in srgb, var(--audio-engaged-fill) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-engaged-fill) 18%, var(--audio-panel));
+  color: var(--audio-engaged-fill);
 }
 
 .sendModeRow button:disabled {

@@ -90,6 +90,13 @@ export function AudioRail({
         />
         <div className={styles.monitorCardStatus}>
           <span className={styles.statusDot} />
+          {/* The Phase 3 Slice 0 plan called for restructuring this line into a
+              <small> suffix chip. On inspection the visible "Active mix-28"
+              defect lived in AudioLiveMeterReadout.module.css's canvas overlay
+              grid, not here — the fix landed there in commit 32a5815. This
+              line is intentionally simple; if a future polish pass adds a
+              data-driven suffix to the eyebrow, route it through a separate
+              <small> chip per the original Slice 0 intent. (C9) */}
           <span>{viewModel.meterSimulationActive ? "Active mix · test meters" : "Active mix · live"}</span>
         </div>
         <div className={styles.railHeader}>
@@ -245,6 +252,21 @@ export function AudioRail({
           <button aria-label="Sync" disabled={!viewModel.capabilities.canSync} onClick={onSync} type="button">
             <RefreshCw size={13} strokeWidth={1.8} aria-hidden="true" />
             Sync
+            {viewModel.status.warningTitle && !viewModel.status.bannerEligible ? (
+              // Slice 7's status dot was originally added to AudioToolbar.tsx,
+              // but that component is dead code (not mounted in the active
+              // layout — see Phase 2 GS-AUD-44 drift entry). Mirroring the
+              // dot here next to the live Sync button is the actual surface
+              // operators see. The testid stays "audio-toolbar-status-dot"
+              // for spec continuity with the existing operator-shell test.
+              <span
+                className={styles.toolbarStatusDot}
+                data-testid="audio-toolbar-status-dot"
+                role="status"
+                title={`${viewModel.status.warningTitle} — ${viewModel.status.warningBody ?? "press Sync to verify"}`}
+                aria-label={`${viewModel.status.warningTitle}. ${viewModel.status.warningBody ?? ""}`}
+              />
+            ) : null}
           </button>
           <button onClick={onOpenSetup} title="Open Setup / Support" type="button">
             <Settings size={13} strokeWidth={1.8} aria-hidden="true" />
