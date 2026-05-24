@@ -65,21 +65,21 @@ test("1920 fallback keeps the output lane Mute control tappable", async ({ page 
   await openFixture(page, "audio-1920-fallback");
   const mainOut = page.getByTestId("audio-output-audio-mix-main");
   await expect(mainOut).toBeVisible();
-  const controls = mainOut.locator('[data-output-controls="true"]');
-  await expect(controls).toBeVisible();
-  // Slice 3 (Phase 3): Output card now exposes Mute only — Dim/Mono/Talk
-  // moved to the rail. At 1920 fallback the surviving Mute must still
-  // measure a tappable height (>= 18 px per the narrowest container-query
-  // override).
-  const buttons = await controls.evaluate((el) => {
-    return Array.from(el.querySelectorAll("button[data-control]")).map((button) => ({
-      control: button.getAttribute("data-control"),
-      rect: button.getBoundingClientRect(),
-    }));
-  });
-  expect(buttons.map((entry) => entry.control)).toEqual(["mute"]);
-  for (const entry of buttons) {
-    expect(entry.rect.width).toBeGreaterThan(0);
-    expect(entry.rect.height).toBeGreaterThanOrEqual(18);
-  }
+  // Phase 3 follow-up E19: Output Mute moved from the bottom laneControls
+  // strip into the outputBusPanel next to the Bus level. Slice 3 already
+  // removed Dim/Mono/Talk from the lane. At 1920 fallback the surviving
+  // Mute must still measure a tappable height (>= 18 px per the narrowest
+  // container-query override).
+  const muteButton = mainOut.locator('button[data-control="mute"]');
+  await expect(muteButton).toBeVisible();
+  const rect = await muteButton.evaluate((el) => el.getBoundingClientRect());
+  expect(rect.width).toBeGreaterThan(0);
+  expect(rect.height).toBeGreaterThanOrEqual(18);
+
+  // Dim / Mono / Talk explicitly remain absent from the lane (they live on
+  // the rail's monitor card after Slice 3). Mute is the only per-target
+  // toggle.
+  await expect(mainOut.locator('button[data-control="dim"]')).toHaveCount(0);
+  await expect(mainOut.locator('button[data-control="mono"]')).toHaveCount(0);
+  await expect(mainOut.locator('button[data-control="talk"]')).toHaveCount(0);
 });

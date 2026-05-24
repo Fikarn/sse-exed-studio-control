@@ -46,10 +46,10 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 
 ## E. Slice 4 — abandoned plan goals
 
-- [ ] **E16.** Outputs meter `data-meter-kind="mixTarget"` styling — wider column, higher LED brightness ceiling, inner bezel. Or formally drop with rationale recorded.
-- [ ] **E17.** Playback strip 3 compact rows under fader (role/tag chip, send mini, M toggle). Or formally drop.
-- [ ] **E18.** Create `AudioLaneTagStrip` component if E17 lands.
-- [ ] **E19.** Outputs Mute relocation — into Bus panel, freeing bottom row. Or formally drop.
+- [x] **E16.** Subtle mixTarget meter promotion landed: new `.stereoMeter[data-meter-kind="mixTarget"] .meterTrack` rule adds a stronger inset-shadow stack ("recessed hardware display" cue) and tighter outer border on Outputs meters vs Inputs. Brightness ceiling of the green LEDs themselves left unchanged — the visual win comes from the bezel, not from louder green (the implementer's "data-feeding handles parity" rationale partially survives; Output meters still win because the bezel reads as more substantial hardware). (2026-05-24)
+- [x] **E17.** Playback strip density addressed via a smaller scope than the plan called for: instead of three rows (role/tag chip + send mini + M toggle), one strip in the preamp's vertical slot showing `BED · STEREO`-style group + format identity. The "Send → Main Out" mini was dropped because the existing `.laneReadout` already shows the send dB value and adding a parallel mini below would be redundant. The M toggle stays in its existing `.laneControls` slot — no need to also render it in a new strip. Motivated deviation from the plan's "three rows" but the spirit (Playback strip stops reading hollow) is delivered. (2026-05-24)
+- [x] **E18.** New `AudioLaneTagStrip.tsx` + `.module.css` component rendered for `channel.role === "playback-pair"`. Uses the lane's existing `--audio-lane-accent` for the group label. Reused on any future non-preamp channel kind. (2026-05-24)
+- [x] **E19.** Outputs Mute moved from the bottom `laneControls` strip into the `outputBusPanel` next to "Bus level". Reads as one cluster — level + mute — instead of a stranded button below a metric grid. The Slice 3 deletion of Dim/Mono/Talk had left the bottom row holding only Mute, which already looked like an after-thought. `audio-hierarchy.spec.ts:63` updated to find Mute at its new site (and explicitly assert Dim/Mono/Talk remain absent). (2026-05-24)
 
 ## F. Slice 5 hygiene
 

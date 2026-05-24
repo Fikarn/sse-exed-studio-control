@@ -224,6 +224,44 @@
   box-sizing: border-box;
 }
 
+/* Phase 3 follow-up E19: Outputs Mute now sits inside the Bus panel next
+   to the Bus level. The outputBusHeader is a 2-column flex with the
+   level readout taking the left column and the Mute button living in
+   the right. Replaces the previous bottom-row laneControls placement
+   that read as a stranded button after Slice 3 removed Dim/Mono/Talk. */
+.outputBusHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.outputBusMuteButton {
+  align-self: stretch;
+  min-width: 56px;
+  padding: 6px 12px;
+  border: 1px solid var(--audio-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.outputBusMuteButton[data-active="true"] {
+  border-color: color-mix(in srgb, var(--audio-mute) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-mute) 18%, var(--audio-panel));
+  color: var(--audio-mute);
+}
+
+.outputBusMuteButton:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
 .outputBusPanel span {
   display: grid;
   align-content: center;

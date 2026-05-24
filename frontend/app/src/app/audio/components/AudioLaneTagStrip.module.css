@@ -1,0 +1,33 @@
+/* Phase 3 follow-up E17/E18: compact group + format identity strip for
+   channel lanes that don't render the AudioPreampControl (Playback strips
+   most importantly). Sits in the same vertical slot the preamp occupies on
+   Inputs, so the Playback strip no longer reads as missing-content beneath
+   the lane header. Two short rows: group label (BED / FX / etc.) on top,
+   format (STEREO / MONO) below. Group color inherits via --audio-lane-accent
+   which the parent channelLane already sets per data-group. */
+.laneTagStrip {
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  min-height: 30px;
+  border: 1px solid color-mix(in srgb, var(--audio-border) 70%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--audio-canvas) 90%, transparent);
+}
+
+.laneTagGroup {
+  color: var(--audio-lane-accent);
+  font: var(--font-weight-semibold) 9px / 1 var(--font-family-mono);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.laneTagFormat {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) 8px / 1 var(--font-family-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}

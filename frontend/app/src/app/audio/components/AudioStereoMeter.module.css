@@ -73,6 +73,19 @@
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.58);
 }
 
+/* Phase 3 follow-up E16: subtle promotion for mixTarget (Outputs) meters so
+   they read as the louder, more operationally critical surface vs Inputs.
+   Slightly stronger inner-bezel shadow stack ("recessed hardware display"
+   cue) and a tighter outer border. Brightness ceiling for the meter LEDs
+   themselves is unchanged — the visual win comes from the bezel, not from
+   making the green louder. Tracks data-meter-kind set in AudioStereoMeter.tsx. */
+.stereoMeter[data-meter-kind="mixTarget"] .meterTrack {
+  border-color: color-mix(in srgb, var(--audio-border) 95%, transparent);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.62),
+    inset 0 0 6px rgba(0, 0, 0, 0.32);
+}
+
 .meterTrack[data-tone="amber"] {
   border-color: color-mix(in srgb, var(--audio-meter-warn) 28%, var(--audio-border));
 }
