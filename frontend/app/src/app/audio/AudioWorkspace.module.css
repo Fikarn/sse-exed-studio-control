@@ -32,6 +32,25 @@
   --color-primary-500: var(--audio-accent);
   --color-warning-500: var(--audio-hot);
   --color-danger-500: var(--audio-clip);
+  /* Why: the global `--audio-warn-*` token family resolves to the brand.yellow
+     palette (#E8D561). Inside the audio module the page's tuned warn yellow
+     is `--audio-hot` (#ffd33d) — slightly brighter and warmer. Redefine the
+     warn family locally so semantic consumers (Slice 2 / Closeout A: the
+     OSC warning band, the SOLO warning band, etc.) get audio's tuned color
+     while keeping the cross-module token name. Other workspaces still see
+     brand.yellow because they don't compose this rule.
+     Trade-off: this override re-establishes a per-module color value at the
+     exact layer Slice 1's centralized tokens were meant to remove. It's
+     deliberate — converging on brand.yellow now would visibly shift every
+     warn surface on the audio page. Tracked as item I32 in
+     [audio-ui-phase-3-followup-fixes.md](../../../../docs/plans/audio-ui-phase-3-followup-fixes.md)
+     for a future deliberate decision (collapse the two yellows globally,
+     or accept the per-page tuning permanently). */
+  --audio-warn-fill: var(--audio-hot);
+  --audio-warn-soft: color-mix(in srgb, var(--audio-hot) 14%, transparent);
+  --audio-warn-border: color-mix(in srgb, var(--audio-hot) 50%, transparent);
+  --audio-warn-glow: color-mix(in srgb, var(--audio-hot) 6%, transparent);
+  --audio-warn-dot: var(--audio-hot);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -101,10 +120,10 @@
   gap: 12px;
   min-height: 38px;
   padding: 0 14px;
-  border: 1px solid color-mix(in srgb, var(--audio-hot) 38%, var(--audio-border));
+  border: 1px solid color-mix(in srgb, var(--audio-warn-fill) 38%, var(--audio-border));
   border-radius: 8px;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 14%, transparent), transparent),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-warn-fill) 14%, transparent), transparent),
     color-mix(in srgb, var(--color-surface-900) 92%, transparent);
 }
 

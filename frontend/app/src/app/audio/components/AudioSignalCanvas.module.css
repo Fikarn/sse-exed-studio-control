@@ -28,10 +28,10 @@
   gap: 12px;
   min-height: 38px;
   padding: 0 14px;
-  border: 1px solid color-mix(in srgb, var(--audio-hot) 38%, var(--audio-border));
+  border: 1px solid color-mix(in srgb, var(--audio-warn-fill) 38%, var(--audio-border));
   border-radius: 8px;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 14%, transparent), transparent),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-warn-fill) 14%, transparent), transparent),
     color-mix(in srgb, var(--color-surface-900) 92%, transparent);
   color: var(--color-text-muted);
   font: var(--font-weight-regular) 12px / 1.25 var(--font-family-ui);
@@ -44,7 +44,7 @@
   border-width: 0 0 1px;
   border-radius: 0;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 10%, transparent), transparent 50%),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-warn-fill) 10%, transparent), transparent 50%),
     color-mix(in srgb, var(--audio-canvas) 88%, var(--audio-panel) 12%);
   box-shadow: none;
 }
@@ -64,7 +64,7 @@
 }
 
 .warningBand strong {
-  color: var(--audio-hot);
+  color: var(--audio-warn-fill);
   font: var(--font-weight-semibold) 12px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -88,10 +88,10 @@
 .warningRecoveryActions button {
   min-height: 24px;
   padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--audio-hot) 55%, var(--audio-border));
+  border: 1px solid color-mix(in srgb, var(--audio-warn-fill) 55%, var(--audio-border));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--audio-hot) 8%, var(--audio-canvas));
-  color: var(--audio-hot);
+  background: color-mix(in srgb, var(--audio-warn-fill) 8%, var(--audio-canvas));
+  color: var(--audio-warn-fill);
   font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -296,10 +296,10 @@
   gap: 10px;
   min-height: 30px;
   padding: 0 10px 0 14px;
-  border: 1px solid color-mix(in srgb, var(--audio-hot) 44%, var(--audio-border));
+  border: 1px solid color-mix(in srgb, var(--audio-warn-fill) 44%, var(--audio-border));
   border-radius: 8px;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 14%, transparent), transparent),
+    linear-gradient(90deg, color-mix(in srgb, var(--audio-warn-fill) 14%, transparent), transparent),
     color-mix(in srgb, var(--color-surface-900) 82%, transparent);
 }
 
@@ -310,7 +310,7 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: var(--audio-hot);
+  background: var(--audio-warn-fill);
   color: #1a1500;
   font: var(--font-weight-semibold) 11px / 1 var(--font-family-display);
 }
@@ -323,8 +323,8 @@
   left: 0;
   width: 3px;
   border-radius: 8px 0 0 8px;
-  background: var(--audio-hot);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--audio-hot) 42%, transparent);
+  background: var(--audio-warn-fill);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--audio-warn-fill) 42%, transparent);
 }
 
 .canvasWarningBand[data-kind="clip"] {
@@ -342,7 +342,7 @@
 }
 
 .canvasWarningBand strong {
-  color: var(--audio-hot);
+  color: var(--audio-warn-fill);
   font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -362,7 +362,7 @@
 }
 
 .canvasWarningBand span b {
-  color: var(--audio-hot);
+  color: var(--audio-warn-fill);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -373,10 +373,10 @@
   min-height: 22px;
   max-width: 110px;
   padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--audio-hot) 46%, var(--audio-border));
+  border: 1px solid color-mix(in srgb, var(--audio-warn-fill) 46%, var(--audio-border));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--audio-hot) 12%, var(--audio-canvas));
-  color: var(--audio-hot);
+  background: color-mix(in srgb, var(--audio-warn-fill) 12%, var(--audio-canvas));
+  color: var(--audio-warn-fill);
   cursor: pointer;
   font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
   letter-spacing: 0;
@@ -389,10 +389,10 @@
 .canvasWarningBand > button:not(.canvasWarningChip) {
   min-height: 22px;
   padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--audio-hot) 55%, var(--audio-border));
+  border: 1px solid color-mix(in srgb, var(--audio-warn-fill) 55%, var(--audio-border));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--audio-hot) 8%, var(--audio-canvas));
-  color: var(--audio-hot);
+  background: color-mix(in srgb, var(--audio-warn-fill) 8%, var(--audio-canvas));
+  color: var(--audio-warn-fill);
   font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
