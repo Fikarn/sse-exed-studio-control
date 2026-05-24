@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the top-level engineering handoff for the repository as of `2026-05-20`.
+This is the top-level engineering handoff for the repository as of `2026-05-24`.
 
 Read this first before resuming product, release, or cleanup work. Use it as the entry point into the more detailed documents linked below.
 
@@ -17,6 +17,7 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - Responsive operator layout support landed in [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71) on `2026-05-03` (`4af7e8b8427cff78837054326478e1a67398154c`). Lighting now has logical CSS-pixel layout modes, mode-keyed column persistence, toolbar priority overflow, a narrow inspector drawer, separate stage zoom controls, shell-owned window layout persistence, and Scaled Studio Preview for current-hardware human review.
 - Lighting fixture catalog implementation landed after the responsive pass. The Rust engine now owns fixture definitions, mode/channel metadata, DMX mapping and validation, persistence compatibility, universe-aware patching, scene `controlValues`, and catalog snapshots. React renders catalog metadata and sends explicit commands only; it is not the source of truth for fixture/DMX policy. Verified catalog entries are selectable in the Add Fixture dialog; `research-needed` entries remain non-selectable tracking metadata.
 - Stage plot fixture identity implementation landed after the catalog pass. The engine-owned catalog now exposes additive visual metadata for existing fixture definitions, and React renders fixture family symbols, output footprints, live drag/rotation/value previews, render modes, and selected-scene previews from snapshots only. Fixture/device policy remains engine-owned; React does not own DMX footprint, persistence, or vendor behavior.
+- Audio Phase 3 gold-standard polish landed in 8 slices (`#88`–`#95`, 2026-05-23) plus a 35-item follow-up audit pass merged via [PR #97](https://github.com/Fikarn/sse-exed-studio-control/pull/97) on `2026-05-24`. The audio page now reads one warn yellow / one engaged amber / one talkback green, mini-graph and full-graph processing surfaces share a hardware-readout vocabulary, the Playback strips no longer read as hollow, Outputs Mute lives next to "Bus level" inside the bus panel, peak-hold readouts go neutral grey in the safe zone, and one full-width banner at most renders at the top of the workspace at any time. Plan checked in at [docs/plans/audio-phase-3-gold-standard-polish.md](docs/plans/audio-phase-3-gold-standard-polish.md); follow-up ledger at [docs/plans/audio-ui-phase-3-followup-fixes.md](docs/plans/audio-ui-phase-3-followup-fixes.md); honest scoring + closeout deltas in [docs/plans/audio-ui-gold-standard-progress.md](docs/plans/audio-ui-gold-standard-progress.md).
 - A one-way legacy-import path (`native/rust-engine/src/legacy_import.rs`) remains so that operators migrating from a pre-`v2.0.0` Electron installation can bring their old `db.json` forward on first native launch. This is the only legacy code that is intentionally retained.
 
 ## Start Here
@@ -211,6 +212,28 @@ Validation recorded for this pass:
 - `npm run frontend:playwright:test` passed: 42 tests.
 - `npm run tauri:visual:review -- --fixtures=setup-required,setup-degraded,audio-populated,planning-populated,lighting-populated,lighting-dmx-unreachable --sizes=2560x1440,1920x1080 --port=4174` passed with 12 screenshots and 0 failures; summary at `artifacts/visual/tauri-cutover/fixture-viewport-summary.json`.
 - Static typography scans found no remaining `font-family-sans`, raw `system-ui`/`sans-serif`/`monospace`, or nonzero/negative letter spacing in app/design-system source.
+
+### Audio Phase 3 gold-standard polish + 35-item follow-up audit
+
+Status: implemented in 9 PRs ([#88](https://github.com/Fikarn/sse-exed-studio-control/pull/88)–[#95](https://github.com/Fikarn/sse-exed-studio-control/pull/95), [#97](https://github.com/Fikarn/sse-exed-studio-control/pull/97)) on `2026-05-23`–`2026-05-24`.
+
+Important facts for future sessions:
+
+- The Phase 3 plan is checked in at [docs/plans/audio-phase-3-gold-standard-polish.md](./plans/audio-phase-3-gold-standard-polish.md) with a provenance note. The 35-item follow-up ledger that audited Phase 3 vs. delivered is at [docs/plans/audio-ui-phase-3-followup-fixes.md](./plans/audio-ui-phase-3-followup-fixes.md). The honest closeout deltas across Phase 2 and Phase 3 live in [docs/plans/audio-ui-gold-standard-progress.md](./plans/audio-ui-gold-standard-progress.md) under "Phase 3 closeout deltas" + "Phase 3 Validation Log".
+- The audio page now uses a deliberate two-tier semantic vocabulary: `--audio-warn-fill` (warn yellow, demands action) and `--audio-engaged-fill` (warm amber, persistent engaged state). Two pre-existing near-identical yellows (`--audio-hot`, `--audio-solo`) collapsed to one warn token — every SOLO surface, OSC warning band, and clip indicator now reads through `--audio-warn-fill`. The `--audio-warn-fill` resolution is overridden locally inside `.audioShell` to keep the audio page's tuned `#ffd33d` while leaving `brand.yellow` (`#E8D561`) intact for Lighting / Planning.
+- `AudioHardwareReadout` is a CSS-only wrapper for short value badges only (Outputs Bus level, Rail Monitor level, inspector Send-to-bus). The full EQ and Dynamics graphs share the same amber-backlight vocabulary at the CSS level (`::after` pseudo-elements on `.eqGraphFull` / `.dynamicsGraphFull`) — wrapping the graphs in the component would paint a bezel-in-bezel against their grid backgrounds. The inspector small preamp is deliberately not wrapped for the same reason (it's already a fully-skeuomorphic raster element).
+- Talkback active state stays on `--audio-talk` green (broadcast convention for talkback "go"), even though the Slice 2 plan listed it under engaged amber. Recorded as a motivated deviation in [docs/plans/audio-ui-phase-3-followup-fixes.md](./plans/audio-ui-phase-3-followup-fixes.md) under D12.
+- The TALENT identity badge stays on `--audio-group-talent` ochre — it's part of the per-group color palette (talent / line / bed / fx / remote each have a distinct color), not part of the yellow overload Slice 2 was reducing. Recorded as a motivated deviation under D13.
+- `AudioToolbar.tsx` is dead code (not mounted in any active layout — preserved for a future toolbar re-mount under the GS-AUD-44 precedent). Any feature that needs to render on the toolbar surface should add the JSX to the live host in `AudioRail.tsx` instead. The Slice 7 status dot was originally added to the dead component; the follow-up moved its live render site to `AudioRail.tsx`.
+- The "Rescope protocol (sliced plans)" section in [AGENTS.md](../AGENTS.md) is the canonical rule for handling plan divergences: edit the plan doc + re-number/rename the slice + open a follow-up item, instead of silently substituting different work under the same slice number. Phase 3 Slice 4 and Slice 6 are the case study.
+
+Validation recorded for the follow-up pass:
+
+- `npm run frontend:typecheck` passed across all workspaces.
+- `npm run frontend:playwright:test` passed: **160 / 160 specs** (was 144 before Phase 3 follow-up; +16 new specs in `frontend/app/tests/audio-phase-3-followups.spec.ts`).
+- Live Tauri shell visual verification via a 27-step operator checklist (recorded in the 2026-05-24 session transcript) — all surfaces verified at `2560×1440` Scaled Studio Preview.
+- Open follow-ups carried forward: a pixel-diff acceptance step for `tauri:visual:review` (currently only asserts `fitsViewport`).
+- Obsolete branch carried on origin: `claude/audio-meter-phase-2` is a 2026-05-20 checkpoint of an earlier Phase 1b audio meter architecture (`audio_backend.rs` refactor, protocol changes, `LiveAudioStereoMeter` + `meterStore` split, ballistics module). It sits 21,988 lines BEHIND main and removes `rme_totalmix_osc.rs` which the shipping engine depends on — Phase 2 took the meter architecture in a different direction. Safe to delete or tag-and-archive; not landable on current main without redoing the entire Phase 2 close-out on top.
 
 ## Validation Baseline
 
