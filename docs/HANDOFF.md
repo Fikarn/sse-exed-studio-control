@@ -232,7 +232,8 @@ Validation recorded for the follow-up pass:
 - `npm run frontend:typecheck` passed across all workspaces.
 - `npm run frontend:playwright:test` passed: **160 / 160 specs** (was 144 before Phase 3 follow-up; +16 new specs in `frontend/app/tests/audio-phase-3-followups.spec.ts`).
 - Live Tauri shell visual verification via a 27-step operator checklist (recorded in the 2026-05-24 session transcript) — all surfaces verified at `2560×1440` Scaled Studio Preview.
-- Open follow-ups carried forward: `claude/audio-meter-phase-2` branch (Phase 1b audio meter architecture handoff, 1,381 lines across 24 files including engine `audio_backend.rs`, protocol changes, and a `meterStore` split — kept on origin pending the operator's decision on whether to land or archive it); a pixel-diff acceptance step for `tauri:visual:review` (currently only asserts `fitsViewport`).
+- Open follow-ups carried forward: a pixel-diff acceptance step for `tauri:visual:review` (currently only asserts `fitsViewport`).
+- Obsolete branch carried on origin: `claude/audio-meter-phase-2` is a 2026-05-20 checkpoint of an earlier Phase 1b audio meter architecture (`audio_backend.rs` refactor, protocol changes, `LiveAudioStereoMeter` + `meterStore` split, ballistics module). It sits 21,988 lines BEHIND main and removes `rme_totalmix_osc.rs` which the shipping engine depends on — Phase 2 took the meter architecture in a different direction. Safe to delete or tag-and-archive; not landable on current main without redoing the entire Phase 2 close-out on top.
 
 ## Validation Baseline
 
