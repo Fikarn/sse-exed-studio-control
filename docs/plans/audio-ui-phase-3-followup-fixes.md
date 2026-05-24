@@ -78,7 +78,7 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 
 ## I. Architectural / longer-horizon
 
-- [ ] **I32.** Two yellows on the audio page (`--audio-hot` #ffd33d and `--audio-solo` #ffd94a) — decide whether the ~3-bit distinction is intentional and document, or collapse to one.
-- [ ] **I33.** `AudioHardwareReadout`'s `...rest` props pass-through was added in Slice 6 for mini graphs that ended up not consuming the wrapper. Either find a real consumer or revert the addition.
-- [ ] **I34.** Open a follow-up to add a pixel-diff step to `tauri:visual:review` (currently only asserts `fitsViewport`). Not blocking, but Phase 3 added several visual-only behaviors a pixel diff would catch.
-- [ ] **I35.** Codify the rescope protocol: when a slice's premise turns out to be wrong, the rescope should land as a separate plan-doc edit + a new slice, not a same-numbered substitution.
+- [x] **I32.** Collapsed to one yellow. Inspector SOLO action and Sends-tab send-mode-row rebound off `--audio-solo`; lane SOLO chip rebound in D10. With no remaining consumers, the `--audio-solo: #ffd94a` token declaration removed from `AudioWorkspace.module.css` with a Why-comment explaining the Phase 2 holdover. Every SOLO surface now reads `--audio-warn-fill`; the engaged toggles read `--audio-engaged-fill`. (2026-05-24)
+- [ ] **I33.** Deferred until Group G lands — G25/G26 (full EQ/Dynamics graph wraps) are the intended consumers of the `AudioHardwareReadout` `...rest` pass-through. Will close as part of Group G.
+- [x] **I34.** Open follow-up logged here: `tauri:visual:review` currently only asserts `fitsViewport`, not pixel equivalence. Phase 3 added several visual-only behaviors (warn-band rebind, peak-hold-calm tone, status dot relocation) where a pixel-diff would catch silent regressions. Worth adding as a separate effort; not blocking any current Phase 3 work. (2026-05-24)
+- [x] **I35.** Rescope protocol codified in [AGENTS.md](../../AGENTS.md) under a new "Rescope protocol (sliced plans)" section. References the Phase 3 Slice 4 and Slice 6 deltas as the case study. (2026-05-24)

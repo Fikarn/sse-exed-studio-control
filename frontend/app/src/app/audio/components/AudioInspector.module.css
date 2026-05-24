@@ -428,10 +428,15 @@
   color: var(--audio-engaged-fill);
 }
 
+/* Inspector SOLO action button bound to --audio-warn-fill so the inspector
+   and the lane SOLO chip use the exact same yellow (D10 moved the lane chip
+   off the legacy --audio-solo literal). Recorded as part of item I32
+   (collapse the two near-identical yellows). The local --audio-warn-fill
+   override in .audioShell resolves to --audio-hot. */
 .inspectorActionRow button[data-control="solo"][data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-solo) 55%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-solo) 18%, var(--audio-panel));
-  color: var(--audio-solo);
+  border-color: color-mix(in srgb, var(--audio-warn-fill) 55%, var(--audio-border));
+  background: color-mix(in srgb, var(--audio-warn-fill) 18%, var(--audio-panel));
+  color: var(--audio-warn-fill);
 }
 
 .inspectorButtonGrid button[data-control="mute"][data-active="true"],

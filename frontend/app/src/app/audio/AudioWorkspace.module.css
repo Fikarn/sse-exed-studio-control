@@ -17,7 +17,13 @@
   --audio-hot: #ffd33d;
   --audio-clip: #ff2d2d;
   --audio-mute: #ff7d55;
-  --audio-solo: #ffd94a;
+  /* --audio-solo (#ffd94a) was removed 2026-05-24 (item I32 in
+     audio-ui-phase-3-followup-fixes.md). After Slice 2 closeout A (warn-band
+     rebind) and the I32 SOLO-chip / send-mode-row rebinds, every consumer
+     reads either --audio-warn-fill (warn yellow) or --audio-engaged-fill
+     (engaged amber). #ffd94a was visually indistinguishable from
+     --audio-hot (#ffd33d) at studio distance — the two-yellow split was a
+     Phase 2 holdover, not an intentional palette decision. */
   --audio-talk: #74e3a3;
   --audio-tier-accent: var(--audio-tier-outputs);
   --audio-lane-accent: var(--audio-tier-accent);
