@@ -93,6 +93,22 @@ export function AudioInspectorDynamicsTab({
         data-testid="audio-dynamics-curve"
         aria-hidden="true"
       >
+        {/* Phase 3 follow-up G28: always-visible -60 / 0 dB axis cues so a
+            bypassed 1:1 curve doesn't read as "no data" — the axes are
+            calibrated and labelled regardless of whether the compressor
+            is engaged. */}
+        <span className={tabStyles.dynamicsAxisLabel} data-axis-position="top-left">
+          0 dB
+        </span>
+        <span className={tabStyles.dynamicsAxisLabel} data-axis-position="top-right">
+          0 dB
+        </span>
+        <span className={tabStyles.dynamicsAxisLabel} data-axis-position="bottom-left">
+          -60 dB
+        </span>
+        <span className={tabStyles.dynamicsAxisLabel} data-axis-position="bottom-right">
+          -60 dB
+        </span>
         <svg viewBox="0 0 100 100" preserveAspectRatio="none">
           <path d={dynamicsCurve} />
           <circle cx={dynamicsCurvePoint.x} cy={dynamicsCurvePoint.y} r="3" />
@@ -101,6 +117,25 @@ export function AudioInspectorDynamicsTab({
           data-active={selectedChannel.dynamics.gate.enabled}
           style={{ "--dynamics-gate-x": `${gateThresholdX}%` } as CSSProperties}
         />
+      </div>
+      {/* Phase 3 follow-up G27: monospace Threshold/Ratio/Makeup readout
+          cluster — three at-rest facts that name the compressor's current
+          curve in numerals, so the graph and the numbers reinforce each
+          other. Data from selectedChannel.dynamics.compressor; no engine
+          change required. */}
+      <div className={tabStyles.dynamicsReadoutCluster} data-testid="audio-dynamics-readout-cluster">
+        <span>
+          <small>Threshold</small>
+          <strong>{selectedChannel.dynamics.compressor.thresholdDb.toFixed(0)} dB</strong>
+        </span>
+        <span>
+          <small>Ratio</small>
+          <strong>{selectedChannel.dynamics.compressor.ratio.toFixed(1)}:1</strong>
+        </span>
+        <span>
+          <small>Makeup</small>
+          <strong>+{selectedChannel.dynamics.compressor.makeupDb.toFixed(1)} dB</strong>
+        </span>
       </div>
       <div className={eqStyles.graphRangeRow} data-testid="audio-dynamics-range">
         <span>Gate {selectedChannel.dynamics.gate.thresholdDb.toFixed(0)} dB</span>

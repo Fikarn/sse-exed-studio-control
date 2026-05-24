@@ -22,6 +22,7 @@
   position: relative;
   display: inline-flex;
   align-items: baseline;
+  padding: 6px 10px;
   border: 1px solid color-mix(in srgb, var(--audio-border-strong) 80%, transparent);
   border-radius: 6px;
   background: var(--audio-canvas);
@@ -52,20 +53,4 @@
   align-items: baseline;
   gap: 4px;
   min-width: 0;
-}
-
-.hardwareReadout[data-variant="display"] {
-  display: block;
-}
-
-.hardwareReadout[data-variant="display"] .hardwareReadoutContent {
-  display: block;
-}
-
-/* Default padding for the "readout" variant — value badges sized to wrap a
-   short dB number with comfortable air. The "display" variant is left to
-   the caller because graph canvases need to fill their parent without
-   forced padding. */
-.hardwareReadout[data-variant="readout"] {
-  padding: 6px 10px;
 }

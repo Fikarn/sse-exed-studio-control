@@ -23,6 +23,32 @@
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.54);
 }
 
+/* Phase 3 follow-up G25: amber LED-style backlight pseudo-element so the
+   full EQ graph shares the same hardware vocabulary the Slice 5
+   AudioHardwareReadout wrapper establishes for level readouts. Mirrors the
+   Slice 6 mini-graph treatment in AudioInspector.module.css. Z-index 0 so
+   the SVG path / handles / value badge (z-index 1+) paint above. */
+.eqGraphFull::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    110% 75% at 50% 92%,
+    color-mix(in srgb, var(--audio-engaged-glow) 80%, transparent),
+    transparent 70%
+  );
+}
+
+/* G23: response curve at 30% opacity when the EQ section is bypassed. The
+   graph is still rendered (so the operator can see what the EQ would do
+   if engaged), but the visual weight backs off — reads as "armed but
+   inactive" instead of competing with active controls. */
+.eqGraphFull[data-eq-enabled="false"] svg path {
+  opacity: 0.3;
+}
+
 .eqGraphFull svg {
   position: relative;
   z-index: 2;
@@ -180,6 +206,18 @@
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.66),
     0 0 18px color-mix(in srgb, var(--audio-hot) 46%, transparent);
+}
+
+/* G24: ghosted handle treatment when the EQ section is bypassed or the
+   band has no audible effect (|gainDb| < 0.05). Selected state still
+   reads through the box-shadow above, so ghosted + selected is a valid
+   composite (the operator can interact with a ghosted band to add gain). */
+.eqPoint[data-ghost="true"]:not([data-selected="true"]) {
+  border-color: color-mix(in srgb, var(--audio-accent) 30%, var(--audio-border));
+  background:
+    radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.08), transparent 36%),
+    color-mix(in srgb, var(--audio-panel-strong) 88%, var(--audio-accent) 8%);
+  opacity: 0.55;
 }
 
 .eqLowCutPoint {

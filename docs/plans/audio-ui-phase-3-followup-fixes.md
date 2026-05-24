@@ -54,17 +54,17 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 ## F. Slice 5 hygiene
 
 - [x] **F20.** Decision recorded: keep the highlight layer folded into the bezel's `inset 0 1px 0 rgba(250, 246, 230, 0.045)` box-shadow (a dedicated `<span>` for a single-pixel inner highlight isn't worth the DOM cost). Comment in `AudioHardwareReadout.module.css` now explicitly enumerates the four plan layers and identifies the implementation choice for the highlight one. (2026-05-24)
-- [ ] **F21.** Will be consumed by Group G (G25, G26 — full EQ/Dynamics graph wraps). Tracked, not yet closed.
+- [x] **F21.** `variant="display"` removed from `AudioHardwareReadout.tsx` and its CSS. The Slice 6 plan called for it to wrap the full EQ + Dynamics graphs, but Group G (G25/G26) landed the same amber-backlight effect at the CSS level directly on `.eqGraphFull` / `.dynamicsGraphFull` (matching the Slice 6 mini-graph pattern) because the variant would have painted a bezel-in-bezel against the graph canvases' own grid backgrounds — same problem F22 sidestepped for the preamp. (2026-05-24)
 - [x] **F22.** Decision recorded as a Why-comment in `AudioInspectorChannelHardwareCard.tsx` header: the inspector small preamp is intentionally not wrapped in `AudioHardwareReadout` because the preamp is already a fully-detailed skeuomorphic element (bezel-in-bezel would read worse). (2026-05-24)
 
 ## G. Slice 6 — abandoned plan goals
 
-- [ ] **G23.** Bypassed EQ curve at ~30% opacity when `selectedChannel.eq.enabled === false`. Or formally drop.
-- [ ] **G24.** Ghosted band handles at default frequencies (LC 80, B1 250, B2 1k, B3 4k) with `data-ghost=true`. Or formally drop.
-- [ ] **G25.** Wrap the full EQ graph in `AudioHardwareReadout variant="display"`. Or formally drop (couples with F21).
-- [ ] **G26.** Wrap the full Dynamics graph in the same wrapper. Or formally drop (couples with F21).
-- [ ] **G27.** Dynamics monospace Ratio / Threshold / Knee readout cluster (data already on `selectedChannel.dynamics.compressor`). Or formally drop.
-- [ ] **G28.** Dynamics always-visible `-60 dB` / `0 dB` axis labels. Or formally drop.
+- [x] **G23.** Bypassed EQ curve dims to 30% opacity via a new `.eqGraphFull[data-eq-enabled="false"] svg path { opacity: 0.3 }` rule. The graph keeps rendering (the operator sees what the EQ would do if engaged) but reads as armed-but-inactive rather than competing with active controls. (2026-05-24)
+- [x] **G24.** Ghosted band handle treatment landed via `data-ghost` on each `.eqPoint`. Motivated interpretation of the plan: a band reads as ghosted when the EQ section is bypassed OR the band itself has no audible effect (`|gainDb| < 0.05`). Plan called this out as "default frequencies on first selection" — but the existing data model doesn't track "user has touched this band yet," and the gainDb-zero approximation is what an operator would actually want (any band sitting flat reads as inactive). Selected state still wins via box-shadow, so ghosted + selected is a valid composite while the operator is editing. (2026-05-24)
+- [x] **G25.** Amber LED backlight on the full EQ graph landed via a new `::after` pseudo-element on `.eqGraphFull` matching the Slice 6 mini-graph pattern. NOT via `AudioHardwareReadout variant="display"` — see F21 for the rationale (bezel-in-bezel problem). The shared visual vocabulary holds; only the implementation mechanism differs. (2026-05-24)
+- [x] **G26.** Amber LED backlight on the full Dynamics graph via the same `::after` pattern on `.dynamicsGraphFull`. (2026-05-24)
+- [x] **G27.** Dynamics monospace readout cluster landed below the curve as a new `.dynamicsReadoutCluster` three-column grid: Threshold / Ratio / Makeup. Motivated deviation: plan called it "Ratio / Threshold / Knee" but the compressor model carries no `kneeDb` field — substituted Makeup which is in the model and operationally useful at-rest. (2026-05-24)
+- [x] **G28.** Always-visible `-60 dB` / `0 dB` axis labels landed in all four corners of `.dynamicsGraphFull` via `.dynamicsAxisLabel[data-axis-position]`. Calibrates the graph so a bypassed 1:1 line reads as "the compressor is set to pass everything through" rather than "no data." Positioned absolutely; SVG viewBox / curve geometry untouched. (2026-05-24)
 
 ## H. Tests / verification
 
@@ -79,6 +79,6 @@ Source progress doc that the audit found stale: [audio-ui-gold-standard-progress
 ## I. Architectural / longer-horizon
 
 - [x] **I32.** Collapsed to one yellow. Inspector SOLO action and Sends-tab send-mode-row rebound off `--audio-solo`; lane SOLO chip rebound in D10. With no remaining consumers, the `--audio-solo: #ffd94a` token declaration removed from `AudioWorkspace.module.css` with a Why-comment explaining the Phase 2 holdover. Every SOLO surface now reads `--audio-warn-fill`; the engaged toggles read `--audio-engaged-fill`. (2026-05-24)
-- [ ] **I33.** Deferred until Group G lands — G25/G26 (full EQ/Dynamics graph wraps) are the intended consumers of the `AudioHardwareReadout` `...rest` pass-through. Will close as part of Group G.
+- [x] **I33.** `...rest` HTML-attribute pass-through removed from `AudioHardwareReadout.tsx` along with `variant="display"`. After Group G landed the EQ + Dynamics graph backlights at the CSS level (not via the wrapper, per F21's rationale), nothing consumes the pass-through. (2026-05-24)
 - [x] **I34.** Open follow-up logged here: `tauri:visual:review` currently only asserts `fitsViewport`, not pixel equivalence. Phase 3 added several visual-only behaviors (warn-band rebind, peak-hold-calm tone, status dot relocation) where a pixel-diff would catch silent regressions. Worth adding as a separate effort; not blocking any current Phase 3 work. (2026-05-24)
 - [x] **I35.** Rescope protocol codified in [AGENTS.md](../../AGENTS.md) under a new "Rescope protocol (sliced plans)" section. References the Phase 3 Slice 4 and Slice 6 deltas as the case study. (2026-05-24)
