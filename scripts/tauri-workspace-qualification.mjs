@@ -170,6 +170,16 @@ function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath, update
 // software rendering. The qualification CI job (plan PR 2b) sets this.
 const DEFAULT_WAIT_TIMEOUT_MS = Number(process.env.SSE_TAURI_QUALIFICATION_TIMEOUT_MS ?? 40_000);
 
+// Mirror of `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC` (added in plan PR 2 for
+// the native:acceptance lane): when set, the workspace qualification skips
+// the audio-mutation block + the post-restart audio-state assertions because
+// `audioSnapshot?.verified` only flips true after real RME TotalMix OSC
+// packets arrive on the receive port, and stock GitHub runners have no
+// TotalMix. Lighting + planning round-trips still execute. The CI
+// qualification job sets this; local laptop runs without the env var
+// continue to require live TotalMix exactly as before.
+const SKIP_AUDIO_PROBE = process.env.SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE === "1";
+
 async function waitForStatus({ child, label, predicate, statusPath, timeoutMs = DEFAULT_WAIT_TIMEOUT_MS }) {
   const deadline = Date.now() + timeoutMs;
   let lastStatus = null;
@@ -436,75 +446,88 @@ async function runWorkspaceQualification() {
     });
     assertWorkspaceReady(audioWorkspace.status, "audio");
     const audioSnapshot = audioWorkspace.status.shellState.audioSnapshot;
-    assert(audioSnapshot?.verified === true, "Expected audio probe to make live audio snapshot verified.");
-    const audioChannel =
-      asArray(audioSnapshot?.channels).find((entry) => entry?.role === "front-preamp") ??
-      asArray(audioSnapshot?.channels)[0];
-    const audioMixTarget =
-      asArray(audioSnapshot?.mixTargets).find((entry) => entry?.id !== audioSnapshot.selectedMixTargetId) ??
-      asArray(audioSnapshot?.mixTargets)[0];
-    const audioRecallSnapshot = asArray(audioSnapshot?.snapshots)[0];
-    assert(audioChannel?.id, "Expected live audio snapshot to expose at least one channel.");
-    assert(audioMixTarget?.id, "Expected live audio snapshot to expose at least one mix target.");
-    assert(audioRecallSnapshot?.id, "Expected live audio snapshot to expose at least one recall snapshot.");
-    audioChannelId = audioChannel.id;
-    audioMixTargetId = audioMixTarget.id;
-    audioSnapshotId = audioRecallSnapshot.id;
 
-    const audioSync = await dispatchCommand(firstSession, firstRun, "syncAudio");
-    assert(
-      audioSync.status.shellState.audioSnapshot?.consoleStateConfidence === "aligned",
-      "Expected live audio sync to align console state."
-    );
+    if (SKIP_AUDIO_PROBE) {
+      console.log(
+        "Skipping audio mutation block (SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1); no RME TotalMix on this host."
+      );
+      evidence.recordCheck("audio-live-mutations-skipped", {
+        reason: "audio-probe-disabled",
+      });
+    } else {
+      assert(audioSnapshot?.verified === true, "Expected audio probe to make live audio snapshot verified.");
+      const audioChannel =
+        asArray(audioSnapshot?.channels).find((entry) => entry?.role === "front-preamp") ??
+        asArray(audioSnapshot?.channels)[0];
+      const audioMixTarget =
+        asArray(audioSnapshot?.mixTargets).find((entry) => entry?.id !== audioSnapshot.selectedMixTargetId) ??
+        asArray(audioSnapshot?.mixTargets)[0];
+      const audioRecallSnapshot = asArray(audioSnapshot?.snapshots)[0];
+      assert(audioChannel?.id, "Expected live audio snapshot to expose at least one channel.");
+      assert(audioMixTarget?.id, "Expected live audio snapshot to expose at least one mix target.");
+      assert(audioRecallSnapshot?.id, "Expected live audio snapshot to expose at least one recall snapshot.");
+      audioChannelId = audioChannel.id;
+      audioMixTargetId = audioMixTarget.id;
+      audioSnapshotId = audioRecallSnapshot.id;
 
-    const audioSettings = await dispatchCommand(firstSession, firstRun, "updateAudioSettings", {
-      request: {
-        selectedChannelId: audioChannelId,
-        selectedMixTargetId: audioMixTargetId,
-      },
-    });
-    assert(
-      audioSettings.status.shellState.audioSnapshot?.selectedChannelId === audioChannelId,
-      "Expected live audio selected channel setting to round-trip."
-    );
-    assert(
-      audioSettings.status.shellState.audioSnapshot?.selectedMixTargetId === audioMixTargetId,
-      "Expected live audio selected mix target setting to round-trip."
-    );
+      const audioSync = await dispatchCommand(firstSession, firstRun, "syncAudio");
+      assert(
+        audioSync.status.shellState.audioSnapshot?.consoleStateConfidence === "aligned",
+        "Expected live audio sync to align console state."
+      );
 
-    const audioChannelUpdate = await dispatchCommand(firstSession, firstRun, "updateAudioChannel", {
-      request: {
+      const audioSettings = await dispatchCommand(firstSession, firstRun, "updateAudioSettings", {
+        request: {
+          selectedChannelId: audioChannelId,
+          selectedMixTargetId: audioMixTargetId,
+        },
+      });
+      assert(
+        audioSettings.status.shellState.audioSnapshot?.selectedChannelId === audioChannelId,
+        "Expected live audio selected channel setting to round-trip."
+      );
+      assert(
+        audioSettings.status.shellState.audioSnapshot?.selectedMixTargetId === audioMixTargetId,
+        "Expected live audio selected mix target setting to round-trip."
+      );
+
+      const audioChannelUpdate = await dispatchCommand(firstSession, firstRun, "updateAudioChannel", {
+        request: {
+          channelId: audioChannelId,
+          mute: true,
+        },
+      });
+      const updatedAudioChannel = findById(
+        audioChannelUpdate.status.shellState.audioSnapshot?.channels,
+        audioChannelId
+      );
+      assert(updatedAudioChannel?.mute === true, "Expected live audio channel mute update to round-trip.");
+
+      const audioTargetUpdate = await dispatchCommand(firstSession, firstRun, "updateAudioMixTarget", {
+        request: {
+          dim: true,
+          mixTargetId: audioMixTargetId,
+        },
+      });
+      const updatedAudioTarget = findById(
+        audioTargetUpdate.status.shellState.audioSnapshot?.mixTargets,
+        audioMixTargetId
+      );
+      assert(updatedAudioTarget?.dim === true, "Expected live audio mix target dim update to round-trip.");
+
+      const audioRecall = await dispatchCommand(firstSession, firstRun, "recallAudioSnapshot", {
+        snapshotId: audioSnapshotId,
+      });
+      assert(
+        audioRecall.status.shellState.audioSnapshot?.lastRecalledSnapshotId === audioSnapshotId,
+        "Expected live audio snapshot recall to update lastRecalledSnapshotId."
+      );
+      evidence.recordCheck("audio-live-mutations-round-trip", {
         channelId: audioChannelId,
-        mute: true,
-      },
-    });
-    const updatedAudioChannel = findById(audioChannelUpdate.status.shellState.audioSnapshot?.channels, audioChannelId);
-    assert(updatedAudioChannel?.mute === true, "Expected live audio channel mute update to round-trip.");
-
-    const audioTargetUpdate = await dispatchCommand(firstSession, firstRun, "updateAudioMixTarget", {
-      request: {
-        dim: true,
         mixTargetId: audioMixTargetId,
-      },
-    });
-    const updatedAudioTarget = findById(
-      audioTargetUpdate.status.shellState.audioSnapshot?.mixTargets,
-      audioMixTargetId
-    );
-    assert(updatedAudioTarget?.dim === true, "Expected live audio mix target dim update to round-trip.");
-
-    const audioRecall = await dispatchCommand(firstSession, firstRun, "recallAudioSnapshot", {
-      snapshotId: audioSnapshotId,
-    });
-    assert(
-      audioRecall.status.shellState.audioSnapshot?.lastRecalledSnapshotId === audioSnapshotId,
-      "Expected live audio snapshot recall to update lastRecalledSnapshotId."
-    );
-    evidence.recordCheck("audio-live-mutations-round-trip", {
-      channelId: audioChannelId,
-      mixTargetId: audioMixTargetId,
-      snapshotId: audioSnapshotId,
-    });
+        snapshotId: audioSnapshotId,
+      });
+    }
 
     const planningWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
       workspaceId: "planning",
@@ -606,18 +629,20 @@ async function runWorkspaceQualification() {
       restartStatus.shellState.lightingSnapshot?.lastRecalledSceneId === lightingRecalledSceneId,
       "Expected restarted Tauri runtime to preserve the recalled lighting scene."
     );
-    assert(
-      restartStatus.shellState.audioSnapshot?.selectedChannelId === audioChannelId,
-      "Expected restarted Tauri runtime to preserve selected audio channel."
-    );
-    assert(
-      restartStatus.shellState.audioSnapshot?.selectedMixTargetId === audioMixTargetId,
-      "Expected restarted Tauri runtime to preserve selected audio mix target."
-    );
-    assert(
-      restartStatus.shellState.audioSnapshot?.lastRecalledSnapshotId === audioSnapshotId,
-      "Expected restarted Tauri runtime to preserve last recalled audio snapshot."
-    );
+    if (!SKIP_AUDIO_PROBE) {
+      assert(
+        restartStatus.shellState.audioSnapshot?.selectedChannelId === audioChannelId,
+        "Expected restarted Tauri runtime to preserve selected audio channel."
+      );
+      assert(
+        restartStatus.shellState.audioSnapshot?.selectedMixTargetId === audioMixTargetId,
+        "Expected restarted Tauri runtime to preserve selected audio mix target."
+      );
+      assert(
+        restartStatus.shellState.audioSnapshot?.lastRecalledSnapshotId === audioSnapshotId,
+        "Expected restarted Tauri runtime to preserve last recalled audio snapshot."
+      );
+    }
     assert(
       asArray(restartStatus.shellState.planningSnapshot?.projects).some(
         (entry) => entry?.title === planningProjectTitle

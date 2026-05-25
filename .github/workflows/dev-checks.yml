@@ -192,6 +192,13 @@ jobs:
       # (and fail) to probe a DRI3 device under xvfb. Without this, the
       # engine's first health snapshot is delayed by the libEGL fallback.
       LIBGL_ALWAYS_SOFTWARE: "1"
+      # Mirror of B3's `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC`. CI runners
+      # have no RME TotalMix on 127.0.0.1, so the workspace qualification's
+      # `audioSnapshot.verified === true` assertion (and the post-restart
+      # audio-state checks) would always fail. Skipping that block keeps
+      # the lighting + planning + restart parity assertions intact. Local
+      # runs without this env var still require live TotalMix.
+      SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE: "1"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
