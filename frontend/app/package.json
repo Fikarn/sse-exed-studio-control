@@ -7,6 +7,8 @@
     "build": "tsc -p tsconfig.app.json && vite build",
     "dev": "vite",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest --passWithNoTests",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build",
