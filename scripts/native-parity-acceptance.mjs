@@ -782,7 +782,19 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     /could not bind receive port/i.test(audioCheck.message) &&
     /operation not permitted/i.test(audioCheck.message);
 
-  if (!audioProbeBindDenied) {
+  // CI escape: stock GitHub runners have no RME TotalMix OSC source, so the
+  // probe successfully binds 7001/9001 but never receives meter packets and
+  // fails with "No RME TotalMix OSC meter packets were received…". The
+  // `audioProbeBindDenied` escape above only covers sandboxed-bind failures,
+  // not the no-traffic case. Operators set this env var in their CI workflow
+  // (see `.github/workflows/dev-checks.yml` `native-acceptance` job) to drop
+  // only the audio.sync / audio.snapshot.recall assertions; the rest of the
+  // harness (import → backup → restart → workflow parity → restore → verify
+  // rollback) still runs end-to-end. Local laptop runs without the env var
+  // continue to require live TotalMix exactly as before.
+  const skipAudioSync = process.env.SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC === "1";
+
+  if (!audioProbeBindDenied && !skipAudioSync) {
     assert(
       audioCheck.status === "passed",
       `${runtimeLabel} commissioning audio probe did not pass before sync/recall validation: ${audioCheck.message}`
@@ -814,9 +826,11 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
   assert(
     mutatedSnapshot.selectedChannelId === "audio-input-12" &&
       mutatedSnapshot.selectedMixTargetId === "audio-mix-phones-a" &&
-      mutatedSnapshot.consoleStateConfidence === (audioProbeBindDenied ? "aligned" : "assumed") &&
-      mutatedSnapshot.lastConsoleSyncReason === (audioProbeBindDenied ? null : "snapshot") &&
-      mutatedSnapshot.lastRecalledSnapshotId === (audioProbeBindDenied ? null : "snapshot-panel"),
+      // `skipAudioSync` mirrors the bind-denied skip path because both bypass
+      // the audio.sync + audio.snapshot.recall block above.
+      mutatedSnapshot.consoleStateConfidence === (audioProbeBindDenied || skipAudioSync ? "aligned" : "assumed") &&
+      mutatedSnapshot.lastConsoleSyncReason === (audioProbeBindDenied || skipAudioSync ? null : "snapshot") &&
+      mutatedSnapshot.lastRecalledSnapshotId === (audioProbeBindDenied || skipAudioSync ? null : "snapshot-panel"),
     `${runtimeLabel} audio snapshot did not retain the expected selection and recall markers.`
   );
   assert(

@@ -1,0 +1,27 @@
+name: Setup Tauri Linux build deps
+description: |
+  Install the apt packages required to compile the Tauri 2 shell on
+  ubuntu-latest. Shared by every CI job that touches `cargo` for the
+  `sse-exed-tauri-shell` crate (rust, native-acceptance, tauri-foundation,
+  qualification) so the dep list stays defined in one place.
+
+  Pairs with `Swatinem/rust-cache@v2`: the action itself only installs system
+  libraries — Cargo cache + rust toolchain stay in the caller's workflow.
+
+runs:
+  using: composite
+  steps:
+    - name: apt-get install Tauri 2 dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          curl \
+          file \
+          libayatana-appindicator3-dev \
+          librsvg2-dev \
+          libssl-dev \
+          libwebkit2gtk-4.1-dev \
+          libxdo-dev \
+          wget
