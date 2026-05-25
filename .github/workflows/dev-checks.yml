@@ -56,6 +56,22 @@ jobs:
       - run: npm ci
       - run: npm run frontend:typecheck
 
+  # plan PR 4 / workstream D1: Vitest unit + component tests across the
+  # frontend workspaces. Currently passes-with-no-tests because the suites
+  # land in subsequent plan PRs (D2, D3, D6); the job exists now so the
+  # very first vitest test added in a follow-up doesn't have to also wire
+  # up CI.
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run frontend:test
+
   # plan PR 1 / workstream B1 + B2 (consolidated).
   # `frontend:playwright:test` now includes the `visual-review.spec.ts`
   # baseline diff (workstream A1), so this single job covers both the

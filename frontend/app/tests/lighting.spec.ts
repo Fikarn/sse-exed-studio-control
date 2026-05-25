@@ -1,0 +1,586 @@
+import { expect, test } from "@playwright/test";
+
+import { expectNoDocumentScroll } from "./helpers/geometry";
+import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
+import { modifierShortcut } from "./helpers/modifier-shortcut";
+import { openFixture } from "./helpers/openFixture";
+
+// plan PR 4 / workstream D4: lighting workspace specs split out of
+// operator-shell.spec.ts. Covers the snapshot loading posture, fixture
+// snapshot rendering, layout responsiveness across viewport sizes,
+// scaled-studio-preview entry, preview mode, palette pools, patch mode,
+// view bookmarks, drag-lasso multi-select, fixture nudge/drag/rotate,
+// DMX monitor expand, and DMX-unreachable + blackout posture.
+
+test("renders the lighting snapshot loading posture", async ({ page }) => {
+  await openFixture(page, "lighting-loading");
+
+  const workspace = page.getByRole("main").first();
+  await expect(page.getByRole("toolbar", { name: "Lighting workspace toolbar" })).toBeVisible();
+  await expect(workspace.getByText("No scenes saved yet")).toBeVisible();
+  await expect(workspace.getByText("No fixtures on the rig yet")).toBeVisible();
+  await expect(workspace.getByText("0 / 0 patched")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Fixture /i })).toHaveCount(0);
+});
+
+test("renders the lighting workspace from an engine-backed fixture snapshot", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const workspace = page.getByRole("main").first();
+  await expect(page.getByRole("toolbar", { name: "Lighting workspace toolbar" })).toBeVisible();
+  await expect(workspace.getByText("192.168.1.80 · U1")).toBeVisible();
+  await expect(workspace.getByText("Warm wash").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toHaveAttribute(
+    "data-selected",
+    "true"
+  );
+  await expect(page.getByRole("button", { name: "Recall scene Interview" })).toBeVisible();
+  await expect(page.getByRole("application", { name: "Lighting stage plot" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Fixture Key, 76 percent, 3200 kelvin/i })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await expect(workspace.getByText("1 fixture selected")).toBeVisible();
+  await expect(workspace.getByText("Scene state")).toBeVisible();
+  await expect(workspace.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Scene intensity shape for Warm wash" })).toBeVisible();
+
+  await page.keyboard.press("KeyS");
+  await expect(page.getByRole("button", { name: "Recall scene Scene 3" })).toBeVisible();
+  await page.getByRole("button", { name: "Recall scene Interview" }).click();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toHaveAttribute(
+    "data-selected",
+    "true"
+  );
+  await expect(
+    page.getByRole("application", { name: "Lighting stage plot" }).getByText("Interview", { exact: true })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Fixture Key, 92 percent, 4400 kelvin/i })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+
+  await page.getByLabel("Fixture intensity").focus();
+  await page.getByLabel("Fixture intensity").press("End");
+  await expect(page.getByLabel("Fixture intensity")).toHaveAttribute("aria-valuenow", "100");
+  await page.getByLabel("Fixture CCT").focus();
+  await page.getByLabel("Fixture CCT").press("End");
+  await expect(page.getByLabel("Fixture CCT")).toHaveAttribute("aria-valuenow", "5600");
+
+  await page.getByRole("button", { name: /^Fixture Warm wash,/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: /^Fixture Warm wash,/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByLabel("Lighting inspector — Fixture").getByText("Apollo Bridge", { exact: true })
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Turn off" }).click();
+  await expect(page.getByRole("button", { name: /^Fixture Warm wash, off,/ })).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Inspect Front group" }).click();
+  await page.getByRole("tab", { name: "Group" }).click();
+  await expect(page.getByRole("heading", { name: "Group" })).toBeVisible();
+  await expect(workspace.getByText("Front", { exact: true }).last()).toBeVisible();
+  await page.getByRole("button", { name: "Turn group off" }).click();
+  await expect(page.getByRole("button", { name: /Front, 2 fixtures.*off\. Toggle on\./i })).toBeVisible();
+});
+
+test("renders lighting fixture symbol families and stage plot render modes", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openFixture(page, "lighting-symbol-families");
+
+  const plot = page.getByRole("application", { name: "Lighting stage plot" });
+  await expect(plot.locator('[data-fixture-id="fixture-key"] [data-symbol-kind="panel"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-id="fixture-soft-mat"] [data-symbol-kind="soft-mat"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-id="fixture-back"] [data-symbol-kind="linear-bar"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-id="fixture-fresnel"] [data-symbol-kind="fresnel"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-id="fixture-kicker"] [data-symbol-kind="control-node"]')).toHaveCount(1);
+  await expect(plot.locator('[data-fixture-output-id="fixture-kicker"]')).toHaveCount(0);
+
+  await page.getByRole("radio", { name: "Coverage" }).click();
+  await expect(plot).toHaveAttribute("data-render-mode", "coverage");
+  await page.getByRole("radio", { name: "Photometric" }).click();
+  await expect(plot).toHaveAttribute("data-render-mode", "photometric");
+  await expect(plot.locator('[data-fixture-output-id="fixture-back"]')).toHaveText(/593 lx @ 1 m|120 deg est\./);
+  await page.getByRole("radio", { name: "Pixel" }).click();
+  await expect(plot).toHaveAttribute("data-render-mode", "pixel");
+  expect(await plot.locator('[data-fixture-id="fixture-back"] [data-emitter-segment="true"]').count()).toBeGreaterThan(
+    0
+  );
+
+  const symbolKey = page.getByTestId("fixture-symbol-key");
+  await expect(symbolKey).toBeVisible();
+  await expect(page.getByTestId("fixture-symbol-key-row-litepanels-astra-bicolor")).toContainText("2");
+  await expect(page.getByTestId("fixture-symbol-key-row-aputure-infinibar-pb12")).toContainText("8 ch");
+
+  const fresnel = page.getByRole("button", { name: /^Fixture Fresnel,/ });
+  await fresnel.focus();
+  await page.keyboard.press("Enter");
+  await expect(fresnel).toHaveAttribute("aria-pressed", "true");
+});
+
+test("keeps the full lighting workspace visible at the 1920x1080 fallback size", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openFixture(page, "lighting-populated");
+
+  const workspace = page.getByRole("main").first();
+  await expect(page.getByRole("toolbar", { name: "Lighting workspace toolbar" })).toBeVisible();
+  await expect(workspace.getByText("Scenes", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("Groups", { exact: true })).toBeVisible();
+  await expect(page.getByRole("application", { name: "Lighting stage plot" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Patch/ })).toBeVisible();
+  await expect(workspace.getByText("1 fixture selected")).toBeVisible();
+
+  const layoutMetrics = await page.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    scrollWidth: document.documentElement.scrollWidth,
+    viewportHeight: window.innerHeight,
+    viewportWidth: window.innerWidth,
+  }));
+
+  expect(layoutMetrics.scrollHeight).toBeLessThanOrEqual(layoutMetrics.viewportHeight + 1);
+  expect(layoutMetrics.scrollWidth).toBeLessThanOrEqual(layoutMetrics.viewportWidth + 1);
+});
+
+test("adapts lighting layout modes across supported logical viewport sizes", async ({ page }) => {
+  const cases = [
+    { width: 1280, height: 800, mode: "narrowUtility" },
+    { width: 1440, height: 900, mode: "desktopCompact" },
+    { width: 1600, height: 960, mode: "desktopCompact" },
+    { width: 1728, height: 1117, mode: "desktopCompact" },
+    { width: 1920, height: 1080, mode: "studioFull" },
+    { width: 2560, height: 1440, mode: "studioFull" },
+  ] as const;
+
+  for (const entry of cases) {
+    await page.setViewportSize({ width: entry.width, height: entry.height });
+    await openFixture(page, "lighting-populated");
+
+    await expect(page.locator("[data-operator-layout-root]")).toHaveAttribute("data-layout-mode", entry.mode);
+    await expect(page.getByTestId("lighting-toolbar")).toBeVisible();
+    await expect(page.getByTestId("lighting-stage")).toBeVisible();
+    await expectToolbarPrimaryControlsFit(page);
+    await expectNoDocumentScroll(page);
+
+    const stageBounds = await page.getByTestId("lighting-stage").boundingBox();
+    expect(stageBounds?.width ?? 0).toBeGreaterThanOrEqual(entry.mode === "narrowUtility" ? 520 : 560);
+    expect(stageBounds?.height ?? 0).toBeGreaterThanOrEqual(entry.mode === "narrowUtility" ? 400 : 440);
+
+    if (entry.mode !== "studioFull") {
+      await page.getByTestId("lighting-toolbar-overflow").click();
+      await expect(page.getByRole("menuitem", { name: /Highlight selection|Clear Highlight/ })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: /Solo selection|Clear Solo/ })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Find selected fixtures" })).toBeVisible();
+      await page.keyboard.press("Escape");
+    }
+
+    if (entry.mode === "narrowUtility") {
+      await expect(page.getByTestId("lighting-inspector-drawer")).toHaveCount(0);
+      await page.getByTestId("lighting-open-inspector").click();
+      await expect(page.getByTestId("lighting-inspector-drawer")).toBeVisible();
+      await expect(page.getByTestId("lighting-inspector-drawer").getByLabel("Fixture intensity")).toBeVisible();
+      await page.getByTestId("lighting-inspector-drawer").getByRole("button", { name: "Close" }).click();
+      await expect(page.getByTestId("lighting-inspector-drawer")).toHaveCount(0);
+    }
+  }
+});
+
+test("renders scaled studio preview inside the current MacBook-sized viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1512, height: 982 });
+  const response = await page.goto("/?fixture=lighting-populated&transport=fixture&operatorReview=studio");
+  expect(response, "studio preview fixture should return a document response").not.toBeNull();
+  expect(response!.status(), "studio preview fixture should not fail to load").toBeLessThan(400);
+
+  const root = page.locator("[data-operator-layout-root]");
+  await expect(root).toHaveAttribute("data-review-surface", "studioPreview");
+  await expect(root).toHaveAttribute("data-layout-mode", "studioFull");
+  await expect(root).toHaveAttribute("data-layout-width", "2560");
+  await expect(root).toHaveAttribute("data-layout-height", "1440");
+  await expect(page.getByText(/Studio Preview/)).toBeVisible();
+  await expectToolbarPrimaryControlsFit(page);
+  await expectNoDocumentScroll(page);
+
+  const visualBounds = await root.boundingBox();
+  expect(visualBounds?.width ?? 0).toBeLessThanOrEqual(1512 + 1);
+  expect(visualBounds?.height ?? 0).toBeLessThanOrEqual(982 + 1);
+  expect((visualBounds?.width ?? 0) / (visualBounds?.height ?? 1)).toBeCloseTo(16 / 9, 2);
+});
+
+test("enters and exits scaled studio preview from the command palette", async ({ page }) => {
+  await page.setViewportSize({ width: 1512, height: 982 });
+  await openFixture(page, "lighting-populated");
+
+  await page.keyboard.press("Meta+K");
+  await page.locator("input[placeholder*=command]").fill("studio preview");
+  await expect(page.getByRole("option", { name: "Studio Preview: Enter 2560x1440 Review" })).toBeVisible();
+  await page.getByRole("option", { name: "Studio Preview: Enter 2560x1440 Review" }).click();
+
+  const root = page.locator("[data-operator-layout-root]");
+  await expect(root).toHaveAttribute("data-review-surface", "studioPreview");
+  await expect(root).toHaveAttribute("data-layout-mode", "studioFull");
+  await expect(page.getByText(/Studio Preview - 2560x1440 @/)).toBeVisible();
+
+  await page.keyboard.press("Meta+K");
+  await page.locator("input[placeholder*=command]").fill("studio preview");
+  await expect(page.getByRole("option", { name: "Studio Preview: Exit Review" })).toBeVisible();
+  await page.getByRole("option", { name: "Studio Preview: Exit Review" }).click();
+
+  await expect(root).toHaveAttribute("data-review-surface", "native");
+});
+
+test("supports lighting preview mode without driving live scene state", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const workspace = page.getByRole("main").first();
+  await page.getByRole("button", { name: /Preview/ }).click();
+  await expect(page.getByLabel("Lighting preview mode")).toBeVisible();
+  await expect(page.getByText("Editing offline")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Patch/ })).toBeDisabled();
+  await expect(page.getByText("Preview values")).toBeVisible();
+
+  await page.getByLabel("Fixture intensity").focus();
+  await page.getByLabel("Fixture intensity").press("End");
+  await expect(workspace.getByText("Offline edits", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Fixture Key, 100 percent,/ })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+
+  await page.getByRole("button", { name: /Exit preview/ }).click();
+  await expect(page.getByRole("dialog", { name: "Exit preview with offline edits?" })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  await page.getByRole("button", { name: "Recall scene Interview" }).click();
+  await expect(page.getByText("Scene loaded into preview.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (preview)" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Discard" }).click();
+  await expect(page.getByLabel("Lighting preview mode")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Fixture Key, 76 percent,/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("supports lighting palette pools from the inspector and quick picker", async ({ page }) => {
+  await openFixture(page, "lighting-palettes-selected");
+
+  const inspector = page.getByLabel(/Lighting inspector.*Palettes/);
+  await expect(page.getByRole("tab", { name: "Palettes" })).toHaveAttribute("aria-selected", "true");
+  await expect(inspector.getByRole("heading", { name: "Intensity" })).toBeVisible();
+  await expect(inspector.getByRole("heading", { name: "CCT" })).toBeVisible();
+  await expect(inspector.getByText("1 selected")).toBeVisible();
+
+  await inspector.getByRole("button", { name: "Apply Low" }).click();
+  await expect(page.getByRole("button", { name: /^Fixture Key, 10 percent,/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText(/Lighting intensity palette 'Low' applied to 1 fixture/)).toBeVisible();
+
+  await page.keyboard.press(modifierShortcut("Shift+KeyP"));
+  const quickPicker = page.getByRole("dialog", { name: "Lighting palettes" });
+  await expect(quickPicker).toBeVisible();
+  await expect(quickPicker.getByLabel("Search palettes")).toBeFocused();
+  await expect(quickPicker.getByRole("button", { name: "Apply palette Low 10%" }).first()).toBeVisible();
+  await quickPicker.getByLabel("Search palettes").fill("studio");
+  await quickPicker.getByRole("button", { name: "Apply palette Studio 4000K" }).click();
+  await expect(page.getByRole("button", { name: /^Fixture Key, 10 percent, 4000 kelvin/i })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+
+  await inspector.getByRole("button", { name: "Create Intensity palette" }).click();
+  await inspector.getByLabel("Palette name").fill("Desk");
+  await inspector.getByLabel("Palette value").fill("33");
+  await inspector.getByRole("button", { name: "Save" }).click();
+  await expect(inspector.getByRole("button", { name: "Apply Desk" })).toBeVisible();
+
+  await openFixture(page, "lighting-palettes-empty");
+  const emptyInspector = page.getByLabel(/Lighting inspector.*Palettes/);
+  await expect(emptyInspector.getByText("0 selected")).toBeVisible();
+  await expect(emptyInspector.getByRole("button", { name: "Apply Low" })).toBeDisabled();
+  await page.keyboard.press(modifierShortcut("Shift+KeyP"));
+  await expect(page.getByText("Select fixtures to apply.")).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Lighting palettes" }).getByRole("button", { name: "Apply palette Low 10%" })
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+
+  await openFixture(page, "lighting-palettes-patch-disabled");
+  const patchInspector = page.getByLabel(/Lighting inspector.*Palettes/);
+  await expect(patchInspector.getByText("1 selected")).toBeVisible();
+  await expect(patchInspector.getByText("Patch locked")).toBeVisible();
+  await expect(patchInspector.getByRole("button", { name: "Create Intensity palette" })).toBeDisabled();
+  await expect(patchInspector.getByRole("button", { name: "Apply Low" })).toBeDisabled();
+  await expect(patchInspector.getByRole("button", { name: "Edit Low" })).toBeDisabled();
+  await expect(patchInspector.getByRole("button", { name: "Move Low later" })).toBeDisabled();
+  await expect(patchInspector.getByRole("button", { name: "Delete Low" })).toBeDisabled();
+});
+
+test("supports lighting toolbar search, patch mode, and empty-state fixture create", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const workspace = page.getByRole("main").first();
+  await page.getByRole("button", { name: "Recall scene Interview" }).click();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
+  await page.getByRole("button", { name: "Recall scene Warm wash" }).click();
+  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toBeVisible();
+  await page.keyboard.press(modifierShortcut("KeyF"));
+  await expect(page.getByLabel("Search fixtures, scenes and groups")).toBeFocused();
+  const recentScenes = page.getByRole("listbox", { name: "Recent scenes" });
+  await expect(recentScenes).toBeVisible();
+  await expect(recentScenes.getByRole("option", { name: /Warm wash/ })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowDown");
+  await expect(recentScenes.getByRole("option", { name: /Interview/ })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Recall scene Interview (active)" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Delete scene/ }).click();
+  await page.getByRole("button", { name: "Delete scene" }).click();
+  await expect(page.getByText("Scene 'Interview' deleted.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toBeVisible();
+
+  await page.getByLabel("Search fixtures, scenes and groups").fill("zzz");
+  await expect(workspace.getByText(/No scenes match .zzz./)).toBeVisible();
+  await expect(workspace.getByText(/No groups match .zzz./)).toBeVisible();
+  await page.getByLabel("Search fixtures, scenes and groups").fill("");
+  await expect(workspace.getByText(/No scenes match .zzz./)).toBeHidden();
+
+  await page.getByRole("button", { name: /Patch/ }).click();
+  await expect(workspace.getByText("Master · paused · patch mode")).toBeVisible();
+  await expect(page.getByLabel("Fixture patch start channel")).toBeVisible();
+  await expect(page.getByTestId("lighting-beam-fixture-key")).toHaveCount(0);
+  await page.getByLabel("Fixture patch start channel").fill("3");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText("003", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Identify" }).click();
+  await expect(page.getByRole("button", { name: /Bursting/ })).toHaveAttribute("aria-pressed", "true");
+  await page.getByLabel("Beam angle in degrees").fill("42");
+  await page.getByLabel("Beam angle in degrees").press("Enter");
+  await expect(page.getByLabel("Beam angle in degrees")).toHaveValue("42");
+
+  await openFixture(page, "lighting-empty");
+  const emptyWorkspace = page.getByRole("main").first();
+  await expect(emptyWorkspace.getByText("No fixtures on the rig yet")).toBeVisible();
+  await page.getByRole("button", { name: "Add fixture" }).first().click();
+  const addFixtureDialog = page.getByRole("dialog", { name: "Add fixture" });
+  await expect(addFixtureDialog.getByLabel("Name")).toHaveValue("Fixture 1");
+  await addFixtureDialog.getByRole("button", { name: "Add fixture" }).click();
+  await expect(page.getByRole("button", { name: /^Fixture Fixture 1,/ })).toBeVisible();
+});
+
+test("surfaces patch collisions and auto-fixes them in lighting patch mode", async ({ page }) => {
+  await openFixture(page, "lighting-patch-overlap");
+
+  const workspace = page.getByRole("main").first();
+  await page.getByRole("button", { name: /Patch/ }).click();
+
+  const backFixture = page.getByRole("button", { name: /^Fixture Back,/ });
+  await backFixture.focus();
+  await page.keyboard.press("Enter");
+  const patchInspector = page.getByLabel("Lighting inspector — Patch");
+  await expect(patchInspector.getByText("Patch collision")).toBeVisible();
+  await expect(patchInspector.getByText("Key", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Auto-fix to 003" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Auto-fix to 003" }).click();
+  await expect(page.getByRole("button", { name: /^Fixture Back,/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("003", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("Patch collision")).toHaveCount(0);
+});
+
+test("persists lighting view bookmark slots through workspace changes", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.keyboard.press(modifierShortcut("Shift+Digit1"));
+  await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
+  await expect(page.getByText("Saved view 1.")).toBeVisible();
+
+  await page.keyboard.press(modifierShortcut("Digit4"));
+  await expect(page.getByTestId("planning-workspace")).toBeVisible();
+  await page.keyboard.press(modifierShortcut("Digit2"));
+
+  await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
+  await page.keyboard.press("Shift+Digit1");
+  await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
+});
+
+test("supports lighting drag-lasso multi-select and group save", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  await page.getByRole("button", { name: /^Fixture Fill,/ }).focus();
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("Enter");
+  await page.keyboard.up("Shift");
+
+  await expect(page.getByLabel("Selected fixtures", { exact: true }).getByText("2 fixtures selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Clear all selection" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Create a new lighting group" }).click();
+  const createGroupDialog = page.getByRole("dialog", { name: "New lighting group" });
+  await expect(createGroupDialog.getByLabel("Group name")).toBeFocused();
+  await createGroupDialog.getByLabel("Group name").fill("Group 3");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: /^Group 3, 0 fixtures, off\. Toggle on\.$/i })).toBeVisible();
+});
+
+test("saves the current lighting selection as a scene from the inspector prompt", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  await page.keyboard.press(modifierShortcut("Shift+KeyS"));
+  const saveSceneDialog = page.getByRole("dialog", { name: "Save as new scene" });
+  await expect(saveSceneDialog.getByLabel("Scene name")).toBeFocused();
+  await saveSceneDialog.getByLabel("Scene name").fill("Interview reset");
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByRole("button", { name: /Recall scene Interview reset/i })).toBeVisible();
+});
+
+test("nudges the selected fixture horizontally from the keyboard", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  await expect(page.getByLabel("Stage X position in metres")).toHaveValue("0.24");
+  await page.keyboard.press("ArrowRight");
+
+  await expect(page.getByLabel("Stage X position in metres")).toHaveValue("0.35");
+});
+
+test("drags the selected fixture to a new plot position", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const fixture = page.getByRole("button", { name: /^Fixture Key,/ });
+  const output = page.locator('[data-fixture-output-id="fixture-key"]');
+  await fixture.scrollIntoViewIfNeeded();
+  const start = await fixture.evaluate((node) => {
+    const marker = node.querySelector("g[filter]");
+    if (!(marker instanceof SVGGraphicsElement)) throw new Error("Fixture marker body not found");
+    const matrix = marker.getScreenCTM();
+    if (!matrix) throw new Error("Fixture marker matrix not available");
+
+    return { x: matrix.e, y: matrix.f };
+  });
+  const startOutputTransform = await output.getAttribute("transform");
+
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 180, start.y + 120, { steps: 8 });
+  await expect.poll(async () => output.getAttribute("transform")).not.toBe(startOutputTransform);
+  await page.mouse.up();
+  expect(await output.getAttribute("transform")).not.toBe(startOutputTransform);
+
+  await expect(page.getByLabel("Stage X position in metres")).toHaveValue("1.5");
+  await expect(page.getByLabel("Stage Y position in metres")).toHaveValue("1.0");
+});
+
+test("mirrors fixture intensity slider drafts on the stage plot before commit", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const fixture = page.getByRole("button", { name: /^Fixture Key,/ });
+  const output = page.locator('[data-fixture-output-id="fixture-key"]');
+  await expect(fixture).toHaveAttribute("aria-label", /76 percent/);
+  const startOutputOpacity = await output.locator("stop").first().getAttribute("stop-opacity");
+
+  const slider = page.getByRole("slider", { name: "Fixture intensity" });
+  const box = await slider.boundingBox();
+  expect(box).not.toBeNull();
+  const y = box!.y + box!.height / 2;
+
+  await page.mouse.move(box!.x + box!.width * 0.76, y);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width * 0.24, y, { steps: 8 });
+
+  await expect.poll(async () => fixture.getAttribute("aria-label")).toMatch(/2[0-9] percent/);
+  await expect
+    .poll(async () => output.locator("stop").first().getAttribute("stop-opacity"))
+    .not.toBe(startOutputOpacity);
+  await page.mouse.up();
+
+  await expect(fixture).toHaveAttribute("aria-label", /2[0-9] percent/);
+});
+
+test("rotates the selected fixture from the plot and inspector", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const rotationInput = page.getByLabel("Fixture rotation in degrees");
+  await expect(rotationInput).toHaveValue("0");
+
+  const output = page.locator('[data-fixture-output-id="fixture-key"]');
+  const startOutputTransform = await output.getAttribute("transform");
+  const handle = page.locator('[data-fixture-rotate-handle="fixture-key"]');
+  await expect(handle).toBeVisible();
+  const points = await handle.evaluate((node) => {
+    const circle = node.querySelector("circle");
+    const marker = node.closest("[data-fixture-id]");
+    const body = marker?.querySelector("g[filter]");
+    if (!(circle instanceof SVGCircleElement) || !(body instanceof SVGGraphicsElement)) {
+      throw new Error("Fixture rotate handle geometry not found");
+    }
+    const circleRect = circle.getBoundingClientRect();
+    const matrix = body.getScreenCTM();
+    if (!matrix) throw new Error("Fixture marker matrix not available");
+    return {
+      centerX: matrix.e,
+      centerY: matrix.f,
+      handleX: circleRect.left + circleRect.width / 2,
+      handleY: circleRect.top + circleRect.height / 2,
+    };
+  });
+
+  await page.mouse.move(points.handleX, points.handleY);
+  await page.mouse.down();
+  await page.mouse.move(points.centerX + 96, points.centerY - 12, { steps: 8 });
+  await expect.poll(async () => output.getAttribute("transform")).not.toBe(startOutputTransform);
+  await page.mouse.up();
+  expect(await output.getAttribute("transform")).not.toBe(startOutputTransform);
+  await expect(rotationInput).toHaveValue("82");
+
+  await rotationInput.fill("270");
+  await rotationInput.press("Enter");
+  await expect(rotationInput).toHaveValue("270");
+  await expect(page.locator('[data-fixture-id="fixture-key"] g[filter]').first()).toHaveAttribute(
+    "transform",
+    /rotate\(270\)/
+  );
+});
+
+test("toggles the expanded DMX monitor from the keyboard", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  await page.keyboard.press(modifierShortcut("Shift+KeyM"));
+  const dmxMonitorDialog = page.getByRole("dialog", { name: "DMX universe U1" });
+  await expect(dmxMonitorDialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dmxMonitorDialog).toBeHidden();
+});
+
+test("opens the compact DMX strip and expands it to the full monitor", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  await page.getByRole("button", { name: "Show DMX strip" }).click();
+  await expect(page.getByRole("region", { name: "Universe 1 compact DMX strip" })).toBeVisible();
+  await page.getByRole("button", { name: "Open full DMX monitor" }).click();
+  const dialog = page.getByRole("dialog", { name: "DMX universe U1" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("Patched to a fixture")).toBeVisible();
+  await expect(dialog.getByRole("grid", { name: "DMX universe U1 channels" })).toBeVisible();
+  await expect(dialog.locator('[title="Ch 1 · Key · Dimmer"]')).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+});
+
+test("shows lighting DMX-unreachable posture and blackout hold", async ({ page }) => {
+  await openFixture(page, "lighting-dmx-unreachable");
+
+  const workspace = page.getByRole("main").first();
+  await expect(page.getByText("DMX bridge unreachable")).toBeVisible();
+  await expect(workspace.getByText(/Lighting commands won't reach the rig/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Identify" })).toBeDisabled();
+
+  await openFixture(page, "lighting-populated");
+  await page.getByRole("button", { name: "Emergency cut all fixtures" }).click();
+  const cutAllDialog = page.getByRole("dialog", { name: "Cut all fixtures?" });
+  await expect(cutAllDialog).toBeVisible();
+  await cutAllDialog.getByRole("button", { name: "Cut all", exact: true }).click();
+  await expect(page.getByText("All fixtures off")).toBeVisible();
+  await expect(page.getByText("Master · 0 / 4 on")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Fixture Key, off,/ })).toHaveAttribute("aria-pressed", "true");
+});
