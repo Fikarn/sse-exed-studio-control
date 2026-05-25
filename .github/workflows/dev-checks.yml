@@ -156,63 +156,13 @@ jobs:
       - run: npm ci
       - run: npm run tauri:foundation
 
-  # plan PR 2 / workstream B5.
-  # `tauri:setup-support:qualify` + `tauri:workspaces:qualify` spawn the
-  # Tauri shell via `tauri dev --features test-bridge`. The shell opens a
-  # WebKitGTK window, so the runner needs an X server — `xvfb-run -a`
-  # gives each command its own auto-allocated display. Both qualifications
-  # bind 127.0.0.1:4173 (Vite preview) with --strictPort, so they run
-  # serially within this job and on a separate runner from `frontend-e2e`
-  # (which also binds 4173) per the plan's preferred isolation.
-  qualification:
-    runs-on: ubuntu-latest
-    # `tauri-foundation` builds the full Tauri shell crate from cold cache.
-    # We reuse its `rust-cache` via the same `shared-key` so the qualification
-    # scripts' `tauri dev` invocation finds a populated target dir (the
-    # script's 40s `waitForStatus` is far too short for a cold-cache
-    # 400-crate compile). `needs:` enforces the cache-write/read ordering.
-    needs: tauri-foundation
-    env:
-      # Persist the qualification evidence inside the workspace so the
-      # upload-artifact step can grab it (the default temp-dir behavior
-      # leaves it on the runner).
-      SSE_TAURI_QUALIFICATION_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/qualification
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: ./.github/actions/setup-tauri-linux
-      - name: Install xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: native -> target
-          # Share `tauri-foundation`'s populated cache (see `needs:`
-          # comment above).
-          shared-key: tauri-foundation
-      - run: npm ci
-      - name: Pre-build the Tauri shell binary
-        # `tauri dev` would otherwise cold-compile the shell crate inside
-        # the qualification script's 40s `waitForStatus` window. Pre-building
-        # means `tauri dev` finds an up-to-date binary and reaches "initial
-        # ready state" well inside the timeout. The `--features test-bridge`
-        # flag mirrors what `frontend/app/package.json:tauri:dev` invokes.
-        working-directory: native/tauri-shell
-        run: cargo build --features test-bridge
-      - name: Tauri Setup/Support qualification
-        run: xvfb-run -a npm run tauri:setup-support:qualify
-      - name: Tauri workspace qualification
-        run: xvfb-run -a npm run tauri:workspaces:qualify
-      - name: Upload qualification evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tauri-qualification-evidence
-          path: ${{ github.workspace }}/artifacts/qualification/
-          if-no-files-found: ignore
-          retention-days: 14
+  # plan PR 2 / workstream B5: DEFERRED.
+  # The `qualification` job was scoped here but rescoped out — the
+  # qualification scripts have hardcoded 40s `waitForStatus` deadlines that
+  # ubuntu-latest hardware cannot meet (shared rust-cache + pre-built shell
+  # got past the cargo compile cliff but the engine's first health snapshot
+  # then stalls past the 40s window). Making that CI-tolerant needs an
+  # env-var-driven timeout on both ~500-line qualification scripts plus
+  # possible Mesa software-rendering setup for the libEGL warnings — bigger
+  # than a workflow tweak. Tracked in the plan's Follow-ups; lands in a
+  # focused PR ("plan PR 2b: qualification CI job") before PR 3.
