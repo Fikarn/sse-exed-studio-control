@@ -163,7 +163,14 @@ function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath, update
   return child;
 }
 
-async function waitForStatus({ child, label, predicate, statusPath, timeoutMs = 40_000 }) {
+// Default waitForStatus deadline. `SSE_TAURI_QUALIFICATION_TIMEOUT_MS` lets
+// CI extend the window — the operator laptop completes each phase within
+// 40s, but ubuntu-latest hardware needs ~3 min for the engine's first
+// health snapshot to arrive after the WebKitGTK shell launches under xvfb
+// software rendering. The qualification CI job (plan PR 2b) sets this.
+const DEFAULT_WAIT_TIMEOUT_MS = Number(process.env.SSE_TAURI_QUALIFICATION_TIMEOUT_MS ?? 40_000);
+
+async function waitForStatus({ child, label, predicate, statusPath, timeoutMs = DEFAULT_WAIT_TIMEOUT_MS }) {
   const deadline = Date.now() + timeoutMs;
   let lastStatus = null;
 
