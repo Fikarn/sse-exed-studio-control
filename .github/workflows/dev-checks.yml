@@ -8,6 +8,13 @@ on:
 permissions:
   contents: read
 
+# Cancel in-flight runs of this workflow on the same ref when a new push lands
+# (plan PR 1 / workstream B6 concurrency portion). Path filters are deferred
+# to a later PR.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # Required merge hygiene on protected branches. Never a release gate.
 # Target-host release evidence on macOS Apple Silicon and Windows 11 x64
 # remains the release acceptance mechanism for this repo (see AGENTS.md).
@@ -48,6 +55,48 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run frontend:typecheck
+
+  # plan PR 1 / workstream B1 + B2 (consolidated).
+  # `frontend:playwright:test` now includes the `visual-review.spec.ts`
+  # baseline diff (workstream A1), so this single job covers both the
+  # `frontend-e2e` and `visual-review` jobs from the plan — sharing the
+  # Vite preview server boot cost as B2 suggests.
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/app/package.json', 'package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      - name: Install Playwright browser deps (chromium)
+        working-directory: frontend/app
+        run: npx playwright install --with-deps chromium
+      - run: npm run frontend:playwright:test
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/app/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload Playwright test results (visual diffs + traces)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: frontend/app/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
 
   rust:
     runs-on: ubuntu-latest
