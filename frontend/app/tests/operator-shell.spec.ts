@@ -990,8 +990,12 @@ test("keeps the audio workspace stable during meter-only ticks", async ({ page }
   await expect(canvas).toBeVisible();
 
   const initialCounts = await page.evaluate(() => ({ ...window.__SSE_TEST_RENDER_COUNTS__ }));
+  // Plan PR 1 bumped this (and two sibling polls below) from 1_500 → 5_000:
+  // tight enough to flake on ubuntu-latest CI under 3-worker load. Plan PR 5
+  // (workstream D8) should root-cause why the first meter sample takes >1.5s
+  // on slower hardware.
   await expect
-    .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 1_500 })
+    .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 5_000 })
     .toBeGreaterThan(0);
   const initialCanvas = await readMeterCanvasSample(page, "audio-strip-audio-input-9");
 
@@ -1090,7 +1094,7 @@ test("does not refresh audio snapshots for meter-only ticks", async ({ page }) =
     () => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.snapshot"] ?? 0
   );
   await expect
-    .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 1_500 })
+    .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 5_000 })
     .toBeGreaterThan(0);
   await page.waitForTimeout(900);
   const finalAudioSnapshotRequests = await page.evaluate(
@@ -1140,7 +1144,7 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   const meterCanvas = page.getByTestId("audio-meter-canvas");
   await expect(meterCanvas).toBeVisible();
   await expect
-    .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 1_500 })
+    .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 5_000 })
     .toBeGreaterThan(0);
   const stripFill = hostMeter.locator('[data-meter-fill="left"]').first();
   await expect(stripFill).toBeVisible();
