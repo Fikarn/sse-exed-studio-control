@@ -98,8 +98,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # plan PR 2 / workstream B3 (extends).
+  # The plan says "Extends the existing `rust` job with `npm run
+  # native:acceptance` after `native:test`." native:acceptance requires
+  # real RME TotalMix OSC packets on 127.0.0.1; on stock GitHub runners
+  # there are none, so we opt into the new
+  # `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` escape that mirrors the
+  # existing `audioProbeBindDenied` skip — the rest of the harness
+  # (import → backup → restart → workflow parity → restore → verify
+  # rollback) still runs end-to-end. See plan Follow-ups.
   rust:
     runs-on: ubuntu-latest
+    env:
+      SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC: "1"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -109,19 +120,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Install Tauri Linux system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            curl \
-            file \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            libxdo-dev \
-            wget
+      - uses: ./.github/actions/setup-tauri-linux
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native -> target
@@ -130,3 +129,40 @@ jobs:
       - run: npm run rust:clippy
       - run: npm run native:check
       - run: npm run native:test
+      - run: npm run native:acceptance
+
+  # plan PR 2 / workstream B4.
+  # `tauri:foundation` = protocol:generate + native:engine:build +
+  # tauri:build + tauri:smoke. tauri:smoke is stdin/stdout only (no
+  # display required), but tauri:build needs the WebKitGTK toolchain
+  # from the composite action.
+  tauri-foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/setup-tauri-linux
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native -> target
+          # Distinct cache key from the `rust` job — that one targets debug
+          # `studio-control-engine` profile, this one builds the full Tauri
+          # shell. Sharing the cache key would thrash the smaller scope.
+          shared-key: tauri-foundation
+      - run: npm ci
+      - run: npm run tauri:foundation
+
+  # plan PR 2 / workstream B5: DEFERRED.
+  # The `qualification` job was scoped here but rescoped out — the
+  # qualification scripts have hardcoded 40s `waitForStatus` deadlines that
+  # ubuntu-latest hardware cannot meet (shared rust-cache + pre-built shell
+  # got past the cargo compile cliff but the engine's first health snapshot
+  # then stalls past the 40s window). Making that CI-tolerant needs an
+  # env-var-driven timeout on both ~500-line qualification scripts plus
+  # possible Mesa software-rendering setup for the libEGL warnings — bigger
+  # than a workflow tweak. Tracked in the plan's Follow-ups; lands in a
+  # focused PR ("plan PR 2b: qualification CI job") before PR 3.
