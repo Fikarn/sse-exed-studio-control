@@ -30,6 +30,14 @@ const REQUIRED_ASSETS = [
 const OPTIONAL_ASSETS = [
   path.join("release", "native", "macos", "SSE-ExEd-Studio-Control-Native-macOS.zip"),
   path.join("release", "native", "windows", "SSE-ExEd-Studio-Control-Native-windows.zip"),
+  // plan PR 11 / workstream A3: ship the visual-review coverage summary
+  // alongside the manifest when the operator has run `tauri:visual:review`
+  // before `release:publish`. The release manifest's `visualReview.summaryPath`
+  // already records the relative path; uploading the JSON itself means a
+  // future auditor can read what was covered without re-running Playwright.
+  // Absent → skipped silently because A3 calls this "persistent" evidence,
+  // not a release gate.
+  path.join("artifacts", "visual", "tauri-cutover", "fixture-viewport-summary.json"),
 ];
 
 function hasFlag(name) {

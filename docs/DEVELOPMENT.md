@@ -226,6 +226,14 @@ npm run native:test
 npm run native:engine:build
 ```
 
+#### Opt-in real-hardware lane
+
+```bash
+npm run native:test:hardware
+```
+
+`npm run native:test:hardware` runs `cargo test --workspace -- --ignored` so it executes only the Rust tests marked `#[ignore]`. Those markers are reserved for device-bound tests that need real RME UFX III + TotalMix OSC traffic, a connected Stream Deck +, or a live DMX universe — environments CI cannot supply on stock `ubuntu-latest` runners and that the maintainer's laptop only partially supplies. The default `npm run native:test` and the CI `rust` job both skip these tests by design; the operator workstation runs `npm run native:test:hardware` as part of the pre-release smoke pass and records pass/fail per device. Today the lane runs zero `#[ignore]` tests because no hardware-bound suites have been added yet; the wiring is in place so future hardware coverage opts in without touching package.json or AGENTS.md again.
+
 #### Changes affecting operator flows
 
 ```bash
@@ -248,7 +256,7 @@ npm run release:verify
 
 #### Pull Request CI
 
-Every pull request triggers the four-job workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, and `rust`. `format-protocol` runs `format:check`, repository script tests, `release:check`, `file:health`, and `protocol:check`; `rust` runs `rust:fmt:check`, `rust:clippy`, `native:check`, and `native:test`. These jobs are required merge hygiene on `main`. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
+Every pull request triggers the eight-job workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `frontend-e2e`, `rust`, `tauri-foundation`, and `qualification`. `format-protocol` runs `format:check`, repository script tests, `release:check`, `file:health`, and `protocol:check`; `frontend-test` runs `frontend:test` (Vitest across the frontend workspaces); `frontend-e2e` runs `frontend:playwright:test`, which now includes the `visual-review.spec.ts` and `storybook.spec.ts` baselines, and uploads the Playwright report plus snapshot diffs as the `playwright-report` and `playwright-test-results` artifacts; `rust` runs `rust:fmt:check`, `rust:clippy`, `native:check`, `native:test`, and `native:acceptance` (with `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` because CI cannot supply live RME TotalMix OSC traffic); `tauri-foundation` runs `tauri:foundation` (protocol generate → engine build → Tauri build → smoke); `qualification` runs `tauri:setup-support:qualify` and `tauri:workspaces:qualify` under `xvfb` with extended timeouts and the audio-probe skipped. These jobs are required merge hygiene on `main`. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
 
 ### 4a. Cleanup
 

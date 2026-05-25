@@ -30,7 +30,12 @@ const SIZES: readonly Viewport[] = [
   { width: 2560, height: 1440, label: "2560x1440" },
 ];
 
-const STUDIO_PREVIEW_FIXTURES = ["audio-populated"] as const;
+// plan PR 11 / workstream A2: extend Scaled Studio Preview baselines beyond
+// Audio so every operator surface in `OperatorLayoutProvider.tsx` is
+// regression-tested on the proportional `2560x1440` review canvas, not just
+// the Audio fixture. The host viewport mirrors the built-in 14-inch M5
+// MacBook (the documented review surface in `docs/DEVELOPMENT.md §2b`).
+const STUDIO_PREVIEW_FIXTURES = ["setup-ready", "lighting-populated", "audio-populated", "planning-populated"] as const;
 const STUDIO_PREVIEW_HOST: Viewport = { width: 1512, height: 982, label: "1512x982" };
 
 // Planning fixtures render relative time labels ("in 5 minutes", "ended 1h
