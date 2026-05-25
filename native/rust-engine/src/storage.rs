@@ -23,6 +23,7 @@ const STORAGE_SCHEMA_VERSION: i64 = 6;
 const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
 const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 
+#[derive(Debug)]
 pub struct StorageBootstrap {
     pub schema_version: i64,
     pub format_version: String,
@@ -357,6 +358,22 @@ fn migrate_schema(connection: &mut Connection) -> EngineResult<i64> {
     )?;
 
     let mut schema_version = current_schema_version(connection)?;
+
+    // plan PR 7 / workstream E4: forward-compatibility guard. If the
+    // workstation is downgraded to a binary older than the DB schema it
+    // last ran against, opening the DB silently used to succeed and any
+    // newer-only column or seed would be invisible / corrupted. AGENTS.md
+    // rollback posture is: "rollback to a prior tag must remain a
+    // reinstall-away; do not change on-disk formats without an explicit
+    // migration plan." Surfacing a typed, recoverable error keeps the
+    // operator on the original version instead of silently corrupting.
+    if schema_version > STORAGE_SCHEMA_VERSION {
+        return Err(format!(
+            "This workstation database is at schema version {schema_version}, which is newer than this engine binary (supports up to {STORAGE_SCHEMA_VERSION}). \
+             Reinstall the newer release or restore a v{STORAGE_SCHEMA_VERSION}-or-earlier backup before launching this version."
+        )
+        .into());
+    }
 
     if schema_version == 0 {
         connection.execute("INSERT INTO schema_migrations(version) VALUES (1)", [])?;
@@ -1509,6 +1526,49 @@ mod tests {
                 .pointer("/groups/0/colorIndex")
                 .and_then(serde_json::Value::as_i64),
             Some(4)
+        );
+    }
+
+    // plan PR 7 / workstream E4: storage forward-compat guard. Asserts that
+    // a DB at a schema version newer than the current binary refuses to
+    // initialise with a recoverable, operator-readable error (not a panic,
+    // not a silent corruption). AGENTS.md rollback posture: "rollback to a
+    // prior tag must remain a reinstall-away". This test enforces that on
+    // the storage layer.
+    #[test]
+    fn initialize_database_rejects_a_db_newer_than_the_current_binary() {
+        let test_dir = TestDir::new("storage-future-schema");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        // First boot to current schema, then forge a future version row
+        // on top so the migration loop sees a schema_version that's
+        // STORAGE_SCHEMA_VERSION + 1.
+        initialize_database(&db_path).expect("bootstrap should succeed at current version");
+        let future_version: i64 = STORAGE_SCHEMA_VERSION + 1;
+        {
+            let connection = open_connection(&db_path).expect("connection should open");
+            connection
+                .execute(
+                    "INSERT INTO schema_migrations(version) VALUES (?1)",
+                    [future_version],
+                )
+                .expect("future version row should insert");
+        }
+
+        let error = initialize_database(&db_path)
+            .expect_err("downgraded engine should refuse a DB it does not understand");
+        let message = error.to_string();
+        assert!(
+            message.contains(&future_version.to_string()),
+            "error should name the unsupported schema version (got: {message})"
+        );
+        assert!(
+            message.contains(&STORAGE_SCHEMA_VERSION.to_string()),
+            "error should name the binary's max supported version (got: {message})"
+        );
+        assert!(
+            message.contains("Reinstall") || message.contains("backup"),
+            "error should describe an operator-readable next step (got: {message})"
         );
     }
 

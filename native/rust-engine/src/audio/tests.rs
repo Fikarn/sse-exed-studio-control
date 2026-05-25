@@ -1046,3 +1046,51 @@ fn audio_settings_update_resets_probe_when_transport_changes() {
         Some("idle")
     );
 }
+
+// plan PR 7 / workstream E3: gain-reduction (GR) meter closure guard.
+//
+// 2026-05-21 closure (logged in docs/plans/slice-4-deferred.md): TotalMix
+// OSC structurally does not expose gain-reduction. The plan flagged this
+// as a class-of-regression risk — a future agent might silently re-attempt
+// GR work and the suite would not catch the re-introduction. This test
+// asserts that no `gain_reduction` or `gr_meter` symbol creeps back into
+// the OSC adapter source, and that no such field appears in the public
+// meter snapshot types. Re-open the GR work ONLY with a new architecture
+// decision logged in docs/plans/.
+
+const RME_TOTALMIX_OSC_SOURCE: &str = include_str!("../rme_totalmix_osc.rs");
+const AUDIO_TYPES_SOURCE: &str = include_str!("./types.rs");
+const AUDIO_PARSE_SOURCE: &str = include_str!("./parse.rs");
+
+#[test]
+fn gain_reduction_remains_unsupported_by_rme_totalmix_osc() {
+    let forbidden = [
+        "gain_reduction",
+        "gr_meter",
+        "gainReduction",
+        "grMeter",
+        "/gr/",
+    ];
+    let mut hits: Vec<String> = Vec::new();
+    for source in [
+        RME_TOTALMIX_OSC_SOURCE,
+        AUDIO_TYPES_SOURCE,
+        AUDIO_PARSE_SOURCE,
+    ] {
+        for token in forbidden {
+            if source.contains(token) {
+                hits.push(token.to_string());
+            }
+        }
+    }
+    assert!(
+        hits.is_empty(),
+        "Found {} gain-reduction symbol(s) in the RME OSC adapter / audio types: {:?}.
+\
+         The GR-meter closure (2026-05-21, slice-4-deferred.md) is binding: TotalMix OSC \
+         structurally does not expose GR. Re-open the closure with a new architecture \
+         decision before reintroducing these symbols.",
+        hits.len(),
+        hits
+    );
+}
