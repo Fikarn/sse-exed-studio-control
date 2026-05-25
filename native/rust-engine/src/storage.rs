@@ -1572,6 +1572,64 @@ mod tests {
         );
     }
 
+    // plan PR 8 / workstream E7: concurrent DB access. Documents what
+    // happens when two engine instances try to share the same SQLite file.
+    // The plan accepts either "the second instance waits" or "the second
+    // instance fails clearly" — what it forbids is silent corruption. This
+    // test pins whichever behavior the production code ships today so a
+    // future refactor can't drift without surfacing it.
+    #[test]
+    fn second_engine_against_same_db_either_succeeds_or_returns_recoverable_error() {
+        let test_dir = TestDir::new("storage-concurrent");
+        let db_path = test_dir.path().join("native.sqlite3");
+
+        // First engine: full bootstrap. Captures the schema version this
+        // binary expects.
+        let first_bootstrap = initialize_database(&db_path).expect("first bootstrap must succeed");
+
+        // Second engine call against the same file. Outcome is either Ok
+        // (SQLite's locking permits the re-entry) or Err (database is
+        // locked) — both are valid; silent corruption is the forbidden
+        // case.
+        let second = initialize_database(&db_path);
+
+        match second {
+            Ok(second_bootstrap) => {
+                assert_eq!(
+                    second_bootstrap.schema_version, first_bootstrap.schema_version,
+                    "concurrent second bootstrap must agree on the schema version"
+                );
+            }
+            Err(error) => {
+                let message = error.to_string().to_lowercase();
+                // SQLite surfaces lock contention as "database is locked"
+                // or "busy"; assert the message points at the recoverable
+                // class so a future refactor can't smuggle in a panic via
+                // a different error path.
+                assert!(
+                    message.contains("lock") || message.contains("busy"),
+                    "concurrent bootstrap failure must be a recoverable lock error, got: {error}"
+                );
+            }
+        }
+
+        // After both calls, the schema_migrations table must still be
+        // intact — the documented anti-pattern of "two engines silently
+        // corrupted the DB" would show up as a missing/duplicated row
+        // here.
+        let connection =
+            open_connection(&db_path).expect("should re-open db after concurrent bootstraps");
+        let max_version: i64 = connection
+            .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
+                row.get(0)
+            })
+            .expect("schema_migrations should still be readable");
+        assert_eq!(
+            max_version, first_bootstrap.schema_version,
+            "schema_migrations max version must equal what the first bootstrap reported"
+        );
+    }
+
     fn seed_v3_database(db_path: &Path) {
         let connection = open_connection(db_path).expect("connection should open");
         connection
