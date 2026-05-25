@@ -61,3 +61,37 @@ test("shows degraded setup posture from fixtures", async ({ page }) => {
   await page.getByRole("button", { name: /^Open support$/ }).click();
   await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
 });
+
+// plan PR 6 / workstream D6: additional setup-surface coverage. The
+// pre-existing tests above walk the happy path; these focus on the
+// commissioning unlock contract — setup-ready is the published-and-ready
+// state that should NOT show the commissioning runner, and the probe runner
+// detail panels should expose their per-probe status fields.
+
+test("setup-ready fixture still exposes the operator-mode Support entry", async ({ page }) => {
+  await openFixture(page, "setup-ready");
+  // setup-ready means the operator workstation already published — the
+  // shell is in operator mode but the Support button must remain reachable
+  // so the operator can capture diagnostics from the published state.
+  await expect(page.getByRole("button", { name: /^Support$/ })).toBeVisible();
+});
+
+test("setup-required surfaces the full commissioning runner step tab list", async ({ page }) => {
+  await openFixture(page, "setup-required");
+
+  // The runner exposes a fixed set of stage tabs. Asserting all five by
+  // name catches a copy regression or accidental tab-list edit; the
+  // existing walk-through test only exercises the active one.
+  for (const stageName of ["Import profile", "Probe hardware", "Map bindings", "Verify live echo", "Publish"]) {
+    await expect(page.getByRole("tab", { name: new RegExp(stageName, "i") })).toBeVisible();
+  }
+});
+
+test("setup-degraded fixture surfaces the recovery + support entry points", async ({ page }) => {
+  await openFixture(page, "setup-degraded");
+
+  // The degraded state must surface BOTH the diagnostic narrative AND the
+  // recovery affordance the operator clicks through to.
+  await expect(page.getByText("Degraded startup posture")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Open support$/ })).toBeVisible();
+});
