@@ -38,7 +38,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "scripts:test": "node --test scripts/disk-space.test.mjs scripts/qt-ifw-tools.test.mjs scripts/release/validate-release.test.mjs scripts/release/preflight.test.mjs scripts/release/write-release-manifest.test.mjs scripts/release/helpers.test.mjs",
+    "scripts:test": "node --test scripts/disk-space.test.mjs scripts/qt-ifw-tools.test.mjs scripts/release/validate-release.test.mjs scripts/release/preflight.test.mjs scripts/release/write-release-manifest.test.mjs scripts/release/helpers.test.mjs scripts/check-slice-rescope.test.mjs",
     "file:health": "node scripts/file-health.mjs",
     "rust:fmt:check": "cd native && cargo fmt --all -- --check",
     "rust:clippy": "cd native && cargo clippy --workspace --all-targets -- -D warnings",
@@ -143,6 +143,9 @@
   "lint-staged": {
     "*.{js,mjs,ts,tsx,json,yml,yaml,md,css}": [
       "prettier --write"
+    ],
+    "docs/plans/**/*.md": [
+      "node scripts/check-slice-rescope.mjs"
     ]
   },
   "devDependencies": {
