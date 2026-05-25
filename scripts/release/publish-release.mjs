@@ -13,6 +13,7 @@ import {
   resolveReleaseTag,
   resolveRepositoryHttpUrl,
 } from "./helpers.mjs";
+import { buildManifest, manifestPathFor, readChecksumEntries, writeManifest } from "./write-release-manifest.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 process.chdir(rootDir);
@@ -80,6 +81,9 @@ function resolveReleaseNotes(tag, packageJson) {
   return formatReleaseNotes({
     body: releaseSection.body,
     repoUrl: resolveRepositoryHttpUrl(packageJson),
+    // C4: ship authoritative hashes in the GitHub Release body itself,
+    // not just in the sidecar SHA256 files.
+    artifactHashes: readChecksumEntries({ rootDir }),
   });
 }
 
@@ -108,6 +112,22 @@ assert(isValidReleaseTag(tag), `Invalid release tag '${tag}'. Expected vX.Y.Z or
 const repoSlug = resolveRepoSlug(packageJson);
 const notes = resolveReleaseNotes(tag, packageJson);
 const assets = resolveAssets();
+
+// plan PR 3 / workstream C3 — write the chain-of-custody manifest before
+// the gh release upload so it ships as a release asset alongside the
+// installers + checksums.
+const manifestPath = manifestPathFor(tag, { rootDir });
+const manifest = buildManifest({
+  tag,
+  rootDir,
+  buildStartedAt: process.env.SSE_RELEASE_BUILD_STARTED_AT ?? new Date().toISOString(),
+  buildFinishedAt: new Date().toISOString(),
+  notarizationTicketUuid: process.env.SSE_MACOS_NOTARY_TICKET_UUID ?? null,
+});
+writeManifest({ tag, manifest, rootDir });
+console.log(`Wrote release manifest: ${manifestPath}`);
+assets.push(manifestPath);
+
 const notesDir = mkdtempSync(path.join(os.tmpdir(), "sse-release-notes-"));
 const notesPath = path.join(notesDir, `${tag}.md`);
 const prerelease = tag.includes("-");

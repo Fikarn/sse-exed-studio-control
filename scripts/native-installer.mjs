@@ -139,6 +139,17 @@ function renderPackageXml({ version, releaseDate }) {
 
 const target = parseTarget(readFlag("--target"));
 const prepareOnly = hasFlag("--prepare-only");
+const allowStaged = hasFlag("--allow-staged");
+
+if (prepareOnly && !allowStaged) {
+  // plan PR 3 / workstream C2: stop silent staged fallbacks. `--prepare-only`
+  // produces a staged build root without an installer binary; that's only
+  // ever useful in the staged-verification lane and must be opted into.
+  throw new Error(
+    "native-installer.mjs --prepare-only produces a staged (incomplete) installer payload. Pass --allow-staged to confirm you want staged output, or drop --prepare-only to build the full installer (requires QtIFW binarycreator)."
+  );
+}
+
 const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
 const releaseDate = new Date().toISOString().slice(0, 10);
 const { packagedPath, installerPath, archivePath } = resolvePackagedPayload(target);

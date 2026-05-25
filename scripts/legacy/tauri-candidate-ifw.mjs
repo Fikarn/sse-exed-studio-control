@@ -153,6 +153,18 @@ function archiveWindowsPath(sourcePath, archivePath) {
 const target = parseTarget(readFlag("--target"));
 const kind = parseKind(readFlag("--kind"));
 const prepareOnly = hasFlag("--prepare-only");
+const allowStaged = hasFlag("--allow-staged");
+
+if (prepareOnly && !allowStaged) {
+  // plan PR 3 / workstream C2: stop silent staged fallbacks. `--prepare-only`
+  // produces a staged build root without the QtIFW binarycreator / repogen
+  // output; that's only useful in the staged-verification lane and must be
+  // opted into.
+  throw new Error(
+    `legacy/tauri-candidate-ifw.mjs --prepare-only produces a staged (incomplete) ${kind} payload. Pass --allow-staged to confirm you want staged output, or drop --prepare-only to build the full ${kind} (requires QtIFW).`
+  );
+}
+
 const releaseDate = new Date().toISOString().slice(0, 10);
 const payloadPath = ensurePackagedPayload(target);
 const rootName = kind === "installer" ? "tauri-candidate-installer" : "tauri-candidate-updates";
