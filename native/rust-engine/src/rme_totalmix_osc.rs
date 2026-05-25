@@ -1469,4 +1469,85 @@ mod tests {
             "peak should decay by roughly 20 dB/s after the 1500 ms hold window"
         );
     }
+
+    // plan PR 8 / workstream E6: wire-level OSC test. Binds a local UDP
+    // receiver and asserts that `send_totalmix_eq_update` emits the
+    // documented prefix sequence (`/2/busInput` + `/setBankStart` +
+    // `/setOffsetInBank`) followed by the per-band parameter messages.
+    // Exercises the bytes that actually go on the wire — the higher-level
+    // simulator/parser tests above cover the receive side; this fills in
+    // the send-side coverage the plan called out.
+    #[test]
+    fn send_totalmix_eq_update_emits_documented_address_prefix_on_the_wire() {
+        use crate::audio::AudioEqUpdateRequest;
+        use rosc::OscPacket;
+        use std::time::Duration;
+
+        let receiver = UdpSocket::bind(("127.0.0.1", 0)).expect("test UDP receiver should bind");
+        receiver
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .expect("test receiver should accept timeout");
+        let port = receiver
+            .local_addr()
+            .expect("receiver should expose port")
+            .port();
+
+        let request = AudioEqUpdateRequest {
+            channel_id: String::from("audio-input-9"),
+            enabled: None,
+            low_cut_enabled: None,
+            low_cut_frequency_hz: None,
+            low_cut_slope_db_per_octave: None,
+            band_id: Some(String::from("1")),
+            band_enabled: None,
+            band_type: Some(String::from("bell")),
+            frequency_hz: Some(180.0),
+            gain_db: Some(3.0),
+            q: Some(0.9),
+        };
+
+        let count =
+            super::send_totalmix_eq_update("127.0.0.1", port as i64, "audio-input-9", &request)
+                .expect("send_totalmix_eq_update should succeed against the local receiver");
+        assert!(
+            count >= 3,
+            "sender should emit at least the 3-message prefix (got {count})"
+        );
+
+        let mut addresses: Vec<String> = Vec::new();
+        let mut buffer = [0u8; 4096];
+        for _ in 0..count {
+            let (read, _from) = receiver
+                .recv_from(&mut buffer)
+                .expect("each sent message should arrive on the loopback");
+            let packet = rosc::decoder::decode_udp(&buffer[..read])
+                .expect("each datagram should decode as OSC")
+                .1;
+            if let OscPacket::Message(message) = packet {
+                addresses.push(message.addr);
+            }
+        }
+
+        // Prefix contract per `send_totalmix_eq_update`:
+        //   1. `/2/<bus>` (busInput / busOutput)
+        //   2. `/setBankStart`
+        //   3. `/setOffsetInBank`
+        assert!(
+            addresses.iter().any(|addr| addr == "/2/busInput"),
+            "prefix should include /2/busInput, saw {addresses:?}"
+        );
+        assert!(
+            addresses.contains(&String::from("/setBankStart")),
+            "prefix should include /setBankStart, saw {addresses:?}"
+        );
+        assert!(
+            addresses.contains(&String::from("/setOffsetInBank")),
+            "prefix should include /setOffsetInBank, saw {addresses:?}"
+        );
+        // And at least one per-band parameter address after the prefix.
+        assert!(
+            addresses.iter().any(|addr| addr.starts_with("/2/eq")),
+            "wire payload should include at least one /2/eq* parameter address, saw {addresses:?}"
+        );
+    }
 }
