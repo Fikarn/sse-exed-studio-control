@@ -68,13 +68,14 @@ Code health:
 
 - `npm run format:check` / `npm run format` — Prettier check/write.
 - `npm run lint` / `npm run lint:fix` — ESLint check/fix.
-- `npm run scripts:test` — unit tests for repository maintenance/release helper scripts.
+- `npm run scripts:test` — unit tests for repository maintenance/release helper scripts (glob over `scripts/**/*.test.mjs`).
 - `npm run file:health` — tracked-file size and oversized-source guard.
 - `npm run frontend:typecheck` — TypeScript typecheck for all npm workspaces that expose `typecheck`.
+- `npm run frontend:test` — Vitest across all frontend workspaces (`@testing-library/react` for components; pure-logic unit tests).
 - `npm run rust:fmt:check` — Rust formatting check under `native/`.
 - `npm run rust:clippy` — Rust clippy for the native workspace with warnings denied by the command.
 - `npm run protocol:check` / `npm run protocol:generate` — check or regenerate protocol artifacts from `native/protocol/v1.contract.json`.
-- `npm run dev:check` — full local code-health bundle: format, lint, script tests, rustfmt, clippy, protocol, frontend typecheck, native check, native tests.
+- `npm run dev:check` — full local code-health bundle: format, lint, script tests, file health, rustfmt, clippy, protocol, frontend typecheck, frontend tests (Vitest), native check, native tests.
 - `npm run ci` — repo-local convenience gate: format, release metadata check, native foundation.
 
 Frontend and selected shell:
@@ -90,11 +91,16 @@ Frontend and selected shell:
 Native and release:
 
 - `npm run native:check` — `cargo check --workspace` under `native/`.
-- `npm run native:test` — `cargo test --workspace` under `native/`.
+- `npm run native:test` — `cargo test --workspace` under `native/` (excludes `#[ignore]` tests).
+- `npm run native:test:hardware` — opt-in lane that runs `cargo test --workspace -- --ignored`, exercising device-bound tests against a connected RME UFX III / Stream Deck / TotalMix OSC host. CI does not run this; the operator workstation does. See `docs/DEVELOPMENT.md §Opt-in real-hardware lane`.
 - `npm run native:engine:build` — build `studio-control-engine`.
 - `npm run native:foundation` — native shipping foundation lane.
 - `npm run native:acceptance` — native acceptance lane.
-- `npm run release:check` / `npm run release:verify` — release metadata and release verification.
+- `npm run release:preflight` — pre-12-stage-chain credential, tooling, disk, and network reachability check (run before `release:verify`).
+- `npm run release:check` / `npm run release:verify` — release metadata and release verification (`release:verify` chains `release:preflight`).
+- `npm run release:manifest` — write the chain-of-custody release manifest for a tag. Called from `release:publish`; standalone for evidence regeneration.
+- `npm run release:notes` — emit the GitHub Release notes body (artifact hashes embedded from the manifest).
+- `npm run release:publish` — publish artifacts + manifest to GitHub Releases for a tag.
 - `npm run native:release:mac:local` and `npm run native:release:win:local` — target-host shipping release gates when QtIFW tools are installed.
 
 ## Visual Review Discipline
@@ -107,13 +113,32 @@ Every operator-visible change to the selected Tauri surface must:
 
 Tauri visual review, Playwright, fixture-driven smoke coverage, target-host release evidence, and the gate in `docs/archive/FRONTEND_CUTOVER_PLAN.md` are the active validation path. Historical Qt parity screenshots were retired in Checkpoint D.
 
+The committed `visual-review.spec.ts` baselines under `frontend/app/tests/__visual__/visual-review.spec.ts-snapshots/` are the structural patch for the silent-rescope class of bug captured in [#Rescope protocol (sliced plans)](#rescope-protocol-sliced-plans): a content-altering substitution under an existing slice title would now fail the diff gate on CI, and the missing-`Rescope:`-paragraph nudge from `scripts/check-slice-rescope.mjs` would catch the doc-side silence. Treat the two as a pair, not as substitutes.
+
 When the selected Tauri shell is open for user inspection, that exact running shell is the authoritative surface for visual feedback. Treat user callouts as referring to the live `sse-exed-tauri-shell` / `SSE ExEd Studio Control` window unless they explicitly name another artifact. See `docs/HARDWARE_PROFILE.md`.
 
 ## Testing posture
 
-- Engine tests: `cargo test` under `native/rust-engine/`.
+- Engine tests: `cargo test` under `native/rust-engine/`. `#[ignore]`-marked tests are hardware-bound and skipped by default; run them via `npm run native:test:hardware` on the operator workstation.
+- Frontend unit/component tests: `npm run frontend:test` (Vitest + `@testing-library/react`). Specs colocated as `*.test.ts` / `*.test.tsx` under each workspace.
+- Frontend Playwright + visual baselines: `npm run frontend:playwright:test`. `visual-review.spec.ts` commits `toHaveScreenshot` baselines under `frontend/app/tests/__visual__/visual-review.spec.ts-snapshots/` (per-platform `*-darwin.png` / `*-linux.png` files); the CI `frontend-e2e` job re-runs them and uploads diffs + the Playwright report as artifacts. `storybook.spec.ts` does the same for the Storybook static build.
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
 - Target-host lanes: macOS and Windows native verification are both blocking release gates. Treat a Windows target-host failure the same as a macOS failure.
+
+### CI validation lanes (`.github/workflows/dev-checks.yml`)
+
+| Job                  | Covers                                                                                                                                                                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `format-protocol`    | `format:check`, `scripts:test`, `release:check`, `file:health`, `protocol:check`                                                                                                                                                                                                                 |
+| `lint`               | `lint` (ESLint)                                                                                                                                                                                                                                                                                  |
+| `frontend-typecheck` | `frontend:typecheck`                                                                                                                                                                                                                                                                             |
+| `frontend-test`      | `frontend:test` (Vitest across all frontend workspaces)                                                                                                                                                                                                                                          |
+| `frontend-e2e`       | `frontend:playwright:test` — Playwright suite + visual-review + Storybook baselines. Uploads `playwright-report` and `playwright-test-results` artifacts (including snapshot diffs and traces). Reviewers click through from the PR Checks tab; this is the visual-diff PR gate (Workstream A1). |
+| `rust`               | `rust:fmt:check`, `rust:clippy`, `native:check`, `native:test`, `native:acceptance` (with `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` because CI has no real RME TotalMix on `127.0.0.1`)                                                                                                          |
+| `tauri-foundation`   | `tauri:foundation` (protocol generate → engine build → Tauri build → Tauri smoke)                                                                                                                                                                                                                |
+| `qualification`      | `tauri:setup-support:qualify` + `tauri:workspaces:qualify` under `xvfb`, with `SSE_TAURI_QUALIFICATION_TIMEOUT_MS=180000`, `LIBGL_ALWAYS_SOFTWARE=1`, and `SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1` (CI cannot supply live OSC). Uploads `tauri-qualification-evidence` artifact.             |
+
+These jobs are required merge hygiene on `main`. They are **not** the release gate — `npm run native:release:{mac,win}:local` and `npm run release:verify` on the operator workstation remain the release acceptance mechanism.
 
 ## Release posture
 
