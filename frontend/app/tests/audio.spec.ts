@@ -524,6 +524,11 @@ test("does not refresh audio snapshots for meter-only ticks", async ({ page }) =
   await expect
     .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 5_000 })
     .toBeGreaterThan(0);
+  // plan PR 5 / D8 flake sweep: load-bearing wait. We just observed the
+  // first meter sample; this 900 ms window proves the engine doesn't
+  // refresh `audio.snapshot` per meter tick. Replacing with `expect.poll`
+  // would invert the assertion (we want to assert absence of further
+  // requests over the window, not presence).
   await page.waitForTimeout(900);
   const finalAudioSnapshotRequests = await page.evaluate(
     () => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.snapshot"] ?? 0
