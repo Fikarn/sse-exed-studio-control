@@ -104,7 +104,37 @@ export function extractReleaseSection(changelog, version) {
   };
 }
 
-export function formatReleaseNotes({ body, repoUrl }) {
+/**
+ * Format an SHA-256 + filename table for inclusion in the release notes
+ * body. The `entries` array is the same shape as `readChecksumEntries`
+ * returns (see scripts/release/write-release-manifest.mjs).
+ *
+ * plan PR 3 / workstream C4: published GitHub Release pages must contain
+ * the authoritative artifact hashes, not just the sidecar SHA256 files.
+ */
+export function formatArtifactHashTable(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  const grouped = new Map();
+  for (const entry of entries) {
+    const list = grouped.get(entry.target) ?? [];
+    list.push(entry);
+    grouped.set(entry.target, list);
+  }
+  const sections = [];
+  for (const target of ["macos", "windows"]) {
+    const list = grouped.get(target);
+    if (!list || list.length === 0) continue;
+    sections.push(`### ${target}`);
+    sections.push("");
+    sections.push("```");
+    for (const entry of list) sections.push(`${entry.sha256}  ${entry.name}`);
+    sections.push("```");
+    sections.push("");
+  }
+  return sections.length === 0 ? null : sections.join("\n");
+}
+
+export function formatReleaseNotes({ body, repoUrl, artifactHashes = null }) {
   const trimmedBody = body.trim();
   const releaseGuideUrl = repoUrl ? `${repoUrl}/blob/main/docs/RELEASE.md` : null;
   const operationsGuideUrl = repoUrl ? `${repoUrl}/blob/main/docs/OPERATIONS.md` : null;
@@ -125,9 +155,19 @@ export function formatReleaseNotes({ body, repoUrl }) {
     "- `SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt`",
     "- `SSE-ExEd-Studio-Control-Native-windows-SHA256.txt`",
     "",
-    "## Operator Guidance",
-    "",
   ];
+
+  const hashTable = formatArtifactHashTable(artifactHashes);
+  if (hashTable) {
+    lines.push("## Artifact verification", "");
+    lines.push(
+      "Authoritative SHA-256 hashes for the artifacts attached to this release. The sidecar `*-SHA256.txt` assets are produced by the same step.",
+      ""
+    );
+    lines.push(hashTable);
+  }
+
+  lines.push("## Operator Guidance", "");
 
   if (releaseGuideUrl) {
     lines.push(`- [Release flow and installer details](${releaseGuideUrl})`);
@@ -136,7 +176,9 @@ export function formatReleaseNotes({ body, repoUrl }) {
     lines.push(`- [Runtime, recovery, and rollback guidance](${operationsGuideUrl})`);
   }
   if (!releaseGuideUrl && !operationsGuideUrl) {
-    lines.push("- See the repo release and operations documentation for installer, update, recovery, and rollback details.");
+    lines.push(
+      "- See the repo release and operations documentation for installer, update, recovery, and rollback details."
+    );
   }
 
   lines.push("", "## What's Changed", "", trimmedBody, "");
