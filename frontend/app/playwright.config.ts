@@ -28,10 +28,22 @@ export default defineConfig({
   // docs/plans/* "plan PR 1" + frontend/app/tests/__visual__/README.md.
   snapshotPathTemplate: "{testDir}/__visual__/{testFilePath}-snapshots/{arg}-{platform}{ext}",
   reporter: [["html", { outputFolder: "playwright-report" }]],
-  webServer: {
-    command: "npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: "npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
+      port: 4173,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
+      // plan PR 5 / workstream D5: Storybook static server for the
+      // storybook.spec.ts visual lane. The `storybook-static/` build is
+      // produced by `npm run frontend:storybook:build` (chained into
+      // `frontend:playwright:test`).
+      command: "npm run storybook:serve-static",
+      port: 6007,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+  ],
 });

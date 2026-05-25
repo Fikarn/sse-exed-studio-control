@@ -1,13 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { AUDIO_ARM_TIMEOUT_MS } from "../src/app/audio/audioConstants";
-
-async function openFixture(page: Page, fixtureId: string) {
-  const params = new URLSearchParams({ fixture: fixtureId, transport: "fixture" });
-  const response = await page.goto(`/?${params.toString()}`);
-  expect(response).not.toBeNull();
-  expect(response!.status()).toBeLessThan(400);
-}
+import { openFixture } from "./helpers/openFixture";
 
 test("snapshot recall arming renders a countdown bar that respects AUDIO_ARM_TIMEOUT_MS", async ({ page }) => {
   await openFixture(page, "audio-populated");
@@ -27,9 +21,14 @@ test("snapshot recall arming renders a countdown bar that respects AUDIO_ARM_TIM
   await expect(countdown).toHaveCSS("animation-duration", `${AUDIO_ARM_TIMEOUT_MS / 1000}s`);
 
   // After the arm window expires the tile must clear and the countdown bar
-  // must unmount. Allow a small buffer to cover scheduler jitter.
-  await page.waitForTimeout(AUDIO_ARM_TIMEOUT_MS + 500);
-  await expect(recalledTile).toHaveAttribute("data-armed", "false");
+  // must unmount. plan PR 5 / workstream D8 flake sweep: this used to be a
+  // hard `waitForTimeout(AUDIO_ARM_TIMEOUT_MS + 500)` which would have
+  // false-passed on a slow runner that hadn't yet processed the timeout
+  // tick. Polling on the attribute instead waits for the observable
+  // change with a margin big enough to absorb scheduler jitter.
+  await expect(recalledTile).toHaveAttribute("data-armed", "false", {
+    timeout: AUDIO_ARM_TIMEOUT_MS + 2_000,
+  });
   await expect(recalledTile.getByTestId("audio-arm-countdown")).toHaveCount(0);
 });
 

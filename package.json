@@ -50,7 +50,7 @@
     "frontend:storybook": "npm run storybook --workspace frontend/app",
     "frontend:storybook:build": "npm run storybook:build --workspace frontend/app",
     "frontend:fixtures:check": "npm run fixtures:check --workspace frontend/packages/test-fixtures",
-    "frontend:playwright:test": "npm run build --workspace frontend/app && npm run playwright:test --workspace frontend/app",
+    "frontend:playwright:test": "npm run build --workspace frontend/app && npm run frontend:storybook:build && npm run playwright:test --workspace frontend/app",
     "frontend:foundation": "npm run protocol:generate && npm run frontend:tokens:build && npm run frontend:typecheck && npm run frontend:storybook:build && npm run frontend:fixtures:check && npm run frontend:playwright:test",
     "tauri:dev": "npm run tauri:dev --workspace frontend/app",
     "tauri:build": "npm run tauri:build --workspace frontend/app",

@@ -42,6 +42,10 @@ for (const fixtureId of GATED_FIXTURES) {
     // Sample twice with enough delay for the simulated tick to advance if it
     // were running. The checksum must stay identical (empty rects only) even
     // though the meter sequence advances each animation frame.
+    // plan PR 5 / D8 flake sweep: load-bearing wait. The assertion is that
+    // the meter canvas does NOT change while metering is gated, so we need
+    // actual wall-clock time for any drift to manifest. An `expect.poll`
+    // here would invert the test.
     const first = await readCanvasChecksum(page);
     await page.waitForTimeout(800);
     const second = await readCanvasChecksum(page);
