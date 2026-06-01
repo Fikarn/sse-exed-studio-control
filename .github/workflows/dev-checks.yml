@@ -8,6 +8,13 @@ on:
 permissions:
   contents: read
 
+# actions/cache and actions/upload-artifact (@v4) still ship a Node.js 20
+# runtime. Opt them into Node 24 now — GitHub forces it from 2026-06-16 and the
+# actions already support it — so the deprecation warning clears ahead of the
+# runner change without waiting on a new action major.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 # Cancel in-flight runs of this workflow on the same ref when a new push lands
 # (plan PR 1 / workstream B6 concurrency portion). Path filters are deferred
 # to a later PR.
