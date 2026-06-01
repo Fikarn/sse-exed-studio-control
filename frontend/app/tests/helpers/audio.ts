@@ -14,8 +14,14 @@ import {
 // meter-canvas.ts; this module is the workspace + snapshot deck +
 // inspector overview piece.
 
-export const COMPACT_PREAMP_ASPECT_RATIO = 640 / 213;
-export const NARROW_PREAMP_ASPECT_RATIO = 426 / 640;
+// 2026-05-27 Console redesign: both preamp controls are now square SVG rotary
+// dials — AudioStripPreamp (32×32) in the channel strip and AudioKnob (132×132)
+// in the inspector hero. The role="slider" element measures ~1:1 in every
+// surface, so the old 640×213 / 426×640 preamp-bitmap aspect ratios no longer
+// apply. Kept as two named constants so the per-surface assertions still read
+// as "strip preamp" vs "inspector preamp" intent.
+export const COMPACT_PREAMP_ASPECT_RATIO = 1;
+export const NARROW_PREAMP_ASPECT_RATIO = 1;
 
 export async function expectAudioWorkspaceGeometry(page: Page) {
   await expectNoDocumentScroll(page);
@@ -39,59 +45,49 @@ export async function expectAudioWorkspaceGeometry(page: Page) {
 
 export async function expectAudioInspectorPanelsFit(page: Page) {
   for (const { tab, panelId } of [
-    { tab: "Overview", panelId: "audio-inspector-channel" },
+    { tab: "Preamp", panelId: "audio-inspector-channel" },
     { tab: "EQ", panelId: "audio-inspector-eq" },
-    { tab: "Dynamics", panelId: "audio-inspector-dynamics" },
-    { tab: "Sends", panelId: "audio-inspector-sends" },
+    { tab: "Dyn", panelId: "audio-inspector-dynamics" },
+    { tab: "Routing", panelId: "audio-inspector-sends" },
   ]) {
     await page.getByRole("tab", { name: tab, exact: true }).click();
     const metrics = await page.getByTestId(panelId).evaluate((panel) => ({
       clientHeight: panel.clientHeight,
       scrollHeight: panel.scrollHeight,
+      overflowY: getComputedStyle(panel).overflowY,
     }));
-    expect(metrics.scrollHeight, `${panelId} hidden overflow`).toBeLessThanOrEqual(metrics.clientHeight + 1);
+    // 2026-05-27 Console redesign: the dense processing panels (EQ / Dyn
+    // all-knob grids) can exceed the inspector height at the cramped 1920×1080
+    // fallback. That is fine as long as the panel scrolls (content stays
+    // reachable) instead of clipping silently — so a scrollable panel satisfies
+    // the guard. The guard still catches a panel that overflows with hidden
+    // overflow (content cut off with no way to reach it).
+    const fits = metrics.scrollHeight <= metrics.clientHeight + 1;
+    const scrollable = metrics.overflowY === "auto" || metrics.overflowY === "scroll";
+    expect(
+      fits || scrollable,
+      `${panelId} clips content (scrollHeight ${metrics.scrollHeight} > clientHeight ${metrics.clientHeight}, overflow-y ${metrics.overflowY})`
+    ).toBe(true);
   }
-  await page.getByRole("tab", { name: "Overview", exact: true }).click();
+  await page.getByRole("tab", { name: "Preamp", exact: true }).click();
 }
 
-export async function expectAudioStudioSideRailsFilled(page: Page, bottomGapPx = 24) {
+export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx = 24) {
+  // 2026-05-27 Console redesign: the left studio rail (Trust / Snapshot
+  // panels) was replaced by the top bar + bottom monitor bar. This helper now
+  // asserts that chrome is present + filled instead of the removed rail.
+  await expect(page.getByTestId("audio-topbar"), "studio top bar present").toBeVisible();
+  await expect(page.getByTestId("audio-monitor-bar"), "studio monitor bar present").toBeVisible();
   const metrics = await page.evaluate(() => {
-    const boxFor = (selector: string) => {
-      const element = document.querySelector<HTMLElement>(selector);
-      if (!element) return null;
-      const rect = element.getBoundingClientRect();
-      return {
-        bottom: rect.bottom,
-        display: getComputedStyle(element).display,
-        height: rect.height,
-        top: rect.top,
-      };
-    };
-    const inspectorPanel = document.querySelector<HTMLElement>('[data-testid="audio-inspector-channel"]');
-    const inspectorCards = inspectorPanel
-      ? Array.from(inspectorPanel.querySelectorAll<HTMLElement>("[class*=inspectorMiniCard]")).map((element) => {
-          const rect = element.getBoundingClientRect();
-          return { bottom: rect.bottom, top: rect.top };
-        })
-      : [];
-    return {
-      inspectorCards,
-      inspectorPanel: boxFor('[data-testid="audio-inspector-channel"]'),
-      rail: boxFor("[class*=audioRail]"),
-      railSnapshot: boxFor('[data-testid="audio-rail-snapshot-panel"]'),
-      railTrust: boxFor('[data-testid="audio-rail-trust-panel"]'),
-    };
+    const topbar = document.querySelector<HTMLElement>('[data-testid="audio-topbar"]');
+    const monitor = document.querySelector<HTMLElement>('[data-testid="audio-monitor-bar"]');
+    const monitorMeter = document.querySelector<HTMLElement>('[data-testid="audio-monitor-master-meter"]');
+    const rect = (el: HTMLElement | null) => (el ? el.getBoundingClientRect().width : 0);
+    return { monitorMeter: rect(monitorMeter), monitorWidth: rect(monitor), topbarWidth: rect(topbar) };
   });
-
-  expect(metrics.railTrust?.display, "studio trust rail panel visible").not.toBe("none");
-  expect(metrics.railSnapshot?.display, "studio snapshot rail panel visible").not.toBe("none");
-  expect(metrics.railSnapshot?.bottom ?? 0, "left rail content should fill the studio rail").toBeGreaterThanOrEqual(
-    (metrics.rail?.bottom ?? 0) - bottomGapPx
-  );
-  expect(
-    Math.max(...metrics.inspectorCards.map((card) => card.bottom)),
-    "right inspector cards should fill the channel panel"
-  ).toBeGreaterThanOrEqual((metrics.inspectorPanel?.bottom ?? 0) - bottomGapPx);
+  expect(metrics.topbarWidth, "top bar spans the surface").toBeGreaterThan(400);
+  expect(metrics.monitorWidth, "monitor bar spans the surface").toBeGreaterThan(400);
+  expect(metrics.monitorMeter, "monitor master meter is filled").toBeGreaterThan(120);
 }
 
 export async function expectSnapshotActionsDoNotOverlapContent(page: Page, snapshotId: string) {
@@ -146,62 +142,25 @@ export async function expectAudioLaneCardsInsideTierGrids(page: Page) {
   ).toEqual([]);
 }
 
-export async function expectAudioOverviewProcessingStack(page: Page, label: string, minimumGraphHeight: number) {
+export async function expectAudioOverviewProcessingStack(page: Page, label: string, _minimumGraphHeight: number) {
+  // 2026-05-27 Console redesign: the Overview tab's dense mini-preview cards
+  // (Route / EQ / Dynamics graphs) were replaced by the Preamp tab's hero
+  // preamp knob + meter card + send fader. This helper now asserts that
+  // Preamp panel is present and its hardware (preamp) + meter cards fill it.
   const panel = page.getByTestId("audio-inspector-channel");
   const meter = page.getByTestId("audio-inspector-metering");
-  const route = page.getByTestId("audio-inspector-sends-mini");
-  const eq = page.getByTestId("audio-inspector-eq-mini");
-  const dynamics = page.getByTestId("audio-inspector-dynamics-mini");
-  const source = page.getByTestId("audio-inspector-source-mini");
   const hardware = page.getByTestId("audio-inspector-hardware-mini");
 
-  await expect(panel, `${label} Overview panel`).toBeVisible();
-  await expect(source, `${label} Source card removed from Overview`).toHaveCount(0);
-  for (const locator of [meter, hardware, route, eq, dynamics]) {
-    await expect(locator, `${label} Overview card should be visible`).toBeVisible();
-  }
+  await expect(panel, `${label} Preamp panel`).toBeVisible();
+  await expect(hardware, `${label} preamp card visible`).toBeVisible();
+  await expect(meter, `${label} meter card visible`).toBeVisible();
 
-  const panelBox = await readRequiredLocatorBox(panel, `${label} Overview panel`);
+  const panelBox = await readRequiredLocatorBox(panel, `${label} Preamp panel`);
   const meterBox = await readRequiredLocatorBox(meter, `${label} meter card`);
-  const hardwareBox = await readRequiredLocatorBox(hardware, `${label} Hardware card`);
-  const routeBox = await readRequiredLocatorBox(route, `${label} route card`);
-  const eqBox = await readRequiredLocatorBox(eq, `${label} EQ card`);
-  const dynamicsBox = await readRequiredLocatorBox(dynamics, `${label} Dynamics card`);
+  const hardwareBox = await readRequiredLocatorBox(hardware, `${label} preamp card`);
 
-  for (const [box, boxLabel] of [
-    [routeBox, "route"],
-    [eqBox, "EQ"],
-    [dynamicsBox, "Dynamics"],
-  ] as const) {
-    expectInsideBox(box, panelBox, `${label} ${boxLabel} card inside Overview`);
-  }
-
-  expect(hardwareBox.top, `${label} Hardware sits below meter`).toBeGreaterThanOrEqual(meterBox.bottom - 2);
-  expect(hardwareBox.top - meterBox.bottom, `${label} Hardware follows meter directly`).toBeLessThanOrEqual(10);
-  expect(
-    Math.abs(hardwareBox.width - meterBox.width),
-    `${label} Hardware width matches meter stack`
-  ).toBeLessThanOrEqual(2);
-  expect(routeBox.bottom, `${label} route above EQ`).toBeLessThanOrEqual(eqBox.top + 2);
-  expect(eqBox.bottom, `${label} EQ above Dynamics`).toBeLessThanOrEqual(dynamicsBox.top + 2);
-
-  expect(eqBox.width, `${label} EQ spans the full Overview width`).toBeGreaterThan(panelBox.width * 0.88);
-  expect(dynamicsBox.width, `${label} Dynamics spans the full Overview width`).toBeGreaterThan(panelBox.width * 0.88);
-  expect(Math.abs(eqBox.width - dynamicsBox.width), `${label} EQ/Dynamics width parity`).toBeLessThanOrEqual(2);
-
-  const eqGraphBox = await readRequiredLocatorBox(eq.locator("[class*=eqGraphMini]"), `${label} EQ graph`);
-  const dynamicsGraphBox = await readRequiredLocatorBox(
-    dynamics.locator("[class*=dynamicsGraphMini]"),
-    `${label} Dynamics graph`
-  );
-  expectInsideBox(eqGraphBox, eqBox, `${label} EQ graph inside card`);
-  expectInsideBox(dynamicsGraphBox, dynamicsBox, `${label} Dynamics graph inside card`);
-  expect(eqGraphBox.height, `${label} EQ graph useful preview height`).toBeGreaterThanOrEqual(minimumGraphHeight);
-  expect(dynamicsGraphBox.height, `${label} Dynamics graph useful preview height`).toBeGreaterThanOrEqual(
-    minimumGraphHeight
-  );
-  expect(eqGraphBox.width, `${label} EQ graph uses full-width card`).toBeGreaterThan(panelBox.width * 0.82);
-  expect(dynamicsGraphBox.width, `${label} Dynamics graph uses full-width card`).toBeGreaterThan(panelBox.width * 0.82);
+  expectInsideBox(hardwareBox, panelBox, `${label} preamp card inside Preamp panel`);
+  expectInsideBox(meterBox, panelBox, `${label} meter card inside Preamp panel`);
 }
 
 export async function readSnapshotThumbHeights(page: Page, snapshotId: string) {

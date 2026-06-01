@@ -41,14 +41,20 @@ test("health bar drops OSC, Endpoint and Metering rows", async ({ page }) => {
   await expect(healthBar).not.toContainText("Metering");
   await expect(healthBar).toContainText("Clock");
   await expect(healthBar).toContainText("Last sync");
-  // The rail Trust panel is now the canonical surface for those rows.
-  const trust = page.getByTestId("audio-rail-trust-panel");
-  await expect(trust).toContainText("OSC");
-  await expect(trust).toContainText("Endpoint");
-  await expect(trust).toContainText("Metering");
+  // 2026-05-27 redesign: the AudioTopBar stat cluster is now the canonical
+  // surface for OSC / Console / Metering facts. The cluster has no testid
+  // yet — assert via text inside the topbar header.
+  const topbar = page.getByTestId("audio-topbar");
+  await expect(topbar).toContainText("OSC");
+  await expect(topbar).toContainText("Metering");
 });
 
-test("rail mini-meters expose role=meter with aria-valuenow", async ({ page }) => {
+// 2026-05-27 redesign: the rail mini-meter grid (3 mix targets × 2 sides) is
+// gone. The new AudioMonitorBar exposes a single monitor master meter
+// (`audio-monitor-master-meter`) rather than per-target meters. Skipped
+// until the redesign settles on whether per-target meters move into the
+// mixer itself.
+test.skip("rail mini-meters expose role=meter with aria-valuenow", async ({ page }) => {
   await openFixture(page, "audio-populated");
   const rail = page.getByTestId("audio-rail-monitor-card");
   await expect(rail).toBeVisible();
@@ -89,10 +95,12 @@ test("EQ Band 2 locks the band-type selector via the capability flag", async ({ 
   const band2 = page.getByTestId("audio-eq-point-2");
   await band2.click();
 
+  // 2026-05-27 redesign: the EQ tab shows every band's card at once, so a
+  // global Bell button now matches multiple cards. Scope to band 2's card.
   // Band 2 renders exactly one band-type option (Bell) and that option is
   // disabled. The disabled state is sourced from `canChangeBandType` rather
   // than an inline `=== "2"` string match.
-  const bellButton = page.getByRole("button", { name: /^Bell$/i }).first();
+  const bellButton = page.getByTestId("audio-eq-band-card-2").getByRole("button", { name: /^Bell$/i });
   await expect(bellButton).toBeVisible();
   await expect(bellButton).toBeDisabled();
 });

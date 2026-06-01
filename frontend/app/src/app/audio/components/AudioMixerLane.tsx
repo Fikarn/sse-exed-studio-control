@@ -6,14 +6,13 @@ import styles from "./AudioMixerLane.module.css";
 import { AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { createThrottledCommit } from "../audioContinuousControls";
-import { formatAudioDb, formatMeterDb } from "../audioFormatting";
+import { formatAudioDb } from "../audioFormatting";
 import { audioChannelSupportsGain, getAudioChannelGroup, selectedChannelSendLevel } from "../audioViewModel";
 import type { AudioChannelEntry, AudioMixTargetEntry } from "../../shellData";
 import { AudioFader } from "./AudioFader";
-import { AudioHardwareReadout } from "./AudioHardwareReadout";
 import { AudioLaneTagStrip } from "./AudioLaneTagStrip";
-import { AudioPreampControl } from "./AudioPreampControl";
 import { AudioStereoMeter } from "./AudioStereoMeter";
+import { AudioStripPreamp } from "./AudioStripPreamp";
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
@@ -32,11 +31,37 @@ function formatLaneNumber(index: number) {
   return String(index + 1).padStart(2, "0");
 }
 
-function outputHeaderStatus(mixTarget: AudioMixTargetEntry, selected: boolean) {
-  if (selected) return "ACTIVE MIX";
-  if (mixTarget.role === "phones-a") return "CUE A";
-  if (mixTarget.role === "phones-b") return "CUE B";
-  return "SUBMIX";
+function outputGlyphKind(role: string): "speaker" | "phones" | "line" {
+  if (role === "phones-a" || role === "phones-b") return "phones";
+  if (role === "main-out") return "speaker";
+  return "line";
+}
+
+function OutputDestinationGlyph({ kind, active }: { kind: "speaker" | "phones" | "line"; active: boolean }) {
+  const fill = active ? "var(--accent)" : "var(--fg-3)";
+  if (kind === "phones") {
+    return (
+      <svg width={12} height={12} viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M2 7v-1a4 4 0 0 1 8 0v1" stroke={fill} strokeWidth="1.2" strokeLinecap="round" />
+        <rect x="1.5" y="6.5" width="2" height="3.5" rx=".7" fill={fill} />
+        <rect x="8.5" y="6.5" width="2" height="3.5" rx=".7" fill={fill} />
+      </svg>
+    );
+  }
+  if (kind === "line") {
+    return (
+      <svg width={12} height={12} viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <circle cx="6" cy="6" r="4" stroke={fill} strokeWidth="1.2" />
+        <circle cx="6" cy="6" r="1.3" fill={fill} />
+      </svg>
+    );
+  }
+  return (
+    <svg width={12} height={12} viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M3 4.5h1.5L7 2.5v7L4.5 7.5H3z" fill={fill} />
+      <path d="M8.5 4.5c1 1 1 2 0 3" stroke={fill} strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 export function AudioChannelLane({
@@ -116,6 +141,16 @@ export function AudioChannelLane({
             </span>
           )}
           <span className={styles.laneName}>{channel.name}</span>
+          {/* Badges row — prototype shows 48V / HiZ / Ø on the strip when
+              engaged. Reserved (min-height) on preamp-capable strips so the
+              meter baseline stays aligned whether or not a badge is lit. */}
+          {supportsPreamp ? (
+            <span className={styles.laneBadges}>
+              {channel.phantom ? <span className={`${styles.laneBadge} ${styles.laneBadgePhantom}`}>48V</span> : null}
+              {channel.instrument ? <span className={styles.laneBadge}>HiZ</span> : null}
+              {channel.phase ? <span className={styles.laneBadge}>Ø</span> : null}
+            </span>
+          ) : null}
         </div>
         {channel.clip ? (
           <span className={styles.laneHeaderBadges}>
@@ -135,21 +170,7 @@ export function AudioChannelLane({
         ) : null}
       </div>
 
-      {supportsPreamp ? (
-        <AudioPreampControl
-          channelId={channel.id}
-          disabled={!actionsAllowed}
-          gain={gain}
-          label={`${channel.name} preamp gain`}
-          onCommit={(nextGain) => {
-            setDraftValue(gainDraftKey, nextGain);
-            commitChannelContinuous({ channelId: channel.id, gain: nextGain });
-            clearDraftValueLater(gainDraftKey);
-          }}
-          onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
-          variant="compact"
-        />
-      ) : channel.role === "playback-pair" ? (
+      {supportsPreamp ? null : channel.role === "playback-pair" ? (
         // Phase 3 follow-up E17/E18: playback strips have no preamp control,
         // so the same vertical slot used to read as missing content. The
         // tag strip names the group + format using the already-available
@@ -236,6 +257,21 @@ export function AudioChannelLane({
           </button>
         </Tooltip>
       </div>
+
+      {supportsPreamp ? (
+        <AudioStripPreamp
+          channelId={channel.id}
+          disabled={!actionsAllowed}
+          gain={gain}
+          label={`${channel.name} preamp gain`}
+          onCommit={(nextGain) => {
+            setDraftValue(gainDraftKey, nextGain);
+            commitChannelContinuous({ channelId: channel.id, gain: nextGain });
+            clearDraftValueLater(gainDraftKey);
+          }}
+          onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
+        />
+      ) : null}
     </article>
   );
 }
@@ -272,6 +308,16 @@ export function AudioOutputLane({
     [commitMixTargetContinuous]
   );
 
+  const glyphKind = outputGlyphKind(mixTarget.role);
+  const pairLabel =
+    mixTarget.role === "phones-a"
+      ? "Phones · A"
+      : mixTarget.role === "phones-b"
+        ? "Phones · B"
+        : mixTarget.role === "main-out"
+          ? "Stereo"
+          : "Line";
+
   return (
     <article
       className={styles.outputLane}
@@ -285,9 +331,13 @@ export function AudioOutputLane({
         <div className={styles.laneNameBlock}>
           <span className={styles.laneIndexRow}>
             <span>{formatLaneNumber(index)}</span>
-            <span>{outputHeaderStatus(mixTarget, selected)}</span>
+            {selected ? <span className={styles.outputActiveMark}>ACTIVE</span> : null}
           </span>
-          <span className={styles.laneName}>{mixTarget.name}</span>
+          <span className={styles.outputNameRow}>
+            <OutputDestinationGlyph kind={glyphKind} active={selected} />
+            <span className={styles.laneName}>{mixTarget.name}</span>
+          </span>
+          <span className={styles.outputPair}>{pairLabel}</span>
         </div>
       </div>
 
@@ -319,53 +369,26 @@ export function AudioOutputLane({
           showValue={false}
           value={volume}
         />
-        <div className={styles.outputBusPanel}>
-          <div className={styles.outputBusHeader}>
-            <span>
-              <small>Bus level</small>
-              <AudioHardwareReadout>
-                <strong>{formatAudioDb(volume)}</strong>
-              </AudioHardwareReadout>
-            </span>
-            {/* Phase 3 follow-up E19: Outputs Mute moved into the Bus panel
-                next to the level it gates. After Slice 3 stripped Dim/Mono/
-                Talk out of the lane, the bottom row read as a deserted
-                strip carrying a single button; bringing Mute up next to
-                "Bus level" reads as one coherent output-control cluster. */}
-            <button
-              aria-label={`Mute ${mixTarget.name}`}
-              aria-pressed={mixTarget.mute}
-              className={styles.outputBusMuteButton}
-              data-control="mute"
-              data-active={mixTarget.mute}
-              disabled={!actionsAllowed}
-              onClick={(event) => {
-                event.stopPropagation();
-                onUpdateMixTarget({ mixTargetId: mixTarget.id, mute: !mixTarget.mute });
-              }}
-              type="button"
-            >
-              Mute
-            </button>
-          </div>
-          <div className={styles.outputMetricGrid}>
-            <span>
-              <small>Peak hold</small>
-              <strong>
-                L {formatMeterDb(mixTarget.peakHoldLeft)}
-                <em>R {formatMeterDb(mixTarget.peakHoldRight)}</em>
-              </strong>
-            </span>
-            <span>
-              <small>Nominal ref</small>
-              <strong>-18 dBFS</strong>
-            </span>
-            <span>
-              <small>Peak warn</small>
-              <strong>-3 dBFS</strong>
-            </span>
-          </div>
-        </div>
+      </div>
+
+      <div className={styles.laneReadout}>{formatLaneReadout(volume)}</div>
+
+      <div className={styles.laneControls}>
+        <button
+          aria-label={`Mute ${mixTarget.name}`}
+          aria-pressed={mixTarget.mute}
+          className={styles.laneToggle}
+          data-control="mute"
+          data-active={mixTarget.mute}
+          disabled={!actionsAllowed}
+          onClick={(event) => {
+            event.stopPropagation();
+            onUpdateMixTarget({ mixTargetId: mixTarget.id, mute: !mixTarget.mute });
+          }}
+          type="button"
+        >
+          M
+        </button>
       </div>
     </article>
   );

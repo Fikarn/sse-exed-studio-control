@@ -6,7 +6,14 @@
  * alongside the EQ tab. */
 
 .eqGraphFull {
-  position: relative;
+  /* Sticky so the response curve + draggable band handles stay pinned to the
+     top of the (scrollable) EQ panel. The all-bands knob grid below can be
+     tall enough to scroll; without this, focusing a knob scrolls the graph out
+     of view and its drag points become un-hittable (the band-node drag relies
+     on the point staying on screen). */
+  position: sticky;
+  top: 0;
+  z-index: 5;
   isolation: isolate;
   display: block;
   min-height: 170px;
@@ -303,4 +310,191 @@
   .eqGraphFull {
     min-height: 132px;
   }
+}
+
+/* ── All-bands knob grid (2026-05-27 Console redesign) ──────────────────── */
+
+.eqBandGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.eqGridHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.eqEnableButton {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--easing),
+    color 0.12s var(--easing),
+    border-color 0.12s var(--easing);
+}
+
+.eqEnableButton[data-active="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-glow);
+}
+
+.eqEnableButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.eqCards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eqBandCard {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-2);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.12s var(--easing),
+    background 0.12s var(--easing);
+}
+
+.eqBandCard:hover {
+  border-color: var(--line-2);
+}
+
+.eqBandCard[data-active="true"] {
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
+}
+
+.eqBandCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eqBandCardHead strong {
+  font-family: "Inter Tight", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--fg);
+}
+
+.eqBandCardTag {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+.eqBandCardHead button {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg-2);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--easing),
+    color 0.12s var(--easing),
+    border-color 0.12s var(--easing);
+}
+
+.eqBandCardHead button[data-active="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-glow);
+}
+
+.eqBandCardHead button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.eqSlopeColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
+
+.eqBandTypeLabel {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+.eqTypeRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.eqTypeRow button {
+  appearance: none;
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg-3);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.12s var(--easing),
+    color 0.12s var(--easing),
+    border-color 0.12s var(--easing);
+}
+
+.eqTypeRow button[data-active="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-glow);
+}
+
+.eqTypeRow button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

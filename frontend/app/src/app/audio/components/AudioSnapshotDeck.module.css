@@ -1,107 +1,282 @@
+/* AudioSnapshotDeck — Console redesign (2026-05-27, polished 2026-06-01).
+ *
+ * A quiet strip under the mixer: a header row (title · shortcut · capture
+ * action) over a uniform 8-slot grid. Tiles reuse the console card vocabulary
+ * (--bg-1 surface, --line hairline, 6px radius, amber accent for the loaded /
+ * armed slot) so the deck reads as part of the same surface as the mixer and
+ * inspector rather than a bolt-on.
+ */
+
 .snapshotDeck {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
-  gap: 4px;
-  min-height: 82px;
-  margin: 0;
-  padding: 8px 16px;
-  border-top: 1px solid var(--audio-border);
-  border-radius: 0;
-  background: linear-gradient(180deg, var(--audio-panel), var(--audio-canvas));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+  flex-shrink: 0;
 }
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
 
 .snapshotDeckHeader {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
   gap: 10px;
 }
 
 .snapshotDeckHeader h2 {
   margin: 0;
-  color: var(--color-text-strong);
-  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-ui);
-  letter-spacing: 0;
+  font-family: "Inter Tight", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--fg);
 }
 
-.visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
-  white-space: nowrap;
+.snapshotShortcut {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-4);
 }
+
+.snapshotCapture {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-family: "Inter Tight", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--easing),
+    color 0.12s var(--easing),
+    border-color 0.12s var(--easing);
+}
+
+.snapshotCapture:hover:not(:disabled) {
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.snapshotCapture:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Slot grid ───────────────────────────────────────────────────────────── */
 
 .snapshotGrid {
-  display: flex;
-  gap: 4px;
-  min-width: 0;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
 }
 
-.snapshotCapture,
 .snapshotTile {
-  --snapshot-action-strip-width: 34px;
   position: relative;
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 2px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 84px;
+  padding: 8px 10px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: "Inter Tight", system-ui, sans-serif;
+  transition:
+    border-color 0.12s var(--easing),
+    background 0.12s var(--easing),
+    box-shadow 0.12s var(--easing);
+}
+
+.snapshotTile:hover {
+  border-color: var(--line-2);
+  background: var(--bg-2);
+}
+
+/* Loaded slot (and the brief post-recall flash) — soft amber wash. */
+.snapshotTile[data-current="true"],
+.snapshotTile[data-flash="true"] {
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
+}
+
+/* Armed (recall pending) — crisp amber ring so it reads as "about to fire". */
+.snapshotTile[data-armed="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* Slot index — a quiet mono caption, NOT a bordered box. */
+.snapshotSlot {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+.snapshotName {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.snapshotTile[data-current="true"] .snapshotName {
+  color: var(--accent);
+}
+
+.snapshotMeta {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  color: var(--fg-4);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── Empty slot ──────────────────────────────────────────────────────────── */
+
+.snapshotEmpty {
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border-style: dashed;
+  cursor: default;
+}
+
+.snapshotEmpty .snapshotSlot {
+  color: var(--fg-4);
+}
+
+.snapshotEmpty .snapshotName {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+}
+
+/* The placeholder thumb + meta are noise on an empty slot — the dashed tile
+   with "Slot N · Empty" reads cleanly on its own. */
+.snapshotEmpty .snapshotThumb,
+.snapshotEmpty .snapshotMeta {
+  display: none;
+}
+
+/* ── Mix-shape thumbnail ─────────────────────────────────────────────────── */
+
+.snapshotThumb {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 18px;
+  margin-top: 1px;
+  padding: 2px 3px;
+  border-radius: 3px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.snapshotThumb i {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 66px;
-  padding: 7px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-800) 72%, transparent);
-  color: inherit;
-  text-align: left;
+  min-height: 2px;
+  border-radius: 1px;
+  background: var(--fg-4);
+  opacity: 0.5;
 }
 
-.snapshotTile[data-armed="true"] {
-  border-color: color-mix(in srgb, var(--audio-engaged-fill) 70%, var(--audio-border));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-engaged-fill) 18%, transparent), transparent),
-    color-mix(in srgb, var(--audio-panel) 90%, transparent);
-  color: var(--audio-engaged-fill);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--audio-engaged-fill) 28%, transparent),
-    0 0 18px color-mix(in srgb, var(--audio-engaged-fill) 18%, transparent);
+.snapshotThumb[data-has-contents="true"] i {
+  background: color-mix(in oklch, var(--accent) 60%, var(--fg-3));
+  opacity: 0.85;
 }
+
+.snapshotTile[data-current="true"] .snapshotThumb i {
+  background: var(--accent);
+  opacity: 1;
+}
+
+/* ── Recall surface (the populated tile's clickable body) ────────────────── */
+
+.snapshotRecallSurface {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* :focus (not only :focus-visible) so the ring shows under programmatic focus
+   too — the keyboard-recall affordance the operator relies on. */
+.snapshotRecallSurface:focus,
+.snapshotRecallSurface:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.snapshotRecallSurface:disabled {
+  cursor: not-allowed;
+}
+
+/* ── Hover/focus diff popover ────────────────────────────────────────────── */
 
 .snapshotPreview {
   position: absolute;
   z-index: 20;
-  right: calc(var(--snapshot-action-strip-width) + 4px);
+  right: 4px;
   bottom: calc(100% + 6px);
   display: none;
-  width: 180px;
-  gap: 5px;
-  padding: 8px;
-  border: 1px solid var(--audio-border-strong);
-  border-radius: 8px;
-  background: var(--audio-panel-strong);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.54);
+  flex-direction: column;
+  width: 190px;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  background: var(--bg-elev);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
 }
 
 .snapshotTile:hover .snapshotPreview,
 .snapshotTile:focus-within .snapshotPreview {
-  display: grid;
-}
-
-.snapshotPreview strong,
-.snapshotPreview small {
-  color: var(--audio-text-default);
-  font: var(--font-weight-medium) 10px / 1.15 var(--font-family-mono);
-  letter-spacing: 0;
+  display: flex;
 }
 
 .snapshotPreview strong {
-  color: var(--audio-text-strong);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+
+.snapshotPreview small {
+  font-size: 9.5px;
+  color: var(--fg-3);
+  letter-spacing: 0.02em;
 }
 
 .snapshotPreviewLine {
@@ -113,81 +288,33 @@
 
 .snapshotPreviewLine span {
   overflow: hidden;
-  color: var(--audio-text-muted);
+  color: var(--fg-3);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .snapshotPreviewLine strong {
-  color: var(--audio-accent);
+  color: var(--accent);
   white-space: nowrap;
 }
 
 .snapshotPreviewOverflow {
-  color: var(--audio-text-muted);
-  font: var(--font-weight-medium) 9px / 1.2 var(--font-family-mono);
-  letter-spacing: 0;
+  color: var(--fg-4);
+  font-size: 9px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.snapshotCapture {
-  align-content: center;
-  justify-items: start;
-  flex: 0 0 118px;
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--audio-accent) 48%, var(--audio-border));
-  color: var(--color-text-muted);
-  font: var(--font-weight-semibold) 11px / 1.1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-align: left;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.snapshotCapture:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.snapshotRecallSurface {
-  position: absolute;
-  inset: 0 var(--snapshot-action-strip-width) 0 0;
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 2px;
-  padding: 7px;
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.snapshotRecallSurface:disabled {
-  cursor: not-allowed;
-  opacity: 0.62;
-}
-
-.snapshotRecallSurface:focus,
-.snapshotRecallSurface:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--audio-accent) 82%, white);
-  outline-offset: -3px;
-}
+/* ── Per-tile action strip (save / rename / delete) ──────────────────────── */
 
 .snapshotTileActions {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  z-index: 2;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transform: translateY(-50%);
-  visibility: visible;
-  opacity: 0.84;
-  pointer-events: auto;
-  transition: opacity 120ms ease;
+  gap: 2px;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  opacity: 0;
+  transition: opacity 0.12s var(--easing);
 }
 
 .snapshotTile:hover .snapshotTileActions,
@@ -196,226 +323,36 @@
 }
 
 .snapshotActionButton {
-  width: 24px;
-  min-width: 24px;
-  height: 24px;
-  min-height: 24px;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--audio-border-strong) 78%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--audio-panel-strong) 92%, transparent);
-  color: var(--audio-text-default);
-  cursor: pointer;
-}
-
-.snapshotActionButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.46;
-}
-
-.snapshotTile[data-current="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 14%, transparent), transparent),
-    color-mix(in srgb, var(--color-surface-800) 76%, transparent);
-}
-
-.snapshotTile[data-flash="true"] {
-  animation: snapshotPulse 1.5s ease-out;
-}
-
-.snapshotSlot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: auto;
-  height: auto;
-  border: 0;
-  border-radius: 0;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.snapshotName {
-  grid-column: 1;
-  overflow: visible;
-  overflow-wrap: anywhere;
-  color: var(--color-text-strong);
-  font: var(--font-weight-semibold) 13px / 1.1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-overflow: clip;
-  text-transform: none;
-  white-space: normal;
-}
-
-.snapshotName[data-kind="capture"]::after {
-  content: " snapshot";
-}
-
-.snapshotThumb {
-  grid-column: 1 / -1;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-2);
+  color: var(--fg-3);
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  align-items: end;
-  gap: 2px;
-  min-height: 22px;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--audio-border) 74%, transparent);
-  border-radius: 6px;
-  background:
-    linear-gradient(color-mix(in srgb, var(--audio-border) 26%, transparent) 1px, transparent 1px),
-    color-mix(in srgb, var(--color-surface-900) 58%, transparent);
-  background-size: 100% 50%;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--easing),
+    color 0.12s var(--easing),
+    border-color 0.12s var(--easing);
 }
 
-.snapshotThumb i {
-  display: block;
-  min-height: 3px;
-  border-radius: 999px 999px 0 0;
-  background: color-mix(in srgb, var(--audio-accent) 66%, transparent);
+.snapshotActionButton:hover {
+  border-color: var(--line-2);
+  background: var(--bg-elev);
+  color: var(--fg);
 }
 
-.snapshotEmpty {
-  opacity: 0.66;
-}
-
-.snapshotEmpty .snapshotThumb i {
-  height: 20%;
-  background: color-mix(in srgb, var(--color-text-subtle) 24%, transparent);
-}
-
-.snapshotMeta {
-  grid-column: 1 / -1;
-  align-self: end;
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 10px / 1.1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-overflow: ellipsis;
-  text-transform: none;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-}
-
-.snapshotShortcut {
-  display: inline-flex;
-  align-items: center;
-  min-height: 18px;
-  padding: 0 6px;
-  border: 1px solid var(--audio-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-surface-700) 76%, transparent);
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-@keyframes snapshotPulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--audio-accent) 54%, transparent);
-  }
-
-  100% {
-    box-shadow: 0 0 0 14px transparent;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .snapshotTile[data-flash="true"] {
-    animation: none !important;
-  }
-
-  .snapshotTileActions {
-    transition: none !important;
-  }
-}
-
-@container operator-root (min-width: 2200px) and (min-height: 1250px) {
-  .snapshotDeck {
-    min-height: 118px;
-  }
-
-  .snapshotTile,
-  .snapshotCapture {
-    min-height: 92px;
-  }
-
-  .snapshotThumb {
-    min-height: 30px;
-  }
-}
-
-@container operator-root (max-width: 2100px) {
-  .snapshotMeta {
-    font-size: 9px;
-  }
-
-  .snapshotGrid {
-    grid-template-columns: 1.05fr repeat(8, minmax(0, 1fr));
-  }
-
-  .snapshotTile,
-  .snapshotCapture {
-    padding: 6px;
-  }
-}
-
-[data-layout-mode="studioFull"] .snapshotDeck {
-  grid-template-columns: 108px minmax(0, 1fr);
-  gap: 10px;
-  min-height: 118px;
-  padding: 10px 16px;
-}
-
-[data-layout-mode="studioFull"] .snapshotTile,
-[data-layout-mode="studioFull"] .snapshotCapture {
-  min-height: 92px;
-}
-
-[data-layout-mode="studioFull"] .snapshotThumb {
-  min-height: 30px;
-}
-
-@container operator-root (max-height: 1100px) {
-  [data-layout-mode="studioFull"] .snapshotDeck {
-    grid-template-columns: 88px minmax(0, 1fr);
-    gap: 6px;
-    min-height: 82px;
-    padding: 8px 12px;
-  }
-
-  [data-layout-mode="studioFull"] .snapshotTile,
-  [data-layout-mode="studioFull"] .snapshotCapture {
-    min-height: 66px;
-    padding: 6px;
-  }
-
-  [data-layout-mode="studioFull"] .snapshotTile {
-    --snapshot-action-strip-width: 28px;
-  }
-
-  [data-layout-mode="studioFull"] .snapshotTileActions {
-    right: 4px;
-    gap: 2px;
-  }
-
-  [data-layout-mode="studioFull"] .snapshotActionButton {
-    width: 19px;
-    min-width: 19px;
-    height: 19px;
-    min-height: 19px;
-    border-radius: 4px;
-  }
-
-  [data-layout-mode="studioFull"] .snapshotActionButton svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  [data-layout-mode="studioFull"] .snapshotThumb {
-    min-height: 18px;
-  }
+  border: 0;
 }

@@ -11,20 +11,29 @@ test("selected channel lane is visually distinct from its neighbours", async ({ 
   await openFixture(page, "audio-selected-channel");
   const strip = page.getByTestId("audio-strip-audio-playback-3-4");
   await expect(strip).toHaveAttribute("data-selected", "true");
-  const shadow = await strip.evaluate((el) => window.getComputedStyle(el).boxShadow);
-  // The selected lane must carry a non-empty box-shadow (inset stroke + outer
-  // glow). The pre-Slice-2 treatment was a single 1 px inset which still
-  // produced a box-shadow value, so we further assert the shadow contains a
-  // 14 px outer-glow term that the Slice-2 treatment introduces.
-  expect(shadow).not.toBe("none");
-  expect(shadow).toMatch(/14px/);
+  // 2026-05-27 redesign: the selected channel lane no longer uses a 14 px
+  // box-shadow outer glow. `[data-selected="true"]` now lifts the lane with
+  // border-color (var(--line-2)) + background-color (var(--strip-bg-selected)).
+  // Compare those two properties against an unselected sibling lane.
+  const neighbour = page.getByTestId("audio-strip-audio-playback-1-2");
+  await expect(neighbour).toHaveAttribute("data-selected", "false");
+  const readStyle = (locator: typeof strip) =>
+    locator.evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return { background: style.backgroundColor, border: style.borderColor };
+    });
+  const selectedStyle = await readStyle(strip);
+  const neighbourStyle = await readStyle(neighbour);
+  expect(selectedStyle.border).not.toBe(neighbourStyle.border);
+  expect(selectedStyle.background).not.toBe(neighbourStyle.background);
 });
 
-test("output lane exposes inline Mute; rail owns Dim / Mono / Talk", async ({ page }) => {
+test("output lane exposes inline Mute; monitor bar owns Dim / Mono / Talkback", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
-  // Slice 3 (Phase 3): Mute is the only per-output toggle on the Output card.
-  // Dim / Mono / Talk are room-monitor controls — single-sourced on the rail.
+  // 2026-05-27 redesign: Mute is still the only per-output toggle on the
+  // Output card. Dim / Mono / Talkback are room-monitor controls — now
+  // single-sourced on the new AudioMonitorBar (the old rail is gone).
   const mainOut = page.getByTestId("audio-output-audio-mix-main");
   await expect(mainOut).toBeVisible();
   const mute = mainOut.locator('[data-control="mute"]');
@@ -34,17 +43,18 @@ test("output lane exposes inline Mute; rail owns Dim / Mono / Talk", async ({ pa
     await expect(mainOut.locator(`[data-control="${removed}"]`)).toHaveCount(0);
   }
 
-  // The rail's monitor button grid still owns Dim / Mono / Talk.
-  const railMonitor = page.getByTestId("audio-rail-monitor-card");
-  await expect(railMonitor).toBeVisible();
-  for (const control of ["dim", "mono", "talk"] as const) {
-    const button = railMonitor.locator(`[data-control="${control}"]`);
+  // The monitor bar now owns Dim / Mono / Talkback.
+  const monitorBar = page.getByTestId("audio-monitor-bar");
+  await expect(monitorBar).toBeVisible();
+  for (const testid of ["audio-monitor-dim", "audio-monitor-mono", "audio-monitor-talkback"] as const) {
+    const button = page.getByTestId(testid);
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute("aria-pressed", /true|false/);
   }
 });
 
-test("each mixer tier renders a coloured identity rail", async ({ page }) => {
+// 2026-05-27 redesign: per-tier colored identity rails removed; single amber accent (inputs dot / playback hollow dot / outputs accent header).
+test.skip("each mixer tier renders a coloured identity rail", async ({ page }) => {
   await openFixture(page, "audio-populated");
   for (const tier of ["hardware-inputs", "software-playback", "hardware-outputs"] as const) {
     const tierEl = page.locator(`[data-tier="${tier}"]`).first();

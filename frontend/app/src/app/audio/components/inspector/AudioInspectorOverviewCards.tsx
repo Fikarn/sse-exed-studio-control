@@ -1,23 +1,20 @@
-import type { CSSProperties } from "react";
-
 import styles from "../AudioInspector.module.css";
-import dynamicsStyles from "../AudioInspectorDynamicsTab.module.css";
 import { formatAudioDb } from "../../audioFormatting";
 import type { AudioMixTargetEntry } from "../../../shellData";
-import { selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../../audioViewModel";
+import { type AudioWorkspaceViewModel } from "../../audioViewModel";
 import {
-  dynamicsStatusText,
-  eqStatusText,
-  LOW_CUT_HANDLE_ID,
   outputRouteText,
   type AudioEqBand,
   type InspectorTab,
   type SelectedAudioChannel,
 } from "./audioInspectorHelpers";
 
+// 2026-05-27 redesign: the channel-tab "overview" is collapsed to a small
+// hint pointing at EQ / Dyn / Routing. Most of the cards' inputs are no
+// longer read here, but the props stay so the parent in AudioInspector.tsx
+// doesn't need restructuring. The `_*` underscore prefix opts the unused
+// names out of `@typescript-eslint/no-unused-vars`.
 interface AudioInspectorOverviewCardsProps {
-  // Active EQ/dynamics derived values come from the parent so this mini view
-  // tracks the same draft state the EQ tab is editing.
   activeEqHandleId: string | null;
   dynamicsCurve: string;
   dynamicsCurvePoint: { x: number; y: number };
@@ -45,123 +42,33 @@ interface AudioInspectorOverviewCardsProps {
  * the same draft state the EQ tab is editing.
  */
 export function AudioInspectorOverviewCards({
-  activeEqHandleId,
-  dynamicsCurve,
-  dynamicsCurvePoint,
-  eqBands,
-  eqGraphPath,
-  gateThresholdX,
-  lowCutShade,
+  activeEqHandleId: _activeEqHandleId,
+  dynamicsCurve: _dynamicsCurve,
+  dynamicsCurvePoint: _dynamicsCurvePoint,
+  eqBands: _eqBands,
+  eqGraphPath: _eqGraphPath,
+  gateThresholdX: _gateThresholdX,
+  lowCutShade: _lowCutShade,
   monitorValue,
-  onActiveTabChange,
+  onActiveTabChange: _onActiveTabChange,
   selectedChannel,
   selectedMixTarget,
-  selectedSendLevel,
+  selectedSendLevel: _selectedSendLevel,
   viewModel,
 }: AudioInspectorOverviewCardsProps) {
   if (selectedChannel) {
+    // 2026-05-27 Console redesign: the "Preamp" tab body no longer renders the
+    // dense 3-card overview grid (Route / EQ / Dyn jump cards). The sticky
+    // header above already shows preamp + toggles via HardwareCard, and the
+    // dedicated EQ / Dyn / Routing tabs are one click away. Keeping the
+    // overview here would duplicate the header and break the prototype's
+    // calm rhythm.
     return (
-      <div className={`${styles.inspectorMiniGrid} ${styles.channelOverviewGrid}`}>
-        <button
-          aria-label="Open sends tab"
-          className={`${styles.inspectorMiniCard} ${styles.routingMiniCard} ${styles.overviewPrimaryCard} ${styles.overviewRouteCard}`}
-          data-testid="audio-inspector-sends-mini"
-          onClick={() => onActiveTabChange("sends")}
-          type="button"
-        >
-          <span className={styles.graphCardHead}>
-            <span className={styles.eyebrow}>Route · Sends from this source</span>
-            <span>{viewModel.mixTargets.length} destinations</span>
-          </span>
-          <span className={styles.routingGraphMini} aria-hidden="true">
-            <span className={styles.routingSourceNode}>
-              <strong>{selectedChannel.name}</strong>
-              <small>{formatAudioDb(selectedSendLevel)}</small>
-            </span>
-            <svg className={styles.routingCurve} viewBox="0 0 64 72" preserveAspectRatio="none" aria-hidden="true">
-              <path d="M1 36 C21 36 28 11 63 11" />
-              <path d="M1 36 C24 36 30 36 63 36" />
-              <path d="M1 36 C21 36 28 61 63 61" />
-            </svg>
-            <span className={styles.routingTargetStack}>
-              {viewModel.mixTargets.map((mixTarget) => {
-                const value = selectedChannelSendLevel(selectedChannel, mixTarget.id);
-                const sendMode = selectedChannel.sendModes[mixTarget.id];
-                const muted = selectedChannel.mute || sendMode?.mute === true;
-                const noSend = value <= 0.01;
-                return (
-                  <span
-                    className={styles.routingTargetNode}
-                    data-active={mixTarget.id === viewModel.selectedMixTargetId}
-                    data-send-state={muted ? "muted" : noSend ? "none" : "sending"}
-                    key={mixTarget.id}
-                  >
-                    <strong>{mixTarget.name}</strong>
-                    <small>{muted ? "muted" : formatAudioDb(value)}</small>
-                  </span>
-                );
-              })}
-            </span>
-          </span>
-        </button>
-
-        <button
-          aria-label="Open EQ tab"
-          className={`${styles.inspectorMiniCard} ${styles.inspectorGraphCard} ${styles.overviewEqCard}`}
-          data-testid="audio-inspector-eq-mini"
-          onClick={() => onActiveTabChange("eq")}
-          type="button"
-        >
-          <span className={styles.graphCardHead}>
-            <span className={styles.eyebrow}>EQ · {eqStatusText(selectedChannel)}</span>
-            <span className={styles.eqBandRow}>
-              <i data-active={selectedChannel.eq.lowCut.enabled} data-selected={activeEqHandleId === LOW_CUT_HANDLE_ID}>
-                LC
-              </i>
-              {eqBands.map((band) => (
-                <i data-active={selectedChannel.eq.enabled} data-selected={band.id === activeEqHandleId} key={band.id}>
-                  {band.label}
-                </i>
-              ))}
-            </span>
-          </span>
-          <span className={styles.eqGraphMini} aria-hidden="true">
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-              {lowCutShade ? <path className={styles.eqLowCutShade} d={lowCutShade} /> : null}
-              <path d={eqGraphPath} />
-            </svg>
-          </span>
-        </button>
-
-        <button
-          aria-label="Open processing tab"
-          className={`${styles.inspectorMiniCard} ${styles.inspectorGraphCard} ${styles.overviewDynamicsCard}`}
-          data-testid="audio-inspector-dynamics-mini"
-          onClick={() => onActiveTabChange("dynamics")}
-          type="button"
-        >
-          <span className={styles.graphCardHead}>
-            <span className={styles.eyebrow}>Dynamics · {dynamicsStatusText(selectedChannel)}</span>
-            <span className={dynamicsStyles.dynamicsPills}>
-              <i data-active={selectedChannel.dynamics.compressor.enabled}>Comp</i>
-              <i data-active={selectedChannel.dynamics.gate.enabled}>Gate</i>
-            </span>
-          </span>
-          <span
-            className={styles.dynamicsGraphMini}
-            data-active={selectedChannel.dynamics.compressor.enabled}
-            aria-hidden="true"
-          >
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-              <path d={dynamicsCurve} />
-              <circle cx={dynamicsCurvePoint.x} cy={dynamicsCurvePoint.y} r="3" />
-            </svg>
-            <i
-              data-active={selectedChannel.dynamics.gate.enabled}
-              style={{ "--dynamics-gate-x": `${gateThresholdX}%` } as CSSProperties}
-            />
-          </span>
-        </button>
+      <div className={styles.preampTabHint} aria-hidden="true">
+        <span className={styles.eyebrow}>Preamp set above</span>
+        <p>
+          Open <strong>EQ</strong>, <strong>Dyn</strong>, or <strong>Routing</strong> to dig deeper into this channel.
+        </p>
       </div>
     );
   }

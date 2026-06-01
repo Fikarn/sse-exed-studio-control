@@ -166,11 +166,12 @@ export function AudioTieredMixer({
             <span className={styles.tierNum}>03</span>
             <span>{viewModel.hardwareOutputs.label}</span>
           </div>
-          <div className={styles.tierChipRow}>
-            <span className={styles.tierChip} data-active="true">
-              Main
+          <div className={styles.tierMixFor} data-testid="audio-tier-mix-for">
+            <span className={styles.tierMixForEyebrow}>Mix for</span>
+            <span className={styles.tierMixForArrow}>→</span>
+            <span className={styles.tierMixForName}>
+              {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
             </span>
-            <span className={styles.tierChip}>Cue</span>
           </div>
           <small>{viewModel.hardwareOutputs.mixTargets.length} dest · selecting one sets the active mix</small>
         </div>

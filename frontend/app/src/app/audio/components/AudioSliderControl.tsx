@@ -76,7 +76,12 @@ export function AudioSliderControl({
   valueText,
 }: AudioSliderControlProps) {
   const dragRef = useRef<DragState | null>(null);
-  const lastPointerDownAtRef = useRef(0);
+  // Why: initialise to -Infinity (not 0) so the very first pointer-down is
+  // never mistaken for the second tap of a double-click. With 0, a drag that
+  // lands within 360 ms of page load (now - 0 <= 360) wrongly opened the
+  // numeric-entry dialog instead of starting the drag — which the fast-loading
+  // Console redesign hit deterministically on quick machines.
+  const lastPointerDownAtRef = useRef(Number.NEGATIVE_INFINITY);
   const localClearTimerRef = useRef<number | null>(null);
   const [localDraftValue, setLocalDraftValue] = useState<number | null>(null);
   const span = Math.max(0.00001, max - min);
@@ -157,7 +162,7 @@ export function AudioSliderControl({
 
     const now = performance.now();
     if (onRequestNumericValue && now - lastPointerDownAtRef.current <= 360) {
-      lastPointerDownAtRef.current = 0;
+      lastPointerDownAtRef.current = Number.NEGATIVE_INFINITY;
       requestNumericEntry();
       return;
     }

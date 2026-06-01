@@ -5,9 +5,7 @@ import styles from "./AudioSignalCanvas.module.css";
 import type { AudioArmedAction } from "../audioArming";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import type { AudioChannelGroupSelectionRequest, AudioWorkspaceViewModel } from "../audioViewModel";
-import { AudioLiveActiveMixMeter } from "./AudioLiveMeterReadout";
 import { AudioSnapshotDeck } from "./AudioSnapshotDeck";
-import { AudioTargetPicker } from "./AudioTargetPicker";
 import { AudioTieredMixer } from "./AudioTieredMixer";
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
@@ -33,7 +31,7 @@ export function AudioSignalCanvas({
   onSaveSnapshot,
   onSelectChannel,
   onSelectChannelGroup,
-  onSelectMixTarget,
+  onSelectMixTarget: _onSelectMixTarget,
   onSelectOutputMixTarget,
   onSync,
   onTogglePeakHold,
@@ -44,7 +42,7 @@ export function AudioSignalCanvas({
   peakHoldEnabled,
   recentlyRecalledSnapshotId,
   statusWarningRef,
-  store,
+  store: _store,
   viewModel,
 }: {
   armedAction: AudioArmedAction | null;
@@ -127,17 +125,14 @@ export function AudioSignalCanvas({
         </div>
       ) : null}
 
-      <div className={styles.canvasContextBar}>
-        <span className={styles.canvasBarLabel}>Editing</span>
-        <AudioTargetPicker
-          mixTargets={viewModel.mixTargets}
-          onSelectMixTarget={onSelectMixTarget}
-          selectedMixTargetId={viewModel.selectedMixTargetId}
-          selectionLabel={`${viewModel.selectedSourceLabel} selected`}
-        />
-        <span className={styles.canvasSelectedMeta} title={viewModel.selectedSourceMeta}>
-          {viewModel.selectedSourceMeta}
-        </span>
+      {/* 2026-05-27 Console redesign: the dense Phase 3 context bar (editing
+          target picker, meter readouts, big stat pills) is retired — that
+          context now lives in the AudioTopBar status cluster + the
+          "MIX FOR → {active}" eyebrow inside the Outputs section. The Peak
+          Hold + Reset controls keep their testids so existing keyboard +
+          spec coverage stays green, but they render as a slim eyebrow rail
+          on the right edge instead of a full toolbar. */}
+      <div className={styles.canvasContextBar} aria-hidden="false">
         {viewModel.meterSimulationActive ? (
           <span
             className={styles.meterSimulationChip}
@@ -147,8 +142,7 @@ export function AudioSignalCanvas({
             {viewModel.meterSimulationLabel}
           </span>
         ) : null}
-        <span className={styles.canvasDivider} />
-        <span className={styles.canvasBarLabel}>Peak</span>
+        <span className={styles.canvasSpacer} />
         <div className={styles.canvasModeSwitch} aria-label="Meter peak hold">
           <button
             aria-pressed={peakHoldEnabled}
@@ -169,33 +163,6 @@ export function AudioSignalCanvas({
             Reset
           </button>
         </div>
-        <div className={styles.canvasStatPills}>
-          <span>
-            <strong>{viewModel.hardwareInputs.channels.length}</strong> in
-          </span>
-          <span>
-            <strong>{viewModel.softwarePlayback.channels.length}</strong> pb
-          </span>
-          <span>
-            <strong>{viewModel.hardwareOutputs.mixTargets.length}</strong> out
-          </span>
-          <span className={styles.canvasMeterStatus} title={viewModel.activeMixReadout.label}>
-            <strong>{viewModel.activeMixReadout.meterSource}</strong>
-            <em>tap</em>
-            <strong>{viewModel.activeMixReadout.meterPoint}</strong>
-            <em>ref</em>
-            <strong>{viewModel.activeMixReadout.nominalReference}</strong>
-            <em>peak</em>
-            <strong>{viewModel.activeMixReadout.peakStatus}</strong>
-          </span>
-        </div>
-        <span className={styles.canvasSpacer} />
-        <AudioLiveActiveMixMeter
-          fallbackLeft={viewModel.activeMixReadout.meterLeft}
-          fallbackRight={viewModel.activeMixReadout.meterRight}
-          selectedMixTargetId={viewModel.selectedMixTargetId}
-          store={store}
-        />
       </div>
 
       {viewModel.healthStats.soloedChannels > 0 || viewModel.healthStats.clippedChannels > 0 ? (

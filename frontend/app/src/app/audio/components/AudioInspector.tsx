@@ -5,7 +5,10 @@ import styles from "./AudioInspector.module.css";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { getAudioChannelGroup, selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../audioViewModel";
 import { useAudioInspectorEqState } from "../hooks/useAudioInspectorEqState";
+import { AudioInspectorChannelHardwareCard } from "./inspector/AudioInspectorChannelHardwareCard";
 import { AudioInspectorChannelHeader } from "./inspector/AudioInspectorChannelHeader";
+import { AudioInspectorChannelMeterCard } from "./inspector/AudioInspectorChannelMeterCard";
+import { AudioInspectorChannelSendActions } from "./inspector/AudioInspectorChannelSendActions";
 import { AudioInspectorDynamicsTab } from "./inspector/AudioInspectorDynamicsTab";
 import { AudioInspectorEqTab } from "./inspector/AudioInspectorEqTab";
 import { AudioInspectorOutputView } from "./inspector/AudioInspectorOutputView";
@@ -150,26 +153,9 @@ export function AudioInspector({
       <div className={styles.inspectorSticky}>
         {selectedChannel ? (
           <AudioInspectorChannelHeader
-            clearDraftValueLater={clearDraftValueLater}
-            commitChannelContinuous={commitChannelContinuous}
-            gainDraftKey={gainDraftKey}
-            onTogglePhantom={onTogglePhantom}
-            onUpdateChannel={onUpdateChannel}
-            peakHoldEnabled={peakHoldEnabled}
-            peakHoldResetToken={peakHoldResetToken}
-            phantomArmed={phantomArmed}
-            phantomLabel={phantomLabel}
             selectedChannel={selectedChannel}
-            selectedClip={selectedClip}
-            selectedGain={selectedGain}
             selectedGroup={selectedGroup}
-            selectedLeftMeter={selectedLeftMeter}
             selectedMixTarget={selectedMixTarget}
-            selectedRightMeter={selectedRightMeter}
-            selectedSendDraftKey={selectedSendDraftKey}
-            selectedSendLevel={selectedSendLevel}
-            setDraftValue={setDraftValue}
-            store={store}
             viewModel={viewModel}
           />
         ) : selectedMixTarget ? (
@@ -204,18 +190,63 @@ export function AudioInspector({
           id={outputSelectionOnly ? "audio-inspector-output-panel" : "audio-inspector-channel-panel"}
           role="tabpanel"
         >
-          <AudioInspectorOverviewCards
-            {...eqState}
-            dynamicsCurve={dynamicsCurve}
-            dynamicsCurvePoint={dynamicsCurvePoint}
-            gateThresholdX={gateThresholdX}
-            monitorValue={monitorValue}
-            onActiveTabChange={onActiveTabChange}
-            selectedChannel={selectedChannel}
-            selectedMixTarget={selectedMixTarget}
-            selectedSendLevel={selectedSendLevel}
-            viewModel={viewModel}
-          />
+          {selectedChannel ? (
+            // 2026-05-27 Console redesign: the preamp hero + chips, the send
+            // fader / Mute-Solo-Unity, and the meter telemetry moved OUT of
+            // the persistent sticky header and INTO the Preamp tab body, so
+            // the EQ / Dyn / Routing tabs render full-height like the
+            // prototype. HardwareCard renders the hero knob for preamp-capable
+            // channels (the prototype's Preamp pane).
+            <>
+              <AudioInspectorChannelHardwareCard
+                clearDraftValueLater={clearDraftValueLater}
+                commitChannelContinuous={commitChannelContinuous}
+                gainDraftKey={gainDraftKey}
+                onTogglePhantom={onTogglePhantom}
+                onUpdateChannel={onUpdateChannel}
+                phantomArmed={phantomArmed}
+                phantomLabel={phantomLabel}
+                selectedChannel={selectedChannel}
+                selectedGain={selectedGain}
+                setDraftValue={setDraftValue}
+                viewModel={viewModel}
+              />
+              <AudioInspectorChannelSendActions
+                clearDraftValueLater={clearDraftValueLater}
+                commitChannelContinuous={commitChannelContinuous}
+                onUpdateChannel={onUpdateChannel}
+                selectedChannel={selectedChannel}
+                selectedMixTarget={selectedMixTarget}
+                selectedSendDraftKey={selectedSendDraftKey}
+                selectedSendLevel={selectedSendLevel}
+                setDraftValue={setDraftValue}
+                viewModel={viewModel}
+              />
+              <AudioInspectorChannelMeterCard
+                peakHoldEnabled={peakHoldEnabled}
+                peakHoldResetToken={peakHoldResetToken}
+                selectedChannel={selectedChannel}
+                selectedClip={selectedClip}
+                selectedLeftMeter={selectedLeftMeter}
+                selectedRightMeter={selectedRightMeter}
+                store={store}
+                viewModel={viewModel}
+              />
+            </>
+          ) : (
+            <AudioInspectorOverviewCards
+              {...eqState}
+              dynamicsCurve={dynamicsCurve}
+              dynamicsCurvePoint={dynamicsCurvePoint}
+              gateThresholdX={gateThresholdX}
+              monitorValue={monitorValue}
+              onActiveTabChange={onActiveTabChange}
+              selectedChannel={selectedChannel}
+              selectedMixTarget={selectedMixTarget}
+              selectedSendLevel={selectedSendLevel}
+              viewModel={viewModel}
+            />
+          )}
         </section>
       ) : null}
 

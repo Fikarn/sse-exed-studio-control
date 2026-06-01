@@ -11,7 +11,7 @@ import tabStyles from "../AudioInspectorEqTab.module.css";
 import dynamicsStyles from "../AudioInspectorDynamicsTab.module.css";
 import sendStyles from "../AudioInspectorSendsTab.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
-import { AudioSliderControl } from "../AudioSliderControl";
+import { AudioKnob } from "../AudioKnob";
 import {
   EQ_FREQUENCY_MAX,
   EQ_FREQUENCY_MIN,
@@ -27,6 +27,10 @@ import {
   type AudioEqUpdate,
   type SelectedAudioChannel,
 } from "./audioInspectorHelpers";
+
+function formatEqGain(value: number) {
+  return `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(1)}`;
+}
 
 interface AudioInspectorEqBandTrayProps {
   activeEqBand: AudioEqBand;
@@ -104,82 +108,72 @@ export function AudioInspectorEqBandTray({
           </button>
         ))}
       </div>
-      <div className={dynamicsStyles.processingControlGrid}>
-        <label className={dynamicsStyles.processingControl}>
-          <span>Freq</span>
-          <AudioSliderControl
-            disabled={!viewModel.capabilities.canEditProcessing}
-            label={`${selectedChannel.name} Band ${activeEqBand.label} EQ frequency`}
-            max={EQ_FREQUENCY_MAX}
-            min={EQ_FREQUENCY_MIN}
-            onCommit={(value) => {
-              setSelectedEqBandId(activeEqBand.id);
-              setDraftValue(activeEqBandFrequencyKey, value);
-              onUpdateChannelEq({
-                bandId: eqBandId(activeEqBand.id),
-                channelId: selectedChannel.id,
-                frequencyHz: value,
-              });
-              clearDraftValueLater(activeEqBandFrequencyKey);
-            }}
-            onPreview={(value) => setDraftValue(activeEqBandFrequencyKey, value)}
-            orientation="horizontal"
-            step={10}
-            value={activeEqBandFrequencyValue}
-            valueText={formatEqFrequency(activeEqBandFrequencyValue)}
-          />
-          <strong>{formatEqFrequency(activeEqBandFrequencyValue)}</strong>
-        </label>
-        <label className={dynamicsStyles.processingControl}>
-          <span>Gain</span>
-          <AudioSliderControl
-            disabled={!viewModel.capabilities.canEditProcessing}
-            label={`${selectedChannel.name} Band ${activeEqBand.label} EQ gain`}
-            max={EQ_GAIN_MAX}
-            min={EQ_GAIN_MIN}
-            onCommit={(value) => {
-              setSelectedEqBandId(activeEqBand.id);
-              setDraftValue(activeEqBandGainKey, value);
-              onUpdateChannelEq({
-                bandId: eqBandId(activeEqBand.id),
-                channelId: selectedChannel.id,
-                gainDb: value,
-              });
-              clearDraftValueLater(activeEqBandGainKey);
-            }}
-            onPreview={(value) => setDraftValue(activeEqBandGainKey, value)}
-            orientation="horizontal"
-            step={0.5}
-            value={activeEqBandGainValue}
-            valueText={`${activeEqBandGainValue.toFixed(1)} dB`}
-          />
-          <strong>{activeEqBandGainValue.toFixed(1)} dB</strong>
-        </label>
-        <label className={dynamicsStyles.processingControl}>
-          <span>Q</span>
-          <AudioSliderControl
-            disabled={!viewModel.capabilities.canEditProcessing}
-            label={`${selectedChannel.name} Band ${activeEqBand.label} EQ Q`}
-            max={EQ_Q_MAX}
-            min={EQ_Q_MIN}
-            onCommit={(value) => {
-              setSelectedEqBandId(activeEqBand.id);
-              setDraftValue(activeEqBandQKey, value);
-              onUpdateChannelEq({
-                bandId: eqBandId(activeEqBand.id),
-                channelId: selectedChannel.id,
-                q: value,
-              });
-              clearDraftValueLater(activeEqBandQKey);
-            }}
-            onPreview={(value) => setDraftValue(activeEqBandQKey, value)}
-            orientation="horizontal"
-            step={0.1}
-            value={activeEqBandQValue}
-            valueText={`Q ${activeEqBandQValue.toFixed(1)}`}
-          />
-          <strong>Q {activeEqBandQValue.toFixed(1)}</strong>
-        </label>
+      <div className={dynamicsStyles.knobRow}>
+        <AudioKnob
+          ariaLabel={`${selectedChannel.name} Band ${activeEqBand.label} EQ gain`}
+          bipolar
+          caption="Gain"
+          defaultValue={0}
+          disabled={!viewModel.capabilities.canEditProcessing}
+          format={formatEqGain}
+          max={EQ_GAIN_MAX}
+          min={EQ_GAIN_MIN}
+          onCommit={(value) => {
+            setSelectedEqBandId(activeEqBand.id);
+            setDraftValue(activeEqBandGainKey, value);
+            onUpdateChannelEq({
+              bandId: eqBandId(activeEqBand.id),
+              channelId: selectedChannel.id,
+              gainDb: value,
+            });
+            clearDraftValueLater(activeEqBandGainKey);
+          }}
+          onPreview={(value) => setDraftValue(activeEqBandGainKey, value)}
+          step={0.5}
+          value={activeEqBandGainValue}
+        />
+        <AudioKnob
+          ariaLabel={`${selectedChannel.name} Band ${activeEqBand.label} EQ frequency`}
+          caption="Freq"
+          disabled={!viewModel.capabilities.canEditProcessing}
+          format={formatEqFrequency}
+          max={EQ_FREQUENCY_MAX}
+          min={EQ_FREQUENCY_MIN}
+          onCommit={(value) => {
+            setSelectedEqBandId(activeEqBand.id);
+            setDraftValue(activeEqBandFrequencyKey, value);
+            onUpdateChannelEq({
+              bandId: eqBandId(activeEqBand.id),
+              channelId: selectedChannel.id,
+              frequencyHz: value,
+            });
+            clearDraftValueLater(activeEqBandFrequencyKey);
+          }}
+          onPreview={(value) => setDraftValue(activeEqBandFrequencyKey, value)}
+          step={10}
+          value={activeEqBandFrequencyValue}
+        />
+        <AudioKnob
+          ariaLabel={`${selectedChannel.name} Band ${activeEqBand.label} EQ Q`}
+          caption="Q"
+          disabled={!viewModel.capabilities.canEditProcessing}
+          format={(value) => `Q ${value.toFixed(1)}`}
+          max={EQ_Q_MAX}
+          min={EQ_Q_MIN}
+          onCommit={(value) => {
+            setSelectedEqBandId(activeEqBand.id);
+            setDraftValue(activeEqBandQKey, value);
+            onUpdateChannelEq({
+              bandId: eqBandId(activeEqBand.id),
+              channelId: selectedChannel.id,
+              q: value,
+            });
+            clearDraftValueLater(activeEqBandQKey);
+          }}
+          onPreview={(value) => setDraftValue(activeEqBandQKey, value)}
+          step={0.1}
+          value={activeEqBandQValue}
+        />
       </div>
     </>
   );

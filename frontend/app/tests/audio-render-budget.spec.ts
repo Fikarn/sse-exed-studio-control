@@ -71,7 +71,7 @@ test("switching tabs does not multiply the audio inspector render count", async 
   // with a deterministic `aria-selected` assertion — the tab is observably
   // active before we move to the next one, no fixed wall-clock wait
   // needed.
-  for (const tabName of ["EQ", "Dynamics", "Sends", "Overview"]) {
+  for (const tabName of ["EQ", "Dyn", "Routing", "Preamp"]) {
     const tab = page.getByRole("tab", { name: tabName });
     await tab.click();
     await expect(tab).toHaveAttribute("aria-selected", "true");

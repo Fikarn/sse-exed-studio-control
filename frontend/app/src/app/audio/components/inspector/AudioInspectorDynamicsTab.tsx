@@ -5,7 +5,7 @@ import tabStyles from "../AudioInspectorDynamicsTab.module.css";
 import eqStyles from "../AudioInspectorEqTab.module.css";
 import sendStyles from "../AudioInspectorSendsTab.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
-import { AudioSliderControl } from "../AudioSliderControl";
+import { AudioKnob } from "../AudioKnob";
 import {
   dynamicsCurvePath,
   dynamicsPoint,
@@ -161,127 +161,111 @@ export function AudioInspectorDynamicsTab({
                 <strong>{section === "compressor" ? "Compressor" : "Gate"}</strong>
                 <span className={sendStyles.sendCardTag}>{processor.enabled ? "Enabled" : "Bypassed"}</span>
               </div>
-              <div className={tabStyles.processingControlGrid}>
-                <label className={tabStyles.processingControl}>
-                  <span>Thresh</span>
-                  <AudioSliderControl
-                    disabled={!viewModel.capabilities.canEditProcessing}
-                    label={`${selectedChannel.name} ${section} threshold`}
-                    max={0}
-                    min={-80}
-                    onCommit={(value) => {
-                      setDraftValue(thresholdKey, value);
-                      onUpdateChannelDynamics({
-                        channelId: selectedChannel.id,
-                        section,
-                        thresholdDb: value,
-                      });
-                      clearDraftValueLater(thresholdKey);
-                    }}
-                    onPreview={(value) => setDraftValue(thresholdKey, value)}
-                    orientation="horizontal"
-                    step={1}
-                    value={thresholdValue}
-                    valueText={`${thresholdValue.toFixed(0)} dB`}
-                  />
-                  <strong>{thresholdValue.toFixed(0)} dB</strong>
-                </label>
-                <label className={tabStyles.processingControl}>
-                  <span>Ratio</span>
-                  <AudioSliderControl
-                    disabled={!viewModel.capabilities.canEditProcessing}
-                    label={`${selectedChannel.name} ${section} ratio`}
-                    max={20}
-                    min={1}
-                    onCommit={(value) => {
-                      setDraftValue(ratioKey, value);
-                      onUpdateChannelDynamics({
-                        channelId: selectedChannel.id,
-                        ratio: value,
-                        section,
-                      });
-                      clearDraftValueLater(ratioKey);
-                    }}
-                    onPreview={(value) => setDraftValue(ratioKey, value)}
-                    orientation="horizontal"
-                    step={0.5}
-                    value={ratioValue}
-                    valueText={`${ratioValue.toFixed(1)}:1`}
-                  />
-                  <strong>{ratioValue.toFixed(1)}:1</strong>
-                </label>
-                <label className={tabStyles.processingControl}>
-                  <span>Attack</span>
-                  <AudioSliderControl
-                    disabled={!viewModel.capabilities.canEditProcessing}
-                    label={`${selectedChannel.name} ${section} attack`}
-                    max={200}
-                    min={0.1}
-                    onCommit={(value) => {
-                      setDraftValue(attackKey, value);
-                      onUpdateChannelDynamics({
-                        attackMs: value,
-                        channelId: selectedChannel.id,
-                        section,
-                      });
-                      clearDraftValueLater(attackKey);
-                    }}
-                    onPreview={(value) => setDraftValue(attackKey, value)}
-                    orientation="horizontal"
-                    step={0.1}
-                    value={attackValue}
-                    valueText={`${attackValue.toFixed(1)} ms`}
-                  />
-                  <strong>{attackValue.toFixed(1)} ms</strong>
-                </label>
-                <label className={tabStyles.processingControl}>
-                  <span>Release</span>
-                  <AudioSliderControl
-                    disabled={!viewModel.capabilities.canEditProcessing}
-                    label={`${selectedChannel.name} ${section} release`}
-                    max={1000}
-                    min={10}
-                    onCommit={(value) => {
-                      setDraftValue(releaseKey, value);
-                      onUpdateChannelDynamics({
-                        channelId: selectedChannel.id,
-                        releaseMs: value,
-                        section,
-                      });
-                      clearDraftValueLater(releaseKey);
-                    }}
-                    onPreview={(value) => setDraftValue(releaseKey, value)}
-                    orientation="horizontal"
-                    step={5}
-                    value={releaseValue}
-                    valueText={`${releaseValue.toFixed(0)} ms`}
-                  />
-                  <strong>{releaseValue.toFixed(0)} ms</strong>
-                </label>
-                <label className={tabStyles.processingControl}>
-                  <span>Makeup</span>
-                  <AudioSliderControl
-                    disabled={!viewModel.capabilities.canEditProcessing}
-                    label={`${selectedChannel.name} ${section} makeup`}
-                    max={24}
-                    min={-24}
-                    onCommit={(value) => {
-                      setDraftValue(makeupKey, value);
-                      onUpdateChannelDynamics({
-                        channelId: selectedChannel.id,
-                        makeupDb: value,
-                        section,
-                      });
-                      clearDraftValueLater(makeupKey);
-                    }}
-                    onPreview={(value) => setDraftValue(makeupKey, value)}
-                    orientation="horizontal"
-                    step={0.5}
-                    value={makeupValue}
-                    valueText={`${makeupValue.toFixed(1)} dB`}
-                  />
-                  <strong>{makeupValue.toFixed(1)} dB</strong>
-                </label>
+              <div className={tabStyles.knobRow}>
+                <AudioKnob
+                  ariaLabel={`${selectedChannel.name} ${section} threshold`}
+                  caption="Thresh"
+                  defaultValue={section === "compressor" ? -20 : -45}
+                  disabled={!viewModel.capabilities.canEditProcessing}
+                  format={(value) => `${value.toFixed(0)} dB`}
+                  max={0}
+                  min={-80}
+                  onCommit={(value) => {
+                    setDraftValue(thresholdKey, value);
+                    onUpdateChannelDynamics({
+                      channelId: selectedChannel.id,
+                      section,
+                      thresholdDb: value,
+                    });
+                    clearDraftValueLater(thresholdKey);
+                  }}
+                  onPreview={(value) => setDraftValue(thresholdKey, value)}
+                  step={1}
+                  value={thresholdValue}
+                />
+                <AudioKnob
+                  ariaLabel={`${selectedChannel.name} ${section} ratio`}
+                  caption="Ratio"
+                  defaultValue={section === "compressor" ? 3 : 2}
+                  disabled={!viewModel.capabilities.canEditProcessing}
+                  format={(value) => `${value.toFixed(1)}:1`}
+                  max={20}
+                  min={1}
+                  onCommit={(value) => {
+                    setDraftValue(ratioKey, value);
+                    onUpdateChannelDynamics({
+                      channelId: selectedChannel.id,
+                      ratio: value,
+                      section,
+                    });
+                    clearDraftValueLater(ratioKey);
+                  }}
+                  onPreview={(value) => setDraftValue(ratioKey, value)}
+                  step={0.5}
+                  value={ratioValue}
+                />
+                <AudioKnob
+                  ariaLabel={`${selectedChannel.name} ${section} attack`}
+                  caption="Attack"
+                  disabled={!viewModel.capabilities.canEditProcessing}
+                  format={(value) => `${value.toFixed(1)} ms`}
+                  max={200}
+                  min={0.1}
+                  onCommit={(value) => {
+                    setDraftValue(attackKey, value);
+                    onUpdateChannelDynamics({
+                      attackMs: value,
+                      channelId: selectedChannel.id,
+                      section,
+                    });
+                    clearDraftValueLater(attackKey);
+                  }}
+                  onPreview={(value) => setDraftValue(attackKey, value)}
+                  step={0.1}
+                  value={attackValue}
+                />
+                <AudioKnob
+                  ariaLabel={`${selectedChannel.name} ${section} release`}
+                  caption="Release"
+                  disabled={!viewModel.capabilities.canEditProcessing}
+                  format={(value) => `${value.toFixed(0)} ms`}
+                  max={1000}
+                  min={10}
+                  onCommit={(value) => {
+                    setDraftValue(releaseKey, value);
+                    onUpdateChannelDynamics({
+                      channelId: selectedChannel.id,
+                      releaseMs: value,
+                      section,
+                    });
+                    clearDraftValueLater(releaseKey);
+                  }}
+                  onPreview={(value) => setDraftValue(releaseKey, value)}
+                  step={5}
+                  value={releaseValue}
+                />
+                <AudioKnob
+                  ariaLabel={`${selectedChannel.name} ${section} makeup`}
+                  bipolar
+                  caption="Makeup"
+                  defaultValue={0}
+                  disabled={!viewModel.capabilities.canEditProcessing}
+                  format={(value) => `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(1)} dB`}
+                  max={24}
+                  min={-24}
+                  onCommit={(value) => {
+                    setDraftValue(makeupKey, value);
+                    onUpdateChannelDynamics({
+                      channelId: selectedChannel.id,
+                      makeupDb: value,
+                      section,
+                    });
+                    clearDraftValueLater(makeupKey);
+                  }}
+                  onPreview={(value) => setDraftValue(makeupKey, value)}
+                  step={0.5}
+                  value={makeupValue}
+                />
               </div>
             </div>
           );

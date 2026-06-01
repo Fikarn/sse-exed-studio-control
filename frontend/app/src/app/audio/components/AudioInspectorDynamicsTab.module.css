@@ -177,6 +177,18 @@
   color: var(--audio-accent);
 }
 
+/* 2026-05-27 Console redesign: rotary-knob row shared by the EQ band tray,
+   the Low Cut tray, and the dynamics sections. Replaces the slider-row
+   `processingControlGrid` look with the prototype's knob panel. */
+.knobRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-around;
+  align-items: flex-start;
+  padding: 4px 0 2px;
+}
+
 .processingControlGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

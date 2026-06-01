@@ -10,7 +10,7 @@ import tabStyles from "../AudioInspectorEqTab.module.css";
 import dynamicsStyles from "../AudioInspectorDynamicsTab.module.css";
 import sendStyles from "../AudioInspectorSendsTab.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
-import { AudioSliderControl } from "../AudioSliderControl";
+import { AudioKnob } from "../AudioKnob";
 import {
   formatEqFrequency,
   LOW_CUT_FREQUENCY_MAX,
@@ -83,31 +83,28 @@ export function AudioInspectorEqLowCutTray({
           </button>
         ))}
       </div>
-      <div className={dynamicsStyles.processingControlGrid}>
-        <label className={dynamicsStyles.processingControl}>
-          <span>Cutoff</span>
-          <AudioSliderControl
-            disabled={!viewModel.capabilities.canEditProcessing}
-            label={`${selectedChannel.name} Low Cut frequency`}
-            max={LOW_CUT_FREQUENCY_MAX}
-            min={LOW_CUT_FREQUENCY_MIN}
-            onCommit={(value) => {
-              setSelectedEqBandId(LOW_CUT_HANDLE_ID);
-              setDraftValue(lowCutFrequencyKey, value);
-              onUpdateChannelEq({
-                channelId: selectedChannel.id,
-                lowCutFrequencyHz: value,
-              });
-              clearDraftValueLater(lowCutFrequencyKey);
-            }}
-            onPreview={(value) => setDraftValue(lowCutFrequencyKey, value)}
-            orientation="horizontal"
-            step={1}
-            value={lowCutFrequencyValue}
-            valueText={formatEqFrequency(lowCutFrequencyValue)}
-          />
-          <strong>{formatEqFrequency(lowCutFrequencyValue)}</strong>
-        </label>
+      <div className={dynamicsStyles.knobRow}>
+        <AudioKnob
+          ariaLabel={`${selectedChannel.name} Low Cut frequency`}
+          caption="Cutoff"
+          disabled={!viewModel.capabilities.canEditProcessing}
+          format={formatEqFrequency}
+          max={LOW_CUT_FREQUENCY_MAX}
+          min={LOW_CUT_FREQUENCY_MIN}
+          onCommit={(value) => {
+            setSelectedEqBandId(LOW_CUT_HANDLE_ID);
+            setDraftValue(lowCutFrequencyKey, value);
+            onUpdateChannelEq({
+              channelId: selectedChannel.id,
+              lowCutFrequencyHz: value,
+            });
+            clearDraftValueLater(lowCutFrequencyKey);
+          }}
+          onPreview={(value) => setDraftValue(lowCutFrequencyKey, value)}
+          size={56}
+          step={1}
+          value={lowCutFrequencyValue}
+        />
       </div>
     </>
   );

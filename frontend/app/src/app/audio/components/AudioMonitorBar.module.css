@@ -1,0 +1,385 @@
+.monitorBar {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+  background: var(--bg);
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Talkback anchor (left) ───────────────────────────────────────────────── */
+
+.talkbackCell {
+  flex: 0 0 auto;
+  display: flex;
+}
+
+.talkbackButton {
+  width: 132px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
+  border-radius: 8px;
+  border: 1px solid transparent;
+  box-shadow: var(--housing-shadow);
+  color: var(--fg-2);
+  font-family: "Inter Tight", system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 0.12s var(--easing),
+    box-shadow 0.12s var(--easing),
+    background 0.12s var(--easing);
+}
+
+.talkbackButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.talkbackGlyph {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--fg-3);
+  display: grid;
+  place-items: center;
+  transition:
+    border-color 0.12s var(--easing),
+    background 0.12s var(--easing);
+  color: var(--fg-2);
+}
+
+.talkbackName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: -0.005em;
+  display: block;
+}
+
+.talkbackCap {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-4);
+  margin-top: 2px;
+  font-weight: 500;
+  display: block;
+}
+
+.talkbackButton:hover .talkbackGlyph {
+  border-color: var(--fg-2);
+}
+
+.talkbackButton[data-active="true"] {
+  color: var(--bg);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 18px -2px var(--accent-glow);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--accent) 90%, #000) 0%,
+    color-mix(in oklch, var(--accent) 78%, #000) 100%
+  );
+}
+
+.talkbackButton[data-active="true"] .talkbackName {
+  color: var(--bg);
+}
+
+.talkbackButton[data-active="true"] .talkbackCap {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.talkbackButton[data-active="true"] .talkbackGlyph {
+  border-color: var(--bg);
+  background: var(--bg);
+  color: var(--accent);
+}
+
+/* ── Master meter (center) ────────────────────────────────────────────────── */
+
+.masterCell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.masterHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.masterTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.masterEyebrow {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.masterArrow {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.masterName {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--accent);
+}
+
+.masterMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--fg-3);
+  letter-spacing: 0.04em;
+}
+
+.masterDb {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.masterMeter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
+  border-radius: 8px;
+  padding: 10px 14px 8px;
+  box-shadow: var(--housing-shadow);
+  cursor: ew-resize;
+}
+
+.masterMeterRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.masterChLabel {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--fg-3);
+  width: 10px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.masterReadout {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--fg-2);
+  font-variant-numeric: tabular-nums;
+  width: 56px;
+  text-align: right;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+
+.masterTrack {
+  flex: 1;
+  height: 8px;
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--meter-bg);
+  box-shadow:
+    inset 0 0 0 1px var(--line-2),
+    inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.masterTrack::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--meter-clip-pct);
+  width: 1px;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.masterFill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    var(--meter-low) 0%,
+    var(--meter-low) var(--meter-clip-pct),
+    var(--meter-hi) var(--meter-clip-pct),
+    var(--meter-hi) 100%
+  );
+  clip-path: inset(0 calc(100% - var(--level, 0%)) 0 0);
+  transition: clip-path 0.06s linear;
+  will-change: clip-path;
+}
+
+.masterPeak {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--fg);
+  opacity: 0.65;
+  z-index: 2;
+}
+
+.masterScaleLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.masterScale {
+  flex: 1;
+  position: relative;
+  height: 12px;
+}
+
+.masterTick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.masterTick[style*="left: 0%"] {
+  transform: translateX(0);
+  align-items: flex-start;
+}
+
+.masterTick[style*="left: 100%"] {
+  transform: translateX(-100%);
+  align-items: flex-end;
+}
+
+.masterTickMark {
+  width: 1px;
+  height: 3px;
+  background: var(--fg-4);
+}
+
+.masterTick[data-zero="true"] .masterTickMark {
+  background: var(--meter-hi);
+  width: 2px;
+}
+
+.masterTickLabel {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  color: var(--fg-3);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.masterTick[data-zero="true"] .masterTickLabel {
+  color: var(--meter-hi);
+  font-weight: 600;
+}
+
+/* ── Control cluster (right) ──────────────────────────────────────────────── */
+
+.controlCluster {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+  padding: 6px;
+  background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
+  border-radius: 8px;
+  box-shadow: var(--housing-shadow);
+}
+
+.controlButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 76px;
+  padding: 10px 14px;
+  border-radius: 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--fg-2);
+  font-family: "Inter Tight", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition:
+    color 0.12s var(--easing),
+    background 0.12s var(--easing);
+}
+
+.controlButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.controlSub {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  color: var(--fg-4);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.controlButton:hover:not(:disabled) {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.controlButton[data-active="true"] {
+  background: var(--bg-elev);
+  color: var(--fg);
+  box-shadow:
+    inset 0 0 0 1px var(--line-2),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.controlButton[data-active="true"] .controlSub {
+  color: var(--fg-3);
+}
+
+.controlWarn[data-active="true"] {
+  background: var(--danger);
+  color: #fff;
+  box-shadow:
+    inset 0 0 0 1px transparent,
+    0 0 14px var(--danger-soft);
+}
+
+.controlWarn[data-active="true"] .controlSub {
+  color: rgba(255, 255, 255, 0.7);
+}

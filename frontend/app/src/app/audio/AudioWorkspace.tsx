@@ -22,9 +22,10 @@ import {
 import { AudioHealthBar } from "./components/AudioHealthBar";
 import { AudioInspector, type InspectorTab } from "./components/AudioInspector";
 import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
-import { AudioRail } from "./components/AudioRail";
+import { AudioMonitorBar } from "./components/AudioMonitorBar";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { AudioTextDialog } from "./components/AudioTextDialog";
+import { AudioTopBar } from "./components/AudioTopBar";
 import { type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { usePalette } from "../shared/paletteContext";
@@ -82,6 +83,12 @@ const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
 
 const AUDIO_DENSITY_MODE = "desktop";
 
+// Console redesign themes (Studio / Graphite / Bone) — applied via the
+// `data-audio-theme` attribute on the shell; CSS in AudioWorkspace.module.css
+// overrides the token family per theme.
+export type AudioTheme = "studio" | "graphite" | "bone";
+const AUDIO_THEME_STORAGE_KEY = "app.audio.theme";
+
 export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
   const { register } = usePalette();
   const [activeChannelGroups, setActiveChannelGroups] =
@@ -101,6 +108,11 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("channel");
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
+  const [audioTheme, setAudioTheme] = useState<AudioTheme>(() => {
+    if (typeof window === "undefined") return "studio";
+    const stored = window.localStorage.getItem(AUDIO_THEME_STORAGE_KEY);
+    return stored === "graphite" || stored === "bone" ? stored : "studio";
+  });
   const warningBandRef = useRef<HTMLDivElement | null>(null);
   const recallPulseTimerRef = useRef<number | null>(null);
 
@@ -110,6 +122,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     }
     window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace = (window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace ?? 0) + 1;
   });
+
+  useEffect(() => {
+    window.localStorage.setItem(AUDIO_THEME_STORAGE_KEY, audioTheme);
+  }, [audioTheme]);
 
   const { audioSnapshotForView, applyOptimistic, clearOptimistic } = useAudioOptimisticSettings(audioSnapshot);
 
@@ -598,6 +614,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   return (
     <div
       className={styles.audioShell}
+      data-audio-theme={audioTheme}
       data-density={AUDIO_DENSITY_MODE}
       data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
       data-meter-simulation-state={viewModel.meterSimulationState}
@@ -611,21 +628,17 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         </div>
       ) : null}
 
+      <AudioTopBar
+        audioTheme={audioTheme}
+        onOpenSetup={openSetup}
+        onRecallCurrentSnapshot={recallCurrentSnapshot}
+        onSelectTheme={setAudioTheme}
+        onSync={syncAudio}
+        store={store}
+        viewModel={viewModel}
+      />
+
       <div className={styles.audioBody}>
-        <AudioRail
-          clearDraftValueLater={clearDraftValueLater}
-          commitMixTargetContinuous={commitMixTargetContinuous}
-          draftStore={draftStore}
-          getDraftValue={getDraftValue}
-          onRecallCurrentSnapshot={recallCurrentSnapshot}
-          onOpenSetup={openSetup}
-          onSelectMixTarget={selectMixTarget}
-          onSync={syncAudio}
-          store={store}
-          setDraftValue={setDraftValue}
-          onUpdateMixTarget={updateMixTarget}
-          viewModel={viewModel}
-        />
         <AudioSignalCanvas
           armedAction={armedAction}
           busyAction={busyAction}
@@ -684,6 +697,17 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           viewModel={viewModel}
         />
       </div>
+
+      <AudioMonitorBar
+        clearDraftValueLater={clearDraftValueLater}
+        commitMixTargetContinuous={commitMixTargetContinuous}
+        draftStore={draftStore}
+        getDraftValue={getDraftValue}
+        onUpdateMixTarget={updateMixTarget}
+        setDraftValue={setDraftValue}
+        store={store}
+        viewModel={viewModel}
+      />
 
       <AudioMeterCanvasOverlay
         peakHoldEnabled={peakHoldEnabled}
