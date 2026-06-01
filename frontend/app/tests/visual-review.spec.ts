@@ -191,29 +191,21 @@ function assertRatioClose(actual: number, expected: number, label: string, toler
 async function assertStudioPreviewFidelity(page: Page, fixture: string, size: Viewport) {
   const details = await page.evaluate(() => {
     const root = document.querySelector("[data-operator-layout-root]");
-    const displayFor = (selector: string) => {
-      const node = document.querySelector(selector);
-      return node ? getComputedStyle(node).display : null;
-    };
     const ratioFor = (node: Element | null) => {
       if (!node) return null;
       const rect = (node as HTMLElement).getBoundingClientRect();
       return rect.height > 0 ? rect.width / rect.height : null;
     };
-    const compactPreampPanels = Array.from(
-      document.querySelectorAll('[data-testid="audio-workspace"] img[class*="preampPanel"]')
-    )
-      .map((node) => node as HTMLImageElement)
-      .filter((image) => image.currentSrc.includes("preamp-panel-compact"))
-      .map((image) => ({
-        naturalRatio: image.naturalWidth / Math.max(1, image.naturalHeight),
-        renderedRatio: ratioFor(image),
-      }));
+    // 2026-05-27 redesign: the compact preamp is now an SVG AudioStripPreamp
+    // knob (role=slider, square ~1:1) rather than a "preamp-panel-compact"
+    // bitmap. The fidelity check is that the scaled studio preview preserves
+    // the knob's square aspect ratio.
+    const preampKnobRatios = Array.from(
+      document.querySelectorAll('[data-testid="audio-workspace"] [role="slider"][aria-label*="preamp gain"]')
+    ).map((node) => ratioFor(node));
 
     return {
-      canvasBarLabelDisplay: displayFor("[class*=canvasBarLabel]"),
-      canvasSelectedMetaDisplay: displayFor("[class*=canvasSelectedMeta]"),
-      compactPreampPanels,
+      preampKnobRatios,
       root: root
         ? {
             layoutHeight: root.getAttribute("data-layout-height"),
@@ -231,22 +223,16 @@ async function assertStudioPreviewFidelity(page: Page, fixture: string, size: Vi
   expect(details.root?.layoutHeight, `Studio Preview simulated height @ ${size.label}`).toBe("1440");
 
   if (fixture.startsWith("audio-")) {
-    expect(details.canvasBarLabelDisplay, `Audio Studio Preview canvas bar label hidden @ ${size.label}`).not.toBe(
-      "none"
-    );
-    expect(details.canvasSelectedMetaDisplay, `Audio Studio Preview selected meta hidden @ ${size.label}`).not.toBe(
-      "none"
-    );
+    // 2026-05-27 redesign: the canvas bar label ("Editing …") and selected-meta
+    // ("routed to main out") were removed from the slimmed context bar, so the
+    // audio fidelity check now verifies the SVG preamp knobs render square in
+    // the scaled studio preview (the scale must preserve their aspect ratio).
     expect(
-      details.compactPreampPanels.length,
-      `Audio Studio Preview must render compact preamp panels @ ${size.label}`
+      details.preampKnobRatios.length,
+      `Audio Studio Preview must render preamp knobs @ ${size.label}`
     ).toBeGreaterThan(0);
-    details.compactPreampPanels.forEach((panel, index) => {
-      assertRatioClose(
-        panel.renderedRatio ?? Number.NaN,
-        panel.naturalRatio,
-        `Audio Studio Preview compact preamp panel ${index + 1} @ ${size.label}`
-      );
+    details.preampKnobRatios.forEach((ratio, index) => {
+      assertRatioClose(ratio ?? Number.NaN, 1, `Audio Studio Preview preamp knob ${index + 1} @ ${size.label}`, 0.1);
     });
   }
 }

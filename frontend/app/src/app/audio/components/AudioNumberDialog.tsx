@@ -34,6 +34,13 @@ export function AudioNumberDialog({
   const parsed = Number(draft);
   const valid = Number.isFinite(parsed) && parsed >= min && parsed <= max;
   const canSubmit = valid && !busy;
+  // Snap the typed value to the field's step so e.g. an integer-step gain field
+  // never emits a fractional value (the engine rejects non-integer preamp gain).
+  // Clamp in case rounding nudges past an edge.
+  const commitValue =
+    Number.isFinite(parsed) && Number.isFinite(step) && step > 0
+      ? Math.max(min, Math.min(max, Number((Math.round((parsed - min) / step) * step + min).toFixed(5))))
+      : parsed;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -43,7 +50,7 @@ export function AudioNumberDialog({
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmit) return;
-    onConfirm(parsed);
+    onConfirm(commitValue);
   };
 
   return (
@@ -56,7 +63,7 @@ export function AudioNumberDialog({
             Cancel
           </Button>
           <Button
-            onClick={() => onConfirm(parsed)}
+            onClick={() => onConfirm(commitValue)}
             disabled={!canSubmit}
             loading={busy}
             variant="primary"

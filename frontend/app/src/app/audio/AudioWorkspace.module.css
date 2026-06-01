@@ -1,86 +1,236 @@
+/* AudioWorkspace.module.css
+   2026-05-27 redesign — "Console" prototype.
+
+   Tokens come from totalmix-fx-edvin-version/project/Console.html (the Claude
+   Design prototype the operator wants implemented). The legacy --audio-* family
+   used through Phase 3 is preserved as aliases so any code that still reads
+   --audio-accent / --audio-text-strong resolves against the new palette without
+   reaching for inherited brand tokens — see comments below. The Phase 3
+   "locked" broadcast palette (talkback green, group ochres, warn yellow) is
+   intentionally retired per the 2026-05-27 redesign decision.
+*/
+
 .audioShell {
-  --audio-canvas: #06070a;
-  --audio-panel: #0e1015;
-  --audio-panel-soft: #11141a;
-  --audio-panel-strong: #161922;
-  --audio-card: #181b22;
-  --audio-card-hover: #1f232c;
-  --audio-border: rgba(245, 232, 200, 0.1);
-  --audio-border-strong: rgba(245, 232, 200, 0.18);
-  --audio-border-bright: rgba(245, 232, 200, 0.28);
-  --audio-text-strong: #f5efde;
-  --audio-text-default: #cfc8b3;
-  --audio-text-muted: #908a76;
-  --audio-text-subtle: #5e5946;
-  --audio-text-disabled: #4a4636;
-  --audio-accent: var(--audio-output-main-out);
-  --audio-hot: #ffd33d;
-  --audio-clip: #ff2d2d;
-  --audio-mute: #ff7d55;
-  /* --audio-solo (#ffd94a) was removed 2026-05-24 (item I32 in
-     audio-ui-phase-3-followup-fixes.md). After Slice 2 closeout A (warn-band
-     rebind) and the I32 SOLO-chip / send-mode-row rebinds, every consumer
-     reads either --audio-warn-fill (warn yellow) or --audio-engaged-fill
-     (engaged amber). #ffd94a was visually indistinguishable from
-     --audio-hot (#ffd33d) at studio distance — the two-yellow split was a
-     Phase 2 holdover, not an intentional palette decision. */
-  --audio-talk: #74e3a3;
-  --audio-tier-accent: var(--audio-tier-outputs);
-  --audio-lane-accent: var(--audio-tier-accent);
-  --color-surface-900: var(--audio-canvas);
-  --color-surface-800: var(--audio-panel);
-  --color-surface-700: var(--audio-card);
-  --color-border-default: var(--audio-border);
-  --color-text-strong: var(--audio-text-strong);
-  --color-text-default: var(--audio-text-default);
-  --color-text-muted: var(--audio-text-muted);
-  --color-text-subtle: var(--audio-text-subtle);
-  --color-primary-500: var(--audio-accent);
-  --color-warning-500: var(--audio-hot);
-  --color-danger-500: var(--audio-clip);
-  /* Why: the global `--audio-warn-*` token family resolves to the brand.yellow
-     palette (#E8D561). Inside the audio module the page's tuned warn yellow
-     is `--audio-hot` (#ffd33d) — slightly brighter and warmer. Redefine the
-     warn family locally so semantic consumers (Slice 2 / Closeout A: the
-     OSC warning band, the SOLO warning band, etc.) get audio's tuned color
-     while keeping the cross-module token name. Other workspaces still see
-     brand.yellow because they don't compose this rule.
-     Trade-off: this override re-establishes a per-module color value at the
-     exact layer Slice 1's centralized tokens were meant to remove. It's
-     deliberate — converging on brand.yellow now would visibly shift every
-     warn surface on the audio page. Tracked as item I32 in
-     [audio-ui-phase-3-followup-fixes.md](../../../../docs/plans/audio-ui-phase-3-followup-fixes.md)
-     for a future deliberate decision (collapse the two yellows globally,
-     or accept the per-page tuning permanently). */
-  --audio-warn-fill: var(--audio-hot);
-  --audio-warn-soft: color-mix(in srgb, var(--audio-hot) 14%, transparent);
-  --audio-warn-border: color-mix(in srgb, var(--audio-hot) 50%, transparent);
-  --audio-warn-glow: color-mix(in srgb, var(--audio-hot) 6%, transparent);
-  --audio-warn-dot: var(--audio-hot);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  /* ── Console theme — Studio (default, warm amber) ───────────────────────── */
+  --bg: #0c0a08;
+  --bg-1: #131110;
+  --bg-2: #1a1714;
+  --bg-3: #221e1a;
+  --bg-elev: #2a2521;
+
+  --fg: #efebe1;
+  --fg-2: rgba(239, 235, 225, 0.68);
+  --fg-3: rgba(239, 235, 225, 0.44);
+  --fg-4: rgba(239, 235, 225, 0.22);
+
+  --line: rgba(239, 235, 225, 0.07);
+  --line-2: rgba(239, 235, 225, 0.12);
+
+  --accent: #f5a524;
+  --accent-soft: rgba(245, 165, 36, 0.14);
+  --accent-glow: rgba(245, 165, 36, 0.35);
+
+  --danger: oklch(58% 0.22 25);
+  --danger-soft: oklch(58% 0.22 25 / 0.25);
+
+  /* Single warm meter tone + clip-only red. Anchored to the meter container,
+     so the warm→red boundary lives at the same physical position on every
+     meter regardless of fill height (see AudioStereoMeter.module.css). */
+  --meter-low: oklch(82% 0.035 75);
+  --meter-mid: oklch(82% 0.035 75);
+  --meter-hi: oklch(64% 0.24 27);
+  --meter-bg: oklch(10% 0.005 60);
+  --meter-clip-pct: 88%;
+
+  /* The LIVE meters are painted on a <canvas> by AudioMeterCanvasOverlay,
+     which reads this --audio-meter-* family (NOT the static .meterFill CSS).
+     Map the whole ramp to the warm single tone so the canvas renders a cream
+     body with a red clip cap, matching the Console prototype — instead of the
+     green→amber→red fallback. The body gradient is over(top) → hot → amber →
+     green(bottom); setting hot/amber/green to cream and over to red leaves
+     red only at the clip cap. */
+  --audio-meter-bg: var(--meter-bg);
+  --audio-meter-low: oklch(72% 0.03 75);
+  --audio-meter-low-hot: var(--meter-low);
+  --audio-meter-warn: var(--meter-low);
+  --audio-meter-hot: var(--meter-low);
+  --audio-meter-over: var(--meter-hi);
+  --audio-meter-peak-hold: oklch(92% 0.02 75);
+
+  --strip-bg: #15110e;
+  --strip-bg-hover: #1b1714;
+  --strip-bg-selected: #221b15;
+
+  /* Recessed-housing material: used by the topbar cluster, monitor meter,
+     monitor controls, talkback button, etc. Theme-swap-aware. */
+  --housing-bg-top: oklch(8% 0.005 60);
+  --housing-bg-bot: oklch(11% 0.005 60);
+  --housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+
+  --easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Legacy --audio-* aliases (kept so non-redesigned consumers keep
+        rendering without inheriting brand defaults) ─────────────────────── */
+  --audio-canvas: var(--bg);
+  --audio-panel: var(--bg-1);
+  --audio-panel-soft: var(--bg-2);
+  --audio-panel-strong: var(--bg-3);
+  --audio-card: var(--bg-2);
+  --audio-card-hover: var(--bg-3);
+  --audio-border: var(--line);
+  --audio-border-strong: var(--line-2);
+  --audio-border-bright: var(--line-2);
+  --audio-text-strong: var(--fg);
+  --audio-text-default: var(--fg-2);
+  --audio-text-muted: var(--fg-3);
+  --audio-text-subtle: var(--fg-4);
+  --audio-text-disabled: var(--fg-4);
+  --audio-accent: var(--accent);
+  --audio-hot: var(--accent);
+  --audio-clip: var(--danger);
+  --audio-mute: var(--danger);
+  --audio-talk: var(--accent);
+  --audio-tier-accent: var(--accent);
+  --audio-lane-accent: var(--accent);
+  --audio-output-main-out: var(--accent);
+  --audio-output-phones-a: var(--accent);
+  --audio-output-phones-b: var(--accent);
+  --color-surface-900: var(--bg);
+  --color-surface-800: var(--bg-1);
+  --color-surface-700: var(--bg-2);
+  --color-border-default: var(--line);
+  --color-text-strong: var(--fg);
+  --color-text-default: var(--fg-2);
+  --color-text-muted: var(--fg-3);
+  --color-text-subtle: var(--fg-4);
+  --color-primary-500: var(--accent);
+  --color-warning-500: var(--accent);
+  --color-danger-500: var(--danger);
+  --audio-warn-fill: var(--accent);
+  --audio-warn-soft: var(--accent-soft);
+  --audio-warn-border: var(--accent-glow);
+  --audio-warn-glow: var(--accent-soft);
+  --audio-warn-dot: var(--accent);
+  --audio-engaged-fill: var(--accent);
+  --audio-engaged-soft: var(--accent-soft);
+
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0;
   height: 100%;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
   position: relative;
-  background: var(--audio-canvas);
-  color: var(--audio-text-default);
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    "Inter Tight",
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 13px;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
 }
 
-.audioShell[data-output-role="phones-a"] {
-  --audio-accent: var(--audio-output-phones-a);
+/* ── Alternate themes (Console prototype: Graphite + Bone) ────────────────
+   Only the base vars are overridden; the --audio-* legacy aliases + the
+   --audio-meter-* canvas family resolve through var() so they re-theme
+   automatically. Default (no attribute) = Studio = the base .audioShell. */
+
+.audioShell[data-audio-theme="graphite"] {
+  --bg: #0a0d10;
+  --bg-1: #0f1418;
+  --bg-2: #141a1f;
+  --bg-3: #1c232a;
+  --bg-elev: #232b33;
+
+  --fg: #e8edf0;
+  --fg-2: rgba(232, 237, 240, 0.66);
+  --fg-3: rgba(232, 237, 240, 0.42);
+  --fg-4: rgba(232, 237, 240, 0.2);
+
+  --line: rgba(232, 237, 240, 0.07);
+  --line-2: rgba(232, 237, 240, 0.12);
+
+  --accent: #5ee0e0;
+  --accent-soft: rgba(94, 224, 224, 0.12);
+  --accent-glow: rgba(94, 224, 224, 0.3);
+
+  --danger: oklch(62% 0.2 25);
+  --danger-soft: oklch(62% 0.2 25 / 0.25);
+
+  --meter-low: oklch(86% 0.025 220);
+  --meter-mid: oklch(86% 0.025 220);
+  --meter-hi: oklch(62% 0.22 25);
+  --meter-bg: oklch(9% 0.005 220);
+  --audio-meter-low: oklch(76% 0.02 220);
+  --audio-meter-peak-hold: oklch(94% 0.02 220);
+
+  --strip-bg: #0f1418;
+  --strip-bg-hover: #141a20;
+  --strip-bg-selected: #16222a;
+
+  --housing-bg-top: oklch(7% 0.005 220);
+  --housing-bg-bot: oklch(10% 0.005 220);
+  --housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
+.audioShell[data-audio-theme="bone"] {
+  --bg: #f3f0e8;
+  --bg-1: #faf8f2;
+  --bg-2: #ffffff;
+  --bg-3: #ebe7dd;
+  --bg-elev: #ffffff;
+
+  --fg: #1a1814;
+  --fg-2: rgba(26, 24, 20, 0.66);
+  --fg-3: rgba(26, 24, 20, 0.44);
+  --fg-4: rgba(26, 24, 20, 0.22);
+
+  --line: rgba(26, 24, 20, 0.08);
+  --line-2: rgba(26, 24, 20, 0.14);
+
+  --accent: #c25e1e;
+  --accent-soft: rgba(194, 94, 30, 0.12);
+  --accent-glow: rgba(194, 94, 30, 0.3);
+
+  --danger: oklch(50% 0.22 25);
+  --danger-soft: oklch(50% 0.22 25 / 0.15);
+
+  --meter-low: oklch(38% 0.04 75);
+  --meter-mid: oklch(38% 0.04 75);
+  --meter-hi: oklch(56% 0.24 27);
+  --meter-bg: oklch(94% 0.005 75);
+  --audio-meter-low: oklch(46% 0.04 75);
+  --audio-meter-peak-hold: oklch(28% 0.04 75);
+
+  --strip-bg: #fdfbf5;
+  --strip-bg-hover: #fffefa;
+  --strip-bg-selected: #ffffff;
+
+  --housing-bg-top: oklch(88% 0.005 75);
+  --housing-bg-bot: oklch(93% 0.005 75);
+  --housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 0 0 1px rgba(26, 24, 20, 0.08);
+}
+
+/* Output-role accent overrides — kept for any consumer that still reads
+   --audio-accent, but the Console design routes everything through --accent. */
+.audioShell[data-output-role="phones-a"],
 .audioShell[data-output-role="phones-b"] {
-  --audio-accent: var(--audio-output-phones-b);
+  --audio-accent: var(--accent);
 }
 
 .eyebrow {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
-  letter-spacing: 0;
+  color: var(--fg-3);
+  font:
+    500 11px / 1 "JetBrains Mono",
+    ui-monospace,
+    monospace;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -91,7 +241,7 @@
   border-radius: 999px;
   background: radial-gradient(
     220px 180px at 50% 22%,
-    color-mix(in srgb, var(--audio-accent) 46%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 46%, transparent) 0%,
     transparent 70%
   );
   opacity: calc(0.18 + var(--master-glow, 0) * 0.55);
@@ -100,75 +250,15 @@
   transition: opacity 220ms ease;
 }
 
-/* Shared panel surface. Audio surfaces import this via CSS Modules
-   `composes: shellPanel from "./AudioWorkspace.module.css"` so the shared
-   background / border treatment stays single-sourced even after the
-   per-component CSS files split out (Slice 5A). */
 .shellPanel {
-  border: 1px solid var(--audio-border);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(245, 232, 200, 0.035), transparent 36%),
-    radial-gradient(circle at top right, color-mix(in srgb, var(--audio-accent) 9%, transparent), transparent 58%),
-    var(--audio-panel);
+  background: var(--bg-1);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
 }
 
 .loadingPanel {
   composes: shellPanel;
-}
-
-.feedbackBanner {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid color-mix(in srgb, var(--audio-warn-fill) 38%, var(--audio-border));
-  border-radius: 8px;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-warn-fill) 14%, transparent), transparent),
-    color-mix(in srgb, var(--color-surface-900) 92%, transparent);
-}
-
-.feedbackBanner {
-  grid-template-columns: 1fr;
-}
-
-.feedbackBanner[data-tone="error"] {
-  border-color: color-mix(in srgb, var(--audio-clip) 42%, var(--audio-border));
-}
-
-.feedbackBanner {
-  color: var(--color-text-muted);
-  font: var(--font-weight-regular) 12px / 1.25 var(--font-family-ui);
-  letter-spacing: 0;
-}
-
-.audioBody {
-  flex: 1 1 auto;
-  display: grid;
-  grid-template-columns: 304px minmax(0, 1fr) 416px;
-  gap: 8px;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.audioShell button[data-armed="true"] {
-  border-color: color-mix(in srgb, var(--audio-hot) 70%, var(--audio-border));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-hot) 18%, transparent), transparent),
-    color-mix(in srgb, var(--audio-panel) 90%, transparent);
-  color: var(--audio-hot);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--audio-hot) 28%, transparent),
-    0 0 18px color-mix(in srgb, var(--audio-hot) 18%, transparent);
-}
-
-.loadingPanel {
   display: grid;
   align-content: start;
   gap: 14px;
@@ -179,9 +269,12 @@
 
 .loadingPanel h1 {
   margin: 0;
-  color: var(--color-text-strong);
-  font: var(--font-weight-semibold) var(--operator-font-size-title-md, 22px) / 1.15 var(--font-family-display);
-  letter-spacing: 0;
+  color: var(--fg);
+  font:
+    600 22px / 1.15 "Inter Tight",
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .loadingGrid {
@@ -192,13 +285,58 @@
 
 .loadingGrid span {
   min-height: 140px;
-  border: 1px solid var(--audio-border);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--color-surface-700) 72%, transparent);
+  background: var(--bg-2);
+}
+
+.feedbackBanner {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font:
+    500 12px / 1.25 "Inter Tight",
+    system-ui,
+    sans-serif;
+  letter-spacing: 0;
+}
+
+.feedbackBanner[data-tone="error"] {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-bottom-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+}
+
+/* ── Layout slots ─────────────────────────────────────────────────────────── */
+
+.audioBody {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 440px;
+  gap: 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.audioShell button[data-armed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow:
+    0 0 0 1px var(--accent-soft),
+    0 0 18px var(--accent-soft);
 }
 
 .audioShell :is(button, [role="button"], [role="slider"], input):focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--audio-accent) 82%, white);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -219,24 +357,22 @@
 
 @container operator-root (min-width: 2200px) and (min-height: 1250px) {
   .audioBody {
-    grid-template-columns: 352px minmax(0, 1fr) 504px;
-    gap: 0;
+    grid-template-columns: minmax(0, 1fr) 504px;
   }
 }
 
 @container operator-root (max-width: 2100px) {
   .audioBody {
-    grid-template-columns: 276px minmax(0, 1fr) 364px;
+    grid-template-columns: minmax(0, 1fr) 380px;
   }
 }
 
 @container operator-root (max-width: 1600px) {
   .audioBody {
-    grid-template-columns: 196px minmax(0, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 320px;
   }
 }
 
 [data-layout-mode="studioFull"] .audioShell .audioBody {
-  grid-template-columns: 352px minmax(0, 1fr) 504px;
-  gap: 0;
+  grid-template-columns: minmax(0, 1fr) 504px;
 }

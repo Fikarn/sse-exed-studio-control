@@ -1,3 +1,9 @@
+// AudioRail — INTENTIONALLY DEAD CODE as of the 2026-05-27 Console redesign.
+// The left rail has been retired in favour of an AudioTopBar + AudioMonitorBar
+// shell (see AudioWorkspace.tsx). This file is preserved per the
+// AudioToolbar.tsx precedent so future surfaces can re-mount the old rail
+// content if the redesign needs to revert. Do not add new operator features
+// here — they belong on the live AudioTopBar / AudioMonitorBar / AudioInspector.
 import { useEffect, type CSSProperties } from "react";
 import type { ShellStore } from "@sse/engine-client";
 import { RefreshCw, RotateCcw, Settings } from "lucide-react";

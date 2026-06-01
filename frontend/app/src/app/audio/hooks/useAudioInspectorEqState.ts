@@ -86,12 +86,21 @@ export function useAudioInspectorEqState({
         : ["bell"];
   // Why: TotalMix Band 2 is fixed-Bell. Single capability swap if RME unlocks it.
   const canChangeBandType = activeEqBand?.id !== "2";
+  // Draft-aware bands: read each band's gain/freq/Q from the draft store so the
+  // all-bands knob grid AND the response curve render from the same live values.
+  // An in-flight curve-node drag (eqGraphDraft) still overrides its band.
   const eqBands = selectedChannel
-    ? selectedChannel.eq.bands.map((band) =>
-        eqGraphDraft?.bandId === band.id
-          ? { ...band, frequencyHz: eqGraphDraft.frequencyHz, gainDb: eqGraphDraft.gainDb }
-          : band
-      )
+    ? selectedChannel.eq.bands.map((band) => {
+        const draftAware = {
+          ...band,
+          gainDb: getDraftValue(`channel:${channelId}:eq:${band.id}:gain`, band.gainDb),
+          frequencyHz: getDraftValue(`channel:${channelId}:eq:${band.id}:frequency`, band.frequencyHz),
+          q: getDraftValue(`channel:${channelId}:eq:${band.id}:q`, band.q),
+        };
+        return eqGraphDraft?.bandId === band.id
+          ? { ...draftAware, frequencyHz: eqGraphDraft.frequencyHz, gainDb: eqGraphDraft.gainDb }
+          : draftAware;
+      })
     : [];
   const visualEq = selectedChannel
     ? {

@@ -25,8 +25,11 @@ import {
   audioChannelSupportsPhase,
   type AudioWorkspaceViewModel,
 } from "../../audioViewModel";
-import { AudioPreampControl } from "../AudioPreampControl";
+import { AudioKnob } from "../AudioKnob";
 import type { AudioChannelUpdate, SelectedAudioChannel } from "./audioInspectorHelpers";
+
+const PREAMP_GAIN_MAX_DB = 75;
+const PREAMP_GAIN_DEFAULT_DB = 24;
 
 interface PhantomToggleArg {
   channelId: string;
@@ -66,22 +69,40 @@ export function AudioInspectorChannelHardwareCard({
       className={`${styles.inspectorMiniCard} ${styles.sourceCard} ${styles.inspectorStickyHardwareCard}`}
       data-testid="audio-inspector-hardware-mini"
     >
-      <span className={styles.eyebrow}>{audioChannelSupportsGain(selectedChannel) ? "Hardware" : "Software"}</span>
+      <span className={styles.eyebrow}>
+        {audioChannelSupportsGain(selectedChannel) ? "Mic / Line Gain" : "Software"}
+      </span>
       {audioChannelSupportsGain(selectedChannel) ? (
         <div className={styles.inspectorHardwareGrid}>
-          <AudioPreampControl
-            channelId={selectedChannel.id}
-            disabled={!viewModel.actionsAllowed}
-            gain={selectedGain}
-            label={`${selectedChannel.name} preamp gain`}
-            onCommit={(nextGain) => {
-              setDraftValue(gainDraftKey, nextGain);
-              commitChannelContinuous({ channelId: selectedChannel.id, gain: nextGain });
-              clearDraftValueLater(gainDraftKey);
-            }}
-            onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
-            variant="narrow"
-          />
+          <div className={styles.preampHero}>
+            <AudioKnob
+              ariaLabel={`${selectedChannel.name} preamp gain`}
+              caption="dB"
+              defaultValue={PREAMP_GAIN_DEFAULT_DB}
+              disabled={!viewModel.actionsAllowed}
+              // Preamp gain is integer-only engine-side; show + commit whole dB.
+              format={(value) => `${Math.round(value)}`}
+              max={PREAMP_GAIN_MAX_DB}
+              min={0}
+              onCommit={(nextGain) => {
+                setDraftValue(gainDraftKey, nextGain);
+                commitChannelContinuous({ channelId: selectedChannel.id, gain: nextGain });
+                clearDraftValueLater(gainDraftKey);
+              }}
+              onPreview={(nextGain) => setDraftValue(gainDraftKey, nextGain)}
+              size={132}
+              step={1}
+              value={selectedGain}
+              valueInside
+            />
+            <div className={styles.preampHeroScale} aria-hidden="true">
+              <span>0</span>
+              <span className={styles.preampHeroScaleTrack}>
+                <i style={{ left: `${(selectedGain / PREAMP_GAIN_MAX_DB) * 100}%` }} />
+              </span>
+              <span>{PREAMP_GAIN_MAX_DB}</span>
+            </div>
+          </div>
           <div className={styles.unsupportedToggleRow}>
             <button
               aria-label={`${selectedChannel.phantom ? "Disable" : "Enable"} 48V on ${selectedChannel.name}`}

@@ -66,15 +66,27 @@ export const EQ_GAIN_MARKERS = [
 ] as const;
 
 export const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string; testId: string }> = [
-  { id: "channel", label: "Overview", testId: "audio-inspector-channel" },
+  // 2026-05-27 Console redesign: tab labels match the prototype's Preamp /
+  // EQ / Dyn / Routing rhythm. The internal `id` strings stay the Phase 3
+  // values so existing routing / state hooks keep working unmodified.
+  { id: "channel", label: "Preamp", testId: "audio-inspector-channel" },
   { id: "eq", label: "EQ", testId: "audio-inspector-eq" },
-  { id: "dynamics", label: "Dynamics", testId: "audio-inspector-dynamics" },
-  { id: "sends", label: "Sends", testId: "audio-inspector-sends" },
+  { id: "dynamics", label: "Dyn", testId: "audio-inspector-dynamics" },
+  { id: "sends", label: "Routing", testId: "audio-inspector-sends" },
 ];
 
 export function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
+}
+
+// Per-band EQ type options. TotalMix Band 2 is fixed-Bell; Band 1 can become a
+// low-shelf / high-pass, Band 3 a high-shelf / low-pass. Extracted so the
+// all-bands grid and the EQ-state hook compute the same set.
+export function eqBandTypeOptionsFor(bandId: string): readonly string[] {
+  if (bandId === "1") return ["bell", "low-shelf", "high-pass", "low-pass"];
+  if (bandId === "3") return ["bell", "high-shelf", "low-pass", "high-pass"];
+  return ["bell"];
 }
 
 export function formatEqFrequency(value: number) {

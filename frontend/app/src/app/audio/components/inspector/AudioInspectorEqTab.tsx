@@ -2,10 +2,8 @@ import type { CSSProperties, MutableRefObject, PointerEvent as ReactPointerEvent
 
 import styles from "../AudioInspector.module.css";
 import tabStyles from "../AudioInspectorEqTab.module.css";
-import sendStyles from "../AudioInspectorSendsTab.module.css";
 import type { AudioWorkspaceViewModel } from "../../audioViewModel";
-import { AudioInspectorEqBandTray } from "./AudioInspectorEqBandTray";
-import { AudioInspectorEqLowCutTray } from "./AudioInspectorEqLowCutTray";
+import { AudioInspectorEqBandGrid } from "./AudioInspectorEqBandGrid";
 import {
   EQ_FREQUENCY_MARKERS,
   EQ_GAIN_MARKERS,
@@ -21,20 +19,9 @@ import {
 export type { EqDragRef };
 
 interface AudioInspectorEqTabProps {
-  // Per-band draft keys/values resolved in the parent so the EQ tab + Overview
-  // mini card render from the same source.
-  activeEqBand: AudioEqBand | null;
-  activeEqBandFrequencyKey: string;
-  activeEqBandFrequencyValue: number;
-  activeEqBandGainKey: string;
-  activeEqBandGainValue: number;
-  activeEqBandQKey: string;
-  activeEqBandQValue: number;
-  activeEqBandTypeOptions: readonly string[];
   activeEqHandleId: string | null;
   activeEqLabel: string;
   activeEqValue: string;
-  canChangeBandType: boolean;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitEqPointFromPointer: (
     event: ReactPointerEvent<HTMLButtonElement>,
@@ -58,25 +45,16 @@ interface AudioInspectorEqTabProps {
 /**
  * EQ tab body. Renders the band-selector tag strip, the full-size response
  * curve graph with pointer-driven band handles, the value badge, and the
- * Low Cut / per-band control trays.
+ * all-bands knob grid (Low Cut + 3 PEQ bands shown at once).
  *
  * EQ state (selected band, graph draft, drag ref, throttled commit) lives in
  * the parent so the channel Overview mini card and this tab read from the
  * same source — both render the same `eqGraphPath` while a drag is in flight.
  */
 export function AudioInspectorEqTab({
-  activeEqBand,
-  activeEqBandFrequencyKey,
-  activeEqBandFrequencyValue,
-  activeEqBandGainKey,
-  activeEqBandGainValue,
-  activeEqBandQKey,
-  activeEqBandQValue,
-  activeEqBandTypeOptions,
   activeEqHandleId,
   activeEqLabel,
   activeEqValue,
-  canChangeBandType,
   clearDraftValueLater,
   commitEqPointFromPointer,
   commitLowCutFromPointer,
@@ -281,38 +259,18 @@ export function AudioInspectorEqTab({
         </strong>
         <span>20 kHz · ±20 dB</span>
       </div>
-      <div className={`${sendStyles.sendCardFull} ${tabStyles.eqControlTray}`} data-testid="audio-eq-control-tray">
-        {activeEqHandleId === LOW_CUT_HANDLE_ID ? (
-          <AudioInspectorEqLowCutTray
-            clearDraftValueLater={clearDraftValueLater}
-            lowCutFrequencyKey={lowCutFrequencyKey}
-            lowCutFrequencyValue={lowCutFrequencyValue}
-            onUpdateChannelEq={onUpdateChannelEq}
-            selectedChannel={selectedChannel}
-            setDraftValue={setDraftValue}
-            setSelectedEqBandId={setSelectedEqBandId}
-            viewModel={viewModel}
-          />
-        ) : activeEqBand ? (
-          <AudioInspectorEqBandTray
-            activeEqBand={activeEqBand}
-            activeEqBandFrequencyKey={activeEqBandFrequencyKey}
-            activeEqBandFrequencyValue={activeEqBandFrequencyValue}
-            activeEqBandGainKey={activeEqBandGainKey}
-            activeEqBandGainValue={activeEqBandGainValue}
-            activeEqBandQKey={activeEqBandQKey}
-            activeEqBandQValue={activeEqBandQValue}
-            activeEqBandTypeOptions={activeEqBandTypeOptions}
-            canChangeBandType={canChangeBandType}
-            clearDraftValueLater={clearDraftValueLater}
-            onUpdateChannelEq={onUpdateChannelEq}
-            selectedChannel={selectedChannel}
-            setDraftValue={setDraftValue}
-            setSelectedEqBandId={setSelectedEqBandId}
-            viewModel={viewModel}
-          />
-        ) : null}
-      </div>
+      <AudioInspectorEqBandGrid
+        activeEqHandleId={activeEqHandleId}
+        clearDraftValueLater={clearDraftValueLater}
+        eqBands={eqBands}
+        lowCutFrequencyKey={lowCutFrequencyKey}
+        lowCutFrequencyValue={lowCutFrequencyValue}
+        onUpdateChannelEq={onUpdateChannelEq}
+        selectedChannel={selectedChannel}
+        setDraftValue={setDraftValue}
+        setSelectedEqBandId={setSelectedEqBandId}
+        viewModel={viewModel}
+      />
     </div>
   );
 }

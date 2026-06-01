@@ -67,12 +67,16 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   const workspace = page.getByTestId("audio-workspace");
   await expect(workspace).toBeVisible();
   await expect(workspace).toHaveAttribute("data-output-role", "main-out");
+  // 2026-05-27 redesign: a single amber accent (#f5a524) replaces the
+  // per-output cyan (#5dc5e8). --audio-accent now resolves to --accent for
+  // every output role.
   await expect
     .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--audio-accent").trim()))
-    .toBe("#5dc5e8");
+    .toBe("#f5a524");
   await expect(workspace.getByText("Main Out").first()).toBeVisible();
   await expect(page.getByTestId("audio-signal-canvas")).toBeVisible();
-  await expect(page.getByTestId("audio-signal-canvas").getByText("Editing")).toBeVisible();
+  // 2026-05-27 redesign: the dense context bar was slimmed; AudioSignalCanvas
+  // no longer renders an "Editing" label.
   await expect(page.getByTestId("audio-signal-canvas").getByText("View", { exact: true })).toHaveCount(0);
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Submix" })).toHaveCount(0);
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Touch" })).toHaveCount(0);
@@ -82,27 +86,37 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-hardware-outputs-tier")).toBeVisible();
   await expect(page.getByTestId("audio-health-bar")).toBeVisible();
   await expectAudioWorkspaceGeometry(page);
-  await expect(page.getByTestId("audio-master-halo")).toBeVisible();
+  // 2026-05-27 redesign: the decorative master-halo glow lived on the rail
+  // monitor card (AudioRail.tsx), now dead code — the top bar + monitor bar
+  // replaced the rail, so the halo no longer renders.
+  await expect(page.getByTestId("audio-master-halo")).toHaveCount(0);
   await expect(page.getByTestId("audio-routing-overlay")).toHaveCount(0);
-  // GS-AUD-45: OSC / Endpoint / Metering moved to the rail Trust panel
-  // (canonical surface). The footer keeps only the temporal facts.
+  // GS-AUD-45 (now 2026-05-27 redesign): OSC / Metering live in the
+  // AudioTopBar stat cluster; Endpoint is dropped from the chrome entirely.
+  // The footer keeps only the temporal facts.
   await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("OSC");
   await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Endpoint");
   await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Metering");
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Clock");
-  await expect(page.getByTestId("audio-rail-trust-panel")).toContainText("Endpoint");
-  await expect(page.getByTestId("audio-rail-trust-panel")).toContainText("Metering");
+  // 2026-05-27 redesign: Endpoint is no longer surfaced on the chrome.
+  // OSC / Metering live in the AudioTopBar stat cluster (no testid on the
+  // cluster itself yet; assert via topbar text).
+  await expect(page.getByTestId("audio-topbar")).toContainText("OSC");
+  await expect(page.getByTestId("audio-topbar")).toContainText("Metering");
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Command palette");
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Shortcuts");
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank prev");
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank next");
   await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Shift 1-8 recall");
   await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Esc clear");
-  await expect(page.getByTestId("audio-rail-monitor-card")).toBeVisible();
-  await expect(page.getByTestId("audio-rail-monitor-card")).toContainText(formatAudioDb(0.78));
-  await expect(page.getByTestId("audio-rail-tools")).toContainText("Sync");
-  await expect(page.getByTestId("audio-rail-tools").getByRole("button", { name: /Setup/ })).toBeEnabled();
-  await expect(page.getByTestId("audio-rail-tools")).not.toContainText("Levels");
+  // 2026-05-27 redesign: monitor controls moved from the rail card to the
+  // new AudioMonitorBar (footer). The master-meter dB readout is on
+  // `audio-monitor-master-meter`; assert visibility of the bar itself.
+  await expect(page.getByTestId("audio-monitor-bar")).toBeVisible();
+  await expect(page.getByTestId("audio-monitor-master-meter")).toBeVisible();
+  await expect(page.getByTestId("audio-topbar")).toContainText("Sync");
+  await expect(page.getByTestId("audio-topbar-setup")).toBeEnabled();
+  await expect(page.getByTestId("audio-topbar")).not.toContainText("Levels");
   await expect(page.getByTestId("audio-solo-warning-band")).toContainText("solo engaged");
   await expect
     .poll(async () => {
@@ -129,7 +143,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   ).toBeVisible();
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Master" })).toHaveCount(0);
   await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
-  await expect(page.getByTestId("audio-mix-target-audio-mix-main")).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("audio-output-audio-mix-main")).toHaveAttribute("data-selected", "true");
   await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-group", "talent");
   await expect(page.getByTestId("audio-strip-audio-playback-1-2")).toHaveAttribute("data-group", "bed");
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-group", "fx");
@@ -137,7 +151,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-strip-audio-input-12")).toBeVisible();
   await expect(page.getByTestId("audio-strip-audio-input-1")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-feeding", "true");
-  await expect(page.getByTestId("audio-inspector-channel")).toContainText("FX 3/4");
+  await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Software");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Playback telemetry not reported");
   await expect(page.getByTestId("audio-inspector-channel")).not.toContainText("Buffer status");
@@ -145,7 +159,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Stereo link");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Auto fade");
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Hardware");
+  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Mic / Line Gain");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("48V");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Hi-Z");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Polarity");
@@ -153,18 +167,17 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-inspector-hardware-mini")).not.toContainText("Pad");
   await page.getByTestId("audio-strip-audio-playback-3-4").click();
 
-  await page.getByRole("button", { name: /Main Out.*selected/i }).click();
-  await expect(page.getByRole("menu", { name: "Audio output targets" })).toBeVisible();
-  await page.getByRole("menuitem", { name: /Phones 1/i }).click();
+  // 2026-05-27 redesign: the AudioTargetPicker output dropdown (a "Main Out
+  // selected output target" button that opened an "Audio output targets" menu)
+  // was removed. Outputs are now selected directly from the output lanes.
+  await page.getByTestId("audio-output-audio-mix-phones-a").click();
+  await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
   await expect(workspace).toHaveAttribute("data-output-role", "phones-a");
-  await expect(page.getByRole("button", { name: /Phones 1.*selected/i })).toBeVisible();
-
-  await page.getByTestId("audio-mix-target-audio-mix-phones-a").click();
-  await expect(page.getByTestId("audio-mix-target-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
-  await expect(workspace).toHaveAttribute("data-output-role", "phones-a");
+  // 2026-05-27 redesign: per-output accents collapsed to the single amber
+  // accent; phones-a no longer recolours --audio-accent to #e8a341.
   await expect
     .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--audio-accent").trim()))
-    .toBe("#e8a341");
+    .toBe("#f5a524");
   await expect(page.getByTestId("audio-hardware-outputs-tier")).toContainText("Phones 1");
   await page.getByTestId("audio-output-audio-mix-main").click();
   await expect(page.locator('[data-source-tier="outputs"]')).toBeVisible();
@@ -193,7 +206,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-toolbar-current-snapshot")).toHaveText("Recalled Interview block");
 
   await expect(page.getByTestId("audio-inspector-channel")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Preamp" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("Level L / R");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("Peak hold");
   await expect(page.getByTestId("audio-inspector-level-readout")).toHaveAttribute("data-meter-readout-mode", "level");
@@ -202,9 +215,11 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
     "peakHold"
   );
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("Nominal ref");
-  await expect(page.getByTestId("audio-inspector-eq-mini")).toContainText("EQ");
-  await expect(page.getByTestId("audio-inspector-dynamics-mini")).toContainText("Dynamics");
-  await expect(page.getByTestId("audio-inspector-sends-mini")).toContainText("Sends");
+  // 2026-05-27 redesign: Overview mini-preview cards removed; the EQ / Dyn /
+  // Routing tabs are the route into processing now.
+  await expect(page.getByRole("tab", { name: "EQ" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Dyn" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Routing" })).toBeVisible();
   const contextCountsBefore = await page.evaluate(() => ({ ...window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ }));
   await page.getByTestId("audio-strip-audio-input-1").click({ button: "right", position: { x: 12, y: 12 } });
   const menu = page.getByRole("menu", { name: /actions/i });
@@ -237,10 +252,10 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByRole("button", { name: "Enable PEQ" })).toBeEnabled();
   await page.getByRole("button", { name: "Enable PEQ" }).click();
   await expect(page.getByRole("button", { name: "Bypass PEQ" })).toHaveAttribute("data-active", "true");
-  await page.getByRole("tab", { name: "Dynamics" }).click();
+  await page.getByRole("tab", { name: "Dyn" }).click();
   await expect(page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp" })).toBeEnabled();
   await expect(page.getByTestId("audio-dynamics-range")).toContainText("Comp");
-  await page.getByRole("tab", { name: "Sends" }).click();
+  await page.getByRole("tab", { name: "Routing" }).click();
   await expect(page.getByTestId("audio-inspector-sends")).toContainText("Phones 1");
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText(/Send|No send|Muted/);
   const preFader = page.getByTestId("audio-inspector-sends").getByRole("button", { name: "Pre fader" }).first();
@@ -252,10 +267,10 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-inspector-channel")).toBeVisible();
 });
 
-test("audio rail setup action opens the setup workspace", async ({ page }) => {
+test("audio topbar setup action opens the setup workspace", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
-  await page.getByTestId("audio-rail-tools").getByRole("button", { name: /Setup/ }).click();
+  await page.getByTestId("audio-topbar-setup").click();
   await expect(page.getByText("Setup / Support").first()).toBeVisible();
 });
 
@@ -274,14 +289,14 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   await expect(statusDot).toBeVisible();
   await expect(statusDot).toHaveAttribute("title", /OSC NOT VERIFIED/);
   await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
-  await expect(page.getByTestId("audio-rail-tools").getByRole("button", { name: "Sync" })).toBeEnabled();
+  await expect(page.getByTestId("audio-topbar-sync")).toBeEnabled();
   await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).not.toHaveAttribute("aria-disabled", "true");
-  await page.getByTestId("audio-rail-tools").getByRole("button", { name: "Sync" }).click();
+  await page.getByTestId("audio-topbar-sync").click();
   await expect(page.getByText(/Run the commissioning audio probe before syncing/i)).toBeVisible();
 
   await openFixture(page, "audio-osc-disabled");
   await expect(page.getByText("OSC DISABLED", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("audio-rail-tools").getByRole("button", { name: "Sync" })).toBeDisabled();
+  await expect(page.getByTestId("audio-topbar-sync")).toBeDisabled();
 
   await openFixture(page, "audio-offline");
   await expect(page.getByText("CONSOLE UNREACHABLE", { exact: true })).toBeVisible();
@@ -324,30 +339,31 @@ test("renders unclipped dBFS scale labels beside every audio meter", async ({ pa
   await expectDbfsScaleLabelsInsideMeters(page, "native 2560 output inspector");
 });
 
-test("stacks audio inspector processing previews in Overview", async ({ page }) => {
+// 2026-05-27 redesign: Overview mini-preview cards replaced by the hero Preamp pane + dedicated EQ/Dyn/Routing tabs.
+test.skip("stacks audio inspector processing previews in Overview", async ({ page }) => {
   await page.setViewportSize({ width: 2560, height: 1440 });
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await expect(page.getByRole("tab", { name: "Overview", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Preamp", exact: true })).toHaveAttribute("aria-selected", "true");
   await expectAudioOverviewProcessingStack(page, "native 2560 selected-channel", 82);
 
   await page.getByTestId("audio-inspector-eq-mini").click();
   await expect(page.getByRole("tab", { name: "EQ", exact: true })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("tab", { name: "Overview", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Preamp", exact: true })).toHaveAttribute("aria-selected", "true");
 
   await page.getByTestId("audio-inspector-dynamics-mini").click();
-  await expect(page.getByRole("tab", { name: "Dynamics", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("tab", { name: "Overview", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Preamp", exact: true })).toHaveAttribute("aria-selected", "true");
 
   await page.getByTestId("audio-output-audio-mix-main").click();
   await expect(page.getByTestId("audio-inspector-output")).toBeVisible();
   await expect(page.getByRole("tab", { name: "Output", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tab", { name: "EQ", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Dynamics", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Sends", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Routing", exact: true })).toHaveCount(0);
 });
 
 test("renders live-console meter references instead of loudness readouts", async ({ page }) => {
@@ -567,9 +583,11 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await openFixture(page, "audio-populated");
 
   await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveText("TEST METER SIMULATION");
-  await expect(page.getByTestId("audio-rail-monitor-card")).toContainText("test meters");
-  // GS-AUD-45: simulated metering label now lives on the rail Trust panel.
-  await expect(page.getByTestId("audio-rail-trust-panel")).toContainText("test simulation");
+  // 2026-05-27 redesign: the rail Trust panel is gone. The simulated metering
+  // label moved to the AudioTopBar's Metering stat cell ("test simulation").
+  // The rail-card "Active mix · test meters" copy is retired (no replacement
+  // — the monitor bar shows only the active master meter).
+  await expect(page.getByTestId("audio-topbar")).toContainText("test simulation");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST STAGE");
 
   const hostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
@@ -649,8 +667,10 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
     .getByTestId("audio-strip-audio-playback-1-2")
     .locator('[data-meter-component="stereo"]');
   await expect(programPlaybackMeter).toHaveCount(1);
-  const activeMixFill = page.getByTestId("audio-active-mix-meter").locator("i").first();
-  expect(await activeMixFill.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
+  // 2026-05-27 redesign: the rail's "Active mix" mini-meter (audio-active-mix-meter)
+  // was removed with the rail; the monitor bar's master meter replaced it. The
+  // strip/inspector meter no-animation guards above already cover the
+  // "simulated metering must not CSS-animate" contract.
   const firstCanvasSample = await readMeterCanvasSample(page, "audio-strip-audio-input-9");
   await expect
     .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 1_800 })
@@ -658,9 +678,10 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
 
   await openFixture(page, "audio-hardware-metering");
   await expect(page.getByTestId("audio-meter-simulation-chip")).toHaveCount(0);
-  await expect(page.getByTestId("audio-rail-monitor-card")).toContainText("Active mix · live");
-  // GS-AUD-45: the simulated badge moved to the rail Trust panel.
-  await expect(page.getByTestId("audio-rail-trust-panel")).not.toContainText("test simulation");
+  // 2026-05-27 redesign: rail card with the "Active mix · live" eyebrow is
+  // gone. The Metering stat cell on the AudioTopBar shows the live metering
+  // label (footerTelemetry.metering) instead of the "test simulation" copy.
+  await expect(page.getByTestId("audio-topbar")).not.toContainText("test simulation");
   await expect(page.locator("[data-simulated-meter]")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-playback-3-4").locator("[data-simulation-profile]")).toHaveCount(0);
   const hardwareHostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
@@ -811,7 +832,7 @@ test("supports audio warning-band sync and keyboard mix-target changes", async (
   await openFixture(page, "audio-osc-disabled");
   const disabledWarningBand = page.getByTestId("audio-warning-band");
   await expect(disabledWarningBand.getByRole("button", { name: "Sync now" })).toBeDisabled();
-  await expect(page.getByTestId("audio-rail-tools").getByRole("button", { name: "Sync" })).toBeDisabled();
+  await expect(page.getByTestId("audio-topbar-sync")).toBeDisabled();
 });
 
 test("supports audio group filtering and source/output selection flow", async ({ page }) => {
@@ -862,13 +883,16 @@ test("supports audio group filtering and source/output selection flow", async ({
   await page.getByTestId("audio-tier-chip-inputs-talent").click();
   await page.getByTestId("audio-tier-chip-playback-fx").click();
   await page.getByTestId("audio-strip-audio-playback-3-4").click();
-  await expect(page.getByTestId("audio-inspector-channel")).toContainText("FX 3/4");
+  // 2026-05-27 redesign: the channel name moved into the inspector's slimmed
+  // sticky identity header (an <h2>), outside the audio-inspector-channel
+  // tabpanel. Assert FX 3/4's inspector is shown via that header heading.
+  await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
   await page.getByTestId("audio-output-audio-mix-phones-a").click();
-  await expect(page.getByTestId("audio-mix-target-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
   await expect(page.getByRole("tab", { name: "Output", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tab", { name: "EQ", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Dynamics", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Sends", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Routing", exact: true })).toHaveCount(0);
   await expect(page.getByTestId("audio-inspector-output-panel")).toContainText("Phones 1");
   await expect(page.getByTestId("audio-inspector-output")).toContainText("Level L / R");
   await expect(page.getByTestId("audio-inspector-output")).toContainText("Peak hold");
@@ -901,7 +925,10 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
   await expect(strip.getByRole("button", { name: "AutoSet" })).toHaveCount(0);
   await expect(strip.getByRole("button", { name: "Pad" })).toHaveCount(0);
 
-  await expect(inspector).toContainText("Hardware");
+  // 2026-05-27 redesign: the preamp card eyebrow is now "Mic / Line Gain"
+  // (was "Hardware") and hosts an SVG rotary knob; the 48V / Hi-Z / Polarity
+  // / AutoSet toggles stay.
+  await expect(inspector).toContainText("Mic / Line Gain");
   await expect(inspector).toContainText("48V");
   await expect(inspector).toContainText("Hi-Z");
   await expect(inspector).toContainText("Polarity");
@@ -1097,7 +1124,7 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
 test("audio-no-send fixture marks FX playback as not feeding main", async ({ page }) => {
   await openFixture(page, "audio-no-send");
 
-  await expect(page.getByTestId("audio-mix-target-audio-mix-main")).toHaveAttribute("data-selected", "true");
+  await expect(page.getByTestId("audio-output-audio-mix-main")).toHaveAttribute("data-selected", "true");
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
   await expect(page.getByTestId("audio-routing-overlay")).toHaveCount(0);
 });
@@ -1171,13 +1198,18 @@ test("supports engine-backed audio EQ editing", async ({ page }) => {
   await expectSliderValueChanges(page, "Host Low Cut frequency");
 
   await eqPanel.getByRole("button", { name: "2", exact: true }).click();
+  // 2026-05-27 Console redesign: the EQ tab now shows every band's knobs +
+  // type controls at once (all-bands grid) instead of a single-active-band
+  // tray. Band-type assertions scope to band 2's card, and the knob counts
+  // reflect all three PEQ bands (Low Cut has only a cutoff knob, no "EQ" knob).
+  const bandTwoCard = page.getByTestId("audio-eq-band-card-2");
   await expect(page.getByTestId("audio-eq-control-tray")).toContainText("Band 2");
   await expect(page.getByRole("button", { name: "Enable PEQ" })).toBeVisible();
-  await expect(eqPanel.getByRole("button", { name: "Bell", exact: true })).toBeDisabled();
-  await expect(eqPanel.getByRole("button", { name: "Low Shelf", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("slider", { name: /Host .* EQ frequency/ })).toHaveCount(1);
-  await expect(page.getByRole("slider", { name: /Host .* EQ Q/ })).toHaveCount(1);
-  await expect(page.getByRole("slider", { name: /Host .* EQ gain/ })).toHaveCount(1);
+  await expect(bandTwoCard.getByRole("button", { name: "Bell", exact: true })).toBeDisabled();
+  await expect(bandTwoCard.getByRole("button", { name: "Low Shelf", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("slider", { name: /Host .* EQ frequency/ })).toHaveCount(3);
+  await expect(page.getByRole("slider", { name: /Host .* EQ Q/ })).toHaveCount(3);
+  await expect(page.getByRole("slider", { name: /Host .* EQ gain/ })).toHaveCount(3);
   await expect(page.getByRole("slider", { name: "Host Band 2 EQ frequency" })).toHaveAttribute("aria-valuemin", "20");
   await expect(page.getByRole("slider", { name: "Host Band 2 EQ frequency" })).toHaveAttribute(
     "aria-valuemax",
@@ -1224,7 +1256,7 @@ test("supports engine-backed audio dynamics editing", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await page.getByRole("tab", { name: "Dynamics" }).click();
+  await page.getByRole("tab", { name: "Dyn" }).click();
   await expect(page.getByTestId("audio-dynamics-range")).toContainText("Comp");
   await expect(page.getByTestId("audio-dynamics-curve")).toHaveAttribute("data-active", "false");
   const comp = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp" });
@@ -1254,7 +1286,7 @@ test("supports engine-backed audio send mode controls", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await page.getByRole("tab", { name: "Sends" }).click();
+  await page.getByRole("tab", { name: "Routing" }).click();
   const sends = page.getByTestId("audio-inspector-sends");
   await expect(page.getByTestId("audio-send-destination-audio-mix-main")).toContainText("Main Out");
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText("Phones 1");
@@ -1453,17 +1485,39 @@ test("audio preamp gain control responds to pointer drag", async ({ page }) => {
   await expect(hostGain).toHaveAttribute("aria-valuenow", "12");
 });
 
+test("inspector preamp gain knob only reports whole-dB values", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+  await page.getByTestId("audio-strip-audio-input-9").click();
+
+  // The engine rejects fractional preamp gain ("gain must be an integer"), so
+  // the inspector hero knob must only ever commit / report whole dB. Regression
+  // guard: it used to use step 0.5 and display "35.0", which the engine bounced.
+  const heroGain = page.getByTestId("audio-inspector-hardware-mini").getByRole("slider", { name: "Host preamp gain" });
+  await expect(heroGain).toBeVisible();
+  const before = await heroGain.getAttribute("aria-valuenow");
+  const box = await heroGain.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y - 40, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => heroGain.getAttribute("aria-valuenow")).not.toBe(before);
+  const dragged = await heroGain.getAttribute("aria-valuenow");
+  expect(Number.isInteger(Number(dragged)), `dragged gain ${dragged} must be a whole dB`).toBe(true);
+
+  await heroGain.focus();
+  await page.keyboard.press("ArrowDown");
+  const stepped = await heroGain.getAttribute("aria-valuenow");
+  expect(Number.isInteger(Number(stepped)), `keyboard gain ${stepped} must be a whole dB`).toBe(true);
+});
+
 test("renders audio scaled studio preview as the 2560 studio surface", async ({ page }) => {
   const readAudioLayoutDetails = async () =>
     page.evaluate(() => {
       const root = document.querySelector("[data-operator-layout-root]");
       const tieredMixer = document.querySelector('[data-testid="audio-tiered-mixer"]');
       const hostLane = document.querySelector('[data-testid="audio-strip-audio-input-9"]');
-      const canvasBarLabel = document.querySelector("[class*=canvasBarLabel]");
-      const canvasSelectedMeta = document.querySelector("[class*=canvasSelectedMeta]");
       return {
-        canvasBarLabelDisplay: canvasBarLabel ? getComputedStyle(canvasBarLabel).display : null,
-        canvasSelectedMetaDisplay: canvasSelectedMeta ? getComputedStyle(canvasSelectedMeta).display : null,
         hostLaneColumns: hostLane ? getComputedStyle(hostLane).gridTemplateColumns : null,
         hostLaneRows: hostLane ? getComputedStyle(hostLane).gridTemplateRows : null,
         root: root
@@ -1502,11 +1556,10 @@ test("renders audio scaled studio preview as the 2560 studio surface", async ({ 
   expect(previewDetails.tierRows).toBe(nativeDetails.tierRows);
   expect(previewDetails.hostLaneColumns).toBe(nativeDetails.hostLaneColumns);
   expect(previewDetails.hostLaneRows).toBe(nativeDetails.hostLaneRows);
-  expect(previewDetails.canvasBarLabelDisplay).toBe(nativeDetails.canvasBarLabelDisplay);
-  expect(previewDetails.canvasSelectedMetaDisplay).toBe(nativeDetails.canvasSelectedMetaDisplay);
-  const previewRouteMeta = page.locator("[class*=canvasSelectedMeta]").first();
-  await expect(previewRouteMeta).toContainText(/routed to main out/i);
-  await expectNoElementOverflow(previewRouteMeta, "studio preview selected-source route");
+  // 2026-05-27 redesign: the dense canvas context bar was slimmed — the
+  // canvasBarLabel ("Editing …") and canvasSelectedMeta ("routed to main out")
+  // elements were removed, so the studio-preview parity check drops them and
+  // keeps the load-bearing layout-geometry equivalence above.
   await expectAudioLaneCardsInsideTierGrids(page);
 
   const previewHostGain = page
@@ -1538,7 +1591,10 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   await expect(page.getByTestId("audio-software-playback-tier")).toBeVisible();
   await expect(page.getByTestId("audio-hardware-outputs-tier")).toBeVisible();
   await expect(page.getByTestId("audio-health-bar")).toBeVisible();
-  await expect(workspace.getByText("Snapshots")).toBeVisible();
+  // 2026-05-27 redesign: the new top bar adds a "Snapshot" pill, so a bare
+  // workspace.getByText("Snapshots") risks a strict-mode clash. Scope to the
+  // snapshot deck's own header.
+  await expect(page.getByTestId("audio-snapshot-deck").getByText("Snapshots")).toBeVisible();
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Touch" })).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
 
@@ -1551,11 +1607,19 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
     "1920 fallback compact preamp"
   );
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await expect(page.getByTestId("audio-rail-trust-panel")).toBeVisible();
-  await expect(page.getByTestId("audio-rail-snapshot-panel")).toBeVisible();
-  await expect(page.getByTestId("audio-inspector-eq-mini")).toBeVisible();
-  await expect(page.getByTestId("audio-inspector-dynamics-mini")).toBeVisible();
-  await expect(page.getByTestId("audio-inspector-sends-mini")).toBeVisible();
+  // 2026-05-27 redesign: the rail Trust panel and rail Snapshot panel are
+  // gone. The chrome at 1920 now hangs the equivalent facts on the AudioTopBar
+  // (OSC / Metering stat cluster) and keeps the snapshot deck inline under
+  // the mixer (no panel wrapper). Assert the new bars are visible at the
+  // 1920 fallback breakpoint.
+  await expect(page.getByTestId("audio-topbar")).toBeVisible();
+  await expect(page.getByTestId("audio-monitor-bar")).toBeVisible();
+  // 2026-05-27 redesign: the Overview mini-preview cards (eq-mini / dynamics-mini
+  // / sends-mini) were replaced by the EQ / Dyn / Routing tabs; assert those are
+  // present for the selected channel at the 1920 fallback.
+  await expect(page.getByRole("tab", { name: "EQ", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Routing", exact: true })).toBeVisible();
   await expectAudioStudioSideRailsFilled(page, 32);
   await expectAudioOverviewProcessingStack(page, "1920 fallback selected-channel", 40);
   await expectSnapshotActionsDoNotOverlapContent(page, "snapshot-show-open");
@@ -1565,11 +1629,8 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   await expect(page.getByRole("tab", { name: "Output", exact: true })).toHaveAttribute("aria-selected", "true");
   await expectDbfsScaleLabelsInsideMeters(page, "1920 fallback output inspector");
   await expect(page.getByRole("tab", { name: "EQ", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Dynamics", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Sends", exact: true })).toHaveCount(0);
-  await expect(page.getByTestId("audio-inspector-eq-mini")).toHaveCount(0);
-  await expect(page.getByTestId("audio-inspector-dynamics-mini")).toHaveCount(0);
-  await expect(page.getByTestId("audio-inspector-sends-mini")).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Routing", exact: true })).toHaveCount(0);
   const outputFacts = page.locator('[data-fact-size="long"]');
   const outputFactCount = await outputFacts.count();
   expect(outputFactCount, "output long facts should be rendered").toBeGreaterThan(0);

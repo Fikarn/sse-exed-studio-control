@@ -117,15 +117,11 @@ export function AudioSnapshotDeck({
   return (
     <section className={styles.snapshotDeck} data-testid="audio-snapshot-deck">
       <div className={styles.snapshotDeckHeader}>
-        <div>
-          <h2>Snapshots</h2>
-        </div>
+        <h2>Snapshots</h2>
         <span className={styles.snapshotShortcut}>Shift 1-8</span>
         <span className={styles.visuallyHidden} data-testid="audio-toolbar-current-snapshot">
           {currentSnapshot ? `Recalled ${currentSnapshot.name}` : "No recall yet"}
         </span>
-      </div>
-      <div className={styles.snapshotGrid}>
         <button
           className={styles.snapshotCapture}
           aria-label="New snapshot"
@@ -135,14 +131,11 @@ export function AudioSnapshotDeck({
           title={actionsAllowed ? "Capture current mix into the first empty slot" : "Snapshot capture unavailable"}
           type="button"
         >
-          <span className={styles.snapshotSlot}>
-            <Plus size={14} strokeWidth={1.8} aria-hidden="true" />
-          </span>
-          <span className={styles.snapshotName} data-kind="capture">
-            New
-          </span>
-          <span className={styles.snapshotMeta}>Shift +</span>
+          <Plus size={13} strokeWidth={2} aria-hidden="true" />
+          Capture
         </button>
+      </div>
+      <div className={styles.snapshotGrid}>
         {slots.map((snapshot, index) => {
           if (!snapshot) {
             return (

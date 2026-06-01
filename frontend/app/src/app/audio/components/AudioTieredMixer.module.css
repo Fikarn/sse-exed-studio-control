@@ -1,287 +1,264 @@
-/* AudioTieredMixer module — extracted from AudioMixerLane.module.css (Slice 5A).
- * Hosts the tier strip surfaces and lane-grid layout consumed by
- * AudioTieredMixer.tsx. Per-lane interactions (channelLane / outputLane)
- * remain in AudioMixerLane.module.css since AudioMixerLane.tsx is the
- * deeper consumer for those classes. The 1920x1080 / studioFull responsive
- * passes follow the same boundary. */
+/* AudioTieredMixer module — Console redesign (2026-05-27).
+ *
+ * Horizontal signal-flow layout: Inputs → Playback → Outputs sit as three
+ * equal-width section cards in a single row. The previous stacked tier
+ * layout is replaced; tier accent colors are unified to --accent per the
+ * Console prototype's single-amber discipline.
+ */
 
 .tieredMixer {
   position: relative;
   flex: 1 1 auto;
   display: grid;
-  grid-template-rows: minmax(184px, 1.1fr) minmax(116px, 0.9fr) minmax(108px, 0.84fr);
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 14px;
   min-height: 0;
-  padding: 8px;
+  padding: 14px 16px 0;
 }
 
 .mixerTier {
-  --audio-tier-accent: var(--audio-tier-outputs);
   position: relative;
   z-index: 2;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 6px;
+  gap: 0;
   min-height: 0;
-  padding: 8px;
-  border: 1px solid color-mix(in srgb, var(--audio-tier-accent) 52%, var(--audio-border));
-  border-top: 3px solid var(--audio-tier-accent);
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--audio-tier-accent) 12%, transparent), transparent 32%),
-    color-mix(in srgb, var(--audio-canvas) 78%, var(--audio-panel) 22%);
-}
-
-/* Why: left-edge identity rail. Operator scans tiers by colour at studio
-   distance — the 3 px top border tells you "this is a tier" and the rail
-   tells you "and this is which one". Inset 14 px so it sits inside the
-   header tint without colliding with the rounded corner. */
-.mixerTier::before {
-  content: "";
-  position: absolute;
-  top: 14px;
-  bottom: 14px;
-  left: 0;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--audio-tier-accent);
-  pointer-events: none;
-}
-
-.mixerTier[data-tier="hardware-inputs"] {
-  --audio-tier-accent: var(--audio-tier-inputs);
-}
-
-.mixerTier[data-tier="software-playback"] {
-  --audio-tier-accent: var(--audio-tier-playback);
-}
-
-.mixerTier[data-tier="hardware-outputs"] {
-  --audio-tier-accent: var(--audio-tier-outputs);
+  background: var(--bg-1);
+  overflow: hidden;
 }
 
 .outputTier {
-  border-color: color-mix(in srgb, var(--audio-accent) 34%, var(--audio-border));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-accent) 10%, transparent), transparent),
-    color-mix(in srgb, var(--color-surface-900) 68%, transparent);
+  background: var(--bg-1);
+  box-shadow:
+    inset 0 0 0 1px var(--line-2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .tierLabel {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: stretch;
   gap: 14px;
   min-width: 0;
-  min-height: 38px;
-  padding: 0 6px;
-  border-bottom: 1px solid var(--audio-border);
-  border-radius: 6px 6px 0 0;
-  background: color-mix(in srgb, var(--audio-tier-accent) 8%, transparent);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+  cursor: pointer;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.mixerTier[data-tier="hardware-inputs"] .tierLabel {
+  background: linear-gradient(180deg, color-mix(in oklch, var(--accent) 6%, var(--bg-2)) 0%, var(--bg-2) 100%);
+}
+
+.mixerTier[data-tier="hardware-inputs"] .tierTitleBlock > span:last-child::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 8px;
+  vertical-align: middle;
+  opacity: 0.6;
+  position: relative;
+  top: -1px;
+}
+
+.mixerTier[data-tier="software-playback"] .tierLabel {
+  background: var(--bg);
+  color: var(--fg-4);
+}
+
+.mixerTier[data-tier="software-playback"] .tierTitleBlock > span:last-child::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--fg-4);
+  background: transparent;
+  margin-right: 8px;
+  vertical-align: middle;
+  border-radius: 50%;
+  position: relative;
+  top: -1px;
+}
+
+.outputTier .tierLabel {
+  background: var(--accent-soft);
+  border-bottom-color: var(--accent-glow);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .tierTitleBlock {
-  display: grid;
-  grid-template-columns: 22px auto auto;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
 
-.tierTitleBlock span {
-  color: var(--audio-tier-accent);
-  font: var(--font-weight-semibold) 24px / 1.05 var(--font-family-display);
-  letter-spacing: 0;
-  text-transform: none;
+.tierTitleBlock > span:last-child {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .tierIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  color: var(--audio-tier-accent);
+  color: var(--fg-4);
+  width: 14px;
+  height: 14px;
+}
+
+.outputTier .tierIcon {
+  color: var(--accent);
 }
 
 .tierNum {
-  color: var(--audio-text-subtle) !important;
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono) !important;
-  letter-spacing: 0;
-  text-transform: uppercase !important;
-  align-self: end;
-  padding-bottom: 4px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--fg-4);
+  letter-spacing: 0.16em;
 }
 
 .tierChipRow {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  justify-content: flex-start;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-self: end;
 }
 
 .tierChip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 18px;
-  padding: 0 6px;
-  border: 1px solid var(--audio-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-surface-700) 70%, transparent);
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 9px / 1 var(--font-family-mono);
-  letter-spacing: 0;
+  appearance: none;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg-3);
+  border: 1px solid var(--line);
   cursor: pointer;
+  transition:
+    background 0.12s var(--easing),
+    color 0.12s var(--easing),
+    border-color 0.12s var(--easing);
+}
+
+.tierChip:hover {
+  border-color: var(--line-2);
+  color: var(--fg);
 }
 
 .tierChip[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-tier-accent) 52%, var(--audio-border));
-  color: var(--color-text-strong);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-glow);
 }
 
-.tierChip[data-chip="talent"] {
-  border-color: color-mix(in srgb, var(--audio-group-talent) 52%, var(--audio-border));
-  color: var(--audio-group-talent);
+/* Bank pill — kept visible (operators rely on it to see which bank is shown);
+   styled as a quiet mono caption in the tier header. */
+.tierLabel small {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--fg-4);
+  text-transform: uppercase;
+  justify-self: end;
+  white-space: nowrap;
 }
 
-.tierChip[data-chip="line"] {
-  border-color: color-mix(in srgb, var(--audio-group-line) 50%, var(--audio-border));
-  color: var(--audio-group-line);
+.tierMixFor {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  justify-self: end;
+  text-transform: none;
+  font-family: "Inter Tight", system-ui, sans-serif;
+  letter-spacing: -0.005em;
 }
 
-.tierChip[data-chip="bed"] {
-  border-color: color-mix(in srgb, var(--audio-group-bed) 50%, var(--audio-border));
-  color: var(--audio-group-bed);
+.tierMixForEyebrow {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--fg-3);
+  text-transform: uppercase;
+  font-weight: 500;
 }
 
-.tierChip[data-chip="fx"] {
-  border-color: color-mix(in srgb, var(--audio-group-fx) 50%, var(--audio-border));
-  color: var(--audio-group-fx);
+.tierMixForArrow {
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1;
 }
 
-.tierChip[data-chip="remote"] {
-  border-color: color-mix(in srgb, var(--audio-group-remote) 50%, var(--audio-border));
-  color: var(--audio-group-remote);
+.tierMixForName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.01em;
 }
 
-.tierLaneGrid,
-.outputLaneGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 7px;
+.tierLaneGrid {
+  display: flex;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 14px 8px;
   min-height: 0;
-  min-width: 0;
-}
-
-.tierLaneGrid[data-tier="hardware-inputs"] {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 .outputLaneGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 14px 8px;
+  min-height: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tierLaneGrid::-webkit-scrollbar,
+.outputLaneGrid::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tierLaneGrid::-webkit-scrollbar-thumb,
+.outputLaneGrid::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 3px;
 }
 
 .emptyTier {
+  flex: 1;
   display: grid;
   place-items: center;
-  min-height: 0;
-  border: 1px dashed color-mix(in srgb, var(--audio-border) 76%, transparent);
-  border-radius: 8px;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 11px / 1.2 var(--font-family-mono);
-  letter-spacing: 0;
+  padding: 32px;
+  color: var(--fg-4);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-@container operator-root (min-width: 2200px) and (min-height: 1250px) {
-  .tieredMixer {
-    grid-template-rows: minmax(380px, 1.12fr) minmax(258px, 0.78fr) minmax(348px, 1.06fr);
-    gap: 12px;
-    padding: 14px 18px;
-  }
-}
-
-@container operator-root (max-width: 2100px) {
-  .mixerTier {
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-
-  .tieredMixer {
-    grid-template-rows: minmax(292px, 1.18fr) minmax(196px, 0.78fr) minmax(176px, 0.7fr);
-  }
-
-  .tierLaneGrid {
-    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
-  }
-
-  .tierLaneGrid[data-tier="hardware-inputs"] {
-    grid-template-columns: repeat(4, minmax(198px, 210px));
-    align-items: start;
-    justify-content: space-between;
-  }
-
-  /* tierLabel small belongs here. */
-  .tierLabel small {
-    font-size: 9px;
-  }
-}
-
 @container operator-root (max-width: 1600px) {
-  .tierLabel {
-    display: none;
-  }
-
-  .mixerTier {
-    grid-template-rows: minmax(0, 1fr);
-  }
-}
-
-[data-layout-mode="studioFull"] .tieredMixer {
-  grid-template-rows: minmax(350px, 1.06fr) minmax(240px, 0.76fr) minmax(326px, 0.98fr);
-  gap: 12px;
-  padding: 14px 18px;
-}
-
-[data-layout-mode="studioFull"] .mixerTier {
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
-}
-
-[data-layout-mode="studioFull"] .tierLabel {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-}
-
-[data-layout-mode="studioFull"] .tierLaneGrid[data-tier="hardware-inputs"] {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: stretch;
-  justify-content: stretch;
-}
-
-[data-layout-mode="studioFull"] .tierLaneGrid[data-tier="software-playback"] {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-[data-layout-mode="studioFull"] .outputLaneGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-@container operator-root (max-height: 1100px) {
-  [data-layout-mode="studioFull"] .tieredMixer {
-    grid-template-rows: minmax(212px, 1.06fr) minmax(132px, 0.76fr) minmax(122px, 0.72fr);
+  .tieredMixer {
     gap: 8px;
-    padding: 8px 10px;
-  }
-
-  [data-layout-mode="studioFull"] .mixerTier {
-    gap: 5px;
-    padding: 6px;
-  }
-
-  [data-layout-mode="studioFull"] .tierLabel {
-    min-height: 32px;
+    padding: 10px 12px 0;
   }
 }
