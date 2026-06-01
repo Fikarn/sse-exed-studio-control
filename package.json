@@ -150,7 +150,7 @@
     ]
   },
   "devDependencies": {
-    "@eslint-react/eslint-plugin": "^5.7.10",
+    "@eslint-react/eslint-plugin": "^5.8.9",
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
