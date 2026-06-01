@@ -47,12 +47,28 @@ const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 // inspector signal canvas paints peaks). Mask these on audio fixtures so the
 // baseline diff covers layout + chrome, not live values.
 function liveAudioMasks(page: Page): Locator[] {
+  // The meter overlay (`audio-meter-canvas`) is a full-workspace
+  // position:absolute layer, so masking it blanked the entire audio surface and
+  // left nothing pixel-tested. It paints live values only inside
+  // [data-meter-component="stereo"] and [data-mini-meter-kind] slots, and the
+  // only other per-tick values are the inspector/monitor dB numerals
+  // ([data-meter-readout-mode] / the monitor master meter). Masking just those
+  // keeps the static mixer / inspector / snapshot-deck / top + monitor bar
+  // layout in the diff so it is actually regression-tested.
   return [
     page.locator('[data-meter-component="stereo"]'),
-    page.locator('[data-testid="audio-meter-canvas"]'),
-    page.locator('[data-testid="audio-signal-canvas"]'),
+    page.locator("[data-mini-meter-kind]"),
+    page.locator('[data-testid="audio-monitor-master-meter"]'),
+    page.locator("[data-meter-readout-mode]"),
   ];
 }
+
+// AA / font rendering on the unmasked full-page renders jitters run-to-run on
+// the Linux CI runner (a stable element rendered a shade off at its edges) —
+// e.g. lighting-populated-1280x800 once diffed 105 px against the default 100.
+// Absorb that without hiding real layout regressions (which move thousands of
+// pixels). Tuned above the worst observed jitter.
+const FULL_RENDER_MAX_DIFF_PX = 400;
 
 function masksFor(page: Page, fixture: string): Locator[] {
   return fixture.startsWith("audio-") ? liveAudioMasks(page) : [];
@@ -256,6 +272,7 @@ for (const size of SIZES) {
         await assertViewportFit(page, size, fixture);
         await expect(page).toHaveScreenshot(`${fixture}-${size.label}.png`, {
           mask: masksFor(page, fixture),
+          maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
         });
       });
     }
@@ -271,6 +288,7 @@ test.describe("studio preview", () => {
       await assertStudioPreviewFidelity(page, fixture, STUDIO_PREVIEW_HOST);
       await expect(page).toHaveScreenshot(`${fixture}-studio-preview-${STUDIO_PREVIEW_HOST.label}.png`, {
         mask: masksFor(page, fixture),
+        maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
       });
     });
   }
