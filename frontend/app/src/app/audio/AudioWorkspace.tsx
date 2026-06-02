@@ -700,16 +700,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         />
       </div>
 
-      <AudioMonitorBar
-        clearDraftValueLater={clearDraftValueLater}
-        commitMixTargetContinuous={commitMixTargetContinuous}
-        draftStore={draftStore}
-        getDraftValue={getDraftValue}
-        onUpdateMixTarget={updateMixTarget}
-        setDraftValue={setDraftValue}
-        store={store}
-        viewModel={viewModel}
-      />
+      <AudioMonitorBar onUpdateMixTarget={updateMixTarget} viewModel={viewModel} />
 
       <AudioMeterCanvasOverlay
         peakHoldEnabled={peakHoldEnabled}

@@ -1,22 +1,14 @@
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { CSSProperties } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioMonitorBar.module.css";
-import { AUDIO_DRAFT_CLEAR_MS } from "../audioConstants";
-import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
-import { AUDIO_FADER_UNITY, formatAudioDb, formatMeterPercent, snapFaderValue } from "../audioFormatting";
+import { formatAudioDb, formatMeterPercent } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
 interface AudioMonitorBarProps {
-  clearDraftValueLater: (key: string, delayMs?: number) => void;
-  commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
-  draftStore: AudioControlDraftStore;
-  getDraftValue: (key: string, fallback: number) => number;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
-  setDraftValue: (key: string, value: number) => void;
-  store: ShellStore;
   viewModel: AudioWorkspaceViewModel;
 }
 
@@ -34,35 +26,8 @@ const SCALE_TICKS: { db: number; pct: number; label: string }[] = [
   { db: 0, pct: 100, label: "0" },
 ];
 
-// C15: keyboard step on the normalized 0..1 monitor value. Mirrors the
-// AudioSliderControl default (0.01 fine / ×5 coarse) so the master shares the
-// faders' keyboard feel.
-const MONITOR_KEY_STEP = 0.01;
-const MONITOR_KEY_COARSE = MONITOR_KEY_STEP * 5;
-
-function clampNormalized(value: number) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(1, value));
-}
-
-export function AudioMonitorBar({
-  clearDraftValueLater,
-  commitMixTargetContinuous,
-  draftStore,
-  getDraftValue,
-  onUpdateMixTarget,
-  setDraftValue,
-  viewModel,
-}: AudioMonitorBarProps) {
+export function AudioMonitorBar({ onUpdateMixTarget, viewModel }: AudioMonitorBarProps) {
   const selectedMixTarget = viewModel.selectedMixTarget ?? viewModel.mixTargets[0] ?? null;
-  const monitorDraftKey = selectedMixTarget
-    ? `mixTarget:${selectedMixTarget.id}:rail-volume`
-    : "mixTarget:none:rail-volume";
-  const monitorValue = useAudioControlDraftValue(
-    draftStore,
-    monitorDraftKey,
-    getDraftValue(monitorDraftKey, selectedMixTarget?.volume ?? 0)
-  );
 
   const meterLeftPct = selectedMixTarget ? percentNumber(selectedMixTarget.meterLeft) : 0;
   const meterRightPct = selectedMixTarget
@@ -75,7 +40,11 @@ export function AudioMonitorBar({
 
   const activeName = selectedMixTarget?.name ?? "Main Out";
   const activePair = selectedMixTarget?.shortName ?? "";
-  const masterDb = selectedMixTarget ? formatAudioDb(monitorValue) : "—";
+  // View-only readout of the monitor output level. Operator note (2026-06-02):
+  // this is a meter, not a control — the prior C15 work that made it a draggable
+  // slider was removed. Monitor level is set on the RME hardware / engine, so
+  // there is no pointer/keyboard write-path here; the bar only reflects state.
+  const masterDb = selectedMixTarget ? formatAudioDb(selectedMixTarget.volume) : "—";
   const actionsAllowed = viewModel.actionsAllowed;
 
   const setControl = (control: "talkback" | "dim" | "mono") => () => {
@@ -91,78 +60,6 @@ export function AudioMonitorBar({
     if (control === "mono") {
       onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, mono: !selectedMixTarget.mono });
     }
-  };
-
-  const controlDisabled = !selectedMixTarget || !actionsAllowed;
-
-  // C15: route every committed monitor value through snapFaderValue so the
-  // master shares the lanes' unity-snap normalized curve instead of writing a
-  // raw linear ratio.
-  const commitMonitorValue = (nextValue: number) => {
-    if (!selectedMixTarget) return;
-    const snapped = snapFaderValue(clampNormalized(nextValue));
-    setDraftValue(monitorDraftKey, snapped);
-    commitMixTargetContinuous({ mixTargetId: selectedMixTarget.id, volume: snapped });
-  };
-
-  // C15: relative drag (was absolute-on-press). A bare tap to read the meter no
-  // longer jumps the gain — the value only moves by the pointer delta from the
-  // press point, scaled to the band width.
-  const onVolumePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (controlDisabled) return;
-    event.preventDefault();
-    const target = event.currentTarget;
-    target.setPointerCapture(event.pointerId);
-    const width = Math.max(1, target.getBoundingClientRect().width);
-    const startX = event.clientX;
-    const startValue = clampNormalized(monitorValue);
-    const move = (ev: PointerEvent) => {
-      const delta = (ev.clientX - startX) / width;
-      commitMonitorValue(startValue + delta);
-    };
-    const up = () => {
-      target.releasePointerCapture(event.pointerId);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      clearDraftValueLater(monitorDraftKey);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
-
-  // C15: keyboard access (Arrow = step, Shift/Page = coarse, Home/End).
-  const onVolumeKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (controlDisabled) return;
-    const current = clampNormalized(monitorValue);
-    const coarse = event.shiftKey ? MONITOR_KEY_COARSE : MONITOR_KEY_STEP;
-    let nextValue: number;
-    switch (event.key) {
-      case "ArrowUp":
-      case "ArrowRight":
-        nextValue = current + coarse;
-        break;
-      case "ArrowDown":
-      case "ArrowLeft":
-        nextValue = current - coarse;
-        break;
-      case "PageUp":
-        nextValue = current + MONITOR_KEY_COARSE;
-        break;
-      case "PageDown":
-        nextValue = current - MONITOR_KEY_COARSE;
-        break;
-      case "Home":
-        nextValue = 0;
-        break;
-      case "End":
-        nextValue = 1;
-        break;
-      default:
-        return;
-    }
-    event.preventDefault();
-    commitMonitorValue(nextValue);
-    clearDraftValueLater(monitorDraftKey, AUDIO_DRAFT_CLEAR_MS);
   };
 
   const talkbackOn = selectedMixTarget?.talkback ?? false;
@@ -208,25 +105,35 @@ export function AudioMonitorBar({
           </div>
         </div>
 
+        {/* View-only output meter (role="meter", not "slider"): no pointer/keyboard
+            write-path. The L/R tracks carry data-mini-meter-* so the shared canvas
+            overlay paints them live from the meter frame (frame.mixTargets) — the
+            same live source as the strip + inspector meters, so the bar tracks Main
+            Out in realtime. (The #111 monitor-bar rebuild dropped this wiring,
+            leaving the bar on a static snapshot fill.) The clip-path CSS fill stays
+            as the pre-paint fallback. aria-valuenow tracks the louder channel. */}
         <div
-          aria-disabled={controlDisabled ? true : undefined}
-          aria-label={`Monitor level — ${activeName}`}
-          aria-orientation="horizontal"
-          aria-valuemax={1}
+          aria-label={`Monitor output meter — ${activeName}`}
+          aria-valuemax={100}
           aria-valuemin={0}
-          aria-valuenow={selectedMixTarget ? Number(clampNormalized(monitorValue).toFixed(5)) : undefined}
-          aria-valuetext={selectedMixTarget ? masterDb : undefined}
+          aria-valuenow={Math.max(meterLeftPct, meterRightPct)}
+          aria-valuetext={
+            selectedMixTarget
+              ? formatAudioDb(Math.max(selectedMixTarget.meterLeft, selectedMixTarget.meterRight))
+              : undefined
+          }
           className={styles.masterMeter}
           data-testid="audio-monitor-master-meter"
-          data-unity={selectedMixTarget && monitorValue === AUDIO_FADER_UNITY ? "true" : undefined}
-          onKeyDown={onVolumeKeyDown}
-          onPointerDown={onVolumePointerDown}
-          role="slider"
-          tabIndex={controlDisabled ? -1 : 0}
+          role="meter"
         >
           <div className={styles.masterMeterRow}>
             <span className={styles.masterChLabel}>L</span>
-            <div className={styles.masterTrack}>
+            <div
+              className={styles.masterTrack}
+              data-mini-meter-id={selectedMixTarget?.id ?? ""}
+              data-mini-meter-kind="mixTarget"
+              data-mini-meter-side="left"
+            >
               <div className={styles.masterFill} style={{ "--level": `${meterLeftPct}%` } as CSSProperties} />
               {peakLeftPct > 1 ? (
                 <div className={styles.masterPeak} style={{ left: `calc(${peakLeftPct}% - 1px)` }} />
@@ -238,7 +145,12 @@ export function AudioMonitorBar({
           </div>
           <div className={styles.masterMeterRow}>
             <span className={styles.masterChLabel}>R</span>
-            <div className={styles.masterTrack}>
+            <div
+              className={styles.masterTrack}
+              data-mini-meter-id={selectedMixTarget?.id ?? ""}
+              data-mini-meter-kind="mixTarget"
+              data-mini-meter-side="right"
+            >
               <div className={styles.masterFill} style={{ "--level": `${meterRightPct}%` } as CSSProperties} />
               {peakRightPct > 1 ? (
                 <div className={styles.masterPeak} style={{ left: `calc(${peakRightPct}% - 1px)` }} />

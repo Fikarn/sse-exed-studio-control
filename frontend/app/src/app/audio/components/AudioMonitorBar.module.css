@@ -249,6 +249,17 @@
   z-index: 2;
 }
 
+/* When the canvas meter renderer is active (data-canvas-metering present on the
+   operator workspace — "true" painting or "false" gated) the shared overlay owns
+   the live L/R fills + peak, so hide the static clip-path CSS fallback to avoid a
+   ghost meter painted beneath the moving canvas paint. Mirrors the
+   [data-meter-fill]/[data-meter-peak] rule in AudioStereoMeter.module.css; the
+   fallback still shows when the attribute is absent (no JS / canvas disabled). */
+[data-canvas-metering] .masterFill,
+[data-canvas-metering] .masterPeak {
+  opacity: 0;
+}
+
 .masterScaleLine {
   display: flex;
   align-items: center;
