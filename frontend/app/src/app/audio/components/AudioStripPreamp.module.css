@@ -17,7 +17,7 @@
   place-items: center;
   outline: none;
   border-radius: 50%;
-  transition: box-shadow 0.12s var(--easing);
+  transition: box-shadow var(--motion-duration-fast) var(--easing);
 }
 
 /* C14: pre-interaction hover affordance — matches the AudioKnob hairline ring
@@ -48,7 +48,7 @@
 }
 
 .value {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 500;
   color: var(--fg);
@@ -57,7 +57,7 @@
 }
 
 .caption {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;

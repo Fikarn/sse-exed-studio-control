@@ -26,9 +26,9 @@
   min-width: 12px;
   height: 12px;
   padding: 0 3px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--audio-text-subtle) 22%, transparent);
-  color: var(--audio-text-default);
+  border-radius: var(--radius-tight-xs);
+  background: color-mix(in srgb, var(--fg-4) 22%, transparent);
+  color: var(--fg-2);
   font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
   letter-spacing: 0;
   pointer-events: none;
@@ -66,7 +66,7 @@
   position: relative;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--audio-border) 84%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
   border-radius: 2px;
   background:
     repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 14px), var(--audio-meter-bg);
@@ -80,22 +80,22 @@
    themselves is unchanged — the visual win comes from the bezel, not from
    making the green louder. Tracks data-meter-kind set in AudioStereoMeter.tsx. */
 .stereoMeter[data-meter-kind="mixTarget"] .meterTrack {
-  border-color: color-mix(in srgb, var(--audio-border) 95%, transparent);
+  border-color: color-mix(in srgb, var(--line) 95%, transparent);
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.62),
     inset 0 0 6px rgba(0, 0, 0, 0.32);
 }
 
 .meterTrack[data-tone="amber"] {
-  border-color: color-mix(in srgb, var(--audio-meter-warn) 28%, var(--audio-border));
+  border-color: color-mix(in srgb, var(--audio-meter-warn) 28%, var(--line));
 }
 
 .meterTrack[data-tone="hot"] {
-  border-color: color-mix(in srgb, var(--audio-meter-hot) 44%, var(--audio-border));
+  border-color: color-mix(in srgb, var(--audio-meter-hot) 44%, var(--line));
 }
 
 .meterTrack[data-tone="red"] {
-  border-color: color-mix(in srgb, var(--audio-meter-over) 62%, var(--audio-border));
+  border-color: color-mix(in srgb, var(--audio-meter-over) 62%, var(--line));
 }
 
 .meterFill {
@@ -169,12 +169,12 @@
 .stereoMeter[data-clip="true"] .meterTrack {
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.58),
-    inset 0 0 0 1px color-mix(in srgb, var(--audio-clip) 65%, transparent),
-    inset 0 0 14px color-mix(in srgb, var(--audio-clip) 20%, transparent);
+    inset 0 0 0 1px color-mix(in srgb, var(--danger) 65%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--danger) 20%, transparent);
 }
 
 .stereoMeter[data-peak-warning="true"] .meterTrack {
-  border-color: color-mix(in srgb, var(--audio-meter-warn) 58%, var(--audio-border));
+  border-color: color-mix(in srgb, var(--audio-meter-warn) 58%, var(--line));
 }
 
 .stereoMeter[data-meter-point-over="true"] .meterTrack {
@@ -185,14 +185,14 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--audio-clip) 14%, transparent);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
   pointer-events: none;
 }
 
 .meterReadout {
   grid-column: 1 / -1;
   grid-row: 2;
-  color: var(--color-text-subtle);
+  color: var(--fg-4);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;
@@ -211,7 +211,7 @@
   position: absolute;
   right: 2px;
   bottom: clamp(4px, var(--meter-scale-position, 0%), calc(100% - 4px));
-  color: var(--audio-text-subtle);
+  color: var(--fg-4);
   font: var(--font-weight-medium) 8px / 1 var(--font-family-mono);
   letter-spacing: 0;
   transform: translateY(50%);
@@ -219,5 +219,5 @@
 }
 
 .meterScale span[data-meter-scale-mark="0"] {
-  color: var(--audio-accent);
+  color: var(--accent);
 }

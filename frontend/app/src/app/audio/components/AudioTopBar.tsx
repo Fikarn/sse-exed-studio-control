@@ -94,6 +94,7 @@ export function AudioTopBar({
         {THEMES.map((theme) => (
           <button
             aria-pressed={audioTheme === theme.id}
+            className={styles.themeSwitchOption}
             data-active={audioTheme === theme.id}
             data-testid={`audio-theme-${theme.id}`}
             key={theme.id}

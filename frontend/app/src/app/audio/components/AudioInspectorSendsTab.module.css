@@ -43,7 +43,7 @@
 }
 
 .sendCardTag {
-  color: var(--audio-text-muted);
+  color: var(--fg-3);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -54,14 +54,14 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 6px;
   align-items: center;
-  color: var(--audio-text-muted);
+  color: var(--fg-3);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
 }
 
 .sendCardRoute strong {
   overflow: hidden;
-  color: var(--audio-text-default);
+  color: var(--fg-2);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -72,7 +72,7 @@
 
 .sendCardValue {
   justify-self: end;
-  color: var(--audio-text-strong);
+  color: var(--fg);
   font: var(--font-weight-semibold) 18px / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -92,10 +92,10 @@
 
 .sendModeRow button {
   min-height: 25px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 78%, transparent);
-  color: var(--color-text-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tight-md);
+  background: color-mix(in srgb, var(--bg-1) 78%, transparent);
+  color: var(--fg-3);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -118,10 +118,10 @@
 
 .sendTargetButton {
   min-height: 28px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 76%, transparent);
-  color: var(--color-text-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tight-md);
+  background: color-mix(in srgb, var(--bg-1) 76%, transparent);
+  color: var(--fg-3);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;

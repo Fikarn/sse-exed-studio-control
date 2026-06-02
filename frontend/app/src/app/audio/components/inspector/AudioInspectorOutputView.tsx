@@ -169,6 +169,7 @@ export function AudioInspectorOutputView({
         <button
           aria-label={`Mute ${selectedMixTarget.name}`}
           aria-pressed={selectedMixTarget.mute}
+          className={styles.inspectorActionButton}
           data-control="mute"
           data-active={selectedMixTarget.mute}
           disabled={!viewModel.actionsAllowed}
@@ -179,6 +180,7 @@ export function AudioInspectorOutputView({
         </button>
         <button
           aria-label={`Set ${selectedMixTarget.name} monitor level to unity`}
+          className={styles.inspectorActionButton}
           data-control="unity"
           disabled={!viewModel.actionsAllowed}
           onClick={() => onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, volume: AUDIO_FADER_UNITY })}

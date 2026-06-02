@@ -214,6 +214,7 @@ export function AudioTieredMixer({
             <div className={styles.tierPeakHoldSwitch} aria-label="Meter peak hold">
               <button
                 aria-pressed={peakHoldEnabled}
+                className={styles.tierPeakHoldOption}
                 data-active={peakHoldEnabled}
                 data-testid="audio-peak-hold-toggle"
                 onClick={(event) => {
@@ -226,6 +227,7 @@ export function AudioTieredMixer({
                 Hold
               </button>
               <button
+                className={styles.tierPeakHoldOption}
                 data-testid="audio-peak-hold-reset"
                 onClick={(event) => {
                   event.stopPropagation();

@@ -13,9 +13,8 @@
   overflow: hidden;
   border-radius: 5px;
   background:
-    linear-gradient(color-mix(in srgb, var(--audio-border) 24%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-border) 18%, transparent) 1px, transparent 1px),
-    var(--audio-meter-bg);
+    linear-gradient(color-mix(in srgb, var(--line) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 18%, transparent) 1px, transparent 1px), var(--audio-meter-bg);
   background-size:
     100% 50%,
     25% 100%,
@@ -35,7 +34,7 @@
   pointer-events: none;
   background: radial-gradient(
     110% 75% at 50% 92%,
-    color-mix(in srgb, var(--audio-engaged-glow) 80%, transparent),
+    color-mix(in srgb, var(--accent-soft) 80%, transparent),
     transparent 70%
   );
 }
@@ -48,7 +47,7 @@
 .dynamicsAxisLabel {
   position: absolute;
   z-index: 1;
-  color: var(--audio-text-subtle);
+  color: var(--fg-4);
   font: var(--font-weight-medium) 8px / 1 var(--font-family-mono);
   letter-spacing: 0;
   pointer-events: none;
@@ -90,20 +89,20 @@
   align-content: center;
   gap: 4px;
   padding: 6px 8px;
-  border: 1px solid color-mix(in srgb, var(--audio-border) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: 5px;
-  background: color-mix(in srgb, var(--audio-canvas) 90%, transparent);
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
 }
 
 .dynamicsReadoutCluster small {
-  color: var(--audio-text-subtle);
+  color: var(--fg-4);
   font: var(--font-weight-medium) 8px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .dynamicsReadoutCluster strong {
-  color: var(--audio-text-strong);
+  color: var(--fg);
   font: var(--font-weight-semibold) 12px / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -119,18 +118,18 @@
 
 .dynamicsGraphFull path {
   fill: none;
-  stroke: var(--audio-accent);
+  stroke: var(--accent);
   stroke-linecap: round;
   stroke-width: 2;
 }
 
 .dynamicsGraphFull[data-active="false"] path {
-  stroke: color-mix(in srgb, var(--audio-text-subtle) 62%, transparent);
+  stroke: color-mix(in srgb, var(--fg-4) 62%, transparent);
   stroke-dasharray: 4 4;
 }
 
 .dynamicsGraphFull circle {
-  fill: var(--audio-accent);
+  fill: var(--accent);
 }
 
 .dynamicsGraphFull > i {
@@ -147,7 +146,7 @@
 
 .dynamicsGraphFull > i[data-active="false"] {
   opacity: 0.38;
-  background: color-mix(in srgb, var(--audio-text-subtle) 56%, transparent);
+  background: color-mix(in srgb, var(--fg-4) 56%, transparent);
   box-shadow: none;
 }
 
@@ -162,9 +161,9 @@
   align-items: center;
   min-height: 18px;
   padding: 0 6px;
-  border: 1px solid var(--audio-border);
-  border-radius: 999px;
-  color: var(--audio-text-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--fg-4);
   background: transparent;
   font-style: normal;
   cursor: pointer;
@@ -205,7 +204,7 @@
 }
 
 .processingControl span {
-  color: var(--audio-text-muted);
+  color: var(--fg-3);
   font: var(--font-weight-semibold) 9px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -214,7 +213,7 @@
 .processingControl strong {
   justify-self: end;
   min-width: 0;
-  color: var(--audio-text-strong);
+  color: var(--fg);
   font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
   letter-spacing: 0;
   white-space: nowrap;

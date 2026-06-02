@@ -30,7 +30,7 @@
   border: 0;
   background: transparent;
   padding: 10px 14px;
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: -0.005em;
@@ -94,7 +94,7 @@
 
 .inspectorPanel::-webkit-scrollbar-thumb {
   background: var(--line-2);
-  border-radius: 3px;
+  border-radius: var(--radius-tight-xs);
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
@@ -132,7 +132,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -147,12 +147,12 @@
 }
 
 .inspectorTag {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.08em;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-tight-xs);
   background: var(--bg-3);
   color: var(--fg-2);
   border: 1px solid var(--line);
@@ -161,7 +161,7 @@
 
 .inspectorTitle {
   margin: 0 0 4px;
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -170,7 +170,7 @@
 }
 
 .inspectorSubtitle {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-3);
 }
@@ -185,7 +185,7 @@
 .inspectorStickyHardwareCard {
   padding: 22px 16px 20px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: radial-gradient(
     120% 80% at 50% 0%,
     color-mix(in oklch, var(--accent) 6%, var(--bg-2)) 0%,
@@ -198,7 +198,7 @@
 
 .inspectorStickyHardwareCard .eyebrow {
   color: var(--fg-3);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -224,7 +224,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--audio-caption-muted);
@@ -259,11 +259,11 @@
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-tight-md);
   background: var(--bg-2);
   border: 1px solid var(--line);
   color: var(--fg-2);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -274,9 +274,9 @@
   gap: 5px;
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing),
-    border-color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-fast) var(--easing);
   white-space: nowrap;
 }
 
@@ -288,8 +288,8 @@
   background: var(--fg-4);
   flex-shrink: 0;
   transition:
-    background 0.12s var(--easing),
-    box-shadow 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    box-shadow var(--motion-duration-fast) var(--easing);
 }
 
 .unsupportedToggleRow > button:hover:not(:disabled) {
@@ -337,11 +337,11 @@
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-tight-md);
   background: var(--bg-3);
   border: 1px dashed var(--line-2);
   color: var(--fg-2);
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
 }
 
@@ -368,13 +368,13 @@
   flex-direction: column;
   gap: 2px;
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   background: var(--bg-2);
   border: 1px solid var(--line);
 }
 
 .detailGrid small {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   letter-spacing: 0.14em;
   color: var(--audio-caption-muted);
@@ -382,7 +382,7 @@
 }
 
 .detailGrid strong {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
   color: var(--fg);
@@ -395,7 +395,7 @@
 .sourceCard {
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -404,7 +404,7 @@
 
 .inspectorMiniCard .eyebrow,
 .sourceCard .eyebrow {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -475,7 +475,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-3);
 }
@@ -488,7 +488,7 @@
 .inspectorFaderTicks {
   display: flex;
   justify-content: space-between;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   color: var(--fg-3);
 }
@@ -505,16 +505,20 @@
   gap: 6px;
 }
 
-.inspectorActionRow > button {
-  appearance: none;
+/* Mute/Solo/Unity is a segmented control: the buttons compose the shared
+   `.segmentedToggle` reset (see AudioWorkspace) but keep their SIGNAL-color
+   active treatment local — mute lights to --danger and solo to --accent, the
+   same clip-red + amber the lanes use. Geometry (3-up grid cell, mono caption,
+   bordered resting fill) stays local too. */
+.inspectorActionButton {
+  composes: segmentedToggle from "../AudioWorkspace.module.css";
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-tight-md);
   background: var(--bg-3);
   border: 1px solid var(--line);
-  color: var(--fg-3);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -522,32 +526,31 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing),
-    border-color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-fast) var(--easing);
   white-space: nowrap;
 }
 
-.inspectorActionRow > button:hover:not(:disabled) {
+.inspectorActionButton:hover:not(:disabled) {
   border-color: var(--line-2);
   color: var(--fg);
 }
 
-.inspectorActionRow > button[data-control="mute"][data-active="true"] {
+.inspectorActionButton[data-control="mute"][data-active="true"] {
   background: var(--danger);
   border-color: var(--danger);
   color: #fff;
 }
 
-.inspectorActionRow > button[data-control="solo"][data-active="true"] {
+.inspectorActionButton[data-control="solo"][data-active="true"] {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg);
 }
 
-.inspectorActionRow > button:disabled {
+.inspectorActionButton:disabled {
   opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
@@ -565,7 +568,7 @@
     gap: 3px;
     padding: 4px 10px;
   }
-  .inspectorActionRow > button {
+  .inspectorActionButton {
     height: 24px;
   }
 }
@@ -577,7 +580,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px dashed var(--line-2);
   background: var(--bg-2);
 }
@@ -606,9 +609,9 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   padding: 10px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: var(--audio-panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
 }
 
 /* Selector by attribute (data-meter-component) is resilient to CSS-module
@@ -629,7 +632,7 @@
   justify-self: start;
   min-height: 12px;
   padding: 0;
-  color: var(--audio-engaged-fill);
+  color: var(--accent);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -646,7 +649,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   padding-top: 6px;
-  border-top: 1px solid var(--audio-border);
+  border-top: 1px solid var(--line);
 }
 
 .bigMeterRow span,
@@ -658,7 +661,7 @@
 
 .bigMeterRow small,
 .bigMeterReferenceRow small {
-  color: var(--audio-text-muted);
+  color: var(--fg-3);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -668,14 +671,14 @@
   display: inline-flex;
   align-items: baseline;
   min-width: 0;
-  color: var(--audio-text-strong);
+  color: var(--fg);
   font: var(--font-weight-semibold) 15px / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .bigMeterReferenceRow strong {
-  color: var(--audio-text-default);
+  color: var(--fg-2);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
 }
 
@@ -684,7 +687,7 @@
 }
 
 .bigMeterRow strong[data-tone="clip"] {
-  color: var(--audio-clip);
+  color: var(--danger);
 }
 
 .bigMeterRow em,

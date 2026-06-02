@@ -18,7 +18,7 @@
   min-height: 18px;
   border-top: 1px solid var(--line);
   background: var(--bg);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--fg-4);
@@ -64,7 +64,7 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   cursor: pointer;
-  transition: color 0.12s var(--easing);
+  transition: color var(--motion-duration-fast) var(--easing);
 }
 
 .healthCommand:hover {

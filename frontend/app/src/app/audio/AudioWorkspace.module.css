@@ -2,12 +2,14 @@
    2026-05-27 redesign — "Console" prototype.
 
    Tokens come from totalmix-fx-edvin-version/project/Console.html (the Claude
-   Design prototype the operator wants implemented). The legacy --audio-* family
-   used through Phase 3 is preserved as aliases so any code that still reads
-   --audio-accent / --audio-text-strong resolves against the new palette without
-   reaching for inherited brand tokens — see comments below. The Phase 3
-   "locked" broadcast palette (talkback green, group ochres, warn yellow) is
-   intentionally retired per the 2026-05-27 redesign decision.
+   Design prototype the operator wants implemented). The canonical set
+   (--bg/--fg/--accent/--line + families) is the single source of truth; C07
+   (2026-06-02) migrated every live module CSS onto it and pruned the legacy
+   --audio-* and --color-* fork down to the handful of aliases still read by the
+   dead AudioRail/AudioToolbar hosts and the canvas meter overlay — see the
+   alias block below. The Phase 3 "locked" broadcast palette (talkback green,
+   group ochres, warn yellow) is intentionally retired per the 2026-05-27
+   redesign decision.
 */
 
 .audioShell {
@@ -27,6 +29,20 @@
 
   --line: rgba(239, 235, 225, 0.07);
   --line-2: rgba(239, 235, 225, 0.12);
+
+  /* C20 (2026-06-02): audio-scoped font aliases onto the shared global scale.
+     The redesign hardcoded "Inter Tight"/"JetBrains Mono" literals ~75× across
+     the live module CSS, but the app only loads "Inter Variable" +
+     "JetBrains Mono Variable" (see packages/tokens) — there is NO @font-face
+     for "Inter Tight", so every sans literal silently fell back to system-ui
+     and the mono labels rendered in TWO physical fonts (real JetBrains for
+     token readouts, system monospace for the literals). Aliasing to the loaded
+     families (NOT to "Inter Tight" — adding that face is out of scope) collapses
+     the split: all sans text now renders in the loaded Inter and all mono text
+     in the single JetBrains Mono. Theme-independent (these never change per
+     theme), so they live only in the base .audioShell. */
+  --font-ui: var(--font-family-sans);
+  --font-mono: var(--font-family-mono);
 
   --accent: #f5a524;
   --accent-soft: rgba(245, 165, 36, 0.14);
@@ -97,55 +113,46 @@
      Graphite / Bone — no per-theme override needed. */
   --control-disabled-opacity: 0.7;
 
-  /* ── Legacy --audio-* aliases (kept so non-redesigned consumers keep
-        rendering without inheriting brand defaults) ─────────────────────── */
-  --audio-canvas: var(--bg);
+  /* ── Legacy --audio-* / --color-* aliases ──────────────────────────────────
+     C07 (2026-06-02): the redesign's canonical set (--bg/--fg/--accent/--line
+     + families) is now the single source of truth. Every LIVE module CSS reads
+     the canonical tokens directly; the bridge below is the residue kept for two
+     reasons: (a) the two intentionally-dead, unmounted hosts — AudioRail and
+     AudioToolbar (preserved per the Phase-2 GS-AUD-44 dead-code posture) — still
+     read several of these names, and (b) --audio-clip is read by NAME at runtime
+     by AudioMeterCanvasOverlay (getComputedStyle) to paint the canvas clip cap,
+     so it must keep resolving even though the static CSS now reads --danger.
+     When either dead host is ever re-mounted, migrate its tokens to the
+     canonical names and delete the matching alias here.
+
+     The rest of the legacy fork (all the --audio-text-*, --audio-panel-*,
+     --audio-warn-*, --color-*-500 etc. that the redesign no longer reads) was
+     removed once its last live consumer was migrated; only the names below still
+     have a consumer. These are verified 1:1 with the canonical tokens, so the
+     dead hosts + canvas render identically and re-theme automatically. */
   --audio-panel: var(--bg-1);
-  --audio-panel-soft: var(--bg-2);
-  --audio-panel-strong: var(--bg-3);
-  --audio-card: var(--bg-2);
-  --audio-card-hover: var(--bg-3);
   --audio-border: var(--line);
-  --audio-border-strong: var(--line-2);
-  --audio-border-bright: var(--line-2);
-  --audio-text-strong: var(--fg);
-  --audio-text-default: var(--fg-2);
-  --audio-text-muted: var(--fg-3);
-  --audio-text-subtle: var(--fg-4);
-  --audio-text-disabled: var(--fg-4);
+  /* Runtime-read by AudioMeterCanvasOverlay.readColors() — keep aliased even
+     though no static CSS consumer remains (the meter overlay reads it by name
+     via getComputedStyle, with #ff4b4b only as a hard fallback). */
+  --audio-clip: var(--danger);
   /* C10: tier for the faintest *text* captions (snapshot slot/meta/shortcut,
-     lane preamp/index rows, output metric small). Defaults to --fg-4 so the
-     dark themes are unchanged, but the Bone block lifts it to --fg-3 (AA);
-     --fg-4 itself stays reserved for hairlines/dots/thumbs. */
+     lane preamp/index rows, output metric small). NOT a pure 1:1 alias — it
+     defaults to --fg-4 so the dark themes are unchanged, but the Bone block
+     lifts it to --fg-3 (AA), so it stays a real semantic token (kept live in
+     the inspector / mixer lane / snapshot deck). --fg-4 itself stays reserved
+     for hairlines/dots/thumbs. */
   --audio-caption-muted: var(--fg-4);
   --audio-accent: var(--accent);
   --audio-hot: var(--accent);
-  --audio-clip: var(--danger);
-  --audio-mute: var(--danger);
   --audio-talk: var(--accent);
-  --audio-tier-accent: var(--accent);
-  --audio-lane-accent: var(--accent);
-  --audio-output-main-out: var(--accent);
-  --audio-output-phones-a: var(--accent);
-  --audio-output-phones-b: var(--accent);
+  --audio-engaged-fill: var(--accent);
   --color-surface-900: var(--bg);
   --color-surface-800: var(--bg-1);
   --color-surface-700: var(--bg-2);
-  --color-border-default: var(--line);
   --color-text-strong: var(--fg);
-  --color-text-default: var(--fg-2);
   --color-text-muted: var(--fg-3);
   --color-text-subtle: var(--fg-4);
-  --color-primary-500: var(--accent);
-  --color-warning-500: var(--accent);
-  --color-danger-500: var(--danger);
-  --audio-warn-fill: var(--accent);
-  --audio-warn-soft: var(--accent-soft);
-  --audio-warn-border: var(--accent-glow);
-  --audio-warn-glow: var(--accent-soft);
-  --audio-warn-dot: var(--accent);
-  --audio-engaged-fill: var(--accent);
-  --audio-engaged-soft: var(--accent-soft);
 
   display: grid;
   /* C11 (2026-06-02): make the shell rows explicit. The persistent chrome is
@@ -165,12 +172,7 @@
   position: relative;
   background: var(--bg);
   color: var(--fg);
-  font-family:
-    "Inter Tight",
-    "Inter",
-    system-ui,
-    -apple-system,
-    sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
@@ -298,19 +300,39 @@
 
 .eyebrow {
   color: var(--fg-3);
-  font:
-    500 11px / 1 "JetBrains Mono",
-    ui-monospace,
-    monospace;
+  font: 500 11px / 1 var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* C20 (2026-06-02): ONE audio segmented-control segment recipe. The
+   "pick-one-of-N" toggle idiom was hand-built ≥3× with divergent geometries —
+   the topbar theme switcher (.themeSwitch button), the Outputs-tier Peak Hold
+   switch (.tierPeakHoldSwitch button) and the inspector Mute/Solo/Unity action
+   row (.inspectorActionRow > button). This MIRRORS the design-system
+   SegmentedControl's segment structure (a reset button that reads muted at rest
+   and lights on its active flag) using the audio tokens — it is deliberately
+   NOT the DS component (that is bound to --color-studio-* and would break the
+   amber accent + Graphite/Bone themes).
+
+   Each site composes this base and keeps ONLY its distinguishing geometry
+   (font / padding / radius / container) and its active treatment local: the two
+   neutral pills light to --bg-elev, while the inspector row keeps its SIGNAL
+   colors (mute → --danger, solo → --accent) intact. The base carries solely the
+   declarations that are byte-identical across all three sites today
+   (appearance reset, pointer cursor, the muted resting color), so composing it
+   is provably render-neutral — there is nothing for a site rule to override. */
+.segmentedToggle {
+  appearance: none;
+  cursor: pointer;
+  color: var(--fg-3);
 }
 
 .masterHalo {
   position: absolute;
   inset: -28px;
   z-index: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: radial-gradient(
     220px 180px at 50% 22%,
     color-mix(in srgb, var(--accent) 46%, transparent) 0%,
@@ -324,7 +346,7 @@
 
 .shellPanel {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-1);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
 }
@@ -342,10 +364,7 @@
 .loadingPanel h1 {
   margin: 0;
   color: var(--fg);
-  font:
-    600 22px / 1.15 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 600 22px / 1.15 var(--font-ui);
   letter-spacing: -0.02em;
 }
 
@@ -358,7 +377,7 @@
 .loadingGrid span {
   min-height: 140px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-2);
 }
 
@@ -375,10 +394,7 @@
   border-bottom: 1px solid var(--line);
   background: var(--accent-soft);
   color: var(--accent);
-  font:
-    500 12px / 1.25 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 500 12px / 1.25 var(--font-ui);
   letter-spacing: 0;
 }
 

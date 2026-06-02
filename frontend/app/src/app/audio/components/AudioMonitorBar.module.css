@@ -24,17 +24,17 @@
   gap: 10px;
   padding: 12px 14px;
   background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   box-shadow: var(--housing-shadow);
   color: var(--fg-2);
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   text-align: left;
   cursor: pointer;
   transition:
-    color 0.12s var(--easing),
-    box-shadow 0.12s var(--easing),
-    background 0.12s var(--easing);
+    color var(--motion-duration-fast) var(--easing),
+    box-shadow var(--motion-duration-fast) var(--easing),
+    background var(--motion-duration-fast) var(--easing);
 }
 
 .talkbackButton:disabled {
@@ -50,8 +50,8 @@
   display: grid;
   place-items: center;
   transition:
-    border-color 0.12s var(--easing),
-    background 0.12s var(--easing);
+    border-color var(--motion-duration-fast) var(--easing),
+    background var(--motion-duration-fast) var(--easing);
   color: var(--fg-2);
 }
 
@@ -64,7 +64,7 @@
 }
 
 .talkbackCap {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -128,7 +128,7 @@
 }
 
 .masterEyebrow {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -151,7 +151,7 @@
   display: flex;
   align-items: baseline;
   gap: 14px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-3);
   letter-spacing: 0.04em;
@@ -167,7 +167,7 @@
   flex-direction: column;
   gap: 4px;
   background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px 14px 8px;
   box-shadow: var(--housing-shadow);
   cursor: ew-resize;
@@ -180,7 +180,7 @@
 }
 
 .masterChLabel {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.12em;
   color: var(--fg-3);
@@ -190,7 +190,7 @@
 }
 
 .masterReadout {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-2);
   font-variant-numeric: tabular-nums;
@@ -294,7 +294,7 @@
 }
 
 .masterTickLabel {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   color: var(--fg-3);
   letter-spacing: 0.04em;
@@ -315,7 +315,7 @@
   align-items: stretch;
   padding: 6px;
   background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: var(--housing-shadow);
 }
 
@@ -331,14 +331,14 @@
   background: transparent;
   border: 1px solid transparent;
   color: var(--fg-2);
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: -0.005em;
   cursor: pointer;
   transition:
-    color 0.12s var(--easing),
-    background 0.12s var(--easing);
+    color var(--motion-duration-fast) var(--easing),
+    background var(--motion-duration-fast) var(--easing);
 }
 
 .controlButton:disabled {
@@ -347,7 +347,7 @@
 }
 
 .controlSub {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   color: var(--fg-4);
   letter-spacing: 0.12em;

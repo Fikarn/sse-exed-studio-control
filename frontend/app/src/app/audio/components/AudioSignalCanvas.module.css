@@ -25,10 +25,7 @@
 .canvasHeader h2 {
   margin: 3px 0 0;
   color: var(--fg);
-  font:
-    600 18px / 1.12 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 600 18px / 1.12 var(--font-ui);
   letter-spacing: -0.02em;
 }
 
@@ -45,10 +42,7 @@
   border-bottom: 1px solid var(--accent-glow);
   background: var(--accent-soft);
   color: var(--fg-2);
-  font:
-    500 12px / 1.25 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 500 12px / 1.25 var(--font-ui);
   letter-spacing: 0;
 }
 
@@ -64,10 +58,7 @@
 
 .warningBand strong {
   color: var(--accent);
-  font:
-    600 11px / 1 "JetBrains Mono",
-    ui-monospace,
-    monospace;
+  font: 600 11px / 1 var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -75,10 +66,7 @@
 .warningBand span,
 .warningBand small {
   color: var(--fg-2);
-  font:
-    400 12px / 1.25 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 400 12px / 1.25 var(--font-ui);
 }
 
 .warningRecoveryActions {
@@ -93,19 +81,16 @@
   min-height: 24px;
   padding: 0 10px;
   border: 1px solid var(--accent-glow);
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   background: var(--bg-2);
   color: var(--accent);
-  font:
-    500 10px / 1 "JetBrains Mono",
-    ui-monospace,
-    monospace;
+  font: 500 10px / 1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing);
 }
 
 .warningRecoveryActions button:hover {
@@ -185,16 +170,13 @@
      the band to 37px, 1px over the 36px cap the audio.spec.ts geometry check pins.
      Trim vertical padding 6→4 to keep both the solo and clip bands under the cap. */
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-tight-md);
   border: 1px solid var(--accent-glow);
   background: var(--accent-soft);
   color: var(--fg-2);
   white-space: nowrap;
   overflow: hidden;
-  font:
-    400 12px / 1.25 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 400 12px / 1.25 var(--font-ui);
 }
 
 /* Right-align the recovery action(s): the descriptive span grows to fill the
@@ -215,7 +197,7 @@
 
 .canvasWarningBand strong {
   flex: 0 0 auto;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -235,18 +217,15 @@
   appearance: none;
   flex: 0 0 auto;
   border: 1px solid var(--line-2);
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   background: var(--bg-2);
   color: var(--fg-2);
-  font:
-    500 11px / 1 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 500 11px / 1 var(--font-ui);
   padding: 4px 10px;
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing);
 }
 
 .canvasWarningBand button:hover {
@@ -261,7 +240,7 @@
 }
 
 .canvasWarningBand kbd {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.04em;
   color: var(--fg-4);
