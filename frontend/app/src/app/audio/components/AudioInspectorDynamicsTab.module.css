@@ -170,11 +170,14 @@
   cursor: pointer;
 }
 
+/* C19: engaged pill reuses the single Console accent trio (--accent-soft /
+   --accent / --accent-glow) — same engaged treatment as the EQ tab and the
+   Sends mode/target toggles, collapsing the three near-duplicate ambers. */
 .dynamicsPills button[data-active="true"],
 .dynamicsPills i[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 50%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-accent) 14%, transparent);
-  color: var(--audio-accent);
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* 2026-05-27 Console redesign: rotary-knob row shared by the EQ band tray,

@@ -87,7 +87,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  min-height: 84px;
+  min-height: 76px;
   padding: 8px 10px;
   background: var(--bg-1);
   border: 1px solid var(--line);
@@ -307,13 +307,17 @@
 
 /* ── Per-tile action strip (save / rename / delete) ──────────────────────── */
 
+/* Faint resting state (C21) so save / rename / delete are discoverable at a
+   glance rather than fully hidden — they lift to full opacity on hover/focus.
+   They live outside the recall surface, so the two-step arm→apply is unchanged
+   and the test .hover() helper still drives them to opacity 1. */
 .snapshotTileActions {
   display: flex;
   gap: 2px;
   position: absolute;
   top: 6px;
   right: 6px;
-  opacity: 0;
+  opacity: 0.35;
   transition: opacity 0.12s var(--easing);
 }
 

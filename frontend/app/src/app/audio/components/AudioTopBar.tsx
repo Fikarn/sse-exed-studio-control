@@ -47,8 +47,6 @@ export function AudioTopBar({
         <span className={styles.brandDevice}>Fireface UFX III</span>
       </div>
 
-      <span className={styles.spacer} />
-
       <div className={styles.statCluster}>
         <div className={styles.statCell}>
           <span className={styles.statKey}>Console</span>
@@ -84,6 +82,8 @@ export function AudioTopBar({
           </span>
         </button>
       </div>
+
+      <span className={styles.spacer} />
 
       <div className={styles.snapshotPill} data-testid="audio-topbar-snapshot">
         <span className={styles.snapshotPillLabel}>Snapshot</span>

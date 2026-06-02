@@ -165,17 +165,28 @@
   right: 12px;
 }
 
-.laneClipDot {
+/* Clip alert (C21) — a compact labeled red pill in place of the bare 10px dot,
+   mirroring the 48V badge geometry so it sits cleanly in the header badge slot.
+   Clears the held clip on click; reuses the clip-only --danger. */
+.laneClipPill {
   appearance: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--danger);
-  border: 0;
-  box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 60%, transparent);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  line-height: 1;
   cursor: pointer;
-  padding: 0;
-  display: block;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 45%, transparent);
+  transition: background 0.12s var(--easing);
+}
+
+.laneClipPill:hover {
+  background: color-mix(in srgb, var(--danger) 30%, transparent);
 }
 
 /* ── Fader + meter region ─────────────────────────────────────────────────── */

@@ -148,7 +148,15 @@
   --audio-engaged-soft: var(--accent-soft);
 
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  /* C11 (2026-06-02): make the shell rows explicit. The persistent chrome is
+     topbar (r2) / body (r3, the flexible 1fr) / monitor bar (r4) / footer
+     (r5); the optional feedback banner takes r1 and collapses to 0 height when
+     absent. Previously only `auto 1fr auto` was declared, so the footer landed
+     in an *implicit* 4th row and a transient feedback banner shoved every bar
+     down a row (the body lost its 1fr). Pinning the same-module .feedbackBanner
+     and .audioBody by grid-row keeps the body flexible regardless of the
+     banner, and the cross-module bars auto-place into rows 2/4/5 in DOM order. */
+  grid-template-rows: auto auto 1fr auto auto;
   gap: 0;
   height: 100%;
   min-height: 0;
@@ -355,6 +363,8 @@
 }
 
 .feedbackBanner {
+  /* C11: explicit shell row 1 (collapses to 0 when no banner is rendered). */
+  grid-row: 1;
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: 1fr;
@@ -381,6 +391,10 @@
 /* ── Layout slots ─────────────────────────────────────────────────────────── */
 
 .audioBody {
+  /* C11: explicit shell row 3 — the single flexible (1fr) row. Pinning it here
+     keeps the mixer/inspector body flexible even when the feedback banner
+     occupies row 1. */
+  grid-row: 3;
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 440px;

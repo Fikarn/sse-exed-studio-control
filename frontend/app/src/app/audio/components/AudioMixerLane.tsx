@@ -154,18 +154,18 @@ export function AudioChannelLane({
         </div>
         {channel.clip ? (
           <span className={styles.laneHeaderBadges}>
-            {channel.clip ? (
-              <button
-                className={styles.laneClipDot}
-                aria-label={`Clear clip for ${channel.name}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onClearClip(channel.id);
-                }}
-                title="Clear clip hold"
-                type="button"
-              />
-            ) : null}
+            <button
+              className={styles.laneClipPill}
+              aria-label={`Clear clip for ${channel.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClearClip(channel.id);
+              }}
+              title="Clear clip hold"
+              type="button"
+            >
+              CLIP
+            </button>
           </span>
         ) : null}
       </div>

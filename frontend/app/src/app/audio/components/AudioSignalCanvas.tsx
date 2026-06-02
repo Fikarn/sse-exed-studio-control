@@ -126,46 +126,15 @@ export function AudioSignalCanvas({
         </div>
       ) : null}
 
-      {/* 2026-05-27 Console redesign: the dense Phase 3 context bar (editing
-          target picker, meter readouts, big stat pills) is retired — that
-          context now lives in the AudioTopBar status cluster + the
-          "MIX FOR → {active}" eyebrow inside the Outputs section. The Peak
-          Hold + Reset controls keep their testids so existing keyboard +
-          spec coverage stays green, but they render as a slim eyebrow rail
-          on the right edge instead of a full toolbar. */}
-      <div className={styles.canvasContextBar} aria-hidden="false">
-        {viewModel.meterSimulationActive ? (
-          <span
-            className={styles.meterSimulationChip}
-            data-testid="audio-meter-simulation-chip"
-            title={viewModel.meterSimulationDetail}
-          >
-            {viewModel.meterSimulationLabel}
-          </span>
-        ) : null}
-        <span className={styles.canvasSpacer} />
-        <div className={styles.canvasModeSwitch} aria-label="Meter peak hold">
-          <button
-            aria-pressed={peakHoldEnabled}
-            data-active={peakHoldEnabled}
-            data-testid="audio-peak-hold-toggle"
-            onClick={onTogglePeakHold}
-            title={peakHoldEnabled ? "Disable held peak marks" : "Enable held peak marks"}
-            type="button"
-          >
-            Hold
-          </button>
-          <button
-            data-testid="audio-peak-hold-reset"
-            onClick={onResetPeakHolds}
-            title="Reset held peak marks"
-            type="button"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-
+      {/* 2026-05-27 Console redesign + C11 (2026-06-02): the dense Phase 3
+          context bar (editing target picker, meter readouts, big stat pills)
+          is retired — that context now lives in the AudioTopBar status cluster
+          + the "MIX FOR → {active}" eyebrow inside the Outputs section. C11
+          also removes the slim context-bar row entirely (~38px reclaimed):
+          the Peak Hold + Reset controls and the meter-simulation chip now
+          render as an eyebrow inside the Outputs tier header (AudioTieredMixer),
+          keeping their testids + labels so keyboard + spec coverage stays
+          green. */}
       {viewModel.healthStats.soloedChannels > 0 || viewModel.healthStats.clippedChannels > 0 ? (
         <div className={styles.canvasWarningStack}>
           {viewModel.healthStats.soloedChannels > 0 ? (
@@ -230,9 +199,12 @@ export function AudioSignalCanvas({
         getDraftValue={getDraftValue}
         onOpenChannelMenu={onOpenChannelMenu}
         onClearClip={onClearClips}
+        onResetPeakHolds={onResetPeakHolds}
         onSelectChannel={onSelectChannel}
         onSelectChannelGroup={onSelectChannelGroup}
         onSelectOutputMixTarget={onSelectOutputMixTarget}
+        onTogglePeakHold={onTogglePeakHold}
+        peakHoldEnabled={peakHoldEnabled}
         setDraftValue={setDraftValue}
         onUpdateChannel={onUpdateChannel}
         onUpdateMixTarget={onUpdateMixTarget}

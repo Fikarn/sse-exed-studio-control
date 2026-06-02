@@ -5,25 +5,30 @@
  * and Dynamics tab import this module directly for their placeholder
  * surfaces. */
 
+/* C19: flat card surface matching the EQ tab's .eqBandCard (flat --bg-2 /
+   --line / --radius-sm, --accent-soft + --accent-glow when active) so the
+   inspector speaks one card vocabulary instead of the legacy accent-tinted
+   gradient. Shared by both Sends AND Dynamics cards. Resting padding/gap are
+   unchanged (8px radius vs the old 7px is height-neutral) so the no-scroll
+   budget and the @container compaction block below both still hold. */
 .sendCardFull {
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid var(--audio-border);
-  border-radius: 7px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--audio-panel-strong) 90%, var(--audio-accent) 10%),
-    var(--audio-panel-strong)
-  );
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
 }
 
 .sendCardFull[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 52%, var(--audio-border));
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
 }
 
+/* Muted send keeps its --danger-tinted border (live mute semantic); paints
+   over the active accent border above when both apply. */
 .sendCardFull[data-send-state="muted"] {
-  border-color: color-mix(in srgb, var(--audio-mute) 50%, var(--audio-border));
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--line));
 }
 
 .sendCardFull[data-send-state="none"] {
@@ -97,14 +102,13 @@
   cursor: pointer;
 }
 
-/* Send mode (pre-fader / post-fader) is an engaged selection state, not a
-   warn — bind to --audio-engaged-fill so it reads as the same engaged amber
-   the other inspector toggle catch-alls use, instead of the legacy
-   --audio-solo yellow that was a Phase 2 holdover. (I32) */
+/* C19: engaged selection state reuses the single Console accent trio
+   (--accent-soft / --accent / --accent-glow) shared by every inspector
+   toggle — collapses the three near-duplicate engaged ambers into one. */
 .sendModeRow button[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-engaged-fill) 55%, var(--audio-border));
-  background: color-mix(in srgb, var(--audio-engaged-fill) 18%, var(--audio-panel));
-  color: var(--audio-engaged-fill);
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .sendModeRow button:disabled {
@@ -126,8 +130,9 @@
 }
 
 .sendTargetButton[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 54%, var(--audio-border));
-  color: var(--color-text-strong);
+  border-color: var(--accent-glow);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 @container operator-root (max-height: 1120px) {
