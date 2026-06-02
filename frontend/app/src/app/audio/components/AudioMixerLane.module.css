@@ -8,8 +8,13 @@
 
 .channelLane,
 .outputLane {
-  flex: 0 0 auto;
-  width: 110px;
+  /* C08: channel lanes flex to fill their content-proportional tier column so
+     the source tiers no longer pool their strips against the left edge. The
+     110px basis is the prototype strip width; lanes grow to ~140px on the wide
+     2560 surface and shrink no further than 88px. `.outputLane` re-asserts a
+     fixed 220px non-flexing width below (its bus-panel layout needs the room). */
+  flex: 1 1 110px;
+  max-width: 140px;
   min-width: 88px;
   background-color: var(--strip-bg);
   border-radius: 4px;
@@ -76,7 +81,7 @@
   font-size: 9px;
   font-weight: 500;
   letter-spacing: 0.16em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-transform: uppercase;
   min-height: 12px;
 }
@@ -88,7 +93,7 @@
 
 .lanePreampRow > span:last-child,
 .laneIndexRow > span:last-child {
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   font-size: 8.5px;
 }
 
@@ -213,7 +218,10 @@
 .outputBody [data-meter-component="stereo"] {
   flex: 0 0 auto;
   align-self: stretch;
-  width: 46px;
+  /* C08: widen the stereo meter wrapper (46 → 52px) now that lanes flex wider.
+     The meter is fully fluid inside its box, so a wider wrapper cleanly widens
+     the most-scanned bars. */
+  width: 52px;
 }
 
 .outputActiveMark {
@@ -306,7 +314,7 @@
 }
 
 .laneToggle:disabled {
-  opacity: 0.4;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -350,7 +358,7 @@
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 8.5px;
   letter-spacing: 0.14em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-transform: uppercase;
 }
 
@@ -411,7 +419,7 @@
 .outputMetricGrid small {
   font-size: 8.5px;
   letter-spacing: 0.12em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-transform: uppercase;
 }
 
@@ -430,7 +438,12 @@
 /* ── Output-lane: wider strip with bus panel column. ─────────────────────── */
 
 .outputLane {
+  /* Output lanes are 2× a channel strip (they carry the bus panel column) and
+     stay a fixed, non-flexing 220px — overriding the shared C08 channel flex so
+     Outputs never collapses toward the 140px channel cap nor stretches. */
+  flex: 0 0 auto;
   width: 220px;
+  max-width: none;
   min-width: 160px;
 }
 

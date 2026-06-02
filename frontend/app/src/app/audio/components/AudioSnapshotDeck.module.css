@@ -39,7 +39,7 @@
   font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .snapshotCapture {
@@ -70,7 +70,7 @@
 }
 
 .snapshotCapture:disabled {
-  opacity: 0.4;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -124,7 +124,7 @@
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .snapshotName {
@@ -145,7 +145,7 @@
 .snapshotMeta {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 9px;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -162,7 +162,7 @@
 }
 
 .snapshotEmpty .snapshotSlot {
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .snapshotEmpty .snapshotName {
@@ -171,7 +171,7 @@
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 /* The placeholder thumb + meta are noise on an empty slot — the dashed tile
@@ -299,7 +299,7 @@
 }
 
 .snapshotPreviewOverflow {
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   font-size: 9px;
   letter-spacing: 0.04em;
   text-transform: uppercase;

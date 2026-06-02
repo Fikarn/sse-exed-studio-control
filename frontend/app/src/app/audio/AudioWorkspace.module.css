@@ -20,7 +20,9 @@
 
   --fg: #efebe1;
   --fg-2: rgba(239, 235, 225, 0.68);
-  --fg-3: rgba(239, 235, 225, 0.44);
+  /* C10: nudge muted text up (0.44 → 0.50) for a small cross-theme legibility
+     win alongside the Bone AA fixes. */
+  --fg-3: rgba(239, 235, 225, 0.5);
   --fg-4: rgba(239, 235, 225, 0.22);
 
   --line: rgba(239, 235, 225, 0.07);
@@ -38,7 +40,24 @@
      meter regardless of fill height (see AudioStereoMeter.module.css). */
   --meter-low: oklch(82% 0.035 75);
   --meter-mid: oklch(82% 0.035 75);
-  --meter-hi: oklch(64% 0.24 27);
+  /* C09(a): darken the clip cap so the at/over-0 dBFS boundary clears the 3:1
+     UI floor against the cream body (was oklch(64% 0.24 27) ≈ 2.15:1 → ~3.15:1).
+     Mirrored per theme: Graphite a smaller drop, Bone (dark body) RAISES the
+     cap instead. Do NOT darken the cream body ramp to chase this. */
+  --meter-hi: oklch(52% 0.25 27);
+  /* C09(a): tunable clip-cap edge tone. Defaults to --meter-hi so the canvas
+     clip cap (--audio-meter-over) and the static .meterFill top stop track the
+     corrected hot tone, but can be retuned without disturbing the MonitorBar
+     master meter, which also reads --meter-hi. */
+  --meter-clip-edge: var(--meter-hi);
+  /* C09(b): desaturated orange-red intermediate for the transient meterPointOver
+     band — a color-mix of the clip-cap tone toward the warm accent so it reads
+     distinct from BOTH the saturated clip-red AND the amber peak-warning outline
+     (so: not pure amber). */
+  --meter-over-tone: color-mix(in oklch, var(--meter-hi) 72%, var(--accent));
+  /* C09(c): theme-aware keyline/halo for the live peak-hold tick. Dark halo on
+     the light cream meter bodies (Studio/Graphite); see Bone for the light halo. */
+  --meter-peak-edge: oklch(18% 0.02 75);
   --meter-bg: oklch(10% 0.005 60);
   --meter-clip-pct: 88%;
 
@@ -54,7 +73,7 @@
   --audio-meter-low-hot: var(--meter-low);
   --audio-meter-warn: var(--meter-low);
   --audio-meter-hot: var(--meter-low);
-  --audio-meter-over: var(--meter-hi);
+  --audio-meter-over: var(--meter-clip-edge);
   --audio-meter-peak-hold: oklch(92% 0.02 75);
 
   --strip-bg: #15110e;
@@ -69,6 +88,14 @@
 
   --easing: cubic-bezier(0.4, 0, 0.2, 1);
   --easing-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* C22: single disabled-control dim. Replaces a fork of hardcoded 0.4 / 0.45 /
+     0.46 / 0.48 :disabled rules so the disabled treatment is unified instead of
+     "opacity:0.4 everywhere". 0.4 composited the --fg-2 button labels to
+     ~2.14:1 Studio / ~1.78:1 Bone (below the 3:1 UI floor); 0.7 clears it.
+     Opacity is luminance-independent, so one value holds across Studio /
+     Graphite / Bone — no per-theme override needed. */
+  --control-disabled-opacity: 0.7;
 
   /* ── Legacy --audio-* aliases (kept so non-redesigned consumers keep
         rendering without inheriting brand defaults) ─────────────────────── */
@@ -86,6 +113,11 @@
   --audio-text-muted: var(--fg-3);
   --audio-text-subtle: var(--fg-4);
   --audio-text-disabled: var(--fg-4);
+  /* C10: tier for the faintest *text* captions (snapshot slot/meta/shortcut,
+     lane preamp/index rows, output metric small). Defaults to --fg-4 so the
+     dark themes are unchanged, but the Bone block lifts it to --fg-3 (AA);
+     --fg-4 itself stays reserved for hairlines/dots/thumbs. */
+  --audio-caption-muted: var(--fg-4);
   --audio-accent: var(--accent);
   --audio-hot: var(--accent);
   --audio-clip: var(--danger);
@@ -150,7 +182,9 @@
 
   --fg: #e8edf0;
   --fg-2: rgba(232, 237, 240, 0.66);
-  --fg-3: rgba(232, 237, 240, 0.42);
+  /* C10: nudge muted text up (0.42 → 0.50) for a small cross-theme legibility
+     win alongside the Bone AA fixes. */
+  --fg-3: rgba(232, 237, 240, 0.5);
   --fg-4: rgba(232, 237, 240, 0.2);
 
   --line: rgba(232, 237, 240, 0.07);
@@ -165,10 +199,20 @@
 
   --meter-low: oklch(86% 0.025 220);
   --meter-mid: oklch(86% 0.025 220);
-  --meter-hi: oklch(62% 0.22 25);
+  /* C09(a): smaller clip-cap drop than Studio (light cyan-neutral body, was
+     oklch(62% 0.22 25) ≈ 1.99:1). --meter-clip-edge / --audio-meter-over
+     inherit and recompute from this. */
+  --meter-hi: oklch(55% 0.23 25);
+  /* C09(b): keep the over-band orange-red. Graphite's --accent is cyan, so the
+     inherited mix-toward-accent would desaturate to teal-gray and lose the
+     warning read — anchor the mix to a warm orange instead. */
+  --meter-over-tone: color-mix(in oklch, var(--meter-hi) 70%, oklch(72% 0.18 60));
   --meter-bg: oklch(9% 0.005 220);
   --audio-meter-low: oklch(76% 0.02 220);
   --audio-meter-peak-hold: oklch(94% 0.02 220);
+  /* C09(c): dark halo for the peak tick on Graphite's light meter body, hue-
+     matched to the cool neutral. */
+  --meter-peak-edge: oklch(16% 0.015 220);
 
   --strip-bg: #0f1418;
   --strip-bg-hover: #141a20;
@@ -188,25 +232,45 @@
 
   --fg: #1a1814;
   --fg-2: rgba(26, 24, 20, 0.66);
-  --fg-3: rgba(26, 24, 20, 0.44);
+  /* C10 (AA-blocking, light theme): rgba(…,0.44) composited to ~2.7:1 and carried
+     real text (eyebrows, output pairs, snapshot preview, resting SOLO/MUTE glyph).
+     Raise to 0.60 → ≈4:1. Luminance-only; hue unchanged. */
+  --fg-3: rgba(26, 24, 20, 0.6);
   --fg-4: rgba(26, 24, 20, 0.22);
+  /* C10: --fg-4 (~1.6:1) is illegible for real text on the light body — promote
+     the faintest captions to --fg-3 (≈4:1) in Bone only. --fg-4 stays for
+     hairlines/dots/thumbs. */
+  --audio-caption-muted: var(--fg-3);
 
   --line: rgba(26, 24, 20, 0.08);
   --line-2: rgba(26, 24, 20, 0.14);
 
-  --accent: #c25e1e;
-  --accent-soft: rgba(194, 94, 30, 0.12);
-  --accent-glow: rgba(194, 94, 30, 0.3);
+  /* C10 (AA-blocking, light theme): #c25e1e failed accent-on-accent-soft (~3.68:1)
+     on the loaded-snapshot name, Outputs tier label and active tier chips, and
+     solo-active (--bg on --accent) was exactly 3.75:1. Darken to #a64e16 → ≈5.6:1
+     on panels / ≈4.8:1 on accent-soft, which also lifts solo-active to ≈4.95:1.
+     accent-soft / accent-glow re-derived from the same rgb(166, 78, 22). */
+  --accent: #a64e16;
+  --accent-soft: rgba(166, 78, 22, 0.12);
+  --accent-glow: rgba(166, 78, 22, 0.3);
 
   --danger: oklch(50% 0.22 25);
   --danger-soft: oklch(50% 0.22 25 / 0.15);
 
   --meter-low: oklch(38% 0.04 75);
   --meter-mid: oklch(38% 0.04 75);
-  --meter-hi: oklch(56% 0.24 27);
+  /* C09(a): Bone's meter LED body is DARK (oklch 38–46%), so the clip cap is
+     RAISED rather than dropped to clear 3:1 (was oklch(56% 0.24 27) ≈ 1.99:1).
+     The candidate's "drop to ~48%" was backwards and regressed to 1.57:1.
+     --meter-clip-edge / --audio-meter-over inherit and recompute from this. */
+  --meter-hi: oklch(72% 0.24 27);
   --meter-bg: oklch(94% 0.005 75);
   --audio-meter-low: oklch(46% 0.04 75);
   --audio-meter-peak-hold: oklch(28% 0.04 75);
+  /* C09(c): Bone's dark meter body + dark peak tick collapse to ~1.38:1, so the
+     keyline halo is LIGHT here (opposite of Studio/Graphite) to separate the
+     tick from the body. */
+  --meter-peak-edge: oklch(95% 0.01 75);
 
   --strip-bg: #fdfbf5;
   --strip-bg-hover: #fffefa;

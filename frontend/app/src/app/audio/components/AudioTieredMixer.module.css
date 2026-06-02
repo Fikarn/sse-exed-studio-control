@@ -10,7 +10,13 @@
   position: relative;
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  /* C08: content-proportional, NOT count-based. The three columns are sized to
+     their settled content width (Inputs ~4 lanes ≈ 462px, Playback ~6 lanes ≈
+     686px, Outputs 3 × 220px lanes ≈ 680px) so Inputs no longer leaves a void
+     while Outputs — whose 220px lanes are 2× a channel strip — keeps enough
+     room to avoid a horizontal scrollbar. A naïve count-keyed 4:6:3 would
+     starve Outputs; the ~4.2:6.2:6.1 ratio tracks content instead. */
+  grid-template-columns: minmax(0, 4.2fr) minmax(0, 6.2fr) minmax(0, 6.1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 14px;
   min-height: 0;
@@ -95,6 +101,18 @@
   border-bottom-color: var(--accent-glow);
   color: var(--accent);
   font-weight: 600;
+}
+
+/* Source-tier (Inputs / Playback) header lead: packs the title block and the
+   active mix-target echo into the `1fr` grid column so the "which bus am I
+   riding?" context sits beside the left-side faders. The mix-for echo lives
+   here rather than as a third `justify-self:end` sibling (chips + bank pill
+   already own the `auto` column). */
+.tierHeaderLead {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
 }
 
 .tierTitleBlock {
@@ -213,6 +231,14 @@
   letter-spacing: -0.01em;
 }
 
+/* Source-tier echo carries both the full name and the shortName; the wide
+   surface shows the full name, the narrow container query swaps to shortName.
+   (The output-tier `.tierMixForName` has no data-mix-for-name attr and always
+   shows the full name in its roomy `auto` column.) */
+.tierMixForName[data-mix-for-name="short"] {
+  display: none;
+}
+
 .tierLaneGrid {
   display: flex;
   gap: 2px;
@@ -260,5 +286,20 @@
   .tieredMixer {
     gap: 8px;
     padding: 10px 12px 0;
+  }
+
+  /* Narrow surface (e.g. 1920 fallback): collapse the source-tier mix-target
+     echo to shortName so the title row never wraps or pushes the chip/pill
+     cell into a second line. */
+  .tierHeaderLead {
+    gap: 10px;
+  }
+
+  .tierMixForName[data-mix-for-name="full"] {
+    display: none;
+  }
+
+  .tierMixForName[data-mix-for-name="short"] {
+    display: inline;
   }
 }

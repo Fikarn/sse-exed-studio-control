@@ -227,7 +227,7 @@
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 9px;
   letter-spacing: 0.12em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .preampHeroScaleTrack {
@@ -312,7 +312,7 @@
 }
 
 .unsupportedToggleRow > button:disabled {
-  opacity: 0.4;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -377,7 +377,7 @@
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 8.5px;
   letter-spacing: 0.14em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-transform: uppercase;
 }
 
@@ -548,7 +548,7 @@
 }
 
 .inspectorActionRow > button:disabled {
-  opacity: 0.4;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -690,7 +690,7 @@
 .bigMeterRow em,
 .bigMeterReferenceRow em {
   margin-left: 2px;
-  color: var(--audio-text-subtle);
+  color: var(--audio-caption-muted);
   font-style: normal;
   font-weight: var(--font-weight-regular);
 }

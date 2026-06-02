@@ -34,7 +34,7 @@
 
 .knobWrap[data-disabled] .knob {
   cursor: not-allowed;
-  opacity: 0.46;
+  opacity: var(--control-disabled-opacity);
 }
 
 .caption {

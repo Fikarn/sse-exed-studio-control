@@ -108,7 +108,7 @@
 }
 
 .sendModeRow button:disabled {
-  opacity: 0.46;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 

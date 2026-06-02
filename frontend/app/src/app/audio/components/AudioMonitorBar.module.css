@@ -38,7 +38,7 @@
 }
 
 .talkbackButton:disabled {
-  opacity: 0.5;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -342,7 +342,7 @@
 }
 
 .controlButton:disabled {
-  opacity: 0.4;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -353,6 +353,15 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 500;
+}
+
+/* C22(2): the sub-label rides at --fg-4, so under a disabled button it
+   compounded the parent dim down to ~1.19:1 (invisible). Promote it to --fg-3
+   when the button is disabled so it survives the parent opacity (≈2.2:1 before
+   the parent dim, and the parent now dims to --control-disabled-opacity rather
+   than 0.4). */
+.controlButton:disabled .controlSub {
+  color: var(--fg-3);
 }
 
 .controlButton:hover:not(:disabled) {

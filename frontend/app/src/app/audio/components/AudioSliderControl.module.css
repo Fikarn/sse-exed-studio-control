@@ -24,7 +24,7 @@
 
 .sliderControl[aria-disabled="true"] {
   cursor: not-allowed;
-  opacity: 0.46;
+  opacity: var(--control-disabled-opacity);
 }
 
 .sliderControl[data-orientation="vertical"] {

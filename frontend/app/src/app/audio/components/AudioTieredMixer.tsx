@@ -71,10 +71,24 @@ export function AudioTieredMixer({
             data-testid={`audio-tier-label-${tier.id}`}
             onClick={() => onSelectChannel(null)}
           >
-            <div className={styles.tierTitleBlock}>
-              <TierIcon tierId={tier.id} />
-              <span className={styles.tierNum}>{TIER_NUMBERS[tier.id as keyof typeof TIER_NUMBERS]}</span>
-              <span>{tier.label}</span>
+            <div className={styles.tierHeaderLead}>
+              <div className={styles.tierTitleBlock}>
+                <TierIcon tierId={tier.id} />
+                <span className={styles.tierNum}>{TIER_NUMBERS[tier.id as keyof typeof TIER_NUMBERS]}</span>
+                <span>{tier.label}</span>
+              </div>
+              <div className={styles.tierMixFor} data-testid={`audio-tier-mix-for-${tier.id}`}>
+                <span className={styles.tierMixForEyebrow}>Mix for</span>
+                <span className={styles.tierMixForArrow}>→</span>
+                <span className={styles.tierMixForName} data-mix-for-name="full">
+                  {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
+                </span>
+                <span className={styles.tierMixForName} data-mix-for-name="short">
+                  {viewModel.selectedMixTarget?.shortName ??
+                    viewModel.hardwareOutputs.mixTargets[0]?.shortName ??
+                    "Main"}
+                </span>
+              </div>
             </div>
             <div className={styles.tierChipRow}>
               {tier.chips.map((chip) => (

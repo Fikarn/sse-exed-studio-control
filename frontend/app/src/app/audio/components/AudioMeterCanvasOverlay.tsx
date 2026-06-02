@@ -43,7 +43,9 @@ interface MeterColors {
   green: string;
   hot: string;
   over: string;
+  overTone: string;
   peak: string;
+  peakEdge: string;
   rms: string;
 }
 
@@ -61,7 +63,12 @@ function readColors(root: HTMLElement): MeterColors {
     green: cssColor(style, "--audio-meter-low-hot", "#62d979"),
     hot: cssColor(style, "--audio-meter-hot", "#ff9f43"),
     over: cssColor(style, "--audio-meter-over", "#ff4b4b"),
+    // C09(b): desaturated orange-red intermediate for the transient over band,
+    // distinct from both the saturated clip-red and the amber peak-warning
+    // outline. C09(c): theme-aware keyline tone for the peak-hold tick.
+    overTone: cssColor(style, "--meter-over-tone", "#e8743a"),
     peak: cssColor(style, "--audio-meter-peak-hold", "#f8f1a5"),
+    peakEdge: cssColor(style, "--meter-peak-edge", "#2a2418"),
     rms: cssColor(style, "--audio-meter-low", "#39c46b"),
   };
 }
@@ -184,8 +191,16 @@ function drawMeterBody(
 function drawPeakLine(ctx: CanvasRenderingContext2D, rect: MeterRect, dbfs: number, colors: MeterColors) {
   if (!Number.isFinite(dbfs) || dbfs <= METER_FLOOR_DBFS) return;
   const y = Math.max(rect.y + 1, Math.min(rect.y + rect.height - 2, yForDbfs(rect, dbfs)));
+  const x = rect.x + 1;
+  const width = Math.max(1, rect.width - 2);
+  // C09(c): the live canvas force-hides the CSS .meterPeak's separating glow,
+  // leaving the cream peak tick at ~1.38:1 on the cream body. Lay a 1px
+  // theme-aware keyline above and below the tick (dark on light bodies, light
+  // on Bone's dark body) so it separates from the body without a new hue.
+  ctx.fillStyle = colors.peakEdge;
+  ctx.fillRect(x, y - 1, width, 4);
   ctx.fillStyle = colors.peak;
-  ctx.fillRect(rect.x + 1, y, Math.max(1, rect.width - 2), 2);
+  ctx.fillRect(x, y, width, 2);
 }
 
 function drawNominalReference(ctx: CanvasRenderingContext2D, rect: MeterRect, colors: MeterColors) {
@@ -215,8 +230,13 @@ function drawPeakWarningOverlay(ctx: CanvasRenderingContext2D, rect: MeterRect, 
 }
 
 function drawMeterPointOverIndicator(ctx: CanvasRenderingContext2D, rect: MeterRect, colors: MeterColors) {
-  ctx.fillStyle = colors.over;
-  ctx.fillRect(rect.x + 1, rect.y + 1, Math.max(1, rect.width - 2), Math.min(4, Math.max(2, rect.height * 0.08)));
+  // C09(b): a transient over-sample (meterPointOver) and a latched channel-path
+  // clip used to draw identically (both saturated red) and overlap geometrically.
+  // Render the over band as a thinner desaturated orange-red intermediate
+  // (--meter-over-tone) and offset it a hair below the top edge so it no longer
+  // sits exactly under the 1px clip outline drawn at rect.y + 0.5.
+  ctx.fillStyle = colors.overTone;
+  ctx.fillRect(rect.x + 2, rect.y + 3, Math.max(1, rect.width - 4), 2);
 }
 
 function drawMiniMeter(
