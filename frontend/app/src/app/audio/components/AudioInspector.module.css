@@ -453,6 +453,123 @@
   border-top: 1px solid var(--line);
 }
 
+/* ── Send / monitor fader card + Mute/Solo/Unity action row ────────────────
+   C01: these five classes were referenced by AudioInspectorChannelSendActions
+   and AudioInspectorOutputView but never defined, so the send head, dB tick
+   scale, slider width and action row all fell back to raw block flow with
+   default browser buttons. Token-only, mirroring the sibling
+   `.unsupportedToggleRow` lane-toggle treatment so the action pills share the
+   shipped monochrome-amber + clip-red vocabulary. */
+.inspectorFaderCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+
+.inspectorFaderHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.inspectorFaderHead strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.inspectorFaderTicks {
+  display: flex;
+  justify-content: space-between;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8.5px;
+  color: var(--fg-3);
+}
+
+/* AudioSliderControl horizontal sliders measure their own rect and do not
+   self-stretch — without this the slider collapses to its intrinsic width. */
+.inspectorSendSlider {
+  width: 100%;
+}
+
+.inspectorActionRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.inspectorActionRow > button {
+  appearance: none;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  color: var(--fg-3);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--easing),
+    color 0.12s var(--easing),
+    border-color 0.12s var(--easing);
+  white-space: nowrap;
+}
+
+.inspectorActionRow > button:hover:not(:disabled) {
+  border-color: var(--line-2);
+  color: var(--fg);
+}
+
+.inspectorActionRow > button[data-control="mute"][data-active="true"] {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.inspectorActionRow > button[data-control="solo"][data-active="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.inspectorActionRow > button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* C01 fit: the send-fader card sits above the meter card in the Preamp/Channel
+   panel, and at the dense operator heights (e.g. the 1920x1080 fallback) the
+   audit's padding:14/gap:8 chrome overflowed the panel by ~29px — its "footprint
+   <= default buttons" assumption was wrong, because the unstyled fallback had no
+   card chrome at all. 2560 keeps the roomy base; compact the card only at
+   <=1120px logical height, mirroring the EQ/Dyn/Sends tabs' own operator-root
+   blocks (keyed on the logical operator surface so the scaled studio preview
+   still matches native 2560x1440). */
+@container operator-root (max-height: 1120px) {
+  .inspectorFaderCard {
+    gap: 3px;
+    padding: 4px 10px;
+  }
+  .inspectorActionRow > button {
+    height: 24px;
+  }
+}
+
 /* Preamp tab body hint: tells the operator the preamp lives in the sticky
    header above and points to the other tabs. */
 .preampTabHint {

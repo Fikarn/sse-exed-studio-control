@@ -66,14 +66,8 @@ export function AudioMonitorBar({
   const masterDb = selectedMixTarget ? formatAudioDb(monitorValue) : "—";
   const actionsAllowed = viewModel.actionsAllowed;
 
-  const setControl = (control: "talkback" | "dim" | "mono" | "listen") => () => {
+  const setControl = (control: "talkback" | "dim" | "mono") => () => {
     if (!selectedMixTarget) return;
-    if (control === "listen") {
-      // Console prototype includes Listen/Cue; the engine surfaces no listen
-      // flag yet, so route it through dim's slot until upstream support lands.
-      onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, dim: !selectedMixTarget.dim });
-      return;
-    }
     if (control === "talkback") {
       onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, talkback: !selectedMixTarget.talkback });
       return;
@@ -210,19 +204,6 @@ export function AudioMonitorBar({
       </div>
 
       <div className={styles.controlCluster}>
-        <button
-          aria-pressed={dimOn}
-          className={styles.controlButton}
-          data-active={dimOn}
-          data-control="listen"
-          data-testid="audio-monitor-listen"
-          disabled={!selectedMixTarget || !actionsAllowed}
-          onClick={setControl("listen")}
-          type="button"
-        >
-          Listen
-          <span className={styles.controlSub}>Cue</span>
-        </button>
         <button
           aria-pressed={dimOn}
           className={`${styles.controlButton} ${styles.controlWarn}`}

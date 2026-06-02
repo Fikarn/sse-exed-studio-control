@@ -16,6 +16,14 @@
   display: grid;
   place-items: center;
   outline: none;
+  border-radius: 50%;
+  transition: box-shadow 0.12s var(--easing);
+}
+
+/* C14: pre-interaction hover affordance — matches the AudioKnob hairline ring
+   so both preamp surfaces share the same resting signal. */
+.knob:not([aria-disabled="true"]):hover {
+  box-shadow: 0 0 0 1px var(--line-2);
 }
 
 .knob:focus-visible {

@@ -17,6 +17,14 @@
   place-items: center;
   outline: none;
   border-radius: 50%;
+  transition: box-shadow 0.12s var(--easing);
+}
+
+/* C14: pre-interaction hover affordance — the knob is the one interactive
+   class with no resting signal on a tooltip-less panel. A subtle hairline ring
+   echoes the fader-cap / EQ-point hover language. */
+.knobWrap:not([data-disabled]) .knob:hover {
+  box-shadow: 0 0 0 1px var(--line-2);
 }
 
 .knob:focus-visible {

@@ -13,7 +13,13 @@
   min-height: 0;
   touch-action: none;
   user-select: none;
-  cursor: pointer;
+  cursor: grab;
+}
+
+/* C14: while dragging, switch to the grabbing cursor (precedent: .eqPoint uses
+   grab; this completes the grab/grabbing pair the fader cap previously lacked). */
+.sliderControl[data-dragging="true"] {
+  cursor: grabbing;
 }
 
 .sliderControl[aria-disabled="true"] {
@@ -124,7 +130,9 @@
   right: 4px;
   top: 50%;
   height: 1px;
-  background: var(--fg-3);
+  /* C14: lift the resting cap indicator toward --fg-2 so the grab handle reads
+     as interactive before hover. */
+  background: var(--fg-2);
   transform: translateY(-50%);
   transition: background 0.15s var(--easing);
 }

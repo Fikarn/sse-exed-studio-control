@@ -117,6 +117,34 @@
   cursor: not-allowed;
 }
 
+/* Hard-fault statuses (CONSOLE UNREACHABLE / RME METERING OFFLINE / action
+   failure carry tone="error") re-tint the band to the clip-only --danger red,
+   mirroring the sibling .feedbackBanner[data-tone="error"] so a fault no longer
+   renders like the amber pre-flight reminder. Text labels stay for monochrome
+   redundancy. This is the redesign's sanctioned clip-only red — NOT a revival
+   of the retired multi-hue palette. --danger is defined in all three themes. */
+.warningBand[data-tone="error"] {
+  background: var(--danger-soft);
+  border-bottom-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+}
+
+.warningBand[data-tone="error"] strong {
+  color: var(--danger);
+}
+
+.warningBand[data-tone="error"]:focus-visible {
+  outline-color: var(--danger);
+}
+
+.warningBand[data-tone="error"] .warningRecoveryActions button {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+  color: var(--danger);
+}
+
+.warningBand[data-tone="error"] .warningRecoveryActions button:hover {
+  background: var(--danger-soft);
+}
+
 /* ── Context bar (slimmed) ────────────────────────────────────────────────── */
 
 .canvasContextBar {

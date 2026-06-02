@@ -106,6 +106,17 @@
   box-shadow: 0 0 6px var(--accent-glow);
 }
 
+/* Hard-fault statuses (CONSOLE UNREACHABLE / RME METERING OFFLINE / action
+   failure) drive the clip-only --danger red into the dot so a fault no longer
+   reads like the amber pre-flight reminder. Value text stays --fg for every
+   tone — VERIFIED is the most-shown readout and must not be dimmed. */
+.statValue[data-tone="error"] .statDot {
+  width: 7px;
+  height: 7px;
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger-soft);
+}
+
 /* Current-snapshot display pill (prototype's top-bar snapshot chip). */
 .snapshotPill {
   display: flex;

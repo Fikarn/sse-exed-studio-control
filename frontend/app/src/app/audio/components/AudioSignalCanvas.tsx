@@ -100,6 +100,7 @@ export function AudioSignalCanvas({
         <div
           className={styles.warningBand}
           data-variant="compact"
+          data-tone={viewModel.status.tone}
           data-testid="audio-warning-band"
           ref={statusWarningRef}
           role="status"

@@ -47,7 +47,7 @@ export function AudioTopBar({
       <div className={styles.statCluster}>
         <div className={styles.statCell}>
           <span className={styles.statKey}>Console</span>
-          <span className={styles.statValue}>
+          <span className={styles.statValue} data-tone={viewModel.status.tone}>
             <span className={styles.statDot} data-warn={Boolean(warningTitle)} aria-hidden="true" />
             {consoleFact}
           </span>
