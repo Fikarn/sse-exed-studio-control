@@ -23,11 +23,11 @@ import {
 } from "react";
 
 import styles from "./AudioKnob.module.css";
-import { AUDIO_DRAFT_CLEAR_MS } from "../audioConstants";
+import { AUDIO_DRAFT_CLEAR_MS, AUDIO_KNOB_DRAG_TRAVEL_PX } from "../audioConstants";
+import { AudioNumberDialog } from "./AudioNumberDialog";
 
 const ARC_START_DEG = -135;
 const ARC_END_DEG = 135;
-const DRAG_TRAVEL_PX = 150; // vertical px for a full min→max sweep
 
 export interface AudioKnobProps {
   ariaLabel: string;
@@ -38,6 +38,13 @@ export interface AudioKnobProps {
   format?: (value: number) => string;
   max: number;
   min: number;
+  /** Field label inside the typed-entry dialog (e.g. "EQ gain", "Threshold").
+      Defaults to `caption`, then `ariaLabel`. */
+  numericFieldLabel?: string;
+  /** Raw-engine-unit suffix for the typed-entry dialog ("Hz" / "dB" / ":1" /
+      ""). Deliberately NOT derived from `format`, which bakes value+unit and
+      rescales (e.g. "8.00 kHz") — the dialog operates in raw units. */
+  numericSuffix?: string;
   onCommit: (value: number) => void;
   onPreview?: (value: number) => void;
   size?: number;
@@ -73,6 +80,8 @@ export function AudioKnob({
   format,
   max,
   min,
+  numericFieldLabel,
+  numericSuffix,
   onCommit,
   onPreview,
   size = 52,
@@ -83,6 +92,7 @@ export function AudioKnob({
   const dragRef = useRef<DragState | null>(null);
   const clearTimerRef = useRef<number | null>(null);
   const [draft, setDraft] = useState<number | null>(null);
+  const [numberDialogOpen, setNumberDialogOpen] = useState(false);
   const span = Math.max(0.000001, max - min);
   const resolvedStep = step ?? span / 200;
   const current = clamp(draft ?? value, min, max);
@@ -151,8 +161,14 @@ export function AudioKnob({
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.focus();
-    if (event.detail === 2 && defaultValue != null) {
-      previewAndCommit(clamp(defaultValue, min, max));
+    if (event.detail === 2) {
+      // C05: double-click opens typed entry (mirrors AudioFader / AudioStripPreamp);
+      // reset-to-default relocates to Alt+double-click (Backspace/Delete still reset).
+      if (event.altKey) {
+        if (defaultValue != null) previewAndCommit(clamp(defaultValue, min, max));
+      } else {
+        setNumberDialogOpen(true);
+      }
       return;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -165,7 +181,7 @@ export function AudioKnob({
     event.preventDefault();
     event.stopPropagation();
     const fine = event.shiftKey ? 0.25 : 1;
-    const delta = ((drag.startY - event.clientY) / DRAG_TRAVEL_PX) * span * fine;
+    const delta = ((drag.startY - event.clientY) / AUDIO_KNOB_DRAG_TRAVEL_PX) * span * fine;
     preview(clamp(drag.startValue + delta, min, max));
   };
 
@@ -214,6 +230,11 @@ export function AudioKnob({
         if (defaultValue == null) return;
         next = defaultValue;
         break;
+      case "Enter":
+        // C05: Enter opens typed entry, mirroring the fader / strip-preamp siblings.
+        event.preventDefault();
+        setNumberDialogOpen(true);
+        return;
       default:
         return;
     }
@@ -271,6 +292,25 @@ export function AudioKnob({
           <span className={styles.value}>{fmt(current)}</span>
         </>
       )}
+      {numberDialogOpen ? (
+        <AudioNumberDialog
+          // C05: operate in RAW engine units — initial value, bounds and step
+          // are the knob's own (NOT the rescaled `format` output). The explicit
+          // per-site `numericSuffix` carries the unit.
+          fieldLabel={numericFieldLabel ?? caption ?? ariaLabel}
+          initialValue={snapToStep(current)}
+          max={max}
+          min={min}
+          onCancel={() => setNumberDialogOpen(false)}
+          onConfirm={(next) => {
+            setNumberDialogOpen(false);
+            previewAndCommit(next);
+          }}
+          step={resolvedStep}
+          suffix={numericSuffix}
+          title={`Set ${ariaLabel}`}
+        />
+      ) : null}
     </div>
   );
 }

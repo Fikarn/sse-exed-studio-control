@@ -117,6 +117,63 @@
   box-shadow: 0 0 6px var(--danger-soft);
 }
 
+/* Persistent SOLO indicator: a stat cell that doubles as the clear-all-solo
+   button. Always present (neutral "—" + dim dot when nothing is soloed);
+   switches the value + dot to the clip-only --danger when ≥1 channel is
+   soloed, and only then becomes an enabled action (guarded by actionsAllowed
+   in the caller). Inherits the .statCell column layout + monospace face. */
+.statCellButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 16px;
+  position: relative;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  min-width: 0;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0 8px 8px 0;
+  transition: background 0.12s var(--easing);
+}
+
+.statCell + .statCellButton::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--line);
+}
+
+.statCellButton:not(:disabled):hover {
+  background: var(--bg-3);
+}
+
+.statCellButton:disabled {
+  cursor: default;
+}
+
+.soloDot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fg-4);
+}
+
+.statCellButton[data-active="true"] .soloDot {
+  width: 7px;
+  height: 7px;
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger-soft);
+}
+
 /* Current-snapshot display pill (prototype's top-bar snapshot chip). */
 .snapshotPill {
   display: flex;

@@ -288,7 +288,10 @@
   align-items: center;
   gap: 10px;
   min-height: 32px;
-  padding: 6px 12px;
+  /* C04 fit: the "Clear all solo" button gained a <kbd>⌥S</kbd> badge that tipped
+     the band to 37px, 1px over the 36px cap the audio.spec.ts geometry check pins.
+     Trim vertical padding 6→4 to keep both the solo and clip bands under the cap. */
+  padding: 4px 12px;
   border-radius: 6px;
   border: 1px solid var(--accent-glow);
   background: var(--accent-soft);

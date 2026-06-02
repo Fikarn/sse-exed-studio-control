@@ -65,14 +65,17 @@ export const EQ_GAIN_MARKERS = [
   { gainDb: -20, label: "-20 dB" },
 ] as const;
 
-export const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string; testId: string }> = [
+export const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string; testId: string; shortcut: string }> = [
   // 2026-05-27 Console redesign: tab labels match the prototype's Preamp /
   // EQ / Dyn / Routing rhythm. The internal `id` strings stay the Phase 3
   // values so existing routing / state hooks keep working unmodified.
-  { id: "channel", label: "Preamp", testId: "audio-inspector-channel" },
-  { id: "eq", label: "EQ", testId: "audio-inspector-eq" },
-  { id: "dynamics", label: "Dyn", testId: "audio-inspector-dynamics" },
-  { id: "sends", label: "Routing", testId: "audio-inspector-sends" },
+  // `shortcut` is the plain-key accelerator wired in useAudioKeyboardShortcuts
+  // (mirrored onto `aria-keyshortcuts` + `title` for discoverability). Preamp
+  // also answers Q, but P is the advertised key.
+  { id: "channel", label: "Preamp", testId: "audio-inspector-channel", shortcut: "P" },
+  { id: "eq", label: "EQ", testId: "audio-inspector-eq", shortcut: "E" },
+  { id: "dynamics", label: "Dyn", testId: "audio-inspector-dynamics", shortcut: "D" },
+  { id: "sends", label: "Routing", testId: "audio-inspector-sends", shortcut: "R" },
 ];
 
 export function clamp(value: number, min: number, max: number) {

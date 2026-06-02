@@ -98,6 +98,7 @@ const SHORTCUTS: readonly ShortcutSection[] = [
       { keys: ["Shift", "1–8"], description: "Arm or apply audio snapshot recall" },
       { keys: ["←", "→"], description: "Move between Submix output targets" },
       { keys: ["M", "S"], description: "Mute / solo the selected strip" },
+      { keys: ["P", "E", "D", "R"], description: "Inspector tabs: Preamp / EQ / Dyn / Routing" },
       { keys: ["U"], description: "Reset selected Audio fader to unity" },
       { keys: ["⌥", "C"], description: "Clear held audio clip indicators" },
       { keys: ["⌘/Ctrl", "S"], description: "Arm or apply current audio snapshot save" },

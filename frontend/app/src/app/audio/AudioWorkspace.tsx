@@ -505,6 +505,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   }, [viewModel]);
   useAudioKeyboardShortcuts({
     cancelArmedAction,
+    clearAllSolo,
     clearClips,
     contextMenu,
     inspectorTab,
@@ -630,6 +631,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
       <AudioTopBar
         audioTheme={audioTheme}
+        onClearAllSolo={clearAllSolo}
         onOpenSetup={openSetup}
         onRecallCurrentSnapshot={recallCurrentSnapshot}
         onSelectTheme={setAudioTheme}

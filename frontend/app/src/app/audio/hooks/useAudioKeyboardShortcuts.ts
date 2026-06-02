@@ -24,6 +24,7 @@ type SelectableSource = { id: string; kind: "channel" | "output" };
 
 interface UseAudioKeyboardShortcutsArgs {
   cancelArmedAction: () => boolean;
+  clearAllSolo: () => void;
   clearClips: (channelId?: string) => void;
   contextMenu: unknown;
   inspectorTab: string;
@@ -46,6 +47,7 @@ interface UseAudioKeyboardShortcutsArgs {
 
 export function useAudioKeyboardShortcuts({
   cancelArmedAction,
+  clearAllSolo,
   clearClips,
   contextMenu,
   inspectorTab,
@@ -95,9 +97,36 @@ export function useAudioKeyboardShortcuts({
 
     if (isEditableTarget(event.target)) return;
 
+    // Inspector tab accelerators. Only meaningful when a channel is selected —
+    // an output-only selection forces the strip back to the single "channel"
+    // (Output) tab via `outputSelectionOnly`, so the keys stay inert there.
+    // P/Q → Preamp, E → EQ, D → Dynamics, R → Routing. No overlap with m/s/u.
+    if (plain && viewModel.selectedChannel) {
+      const tabForKey: Partial<Record<string, "channel" | "eq" | "dynamics" | "sends">> = {
+        p: "channel",
+        q: "channel",
+        e: "eq",
+        d: "dynamics",
+        r: "sends",
+      };
+      const nextTab = tabForKey[key];
+      if (nextTab) {
+        setInspectorTab(nextTab);
+        event.preventDefault();
+        return;
+      }
+    }
+
     if (!event.metaKey && !event.ctrlKey && event.altKey && key === "c") {
       clearClips();
       event.preventDefault();
+      return;
+    }
+    if (!event.metaKey && !event.ctrlKey && event.altKey && key === "s") {
+      if (viewModel.healthStats.soloedChannels > 0) {
+        clearAllSolo();
+        event.preventDefault();
+      }
       return;
     }
     if (cmdOrCtrl && !event.altKey && key === "s") {

@@ -189,8 +189,13 @@ export function AudioSignalCanvas({
                   {soloedChannel.name} ×
                 </button>
               ) : null}
-              <button disabled={!viewModel.actionsAllowed} onClick={onClearAllSolo} type="button">
-                Clear all solo
+              <button
+                aria-label="Clear all solo"
+                disabled={!viewModel.actionsAllowed}
+                onClick={onClearAllSolo}
+                type="button"
+              >
+                Clear all solo <kbd>⌥S</kbd>
               </button>
             </div>
           ) : null}

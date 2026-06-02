@@ -170,6 +170,8 @@ export function AudioInspectorDynamicsTab({
                   format={(value) => `${value.toFixed(0)} dB`}
                   max={0}
                   min={-80}
+                  numericFieldLabel="Threshold"
+                  numericSuffix="dB"
                   onCommit={(value) => {
                     setDraftValue(thresholdKey, value);
                     onUpdateChannelDynamics({
@@ -191,6 +193,8 @@ export function AudioInspectorDynamicsTab({
                   format={(value) => `${value.toFixed(1)}:1`}
                   max={20}
                   min={1}
+                  numericFieldLabel="Ratio"
+                  numericSuffix=":1"
                   onCommit={(value) => {
                     setDraftValue(ratioKey, value);
                     onUpdateChannelDynamics({
@@ -211,6 +215,8 @@ export function AudioInspectorDynamicsTab({
                   format={(value) => `${value.toFixed(1)} ms`}
                   max={200}
                   min={0.1}
+                  numericFieldLabel="Attack"
+                  numericSuffix="ms"
                   onCommit={(value) => {
                     setDraftValue(attackKey, value);
                     onUpdateChannelDynamics({
@@ -231,6 +237,8 @@ export function AudioInspectorDynamicsTab({
                   format={(value) => `${value.toFixed(0)} ms`}
                   max={1000}
                   min={10}
+                  numericFieldLabel="Release"
+                  numericSuffix="ms"
                   onCommit={(value) => {
                     setDraftValue(releaseKey, value);
                     onUpdateChannelDynamics({
@@ -253,6 +261,8 @@ export function AudioInspectorDynamicsTab({
                   format={(value) => `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(1)} dB`}
                   max={24}
                   min={-24}
+                  numericFieldLabel="Makeup"
+                  numericSuffix="dB"
                   onCommit={(value) => {
                     setDraftValue(makeupKey, value);
                     onUpdateChannelDynamics({

@@ -112,6 +112,8 @@ export function AudioInspectorEqBandGrid({
               format={formatEqFrequency}
               max={LOW_CUT_FREQUENCY_MAX}
               min={LOW_CUT_FREQUENCY_MIN}
+              numericFieldLabel="Cutoff frequency"
+              numericSuffix="Hz"
               onCommit={(value) => {
                 setSelectedEqBandId(LOW_CUT_HANDLE_ID);
                 setDraftValue(lowCutFrequencyKey, value);
@@ -175,6 +177,8 @@ export function AudioInspectorEqBandGrid({
                   format={formatEqGain}
                   max={EQ_GAIN_MAX}
                   min={EQ_GAIN_MIN}
+                  numericFieldLabel="Gain"
+                  numericSuffix="dB"
                   onCommit={(value) => {
                     setSelectedEqBandId(band.id);
                     setDraftValue(gainKey, value);
@@ -192,6 +196,8 @@ export function AudioInspectorEqBandGrid({
                   format={formatEqFrequency}
                   max={EQ_FREQUENCY_MAX}
                   min={EQ_FREQUENCY_MIN}
+                  numericFieldLabel="Frequency"
+                  numericSuffix="Hz"
                   onCommit={(value) => {
                     setSelectedEqBandId(band.id);
                     setDraftValue(freqKey, value);
@@ -209,6 +215,7 @@ export function AudioInspectorEqBandGrid({
                   format={(value) => `Q ${value.toFixed(1)}`}
                   max={EQ_Q_MAX}
                   min={EQ_Q_MIN}
+                  numericFieldLabel="Q"
                   onCommit={(value) => {
                     setSelectedEqBandId(band.id);
                     setDraftValue(qKey, value);
