@@ -26,7 +26,7 @@
 
 **Current repository state (2026-06-06):**
 
-- Branch **`claude/audio-console-100`** holds Slice 0's code (committed, validated, **not pushed**): `4ff4191` (Audio AUD-01/02/03 + `ok`-tone + `AudioEmptyInspector`) and `9e20256`/its successor (these docs). `main` is unchanged. Audio visual baselines are **not yet regenerated** (the EQ low-cut shade is the one operator-visible change). Slice 0 finalizes this.
+- Branch **`claude/audio-console-100`** carries Slice 0 (PR **#125**, validated, pushed): `4ff4191` (Audio AUD-01/02/03 + `ok`-tone + `AudioEmptyInspector`) + the audit/plan docs. `main` is unchanged until #125 merges. **Audio visual baselines were verified unchanged** — the EQ low-cut shade fix is sub-threshold (Playwright `maxDiffPixels:100`), so no regeneration was needed (see the Rescope log). Slice 1 branches off `main` once #125 lands.
 
 ---
 
@@ -34,24 +34,24 @@
 
 Legend: `☐` not started · `◐` in progress · `☑` done · `⤳` rescoped (see log).
 
-| Slice | Title                                                  | Phase         | Status                                   | PR  |
-| ----: | :----------------------------------------------------- | :------------ | :--------------------------------------- | :-- |
-|     0 | Finalize in-flight Audio fixes                         | A Foundation  | ◐ code committed; baselines + PR pending | —   |
-|     1 | Token foundation (define)                              | A Foundation  | ☐                                        | —   |
-|     2 | Overlay plumbing (z-index / scale / focus)             | A Foundation  | ☐                                        | —   |
-|     3 | Global `[data-theme]` foundation                       | B Theming     | ☐                                        | —   |
-|     4 | Shell frame for Setup / Startup / Recovery             | C Chrome      | ☐                                        | —   |
-|     5 | One shared footer / health-bar primitive               | C Chrome      | ☐                                        | —   |
-|     6 | Unified feedback + amber tone + copy cleanup           | C Chrome      | ☐                                        | —   |
-|     7 | Tabular-nums + focus rings + severity (adopt)          | D Disciplines | ☐                                        | —   |
-|     8 | One control contract                                   | D Disciplines | ☐                                        | —   |
-|     9 | Lighting deep polish                                   | E Surfaces    | ☐                                        | —   |
-|    10 | Planning deep polish                                   | E Surfaces    | ☐                                        | —   |
-|    11 | Setup deep polish                                      | E Surfaces    | ☐                                        | —   |
-|    12 | Startup / Recovery deep polish                         | E Surfaces    | ☐                                        | —   |
-|    13 | Audio adopts shared scale/motion → literal 100         | F Closure     | ☐                                        | —   |
-|    14 | Per-surface Graphite/Bone tuning + per-theme baselines | F Closure     | ☐                                        | —   |
-|    15 | Round-2 runtime audit                                  | G Round 2     | ☐                                        | —   |
+| Slice | Title                                                  | Phase         | Status        | PR   |
+| ----: | :----------------------------------------------------- | :------------ | :------------ | :--- |
+|     0 | Finalize in-flight Audio fixes                         | A Foundation  | ☑ done — #125 | #125 |
+|     1 | Token foundation (define)                              | A Foundation  | ☐             | —    |
+|     2 | Overlay plumbing (z-index / scale / focus)             | A Foundation  | ☐             | —    |
+|     3 | Global `[data-theme]` foundation                       | B Theming     | ☐             | —    |
+|     4 | Shell frame for Setup / Startup / Recovery             | C Chrome      | ☐             | —    |
+|     5 | One shared footer / health-bar primitive               | C Chrome      | ☐             | —    |
+|     6 | Unified feedback + amber tone + copy cleanup           | C Chrome      | ☐             | —    |
+|     7 | Tabular-nums + focus rings + severity (adopt)          | D Disciplines | ☐             | —    |
+|     8 | One control contract                                   | D Disciplines | ☐             | —    |
+|     9 | Lighting deep polish                                   | E Surfaces    | ☐             | —    |
+|    10 | Planning deep polish                                   | E Surfaces    | ☐             | —    |
+|    11 | Setup deep polish                                      | E Surfaces    | ☐             | —    |
+|    12 | Startup / Recovery deep polish                         | E Surfaces    | ☐             | —    |
+|    13 | Audio adopts shared scale/motion → literal 100         | F Closure     | ☐             | —    |
+|    14 | Per-surface Graphite/Bone tuning + per-theme baselines | F Closure     | ☐             | —    |
+|    15 | Round-2 runtime audit                                  | G Round 2     | ☐             | —    |
 
 **Execution order / dependencies:** `0 → 1 → 2 → 3 → {4,5,6} → {7,8} → {9,10,11,12} → 13 → 14 → 15`. Hard deps: **S1 unblocks everything**; S2 needs S1's `--z-*`/scale tokens; S3 needs S1; S4–S8 need S1 (+S3 for theming); S9–S12 adopt S1/S3/S7/S8; S13 needs S1/S3/S5; S14 needs S3 + all surface slices. **Fast coherence win = S1 + S3 + S6.**
 
@@ -106,7 +106,7 @@ One PR ≈ one Slice; for operator-visible Slices, the regenerated visual baseli
 - **Approach:** review the diff; regenerate the **darwin** `audio-populated-*` baselines (the EQ low-cut shade is the one visible change — now a neutral `--fg-3` wash, not a stray accent outline); inspect on Studio Preview; push; open + merge the PR; let CI bootstrap the linux baselines.
 - **Validation:** `npm run frontend:playwright:test` (+ `--update-snapshots` for the audio baseline) · `npm run dev:check`.
 - **Premise check:** rebase on latest `main`; re-run typecheck/lint/`frontend:test`.
-- **Status:** ◐ code committed (`4ff4191`); baselines + PR pending.
+- **Status:** ☑ done — #125. AUD-01/02/03 + `ok`-tone + `AudioEmptyInspector` landed (`4ff4191`); validated green (typecheck, Vitest 27+81, all 9 audio Playwright visual specs, full `dev:check`). **Audio visual baselines verified unchanged** — the EQ low-cut shade fix is sub-threshold (under Playwright's `maxDiffPixels:100`), in-frame in `audio-populated` (channel FX 3/4 selected, EQUALIZER graph); `--update-snapshots` rewrote nothing, so there is no baseline change to commit. See the Rescope log.
 
 ## Slice 1 — Token foundation: define the missing namespaces, scale, z-index, motion
 
@@ -296,3 +296,5 @@ Auditable completeness. `LIG-*` = audit "Lighting — workspace shell" section; 
 When a Slice's premise proves wrong on inspection, renumber/rename the Slice heading and add a dated entry here describing what changed and why (the `scripts/check-slice-rescope.mjs` guard requires this file to carry such an entry once a `## Slice N` heading is edited). Keep entries short and append-only.
 
 **Rescope:** 2026-06-06 — Genesis. Plan authored from `program-ux-audit-2026-06-05.md` and relocated into `docs/plans/` to adopt the team's sliced-plan convention + rescope guard (it began as a root-level draft). No Slice premises were changed; the audit's second-Lighting-section findings were renumbered `LIG-*` → `LGS-*` to remove an ID collision, and several claims were tightened after verifying against live code (title-xl undefined while siblings defined; `--size-controlHeight` casing bug; real z-index values; `defaultLaneHeight = 84`).
+
+**Rescope:** 2026-06-06 — Slice 0 baseline refinement (not a work rescope; slice heading unchanged). The plan assumed AUD-01's EQ low-cut shade change would require regenerating the darwin `audio-populated-*` baselines. Verified against live code + the built fixture: the shade is in-frame (channel FX 3/4 selected, EQUALIZER graph in the inspector), but the stray-accent-outline → neutral-`--fg-3`-wash change falls under Playwright's `maxDiffPixels:100` tolerance — all 9 audio visual specs pass unchanged and `--update-snapshots` (Playwright 1.60, default `changed` mode) rewrote nothing. Slice 0's code is unchanged and correct; only the "regenerate baselines" sub-step proved to be a no-op. Recorded for an honest trail; future operator-visible slices should still expect real baseline diffs.
