@@ -524,24 +524,24 @@ Files: `frontend/app/src/app/lighting/components/LightingToolbar.tsx`, `frontend
 
 ---
 
-### Lighting — stage-plot canvas + fixture inspector + dialogs · score 63/100
+### Lighting — stage-plot canvas + fixture inspector + dialogs · score 63/100 · finding IDs prefixed LGS-
 
 _Closest follower: shares AppShellFrame chrome and the DS HealthBar, uses real scrub controls + EmptyState, but its scrub modifiers are INVERTED vs Audio, it has zero tabular-nums and zero theme participation, and the stage is a large dead floor void._
 
 | ID     | Finding                                                                                                                               | Dimension            | Impact | Effort | Verdict          |
 | :----- | :------------------------------------------------------------------------------------------------------------------------------------ | :------------------- | :----- | :----- | :--------------- |
-| LIG-01 | Highlight/Solo marker ring resolves to an undefined token and falls back to a hardcoded non-palette orange (#ff6b35)                  | ds-coherence         | high   | S      | upheld (high)    |
-| LIG-02 | Retired multi-hue blue is load-bearing across the canvas + DMX monitor + compact strip (with hardcoded #99BA92 fallbacks)             | cross-surface        | high   | M      | corrected (high) |
-| LIG-03 | Lighting cannot follow the operator's theme — Studio/Graphite/Bone is an Audio-only feature, Lighting is locked to dark Studio tokens | cross-surface        | high   | L      | upheld (high)    |
-| LIG-04 | Inspector + dialog <select> set appearance:none with no custom chevron — dropdowns render as bare boxes                               | controls-interaction | medium | S      | upheld (high)    |
-| LIG-05 | Stage grid is effectively invisible (1.07–1.51:1), so the '0.5 / 1 / 5 m' reference the PlotMeta advertises can't be read             | contrast-legibility  | medium | S      | corrected (high) |
-| LIG-06 | Position field family lacks the live-drag value chip + reset accelerator that Levels and marker drags provide                         | controls-interaction | medium | M      | upheld (medium)  |
-| LIG-07 | Scattered raw motion/glass/px literals in the canvas chrome bypass the design tokens                                                  | ds-coherence         | low    | S      | corrected (high) |
-| LIG-08 | CCT scale has an orphaned aria-describedby id — generated and applied but never referenced (and ScrubSlider can't consume it)         | accessibility        | low    | S      | upheld (high)    |
-| LIG-10 | Smart-guide + marquee overlays hardcode brand-green via inline style instead of the canvas stroke tokens                              | ds-coherence         | low    | S      | upheld (high)    |
-| LIG-09 | Inspector is the lone scroll surface; Position + Danger zone risk clipping below the no-scroll fold at 1920x1080                      | layout-density       | low    | M      | upheld (low)     |
+| LGS-01 | Highlight/Solo marker ring resolves to an undefined token and falls back to a hardcoded non-palette orange (#ff6b35)                  | ds-coherence         | high   | S      | upheld (high)    |
+| LGS-02 | Retired multi-hue blue is load-bearing across the canvas + DMX monitor + compact strip (with hardcoded #99BA92 fallbacks)             | cross-surface        | high   | M      | corrected (high) |
+| LGS-03 | Lighting cannot follow the operator's theme — Studio/Graphite/Bone is an Audio-only feature, Lighting is locked to dark Studio tokens | cross-surface        | high   | L      | upheld (high)    |
+| LGS-04 | Inspector + dialog <select> set appearance:none with no custom chevron — dropdowns render as bare boxes                               | controls-interaction | medium | S      | upheld (high)    |
+| LGS-05 | Stage grid is effectively invisible (1.07–1.51:1), so the '0.5 / 1 / 5 m' reference the PlotMeta advertises can't be read             | contrast-legibility  | medium | S      | corrected (high) |
+| LGS-06 | Position field family lacks the live-drag value chip + reset accelerator that Levels and marker drags provide                         | controls-interaction | medium | M      | upheld (medium)  |
+| LGS-07 | Scattered raw motion/glass/px literals in the canvas chrome bypass the design tokens                                                  | ds-coherence         | low    | S      | corrected (high) |
+| LGS-08 | CCT scale has an orphaned aria-describedby id — generated and applied but never referenced (and ScrubSlider can't consume it)         | accessibility        | low    | S      | upheld (high)    |
+| LGS-10 | Smart-guide + marquee overlays hardcode brand-green via inline style instead of the canvas stroke tokens                              | ds-coherence         | low    | S      | upheld (high)    |
+| LGS-09 | Inspector is the lone scroll surface; Position + Danger zone risk clipping below the no-scroll fold at 1920x1080                      | layout-density       | low    | M      | upheld (low)     |
 
-#### LIG-01 — Highlight/Solo marker ring resolves to an undefined token and falls back to a hardcoded non-palette orange (#ff6b35)
+#### LGS-01 — Highlight/Solo marker ring resolves to an undefined token and falls back to a hardcoded non-palette orange (#ff6b35)
 
 `ds-coherence` · impact **high** · effort S · themes Studio/Graphite/Bone · front-end-only
 Files: `frontend/app/src/app/lighting/components/FixtureMarker.tsx`, `frontend/packages/tokens/src/generated/tokens.css`
@@ -550,7 +550,7 @@ Files: `frontend/app/src/app/lighting/components/FixtureMarker.tsx`, `frontend/p
 
 **Proposal.** As written: replace with `const HIGHLIGHT_OVERLAY_STROKE = "var(--color-warning-500)"` (token-disciplined, single-amber law). Recomputed: #D8A95A on bg-deep = 9.25:1 (improves legibility, distinct from the dashed-green selection ring). Optional additive alias `--color-overlay-target: var(--color-warning-500)`. No testids reference HIGHLIGHT_OVERLAY/ff6b35 (grep of \*.spec.ts is clean), no geometry change. Note for the implementer: --color-warning-500 #D8A95A is the same value as the Audio 'engaged amber' (--audio-engaged-fill), so this also lines the latched-overlay semantic up with Audio's engaged accent — exactly the intended cross-surface convergence.
 
-#### LIG-02 — Retired multi-hue blue is load-bearing across the canvas + DMX monitor + compact strip (with hardcoded #99BA92 fallbacks)
+#### LGS-02 — Retired multi-hue blue is load-bearing across the canvas + DMX monitor + compact strip (with hardcoded #99BA92 fallbacks)
 
 `cross-surface` · impact **high** · effort M · themes Studio/Graphite/Bone · front-end-only
 Files: `frontend/app/src/app/lighting/components/DMXMonitorDialog.module.css`, `frontend/app/src/app/lighting/components/DMXCompactStrip.tsx`, `frontend/app/src/app/lighting/components/StagePlot.tsx`, `frontend/app/src/app/lighting/lightingHelpers.ts`
@@ -561,7 +561,7 @@ Files: `frontend/app/src/app/lighting/components/DMXMonitorDialog.module.css`, `
 
 **Correcting the candidate.** Correcting the candidate: the finding is real (and the AA failure on the assigned-cell channel header is the stronger point — that alone keeps impact=high), but TWO parts of the proposal are technically wrong and must be re-scoped. (1) Part (b)'s mechanism is false: the candidate says 'replace the #99BA92 literals with var(--color-brand-green) read via getComputedStyle (the canvas already reads tokens for CCT fills).' It does NOT — DMXCompactStrip has zero getComputedStyle calls; its CCT fills come from lightingFixtureColorHex() (lightingHelpers.ts:46-54) which returns HARDCODED hexes precisely because it is an off-DOM canvas/data-URI context where CSS var() cannot resolve (the file header says so). A canvas fillStyle cannot consume a CSS custom property. The correct front-end-only fix is a named hex const (or a fallback branch inside lightingFixtureColorHex) — NOT a var(). The #99BA92 literal is in fact the exact value of --color-brand-green, so it is already on-palette; this is a 'name the magic number' cleanup, low value, arguably leave-as-is given the surrounding deliberate-hex pattern. (2) Part (c) assumes a 'green tone' on PlotMeta — none exists. PlotMeta.tsx:15 only branches `tone==="blue" ? styles.blue : ""`; the only tones are 'default' and 'blue'. Repointing Selected to green therefore requires ADDING a green tone class to the PlotMeta DS primitive (token-additive, fine) — or falling back to default/neutral, which drops the color cue. Part (a) (DMXMonitorDialog blue→green) is a clean, valid CSS-token swap: recomputed, the green header #99BA92 on the green-soft composite #25242? (rgba(153,186,146,0.16) over bg-soft) = 6.69:1 (clears AA; candidate's '~8.8:1' is overstated but directionally right). Keep impact=high (driven by the real AA failure), effort=M (now includes a PlotMeta DS extension + a canvas const rename, not three pure CSS edits).
 
-#### LIG-03 — Lighting cannot follow the operator's theme — Studio/Graphite/Bone is an Audio-only feature, Lighting is locked to dark Studio tokens
+#### LGS-03 — Lighting cannot follow the operator's theme — Studio/Graphite/Bone is an Audio-only feature, Lighting is locked to dark Studio tokens
 
 `cross-surface` · impact **high** · effort L · themes Graphite/Bone · needs engine data (front-end partial proposed)
 Files: `frontend/packages/tokens/src/generated/tokens.css`, `frontend/app/src/app/lighting/LightingWorkspace.module.css`, `frontend/app/src/app/audio/AudioWorkspace.module.css`
@@ -570,7 +570,7 @@ Files: `frontend/packages/tokens/src/generated/tokens.css`, `frontend/app/src/ap
 
 **Proposal.** Upheld as scoped. Full parity (a root-level data-theme remapping --color-bg-_/--color-brand-_ plus Bone/Graphite-auditing every Lighting-only token — stage-grid, cct, fixture-shell, studio-_, brand-blue/green/yellow — for AA) is a LARGE cross-surface restructure: architecture_ok=false is CORRECT (it would touch state plumbing for the theme attribute on the Lighting shell and risks the no-scroll/contrast invariants across ~dozens of bespoke tokens). Front-end-only safe-now step: (1) DOCUMENT the divergence as a deliberate decision (operator may have intended Audio-only theming) so it is not a latent bug. (2) If app-wide theming IS later intended, lift Audio's base values into tokens.css as `[data-theme="graphite"/"bone"]` overrides of the GLOBAL --color-bg-_/--color-brand-text-\* and have Lighting inherit — but only after every Lighting-specific token gets Bone/Graphite values AA-audited (the L effort). Do not ship a half-theme (dark canvas under light chrome).
 
-#### LIG-04 — Inspector + dialog <select> set appearance:none with no custom chevron — dropdowns render as bare boxes
+#### LGS-04 — Inspector + dialog <select> set appearance:none with no custom chevron — dropdowns render as bare boxes
 
 `controls-interaction` · impact **medium** · effort S · themes Studio/Graphite/Bone · front-end-only
 Files: `frontend/app/src/app/lighting/components/LightingInspector.module.css`, `frontend/app/src/app/lighting/components/RenameDialog.module.css`
@@ -579,7 +579,7 @@ Files: `frontend/app/src/app/lighting/components/LightingInspector.module.css`, 
 
 **Proposal.** Upheld. Add a token-built chevron via inline-SVG `background-image` (currentColor) + `background-position:right 8px center` + `background-repeat:no-repeat` + `padding-right:26px` on `.groupAssignSelect` and `.select`, glyph color --color-brand-text-muted, offsets from existing --space tokens. Purely presentational; native <select> semantics + all testids preserved. Holds in all three themes (currentColor follows --color-brand-text-muted which is a single :root value today).
 
-#### LIG-05 — Stage grid is effectively invisible (1.07–1.51:1), so the '0.5 / 1 / 5 m' reference the PlotMeta advertises can't be read
+#### LGS-05 — Stage grid is effectively invisible (1.07–1.51:1), so the '0.5 / 1 / 5 m' reference the PlotMeta advertises can't be read
 
 `contrast-legibility` · impact **medium** · effort S · themes Studio · front-end-only
 Files: `frontend/packages/tokens/src/generated/tokens.css`, `frontend/app/src/app/lighting/components/StagePlotGrid.tsx`
@@ -590,7 +590,7 @@ Files: `frontend/packages/tokens/src/generated/tokens.css`, `frontend/app/src/ap
 
 **Correcting the candidate.** Correcting the candidate: the defect and the CURRENT contrast numbers are exactly right, but the PROPOSED alpha values do NOT achieve their own stated target. I recomputed the candidate's proposal: major 0.20→0.42 yields 2.93:1 (NOT '~3:1' — it misses), minor 0.10→0.22 yields 1.60:1 (the candidate claims this 'clears ~3:1' — it does not, off by ~half), faint 0.12 yields 1.23:1. So to actually hit 3:1 on the 5m major you need ~0.45+ alpha (major 0.46 ≈ 3.1:1), and the 1m minor cannot reach 3:1 without becoming visually heavy (would need ~0.46 too, defeating the major/minor hierarchy). Recommend: lift major to ~0.46 (≈3:1, the readable reference lines), minor to ~0.26-0.30 (clearly visible at ~1.7-1.9:1 but still subordinate — accept sub-3:1 for the secondary tier since stacking 3:1 on both flattens the hierarchy), faint to ~0.12 (registers under zoom only). Also flag the real tension the candidate named but understated: these lines also composite OVER beam cones, so any alpha that clears 3:1 on the dark floor will be conspicuous through lit cones — tune against a lit scene, not just the empty floor. Impact stays medium, effort S. Themes: Studio only (correct — Graphite/Bone never reach this surface, per LIG-03).
 
-#### LIG-06 — Position field family lacks the live-drag value chip + reset accelerator that Levels and marker drags provide
+#### LGS-06 — Position field family lacks the live-drag value chip + reset accelerator that Levels and marker drags provide
 
 `controls-interaction` · impact **medium** · effort M · themes Studio/Graphite/Bone · front-end-only
 Files: `frontend/app/src/app/lighting/components/InspectorFixture.tsx`, `frontend/packages/design-system/src/components/ScrubLabel.tsx`, `frontend/packages/design-system/src/components/ScrubLabel.module.css`
@@ -599,7 +599,7 @@ Files: `frontend/app/src/app/lighting/components/InspectorFixture.tsx`, `fronten
 
 **Proposal.** Upheld (presentation-only, values already client-side): (1) extend (or wrap) the ScrubLabel DS primitive to render a small value chip during active scrub reusing the marker-drag chip chrome (--color-bg-canvas / --color-brand-green); (2) add an optional `resetValue` prop to ScrubLabel mirroring ScrubSlider, and pass per-field defaults (rotation→0, beam→catalog default via defaultLightingBeamAngle) for double-click reset. No engine data. Confidence medium because it is a DS-primitive enhancement (touches a shared component) rather than a self-contained Lighting edit — coordinate with any other ScrubLabel consumers.
 
-#### LIG-07 — Scattered raw motion/glass/px literals in the canvas chrome bypass the design tokens
+#### LGS-07 — Scattered raw motion/glass/px literals in the canvas chrome bypass the design tokens
 
 `ds-coherence` · impact **low** · effort S · themes Studio/Graphite/Bone · front-end-only
 Files: `frontend/app/src/app/lighting/components/StagePlotControls.module.css`, `frontend/app/src/app/lighting/components/FixtureSymbolKey.module.css`, `frontend/app/src/app/lighting/components/StagePlot.module.css`, `frontend/app/src/app/lighting/components/TalentMarkMarker.tsx`
@@ -610,7 +610,7 @@ Files: `frontend/app/src/app/lighting/components/StagePlotControls.module.css`, 
 
 **Correcting the candidate.** Correcting two token-mapping errors in the proposal that would cause unintended VISUAL changes (the candidate says 'no visual change intended'): (a) StagePlotControls.module.css:10 `rgba(8,10,8,0.78)` is the EXACT value of --color-glass-bg (tokens.css:93), NOT --color-glass-bg-strong (0.85). The candidate suggests mapping it to glass-bg-strong, which would darken it. Map it to --color-glass-bg (zero-change). (b) FixtureSymbolKey.module.css:12 `rgba(8,10,8,0.72)` matches NO existing glass token (nearest --color-glass-bg-subtle is 0.65); it needs an additive token (e.g. --color-glass-bg-control:0.72) for a true no-op, or accept a tiny shift to an existing one. (c) TALENT_FILL is 0.12 but --color-brand-yellow-soft is 0.14 — pointing it there bumps alpha (not zero-change); cleaner is a dedicated additive --color-studio-talent-fill (matching the existing --color-studio-talent-ring/-dot family the file already uses). The 120ms→var(--motion-duration-fast) and PlotPill→--operator-font-size-\* swaps are correct and safe. Impact stays low, effort S.
 
-#### LIG-08 — CCT scale has an orphaned aria-describedby id — generated and applied but never referenced (and ScrubSlider can't consume it)
+#### LGS-08 — CCT scale has an orphaned aria-describedby id — generated and applied but never referenced (and ScrubSlider can't consume it)
 
 `accessibility` · impact **low** · effort S · themes Studio/Graphite/Bone · front-end-only
 Files: `frontend/app/src/app/lighting/components/InspectorFixture.tsx`, `frontend/packages/design-system/src/components/ScrubSlider.tsx`
@@ -619,7 +619,7 @@ Files: `frontend/app/src/app/lighting/components/InspectorFixture.tsx`, `fronten
 
 **Proposal.** Upheld (presentation-only, two options): (1) add an optional `describedById` prop to ScrubSlider that forwards to aria-describedby on its role=slider element, and pass cctScaleId from the CCT ScrubSlider (InspectorFixture.tsx:427) — realizes the intended association (higher-craft, matches Audio's described controls); OR (2) drop the orphaned id from the cctScale div and fold 'warm to cool' into the slider's ariaLabel. Either removes the dead wiring; option 1 touches the shared ScrubSlider primitive.
 
-#### LIG-10 — Smart-guide + marquee overlays hardcode brand-green via inline style instead of the canvas stroke tokens
+#### LGS-10 — Smart-guide + marquee overlays hardcode brand-green via inline style instead of the canvas stroke tokens
 
 `ds-coherence` · impact **low** · effort S · themes Studio/Graphite/Bone · front-end-only
 Files: `frontend/app/src/app/lighting/components/StagePlot.tsx`, `frontend/packages/tokens/src/generated/tokens.css`
@@ -628,7 +628,7 @@ Files: `frontend/app/src/app/lighting/components/StagePlot.tsx`, `frontend/packa
 
 **Proposal.** Upheld. Introduce additive overlay tokens (e.g. --color-plot-guide, --color-plot-marquee-fill, --color-plot-marquee-fill-additive) aliasing the existing green family, and reference them from one place so guide/marquee/selection share a single source of truth; move the literal dash/opacity into tokens or a CSS-module class. Zero visual change; token-additive; consolidates the selection-green vocabulary the way Audio consolidated its accent. Low impact.
 
-#### LIG-09 — Inspector is the lone scroll surface; Position + Danger zone risk clipping below the no-scroll fold at 1920x1080
+#### LGS-09 — Inspector is the lone scroll surface; Position + Danger zone risk clipping below the no-scroll fold at 1920x1080
 
 `layout-density` · impact **low** · effort M · themes Studio/Graphite/Bone · front-end-only
 Files: `frontend/app/src/app/lighting/components/LightingInspector.module.css`, `frontend/app/src/app/lighting/components/InspectorFixture.tsx`
