@@ -132,7 +132,7 @@ export function AudioInspectorEqTab({
         </div>
         <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
           {lowCutShade ? (
-            <path className={styles.eqLowCutShade} d={lowCutShade} data-testid="audio-eq-low-cut-shade" />
+            <path className={tabStyles.eqLowCutShade} d={lowCutShade} data-testid="audio-eq-low-cut-shade" />
           ) : null}
           <path d={eqGraphPath} />
         </svg>

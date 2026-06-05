@@ -125,6 +125,18 @@
   color: var(--fg-3);
 }
 
+.emptyInspectorIcon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--fg-3);
+}
+
 /* ── Header identity (eyebrow / name / subtitle / tags) ───────────────────── */
 
 .inspectorEyebrowRow {
@@ -650,6 +662,33 @@
 
 .eqPreviewCard [data-eq-preview-badge] span {
   font-size: 9px;
+}
+
+/* ── Full graph-panel head (EQ / Dynamics tab shared layout) ───────────────
+   AUD-02: these three classes were dropped when the inspector CSS was split
+   (PR #111) but their JSX refs (styles.placeholderPanel / .graphCardHead /
+   .eqBandRow in AudioInspectorEqTab.tsx + AudioInspectorDynamicsTab.tsx)
+   remained, so the graph head collapsed to default block/inline flow (eyebrow +
+   pills stacked, band buttons bunched). Restored to the pre-split geometry.
+   `.placeholderPanel` supplies the display/gap/height that its co-applied
+   `.inspectorFullGraphPanel` (align-content:start only) cannot. */
+.placeholderPanel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  height: 100%;
+}
+
+.graphCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eqBandRow {
+  display: inline-flex;
+  gap: 4px;
 }
 
 /* ── Channel meter card (audio-inspector-metering) ─────────────────────────

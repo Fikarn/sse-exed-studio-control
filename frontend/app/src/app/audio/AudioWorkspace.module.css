@@ -398,6 +398,17 @@
   letter-spacing: 0;
 }
 
+.feedbackBanner[data-tone="ok"] {
+  /* AUD copy fix: success confirmations read as a calm neutral "done" — NOT amber.
+     Amber (the default/`info` tone) is reserved for attention notices (e.g. the
+     arm-pending "repeat to apply" prompt); painting success amber was the
+     tone-mapping outlier the audit flagged. Monochrome-safe: the palette has no
+     success hue, so ok = quiet elevated neutral. Holds in all three themes. */
+  background: var(--bg-elev);
+  color: var(--fg);
+  border-bottom-color: var(--line-2);
+}
+
 .feedbackBanner[data-tone="error"] {
   background: var(--danger-soft);
   color: var(--danger);

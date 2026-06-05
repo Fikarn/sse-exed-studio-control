@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioInspector.module.css";
+import { AudioEmptyInspector } from "./inspector/AudioEmptyInspector";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { getAudioChannelGroup, selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../audioViewModel";
 import { useAudioInspectorEqState } from "../hooks/useAudioInspectorEqState";
@@ -176,10 +177,10 @@ export function AudioInspector({
             viewModel={viewModel}
           />
         ) : (
-          <div className={styles.emptyInspector}>
-            <h3>No channel selected</h3>
-            <p>Use 1-8, click a lane, or the command palette to select a source. Output selection stays active.</p>
-          </div>
+          <AudioEmptyInspector
+            description="Use 1-8, click a lane, or the command palette to select a source. Output selection stays active."
+            title="No channel selected"
+          />
         )}
       </div>
 
@@ -278,10 +279,10 @@ export function AudioInspector({
               viewModel={viewModel}
             />
           ) : (
-            <div className={styles.emptyInspector}>
-              <h3>No channel selected</h3>
-              <p>EQ controls appear here after a source strip is selected.</p>
-            </div>
+            <AudioEmptyInspector
+              description="EQ controls appear here after a source strip is selected."
+              title="No channel selected"
+            />
           )}
         </section>
       ) : null}

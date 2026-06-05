@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import styles from "../AudioInspector.module.css";
+import { AudioEmptyInspector } from "./AudioEmptyInspector";
 import tabStyles from "../AudioInspectorDynamicsTab.module.css";
 import eqStyles from "../AudioInspectorEqTab.module.css";
 import sendStyles from "../AudioInspectorSendsTab.module.css";
@@ -41,10 +42,10 @@ export function AudioInspectorDynamicsTab({
 }: AudioInspectorDynamicsTabProps) {
   if (!selectedChannel) {
     return (
-      <div className={styles.emptyInspector}>
-        <h3>No channel selected</h3>
-        <p>Dynamics controls appear here after a source strip is selected.</p>
-      </div>
+      <AudioEmptyInspector
+        description="Dynamics controls appear here after a source strip is selected."
+        title="No channel selected"
+      />
     );
   }
 
