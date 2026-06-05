@@ -263,6 +263,20 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await preFader.click();
   await expect(preFader).toHaveAttribute("data-active", "true");
 
+  // Inspector tab keyboard accelerators (channel is selected): E/D/R/P switch
+  // tabs without a mouse trip. aria-keyshortcuts advertises each key.
+  await expect(page.getByRole("tab", { name: "EQ" })).toHaveAttribute("aria-keyshortcuts", "E");
+  await page.keyboard.press("KeyE");
+  await expect(page.getByRole("tab", { name: "EQ" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("KeyD");
+  await expect(page.getByRole("tab", { name: "Dyn" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("KeyR");
+  await expect(page.getByRole("tab", { name: "Routing" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("KeyP");
+  await expect(page.getByRole("tab", { name: "Preamp" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("KeyE");
+  await expect(page.getByRole("tab", { name: "EQ" })).toHaveAttribute("aria-selected", "true");
+
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("audio-inspector-channel")).toBeVisible();
 });

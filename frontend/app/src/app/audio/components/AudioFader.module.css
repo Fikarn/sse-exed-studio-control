@@ -8,7 +8,7 @@
 }
 
 .faderValue {
-  color: var(--color-text-strong);
+  color: var(--fg);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;

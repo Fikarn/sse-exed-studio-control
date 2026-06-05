@@ -48,12 +48,14 @@ export function AudioInspectorTabStrip({
       {INSPECTOR_TABS.map((tab) => (
         <button
           aria-controls={`${tab.testId}-panel`}
+          aria-keyshortcuts={tab.shortcut}
           aria-selected={tab.id === activeTab}
           data-active={tab.id === activeTab}
           id={`${tab.testId}-tab`}
           key={tab.id}
           onClick={() => onActiveTabChange(tab.id)}
           role="tab"
+          title={`${tab.label} (${tab.shortcut})`}
           type="button"
         >
           {tab.label}

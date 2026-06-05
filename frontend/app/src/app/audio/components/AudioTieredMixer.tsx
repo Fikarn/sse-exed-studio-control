@@ -39,9 +39,12 @@ export function AudioTieredMixer({
   getDraftValue,
   onClearClip,
   onOpenChannelMenu,
+  onResetPeakHolds,
   onSelectChannel,
   onSelectChannelGroup,
   onSelectOutputMixTarget,
+  onTogglePeakHold,
+  peakHoldEnabled,
   setDraftValue,
   onUpdateChannel,
   onUpdateMixTarget,
@@ -54,9 +57,12 @@ export function AudioTieredMixer({
   getDraftValue: (key: string, fallback: number) => number;
   onClearClip: (channelId: string) => void;
   onOpenChannelMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
+  onResetPeakHolds: () => void;
   onSelectChannel: (channelId: string | null) => void;
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
   onSelectOutputMixTarget: (mixTargetId: string) => void;
+  onTogglePeakHold: () => void;
+  peakHoldEnabled: boolean;
   setDraftValue: (key: string, value: number) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
@@ -71,10 +77,40 @@ export function AudioTieredMixer({
             data-testid={`audio-tier-label-${tier.id}`}
             onClick={() => onSelectChannel(null)}
           >
-            <div className={styles.tierTitleBlock}>
-              <TierIcon tierId={tier.id} />
-              <span className={styles.tierNum}>{TIER_NUMBERS[tier.id as keyof typeof TIER_NUMBERS]}</span>
-              <span>{tier.label}</span>
+            <div className={styles.tierHeaderLead}>
+              <div className={styles.tierTitleBlock}>
+                <TierIcon tierId={tier.id} />
+                <span className={styles.tierNum}>{TIER_NUMBERS[tier.id as keyof typeof TIER_NUMBERS]}</span>
+                <span>{tier.label}</span>
+              </div>
+              <div className={styles.tierMixFor} data-testid={`audio-tier-mix-for-${tier.id}`}>
+                <span className={styles.tierMixForEyebrow}>Mix for</span>
+                <span className={styles.tierMixForArrow}>→</span>
+                <span className={styles.tierMixForName} data-mix-for-name="full">
+                  {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
+                </span>
+                <span className={styles.tierMixForName} data-mix-for-name="short">
+                  {viewModel.selectedMixTarget?.shortName ??
+                    viewModel.hardwareOutputs.mixTargets[0]?.shortName ??
+                    "Main"}
+                </span>
+              </div>
+              {/* DP3 (POLISH PASS 3): the bank-spec caption moves INTO the lead so
+                  the header reflows to a two-line title-over-meta card — row 1 the
+                  tier identity, row 2 the routing echo + this muted, left-aligned,
+                  ellipsised spec behind a hairline separator (the treatment the
+                  Outputs lead already carried, now shared by every tier). */}
+              <small data-testid={`audio-tier-bank-pill-${tier.id}`}>
+                {tier.channels.length > 0
+                  ? viewModel.clampedBankIndex > 0
+                    ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks} · ch ${
+                        viewModel.bankStart + 1
+                      }-${Math.min(viewModel.bankStart + viewModel.visibleStripCount, viewModel.channels.length)} of ${
+                        viewModel.channels.length
+                      }`
+                    : tier.meta
+                  : "No sources in this bank"}
+              </small>
             </div>
             <div className={styles.tierChipRow}>
               {tier.chips.map((chip) => (
@@ -99,17 +135,6 @@ export function AudioTieredMixer({
                 </button>
               ))}
             </div>
-            <small data-testid={`audio-tier-bank-pill-${tier.id}`}>
-              {tier.channels.length > 0
-                ? viewModel.clampedBankIndex > 0
-                  ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks} · ch ${
-                      viewModel.bankStart + 1
-                    }-${Math.min(viewModel.bankStart + viewModel.visibleStripCount, viewModel.channels.length)} of ${
-                      viewModel.channels.length
-                    }`
-                  : tier.meta
-                : "No sources in this bank"}
-            </small>
           </div>
           <div
             className={styles.tierLaneGrid}
@@ -159,21 +184,70 @@ export function AudioTieredMixer({
           data-testid={`audio-tier-label-${viewModel.hardwareOutputs.id}`}
           onClick={() => onSelectChannel(null)}
         >
-          <div className={styles.tierTitleBlock}>
-            <span className={styles.tierIcon}>
-              <ArrowRight size={18} strokeWidth={1.6} aria-hidden="true" />
-            </span>
-            <span className={styles.tierNum}>03</span>
-            <span>{viewModel.hardwareOutputs.label}</span>
+          <div className={styles.tierHeaderLead}>
+            <div className={styles.tierTitleBlock}>
+              <span className={styles.tierIcon}>
+                <ArrowRight size={18} strokeWidth={1.6} aria-hidden="true" />
+              </span>
+              <span className={styles.tierNum}>03</span>
+              <span>{viewModel.hardwareOutputs.label}</span>
+            </div>
+            <div className={styles.tierMixFor} data-testid="audio-tier-mix-for">
+              <span className={styles.tierMixForEyebrow}>Mix for</span>
+              <span className={styles.tierMixForArrow}>→</span>
+              <span className={styles.tierMixForName}>
+                {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
+              </span>
+            </div>
+            {/* DP3 (POLISH PASS 3): Outputs already carried its spec inline in the
+                lead — now every tier matches it (muted, hairline-separated row-2
+                caption), equalizing the three tier-header heights. */}
+            <small>{viewModel.hardwareOutputs.mixTargets.length} dest · selecting one sets the active mix</small>
           </div>
-          <div className={styles.tierMixFor} data-testid="audio-tier-mix-for">
-            <span className={styles.tierMixForEyebrow}>Mix for</span>
-            <span className={styles.tierMixForArrow}>→</span>
-            <span className={styles.tierMixForName}>
-              {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
-            </span>
+          {/* C11: the retired ~38px context bar's Peak Hold + Reset controls
+              relocate here as a slim eyebrow on the Outputs header (the most
+              metered tier). The meter-simulation chip rides along so its
+              testid + "TEST METER SIMULATION" label keep their spec coverage
+              without the standalone context-bar row. */}
+          <div className={styles.tierMeterEyebrow}>
+            {viewModel.meterSimulationActive ? (
+              <span
+                className={styles.tierMeterSimChip}
+                data-testid="audio-meter-simulation-chip"
+                title={viewModel.meterSimulationDetail}
+              >
+                {viewModel.meterSimulationLabel}
+              </span>
+            ) : null}
+            <div className={styles.tierPeakHoldSwitch} aria-label="Meter peak hold">
+              <button
+                aria-pressed={peakHoldEnabled}
+                className={styles.tierPeakHoldOption}
+                data-active={peakHoldEnabled}
+                data-testid="audio-peak-hold-toggle"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onTogglePeakHold();
+                }}
+                title={peakHoldEnabled ? "Disable held peak marks" : "Enable held peak marks"}
+                type="button"
+              >
+                Hold
+              </button>
+              <button
+                className={styles.tierPeakHoldOption}
+                data-testid="audio-peak-hold-reset"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onResetPeakHolds();
+                }}
+                title="Reset held peak marks"
+                type="button"
+              >
+                Reset
+              </button>
+            </div>
           </div>
-          <small>{viewModel.hardwareOutputs.mixTargets.length} dest · selecting one sets the active mix</small>
         </div>
         <div className={styles.outputLaneGrid}>
           {viewModel.hardwareOutputs.mixTargets.map((mixTarget, index) => (

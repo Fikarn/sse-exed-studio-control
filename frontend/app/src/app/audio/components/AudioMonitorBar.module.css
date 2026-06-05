@@ -24,21 +24,21 @@
   gap: 10px;
   padding: 12px 14px;
   background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   box-shadow: var(--housing-shadow);
   color: var(--fg-2);
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   text-align: left;
   cursor: pointer;
   transition:
-    color 0.12s var(--easing),
-    box-shadow 0.12s var(--easing),
-    background 0.12s var(--easing);
+    color var(--motion-duration-fast) var(--easing),
+    box-shadow var(--motion-duration-fast) var(--easing),
+    background var(--motion-duration-fast) var(--easing);
 }
 
 .talkbackButton:disabled {
-  opacity: 0.5;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -50,8 +50,8 @@
   display: grid;
   place-items: center;
   transition:
-    border-color 0.12s var(--easing),
-    background 0.12s var(--easing);
+    border-color var(--motion-duration-fast) var(--easing),
+    background var(--motion-duration-fast) var(--easing);
   color: var(--fg-2);
 }
 
@@ -64,7 +64,7 @@
 }
 
 .talkbackCap {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -128,7 +128,7 @@
 }
 
 .masterEyebrow {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -151,7 +151,7 @@
   display: flex;
   align-items: baseline;
   gap: 14px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-3);
   letter-spacing: 0.04em;
@@ -167,7 +167,7 @@
   flex-direction: column;
   gap: 4px;
   background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 10px 14px 8px;
   box-shadow: var(--housing-shadow);
   cursor: ew-resize;
@@ -180,7 +180,7 @@
 }
 
 .masterChLabel {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.12em;
   color: var(--fg-3);
@@ -190,7 +190,7 @@
 }
 
 .masterReadout {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-2);
   font-variant-numeric: tabular-nums;
@@ -200,38 +200,58 @@
   letter-spacing: -0.01em;
 }
 
+/* DP2 (2026-06-04 Console polish · POLISH PASS 3): bring the master L/R bar into
+   the same language as the refined channel meters. Recessed trough — slightly
+   taller (9px) with a faint top-edge darkening like the vertical tracks, shown
+   in the unlit region beneath the canvas-painted fill. The fixed cream→amber→red
+   colour zones + the cylindrical glass body live in the canvas mini-meter draw
+   (AudioMeterCanvasOverlay); the z-index-8 canvas paints over this track, so a
+   CSS fill gradient would only show as the pre-paint fallback. */
 .masterTrack {
   flex: 1;
-  height: 8px;
-  border-radius: 2px;
+  height: 9px;
+  border-radius: 2.5px;
   position: relative;
   overflow: hidden;
-  background-color: var(--meter-bg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--meter-bg) 80%, #000) 0%, var(--meter-bg) 42%);
   box-shadow:
     inset 0 0 0 1px var(--line-2),
-    inset 0 1px 2px rgba(0, 0, 0, 0.4);
+    inset 0 1.5px 3px rgba(0, 0, 0, 0.5);
 }
 
+/* Quiet hairline at the amber→red boundary — a fixed "do not cross" clip datum
+   the canvas bloom can't fully convey on its own. Replaces the hard black
+   divider; pinned at 92% (the zone map's amber→red boundary) above the fill. */
 .masterTrack::after {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
-  left: var(--meter-clip-pct);
+  left: 92%;
   width: 1px;
-  background: rgba(0, 0, 0, 0.35);
+  background: color-mix(in srgb, var(--meter-hi) 40%, transparent);
   pointer-events: none;
-  z-index: 1;
+  z-index: 3;
 }
 
+/* Pre-paint fallback fill (hidden under the canvas via [data-canvas-metering]).
+   The live zone gradient + glass are painted in the canvas mini-meter draw; this
+   static gradient only shows before the first canvas paint or when the overlay
+   is disabled, so it carries the same fixed cream→amber→red zone map flipped
+   left→right to stay visually consistent with the canvas. */
 .masterFill {
+  --m-amber: oklch(80% 0.155 82);
   position: absolute;
   inset: 0;
   background: linear-gradient(
-    to right,
-    var(--meter-low) 0%,
-    var(--meter-low) var(--meter-clip-pct),
-    var(--meter-hi) var(--meter-clip-pct),
+    90deg,
+    var(--audio-meter-low-hot) 0%,
+    var(--audio-meter-low-hot) 62%,
+    color-mix(in srgb, var(--audio-meter-low-hot) 55%, var(--m-amber)) 73%,
+    var(--m-amber) 80%,
+    var(--m-amber) 88%,
+    color-mix(in srgb, var(--m-amber) 45%, var(--meter-hi)) 92.5%,
+    var(--meter-hi) 96%,
     var(--meter-hi) 100%
   );
   clip-path: inset(0 calc(100% - var(--level, 0%)) 0 0);
@@ -239,14 +259,30 @@
   will-change: clip-path;
 }
 
+/* Peak-hold tick: crisp, 2px, with a dark hairline outline so it reads on both
+   the lit cream bar and the dark trough. The live tick is canvas-painted (this
+   CSS copy is the pre-paint fallback, hidden under the canvas). */
 .masterPeak {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 1.5px;
-  background: var(--fg);
-  opacity: 0.65;
-  z-index: 2;
+  width: 2px;
+  background: var(--audio-meter-peak-hold);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.45);
+  border-radius: 0.5px;
+  opacity: 1;
+  z-index: 4;
+}
+
+/* When the canvas meter renderer is active (data-canvas-metering present on the
+   operator workspace — "true" painting or "false" gated) the shared overlay owns
+   the live L/R fills + peak, so hide the static clip-path CSS fallback to avoid a
+   ghost meter painted beneath the moving canvas paint. Mirrors the
+   [data-meter-fill]/[data-meter-peak] rule in AudioStereoMeter.module.css; the
+   fallback still shows when the attribute is absent (no JS / canvas disabled). */
+[data-canvas-metering] .masterFill,
+[data-canvas-metering] .masterPeak {
+  opacity: 0;
 }
 
 .masterScaleLine {
@@ -294,7 +330,7 @@
 }
 
 .masterTickLabel {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   color: var(--fg-3);
   letter-spacing: 0.04em;
@@ -315,7 +351,7 @@
   align-items: stretch;
   padding: 6px;
   background: linear-gradient(180deg, var(--housing-bg-top) 0%, var(--housing-bg-bot) 100%);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: var(--housing-shadow);
 }
 
@@ -331,28 +367,37 @@
   background: transparent;
   border: 1px solid transparent;
   color: var(--fg-2);
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: -0.005em;
   cursor: pointer;
   transition:
-    color 0.12s var(--easing),
-    background 0.12s var(--easing);
+    color var(--motion-duration-fast) var(--easing),
+    background var(--motion-duration-fast) var(--easing);
 }
 
 .controlButton:disabled {
-  opacity: 0.4;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
 .controlSub {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   color: var(--fg-4);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 500;
+}
+
+/* C22(2): the sub-label rides at --fg-4, so under a disabled button it
+   compounded the parent dim down to ~1.19:1 (invisible). Promote it to --fg-3
+   when the button is disabled so it survives the parent opacity (≈2.2:1 before
+   the parent dim, and the parent now dims to --control-disabled-opacity rather
+   than 0.4). */
+.controlButton:disabled .controlSub {
+  color: var(--fg-3);
 }
 
 .controlButton:hover:not(:disabled) {

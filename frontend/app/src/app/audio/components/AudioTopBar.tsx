@@ -13,6 +13,7 @@ const THEMES: { id: AudioTheme; label: string }[] = [
 
 interface AudioTopBarProps {
   audioTheme: AudioTheme;
+  onClearAllSolo: () => void;
   onOpenSetup: () => void;
   onRecallCurrentSnapshot: () => void;
   onSelectTheme: (theme: AudioTheme) => void;
@@ -23,6 +24,7 @@ interface AudioTopBarProps {
 
 export function AudioTopBar({
   audioTheme,
+  onClearAllSolo,
   onOpenSetup,
   onRecallCurrentSnapshot,
   onSelectTheme,
@@ -34,6 +36,9 @@ export function AudioTopBar({
   const meteringFact = viewModel.meterSimulationActive ? "test simulation" : viewModel.footerTelemetry.metering;
   const consoleFact = viewModel.status.label;
   const warningTitle = viewModel.status.warningTitle;
+  const soloCount = viewModel.healthStats.soloedChannels;
+  const soloActive = soloCount > 0;
+  const canClearSolo = soloActive && viewModel.actionsAllowed;
 
   return (
     <header className={styles.topbar} data-testid="audio-topbar">
@@ -42,12 +47,10 @@ export function AudioTopBar({
         <span className={styles.brandDevice}>Fireface UFX III</span>
       </div>
 
-      <span className={styles.spacer} />
-
       <div className={styles.statCluster}>
         <div className={styles.statCell}>
           <span className={styles.statKey}>Console</span>
-          <span className={styles.statValue}>
+          <span className={styles.statValue} data-tone={viewModel.status.tone}>
             <span className={styles.statDot} data-warn={Boolean(warningTitle)} aria-hidden="true" />
             {consoleFact}
           </span>
@@ -60,7 +63,27 @@ export function AudioTopBar({
           <span className={styles.statKey}>Metering</span>
           <span className={styles.statValue}>{meteringFact}</span>
         </div>
+        <button
+          type="button"
+          className={styles.statCellButton}
+          data-testid="audio-topbar-solo"
+          data-active={soloActive}
+          disabled={!canClearSolo}
+          onClick={onClearAllSolo}
+          title={
+            soloActive ? `${soloCount} channel${soloCount === 1 ? "" : "s"} soloed — clear (⌥S)` : "No channels soloed"
+          }
+          aria-label={soloActive ? `Solo — ${soloCount} engaged, clear (⌥S)` : "Solo — none engaged"}
+        >
+          <span className={styles.statKey}>Solo</span>
+          <span className={styles.statValue} data-tone={soloActive ? "error" : undefined}>
+            <span className={styles.soloDot} aria-hidden="true" />
+            {soloActive ? soloCount : "—"}
+          </span>
+        </button>
       </div>
+
+      <span className={styles.spacer} />
 
       <div className={styles.snapshotPill} data-testid="audio-topbar-snapshot">
         <span className={styles.snapshotPillLabel}>Snapshot</span>
@@ -71,6 +94,7 @@ export function AudioTopBar({
         {THEMES.map((theme) => (
           <button
             aria-pressed={audioTheme === theme.id}
+            className={styles.themeSwitchOption}
             data-active={audioTheme === theme.id}
             data-testid={`audio-theme-${theme.id}`}
             key={theme.id}

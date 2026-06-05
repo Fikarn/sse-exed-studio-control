@@ -25,10 +25,7 @@
 .canvasHeader h2 {
   margin: 3px 0 0;
   color: var(--fg);
-  font:
-    600 18px / 1.12 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 600 18px / 1.12 var(--font-ui);
   letter-spacing: -0.02em;
 }
 
@@ -45,10 +42,7 @@
   border-bottom: 1px solid var(--accent-glow);
   background: var(--accent-soft);
   color: var(--fg-2);
-  font:
-    500 12px / 1.25 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 500 12px / 1.25 var(--font-ui);
   letter-spacing: 0;
 }
 
@@ -64,10 +58,7 @@
 
 .warningBand strong {
   color: var(--accent);
-  font:
-    600 11px / 1 "JetBrains Mono",
-    ui-monospace,
-    monospace;
+  font: 600 11px / 1 var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -75,10 +66,7 @@
 .warningBand span,
 .warningBand small {
   color: var(--fg-2);
-  font:
-    400 12px / 1.25 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 400 12px / 1.25 var(--font-ui);
 }
 
 .warningRecoveryActions {
@@ -93,19 +81,16 @@
   min-height: 24px;
   padding: 0 10px;
   border: 1px solid var(--accent-glow);
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   background: var(--bg-2);
   color: var(--accent);
-  font:
-    500 10px / 1 "JetBrains Mono",
-    ui-monospace,
-    monospace;
+  font: 500 10px / 1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing);
 }
 
 .warningRecoveryActions button:hover {
@@ -113,145 +98,64 @@
 }
 
 .warningRecoveryActions button:disabled {
-  opacity: 0.4;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
-/* ── Context bar (slimmed) ────────────────────────────────────────────────── */
-
-.canvasContextBar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 24px;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  color: var(--fg-3);
+/* Hard-fault statuses (CONSOLE UNREACHABLE / RME METERING OFFLINE / action
+   failure carry tone="error") re-tint the band to the clip-only --danger red,
+   mirroring the sibling .feedbackBanner[data-tone="error"] so a fault no longer
+   renders like the amber pre-flight reminder. Text labels stay for monochrome
+   redundancy. This is the redesign's sanctioned clip-only red — NOT a revival
+   of the retired multi-hue palette. --danger is defined in all three themes. */
+.warningBand[data-tone="error"] {
+  background: var(--danger-soft);
+  border-bottom-color: color-mix(in srgb, var(--danger) 40%, var(--line));
 }
 
-.canvasBarLabel {
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--fg-4);
-  font-weight: 500;
+.warningBand[data-tone="error"] strong {
+  color: var(--danger);
 }
 
-.canvasSelectedMeta {
-  font-size: 11px;
-  color: var(--fg-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 240px;
+.warningBand[data-tone="error"]:focus-visible {
+  outline-color: var(--danger);
 }
 
-.meterSimulationChip {
-  font-size: 8.5px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: var(--bg-2);
-  color: var(--fg-3);
-  border: 1px solid var(--line);
+.warningBand[data-tone="error"] .warningRecoveryActions button {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--line));
+  color: var(--danger);
 }
 
-.canvasDivider {
-  width: 1px;
-  align-self: stretch;
-  background: var(--line);
-  margin: 4px 4px;
+.warningBand[data-tone="error"] .warningRecoveryActions button:hover {
+  background: var(--danger-soft);
 }
 
-.canvasModeSwitch {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 5px;
-  background: var(--bg-2);
-}
+/* ── Context bar ──────────────────────────────────────────────────────────
+   C11 (2026-06-02): the slimmed context-bar row (.canvasContextBar + its
+   meter-sim chip / Peak Hold switch / stat-pill helpers) is removed to reclaim
+   ~38px of vertical budget directly above the meters. The Peak Hold + Reset
+   controls and the meter-simulation chip moved into the Outputs tier header
+   eyebrow (.tierMeterEyebrow in AudioTieredMixer.module.css). */
 
-.canvasModeSwitch button {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--fg-3);
-  font:
-    500 10px / 1 "JetBrains Mono",
-    ui-monospace,
-    monospace;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 4px 8px;
-  border-radius: 3px;
-  cursor: pointer;
-  transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing);
-}
-
-.canvasModeSwitch button:hover {
-  color: var(--fg);
-}
-
-.canvasModeSwitch button[data-active="true"],
-.canvasModeSwitch button[aria-pressed="true"] {
-  background: var(--bg-elev);
-  color: var(--fg);
-}
-
-.canvasStatPills {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 10px;
-  color: var(--fg-3);
-}
-
-.canvasStatPills > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.canvasStatPills strong {
-  color: var(--fg);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.canvasMeterStatus {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.canvasMeterStatus em {
-  font-style: normal;
-  color: var(--fg-4);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.canvasSpacer {
-  flex: 1;
-}
-
-/* ── Warning stack (clip / solo) ─────────────────────────────────────────── */
+/* ── Warning rail (clip / solo) ──────────────────────────────────────────────
+   C11 (2026-06-02): the solo + clip warning bands previously STACKED in a
+   `flex-direction: column` rail, so two simultaneous warnings spent ~78px of
+   bordered chrome directly above the meters — exactly when the meters matter.
+   They now sit as inline segments on a SINGLE row capped at 36px (each segment
+   still ≤36px, the height the audio.spec.ts geometry check pins on the solo
+   band), with their recovery actions right-aligned inside each segment. When
+   only one warning is active it simply fills the row. */
 
 .canvasWarningStack {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: stretch;
   flex-shrink: 0;
+  /* Cap the consolidated rail at a single 36px row regardless of how many
+     warnings are active. */
+  max-height: 36px;
   padding: 0 16px;
-  margin-top: 8px;
+  margin-top: 6px;
   gap: 6px;
 }
 
@@ -259,16 +163,31 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 32px;
-  padding: 6px 12px;
-  border-radius: 6px;
+  /* C04 fit: the "Clear all solo" button gained a <kbd>⌥S</kbd> badge that tipped
+     the band to 37px, 1px over the 36px cap the audio.spec.ts geometry check pins.
+     Trim vertical padding 6→4 to keep both the solo and clip bands under the cap. */
+  padding: 4px 12px;
+  border-radius: var(--radius-tight-md);
   border: 1px solid var(--accent-glow);
   background: var(--accent-soft);
   color: var(--fg-2);
-  font:
-    400 12px / 1.25 "Inter Tight",
-    system-ui,
-    sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  font: 400 12px / 1.25 var(--font-ui);
+}
+
+/* Right-align the recovery action(s): the descriptive span grows to fill the
+   segment, pushing the trailing chip/button cluster to the segment's right
+   edge. The span also truncates so a segment never grows the rail or wraps to a
+   second line. */
+.canvasWarningBand > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .canvasWarningBand[data-kind="clip"] {
@@ -277,7 +196,8 @@
 }
 
 .canvasWarningBand strong {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -295,19 +215,17 @@
 
 .canvasWarningBand button {
   appearance: none;
+  flex: 0 0 auto;
   border: 1px solid var(--line-2);
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   background: var(--bg-2);
   color: var(--fg-2);
-  font:
-    500 11px / 1 "Inter Tight",
-    system-ui,
-    sans-serif;
+  font: 500 11px / 1 var(--font-ui);
   padding: 4px 10px;
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing);
 }
 
 .canvasWarningBand button:hover {
@@ -322,7 +240,7 @@
 }
 
 .canvasWarningBand kbd {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.04em;
   color: var(--fg-4);

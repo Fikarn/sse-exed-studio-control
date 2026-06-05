@@ -10,7 +10,13 @@
   position: relative;
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  /* C08: content-proportional, NOT count-based. The three columns are sized to
+     their settled content width (Inputs ~4 lanes ≈ 462px, Playback ~6 lanes ≈
+     686px, Outputs 3 × 220px lanes ≈ 680px) so Inputs no longer leaves a void
+     while Outputs — whose 220px lanes are 2× a channel strip — keeps enough
+     room to avoid a horizontal scrollbar. A naïve count-keyed 4:6:3 would
+     starve Outputs; the ~4.2:6.2:6.1 ratio tracks content instead. */
+  grid-template-columns: minmax(0, 4.2fr) minmax(0, 6.2fr) minmax(0, 6.1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 14px;
   min-height: 0;
@@ -24,7 +30,7 @@
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   min-height: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-1);
   overflow: hidden;
 }
@@ -42,11 +48,13 @@
   align-items: center;
   gap: 14px;
   min-width: 0;
-  padding: 10px 14px;
+  /* DP3 (POLISH PASS 3): a touch more vertical air now that the lead carries a
+     two-line title-over-meta card; the three tier headers settle at one height. */
+  padding: 9px 14px 10px;
   border-bottom: 1px solid var(--line);
   background: var(--bg-2);
   cursor: pointer;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -97,16 +105,39 @@
   font-weight: 600;
 }
 
+/* Source-tier (Inputs / Playback) header lead: packs the title block and the
+   active mix-target echo into the `1fr` grid column so the "which bus am I
+   riding?" context sits beside the left-side faders. The mix-for echo lives
+   here rather than as a third `justify-self:end` sibling (chips + bank pill
+   already own the `auto` column). */
+.tierHeaderLead {
+  display: inline-flex;
+  /* DP3 (POLISH PASS 3): the lead becomes a two-line stack — the title block
+     claims the whole first line (flex: 0 0 100% below), routing + spec wrap
+     onto the second as a quiet, baseline-aligned meta line. */
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 11px;
+  row-gap: 5px;
+  min-width: 0;
+}
+
+.tierHeaderLead .tierTitleBlock {
+  flex: 0 0 100%;
+}
+
 .tierTitleBlock {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  /* DP3 (POLISH PASS 3): a touch more air; the tier number reads as a quiet
+     index ahead of the name rather than crowding the icon. */
+  gap: 9px;
   min-width: 0;
 }
 
 .tierTitleBlock > span:last-child {
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 500;
 }
@@ -125,7 +156,7 @@
 }
 
 .tierNum {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-4);
   letter-spacing: 0.16em;
@@ -141,21 +172,21 @@
 
 .tierChip {
   appearance: none;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   background: var(--bg);
   color: var(--fg-3);
   border: 1px solid var(--line);
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing),
-    border-color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-fast) var(--easing);
 }
 
 .tierChip:hover {
@@ -172,7 +203,7 @@
 /* Bank pill — kept visible (operators rely on it to see which bank is shown);
    styled as a quiet mono caption in the tier header. */
 .tierLabel small {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.08em;
   color: var(--fg-4);
@@ -181,18 +212,43 @@
   white-space: nowrap;
 }
 
+/* DP3 (POLISH PASS 3): the bank-spec caption now rides on the lead's second
+   row — muted, left-aligned, ellipsised, set off from the routing echo by a
+   hairline left border (no glyph). UI font + near-zero tracking so the name
+   above stays the anchor and the spec reads as supporting metadata. */
+.tierHeaderLead > small {
+  flex: 0 1 auto;
+  min-width: 0;
+  justify-self: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  text-transform: none;
+  letter-spacing: 0.005em;
+  color: var(--fg-4);
+  padding-left: 11px;
+  border-left: 1px solid var(--line);
+}
+
 .tierMixFor {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
   justify-self: end;
   text-transform: none;
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   letter-spacing: -0.005em;
 }
 
+/* DP3 (POLISH PASS 3): the routing lead-in stays put on the lead's second row
+   while the spec caption flexes/ellipsises beside it. */
+.tierHeaderLead .tierMixFor {
+  flex-shrink: 0;
+}
+
 .tierMixForEyebrow {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.12em;
   color: var(--fg-3);
@@ -211,6 +267,81 @@
   font-weight: 600;
   color: var(--accent);
   letter-spacing: -0.01em;
+}
+
+/* Source-tier echo carries both the full name and the shortName; the wide
+   surface shows the full name, the narrow container query swaps to shortName.
+   (The output-tier `.tierMixForName` has no data-mix-for-name attr and always
+   shows the full name in its roomy `auto` column.) */
+.tierMixForName[data-mix-for-name="short"] {
+  display: none;
+}
+
+/* C11: Peak Hold + Reset eyebrow on the Outputs tier header. Replaces the
+   retired ~38px context-bar row; sits in the header's `auto` column at the
+   right edge alongside the (conditional) meter-simulation chip. Geometry +
+   palette mirror the old `.canvasModeSwitch` / `.meterSimulationChip` so the
+   controls read identically — just hosted in the most-metered tier instead of
+   a standalone row. */
+.tierMeterEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  cursor: default;
+}
+
+.tierMeterSimChip {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--radius-tight-xs);
+  background: var(--bg-2);
+  color: var(--fg-3);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.tierPeakHoldSwitch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 5px;
+  background: var(--bg-2);
+}
+
+/* Segmented control: the Hold/Reset options compose the shared
+   `.segmentedToggle` reset (see AudioWorkspace) and keep their mono caption
+   geometry + neutral active treatment local. */
+.tierPeakHoldOption {
+  composes: segmentedToggle from "../AudioWorkspace.module.css";
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: var(--radius-tight-xs);
+  transition:
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing);
+}
+
+.tierPeakHoldOption:hover {
+  color: var(--fg);
+}
+
+.tierPeakHoldOption[data-active="true"],
+.tierPeakHoldOption[aria-pressed="true"] {
+  background: var(--bg-elev);
+  color: var(--fg);
 }
 
 .tierLaneGrid {
@@ -241,7 +372,7 @@
 .tierLaneGrid::-webkit-scrollbar-thumb,
 .outputLaneGrid::-webkit-scrollbar-thumb {
   background: var(--line-2);
-  border-radius: 3px;
+  border-radius: var(--radius-tight-xs);
 }
 
 .emptyTier {
@@ -250,7 +381,7 @@
   place-items: center;
   padding: 32px;
   color: var(--fg-4);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -260,5 +391,20 @@
   .tieredMixer {
     gap: 8px;
     padding: 10px 12px 0;
+  }
+
+  /* Narrow surface (e.g. 1920 fallback): collapse the source-tier mix-target
+     echo to shortName so the title row never wraps or pushes the chip/pill
+     cell into a second line. */
+  .tierHeaderLead {
+    gap: 10px;
+  }
+
+  .tierMixForName[data-mix-for-name="full"] {
+    display: none;
+  }
+
+  .tierMixForName[data-mix-for-name="short"] {
+    display: inline;
   }
 }

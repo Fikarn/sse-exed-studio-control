@@ -82,6 +82,18 @@ export const AUDIO_DRAFT_CLEAR_MS = 250;
 // Source: previously inline at AudioPreampControl.tsx:98,116,163,164.
 export const PREAMP_GAIN_MAX_DB = 75;
 
+// Why: default preamp gain in dB — the reset target for Backspace/Delete on the
+// preamp surfaces (inspector hero AudioKnob + channel-strip AudioStripPreamp).
+// Consolidated so both surfaces reset to the same value (C13 preamp unification).
+// Source: previously inline at AudioInspectorChannelHardwareCard.tsx:32.
+export const PREAMP_GAIN_DEFAULT_DB = 24;
+
+// Why: vertical pointer travel (px) for a full min→max sweep of an audio rotary
+// knob. Shared so the two preamp surfaces (inspector hero AudioKnob + channel-
+// strip AudioStripPreamp) move at the same px-per-dB (C13 preamp unification;
+// the strip preamp previously used a divergent 120 px).
+export const AUDIO_KNOB_DRAG_TRAVEL_PX = 150;
+
 // Why: angular sweep of the preamp knob bitmap. The PNG asset is authored so
 // the visible indicator travels 250° from minimum to maximum gain.
 // Source: previously inline at AudioPreampControl.tsx:164.

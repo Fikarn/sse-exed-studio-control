@@ -63,12 +63,16 @@ function liveAudioMasks(page: Page): Locator[] {
   ];
 }
 
-// AA / font rendering on the unmasked full-page renders jitters run-to-run on
-// the Linux CI runner (a stable element rendered a shade off at its edges) —
-// e.g. lighting-populated-1280x800 once diffed 105 px against the default 100.
-// Absorb that without hiding real layout regressions (which move thousands of
-// pixels). Tuned above the worst observed jitter.
-const FULL_RENDER_MAX_DIFF_PX = 400;
+// AA / font rendering on the unmasked full-page renders jitters run-to-run
+// (a stable element rendered a shade off at its edges) — e.g.
+// lighting-populated-1280x800 once diffed 105 px against the default 100.
+// The 2026-06-02 audio UX polish enlarged the jitter surface — the live meter
+// sim's random fills plus the corrected sans face now resolving to Inter
+// (instead of the unloaded "Inter Tight" -> system-ui fallback) add text-edge
+// AA — so audio-populated-1440x900 reproducibly diffs ~440 px against a
+// baseline regenerated from identical code. Raised 400 -> 800 to absorb that;
+// still far below a real layout regression, which moves thousands of pixels.
+const FULL_RENDER_MAX_DIFF_PX = 800;
 
 function masksFor(page: Page, fixture: string): Locator[] {
   return fixture.startsWith("audio-") ? liveAudioMasks(page) : [];

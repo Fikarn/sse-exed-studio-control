@@ -505,6 +505,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   }, [viewModel]);
   useAudioKeyboardShortcuts({
     cancelArmedAction,
+    clearAllSolo,
     clearClips,
     contextMenu,
     inspectorTab,
@@ -630,6 +631,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
       <AudioTopBar
         audioTheme={audioTheme}
+        onClearAllSolo={clearAllSolo}
         onOpenSetup={openSetup}
         onRecallCurrentSnapshot={recallCurrentSnapshot}
         onSelectTheme={setAudioTheme}
@@ -698,16 +700,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         />
       </div>
 
-      <AudioMonitorBar
-        clearDraftValueLater={clearDraftValueLater}
-        commitMixTargetContinuous={commitMixTargetContinuous}
-        draftStore={draftStore}
-        getDraftValue={getDraftValue}
-        onUpdateMixTarget={updateMixTarget}
-        setDraftValue={setDraftValue}
-        store={store}
-        viewModel={viewModel}
-      />
+      <AudioMonitorBar onUpdateMixTarget={updateMixTarget} viewModel={viewModel} />
 
       <AudioMeterCanvasOverlay
         peakHoldEnabled={peakHoldEnabled}

@@ -20,9 +20,8 @@
   overflow: hidden;
   border-radius: 5px;
   background:
-    linear-gradient(color-mix(in srgb, var(--audio-border) 24%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--audio-border) 18%, transparent) 1px, transparent 1px),
-    var(--audio-meter-bg);
+    linear-gradient(color-mix(in srgb, var(--line) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 18%, transparent) 1px, transparent 1px), var(--audio-meter-bg);
   background-size:
     100% 50%,
     25% 100%,
@@ -43,7 +42,7 @@
   pointer-events: none;
   background: radial-gradient(
     110% 75% at 50% 92%,
-    color-mix(in srgb, var(--audio-engaged-glow) 80%, transparent),
+    color-mix(in srgb, var(--accent-soft) 80%, transparent),
     transparent 70%
   );
 }
@@ -84,8 +83,8 @@
   left: 0;
   height: 1px;
   content: "";
-  background: color-mix(in srgb, var(--audio-text-strong) 32%, transparent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-accent) 10%, transparent);
+  background: color-mix(in srgb, var(--fg) 32%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .eqGraphDbLabel {
@@ -93,8 +92,8 @@
   top: clamp(8px, var(--eq-marker-y), calc(100% - 8px));
   right: 8px;
   padding: 2px 4px;
-  border-radius: 4px;
-  color: color-mix(in srgb, var(--audio-text-muted) 74%, transparent);
+  border-radius: var(--radius-tight-sm);
+  color: color-mix(in srgb, var(--fg-3) 74%, transparent);
   background: color-mix(in srgb, var(--audio-meter-bg) 62%, transparent);
   font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
   letter-spacing: 0;
@@ -108,12 +107,12 @@
   bottom: 0;
   left: var(--eq-marker-x);
   width: 1px;
-  background: color-mix(in srgb, var(--audio-border) 24%, transparent);
+  background: color-mix(in srgb, var(--line) 24%, transparent);
   transform: translateX(-50%);
 }
 
 .eqGraphFrequencyMarker[data-major="true"] {
-  background: color-mix(in srgb, var(--audio-text-muted) 26%, transparent);
+  background: color-mix(in srgb, var(--fg-3) 26%, transparent);
 }
 
 .eqGraphFrequencyMarker i {
@@ -126,7 +125,7 @@
   position: absolute;
   bottom: 6px;
   left: 50%;
-  color: color-mix(in srgb, var(--audio-text-muted) 66%, transparent);
+  color: color-mix(in srgb, var(--fg-3) 66%, transparent);
   font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
   letter-spacing: 0;
   white-space: nowrap;
@@ -147,7 +146,7 @@
 
 .eqGraphFull path {
   fill: none;
-  stroke: var(--audio-accent);
+  stroke: var(--accent);
   stroke-linecap: round;
   stroke-width: 2;
 }
@@ -161,20 +160,26 @@
   gap: 3px;
   min-width: 118px;
   padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--audio-accent) 46%, var(--audio-border));
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--audio-panel-strong) 88%, black 12%);
+  border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-3) 88%, black 12%);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
 }
 
 .eqValueBadge strong {
-  color: var(--audio-text-strong);
-  font: var(--font-weight-semibold) 12px / 1 var(--font-family-display);
-  letter-spacing: 0;
+  color: var(--fg);
+  /* Claude Design polish (DP4): the band label reads as a mono instrument
+     readout (matches the value line below it) rather than the display
+     face. Size/line-height unchanged. */
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
 }
 
 .eqValueBadge span {
-  color: var(--audio-accent);
+  color: var(--accent);
   font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
 }
@@ -195,12 +200,12 @@
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--audio-accent) 74%, white 12%);
+  border: 1px solid color-mix(in srgb, var(--accent) 74%, white 12%);
   border-radius: 50%;
   background:
     radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.22), transparent 36%),
-    color-mix(in srgb, var(--audio-panel-strong) 74%, var(--audio-accent) 26%);
-  color: var(--audio-text-strong);
+    color-mix(in srgb, var(--bg-3) 74%, var(--accent) 26%);
+  color: var(--fg);
   font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
   letter-spacing: 0;
   transform: translate(-50%, -50%);
@@ -209,10 +214,10 @@
 }
 
 .eqPoint[data-selected="true"] {
-  border-color: var(--audio-hot);
+  border-color: var(--accent);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.66),
-    0 0 18px color-mix(in srgb, var(--audio-hot) 46%, transparent);
+    0 0 18px color-mix(in srgb, var(--accent) 46%, transparent);
 }
 
 /* G24: ghosted handle treatment when the EQ section is bypassed or the
@@ -220,32 +225,32 @@
    reads through the box-shadow above, so ghosted + selected is a valid
    composite (the operator can interact with a ghosted band to add gain). */
 .eqPoint[data-ghost="true"]:not([data-selected="true"]) {
-  border-color: color-mix(in srgb, var(--audio-accent) 30%, var(--audio-border));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
   background:
     radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.08), transparent 36%),
-    color-mix(in srgb, var(--audio-panel-strong) 88%, var(--audio-accent) 8%);
+    color-mix(in srgb, var(--bg-3) 88%, var(--accent) 8%);
   opacity: 0.55;
 }
 
 .eqLowCutPoint {
-  border-radius: 8px;
-  border-color: color-mix(in srgb, var(--audio-hot) 70%, white 8%);
+  border-radius: var(--radius-sm);
+  border-color: color-mix(in srgb, var(--accent) 70%, white 8%);
   background:
     radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.2), transparent 36%),
-    color-mix(in srgb, var(--audio-panel-strong) 62%, var(--audio-hot) 38%);
+    color-mix(in srgb, var(--bg-3) 62%, var(--accent) 38%);
 }
 
 .eqLowCutPoint[data-active="false"] {
-  border-color: color-mix(in srgb, var(--audio-text-subtle) 56%, var(--audio-border));
+  border-color: color-mix(in srgb, var(--fg-4) 56%, var(--line));
   background:
     radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.14), transparent 36%),
-    color-mix(in srgb, var(--audio-panel-strong) 84%, var(--audio-text-subtle) 16%);
-  color: var(--audio-text-muted);
+    color-mix(in srgb, var(--bg-3) 84%, var(--fg-4) 16%);
+  color: var(--fg-3);
 }
 
 .eqPoint:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: var(--control-disabled-opacity);
 }
 
 .inspectorFullGraphPanel {
@@ -257,14 +262,14 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  color: var(--audio-text-muted);
+  color: var(--fg-3);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .graphRangeRow strong {
-  color: var(--audio-text-strong);
+  color: var(--fg);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -285,10 +290,10 @@
 .eqModeRow button {
   min-height: 28px;
   padding: 0 10px;
-  border: 1px solid var(--audio-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-surface-800) 72%, transparent);
-  color: var(--audio-text-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-tight-md);
+  background: color-mix(in srgb, var(--bg-1) 72%, transparent);
+  color: var(--fg-3);
   font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -296,14 +301,14 @@
 }
 
 .eqModeRow button[data-active="true"] {
-  border-color: color-mix(in srgb, var(--audio-accent) 58%, var(--audio-border));
-  color: var(--audio-text-strong);
-  background: color-mix(in srgb, var(--audio-accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--line));
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 .eqModeRow button:disabled {
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: var(--control-disabled-opacity);
 }
 
 @container operator-root (max-height: 1120px) {
@@ -325,7 +330,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -337,7 +342,7 @@
   border: 1px solid var(--line);
   background: var(--bg-2);
   color: var(--fg-2);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -346,9 +351,9 @@
   border-radius: 5px;
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing),
-    border-color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-fast) var(--easing);
 }
 
 .eqEnableButton[data-active="true"] {
@@ -358,7 +363,7 @@
 }
 
 .eqEnableButton:disabled {
-  opacity: 0.45;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -370,7 +375,7 @@
 
 .eqBandCard {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-2);
   padding: 12px;
   display: flex;
@@ -378,8 +383,8 @@
   gap: 10px;
   cursor: pointer;
   transition:
-    border-color 0.12s var(--easing),
-    background 0.12s var(--easing);
+    border-color var(--motion-duration-fast) var(--easing),
+    background var(--motion-duration-fast) var(--easing);
 }
 
 .eqBandCard:hover {
@@ -399,7 +404,7 @@
 }
 
 .eqBandCardHead strong {
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: -0.005em;
@@ -407,7 +412,7 @@
 }
 
 .eqBandCardTag {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -419,18 +424,18 @@
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--fg-2);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing),
-    border-color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-fast) var(--easing);
 }
 
 .eqBandCardHead button[data-active="true"] {
@@ -440,7 +445,7 @@
 }
 
 .eqBandCardHead button:disabled {
-  opacity: 0.45;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -453,7 +458,7 @@
 }
 
 .eqBandTypeLabel {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -473,19 +478,19 @@
   border: 1px solid var(--line);
   background: var(--bg);
   color: var(--fg-3);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding: 4px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing),
-    border-color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-fast) var(--easing);
 }
 
 .eqTypeRow button[data-active="true"] {
@@ -495,6 +500,6 @@
 }
 
 .eqTypeRow button:disabled {
-  opacity: 0.45;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }

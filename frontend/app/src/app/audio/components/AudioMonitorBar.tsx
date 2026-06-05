@@ -2,20 +2,13 @@ import type { CSSProperties } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioMonitorBar.module.css";
-import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { formatAudioDb, formatMeterPercent } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
 interface AudioMonitorBarProps {
-  clearDraftValueLater: (key: string, delayMs?: number) => void;
-  commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
-  draftStore: AudioControlDraftStore;
-  getDraftValue: (key: string, fallback: number) => number;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
-  setDraftValue: (key: string, value: number) => void;
-  store: ShellStore;
   viewModel: AudioWorkspaceViewModel;
 }
 
@@ -33,24 +26,8 @@ const SCALE_TICKS: { db: number; pct: number; label: string }[] = [
   { db: 0, pct: 100, label: "0" },
 ];
 
-export function AudioMonitorBar({
-  clearDraftValueLater,
-  commitMixTargetContinuous,
-  draftStore,
-  getDraftValue,
-  onUpdateMixTarget,
-  setDraftValue,
-  viewModel,
-}: AudioMonitorBarProps) {
+export function AudioMonitorBar({ onUpdateMixTarget, viewModel }: AudioMonitorBarProps) {
   const selectedMixTarget = viewModel.selectedMixTarget ?? viewModel.mixTargets[0] ?? null;
-  const monitorDraftKey = selectedMixTarget
-    ? `mixTarget:${selectedMixTarget.id}:rail-volume`
-    : "mixTarget:none:rail-volume";
-  const monitorValue = useAudioControlDraftValue(
-    draftStore,
-    monitorDraftKey,
-    getDraftValue(monitorDraftKey, selectedMixTarget?.volume ?? 0)
-  );
 
   const meterLeftPct = selectedMixTarget ? percentNumber(selectedMixTarget.meterLeft) : 0;
   const meterRightPct = selectedMixTarget
@@ -63,17 +40,15 @@ export function AudioMonitorBar({
 
   const activeName = selectedMixTarget?.name ?? "Main Out";
   const activePair = selectedMixTarget?.shortName ?? "";
-  const masterDb = selectedMixTarget ? formatAudioDb(monitorValue) : "—";
+  // View-only readout of the monitor output level. Operator note (2026-06-02):
+  // this is a meter, not a control — the prior C15 work that made it a draggable
+  // slider was removed. Monitor level is set on the RME hardware / engine, so
+  // there is no pointer/keyboard write-path here; the bar only reflects state.
+  const masterDb = selectedMixTarget ? formatAudioDb(selectedMixTarget.volume) : "—";
   const actionsAllowed = viewModel.actionsAllowed;
 
-  const setControl = (control: "talkback" | "dim" | "mono" | "listen") => () => {
+  const setControl = (control: "talkback" | "dim" | "mono") => () => {
     if (!selectedMixTarget) return;
-    if (control === "listen") {
-      // Console prototype includes Listen/Cue; the engine surfaces no listen
-      // flag yet, so route it through dim's slot until upstream support lands.
-      onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, dim: !selectedMixTarget.dim });
-      return;
-    }
     if (control === "talkback") {
       onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, talkback: !selectedMixTarget.talkback });
       return;
@@ -85,30 +60,6 @@ export function AudioMonitorBar({
     if (control === "mono") {
       onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, mono: !selectedMixTarget.mono });
     }
-  };
-
-  const onVolumePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!selectedMixTarget) return;
-    if (!actionsAllowed) return;
-    event.preventDefault();
-    const target = event.currentTarget;
-    target.setPointerCapture(event.pointerId);
-    const apply = (clientX: number) => {
-      const rect = target.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      setDraftValue(monitorDraftKey, ratio);
-      commitMixTargetContinuous({ mixTargetId: selectedMixTarget.id, volume: ratio });
-    };
-    apply(event.clientX);
-    const move = (ev: PointerEvent) => apply(ev.clientX);
-    const up = () => {
-      target.releasePointerCapture(event.pointerId);
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      clearDraftValueLater(monitorDraftKey);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
   };
 
   const talkbackOn = selectedMixTarget?.talkback ?? false;
@@ -154,14 +105,35 @@ export function AudioMonitorBar({
           </div>
         </div>
 
+        {/* View-only output meter (role="meter", not "slider"): no pointer/keyboard
+            write-path. The L/R tracks carry data-mini-meter-* so the shared canvas
+            overlay paints them live from the meter frame (frame.mixTargets) — the
+            same live source as the strip + inspector meters, so the bar tracks Main
+            Out in realtime. (The #111 monitor-bar rebuild dropped this wiring,
+            leaving the bar on a static snapshot fill.) The clip-path CSS fill stays
+            as the pre-paint fallback. aria-valuenow tracks the louder channel. */}
         <div
+          aria-label={`Monitor output meter — ${activeName}`}
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={Math.max(meterLeftPct, meterRightPct)}
+          aria-valuetext={
+            selectedMixTarget
+              ? formatAudioDb(Math.max(selectedMixTarget.meterLeft, selectedMixTarget.meterRight))
+              : undefined
+          }
           className={styles.masterMeter}
-          onPointerDown={onVolumePointerDown}
           data-testid="audio-monitor-master-meter"
+          role="meter"
         >
           <div className={styles.masterMeterRow}>
             <span className={styles.masterChLabel}>L</span>
-            <div className={styles.masterTrack}>
+            <div
+              className={styles.masterTrack}
+              data-mini-meter-id={selectedMixTarget?.id ?? ""}
+              data-mini-meter-kind="mixTarget"
+              data-mini-meter-side="left"
+            >
               <div className={styles.masterFill} style={{ "--level": `${meterLeftPct}%` } as CSSProperties} />
               {peakLeftPct > 1 ? (
                 <div className={styles.masterPeak} style={{ left: `calc(${peakLeftPct}% - 1px)` }} />
@@ -173,7 +145,12 @@ export function AudioMonitorBar({
           </div>
           <div className={styles.masterMeterRow}>
             <span className={styles.masterChLabel}>R</span>
-            <div className={styles.masterTrack}>
+            <div
+              className={styles.masterTrack}
+              data-mini-meter-id={selectedMixTarget?.id ?? ""}
+              data-mini-meter-kind="mixTarget"
+              data-mini-meter-side="right"
+            >
               <div className={styles.masterFill} style={{ "--level": `${meterRightPct}%` } as CSSProperties} />
               {peakRightPct > 1 ? (
                 <div className={styles.masterPeak} style={{ left: `calc(${peakRightPct}% - 1px)` }} />
@@ -210,19 +187,6 @@ export function AudioMonitorBar({
       </div>
 
       <div className={styles.controlCluster}>
-        <button
-          aria-pressed={dimOn}
-          className={styles.controlButton}
-          data-active={dimOn}
-          data-control="listen"
-          data-testid="audio-monitor-listen"
-          disabled={!selectedMixTarget || !actionsAllowed}
-          onClick={setControl("listen")}
-          type="button"
-        >
-          Listen
-          <span className={styles.controlSub}>Cue</span>
-        </button>
         <button
           aria-pressed={dimOn}
           className={`${styles.controlButton} ${styles.controlWarn}`}

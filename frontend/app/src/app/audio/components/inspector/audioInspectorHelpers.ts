@@ -59,20 +59,32 @@ export const EQ_FREQUENCY_MARKERS = [
   { frequencyHz: 20000, label: "20 kHz", major: true },
 ] as const;
 
+// The read-only Preamp-tab EQ mini-preview mirrors Claude Design's EQ graph,
+// which labels only the interior decade gridlines (100 / 1k / 10k) for a clean,
+// premium read. The dense 1-2-5 axis above stays on the full EQ tab, where the
+// extra gridlines aid precise band placement. Derived from the full set (not a
+// re-list) so the two axes can never silently drift apart.
+export const EQ_PREVIEW_FREQUENCY_MARKERS = EQ_FREQUENCY_MARKERS.filter((marker) =>
+  [100, 1000, 10000].includes(marker.frequencyHz)
+);
+
 export const EQ_GAIN_MARKERS = [
   { gainDb: 20, label: "+20 dB" },
   { gainDb: 0, label: "0 dB" },
   { gainDb: -20, label: "-20 dB" },
 ] as const;
 
-export const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string; testId: string }> = [
+export const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string; testId: string; shortcut: string }> = [
   // 2026-05-27 Console redesign: tab labels match the prototype's Preamp /
   // EQ / Dyn / Routing rhythm. The internal `id` strings stay the Phase 3
   // values so existing routing / state hooks keep working unmodified.
-  { id: "channel", label: "Preamp", testId: "audio-inspector-channel" },
-  { id: "eq", label: "EQ", testId: "audio-inspector-eq" },
-  { id: "dynamics", label: "Dyn", testId: "audio-inspector-dynamics" },
-  { id: "sends", label: "Routing", testId: "audio-inspector-sends" },
+  // `shortcut` is the plain-key accelerator wired in useAudioKeyboardShortcuts
+  // (mirrored onto `aria-keyshortcuts` + `title` for discoverability). Preamp
+  // also answers Q, but P is the advertised key.
+  { id: "channel", label: "Preamp", testId: "audio-inspector-channel", shortcut: "P" },
+  { id: "eq", label: "EQ", testId: "audio-inspector-eq", shortcut: "E" },
+  { id: "dynamics", label: "Dyn", testId: "audio-inspector-dynamics", shortcut: "D" },
+  { id: "sends", label: "Routing", testId: "audio-inspector-sends", shortcut: "R" },
 ];
 
 export function clamp(value: number, min: number, max: number) {

@@ -32,8 +32,8 @@ interface AudioInspectorOverviewCardsProps {
 
 /**
  * Overview tab cards. Three branches:
- * - selectedChannel → Route / EQ / Dynamics mini cards that double as
- *   "jump-to-this-tab" buttons.
+ * - selectedChannel → a small hint pointing at EQ / Dyn / Routing (the EQ
+ *   mini-preview itself lives in AudioInspector.tsx, above the send card).
  * - selectedMixTarget (no channel) → Output / Output state / Output processing
  *   / Trust mini cards.
  * - neither → empty state with selection hint.

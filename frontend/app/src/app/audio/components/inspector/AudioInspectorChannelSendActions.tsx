@@ -80,6 +80,7 @@ export function AudioInspectorChannelSendActions({
         <button
           aria-label={`Mute ${selectedChannel.name}`}
           aria-pressed={selectedChannel.mute}
+          className={styles.inspectorActionButton}
           data-control="mute"
           data-active={selectedChannel.mute}
           disabled={!viewModel.actionsAllowed}
@@ -91,6 +92,7 @@ export function AudioInspectorChannelSendActions({
         <button
           aria-label={`Solo ${selectedChannel.name}`}
           aria-pressed={selectedChannel.solo}
+          className={styles.inspectorActionButton}
           data-control="solo"
           data-active={selectedChannel.solo}
           disabled={!viewModel.actionsAllowed}
@@ -101,6 +103,7 @@ export function AudioInspectorChannelSendActions({
         </button>
         <button
           aria-label={`Set ${selectedChannel.name} send to unity`}
+          className={styles.inspectorActionButton}
           data-control="unity"
           disabled={!viewModel.actionsAllowed}
           onClick={() =>

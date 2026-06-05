@@ -17,6 +17,7 @@
  * docs/plans/audio-ui-phase-3-followup-fixes.md.
  */
 import styles from "../AudioInspector.module.css";
+import { PREAMP_GAIN_DEFAULT_DB } from "../../audioConstants";
 import {
   audioChannelSupportsAutoSet,
   audioChannelSupportsGain,
@@ -29,7 +30,6 @@ import { AudioKnob } from "../AudioKnob";
 import type { AudioChannelUpdate, SelectedAudioChannel } from "./audioInspectorHelpers";
 
 const PREAMP_GAIN_MAX_DB = 75;
-const PREAMP_GAIN_DEFAULT_DB = 24;
 
 interface PhantomToggleArg {
   channelId: string;
@@ -84,6 +84,8 @@ export function AudioInspectorChannelHardwareCard({
               format={(value) => `${Math.round(value)}`}
               max={PREAMP_GAIN_MAX_DB}
               min={0}
+              numericFieldLabel="Preamp gain"
+              numericSuffix="dB"
               onCommit={(nextGain) => {
                 setDraftValue(gainDraftKey, nextGain);
                 commitChannelContinuous({ channelId: selectedChannel.id, gain: nextGain });

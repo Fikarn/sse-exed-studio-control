@@ -1,7 +1,10 @@
 .stripPreamp {
   display: flex;
   align-items: center;
-  gap: 10px;
+  /* DP1 (channel-strip-refine): knob + readout sit together as one centered
+     cluster (was knob hard-left, readout hard-right, dead gap in the middle). */
+  justify-content: center;
+  gap: 9px;
   padding: 12px 4px 4px;
   margin-top: 12px;
   border-top: 1px solid var(--line);
@@ -16,6 +19,14 @@
   display: grid;
   place-items: center;
   outline: none;
+  border-radius: 50%;
+  transition: box-shadow var(--motion-duration-fast) var(--easing);
+}
+
+/* C14: pre-interaction hover affordance — matches the AudioKnob hairline ring
+   so both preamp surfaces share the same resting signal. */
+.knob:not([aria-disabled="true"]):hover {
+  box-shadow: 0 0 0 1px var(--line-2);
 }
 
 .knob:focus-visible {
@@ -25,22 +36,24 @@
 }
 
 .knob[aria-disabled="true"] {
-  opacity: 0.46;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
 .label {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  flex: 1;
+  /* DP1 (channel-strip-refine): readout hugs the knob (left-aligned, no longer
+     stretched flush-right) so the pair reads as one centered cluster. */
+  align-items: flex-start;
+  flex: 0 1 auto;
   gap: 1px;
   line-height: 1;
   min-width: 0;
 }
 
 .value {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 500;
   color: var(--fg);
@@ -49,7 +62,7 @@
 }
 
 .caption {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;

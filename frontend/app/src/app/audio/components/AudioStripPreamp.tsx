@@ -16,10 +16,14 @@ import {
 } from "react";
 
 import styles from "./AudioStripPreamp.module.css";
-import { AUDIO_DRAFT_CLEAR_MS } from "../audioConstants";
+import {
+  AUDIO_DRAFT_CLEAR_MS,
+  AUDIO_KNOB_DRAG_TRAVEL_PX,
+  PREAMP_GAIN_DEFAULT_DB,
+  PREAMP_GAIN_MAX_DB,
+} from "../audioConstants";
 import { AudioNumberDialog } from "./AudioNumberDialog";
 
-const PREAMP_GAIN_MAX_DB = 75;
 const ARC_START_DEG = -135;
 const ARC_END_DEG = 135;
 
@@ -110,7 +114,7 @@ export function AudioStripPreamp({
     }
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
-      height: 120,
+      height: AUDIO_KNOB_DRAG_TRAVEL_PX,
       pointerId: event.pointerId,
       startGain: currentGain,
       startY: event.clientY,
@@ -165,6 +169,12 @@ export function AudioStripPreamp({
         break;
       case "End":
         next = PREAMP_GAIN_MAX_DB;
+        break;
+      case "Backspace":
+      case "Delete":
+        // C13: reset to the default preamp gain, mirroring AudioKnob so the two
+        // preamp surfaces share the same reset key + reset target.
+        next = PREAMP_GAIN_DEFAULT_DB;
         break;
       case "Enter":
         event.preventDefault();

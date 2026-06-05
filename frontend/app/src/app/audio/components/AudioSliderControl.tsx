@@ -84,6 +84,10 @@ export function AudioSliderControl({
   const lastPointerDownAtRef = useRef(Number.NEGATIVE_INFINITY);
   const localClearTimerRef = useRef<number | null>(null);
   const [localDraftValue, setLocalDraftValue] = useState<number | null>(null);
+  // C14: drives the `data-dragging` attribute so the cursor flips to `grabbing`
+  // while a pointer drag is active (purely presentational — value flow is
+  // unchanged and still tracked via dragRef).
+  const [isDragging, setIsDragging] = useState(false);
   const span = Math.max(0.00001, max - min);
   const currentValue = clamp(localDraftValue ?? value, min, max);
   const effectiveFineStep = fineStep ?? step;
@@ -203,6 +207,7 @@ export function AudioSliderControl({
       startPointer: orientation === "vertical" ? event.clientY : event.clientX,
       startValue: currentValue,
     };
+    setIsDragging(true);
     preview(nextValue);
   };
 
@@ -226,6 +231,7 @@ export function AudioSliderControl({
     event.preventDefault();
     event.stopPropagation();
     dragRef.current = null;
+    setIsDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -237,6 +243,7 @@ export function AudioSliderControl({
     if (!drag || drag.pointerId !== event.pointerId) return;
     event.stopPropagation();
     dragRef.current = null;
+    setIsDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -313,6 +320,7 @@ export function AudioSliderControl({
       aria-valuenow={Number(formatAriaNumber(currentValue))}
       aria-valuetext={valueText}
       className={[styles.sliderControl, className].filter(Boolean).join(" ")}
+      data-dragging={isDragging ? "true" : undefined}
       data-orientation={orientation}
       data-testid={testId}
       data-unity={snapUnity && currentValue === AUDIO_FADER_UNITY ? "true" : undefined}

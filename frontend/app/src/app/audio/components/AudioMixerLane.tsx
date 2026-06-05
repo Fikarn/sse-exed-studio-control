@@ -37,6 +37,19 @@ function outputGlyphKind(role: string): "speaker" | "phones" | "line" {
   return "line";
 }
 
+// DP3 (POLISH PASS 2 / 3): the output-lane routing footer reads the bus role
+// off the already-threaded mix-target role — phones cues read "Headphone Cue",
+// every other bus reads "Monitor Bus" — so the strip ends on a deliberate
+// routing line instead of trailing off below the lone Mute button.
+function outputFooterRole(role: string): string {
+  return role === "phones-a" || role === "phones-b" ? "Headphone Cue" : "Monitor Bus";
+}
+
+// Fixed hardware destination — every mix target routes to the one interface.
+// Presentation-only constant (the topbar + tier meta already name this device
+// inline); introduces no new engine/OSC/store data.
+const OUTPUT_FOOTER_DEST = "UFX III";
+
 function OutputDestinationGlyph({ kind, active }: { kind: "speaker" | "phones" | "line"; active: boolean }) {
   const fill = active ? "var(--accent)" : "var(--fg-3)";
   if (kind === "phones") {
@@ -154,23 +167,31 @@ export function AudioChannelLane({
         </div>
         {channel.clip ? (
           <span className={styles.laneHeaderBadges}>
-            {channel.clip ? (
-              <button
-                className={styles.laneClipDot}
-                aria-label={`Clear clip for ${channel.name}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onClearClip(channel.id);
-                }}
-                title="Clear clip hold"
-                type="button"
-              />
-            ) : null}
+            <button
+              className={styles.laneClipPill}
+              aria-label={`Clear clip for ${channel.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClearClip(channel.id);
+              }}
+              title="Clear clip hold"
+              type="button"
+            >
+              CLIP
+            </button>
           </span>
         ) : null}
       </div>
 
-      {supportsPreamp ? null : channel.role === "playback-pair" ? (
+      {supportsPreamp ? (
+        // Operator review (2026-06-04): physical-input strips were the only
+        // strips with no identity card in this slot, so their meter baseline
+        // sat a card's-height higher than the playback/output strips. Give them
+        // the same card — input type (Hi-Z vs mic) + format — so the meter
+        // bridge aligns across every strip. Presentation only, from existing
+        // channel flags (no new engine state).
+        <AudioLaneTagStrip group={channel.instrument ? "HI-Z" : "MIC"} stereo={channel.stereo} />
+      ) : channel.role === "playback-pair" ? (
         // Phase 3 follow-up E17/E18: playback strips have no preamp control,
         // so the same vertical slot used to read as missing content. The
         // tag strip names the group + format using the already-available
@@ -309,13 +330,17 @@ export function AudioOutputLane({
   );
 
   const glyphKind = outputGlyphKind(mixTarget.role);
-  const pairLabel =
-    mixTarget.role === "phones-a"
-      ? "Phones · A"
-      : mixTarget.role === "phones-b"
-        ? "Phones · B"
-        : mixTarget.role === "main-out"
-          ? "Stereo"
+  // DP3 (POLISH PASS 3): the output strip's GROUP/FORMAT tag chip — the same
+  // bordered identity card every input (MIC · MONO) and playback (BED · STEREO)
+  // lane carries — replaces the old plain subtitle so the output headers read
+  // consistently. Bus identity comes from the already-threaded mix-target role.
+  const tagGroup =
+    mixTarget.role === "main-out"
+      ? "Main"
+      : mixTarget.role === "phones-a"
+        ? "Cue A"
+        : mixTarget.role === "phones-b"
+          ? "Cue B"
           : "Line";
 
   return (
@@ -337,9 +362,14 @@ export function AudioOutputLane({
             <OutputDestinationGlyph kind={glyphKind} active={selected} />
             <span className={styles.laneName}>{mixTarget.name}</span>
           </span>
-          <span className={styles.outputPair}>{pairLabel}</span>
         </div>
       </div>
+
+      {/* DP3 (POLISH PASS 3): output lanes get the same bordered GROUP/FORMAT
+          chip the input/playback lanes carry (replacing the old plain subtitle)
+          so the strip headers read consistently. Reuses the existing tag-strip
+          component; identity is the already-threaded mix-target role + format. */}
+      <AudioLaneTagStrip group={tagGroup.toUpperCase()} stereo={!mixTarget.mono} />
 
       <div className={styles.outputBody}>
         <AudioStereoMeter
@@ -389,6 +419,18 @@ export function AudioOutputLane({
         >
           M
         </button>
+      </div>
+
+      {/* DP3 (POLISH PASS 2 / 3): output lanes carry no preamp/solo, so ~60px
+          hung empty below the lone Mute button. Pin a quiet routing footer to
+          the bottom edge — the bus role (from the threaded mix-target role)
+          over its fixed hardware destination — so the controls read as anchored
+          under the meter and the strip ends deliberately. Its min-height fills
+          the knob slot the input/playback preamp occupies, re-aligning the
+          output meter bottoms onto the surface's shared meter bridge. */}
+      <div className={styles.outputFooter} data-testid={`audio-output-footer-${mixTarget.id}`}>
+        <span className={styles.outputFooterRole}>{outputFooterRole(mixTarget.role)}</span>
+        <span className={styles.outputFooterDest}>→ {OUTPUT_FOOTER_DEST}</span>
       </div>
     </article>
   );

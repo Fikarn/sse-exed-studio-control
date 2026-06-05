@@ -11,11 +11,14 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 6px 16px;
-  min-height: 24px;
+  /* C11 (2026-06-02): tighten the footer caption strip ~6px (padding 6→3,
+     min-height 24→18) to reclaim vertical budget for the meters. The 15px
+     icons + 9px mono caption still clear an 18px row. */
+  padding: 3px 16px;
+  min-height: 18px;
   border-top: 1px solid var(--line);
   background: var(--bg);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--fg-4);
@@ -61,7 +64,7 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   cursor: pointer;
-  transition: color 0.12s var(--easing);
+  transition: color var(--motion-duration-fast) var(--easing);
 }
 
 .healthCommand:hover {

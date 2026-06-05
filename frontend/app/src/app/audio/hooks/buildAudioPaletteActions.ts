@@ -132,6 +132,7 @@ export function buildAudioPaletteActions(args: BuildAudioPaletteActionsArgs): Pa
       label: "Clear all solo",
       group: "Actions",
       keywords: ["audio", "solo", "clear"],
+      shortcut: "⌥S",
       action: clearAllSolo,
     },
     {

@@ -30,7 +30,7 @@
   border: 0;
   background: transparent;
   padding: 10px 14px;
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: -0.005em;
@@ -94,7 +94,7 @@
 
 .inspectorPanel::-webkit-scrollbar-thumb {
   background: var(--line-2);
-  border-radius: 3px;
+  border-radius: var(--radius-tight-xs);
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
@@ -132,7 +132,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -147,12 +147,12 @@
 }
 
 .inspectorTag {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.08em;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-tight-xs);
   background: var(--bg-3);
   color: var(--fg-2);
   border: 1px solid var(--line);
@@ -161,16 +161,20 @@
 
 .inspectorTitle {
   margin: 0 0 4px;
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  /* Claude Design polish (DP4 · om-polish-2): the inspector hero title
+     carries the focal weight (600) so it out-ranks the 600-weight
+     channel-card names by size AND weight — the panel subject reads as
+     the clear anchor. */
+  font-weight: 600;
+  letter-spacing: -0.015em;
   color: var(--fg);
   line-height: 1.1;
 }
 
 .inspectorSubtitle {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-3);
 }
@@ -185,7 +189,7 @@
 .inspectorStickyHardwareCard {
   padding: 22px 16px 20px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: radial-gradient(
     120% 80% at 50% 0%,
     color-mix(in oklch, var(--accent) 6%, var(--bg-2)) 0%,
@@ -198,11 +202,14 @@
 
 .inspectorStickyHardwareCard .eyebrow {
   color: var(--fg-3);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  text-align: center;
+  /* Claude Design polish (DP4): this sticky-hardware card was the only
+     inspector card centering its eyebrow; every other eyebrow is
+     left-aligned, so match them. */
+  text-align: left;
 }
 
 .inspectorHardwareGrid {
@@ -224,10 +231,10 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .preampHeroScaleTrack {
@@ -259,11 +266,11 @@
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-tight-md);
   background: var(--bg-2);
   border: 1px solid var(--line);
   color: var(--fg-2);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -274,9 +281,9 @@
   gap: 5px;
   cursor: pointer;
   transition:
-    background 0.12s var(--easing),
-    color 0.12s var(--easing),
-    border-color 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-fast) var(--easing);
   white-space: nowrap;
 }
 
@@ -288,8 +295,8 @@
   background: var(--fg-4);
   flex-shrink: 0;
   transition:
-    background 0.12s var(--easing),
-    box-shadow 0.12s var(--easing);
+    background var(--motion-duration-fast) var(--easing),
+    box-shadow var(--motion-duration-fast) var(--easing);
 }
 
 .unsupportedToggleRow > button:hover:not(:disabled) {
@@ -312,7 +319,7 @@
 }
 
 .unsupportedToggleRow > button:disabled {
-  opacity: 0.4;
+  opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -337,11 +344,11 @@
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-tight-md);
   background: var(--bg-3);
   border: 1px dashed var(--line-2);
   color: var(--fg-2);
-  font-family: "Inter Tight", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
 }
 
@@ -368,21 +375,21 @@
   flex-direction: column;
   gap: 2px;
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-tight-sm);
   background: var(--bg-2);
   border: 1px solid var(--line);
 }
 
 .detailGrid small {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   letter-spacing: 0.14em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-transform: uppercase;
 }
 
 .detailGrid strong {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 500;
   color: var(--fg);
@@ -395,7 +402,7 @@
 .sourceCard {
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -404,7 +411,7 @@
 
 .inspectorMiniCard .eyebrow,
 .sourceCard .eyebrow {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -453,6 +460,126 @@
   border-top: 1px solid var(--line);
 }
 
+/* ── Send / monitor fader card + Mute/Solo/Unity action row ────────────────
+   C01: these five classes were referenced by AudioInspectorChannelSendActions
+   and AudioInspectorOutputView but never defined, so the send head, dB tick
+   scale, slider width and action row all fell back to raw block flow with
+   default browser buttons. Token-only, mirroring the sibling
+   `.unsupportedToggleRow` lane-toggle treatment so the action pills share the
+   shipped monochrome-amber + clip-red vocabulary. */
+.inspectorFaderCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+
+.inspectorFaderHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.inspectorFaderHead strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.inspectorFaderTicks {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  color: var(--fg-3);
+}
+
+/* AudioSliderControl horizontal sliders measure their own rect and do not
+   self-stretch — without this the slider collapses to its intrinsic width. */
+.inspectorSendSlider {
+  width: 100%;
+}
+
+.inspectorActionRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* Mute/Solo/Unity is a segmented control: the buttons compose the shared
+   `.segmentedToggle` reset (see AudioWorkspace) but keep their SIGNAL-color
+   active treatment local — mute lights to --danger and solo to --accent, the
+   same clip-red + amber the lanes use. Geometry (3-up grid cell, mono caption,
+   bordered resting fill) stays local too. */
+.inspectorActionButton {
+  composes: segmentedToggle from "../AudioWorkspace.module.css";
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-tight-md);
+  background: var(--bg-3);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--motion-duration-fast) var(--easing),
+    color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-fast) var(--easing);
+  white-space: nowrap;
+}
+
+.inspectorActionButton:hover:not(:disabled) {
+  border-color: var(--line-2);
+  color: var(--fg);
+}
+
+.inspectorActionButton[data-control="mute"][data-active="true"] {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.inspectorActionButton[data-control="solo"][data-active="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.inspectorActionButton:disabled {
+  opacity: var(--control-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* C01 fit: the send-fader card sits above the meter card in the Preamp/Channel
+   panel, and at the dense operator heights (e.g. the 1920x1080 fallback) the
+   audit's padding:14/gap:8 chrome overflowed the panel by ~29px — its "footprint
+   <= default buttons" assumption was wrong, because the unstyled fallback had no
+   card chrome at all. 2560 keeps the roomy base; compact the card only at
+   <=1120px logical height, mirroring the EQ/Dyn/Sends tabs' own operator-root
+   blocks (keyed on the logical operator surface so the scaled studio preview
+   still matches native 2560x1440). */
+@container operator-root (max-height: 1120px) {
+  .inspectorFaderCard {
+    gap: 3px;
+    padding: 4px 10px;
+  }
+  .inspectorActionButton {
+    height: 24px;
+  }
+}
+
 /* Preamp tab body hint: tells the operator the preamp lives in the sticky
    header above and points to the other tabs. */
 .preampTabHint {
@@ -460,7 +587,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px dashed var(--line-2);
   background: var(--bg-2);
 }
@@ -477,6 +604,54 @@
   font-weight: 600;
 }
 
+/* ── Inspector EQ mini-preview (Claude Design polish · DP4) ────────────────
+   A read-only EQ glance on the Preamp tab. It reuses the EQ tab's own
+   `.eqGraphFull` styling (imported as the child element's classes) and the
+   parent's live EQ draft data, so it matches the full EQ tab exactly; here we
+   only shrink the band handle for preview scale, freeze the curve
+   (pointer-events:none → inert spans), and tuck the value badge in. The child
+   nodes live in AudioInspectorEqTab.module.css; we reach them via the stable
+   `data-eq-preview*` hooks the markup sets, never their hashed classes. */
+.eqPreviewCard {
+  gap: 12px;
+}
+
+/* Was sticky + 170px in the EQ tab; the preview is a compact card panel. */
+.eqPreviewCard [data-eq-preview] {
+  position: relative;
+  min-height: 124px;
+}
+
+.eqPreviewCard [data-eq-preview] svg {
+  position: absolute;
+  inset: 0;
+}
+
+/* Shrunk, inert band handles — preview scale, no interaction. */
+.eqPreviewCard [data-eq-preview-point] {
+  width: 18px;
+  height: 18px;
+  font-size: 7px;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Restyled value badge: tighter inset + smaller type for the preview. */
+.eqPreviewCard [data-eq-preview-badge] {
+  top: 8px;
+  right: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.eqPreviewCard [data-eq-preview-badge] strong {
+  font-size: 11px;
+}
+
+.eqPreviewCard [data-eq-preview-badge] span {
+  font-size: 9px;
+}
+
 /* ── Channel meter card (audio-inspector-metering) ─────────────────────────
    2026-05-27 redesign follow-up: the `.bigMeter*` rules were dropped when the
    inspector CSS was rewritten, so the card lost its 2-column layout and the
@@ -489,9 +664,9 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   padding: 10px;
-  border: 1px solid var(--audio-border);
-  border-radius: 8px;
-  background: var(--audio-panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
 }
 
 /* Selector by attribute (data-meter-component) is resilient to CSS-module
@@ -512,7 +687,7 @@
   justify-self: start;
   min-height: 12px;
   padding: 0;
-  color: var(--audio-engaged-fill);
+  color: var(--accent);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -529,7 +704,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   padding-top: 6px;
-  border-top: 1px solid var(--audio-border);
+  border-top: 1px solid var(--line);
 }
 
 .bigMeterRow span,
@@ -541,7 +716,7 @@
 
 .bigMeterRow small,
 .bigMeterReferenceRow small {
-  color: var(--audio-text-muted);
+  color: var(--fg-3);
   font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -551,14 +726,14 @@
   display: inline-flex;
   align-items: baseline;
   min-width: 0;
-  color: var(--audio-text-strong);
+  color: var(--fg);
   font: var(--font-weight-semibold) 15px / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .bigMeterReferenceRow strong {
-  color: var(--audio-text-default);
+  color: var(--fg-2);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
 }
 
@@ -567,13 +742,13 @@
 }
 
 .bigMeterRow strong[data-tone="clip"] {
-  color: var(--audio-clip);
+  color: var(--danger);
 }
 
 .bigMeterRow em,
 .bigMeterReferenceRow em {
   margin-left: 2px;
-  color: var(--audio-text-subtle);
+  color: var(--audio-caption-muted);
   font-style: normal;
   font-weight: var(--font-weight-regular);
 }

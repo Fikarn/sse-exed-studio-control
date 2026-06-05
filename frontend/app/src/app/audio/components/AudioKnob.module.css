@@ -17,6 +17,14 @@
   place-items: center;
   outline: none;
   border-radius: 50%;
+  transition: box-shadow var(--motion-duration-fast) var(--easing);
+}
+
+/* C14: pre-interaction hover affordance — the knob is the one interactive
+   class with no resting signal on a tooltip-less panel. A subtle hairline ring
+   echoes the fader-cap / EQ-point hover language. */
+.knobWrap:not([data-disabled]) .knob:hover {
+  box-shadow: 0 0 0 1px var(--line-2);
 }
 
 .knob:focus-visible {
@@ -26,11 +34,11 @@
 
 .knobWrap[data-disabled] .knob {
   cursor: not-allowed;
-  opacity: 0.46;
+  opacity: var(--control-disabled-opacity);
 }
 
 .caption {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 8.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -40,7 +48,7 @@
 }
 
 .value {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -58,7 +66,7 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
   line-height: 1;
