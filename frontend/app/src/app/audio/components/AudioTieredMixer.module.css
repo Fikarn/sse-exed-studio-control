@@ -48,7 +48,9 @@
   align-items: center;
   gap: 14px;
   min-width: 0;
-  padding: 10px 14px;
+  /* DP3 (POLISH PASS 3): a touch more vertical air now that the lead carries a
+     two-line title-over-meta card; the three tier headers settle at one height. */
+  padding: 9px 14px 10px;
   border-bottom: 1px solid var(--line);
   background: var(--bg-2);
   cursor: pointer;
@@ -110,21 +112,32 @@
    already own the `auto` column). */
 .tierHeaderLead {
   display: inline-flex;
+  /* DP3 (POLISH PASS 3): the lead becomes a two-line stack — the title block
+     claims the whole first line (flex: 0 0 100% below), routing + spec wrap
+     onto the second as a quiet, baseline-aligned meta line. */
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 14px;
+  column-gap: 11px;
+  row-gap: 5px;
   min-width: 0;
+}
+
+.tierHeaderLead .tierTitleBlock {
+  flex: 0 0 100%;
 }
 
 .tierTitleBlock {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  /* DP3 (POLISH PASS 3): a touch more air; the tier number reads as a quiet
+     index ahead of the name rather than crowding the icon. */
+  gap: 9px;
   min-width: 0;
 }
 
 .tierTitleBlock > span:last-child {
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 500;
 }
@@ -199,6 +212,25 @@
   white-space: nowrap;
 }
 
+/* DP3 (POLISH PASS 3): the bank-spec caption now rides on the lead's second
+   row — muted, left-aligned, ellipsised, set off from the routing echo by a
+   hairline left border (no glyph). UI font + near-zero tracking so the name
+   above stays the anchor and the spec reads as supporting metadata. */
+.tierHeaderLead > small {
+  flex: 0 1 auto;
+  min-width: 0;
+  justify-self: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  text-transform: none;
+  letter-spacing: 0.005em;
+  color: var(--fg-4);
+  padding-left: 11px;
+  border-left: 1px solid var(--line);
+}
+
 .tierMixFor {
   display: inline-flex;
   align-items: baseline;
@@ -207,6 +239,12 @@
   text-transform: none;
   font-family: var(--font-ui);
   letter-spacing: -0.005em;
+}
+
+/* DP3 (POLISH PASS 3): the routing lead-in stays put on the lead's second row
+   while the spec caption flexes/ellipsises beside it. */
+.tierHeaderLead .tierMixFor {
+  flex-shrink: 0;
 }
 
 .tierMixForEyebrow {

@@ -10,6 +10,7 @@ import { AudioInspectorChannelHeader } from "./inspector/AudioInspectorChannelHe
 import { AudioInspectorChannelMeterCard } from "./inspector/AudioInspectorChannelMeterCard";
 import { AudioInspectorChannelSendActions } from "./inspector/AudioInspectorChannelSendActions";
 import { AudioInspectorDynamicsTab } from "./inspector/AudioInspectorDynamicsTab";
+import { AudioInspectorEqPreviewCard } from "./inspector/AudioInspectorEqPreviewCard";
 import { AudioInspectorEqTab } from "./inspector/AudioInspectorEqTab";
 import { AudioInspectorOutputView } from "./inspector/AudioInspectorOutputView";
 import { AudioInspectorOverviewCards } from "./inspector/AudioInspectorOverviewCards";
@@ -210,6 +211,15 @@ export function AudioInspector({
                 selectedGain={selectedGain}
                 setDraftValue={setDraftValue}
                 viewModel={viewModel}
+              />
+              <AudioInspectorEqPreviewCard
+                activeEqHandleId={eqState.activeEqHandleId}
+                activeEqLabel={eqState.activeEqLabel}
+                activeEqValue={eqState.activeEqValue}
+                eqBands={eqState.eqBands}
+                eqGraphPath={eqState.eqGraphPath}
+                lowCutShade={eqState.lowCutShade}
+                selectedChannel={selectedChannel}
               />
               <AudioInspectorChannelSendActions
                 clearDraftValueLater={clearDraftValueLater}

@@ -57,8 +57,15 @@
   top: 4px;
   bottom: 4px;
   left: 50%;
-  width: 8px;
+  /* DP1 (channel-strip-refine): finer slot, visibly carved into the housing —
+     recessed gradient + inset shadows replace the flat --bg + hairline. */
+  width: 6px;
+  border-radius: 3px;
   transform: translateX(-50%);
+  background: linear-gradient(180deg, color-mix(in srgb, #000 32%, var(--bg)), var(--bg));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--fg) 7%, transparent),
+    inset 0 2px 5px rgba(0, 0, 0, 0.55);
 }
 
 .sliderControl[data-orientation="horizontal"] .sliderTrack {
@@ -85,7 +92,15 @@
 .sliderControl[data-orientation="vertical"] .sliderFill {
   bottom: 4px;
   left: 50%;
-  width: 8px;
+  /* DP1 (channel-strip-refine): clean travel indicator below the cap — match
+     the 6px slot, full opacity, a subtle fg wash instead of the muddy 0.35. */
+  width: 6px;
+  opacity: 1;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fg) 26%, transparent),
+    color-mix(in srgb, var(--fg) 11%, transparent)
+  );
   height: max(0px, calc(var(--slider-pct) - 4px));
   transform: translateX(-50%);
 }
@@ -140,9 +155,40 @@
 .sliderControl[data-orientation="vertical"] .sliderCap {
   bottom: var(--slider-pct);
   left: 50%;
-  width: 22px;
-  height: 14px;
+  /* DP1 (channel-strip-refine): molded cap that straddles the slot, lit from
+     above and casting a shadow so it sits proud of the housing. */
+  width: 26px;
+  height: 17px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, var(--line-2));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #fff 13%, var(--bg-elev)) 0%,
+    var(--bg-elev) 46%,
+    color-mix(in srgb, #000 15%, var(--bg-elev)) 100%
+  );
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.5),
+    0 1px 0 rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
   transform: translate(-50%, 50%);
+  transition:
+    border-color var(--motion-duration-fast) var(--easing),
+    box-shadow var(--motion-duration-fast) var(--easing),
+    bottom 0.35s var(--easing-out);
+}
+
+/* DP1 (channel-strip-refine): grip texture — a crisp centre bar flanked by two
+   faint ridges (drawn as the cap's top/bottom box-shadow). */
+.sliderControl[data-orientation="vertical"] .sliderCap::after {
+  height: 2px;
+  left: 5px;
+  right: 5px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--fg) 58%, transparent);
+  box-shadow:
+    0 -3px 0 color-mix(in srgb, var(--fg) 16%, transparent),
+    0 3px 0 color-mix(in srgb, var(--fg) 16%, transparent);
 }
 
 .sliderControl[data-orientation="horizontal"] .sliderCap {
@@ -153,8 +199,13 @@
   transform: translate(-50%, -50%);
 }
 
+/* DP1 (channel-strip-refine): selected channel accents the grip + adds the
+   accent ridge glow on the cap texture. */
 [data-selected="true"] .sliderCap::after {
   background: var(--accent);
+  box-shadow:
+    0 -3px 0 color-mix(in srgb, var(--accent) 32%, transparent),
+    0 3px 0 color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .sliderControl:hover .sliderCap {
@@ -162,6 +213,57 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
+/* DP1 (channel-strip-refine): richer vertical-fader hover — brighter slot edge
+   + a lifted shadow so the cap visibly proud-rises on hover. */
+.sliderControl[data-orientation="vertical"]:hover .sliderCap {
+  border-color: color-mix(in srgb, var(--fg) 30%, var(--line-2));
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+/* DP1 (channel-strip-refine): selected vertical fader cap — accent border +
+   a faint accent glow. */
+[data-selected="true"] .sliderControl[data-orientation="vertical"] .sliderCap {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line-2));
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 0 10px color-mix(in srgb, var(--accent-glow) 60%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
 .sliderControl[data-unity="true"] .sliderCap {
   border-color: var(--fg-3);
+}
+
+/* ── Unity (0 dB) reference detents ───────────────────────────────────────────
+   DP1 (channel-strip-refine): 0 dB sits at 80% of every fader's throw, so two
+   small notches flank the slot at that line as a fixed reference to null faders
+   against. They tuck behind the cap exactly when the fader is at unity. */
+.sliderControl[data-orientation="vertical"]::before,
+.sliderControl[data-orientation="vertical"]::after {
+  content: "";
+  position: absolute;
+  bottom: 80%;
+  width: 5px;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--fg) 40%, transparent);
+  transform: translateY(50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sliderControl[data-orientation="vertical"]::before {
+  left: calc(50% - 9px);
+}
+
+.sliderControl[data-orientation="vertical"]::after {
+  left: calc(50% + 4px);
+}
+
+/* Selected channel lights the unity notches in the accent. */
+[data-selected="true"] .sliderControl[data-orientation="vertical"]::before,
+[data-selected="true"] .sliderControl[data-orientation="vertical"]::after {
+  background: color-mix(in srgb, var(--accent) 62%, transparent);
 }

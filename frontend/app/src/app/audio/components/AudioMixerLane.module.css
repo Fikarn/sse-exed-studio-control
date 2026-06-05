@@ -28,13 +28,16 @@
     background var(--motion-duration-fast) var(--easing);
   cursor: default;
   border: 1px solid transparent;
-  align-self: flex-start;
-  /* Cap the card at the lane-grid height so it never overflows the tier grid
-     (caught by expectAudioLaneCardsInsideTierGrids). At the studio (2560)
-     surface the content is shorter than the grid, so this is a no-op and the
-     card keeps its content height; at the 1920×1080 fallback the grid is
-     shorter than the content, so the card is capped here and the responsive
-     .laneBody/.outputBody below shrinks to fit. */
+  /* Stretch the card to its tier cell (matching Claude Design, which leaves
+     align-self unset = the flex default `stretch`) so the meter body can grow to
+     fill the full cell height instead of floating content-height at the top with
+     a dead band below. Was `flex-start`, which pinned the card to its content. */
+  align-self: stretch;
+  /* Belt-and-suspenders cap so the card can never exceed the tier grid (the
+     expectAudioLaneCardsInsideTierGrids guarantee). With align-self:stretch the
+     card already equals the cell height, so this is a no-op at 2560; at the
+     1920×1080 fallback the responsive .laneBody/.outputBody shrinks (min-height:0)
+     to keep the content within the cell. */
   max-height: 100%;
 }
 
@@ -191,32 +194,37 @@
 
 /* ── Fader + meter region ─────────────────────────────────────────────────── */
 
-/* Prefer the prototype's 280px fader region, but allow it to shrink (it is the
-   only flex-shrinkable child of the card — header/readout/controls/preamp are
-   all flex-shrink:0) so the card fits a shorter tier grid at the 1920×1080
-   fallback. `min-height: 0` lets it shrink below the 280 basis; the meter +
-   fader inside stretch to whatever height the body settles at. */
+/* The meter+fader region is the card's one flexible child (header/readout/
+   controls/preamp are all flex-shrink:0). It GROWS to fill the tier cell —
+   matching Claude Design's `flex: 1 1 240px` — so on the tall 2560×1440 surface
+   the meter stretches to the bottom of the card instead of leaving a dead band
+   under the controls. `min-height: 0` still lets it SHRINK below the 240 basis
+   at the 1920×1080 fallback (cell shorter than content), keeping the card inside
+   the tier grid. The capped `flex: 0 1 280px` here was a DP1 regression. */
 .laneBody {
   position: relative;
-  flex: 0 1 280px;
+  flex: 1 1 240px;
   min-height: 0;
   display: flex;
   align-items: stretch;
   justify-content: center;
-  padding: 14px 8px 14px 0;
-  gap: 14px;
+  /* DP1 (channel-strip-refine): tighten the meter↔fader pairing so the strip
+     reads as one instrument — narrower gap + a slimmer right gutter. */
+  padding: 14px 4px 14px 0;
+  gap: 9px;
   margin: 12px 0 6px;
 }
 
 .outputBody {
   position: relative;
-  flex: 0 1 280px;
+  flex: 1 1 240px;
   min-height: 0;
   display: flex;
   align-items: stretch;
   justify-content: center;
-  padding: 14px 8px 14px 0;
-  gap: 14px;
+  /* DP1 (channel-strip-refine): match the channel-strip meter↔fader spacing. */
+  padding: 14px 4px 14px 0;
+  gap: 9px;
   margin: 12px 0 6px;
   flex-direction: row;
 }
@@ -265,14 +273,6 @@
   word-break: normal;
 }
 
-.outputPair {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-3);
-  letter-spacing: 0.04em;
-  padding-top: 2px;
-}
-
 /* ── dB readout ───────────────────────────────────────────────────────────── */
 
 .laneReadout {
@@ -296,9 +296,31 @@
 
 .laneControls {
   display: flex;
-  gap: 4px;
+  /* DP1 (channel-strip-refine): M and S each take half the strip as a balanced
+     pair (was two ~22px buttons clustered left) — like the output bus toggles. */
+  gap: 6px;
   flex-shrink: 0;
   padding: 0 2px;
+}
+
+/* DP1 (channel-strip-refine): channel M/S buttons are wrapped in <Tooltip>, so
+   each direct child of .laneControls (the Tooltip wrapper span, or — on the
+   output lane — the bare M button) claims half the width. The Tooltip trigger
+   (the [aria-describedby] span; its sibling is the absolutely-positioned bubble)
+   and the button inside it then stretch to fill that half. Reaches the Tooltip
+   structurally via its stable aria attribute — no design-system class import. */
+.laneControls > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.laneControls > * > [aria-describedby] {
+  display: block;
+  width: 100%;
+}
+
+.laneControls .laneToggle {
+  width: 100%;
 }
 
 .laneToggle {
@@ -467,4 +489,60 @@
 
 .outputLane[data-selected="true"] .laneName {
   color: var(--accent);
+}
+
+/* ── Output-lane routing footer (DP3) ─────────────────────────────────────── */
+
+/* DP3 (channel-strip-refine POLISH PASS 2 #1 + POLISH PASS 3 bridge fix):
+   output lanes carry no preamp/solo, so the ~61px the input/playback preamp
+   occupies hung empty below the lone Mute button. The footer fills that knob
+   slot (min-height 61px, box-sizing border-box) so the output meter bottoms
+   land on the same bridge line as the rest of the surface — and ends the strip
+   on a deliberate routing line (bus role over its fixed hardware destination)
+   instead of trailing off into void. (Our output lanes carry no ::after
+   knob-slot spacer, so the prototype's `:has(.outputFooter)::after{content:none}`
+   has nothing to neutralize and is intentionally omitted.) */
+.outputFooter {
+  margin-top: 0;
+  min-height: 61px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.outputFooterRole {
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.outputFooterDest {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--fg-4);
+  font-size: 8.5px;
+}
+
+/* Selected bus lights its routing role in the accent. */
+.outputLane[data-selected="true"] .outputFooterRole {
+  color: var(--accent);
+}
+
+/* DP3 (POLISH PASS 3): output lanes are ~220px wide vs ~110px for input/
+   playback, so a full-width GROUP/FORMAT chip there would dwarf the others.
+   Cap + centre it so the chip is the same physical size as every other strip's.
+   The tag strip lives in AudioLaneTagStrip.module.css; reach it from this
+   parent module via its stable testid (no hashed-class import). */
+.outputLane > [data-testid="audio-lane-tag-strip"] {
+  width: 104px;
+  align-self: center;
 }

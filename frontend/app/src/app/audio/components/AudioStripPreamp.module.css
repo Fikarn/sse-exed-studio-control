@@ -1,7 +1,10 @@
 .stripPreamp {
   display: flex;
   align-items: center;
-  gap: 10px;
+  /* DP1 (channel-strip-refine): knob + readout sit together as one centered
+     cluster (was knob hard-left, readout hard-right, dead gap in the middle). */
+  justify-content: center;
+  gap: 9px;
   padding: 12px 4px 4px;
   margin-top: 12px;
   border-top: 1px solid var(--line);
@@ -40,8 +43,10 @@
 .label {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  flex: 1;
+  /* DP1 (channel-strip-refine): readout hugs the knob (left-aligned, no longer
+     stretched flush-right) so the pair reads as one centered cluster. */
+  align-items: flex-start;
+  flex: 0 1 auto;
   gap: 1px;
   line-height: 1;
   min-width: 0;

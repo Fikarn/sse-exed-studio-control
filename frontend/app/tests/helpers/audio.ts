@@ -145,22 +145,51 @@ export async function expectAudioLaneCardsInsideTierGrids(page: Page) {
 export async function expectAudioOverviewProcessingStack(page: Page, label: string, _minimumGraphHeight: number) {
   // 2026-05-27 Console redesign: the Overview tab's dense mini-preview cards
   // (Route / EQ / Dynamics graphs) were replaced by the Preamp tab's hero
-  // preamp knob + meter card + send fader. This helper now asserts that
-  // Preamp panel is present and its hardware (preamp) + meter cards fill it.
+  // preamp knob + meter card + send fader. Claude Design polish (DP4) then
+  // added a read-only EQ mini-preview card between the preamp hero and the
+  // send card (source → EQ → send → meter). This helper asserts the Preamp
+  // panel is present and that the preamp hero, the EQ preview, and the meter
+  // card all render inside it.
   const panel = page.getByTestId("audio-inspector-channel");
   const meter = page.getByTestId("audio-inspector-metering");
   const hardware = page.getByTestId("audio-inspector-hardware-mini");
+  const eqPreview = page.getByTestId("audio-inspector-eq-preview");
 
   await expect(panel, `${label} Preamp panel`).toBeVisible();
   await expect(hardware, `${label} preamp card visible`).toBeVisible();
+  await expect(eqPreview, `${label} EQ preview visible`).toBeVisible();
   await expect(meter, `${label} meter card visible`).toBeVisible();
 
   const panelBox = await readRequiredLocatorBox(panel, `${label} Preamp panel`);
   const meterBox = await readRequiredLocatorBox(meter, `${label} meter card`);
   const hardwareBox = await readRequiredLocatorBox(hardware, `${label} preamp card`);
+  const eqPreviewBox = await readRequiredLocatorBox(eqPreview, `${label} EQ preview`);
 
+  // The preamp hero + EQ preview sit at the top of the stack, always above the
+  // fold, so they stay fully boxed inside the panel.
   expectInsideBox(hardwareBox, panelBox, `${label} preamp card inside Preamp panel`);
-  expectInsideBox(meterBox, panelBox, `${label} meter card inside Preamp panel`);
+  expectInsideBox(eqPreviewBox, panelBox, `${label} EQ preview inside Preamp panel`);
+  // EQ preview sits below the preamp hero and above the meter card.
+  expect(eqPreviewBox.top, `${label} EQ preview below preamp hero`).toBeGreaterThanOrEqual(hardwareBox.top - 1);
+  expect(meterBox.top, `${label} meter card below EQ preview`).toBeGreaterThanOrEqual(eqPreviewBox.top - 1);
+
+  // The meter card is the last card in the stack. With the EQ preview added,
+  // the cramped 1920×1080 fallback can push it into the panel's scroll
+  // overflow — that is fine (the panel scrolls; the card stays reachable),
+  // exactly as expectAudioInspectorPanelsFit already allows. So we require the
+  // meter card to be horizontally boxed in the panel and to start within the
+  // panel, and only require its bottom inside the panel when the panel is not
+  // scrollable (content actually fits).
+  expect(meterBox.left, `${label} meter card left inside Preamp panel`).toBeGreaterThanOrEqual(panelBox.left - 1);
+  expect(meterBox.right, `${label} meter card right inside Preamp panel`).toBeLessThanOrEqual(panelBox.right + 1);
+  expect(meterBox.top, `${label} meter card top inside Preamp panel`).toBeGreaterThanOrEqual(panelBox.top - 1);
+
+  const panelScrolls = await panel.evaluate(
+    (node) => node.scrollHeight > node.clientHeight + 1 && getComputedStyle(node).overflowY !== "visible"
+  );
+  if (!panelScrolls) {
+    expect(meterBox.bottom, `${label} meter card bottom inside Preamp panel`).toBeLessThanOrEqual(panelBox.bottom + 1);
+  }
 }
 
 export async function readSnapshotThumbHeights(page: Page, snapshotId: string) {

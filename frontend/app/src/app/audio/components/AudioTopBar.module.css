@@ -80,7 +80,12 @@
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   color: var(--fg);
-  letter-spacing: -0.01em;
+  /* Claude Design polish (DP4 · om-polish-2): console status-strip values
+     normalised to uppercase mono with legible tracking so every
+     "LABEL  VALUE" pair reads as one consistent instrument readout (was:
+     SIMULATED upper while "enabled" / "test simulation" sat lower-case). */
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
   font-weight: 500;
   line-height: 1;
   display: flex;

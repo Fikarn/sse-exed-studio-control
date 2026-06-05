@@ -59,6 +59,15 @@ export const EQ_FREQUENCY_MARKERS = [
   { frequencyHz: 20000, label: "20 kHz", major: true },
 ] as const;
 
+// The read-only Preamp-tab EQ mini-preview mirrors Claude Design's EQ graph,
+// which labels only the interior decade gridlines (100 / 1k / 10k) for a clean,
+// premium read. The dense 1-2-5 axis above stays on the full EQ tab, where the
+// extra gridlines aid precise band placement. Derived from the full set (not a
+// re-list) so the two axes can never silently drift apart.
+export const EQ_PREVIEW_FREQUENCY_MARKERS = EQ_FREQUENCY_MARKERS.filter((marker) =>
+  [100, 1000, 10000].includes(marker.frequencyHz)
+);
+
 export const EQ_GAIN_MARKERS = [
   { gainDb: 20, label: "+20 dB" },
   { gainDb: 0, label: "0 dB" },

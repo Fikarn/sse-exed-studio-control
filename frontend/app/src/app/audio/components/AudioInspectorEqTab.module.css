@@ -168,8 +168,14 @@
 
 .eqValueBadge strong {
   color: var(--fg);
-  font: var(--font-weight-semibold) 12px / 1 var(--font-family-display);
-  letter-spacing: 0;
+  /* Claude Design polish (DP4): the band label reads as a mono instrument
+     readout (matches the value line below it) rather than the display
+     face. Size/line-height unchanged. */
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
 }
 
 .eqValueBadge span {

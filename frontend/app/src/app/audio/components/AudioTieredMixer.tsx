@@ -95,6 +95,22 @@ export function AudioTieredMixer({
                     "Main"}
                 </span>
               </div>
+              {/* DP3 (POLISH PASS 3): the bank-spec caption moves INTO the lead so
+                  the header reflows to a two-line title-over-meta card — row 1 the
+                  tier identity, row 2 the routing echo + this muted, left-aligned,
+                  ellipsised spec behind a hairline separator (the treatment the
+                  Outputs lead already carried, now shared by every tier). */}
+              <small data-testid={`audio-tier-bank-pill-${tier.id}`}>
+                {tier.channels.length > 0
+                  ? viewModel.clampedBankIndex > 0
+                    ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks} · ch ${
+                        viewModel.bankStart + 1
+                      }-${Math.min(viewModel.bankStart + viewModel.visibleStripCount, viewModel.channels.length)} of ${
+                        viewModel.channels.length
+                      }`
+                    : tier.meta
+                  : "No sources in this bank"}
+              </small>
             </div>
             <div className={styles.tierChipRow}>
               {tier.chips.map((chip) => (
@@ -119,17 +135,6 @@ export function AudioTieredMixer({
                 </button>
               ))}
             </div>
-            <small data-testid={`audio-tier-bank-pill-${tier.id}`}>
-              {tier.channels.length > 0
-                ? viewModel.clampedBankIndex > 0
-                  ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks} · ch ${
-                      viewModel.bankStart + 1
-                    }-${Math.min(viewModel.bankStart + viewModel.visibleStripCount, viewModel.channels.length)} of ${
-                      viewModel.channels.length
-                    }`
-                  : tier.meta
-                : "No sources in this bank"}
-            </small>
           </div>
           <div
             className={styles.tierLaneGrid}
@@ -194,6 +199,9 @@ export function AudioTieredMixer({
                 {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
               </span>
             </div>
+            {/* DP3 (POLISH PASS 3): Outputs already carried its spec inline in the
+                lead — now every tier matches it (muted, hairline-separated row-2
+                caption), equalizing the three tier-header heights. */}
             <small>{viewModel.hardwareOutputs.mixTargets.length} dest · selecting one sets the active mix</small>
           </div>
           {/* C11: the retired ~38px context bar's Peak Hold + Reset controls

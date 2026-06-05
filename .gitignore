@@ -28,3 +28,8 @@ frontend/**/storybook-static/
 frontend/**/playwright-report/
 frontend/**/test-results/
 test-results/
+
+# Audio design-comparison dev tooling (session-local; see memory/audio-ux-polish-handoff.md)
+/audio-page-seed.html
+/audio-page-seed-preview.png
+/seed-audio-prototype.mjs

@@ -15,23 +15,15 @@
 /* GS-AUD inline P2 (Slice 3 deferred → Slice 5 close-out): mono "M" overlay
    glyph for mirrored meters. Positioned absolutely so the laneBody grid
    arity stays at 2 columns; the previous attempt added a 3rd grid child
-   and collapsed the fader column. */
+   and collapsed the fader column.
+
+   DP2 (2026-06-04 Console polish): the meter's own "M" badge is now redundant
+   — the header MONO chip and the new single-bar mono shape (below) already say
+   mono — so the design drops the glyph. The element stays in the markup (the
+   mirrorRight branch still renders it) but is visually removed to keep the
+   meter quiet. */
 .meterMonoBadge {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  z-index: 2;
-  display: inline-grid;
-  place-items: center;
-  min-width: 12px;
-  height: 12px;
-  padding: 0 3px;
-  border-radius: var(--radius-tight-xs);
-  background: color-mix(in srgb, var(--fg-4) 22%, transparent);
-  color: var(--fg-2);
-  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  pointer-events: none;
+  display: none;
 }
 
 .stereoMeter {
@@ -58,18 +50,45 @@
   min-height: 0;
 }
 
+/* DP2 (2026-06-04 Console polish): mono meters render as a single bar.
+   Mic preamp inputs (and the Phones 2 cue) are mono — they are flagged
+   data-meter-mirror-right="true" and just mirror the left bar into the right.
+   A mono source shouldn't read as a stereo pair, so collapse the mirrored
+   pair to one full-width bar and hide the redundant right track. The canvas
+   overlay keys its geometry off the per-track rects, so dropping the right
+   track makes it paint the single remaining (full-width) left track only —
+   no canvas change needed for the mono case. */
+.stereoMeter[data-meter-mirror-right="true"] .meterPair {
+  grid-template-columns: 1fr;
+}
+
+.stereoMeter[data-meter-mirror-right="true"] .meterTrack[data-meter-track="right"] {
+  display: none;
+}
+
 .meterPeakReadout {
   display: none;
 }
 
+/* DP2 (2026-06-04 Console polish): recessed trough. The dense LED ladder and
+   the stray fill hairline are dropped for a cleaner, quieter read; the track
+   becomes a recessed slot with a faint top-edge darkening (it shows in the
+   unlit region beneath the canvas-painted fill). Radius softened to 2.5px to
+   pair with the new carved fader slot (DP1). The cylindrical glass sheen +
+   the fixed cream→amber→red colour zones + the −18 dBFS nominal line all live
+   in the canvas draw functions (AudioMeterCanvasOverlay) — the z-index-8 canvas
+   paints over this track, so CSS fill styling would not show in the lit area. */
 .meterTrack {
   position: relative;
   min-height: 0;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
-  border-radius: 2px;
-  background:
-    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 14px), var(--audio-meter-bg);
+  border-radius: 2.5px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--audio-meter-bg) 86%, #000) 0%,
+    var(--audio-meter-bg) 10%
+  );
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.58);
 }
 
@@ -105,6 +124,14 @@
   bottom: 2px;
   left: 2px;
   border-radius: 1px;
+  /* The design's fixed-dBFS colour zones live in the CANVAS renderer
+     (AudioMeterCanvasOverlay drawMeterBody) — the live app paints there and
+     hides this CSS fill under it. This canvas-off FALLBACK must keep the
+     transform-driven reveal: the live meters animate at 30Hz and a load-bearing
+     perf guard (audio.spec.ts "renders live audio meters without clip-path
+     compositor churn") requires `transform`, NOT `clip-path`. So the fixed-zone
+     gradient (which needs clip-path to stay anchored) cannot be ported here —
+     the fallback keeps the moving comet-head gradient on purpose. */
   background: linear-gradient(
     180deg,
     var(--audio-meter-over) 0 5%,

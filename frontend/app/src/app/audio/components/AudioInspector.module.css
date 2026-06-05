@@ -163,8 +163,12 @@
   margin: 0 0 4px;
   font-family: var(--font-ui);
   font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.02em;
+  /* Claude Design polish (DP4 · om-polish-2): the inspector hero title
+     carries the focal weight (600) so it out-ranks the 600-weight
+     channel-card names by size AND weight — the panel subject reads as
+     the clear anchor. */
+  font-weight: 600;
+  letter-spacing: -0.015em;
   color: var(--fg);
   line-height: 1.1;
 }
@@ -202,7 +206,10 @@
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  text-align: center;
+  /* Claude Design polish (DP4): this sticky-hardware card was the only
+     inspector card centering its eyebrow; every other eyebrow is
+     left-aligned, so match them. */
+  text-align: left;
 }
 
 .inspectorHardwareGrid {
@@ -595,6 +602,54 @@
 .preampTabHint p strong {
   color: var(--fg-2);
   font-weight: 600;
+}
+
+/* ── Inspector EQ mini-preview (Claude Design polish · DP4) ────────────────
+   A read-only EQ glance on the Preamp tab. It reuses the EQ tab's own
+   `.eqGraphFull` styling (imported as the child element's classes) and the
+   parent's live EQ draft data, so it matches the full EQ tab exactly; here we
+   only shrink the band handle for preview scale, freeze the curve
+   (pointer-events:none → inert spans), and tuck the value badge in. The child
+   nodes live in AudioInspectorEqTab.module.css; we reach them via the stable
+   `data-eq-preview*` hooks the markup sets, never their hashed classes. */
+.eqPreviewCard {
+  gap: 12px;
+}
+
+/* Was sticky + 170px in the EQ tab; the preview is a compact card panel. */
+.eqPreviewCard [data-eq-preview] {
+  position: relative;
+  min-height: 124px;
+}
+
+.eqPreviewCard [data-eq-preview] svg {
+  position: absolute;
+  inset: 0;
+}
+
+/* Shrunk, inert band handles — preview scale, no interaction. */
+.eqPreviewCard [data-eq-preview-point] {
+  width: 18px;
+  height: 18px;
+  font-size: 7px;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Restyled value badge: tighter inset + smaller type for the preview. */
+.eqPreviewCard [data-eq-preview-badge] {
+  top: 8px;
+  right: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.eqPreviewCard [data-eq-preview-badge] strong {
+  font-size: 11px;
+}
+
+.eqPreviewCard [data-eq-preview-badge] span {
+  font-size: 9px;
 }
 
 /* ── Channel meter card (audio-inspector-metering) ─────────────────────────
