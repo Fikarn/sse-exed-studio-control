@@ -57,6 +57,17 @@ updates:
     rebase-strategy: disabled
     allow:
       - dependency-type: direct
+    # Mirror the root npm ignore: @types/node + typescript majors are
+    # intentionally deferred (see CHANGELOG). @types/node lives in this
+    # workspace, so the rule has to be here too — its absence is what let
+    # the @types/node 25 major PR (#119) open.
+    ignore:
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
     commit-message:
       prefix: "chore(frontend-deps)"
 
