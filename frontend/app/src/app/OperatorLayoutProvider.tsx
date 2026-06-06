@@ -25,11 +25,20 @@ import styles from "./OperatorLayoutProvider.module.css";
 
 const UI_SCALE_STORAGE_KEY = "app.operator.uiScale";
 const REVIEW_SURFACE_STORAGE_KEY = "app.operator.reviewSurface";
+const THEME_STORAGE_KEY = "app.operator.theme";
+
+export type OperatorTheme = "studio" | "graphite" | "bone";
+
+function isOperatorTheme(value: unknown): value is OperatorTheme {
+  return value === "studio" || value === "graphite" || value === "bone";
+}
 
 interface OperatorLayoutContextValue {
   layoutMode: OperatorLayoutMode;
   uiScale: OperatorUiScale;
   setUiScale: Dispatch<SetStateAction<OperatorUiScale>>;
+  theme: OperatorTheme;
+  setTheme: Dispatch<SetStateAction<OperatorTheme>>;
   reviewSurface: OperatorReviewSurface;
   setReviewSurface: Dispatch<SetStateAction<OperatorReviewSurface>>;
   reviewScale: number;
@@ -61,6 +70,14 @@ function readStoredReviewSurface(): OperatorReviewSurface {
   return isOperatorReviewSurface(stored) ? stored : "native";
 }
 
+function readStoredTheme(): OperatorTheme {
+  if (typeof window === "undefined") return "studio";
+  const requested = new URL(window.location.href).searchParams.get("theme");
+  if (isOperatorTheme(requested)) return requested;
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  return isOperatorTheme(stored) ? stored : "studio";
+}
+
 function shouldShowConstrainedWarning() {
   if (typeof window === "undefined") return false;
   const params = new URL(window.location.href).searchParams;
@@ -83,6 +100,7 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
   );
   const [uiScale, setUiScale] = useState<OperatorUiScale>(readStoredUiScale);
   const [reviewSurface, setReviewSurface] = useState<OperatorReviewSurface>(readStoredReviewSurface);
+  const [theme, setTheme] = useState<OperatorTheme>(readStoredTheme);
 
   const reviewEnabled = reviewSurface === "studioPreview";
   const reviewTarget = reviewEnabled ? OPERATOR_STUDIO_PREVIEW_SIZE : null;
@@ -153,6 +171,18 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(REVIEW_SURFACE_STORAGE_KEY, reviewSurface);
   }, [reviewSurface]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    // Theme lives on <html> so portaled overlays inherit it. Studio is the
+    // generated `tokens.css` default; graphite/bone match `themes.css` blocks.
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
   const layoutMode = deriveOperatorLayoutMode(size);
   const reviewScale =
     reviewTarget === null
@@ -173,7 +203,9 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
       reviewTargetHeight: reviewTarget?.height ?? null,
       reviewTargetWidth: reviewTarget?.width ?? null,
       setReviewSurface,
+      setTheme,
       setUiScale,
+      theme,
       uiScale,
     }),
     [
@@ -185,6 +217,7 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
       reviewTarget?.width,
       size.height,
       size.width,
+      theme,
       uiScale,
     ]
   );
