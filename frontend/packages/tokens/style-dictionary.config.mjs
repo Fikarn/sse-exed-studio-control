@@ -2,8 +2,15 @@ import StyleDictionary from "style-dictionary";
 
 StyleDictionary.registerFormat({
   name: "sse/typescript-tokens",
-  format: ({ dictionary }) => {
-    const tokens = Object.fromEntries(dictionary.allTokens.map((token) => [token.name, token.value]));
+  format: ({ dictionary, options }) => {
+    // Style Dictionary v5 runs this source in DTCG mode (`$value`/`$type`), so a
+    // token's resolved value lives on `$value`, not the legacy `value`. Reading
+    // `.value` here yields `undefined` for every token, which `JSON.stringify`
+    // then omits — the cause of the previously-empty `{}` output.
+    const useDtcg = options?.usesDtcg ?? false;
+    const tokens = Object.fromEntries(
+      dictionary.allTokens.map((token) => [token.name, useDtcg ? token.$value : token.value])
+    );
 
     return `export const tokenValues = ${JSON.stringify(tokens, null, 2)} as const;
 

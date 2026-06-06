@@ -159,7 +159,7 @@ Only one piece of pre-v2.0.0 code is intentionally retained:
 ## Generated and local-only files
 
 - Protocol source of truth: `native/protocol/v1.contract.json` and `native/protocol/v1.md`. Generated outputs are `native/protocol/generated/v1.schema.json`, `frontend/packages/engine-client/src/generated/protocol.ts`, and `frontend/packages/engine-client/src/generated/snapshots/**`; update them with `npm run protocol:generate`.
-- Token source of truth: `frontend/packages/tokens/src/source/tokens.json` and `frontend/packages/tokens/src/tokens/**`. Generated outputs under `frontend/packages/tokens/src/generated/**` come from `npm run frontend:tokens:build`.
+- Token source of truth: `frontend/packages/tokens/src/tokens/**` (e.g. `core.json`), built by `frontend/packages/tokens/style-dictionary.config.mjs`. Generated outputs under `frontend/packages/tokens/src/generated/**` come from `npm run frontend:tokens:build`.
 - Do not hand-edit generated outputs unless the task is explicitly about the generator or the generated diff is produced by the checked-in command.
 - Keep ignored local outputs out of commits: `node_modules/`, `release/`, `artifacts/`, `.tools/`, `.DS_Store`, `.swift-module-cache/`, `native/**/target/`, `native/**/build/`, `frontend/**/dist/`, `frontend/**/storybook-static/`, Playwright reports, and test results.
 
