@@ -728,7 +728,7 @@ button.lightingDmxDrawerCell {
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: var(--z-dialog);
   display: grid;
   place-items: center;
   padding: clamp(20px, 4vw, 48px);

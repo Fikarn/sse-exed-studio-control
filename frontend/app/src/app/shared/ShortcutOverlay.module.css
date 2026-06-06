@@ -10,7 +10,7 @@
   align-items: flex-start;
   justify-content: center;
   padding-top: 10vh;
-  z-index: 1200;
+  z-index: var(--z-palette);
 }
 
 @media (prefers-reduced-motion: no-preference) {
