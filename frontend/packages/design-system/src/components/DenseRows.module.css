@@ -95,7 +95,7 @@
   }
 
   .table tbody tr:first-child td {
-    border-top-color: var(--color-surface-borderStrong);
+    border-top-color: var(--color-surface-border-strong);
   }
 
   .alignEnd {

@@ -11,7 +11,7 @@
   }
 
   .regular {
-    min-height: var(--size-controlHeight);
+    min-height: var(--size-control-height);
   }
 
   .compact {
@@ -42,7 +42,7 @@
 
   .segment[aria-checked="true"] {
     background: rgba(255, 255, 255, 0.08);
-    border-color: var(--color-surface-borderStrong);
+    border-color: var(--color-surface-border-strong);
     color: var(--color-studio-050);
   }
 

@@ -24,6 +24,12 @@ export default {
           format: "css/variables",
           options: {
             selector: ":root",
+            // Emit `var(--base)` for any token whose value is a reference, so
+            // the Slice 1 semantic aliases stay theme-aware: Slice 3's
+            // `[data-theme]` blocks then only override the base tokens and the
+            // aliases cascade. Functionally identical in the single dark theme
+            // (var() resolves to the same value the literal would have).
+            outputReferences: true,
           },
         },
       ],

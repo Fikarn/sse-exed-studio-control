@@ -7,7 +7,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-3);
-    min-height: var(--size-controlHeight);
+    min-height: var(--size-control-height);
     padding: var(--space-2);
   }
 

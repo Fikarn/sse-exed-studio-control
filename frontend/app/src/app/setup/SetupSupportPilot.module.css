@@ -259,7 +259,7 @@
 
   .textField {
     width: 100%;
-    min-height: var(--size-controlHeight);
+    min-height: var(--size-control-height);
     padding: 0 var(--space-4);
     border: 1px solid var(--color-border-default);
     border-radius: var(--radius-pill);
