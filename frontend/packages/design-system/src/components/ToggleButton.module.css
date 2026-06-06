@@ -8,7 +8,7 @@
     cursor: pointer;
     display: inline-flex;
     gap: var(--space-3);
-    min-height: var(--size-controlHeight);
+    min-height: var(--size-control-height);
     padding: var(--space-2) var(--space-5);
     text-align: left;
     transition:
@@ -17,7 +17,7 @@
   }
 
   .toggle:hover {
-    border-color: var(--color-surface-borderStrong);
+    border-color: var(--color-surface-border-strong);
   }
 
   .toggle:disabled {
@@ -27,7 +27,7 @@
 
   .indicator {
     background: var(--color-studio-600);
-    border: 1px solid var(--color-surface-borderStrong);
+    border: 1px solid var(--color-surface-border-strong);
     border-radius: var(--radius-pill);
     flex: 0 0 auto;
     height: 14px;

@@ -11,12 +11,18 @@
       "900": { "$value": "#111914" },
       "800": { "$value": "#18221B" },
       "700": { "$value": "#213028" },
-      "600": { "$value": "#2C4036" }
+      "600": { "$value": "#2C4036" },
+      "default": { "$value": "{color.bg.default}" },
+      "soft": { "$value": "{color.bg.soft}" },
+      "raised": { "$value": "{color.bg.raised}" },
+      "border": { "$value": "{color.bg.border}" },
+      "borderStrong": { "$value": "{color.bg.borderStrong}" }
     },
     "text": {
       "strong": { "$value": "#F4F8F2" },
       "muted": { "$value": "#B7C2BA" },
-      "subtle": { "$value": "#8C978F" }
+      "subtle": { "$value": "#8C978F" },
+      "primary": { "$value": "{color.text.strong}" }
     },
     "primary": {
       "500": { "$value": "#99BA92" },
@@ -40,6 +46,19 @@
     "border": {
       "default": { "$value": "#2A3B31" },
       "strong": { "$value": "#406050" }
+    },
+    "accent": {
+      "green": { "$value": "{color.primary.500}" },
+      "amber": { "$value": "{color.warning.500}" },
+      "red": { "$value": "{color.danger.500}" },
+      "primary": { "$value": "{color.primary.500}" }
+    },
+    "success": {
+      "500": { "$value": "{color.primary.500}" },
+      "soft": { "$value": "{color.brand.greenSoft}" }
+    },
+    "status": {
+      "warning": { "$value": "{color.warning.500}" }
     },
     "brand": {
       "green": { "$value": "{color.primary.500}" },
@@ -108,6 +127,13 @@
       "doorStroke": { "$value": "rgba(212, 205, 179, 0.32)" }
     },
     "studio": {
+      "050": { "$value": "{color.text.strong}" },
+      "100": { "$value": "{color.text.strong}" },
+      "200": { "$value": "{color.text.muted}" },
+      "300": { "$value": "{color.text.muted}" },
+      "400": { "$value": "{color.text.subtle}" },
+      "500": { "$value": "{color.border.strong}" },
+      "600": { "$value": "{color.border.default}" },
       "wall": { "$value": "#4d5544" },
       "wallStroke": { "$value": "#6b7560" },
       "element": { "$value": "rgba(108, 116, 96, 0.18)" },
@@ -187,6 +213,8 @@
       "display": { "$value": "\"Fraunces Variable\", \"Fraunces\", \"Source Serif 4\", Georgia, serif" }
     },
     "size": {
+      "2xs": { "$value": "10px" },
+      "xs": { "$value": "11px" },
       "sm": { "$value": "12px" },
       "md": { "$value": "14px" },
       "lg": { "$value": "16px" },
@@ -204,12 +232,18 @@
     "3": { "$value": "12px" },
     "4": { "$value": "16px" },
     "5": { "$value": "20px" },
-    "6": { "$value": "24px" }
+    "6": { "$value": "24px" },
+    "7": { "$value": "28px" },
+    "8": { "$value": "32px" },
+    "9": { "$value": "36px" },
+    "10": { "$value": "40px" }
   },
   "radius": {
     "sm": { "$value": "8px" },
     "md": { "$value": "14px" },
     "lg": { "$value": "20px" },
+    "xl": { "$value": "24px" },
+    "surface": { "$value": "{radius.lg}" },
     "pill": { "$value": "999px" },
     "tight": {
       "xs": { "$value": "3px" },
@@ -262,10 +296,21 @@
   "motion": {
     "duration": {
       "fast": { "$value": "120ms" },
-      "normal": { "$value": "180ms" }
+      "normal": { "$value": "180ms" },
+      "slow": { "$value": "240ms" }
     },
     "easing": {
-      "standard": { "$value": "cubic-bezier(0.22, 1, 0.36, 1)" }
+      "standard": { "$value": "cubic-bezier(0.22, 1, 0.36, 1)" },
+      "inOut": { "$value": "cubic-bezier(0.4, 0, 0.2, 1)" },
+      "out": { "$value": "cubic-bezier(0.16, 1, 0.3, 1)" }
     }
+  },
+  "z": {
+    "overlay": { "$value": "100" },
+    "toast": { "$value": "1000" },
+    "menu": { "$value": "1050" },
+    "dialog": { "$value": "1100" },
+    "palette": { "$value": "1200" },
+    "tooltip": { "$value": "1300" }
   }
 }

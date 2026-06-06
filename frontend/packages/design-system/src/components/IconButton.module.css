@@ -19,7 +19,7 @@
   }
 
   .button:hover {
-    border-color: var(--color-surface-borderStrong);
+    border-color: var(--color-surface-border-strong);
     color: var(--color-studio-050);
   }
 
@@ -40,8 +40,8 @@
   }
 
   .md {
-    height: var(--size-controlHeight);
-    width: var(--size-controlHeight);
+    height: var(--size-control-height);
+    width: var(--size-control-height);
   }
 
   .primary {

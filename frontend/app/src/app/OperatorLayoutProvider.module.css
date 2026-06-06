@@ -29,6 +29,7 @@
   --operator-font-size-title-sm: calc(16px * var(--operator-ui-scale-factor));
   --operator-font-size-title-md: calc(18px * var(--operator-ui-scale-factor));
   --operator-font-size-title-lg: calc(22px * var(--operator-ui-scale-factor));
+  --operator-font-size-title-xl: calc(34px * var(--operator-ui-scale-factor));
   --operator-font-size-shell-title: calc(30px * var(--operator-ui-scale-factor));
   --operator-shell-height: clamp(56px, calc(var(--size-shell-height) * var(--operator-ui-scale-factor)), 84px);
   --operator-shell-header-gap: calc(18px * var(--operator-ui-scale-factor));
