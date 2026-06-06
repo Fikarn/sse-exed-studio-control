@@ -15,7 +15,7 @@
   align-items: flex-end;
   gap: 8px;
   max-width: calc(100vw - 48px);
-  z-index: 1000;
+  z-index: var(--z-toast);
   pointer-events: none;
 }
 

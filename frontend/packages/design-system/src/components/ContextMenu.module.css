@@ -14,7 +14,7 @@
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-md);
   box-shadow: var(--shadow-lg);
-  z-index: 1100;
+  z-index: var(--z-menu);
   outline: none;
 }
 
