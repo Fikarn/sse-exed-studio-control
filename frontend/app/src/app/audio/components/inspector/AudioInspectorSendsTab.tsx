@@ -1,4 +1,4 @@
-import styles from "../AudioInspector.module.css";
+import { AudioEmptyInspector } from "./AudioEmptyInspector";
 import tabStyles from "../AudioInspectorSendsTab.module.css";
 import { deriveSendStatusLabel, formatAudioDb } from "../../audioFormatting";
 import { selectedChannelSendLevel, type AudioWorkspaceViewModel } from "../../audioViewModel";
@@ -35,10 +35,10 @@ export function AudioInspectorSendsTab({
 }: AudioInspectorSendsTabProps) {
   if (!selectedChannel) {
     return (
-      <div className={styles.emptyInspector}>
-        <h3>No channel selected</h3>
-        <p>Send levels appear here after a source strip is selected.</p>
-      </div>
+      <AudioEmptyInspector
+        description="Send levels appear here after a source strip is selected."
+        title="No channel selected"
+      />
     );
   }
 

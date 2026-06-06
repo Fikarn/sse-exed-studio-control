@@ -1,9 +1,10 @@
 /* AudioInspectorEqTab module — EQ-tab-specific surfaces extracted from
- * AudioInspector.module.css (Slice 5A). Consumed by AudioInspectorEqTab.tsx,
- * AudioInspectorEqLowCutTray.tsx, AudioInspectorEqBandTray.tsx. Classes
- * shared with the Overview tab (eqBandRow, eqGraphMini, eqLowCutShade)
- * stay in the router; those are dual-consumed and Overview renders
- * alongside the EQ tab. */
+ * AudioInspector.module.css (Slice 5A). Live consumers: AudioInspectorEqTab.tsx,
+ * AudioInspectorEqPreviewCard.tsx, and AudioInspectorDynamicsTab.tsx (full graph
+ * panel + frequency markers). `.eqLowCutShade` lives HERE, scoped under
+ * `.eqGraphFull`, and is dual-consumed by the EQ tab and the overview preview
+ * card. The shared graph-head layout classes (`.graphCardHead`, `.eqBandRow`,
+ * `.placeholderPanel`) live in AudioInspector.module.css (the router). */
 
 .eqGraphFull {
   /* Sticky so the response curve + draggable band handles stay pinned to the
@@ -149,6 +150,17 @@
   stroke: var(--accent);
   stroke-linecap: round;
   stroke-width: 2;
+}
+
+.eqGraphFull .eqLowCutShade {
+  /* AUD-01: the low-cut attenuation region. MUST out-specify `.eqGraphFull path`
+     (0,1,1) above — a bare `.eqLowCutShade` (0,1,0) loses and inherits the accent
+     stroke + fill:none, painting a stray outline of the region (the bug PR #111
+     shipped by dropping the rule but keeping the ref). A neutral wash reads better
+     than amber for an attenuated band; `--fg-3` is defined in all three themes and,
+     as a decorative fill, is not subject to text-AA — Bone-safe. */
+  fill: color-mix(in srgb, var(--fg-3) 18%, transparent);
+  stroke: none;
 }
 
 .eqValueBadge {

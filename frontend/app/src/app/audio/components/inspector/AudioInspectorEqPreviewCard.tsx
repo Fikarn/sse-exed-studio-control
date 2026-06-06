@@ -84,7 +84,7 @@ export function AudioInspectorEqPreviewCard({
           </div>
         </div>
         <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {lowCutShade ? <path className={styles.eqLowCutShade} d={lowCutShade} /> : null}
+          {lowCutShade ? <path className={tabStyles.eqLowCutShade} d={lowCutShade} /> : null}
           <path d={eqGraphPath} />
         </svg>
         <div className={tabStyles.eqValueBadge} data-eq-preview-badge="true">
