@@ -19,6 +19,7 @@ import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
 import { PlanningWorkspaceSurface } from "./planning/PlanningWorkspace";
 import { PaletteProvider, usePalette } from "./shared/paletteContext";
+import { PreReadyFrame } from "./shared/PreReadyFrame";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ShortcutOverlay } from "./shared/ShortcutOverlay";
 import { ToastProvider } from "./shared/toastContext";
@@ -322,11 +323,9 @@ function OperatorShellInner() {
   if (setupModalActive && shellExperience === "startup") {
     return (
       <>
-        <div className={styles.setupShell}>
-          <div className={styles.setupCanvas}>
-            <SetupStartupSurface appSnapshot={shellState.appSnapshot} onShowShortcuts={showShortcuts} />
-          </div>
-        </div>
+        <PreReadyFrame>
+          <SetupStartupSurface appSnapshot={shellState.appSnapshot} onShowShortcuts={showShortcuts} />
+        </PreReadyFrame>
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (
           <ShellDialog
@@ -344,7 +343,9 @@ function OperatorShellInner() {
   if (shellExperience === "startup") {
     return (
       <>
-        <StartupSurface lifecycle={shellState.lifecycle} onShowShortcuts={showShortcuts} />
+        <PreReadyFrame>
+          <StartupSurface lifecycle={shellState.lifecycle} onShowShortcuts={showShortcuts} />
+        </PreReadyFrame>
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (
           <ShellDialog
@@ -362,21 +363,19 @@ function OperatorShellInner() {
   if (setupModalActive && shellExperience === "ready") {
     return (
       <>
-        <div className={styles.setupShell}>
-          <div className={styles.setupCanvas}>
-            <SetupSupportPilot
-              appSnapshot={shellState.appSnapshot}
-              commissioningSnapshot={shellState.commissioningSnapshot}
-              controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
-              healthSnapshot={shellState.healthSnapshot}
-              liveTransportRequested={environment.liveTransportRequested}
-              onRequestRestart={requestRestart}
-              onShowShortcuts={showShortcuts}
-              store={environment.store}
-              supportSnapshot={deferredSupportSnapshot}
-            />
-          </div>
-        </div>
+        <PreReadyFrame>
+          <SetupSupportPilot
+            appSnapshot={shellState.appSnapshot}
+            commissioningSnapshot={shellState.commissioningSnapshot}
+            controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
+            healthSnapshot={shellState.healthSnapshot}
+            liveTransportRequested={environment.liveTransportRequested}
+            onRequestRestart={requestRestart}
+            onShowShortcuts={showShortcuts}
+            store={environment.store}
+            supportSnapshot={deferredSupportSnapshot}
+          />
+        </PreReadyFrame>
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (
           <ShellDialog
@@ -394,20 +393,18 @@ function OperatorShellInner() {
   if (setupModalActive && shellExperience === "recovery") {
     return (
       <>
-        <div className={styles.setupShell}>
-          <div className={styles.setupCanvas}>
-            <SetupRecoverySurface
-              appSnapshot={shellState.appSnapshot}
-              failure={shellState.startupFailure}
-              healthSnapshot={shellState.healthSnapshot}
-              liveTransportRequested={environment.liveTransportRequested}
-              onRequestRestart={requestRestart}
-              onShowShortcuts={showShortcuts}
-              store={environment.store}
-              supportSnapshot={deferredSupportSnapshot}
-            />
-          </div>
-        </div>
+        <PreReadyFrame>
+          <SetupRecoverySurface
+            appSnapshot={shellState.appSnapshot}
+            failure={shellState.startupFailure}
+            healthSnapshot={shellState.healthSnapshot}
+            liveTransportRequested={environment.liveTransportRequested}
+            onRequestRestart={requestRestart}
+            onShowShortcuts={showShortcuts}
+            store={environment.store}
+            supportSnapshot={deferredSupportSnapshot}
+          />
+        </PreReadyFrame>
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (
           <ShellDialog
@@ -425,12 +422,14 @@ function OperatorShellInner() {
   if (shellExperience === "recovery") {
     return (
       <>
-        <RecoverySurface
-          failure={shellState.startupFailure}
-          healthSnapshot={shellState.healthSnapshot}
-          onRequestRestart={requestRestart}
-          onShowShortcuts={showShortcuts}
-        />
+        <PreReadyFrame>
+          <RecoverySurface
+            failure={shellState.startupFailure}
+            healthSnapshot={shellState.healthSnapshot}
+            onRequestRestart={requestRestart}
+            onShowShortcuts={showShortcuts}
+          />
+        </PreReadyFrame>
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (
           <ShellDialog
