@@ -50,10 +50,8 @@
   --color-border-default: #2b3942;
   --color-border-strong: #41555f;
 
-  /* text — cool white ramp */
-  --color-text-strong: #e8edf0;
-  --color-text-muted: #aeb9c2;
-  --color-text-subtle: #828d96;
+  /* text — cool white ramp (canonical: brand-text-*; --color-text-* aliases it
+     via core.json, so it cascades from here — Slice 3b namespace collapse) */
   --color-brand-text-primary: #e6f4f3;
   --color-brand-text-secondary: #bcccce;
   --color-brand-text-muted: #7e8a8c;
@@ -104,10 +102,8 @@
   --color-border-default: #d6d0c2;
   --color-border-strong: #b7b0a0;
 
-  /* text — dark ramp (Audio bone fg) */
-  --color-text-strong: #1a1814;
-  --color-text-muted: #54514a;
-  --color-text-subtle: #71706a;
+  /* text — dark ramp (canonical brand-text-*; --color-text-* aliases it via
+     core.json — Slice 3b namespace collapse) */
   --color-brand-text-primary: #262017;
   --color-brand-text-secondary: #4a4636;
   --color-brand-text-muted: #6e6a5a;

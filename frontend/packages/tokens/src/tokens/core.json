@@ -19,9 +19,9 @@
       "borderStrong": { "$value": "{color.bg.borderStrong}" }
     },
     "text": {
-      "strong": { "$value": "#F4F8F2" },
-      "muted": { "$value": "#B7C2BA" },
-      "subtle": { "$value": "#8C978F" },
+      "strong": { "$value": "{color.brand.text.primary}" },
+      "muted": { "$value": "{color.brand.text.secondary}" },
+      "subtle": { "$value": "{color.brand.text.muted}" },
       "primary": { "$value": "{color.text.strong}" }
     },
     "primary": {
