@@ -1,6 +1,14 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, MetricCard, StatusBadge, StatusPill, Surface } from "@sse/design-system";
+import {
+  Button,
+  HealthBar,
+  type HealthBarItemData,
+  MetricCard,
+  StatusBadge,
+  StatusPill,
+  Surface,
+} from "@sse/design-system";
 import type { JsonValue, ShellStore } from "@sse/engine-client";
 
 import { exportShellDiagnostics, openShellPath } from "../shellCommands";
@@ -557,6 +565,40 @@ export function SetupSupportPilot({
     }
     return isReady ? "Open planning" : "Publish setup";
   }, [activeStepId, isReady]);
+
+  // Slice 5 (CHROME-02): the commissioning runner footer is unified onto the
+  // shared DS HealthBar (full variant) — a few setup status items derived from
+  // already-present snapshot data on the left, the Back / primary nav in the
+  // bar's actions slot. Presentation-only: no new engine/OSC data.
+  const setupFooterItems = useMemo<HealthBarItemData[]>(() => {
+    const activeStepLabel = runnerSteps.find((step) => step.id === activeStepId)?.label ?? "";
+    const checkEntries = Object.entries(healthChecks ?? {});
+    const checksTotal = checkEntries.length;
+    const checksPassed = checkEntries.filter(
+      ([, value]) => asStatusTone(asRecord(value)?.status, "info") === "ok"
+    ).length;
+
+    const items: HealthBarItemData[] = [
+      {
+        label: "Step",
+        value: `${stepIndex + 1} / ${runnerStepOrder.length}`,
+        suffix: activeStepLabel ? `· ${activeStepLabel}` : undefined,
+      },
+    ];
+    if (checksTotal > 0) {
+      items.push({
+        label: "Checks",
+        dot: checksPassed === checksTotal ? "ok" : "attn",
+        value: `${checksPassed} / ${checksTotal} ok`,
+      });
+    }
+    items.push({
+      label: "Commissioning",
+      dot: isReady ? "ok" : "attn",
+      value: isReady ? "Ready to publish" : "In progress",
+    });
+    return items;
+  }, [activeStepId, healthChecks, isReady, runnerSteps, stepIndex]);
 
   const invokePrimaryAction = useLiveCallback(() => {
     if (activeStepId === "import") {
@@ -1151,14 +1193,20 @@ export function SetupSupportPilot({
             </aside>
           </div>
 
-          <div className={styles.footerBar}>
-            <Button disabled={stepIndex <= 0} onClick={() => moveStepSelection(-1)} variant="ghost">
-              Back
-            </Button>
-            <Button onClick={invokePrimaryAction} variant="primary" disabled={busyAction !== null}>
-              {busyAction ? "Working…" : primaryActionLabel}
-            </Button>
-          </div>
+          <HealthBar
+            className={styles.setupFooter}
+            items={setupFooterItems}
+            actions={
+              <>
+                <Button disabled={stepIndex <= 0} onClick={() => moveStepSelection(-1)} variant="ghost">
+                  Back
+                </Button>
+                <Button onClick={invokePrimaryAction} variant="primary" disabled={busyAction !== null}>
+                  {busyAction ? "Working…" : primaryActionLabel}
+                </Button>
+              </>
+            }
+          />
         </div>
       ) : (
         <div className={styles.supportGrid}>

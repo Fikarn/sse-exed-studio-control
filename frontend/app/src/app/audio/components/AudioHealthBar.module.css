@@ -1,77 +1,22 @@
-/* AudioHealthBar — Console redesign (2026-05-27).
+/* AudioHealthBar — caption-variant theming map.
  *
- * The Console prototype has no health/status footer (status lives in the
- * AudioTopBar status cluster). The repo's existing health bar carries
- * keyboard-shortcut hints + bank navigation that operators rely on, so we
- * keep it but render it as a very thin caption strip — quiet eyebrow text,
- * minimal vertical footprint.
+ * The footer renders through the shared DS HealthBar (caption variant — see
+ * @sse/design-system). This module no longer styles the footer directly; it
+ * only remaps the primitive's --hb-* theming hooks onto Audio's private theme
+ * tokens (--bg / --fg-* / --line / --font-mono / --easing), which are set on
+ * `.audioShell` and re-themed per `data-audio-theme`. These rules are
+ * unlayered, so they out-prioritise the primitive's layered `.caption`
+ * defaults — the strip stays byte-identical to the bespoke footer it replaced
+ * (Console redesign 2026-05-27; thin caption strip, status lives in the rail).
  */
 
-.healthBar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  /* C11 (2026-06-02): tighten the footer caption strip ~6px (padding 6→3,
-     min-height 24→18) to reclaim vertical budget for the meters. The 15px
-     icons + 9px mono caption still clear an 18px row. */
-  padding: 3px 16px;
-  min-height: 18px;
-  border-top: 1px solid var(--line);
-  background: var(--bg);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: var(--fg-4);
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-
-.healthItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.healthItem strong {
-  color: var(--fg-2);
-  font-weight: 600;
-}
-
-.healthTelemetry {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.healthShortcutGroup {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.healthCommand {
-  appearance: none;
-  background: transparent;
-  color: var(--fg-3);
-  border: 0;
-  padding: 0;
-  font: inherit;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  transition: color var(--motion-duration-fast) var(--easing);
-}
-
-.healthCommand:hover {
-  color: var(--fg);
-}
-
-.healthCommand:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.audioFooter {
+  --hb-bg: var(--bg);
+  --hb-line: var(--line);
+  --hb-fg-muted: var(--fg-4);
+  --hb-fg: var(--fg-3);
+  --hb-fg-strong: var(--fg-2);
+  --hb-fg-hover: var(--fg);
+  --hb-font-mono: var(--font-mono);
+  --hb-easing: var(--easing);
 }

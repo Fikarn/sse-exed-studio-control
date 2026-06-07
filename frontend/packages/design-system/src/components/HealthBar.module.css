@@ -117,4 +117,79 @@
     padding: 2px 6px;
     color: var(--color-brand-text-secondary);
   }
+
+  /* Caption variant — the thin telemetry + shortcut footer strip, levelled
+     up from Audio's bespoke footer. Everything routes through the --hb-*
+     theming hooks (global defaults below); Audio remaps those hooks onto its
+     private theme tokens via an (unlayered → higher-priority) className so its
+     footer stays byte-identical to the bespoke version it replaced. */
+  .caption {
+    --hb-bg: var(--color-bg-deep);
+    --hb-line: var(--color-bg-stroke);
+    --hb-fg-muted: var(--color-brand-text-muted);
+    --hb-fg: var(--color-brand-text-secondary);
+    --hb-fg-strong: var(--color-brand-text-primary);
+    --hb-fg-hover: var(--color-brand-text-primary);
+    --hb-font-mono: var(--font-family-mono);
+    --hb-easing: var(--motion-easing-standard);
+
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 3px 16px;
+    min-height: 18px;
+    border-top: 1px solid var(--hb-line);
+    background: var(--hb-bg);
+    font-family: var(--hb-font-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--hb-fg-muted);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .captionTelemetry {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .captionItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .captionItem strong {
+    color: var(--hb-fg-strong);
+    font-weight: 600;
+  }
+
+  .captionShortcuts {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .captionShortcut {
+    appearance: none;
+    background: transparent;
+    color: var(--hb-fg);
+    border: 0;
+    padding: 0;
+    font: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: color var(--motion-duration-fast) var(--hb-easing);
+  }
+
+  .captionShortcut:hover {
+    color: var(--hb-fg-hover);
+  }
 }
