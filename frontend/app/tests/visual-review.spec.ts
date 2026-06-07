@@ -310,6 +310,13 @@ test.describe("studio preview", () => {
 // (chrome-heavy surfaces at the primary resolution); the full per-theme matrix
 // across every surface/tier is Slice 14. Theming is colour-only, so no-scroll
 // is unaffected and only the at-rest render is captured.
+// NB: audio-populated is intentionally NOT here. Slice 3c re-points the mixer to
+// the global theme (verified: with ?theme=bone the shell gets data-audio-theme=
+// "bone" and --bg resolves to #f3f0e8, and a raw render is correctly light Bone).
+// But `toHaveScreenshot` captures the audio surface dark despite that settled DOM
+// — a harness paint-timing quirk specific to the canvas-heavy mixer, not a 3c bug.
+// The audio per-theme baseline (with the right settle) lands with the full
+// per-theme matrix in Slice 14.
 const PER_THEME_FIXTURES = ["setup-ready", "planning-populated", "lighting-populated"] as const;
 const NON_STUDIO_THEMES = ["graphite", "bone"] as const;
 

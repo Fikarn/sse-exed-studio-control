@@ -26,6 +26,7 @@ import { AudioMonitorBar } from "./components/AudioMonitorBar";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { AudioTextDialog } from "./components/AudioTextDialog";
 import { AudioTopBar } from "./components/AudioTopBar";
+import { useOperatorLayout } from "../OperatorLayoutProvider";
 import { type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { usePalette } from "../shared/paletteContext";
@@ -85,9 +86,11 @@ const AUDIO_DENSITY_MODE = "desktop";
 
 // Console redesign themes (Studio / Graphite / Bone) — applied via the
 // `data-audio-theme` attribute on the shell; CSS in AudioWorkspace.module.css
-// overrides the token family per theme.
+// overrides Audio's private token family per theme. Slice 3c: the active theme
+// is now driven by the GLOBAL theme (OperatorLayoutProvider / `data-theme` on
+// <html>) instead of an audio-local state + storage, so flipping the theme
+// anywhere carries the mixer along — the dark-chrome/light-mixer seam is closed.
 export type AudioTheme = "studio" | "graphite" | "bone";
-const AUDIO_THEME_STORAGE_KEY = "app.audio.theme";
 
 export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
   const { register } = usePalette();
@@ -108,11 +111,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("channel");
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
-  const [audioTheme, setAudioTheme] = useState<AudioTheme>(() => {
-    if (typeof window === "undefined") return "studio";
-    const stored = window.localStorage.getItem(AUDIO_THEME_STORAGE_KEY);
-    return stored === "graphite" || stored === "bone" ? stored : "studio";
-  });
+  // Slice 3c — follow the global theme rather than an audio-local state, so the
+  // mixer re-themes in lockstep with the chrome (seam closed). The switcher in
+  // AudioTopBar drives the same global setter.
+  const { theme: audioTheme, setTheme: setAudioTheme } = useOperatorLayout();
   const warningBandRef = useRef<HTMLDivElement | null>(null);
   const recallPulseTimerRef = useRef<number | null>(null);
 
@@ -122,10 +124,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     }
     window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace = (window.__SSE_TEST_RENDER_COUNTS__.audioWorkspace ?? 0) + 1;
   });
-
-  useEffect(() => {
-    window.localStorage.setItem(AUDIO_THEME_STORAGE_KEY, audioTheme);
-  }, [audioTheme]);
 
   const { audioSnapshotForView, applyOptimistic, clearOptimistic } = useAudioOptimisticSettings(audioSnapshot);
 
