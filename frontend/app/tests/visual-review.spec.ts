@@ -85,13 +85,20 @@ function expectedLayoutMode(width: number, height: number): string {
   return "constrained";
 }
 
-async function gotoFixture(page: Page, fixture: string, options: { operatorReview?: "studio" } = {}) {
+async function gotoFixture(
+  page: Page,
+  fixture: string,
+  options: { operatorReview?: "studio"; theme?: "graphite" | "bone" } = {}
+) {
   if (fixture.startsWith("planning-")) {
     await page.clock.setFixedTime(FIXTURE_NOW);
   }
   const params = new URLSearchParams({ fixture, transport: "fixture" });
   if (options.operatorReview) {
     params.set("operatorReview", options.operatorReview);
+  }
+  if (options.theme) {
+    params.set("theme", options.theme);
   }
   const response = await page.goto(`/?${params.toString()}`, { waitUntil: "networkidle" });
   expect(response, `fixture ${fixture} should return a document response`).not.toBeNull();
@@ -295,6 +302,30 @@ test.describe("studio preview", () => {
         maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
       });
     });
+  }
+});
+
+// Slice 3 — per-theme foundation. Graphite/Bone become app-wide via the global
+// `data-theme` attribute. This is the baseline INFRA + a representative set
+// (chrome-heavy surfaces at the primary resolution); the full per-theme matrix
+// across every surface/tier is Slice 14. Theming is colour-only, so no-scroll
+// is unaffected and only the at-rest render is captured.
+const PER_THEME_FIXTURES = ["setup-ready", "planning-populated", "lighting-populated"] as const;
+const NON_STUDIO_THEMES = ["graphite", "bone"] as const;
+
+test.describe("per-theme foundation", () => {
+  test.use({ viewport: { width: 2560, height: 1440 } });
+
+  for (const fixture of PER_THEME_FIXTURES) {
+    for (const theme of NON_STUDIO_THEMES) {
+      test(`${fixture} @ ${theme}`, async ({ page }) => {
+        await gotoFixture(page, fixture, { theme });
+        await expect(page).toHaveScreenshot(`${fixture}-${theme}-2560x1440.png`, {
+          mask: masksFor(page, fixture),
+          maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
+        });
+      });
+    }
   }
 });
 

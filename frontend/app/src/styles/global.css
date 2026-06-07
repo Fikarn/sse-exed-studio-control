@@ -1,6 +1,7 @@
 @layer reset, tokens, primitives, components, utilities, overrides;
 
 @import "@sse/tokens/styles.css" layer(tokens);
+@import "@sse/tokens/themes.css" layer(tokens);
 
 @layer reset {
   *,

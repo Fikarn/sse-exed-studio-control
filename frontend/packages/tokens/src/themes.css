@@ -1,0 +1,135 @@
+/*
+ * Global theme overrides — Slice 3 (program UX refinement).
+ *
+ * Hand-authored sibling to the generated `tokens.css`. The generated `:root`
+ * block is the default (Studio) theme; these `:root[data-theme="…"]` blocks
+ * re-map the CORE semantic color tokens for Graphite (cool-neutral dark) and
+ * Bone (light). Because the Slice 1 semantic aliases are emitted as
+ * `var(--base)` references, overriding the base tokens here cascades to every
+ * alias (--color-accent-*, --color-studio-*, --color-text-primary,
+ * --color-surface-default/raised/border, --color-success-*, --color-status-*),
+ * so the whole shared layer re-themes from this one file.
+ *
+ * `[data-theme]` lives on <html> (set by OperatorLayoutProvider), so portaled
+ * overlays inherit the theme too. `:root[data-theme]` (specificity 0,1,1)
+ * out-specifies the generated `:root` (0,1,0) regardless of layer order.
+ *
+ * Values were derived by a deterministic derive→adversarial-AA-verify workflow
+ * adopting the Audio Console's three theme identities (Studio amber, Graphite
+ * cyan, Bone dark-amber); every foreground clears its WCAG AA target in both
+ * themes (text 4.5:1, muted/subtle/severity 3:1).
+ *
+ * SCOPE: core semantic families only. The decorative stage/studio/glass/fixture
+ * tokens, the multi-hue brand colors (blue/coral/burgundy/yellow), and the
+ * physical `--color-cct-*` light temperatures keep their Studio values here —
+ * their per-theme (esp. Bone-light) tuning lands in Slice 14.
+ */
+
+:root[data-theme="graphite"] {
+  /* surface / bg / border — cool blue-black neutral */
+  --color-bg-deep: #07090b;
+  --color-bg-canvas: #0c0f12;
+  --color-bg-default: #11151a;
+  --color-bg-soft: #0e1216;
+  --color-bg-raised: #161b21;
+  --color-bg-strong: #1c232a;
+  --color-bg-elevated: #232b33;
+  --color-bg-stroke: #222a31;
+  --color-bg-hairline: rgba(232, 237, 240, 0.05);
+  --color-bg-border: #2a333b;
+  --color-bg-border-strong: #3a454e;
+  --color-surface-900: #10161b;
+  --color-surface-800: #19222a;
+  --color-surface-700: #222e38;
+  --color-surface-600: #2e3d48;
+  --color-background-950: #080b0d;
+  --color-background-900: #0f141a;
+  --color-background-850: #141a21;
+  --color-background-800: #1b232b;
+  --color-background-700: #232e37;
+  --color-border-default: #2b3942;
+  --color-border-strong: #41555f;
+
+  /* text — cool white ramp */
+  --color-text-strong: #e8edf0;
+  --color-text-muted: #aeb9c2;
+  --color-text-subtle: #828d96;
+  --color-brand-text-primary: #e6f4f3;
+  --color-brand-text-secondary: #bcccce;
+  --color-brand-text-muted: #7e8a8c;
+  --color-brand-text-faint: #525c5e;
+
+  /* primary / brand accent — green shifts to teal (Audio graphite cyan) */
+  --color-primary-500: #6fd6ce;
+  --color-primary-400: #9ce7df;
+  --color-primary-700: #3e7e78;
+  --color-brand-green-hot: #8fe6de;
+  --color-brand-green-soft: rgba(111, 214, 206, 0.16);
+  --color-brand-green-border: rgba(111, 214, 206, 0.5);
+  --color-brand-green-glow: rgba(111, 214, 206, 0.1);
+
+  /* severity — red / amber / blue, tuned for the cool dark bg */
+  --color-danger-500: #e5736e;
+  --color-danger-soft: rgba(229, 115, 110, 0.16);
+  --color-danger-soft-strong: rgba(229, 115, 110, 0.28);
+  --color-danger-glow: rgba(229, 115, 110, 0.06);
+  --color-danger-border: rgba(229, 115, 110, 0.5);
+  --color-danger-border-strong: rgba(229, 115, 110, 0.7);
+  --color-warning-500: #e0b463;
+  --color-info-500: #7fc0e8;
+}
+
+:root[data-theme="bone"] {
+  /* surface / bg / border — warm light */
+  --color-bg-deep: #ded9cc;
+  --color-bg-canvas: #e6e1d6;
+  --color-bg-default: #ece8de;
+  --color-bg-soft: #e9e4d9;
+  --color-bg-raised: #f2eee5;
+  --color-bg-strong: #f7f4ed;
+  --color-bg-elevated: #fbf9f3;
+  --color-bg-stroke: #f4f1ea;
+  --color-bg-hairline: rgba(26, 24, 20, 0.07);
+  --color-bg-border: #d8d2c4;
+  --color-bg-border-strong: #c4bdac;
+  --color-surface-900: #ebe6db;
+  --color-surface-800: #f1ece3;
+  --color-surface-700: #f6f2ea;
+  --color-surface-600: #fbf8f2;
+  --color-background-950: #dcd7c9;
+  --color-background-900: #e4dfd3;
+  --color-background-850: #eae5da;
+  --color-background-800: #f0ebe2;
+  --color-background-700: #f5f1e9;
+  --color-border-default: #d6d0c2;
+  --color-border-strong: #b7b0a0;
+
+  /* text — dark ramp (Audio bone fg) */
+  --color-text-strong: #1a1814;
+  --color-text-muted: #54514a;
+  --color-text-subtle: #71706a;
+  --color-brand-text-primary: #262017;
+  --color-brand-text-secondary: #4a4636;
+  --color-brand-text-muted: #6e6a5a;
+  --color-brand-text-faint: #7d7a6c;
+
+  /* primary / brand accent — green darkened to clear AA on the light body */
+  --color-primary-500: #3f6b41;
+  --color-primary-400: #4e844f;
+  --color-primary-700: #2d4f2f;
+  --color-brand-green-hot: #487a49;
+  --color-brand-green-soft: rgba(63, 107, 65, 0.16);
+  --color-brand-green-border: rgba(63, 107, 65, 0.5);
+  --color-brand-green-glow: rgba(63, 107, 65, 0.1);
+
+  /* severity — darkened reds/ambers/blues for AA on light (warning + info
+     auto-corrected by the AA workflow to clear threshold) */
+  --color-danger-500: #b23a30;
+  --color-danger-soft: rgba(178, 58, 48, 0.16);
+  --color-danger-soft-strong: rgba(178, 58, 48, 0.28);
+  --color-danger-glow: rgba(178, 58, 48, 0.06);
+  --color-danger-border: rgba(178, 58, 48, 0.5);
+  --color-danger-border-strong: rgba(178, 58, 48, 0.7);
+  --color-warning-500: #885d10;
+  --color-info-500: #296498;
+}
