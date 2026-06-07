@@ -250,33 +250,11 @@ button.lightingDmxDrawerCell {
   }
 }
 
-.setupShell {
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: 0 32px;
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--color-primary-500) 12%, transparent), transparent 38%),
-    radial-gradient(
-      circle at bottom right,
-      color-mix(in srgb, var(--color-warning-500) 10%, transparent),
-      transparent 32%
-    ),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-900) 96%, black 4%), var(--color-background-950));
-}
-
-.setupCanvas {
-  width: min(1400px, 100%);
-  min-height: 100vh;
-  min-height: 100dvh;
-  margin: 0 auto;
-}
-
 .setupLoadingShell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: var(--space-4) 0;
+  height: 100%;
+  padding: var(--space-4) var(--space-6);
 }
 
 .setupUtilityRow {
@@ -581,18 +559,11 @@ button.lightingDmxDrawerCell {
 }
 
 .stateShell {
-  min-height: 100vh;
+  height: 100%;
   display: grid;
   place-items: center;
   padding: clamp(24px, 4vw, 48px);
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--color-primary-500) 10%, transparent), transparent 42%),
-    radial-gradient(
-      circle at bottom right,
-      color-mix(in srgb, var(--color-warning-500) 10%, transparent),
-      transparent 36%
-    ),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-900) 96%, black 4%), var(--color-background-950));
+  /* PreReadyFrame now supplies the full-height gradient backdrop + crest. */
 }
 
 .stateSurface {
