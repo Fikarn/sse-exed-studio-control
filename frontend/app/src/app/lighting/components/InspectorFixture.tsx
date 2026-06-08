@@ -446,7 +446,7 @@ export function InspectorFixture({
       {onSpatialCommit ? (
         <InspectorSection title="Position" className={styles.compactSection}>
           <div className={styles.positionGrid}>
-            <label className={styles.positionField}>
+            <div className={styles.positionField}>
               <ScrubLabel
                 value={parseDraft(spatialXDraft, fixture.spatialX ?? 0)}
                 onChange={(next) => setSpatialXDraft(formatScrubMeters(next))}
@@ -455,6 +455,8 @@ export function InspectorFixture({
                 max={STUDIO_LAYOUT.roomWidthMeters}
                 pixelsPerStep={0.05}
                 step={0.1}
+                ariaLabel="Stage X"
+                formatValue={formatScrubMeters}
                 className={styles.positionLabel}
               >
                 Stage X (m)
@@ -473,8 +475,8 @@ export function InspectorFixture({
                   }
                 }}
               />
-            </label>
-            <label className={styles.positionField}>
+            </div>
+            <div className={styles.positionField}>
               <ScrubLabel
                 value={parseDraft(spatialYDraft, fixture.spatialY ?? 0)}
                 onChange={(next) => setSpatialYDraft(formatScrubMeters(next))}
@@ -483,6 +485,8 @@ export function InspectorFixture({
                 max={STUDIO_LAYOUT.roomDepthMeters}
                 pixelsPerStep={0.05}
                 step={0.1}
+                ariaLabel="Stage Y"
+                formatValue={formatScrubMeters}
                 className={styles.positionLabel}
               >
                 Stage Y (m)
@@ -501,8 +505,8 @@ export function InspectorFixture({
                   }
                 }}
               />
-            </label>
-            <label className={styles.positionField}>
+            </div>
+            <div className={styles.positionField}>
               <ScrubLabel
                 value={parseDraft(rigZDraft, fixture.rigZ ?? 0)}
                 onChange={(next) => setRigZDraft(formatScrubMeters(next))}
@@ -511,6 +515,8 @@ export function InspectorFixture({
                 max={RIG_HEIGHT_MAX_METERS}
                 pixelsPerStep={0.05}
                 step={0.1}
+                ariaLabel="Rig height"
+                formatValue={formatScrubMeters}
                 className={styles.positionLabel}
               >
                 Rig height (m)
@@ -529,8 +535,8 @@ export function InspectorFixture({
                   }
                 }}
               />
-            </label>
-            <label className={styles.positionField}>
+            </div>
+            <div className={styles.positionField}>
               <ScrubLabel
                 value={parseDraft(rotationDraft, normalizeDegrees(fixture.spatialRotation))}
                 onChange={(next) => setRotationDraft(formatScrubDegrees(normalizeDegrees(next)))}
@@ -539,6 +545,8 @@ export function InspectorFixture({
                 max={ROTATION_MAX_DEGREES}
                 pixelsPerStep={0.5}
                 step={1}
+                ariaLabel="Rotation"
+                formatValue={(value) => formatScrubDegrees(normalizeDegrees(value))}
                 className={styles.positionLabel}
               >
                 Rotation (°)
@@ -557,8 +565,8 @@ export function InspectorFixture({
                   }
                 }}
               />
-            </label>
-            <label className={styles.positionField}>
+            </div>
+            <div className={styles.positionField}>
               <ScrubLabel
                 value={parseDraft(beamAngleDraft, fixture.beamAngleDegrees ?? defaultLightingBeamAngle(fixture.type))}
                 onChange={(next) => setBeamAngleDraft(formatScrubDegrees(next))}
@@ -567,6 +575,8 @@ export function InspectorFixture({
                 max={BEAM_ANGLE_MAX_DEGREES}
                 pixelsPerStep={0.5}
                 step={1}
+                ariaLabel="Beam angle"
+                formatValue={formatScrubDegrees}
                 className={styles.positionLabel}
               >
                 Beam angle (°)
@@ -585,7 +595,7 @@ export function InspectorFixture({
                   }
                 }}
               />
-            </label>
+            </div>
           </div>
         </InspectorSection>
       ) : null}

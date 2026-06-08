@@ -125,14 +125,15 @@
 
 /* PLA-04: one keyboard focus ring for every interactive Planning control,
    mirroring the Audio/Lighting per-surface house pattern + the search-input
-   recipe. (planningBoardCard is a non-focusable <article> — it gets a ring once
-   CONTROLS-03/Slice 8 makes the card keyboard-focusable.) */
+   recipe. (CONTROLS-03/Slice 8b made planningBoardCard keyboard-focusable, so
+   it now joins the recipe.) */
 .planningToolbarButton:focus-visible,
 .planningModeButton:focus-visible,
 .planningNudgeButton:focus-visible,
 .planningTodayButton:focus-visible,
 .planningFilterButton:focus-visible,
 .planningBoardDetailButton:focus-visible,
+.planningBoardCard:focus-visible,
 .planningBlock:focus-visible,
 .planningUnscheduledChip:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);

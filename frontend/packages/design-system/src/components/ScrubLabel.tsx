@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
@@ -29,6 +30,16 @@ export interface ScrubLabelProps {
   step?: number;
   /** Disabled state. */
   disabled?: boolean;
+  /** Accessible name for the `role="slider"` element. Required in practice
+   *  because `children` is arbitrary node content, not a string. Keep it short
+   *  and distinct from the paired `<input>`'s label so screen readers announce
+   *  two affordances (nudge vs typed entry), not the same name twice. */
+  ariaLabel?: string;
+  /** Formats the numeric value for `aria-valuetext`. Pass the same formatter the
+   *  paired `<input>` displays so the slider announces the on-screen string. */
+  formatValue?: (value: number) => string;
+  /** Tab order for the slider. Defaults to 0. */
+  tabIndex?: number;
   /** Extra class on the root span. */
   className?: string;
 }
@@ -59,19 +70,29 @@ function snapToStep(value: number, step: number): number {
   return Math.round(value / step) * step;
 }
 
+const DEFAULT_FORMAT = (value: number): string => String(value);
+
 /**
  * Drag-horizontal scrub on a label, paired with an editable text input.
  * Logic Pro / Figma idiom — the label becomes a "scrubber" that nudges
  * the value while still allowing keyboard editing of the input itself.
  *
+ * CONTROLS-06: exposes `role="slider"` with arrow / Home / End / PageUp-Down
+ * keyboard nudges (raw step — fine/coarse stay a pointer-only affordance,
+ * mirroring `ScrubSlider`, which avoids a snap-grid no-op). The paired input
+ * remains the typed-entry surface; give the slider a distinct `ariaLabel` so
+ * the two announce as separate affordances rather than double-reading the value.
+ *
  * Modifiers (mid-drag): Cmd/Ctrl = ×0.1 fine, Shift = ×10 coarse, plain = ×1.
  *
- * Use inside a `<label>` alongside the matching `<input>`:
+ * Pair with a matching `<input>` inside a plain wrapper — NOT a `<label>`, since
+ * a focusable `role="slider"` is interactive content and must not live inside a
+ * label. Give the input its own `aria-label`:
  *
- *   <label>
- *     <ScrubLabel value={x} onChange={setX} min={0} max={12}>Stage X (m)</ScrubLabel>
- *     <input value={x} ... />
- *   </label>
+ *   <div>
+ *     <ScrubLabel value={x} onChange={setX} min={0} max={12} ariaLabel="Stage X">Stage X (m)</ScrubLabel>
+ *     <input aria-label="Stage X position in metres" value={x} ... />
+ *   </div>
  */
 export function ScrubLabel({
   children,
@@ -83,11 +104,15 @@ export function ScrubLabel({
   pixelsPerStep = 0.1,
   step,
   disabled = false,
+  ariaLabel,
+  formatValue = DEFAULT_FORMAT,
+  tabIndex = 0,
   className,
 }: ScrubLabelProps) {
   const dragRef = useRef<DragState | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
   const effectiveStep = step ?? pixelsPerStep;
+  const valueText = formatValue(value);
   // RAF-throttled onChange (same pattern as ScrubSlider). Coalesces high-rate
   // pointer events into one React update per animation frame.
   const pendingValueRef = useRef<number | null>(null);
@@ -161,6 +186,49 @@ export function ScrubLabel({
     [onChange, onCommit, value]
   );
 
+  // Keyboard nudge mirrors ScrubSlider: RAW step (no fine/coarse modifier), so
+  // the result always lands on the snap grid. onCommit fires per committed key
+  // like finishDrag does on pointerup.
+  const onKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLSpanElement>) => {
+      if (disabled) return;
+      let next: number;
+      switch (event.key) {
+        case "ArrowLeft":
+        case "ArrowDown":
+          next = value - effectiveStep;
+          break;
+        case "ArrowRight":
+        case "ArrowUp":
+          next = value + effectiveStep;
+          break;
+        case "PageDown":
+          next = value - effectiveStep * 10;
+          break;
+        case "PageUp":
+          next = value + effectiveStep * 10;
+          break;
+        case "Home":
+          if (min === undefined) return;
+          next = min;
+          break;
+        case "End":
+          if (max === undefined) return;
+          next = max;
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      next = clampValue(snapToStep(next, effectiveStep), min, max);
+      if (next !== value) {
+        onChange(next);
+        onCommit?.(next);
+      }
+    },
+    [disabled, effectiveStep, max, min, onChange, onCommit, value]
+  );
+
   return (
     <span
       className={[
@@ -171,7 +239,15 @@ export function ScrubLabel({
       ]
         .filter(Boolean)
         .join(" ")}
-      role="presentation"
+      role="slider"
+      aria-label={ariaLabel}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-valuetext={valueText}
+      aria-disabled={disabled || undefined}
+      tabIndex={disabled ? -1 : tabIndex}
+      onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={finishDrag}
