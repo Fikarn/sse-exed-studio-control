@@ -1,3 +1,8 @@
+/* AudioTextDialog — styled on GLOBAL DS tokens, not Audio-private (--bg-3/--fg/
+   --line-2/--accent), because the DS Dialog portals to document.body, OUTSIDE
+   .audioShell where those vars are defined. Mirrors NumberEntryDialog.module.css
+   so the rename dialog themes correctly wherever it portals. */
+
 .audioDialogForm {
   display: grid;
   gap: 8px;
@@ -6,7 +11,7 @@
 
 .audioDialogForm label,
 .audioDialogForm small {
-  color: var(--fg-3);
+  color: var(--color-text-muted);
   font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -16,30 +21,16 @@
   width: 100%;
   min-height: 34px;
   padding: 0 10px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--color-surface-border-strong);
   border-radius: var(--radius-tight-md);
-  background: var(--bg-3);
-  color: var(--fg);
+  background: var(--color-bg-soft);
+  color: var(--color-text-strong);
   font: var(--font-weight-semibold) 14px / 1 var(--font-family-ui);
   letter-spacing: 0;
   outline: none;
 }
 
 .audioDialogForm input:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 76%, var(--line-2));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
-}
-
-.audioDialogNumberField {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.audioDialogNumberField span {
-  color: var(--fg-3);
-  font: var(--font-weight-semibold) 12px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
+  border-color: color-mix(in srgb, var(--color-primary-500) 76%, var(--color-surface-border-strong));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 28%, transparent);
 }
