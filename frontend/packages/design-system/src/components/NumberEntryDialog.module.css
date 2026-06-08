@@ -34,6 +34,14 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 28%, transparent);
 }
 
+/* CONTROLS-07: hide the native number-spinner chrome. Keyboard arrow-stepping
+   (and the consumer's min/max/step clamping) is unaffected. */
+.form input::-webkit-outer-spin-button,
+.form input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
 .numberField {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
