@@ -7,12 +7,12 @@ import { StatusPill } from "../StatusPill";
 // with every other status primitive. These lock the label + the tone->color
 // mapping (driven by the inline --tone CSS var) + the info default.
 
-const TONE_VARS: Record<string, string> = {
+const TONE_VARS = {
   ok: "var(--color-primary-500)",
   attention: "var(--color-warning-500)",
   error: "var(--color-danger-500)",
   info: "var(--color-info-500)",
-};
+} as const;
 
 describe("StatusPill", () => {
   it("renders the label", () => {
