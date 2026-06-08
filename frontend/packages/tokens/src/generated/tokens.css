@@ -52,6 +52,7 @@
   --color-brand-text-secondary: #D4CDB3;
   --color-brand-text-muted: #8A8470;
   --color-brand-text-faint: #5A5547;
+  --color-scrim: rgba(0, 0, 0, 0.45);
   --color-bg-deep: #08090A;
   --color-bg-canvas: #0D0F0D;
   --color-bg-default: #121412;

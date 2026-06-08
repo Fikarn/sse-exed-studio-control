@@ -320,11 +320,25 @@ function OperatorShellInner() {
 
   const shellExperience = deriveShellExperience(shellState);
 
+  // CHROME-08: pre-ready surfaces (startup / recovery / setup-recovery) have no
+  // bottom footer, so the toast portal (mounted at document.body) should dock at
+  // the true edge rather than reserve the health-bar offset. The toast lives
+  // outside `.root`, so flag it on <html> — the one ancestor it inherits from.
+  useEffect(() => {
+    const preReady = shellExperience !== "ready";
+    document.documentElement.toggleAttribute("data-pre-ready", preReady);
+    return () => document.documentElement.removeAttribute("data-pre-ready");
+  }, [shellExperience]);
+
   if (setupModalActive && shellExperience === "startup") {
     return (
       <>
         <PreReadyFrame>
-          <SetupStartupSurface appSnapshot={shellState.appSnapshot} onShowShortcuts={showShortcuts} />
+          <SetupStartupSurface
+            appSnapshot={shellState.appSnapshot}
+            lifecycle={shellState.lifecycle}
+            onShowShortcuts={showShortcuts}
+          />
         </PreReadyFrame>
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (

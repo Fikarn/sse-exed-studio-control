@@ -4,12 +4,17 @@
    so it isn't subject to per-workspace overflow / transform clipping.
 
    The app's operator workspaces reserve the bottom edge for the health bar,
-   so the stack docks above that chrome instead of competing with it. */
+   so the stack docks above that chrome instead of competing with it.
+   --toast-safe-bottom defaults to the health-bar height; surfaces with no
+   footer (pre-ready: startup / recovery / setup-recovery) set it to 0 via
+   `html[data-pre-ready]` so the toast docks at the true edge there (CHROME-08).
+   The portal mounts at document.body — outside .root — so the override is
+   keyed on <html>, the only ancestor that reaches it. */
 
 .stack {
   position: fixed;
   right: 24px;
-  bottom: calc(var(--space-4) + var(--size-health-bar-height) + 12px);
+  bottom: calc(var(--space-4) + var(--toast-safe-bottom, var(--size-health-bar-height)) + 12px);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -22,7 +27,7 @@
 @media (max-width: 720px) {
   .stack {
     right: 12px;
-    bottom: calc(12px + var(--size-health-bar-height) + 10px);
+    bottom: calc(12px + var(--toast-safe-bottom, var(--size-health-bar-height)) + 10px);
     max-width: calc(100vw - 24px);
   }
 }

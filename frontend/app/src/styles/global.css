@@ -56,6 +56,14 @@
     color: var(--color-text-strong);
   }
 
+  /* CHROME-08: pre-ready surfaces (startup / recovery / setup-recovery) have
+     no bottom footer, so collapse the toast's reserved health-bar offset to
+     the true edge there. Keyed on <html> because the toast portal mounts at
+     document.body, outside the operator `.root` scope. */
+  html[data-pre-ready] {
+    --toast-safe-bottom: 0px;
+  }
+
   body {
     background:
       radial-gradient(circle at top left, rgba(153, 186, 146, 0.1), transparent 34%),

@@ -322,6 +322,13 @@ button.lightingDmxDrawerCell {
   animation: setupStartupPulse 1.2s ease-in-out infinite;
 }
 
+/* STA-05: the startup step rail sits under the pulse on the primary cold-boot
+   screen; constrain its width so it reads as a centered progress list rather
+   than spanning the full-bleed PreReadyFrame main. */
+.setupLoadingSteps {
+  width: min(100%, 560px);
+}
+
 .setupRecoveryShell {
   display: grid;
   gap: var(--space-4);
