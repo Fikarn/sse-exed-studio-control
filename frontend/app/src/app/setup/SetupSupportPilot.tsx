@@ -839,7 +839,7 @@ export function SetupSupportPilot({
                       </p>
                     </div>
                     <StatusBadge
-                      label={String(controlSurface?.status ?? "pending")}
+                      label={statusToneLabel(asStatusTone(controlSurface?.status, "info"))}
                       tone={mapStatusBadgeTone(asStatusTone(controlSurface?.status, "info"))}
                     />
                   </div>
