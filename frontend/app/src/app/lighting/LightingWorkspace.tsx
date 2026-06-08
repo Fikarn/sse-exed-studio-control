@@ -221,7 +221,7 @@ function pushUndoOutcomeToast(toast: ToastApi, outcome: UndoOutcome): void {
   }
   if (outcome.kind === "rejected") {
     toast.push({
-      tone: "info",
+      tone: "attention",
       message: `Cannot undo "${outcome.label}" — ${outcome.reason}.`,
     });
     return;
@@ -1062,7 +1062,7 @@ export function LightingWorkspaceSurface({
       return;
     }
     if (uiMode === "patch") {
-      toast.push({ message: "Exit patch mode before preview editing.", tone: "info" });
+      toast.push({ message: "Exit patch mode before preview editing.", tone: "attention" });
       return;
     }
     startBusy("preview-mode");
@@ -1078,7 +1078,7 @@ export function LightingWorkspaceSurface({
 
   const handleTogglePatch = useLiveCallback(() => {
     if (previewMode) {
-      toast.push({ message: "Exit preview before entering patch mode.", tone: "info" });
+      toast.push({ message: "Exit preview before entering patch mode.", tone: "attention" });
       return;
     }
     setUiMode((current) => (current === "patch" ? "recall" : "patch"));
@@ -1169,7 +1169,7 @@ export function LightingWorkspaceSurface({
 
   const requestAddFixture = useCallback(() => {
     if (previewMode) {
-      toast.push({ message: "Exit preview before adding fixtures.", tone: "info" });
+      toast.push({ message: "Exit preview before adding fixtures.", tone: "attention" });
       return;
     }
     setCreateFixtureOpen(true);
@@ -1312,7 +1312,7 @@ export function LightingWorkspaceSurface({
 
   const handleApplyPalette = useLiveCallback(async (paletteId: string, fixtureIds: readonly string[]) => {
     if (fixtureIds.length === 0) {
-      toast.push({ message: "Select a fixture before applying a palette.", tone: "info" });
+      toast.push({ message: "Select a fixture before applying a palette.", tone: "attention" });
       return;
     }
     const busyKey = `palette-apply:${paletteId}`;
@@ -1683,7 +1683,7 @@ export function LightingWorkspaceSurface({
     if (uiMode === "patch") {
       toast.push({
         message: "Patch mode is active. Exit patch mode before recalling a scene.",
-        tone: "info",
+        tone: "attention",
       });
       return;
     }
@@ -1710,7 +1710,7 @@ export function LightingWorkspaceSurface({
       // operator knows recall is preview-only and not a failed action.
       toast.push({
         message: "Bridge unreachable — showing scene contents only.",
-        tone: "info",
+        tone: "attention",
       });
       return;
     }
@@ -2017,7 +2017,7 @@ export function LightingWorkspaceSurface({
   // Operator press while highlight is active = clear (toggle).
   const handleToggleHighlight = useLiveCallback(async () => {
     if (previewMode) {
-      toast.push({ message: "Exit preview to use live Highlight.", tone: "info" });
+      toast.push({ message: "Exit preview to use live Highlight.", tone: "attention" });
       return;
     }
     if (highlightActive) {
@@ -2032,7 +2032,7 @@ export function LightingWorkspaceSurface({
       return;
     }
     if (selectedFixtureIds.size === 0) {
-      toast.push({ message: "Select fixtures to enable Highlight.", tone: "info" });
+      toast.push({ message: "Select fixtures to enable Highlight.", tone: "attention" });
       return;
     }
     startBusy("highlight");
@@ -2056,7 +2056,7 @@ export function LightingWorkspaceSurface({
   // Wave 29 — Solo toggle. Symmetric to Highlight.
   const handleToggleSolo = useLiveCallback(async () => {
     if (previewMode) {
-      toast.push({ message: "Exit preview to use live Solo.", tone: "info" });
+      toast.push({ message: "Exit preview to use live Solo.", tone: "attention" });
       return;
     }
     if (soloActive) {
@@ -2071,7 +2071,7 @@ export function LightingWorkspaceSurface({
       return;
     }
     if (selectedFixtureIds.size === 0) {
-      toast.push({ message: "Select fixtures to enable Solo.", tone: "info" });
+      toast.push({ message: "Select fixtures to enable Solo.", tone: "attention" });
       return;
     }
     startBusy("solo");
@@ -2098,11 +2098,11 @@ export function LightingWorkspaceSurface({
   // chosen to clear in <2 s for a typical 3-fixture key triangle.
   const handleIdentifyFind = useLiveCallback(async () => {
     if (previewMode) {
-      toast.push({ message: "Exit preview to use live Find.", tone: "info" });
+      toast.push({ message: "Exit preview to use live Find.", tone: "attention" });
       return;
     }
     if (selectedFixtureIds.size === 0) {
-      toast.push({ message: "Select fixtures to enable Find.", tone: "info" });
+      toast.push({ message: "Select fixtures to enable Find.", tone: "attention" });
       return;
     }
     const ids = Array.from(selectedFixtureIds);
@@ -2350,7 +2350,7 @@ export function LightingWorkspaceSurface({
 
   const handleFixtureNudge = useLiveCallback(async (deltaXMeters: number, deltaYMeters: number) => {
     if (previewMode) {
-      toast.push({ message: "Exit preview to move fixtures on the plot.", tone: "info" });
+      toast.push({ message: "Exit preview to move fixtures on the plot.", tone: "attention" });
       return;
     }
     const fixture = persistedSelectedFixtureId
@@ -2376,7 +2376,7 @@ export function LightingWorkspaceSurface({
       case "rejected":
         toast.push({
           message: `Cannot ${kind.toLowerCase()} ‘${outcome.label}’: ${outcome.reason}.`,
-          tone: "info",
+          tone: "attention",
         });
         break;
       case "error":

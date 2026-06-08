@@ -49,6 +49,21 @@
   border-color: var(--color-danger-500);
 }
 
+/* attention — amber advisory (blocked action / degraded-but-not-failed). Uses
+   the single sanctioned amber (--color-warning-500, themed in all three). The
+   wash + border carry the amber identity while body text stays the primary
+   token so it clears AA in Studio/Graphite/Bone (amber-on-dark text would
+   not). */
+.toast[data-tone="attention"] {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-warning-500) 18%, var(--color-bg-soft)),
+    var(--color-bg-soft)
+  );
+  color: var(--color-brand-text-primary);
+  border-color: color-mix(in srgb, var(--color-warning-500) 60%, var(--color-bg-stroke));
+}
+
 .toast[data-tone="info"] {
   background: var(--color-bg-soft);
   color: var(--color-brand-text-secondary);
