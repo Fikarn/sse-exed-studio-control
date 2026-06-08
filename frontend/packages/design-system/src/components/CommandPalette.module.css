@@ -134,7 +134,10 @@
 }
 
 .itemFocused {
+  /* GLO-03: the active (aria-activedescendant) row was a bare tint; add an inset
+     keyline so it reads as a focus affordance, not just another green state. */
   background: var(--color-brand-green-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-green) 55%, transparent);
 }
 
 .label {

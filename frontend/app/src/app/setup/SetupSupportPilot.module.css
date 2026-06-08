@@ -441,9 +441,12 @@
 
   .railButton:disabled {
     cursor: not-allowed;
+    /* SET-10 / THEME-04: drop opacity:0.55 — it crushed full-alpha
+       --color-text-subtle below the 3:1 UI floor in all three themes. Disabled
+       reads via the desaturated border + not-allowed cursor; full-alpha subtle
+       clears 3:1 in Studio/Graphite/Bone. */
     border-color: color-mix(in srgb, var(--color-border-default) 86%, transparent);
     color: var(--color-text-subtle);
-    opacity: 0.55;
   }
 
   /* Slice 5 (CHROME-02): the runner footer is now the shared DS HealthBar

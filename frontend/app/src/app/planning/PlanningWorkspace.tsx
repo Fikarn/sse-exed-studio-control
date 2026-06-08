@@ -1044,11 +1044,11 @@ export function PlanningWorkspaceSurface({
               <span className={planningStyles.planningStatLabel}>On-time</span>
               <span className={planningStyles.planningStatValue}>{onTimeCount}</span>
             </div>
-            <div className={planningStyles.planningStatChip}>
+            <div className={planningStyles.planningStatChip} data-tone={slippedCount > 0 ? "warn" : undefined}>
               <span className={planningStyles.planningStatLabel}>Slipped</span>
               <span className={planningStyles.planningStatValue}>{slippedCount}</span>
             </div>
-            <div className={planningStyles.planningStatChip}>
+            <div className={planningStyles.planningStatChip} data-tone={blockedCount > 0 ? "danger" : undefined}>
               <span className={planningStyles.planningStatLabel}>Blocked</span>
               <span className={planningStyles.planningStatValue}>{blockedCount}</span>
             </div>
