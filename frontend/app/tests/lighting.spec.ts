@@ -444,6 +444,26 @@ test("nudges the selected fixture horizontally from the keyboard", async ({ page
   await expect(page.getByLabel("Stage X position in metres")).toHaveValue("0.35");
 });
 
+test("nudges a fixture Position field from the ScrubLabel slider keyboard", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  // CONTROLS-06: the Position label is now a role=slider, keyboard-operable like
+  // every other slider in the product.
+  const stageX = page.getByRole("slider", { name: "Stage X" });
+  await expect(stageX).toHaveAttribute("aria-valuenow", "0.24");
+
+  await stageX.focus();
+  // The ScrubLabel handles the arrow (and preventDefaults it), so the global
+  // stage-plot nudge is suppressed and the value snaps onto the field's grid.
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByLabel("Stage X position in metres")).toHaveValue("0.3");
+  await expect(stageX).toHaveAttribute("aria-valuenow", "0.3");
+
+  await page.keyboard.press("Home");
+  await expect(page.getByLabel("Stage X position in metres")).toHaveValue("0.0");
+  await expect(stageX).toHaveAttribute("aria-valuenow", "0");
+});
+
 test("drags the selected fixture to a new plot position", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 

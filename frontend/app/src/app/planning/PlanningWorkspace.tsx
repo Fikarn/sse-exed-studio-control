@@ -1255,12 +1255,63 @@ export function PlanningWorkspaceSurface({
                           data-selected={settings.selectedProjectId === project.id}
                           draggable
                           data-testid={`planning-board-card-${project.id}`}
+                          role="group"
+                          tabIndex={0}
+                          aria-roledescription="Draggable kanban card"
+                          aria-label={`${project.title}, ${column.label} column, position ${projectIndex + 1} of ${columnProjects.length}. Use arrow keys to move.`}
                           onClick={() =>
                             void store.updatePlanningSettings({
                               selectedProjectId: project.id,
                               selectedTaskId: projectTasks[0]?.id ?? null,
                             })
                           }
+                          onKeyDown={(event) => {
+                            // CONTROLS-03: keyboard parity for the pointer-drag
+                            // verb. Reuses reorderPlanningProject (the drag path)
+                            // — presentation-only, no new engine data. Modifier
+                            // chords early-return so app/OS shortcuts are untouched.
+                            if (event.metaKey || event.ctrlKey || event.altKey) {
+                              return;
+                            }
+                            if (event.key === "Enter" || event.key === " ") {
+                              // Only the card itself selects; the nested detail
+                              // button keeps its own Enter/Space activation.
+                              if (event.target !== event.currentTarget) {
+                                return;
+                              }
+                              event.preventDefault();
+                              void store.updatePlanningSettings({
+                                selectedProjectId: project.id,
+                                selectedTaskId: projectTasks[0]?.id ?? null,
+                              });
+                              return;
+                            }
+                            if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+                              // Reorder within the current status column.
+                              const targetIndex = projectIndex + (event.key === "ArrowUp" ? -1 : 1);
+                              if (targetIndex < 0 || targetIndex >= columnProjects.length) {
+                                return;
+                              }
+                              event.preventDefault();
+                              void reorderPlanningProject(project.id, column.id, targetIndex);
+                              return;
+                            }
+                            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                              // Move to the adjacent status column (append to its end,
+                              // matching the column-body pointer drop).
+                              const columnIndex = boardColumns.findIndex((entry) => entry.id === column.id);
+                              const targetColumnIndex = columnIndex + (event.key === "ArrowLeft" ? -1 : 1);
+                              if (targetColumnIndex < 0 || targetColumnIndex >= boardColumns.length) {
+                                return;
+                              }
+                              event.preventDefault();
+                              const targetStatus = boardColumns[targetColumnIndex].id;
+                              const targetCount = filteredProjects.filter(
+                                (entry) => entry.status === targetStatus
+                              ).length;
+                              void reorderPlanningProject(project.id, targetStatus, targetCount);
+                            }
+                          }}
                           onDragEnd={() => clearPlanningBoardDragState()}
                           onDragStart={(event) => {
                             setDraggingBoardProjectId(project.id);

@@ -69,6 +69,64 @@ test("supports retained planning board drag reorder and status moves", async ({ 
   await expect(blockedCards.nth(1)).toContainText("lighting");
 });
 
+test("moves a planning board card across status columns from the keyboard", async ({ page }) => {
+  await openFixture(page, "planning-populated");
+
+  const workspace = page.getByTestId("planning-workspace");
+  await page.keyboard.press("Shift+KeyB");
+
+  const inProgressColumn = workspace.getByTestId("planning-board-column-in-progress");
+  const blockedColumn = workspace.getByTestId("planning-board-column-blocked");
+  const boothCard = workspace.getByTestId("planning-board-card-proj-booth-2");
+
+  // CONTROLS-03: the card is now a focusable, keyboard-operable group.
+  await expect(boothCard).toHaveAttribute("role", "group");
+  await expect(boothCard).toHaveAttribute("tabindex", "0");
+  await expect(boothCard).toHaveAttribute("aria-roledescription", "Draggable kanban card");
+
+  await boothCard.focus();
+  await expect(boothCard).toBeFocused();
+
+  // ArrowRight moves in-progress -> blocked, reusing the drag reorder path.
+  await page.keyboard.press("ArrowRight");
+  await expect(blockedColumn.getByTestId("planning-board-card-proj-booth-2")).toBeVisible();
+  await expect(blockedColumn.getByTestId("planning-board-card-proj-booth-2")).toHaveAttribute("data-blocked", "true");
+  await expect(inProgressColumn.getByTestId("planning-board-card-proj-booth-2")).toHaveCount(0);
+});
+
+test("reorders a planning board card within its column from the keyboard", async ({ page }) => {
+  await openFixture(page, "planning-populated");
+
+  const workspace = page.getByTestId("planning-workspace");
+  await page.keyboard.press("Shift+KeyB");
+
+  const inProgressColumn = workspace.getByTestId("planning-board-column-in-progress");
+  const inProgressCards = inProgressColumn.locator('[data-testid^="planning-board-card-"]');
+  await expect(inProgressCards.nth(0)).toHaveAttribute("data-testid", "planning-board-card-proj-booth-2");
+  await expect(inProgressCards.nth(1)).toHaveAttribute("data-testid", "planning-board-card-proj-audio");
+
+  await workspace.getByTestId("planning-board-card-proj-booth-2").focus();
+  // ArrowDown reorders booth_2 one position later within in-progress.
+  await page.keyboard.press("ArrowDown");
+  await expect(inProgressCards.nth(0)).toHaveAttribute("data-testid", "planning-board-card-proj-audio");
+  await expect(inProgressCards.nth(1)).toHaveAttribute("data-testid", "planning-board-card-proj-booth-2");
+});
+
+test("selects a planning board card with Enter from the keyboard", async ({ page }) => {
+  await openFixture(page, "planning-populated");
+
+  const workspace = page.getByTestId("planning-workspace");
+  await page.keyboard.press("Shift+KeyB");
+
+  // proj-booth-2 is the seeded selection; selecting another card via the
+  // keyboard must move the selection.
+  const opsCard = workspace.getByTestId("planning-board-card-proj-ops");
+  await opsCard.focus();
+  await page.keyboard.press("Enter");
+  await expect(opsCard).toHaveAttribute("data-selected", "true");
+  await expect(workspace.getByTestId("planning-board-card-proj-booth-2")).toHaveAttribute("data-selected", "false");
+});
+
 test("supports planning timeline selection, keyboard reschedule, and local day navigation", async ({ page }) => {
   await openFixture(page, "planning-populated");
 
