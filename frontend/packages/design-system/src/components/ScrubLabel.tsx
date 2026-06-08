@@ -40,8 +40,11 @@ interface DragState {
 }
 
 function modifierFactor(event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }): number {
-  if (event.shiftKey) return 0.1;
-  if (event.metaKey || event.ctrlKey) return 10;
+  // CONTROLS-01: align to the Audio fader contract — Cmd/Ctrl = ×0.1 FINE
+  // (was inverted vs Audio). Mirrors the ScrubSlider flip so the two scrub
+  // primitives agree.
+  if (event.metaKey || event.ctrlKey) return 0.1;
+  if (event.shiftKey) return 10;
   return 1;
 }
 
@@ -61,7 +64,7 @@ function snapToStep(value: number, step: number): number {
  * Logic Pro / Figma idiom — the label becomes a "scrubber" that nudges
  * the value while still allowing keyboard editing of the input itself.
  *
- * Modifiers (mid-drag): Shift = ×0.1 fine, Cmd/Ctrl = ×10 coarse, plain = ×1.
+ * Modifiers (mid-drag): Cmd/Ctrl = ×0.1 fine, Shift = ×10 coarse, plain = ×1.
  *
  * Use inside a `<label>` alongside the matching `<input>`:
  *

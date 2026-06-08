@@ -57,8 +57,11 @@ export interface ScrubSliderProps {
 const DEFAULT_FORMAT = (value: number) => String(Math.round(value));
 
 function modifierForEvent(event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }): ScrubModifier {
-  if (event.shiftKey) return "fine";
-  if (event.metaKey || event.ctrlKey) return "coarse";
+  // CONTROLS-01: align to the Audio fader contract — Cmd/Ctrl = FINE adjust
+  // (the modifier was previously inverted vs Audio: Cmd/Ctrl gave coarse). Shift
+  // keeps a coarse affordance, which Audio's linear fader does not contradict.
+  if (event.metaKey || event.ctrlKey) return "fine";
+  if (event.shiftKey) return "coarse";
   return "default";
 }
 
@@ -92,8 +95,8 @@ interface DragState {
 /**
  * Continuous numeric slider with pointer + keyboard input. Replaces native
  * `<input type="range">` with custom track + thumb so we can intercept the
- * pointer-delta calculation and apply fine/coarse modifiers — Figma /
- * Logic Pro convention: Shift = ×0.1 fine, Cmd/Ctrl = ×10 coarse, plain = ×1.
+ * pointer-delta calculation and apply fine/coarse modifiers. Matches the Audio
+ * fader contract: Cmd/Ctrl = ×0.1 fine, Shift = ×10 coarse, plain = ×1.
  *
  * Double-click resets to `resetValue` when provided. Keyboard nudges retain
  * native semantics (arrows, Home/End, PageUp/Down). ARIA shape mirrors

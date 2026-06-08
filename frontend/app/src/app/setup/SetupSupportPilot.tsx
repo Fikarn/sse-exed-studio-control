@@ -799,6 +799,7 @@ export function SetupSupportPilot({
             {runnerSteps.map((step, index) => (
               <button
                 key={step.id}
+                aria-selected={step.id === activeStepId}
                 className={styles.stepButton}
                 data-active={step.id === activeStepId}
                 data-status={step.tone}
