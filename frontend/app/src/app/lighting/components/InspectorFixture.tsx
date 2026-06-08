@@ -301,7 +301,7 @@ export function InspectorFixture({
               ) : null}
             </div>
             <div className={styles.fixtureSubline}>
-              <StatusDot state={fixture.on ? "ok" : "info"} size="sm" />
+              <StatusDot tone={fixture.on ? "ok" : "info"} size="sm" />
               {fixture.on ? "Live" : "Standby"} · {MOUNTING_LABEL[deriveMounting(fixture, catalog)]}
             </div>
           </div>

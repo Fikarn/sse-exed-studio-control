@@ -7,29 +7,29 @@ import { StatusDot, type StatusDotSize, type StatusDotState } from "../StatusDot
 // imports). Renders an aria-hidden span — no interactive behavior, so
 // tests cover render + every variant + the optional glow toggle.
 
-const STATES: readonly StatusDotState[] = ["ok", "attn", "err", "info"];
+const TONES: readonly StatusDotState[] = ["ok", "attn", "err", "info"];
 const SIZES: readonly StatusDotSize[] = ["sm", "md"];
 
 describe("StatusDot", () => {
   it("renders an aria-hidden span by default", () => {
-    const { container } = render(<StatusDot state="ok" />);
+    const { container } = render(<StatusDot tone="ok" />);
     const span = container.querySelector("span");
     expect(span).not.toBeNull();
     expect(span).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("applies every documented state", () => {
-    for (const state of STATES) {
-      const { unmount, container } = render(<StatusDot state={state} />);
+  it("applies every documented tone", () => {
+    for (const tone of TONES) {
+      const { unmount, container } = render(<StatusDot tone={tone} />);
       const span = container.querySelector("span");
-      expect(span?.className).toMatch(new RegExp(state));
+      expect(span?.className).toMatch(new RegExp(tone));
       unmount();
     }
   });
 
   it("applies every documented size", () => {
     for (const size of SIZES) {
-      const { unmount, container } = render(<StatusDot state="ok" size={size} />);
+      const { unmount, container } = render(<StatusDot tone="ok" size={size} />);
       const span = container.querySelector("span");
       expect(span?.className).toMatch(new RegExp(size));
       unmount();
@@ -37,19 +37,19 @@ describe("StatusDot", () => {
   });
 
   it("includes the glow class when glow=true (default)", () => {
-    const { container } = render(<StatusDot state="ok" />);
+    const { container } = render(<StatusDot tone="ok" />);
     const span = container.querySelector("span");
     expect(span?.className).toMatch(/glow/);
   });
 
   it("omits the glow class when glow=false", () => {
-    const { container } = render(<StatusDot state="ok" glow={false} />);
+    const { container } = render(<StatusDot tone="ok" glow={false} />);
     const span = container.querySelector("span");
     expect(span?.className).not.toMatch(/glow/);
   });
 
   it("merges a caller-supplied className", () => {
-    const { container } = render(<StatusDot state="ok" className="extra-class" />);
+    const { container } = render(<StatusDot tone="ok" className="extra-class" />);
     const span = container.querySelector("span");
     expect(span?.className).toMatch(/extra-class/);
   });

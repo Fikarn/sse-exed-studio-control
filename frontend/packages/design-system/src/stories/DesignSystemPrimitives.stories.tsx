@@ -280,24 +280,24 @@ export const DirectionDStatusDot: StoryObj<typeof meta> = {
       <div style={dColumn}>
         <div style={dRow}>
           <span style={{ width: "120px" }}>md, glow on</span>
-          <StatusDot state="ok" />
-          <StatusDot state="attn" />
-          <StatusDot state="err" />
-          <StatusDot state="info" />
+          <StatusDot tone="ok" />
+          <StatusDot tone="attn" />
+          <StatusDot tone="err" />
+          <StatusDot tone="info" />
         </div>
         <div style={dRow}>
           <span style={{ width: "120px" }}>sm, glow on</span>
-          <StatusDot state="ok" size="sm" />
-          <StatusDot state="attn" size="sm" />
-          <StatusDot state="err" size="sm" />
-          <StatusDot state="info" size="sm" />
+          <StatusDot tone="ok" size="sm" />
+          <StatusDot tone="attn" size="sm" />
+          <StatusDot tone="err" size="sm" />
+          <StatusDot tone="info" size="sm" />
         </div>
         <div style={dRow}>
           <span style={{ width: "120px" }}>md, glow off</span>
-          <StatusDot state="ok" glow={false} />
-          <StatusDot state="attn" glow={false} />
-          <StatusDot state="err" glow={false} />
-          <StatusDot state="info" glow={false} />
+          <StatusDot tone="ok" glow={false} />
+          <StatusDot tone="attn" glow={false} />
+          <StatusDot tone="err" glow={false} />
+          <StatusDot tone="info" glow={false} />
         </div>
       </div>
     </div>

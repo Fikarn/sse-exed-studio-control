@@ -63,6 +63,7 @@ export { MultiValueSlider, parseDeltaExpression } from "./components/MultiValueS
 export type { MultiValueSliderProps } from "./components/MultiValueSlider";
 export { SegmentedControl } from "./components/SegmentedControl";
 export type { SegmentedControlOption, SegmentedControlProps } from "./components/SegmentedControl";
+export type { SharedStatusTone } from "./components/statusTone";
 export { StatusBadge } from "./components/StatusBadge";
 export type { StatusBadgeProps, StatusTone } from "./components/StatusBadge";
 export { StatusDot } from "./components/StatusDot";

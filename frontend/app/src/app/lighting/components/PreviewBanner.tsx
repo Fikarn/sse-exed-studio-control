@@ -18,7 +18,7 @@ export function PreviewBanner({ busy = false, dirty, targetSceneName, onDiscard,
     <section className={styles.banner} aria-label="Lighting preview mode">
       <div className={styles.copy} aria-live="polite">
         <span className={styles.eyebrow}>
-          <StatusDot state={dirty ? "attn" : "info"} size="sm" />
+          <StatusDot tone={dirty ? "attn" : "info"} size="sm" />
           Editing offline
         </span>
         <span className={styles.detail}>

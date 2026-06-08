@@ -142,7 +142,7 @@ export const HealthItem = ({ label, value, dot, suffix, icon, last, className }:
       <div className={styles.label}>{label}</div>
       <div className={styles.value}>
         {icon}
-        {dot ? <StatusDot state={dot} size="md" /> : null}
+        {dot ? <StatusDot tone={dot} size="md" /> : null}
         <span className={styles.valueText}>{value}</span>
         {suffix ? <small>{suffix}</small> : null}
       </div>
