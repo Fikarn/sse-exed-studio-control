@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 
 import styles from "./Toast.module.css";
 
-export type ToastTone = "ok" | "error" | "info";
+export type ToastTone = "ok" | "attention" | "error" | "info";
 
 export interface ToastAction {
   label: string;
@@ -24,6 +24,7 @@ export interface ToastProps {
 
 /**
  * Single toast bubble. Tones: ok (success / non-error confirmation),
+ * attention (amber — a blocked-action or degraded-but-not-failed advisory),
  * info (neutral status), error (sticky failures). Stacks are rendered by
  * the consumer via a portal — this primitive is one tile.
  */

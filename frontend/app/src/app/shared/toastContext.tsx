@@ -19,7 +19,7 @@ export interface ToastInput {
   title?: string;
   /** Inline action button (typically "Undo"). Click also dismisses the toast. */
   action?: ToastAction;
-  /** Override auto-dismiss timing. Defaults: ok/info 3.5 s, error sticky. */
+  /** Override auto-dismiss timing. Defaults: ok/info 3.5 s, attention 5 s, error sticky. */
   durationMs?: number;
 }
 
@@ -35,6 +35,7 @@ export interface ToastApi {
 const DEFAULT_DURATION_MS: Record<ToastTone, number | null> = {
   ok: 3500,
   info: 3500,
+  attention: 5000, // amber advisory — lingers a touch longer than info, not sticky
   error: null, // sticky until manual dismiss
 };
 
