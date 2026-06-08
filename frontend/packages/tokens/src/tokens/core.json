@@ -92,6 +92,7 @@
         "faint": { "$value": "#5A5547" }
       }
     },
+    "scrim": { "$value": "rgba(0, 0, 0, 0.45)" },
     "bg": {
       "deep": { "$value": "#08090A" },
       "canvas": { "$value": "#0D0F0D" },

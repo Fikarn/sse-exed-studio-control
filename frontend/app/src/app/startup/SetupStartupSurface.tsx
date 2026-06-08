@@ -1,13 +1,17 @@
-import { Button } from "@sse/design-system";
+import { Button, StatusBadge } from "@sse/design-system";
+import type { ShellState } from "@sse/engine-client";
 
 import { asRecord, type SnapshotRecord } from "../shellData";
 import styles from "../OperatorShell.module.css";
+import { buildStartupSteps, stepStatusLabel } from "./startupHelpers";
 
 export function SetupStartupSurface({
   appSnapshot,
+  lifecycle,
   onShowShortcuts,
 }: {
   appSnapshot: SnapshotRecord | null;
+  lifecycle: ShellState["lifecycle"];
   onShowShortcuts: () => void;
 }) {
   const shell = asRecord(appSnapshot?.shell);
@@ -43,6 +47,21 @@ export function SetupStartupSurface({
       <div aria-live="polite" className={styles.setupLoadingState} role="status">
         <div className={styles.setupLoadingLabel}>STARTING ENGINE…</div>
         <div aria-hidden="true" className={styles.setupLoadingPulse} />
+        {/* STA-05: surface the engine-handshake progress on the primary cold-boot
+            screen (was just the label + pulse), reusing the shared startup steps. */}
+        <div className={styles.setupLoadingSteps}>
+          <div className={styles.stepList}>
+            {buildStartupSteps(lifecycle).map((step) => (
+              <div key={step.label} className={styles.stepItem}>
+                <div>
+                  <div className={styles.stepLabel}>{step.label}</div>
+                  <div className={styles.stepDetail}>{step.description}</div>
+                </div>
+                <StatusBadge label={stepStatusLabel(step.tone)} tone={step.tone} />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
