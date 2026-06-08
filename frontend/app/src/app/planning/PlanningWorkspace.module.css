@@ -123,6 +123,22 @@
   outline-offset: 2px;
 }
 
+/* PLA-04: one keyboard focus ring for every interactive Planning control,
+   mirroring the Audio/Lighting per-surface house pattern + the search-input
+   recipe. (planningBoardCard is a non-focusable <article> — it gets a ring once
+   CONTROLS-03/Slice 8 makes the card keyboard-focusable.) */
+.planningToolbarButton:focus-visible,
+.planningModeButton:focus-visible,
+.planningNudgeButton:focus-visible,
+.planningTodayButton:focus-visible,
+.planningFilterButton:focus-visible,
+.planningBoardDetailButton:focus-visible,
+.planningBlock:focus-visible,
+.planningUnscheduledChip:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);
+  outline-offset: 2px;
+}
+
 .planningToolbarNotice {
   padding: 12px 14px;
   border: 1px solid var(--color-border-default);
@@ -169,6 +185,7 @@
   font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 32px) / 1 var(--font-family-mono);
   color: var(--color-text-primary);
   letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .planningTimeReportSubtitle {
@@ -256,6 +273,7 @@
   gap: var(--space-2);
   color: var(--color-text-primary);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .planningTimeReportRunningDot {
@@ -322,6 +340,7 @@
   color: var(--color-text-primary);
   font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.3 var(--font-family-mono);
   letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .planningProjectDetailProgress {
@@ -406,9 +425,15 @@
 }
 
 .planningProjectDetailTaskComposerInput:focus {
-  outline: none;
   border-color: color-mix(in srgb, var(--color-primary-500) 54%, var(--color-border-default));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
+}
+
+/* CONTROLS-04: restore a real keyboard focus ring (the input previously set
+   outline:none on :focus, defeating it). */
+.planningProjectDetailTaskComposerInput:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);
+  outline-offset: 2px;
 }
 
 .planningProjectDetailTaskComposerActions {
@@ -588,9 +613,14 @@
 }
 
 .planningProjectDetailChecklistComposerInput:focus {
-  outline: none;
   border-color: color-mix(in srgb, var(--color-primary-500) 54%, var(--color-border-default));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
+}
+
+/* CONTROLS-04: restore the keyboard focus ring defeated by outline:none. */
+.planningProjectDetailChecklistComposerInput:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);
+  outline-offset: 2px;
 }
 
 .planningProjectDetailChecklistError {
@@ -656,6 +686,19 @@
   background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
 }
 
+/* PLA-05: severity-encode the at-a-glance metric chips so a non-zero Slipped
+   (amber attention) / Blocked (danger) chip is chromatically distinct from the
+   neutral On-time/Lanes chips. data-tone is only set when the count > 0. */
+.planningStatChip[data-tone="warn"] {
+  border-color: color-mix(in srgb, var(--color-warning-500) 38%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-warning-500) 12%, var(--color-surface-800));
+}
+
+.planningStatChip[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--color-danger-500) 38%, var(--color-border-default));
+  background: color-mix(in srgb, var(--color-danger-500) 12%, var(--color-surface-800));
+}
+
 .planningNowLabel,
 .planningStatLabel {
   color: var(--color-text-subtle);
@@ -668,6 +711,7 @@
 .planningStatValue {
   font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-lg)) / 1 var(--font-family-mono);
   letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .planningNowHeader {
@@ -797,6 +841,7 @@
   transform: translateX(-50%);
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .planningTimeline {
@@ -978,9 +1023,13 @@
   animation: planningOverlapPulse 900ms ease-out;
 }
 
+/* PLA-12: selection is a NEUTRAL high-contrast keyline so it doesn't collide
+   with the green in-progress fill / running glow stacked underneath (those three
+   states previously all read as primary-green). --color-text-strong themes per
+   data-theme (near-white in Studio/Graphite, dark in Bone). */
 .planningBlock[data-selected="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 54%, var(--color-border-default));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
+  border-color: var(--color-text-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-text-strong) 35%, transparent);
 }
 
 @keyframes planningOverlapPulse {
@@ -1001,6 +1050,7 @@
 .planningBlockMeta {
   color: var(--color-text-muted);
   font: var(--font-weight-medium) 12px / 1.2 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
 
@@ -1228,8 +1278,8 @@
 }
 
 .planningBoardCard[data-selected="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
+  border-color: var(--color-text-strong);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-text-strong) 35%, transparent);
 }
 
 .planningBoardCard[data-dragging="true"] {
