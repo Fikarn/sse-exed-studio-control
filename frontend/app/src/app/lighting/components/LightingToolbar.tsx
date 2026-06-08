@@ -324,7 +324,7 @@ export function LightingToolbar({
             className={`${styles.chip} ${bridgeReachable ? styles.chipGreen : styles.chipErr}`}
             data-toolbar-primary="status"
           >
-            <StatusDot state={bridgeReachable ? "ok" : "err"} size="sm" />
+            <StatusDot tone={bridgeReachable ? "ok" : "err"} size="sm" />
             DMX U{bridgeUniverse} · {bridgeReachable ? "reachable" : "unreachable"}
           </span>
         </Tooltip>

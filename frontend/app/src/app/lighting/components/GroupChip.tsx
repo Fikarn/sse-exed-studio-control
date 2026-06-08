@@ -162,7 +162,7 @@ export function GroupChip({
         {colorHex ? (
           <span aria-hidden="true" className={styles.groupChipColorBar} style={{ background: colorHex }} />
         ) : null}
-        <StatusDot state={on ? "ok" : "info"} size="sm" glow={on} />
+        <StatusDot tone={on ? "ok" : "info"} size="sm" glow={on} />
         <span className={styles.groupChipName}>{name}</span>
         <span className={styles.groupChipCount}>{fixtureCount}F</span>
         {on ? (

@@ -750,7 +750,7 @@ export function SetupSupportPilot({
         <div className={styles.feedbackBanner} role="status">
           <StatusPill
             label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
-            status={feedbackStatus(feedback) ?? "info"}
+            tone={feedbackStatus(feedback) ?? "info"}
           />
           <span>{feedback.message}</span>
         </div>
@@ -820,7 +820,7 @@ export function SetupSupportPilot({
                           ? "Current"
                           : "Up next"
                   }
-                  status={step.tone}
+                  tone={step.tone}
                 />
               </button>
             ))}
@@ -968,7 +968,7 @@ export function SetupSupportPilot({
                             <div className={styles.checkTitle}>{check.label}</div>
                             <div className={styles.checkDetail}>{check.detail}</div>
                           </div>
-                          <StatusPill label={statusToneLabel(check.status)} status={check.status} />
+                          <StatusPill label={statusToneLabel(check.status)} tone={check.status} />
                         </div>
                         <div className={styles.inlineActions}>
                           <Button
@@ -1029,7 +1029,7 @@ export function SetupSupportPilot({
                     <div className={styles.verifyLead}>
                       <StatusPill
                         label={echoControlId ? "Pulse detected" : "Waiting for press"}
-                        status={echoControlId ? "ok" : "info"}
+                        tone={echoControlId ? "ok" : "info"}
                       />
                       <span className={styles.metaCopy}>
                         {echoControlId
@@ -1153,7 +1153,7 @@ export function SetupSupportPilot({
                         <span className={styles.sideLabel}>{key}</span>
                         <StatusPill
                           label={String(record?.summary ?? "Pending")}
-                          status={asStatusTone(record?.status, "info")}
+                          tone={asStatusTone(record?.status, "info")}
                         />
                       </div>
                     );
@@ -1325,7 +1325,7 @@ export function SetupSupportPilot({
                       <div className={styles.checkTitle}>{check.label}</div>
                       <div className={styles.checkDetail}>{check.detail}</div>
                     </div>
-                    <StatusPill label={statusToneLabel(check.status)} status={check.status} />
+                    <StatusPill label={statusToneLabel(check.status)} tone={check.status} />
                   </div>
                   <Button
                     onClick={() => {

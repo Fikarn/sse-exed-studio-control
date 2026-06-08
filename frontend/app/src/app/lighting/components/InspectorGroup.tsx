@@ -115,7 +115,7 @@ export function InspectorGroup({
               ) : null}
             </div>
             <div className={styles.fixtureSubline}>
-              <StatusDot state={dotState} size="sm" />
+              <StatusDot tone={dotState} size="sm" />
               {onCount}/{fixtures.length} on
             </div>
           </div>
