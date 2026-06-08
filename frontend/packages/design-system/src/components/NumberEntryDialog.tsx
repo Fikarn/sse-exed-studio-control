@@ -1,9 +1,43 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { Button, Dialog } from "@sse/design-system";
 
-import styles from "./AudioDialog.module.css";
+import { Button } from "./Button";
+import { Dialog } from "./Dialog";
+import styles from "./NumberEntryDialog.module.css";
 
-export function AudioNumberDialog({
+export interface NumberEntryDialogProps {
+  /** Disables the form while a commit is in flight. */
+  busy?: boolean;
+  /** Confirm-button label. Defaults to "Set". */
+  confirmLabel?: string;
+  /** Visible label for the number field. */
+  fieldLabel: string;
+  /** Value the field opens with. */
+  initialValue: number;
+  /** Inclusive bounds. */
+  max: number;
+  min: number;
+  /** Fired on Escape / Cancel / backdrop dismiss. */
+  onCancel: () => void;
+  /** Fired with the snapped, clamped value on confirm. */
+  onConfirm: (value: number) => void;
+  /** Field step. Typed values snap to it. Defaults to 1. */
+  step?: number;
+  /** Optional unit shown after the field (e.g. "%", "K", "dB"). */
+  suffix?: string;
+  /** Dialog title (e.g. "Set Fixture intensity"). */
+  title: string;
+}
+
+/**
+ * Shared typed-numeric-entry dialog. Opened from a slider's double-click / Enter
+ * (the consumer owns the open state; see ScrubSlider / AudioSliderControl
+ * `onRequestNumericValue`). Snaps + clamps the typed value to the field's step
+ * before confirming, so an integer-step field never emits a fractional value.
+ *
+ * Styled on global DS tokens, so it themes correctly anywhere it portals
+ * (the DS `Dialog` portals to `document.body`, outside any workspace shell).
+ */
+export function NumberEntryDialog({
   busy = false,
   confirmLabel = "Set",
   fieldLabel,
@@ -15,28 +49,15 @@ export function AudioNumberDialog({
   step = 1,
   suffix,
   title,
-}: {
-  busy?: boolean;
-  confirmLabel?: string;
-  fieldLabel: string;
-  initialValue: number;
-  max: number;
-  min: number;
-  onCancel: () => void;
-  onConfirm: (value: number) => void;
-  step?: number;
-  suffix?: string;
-  title: string;
-}) {
+}: NumberEntryDialogProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState(() => (Number.isFinite(initialValue) ? String(initialValue) : String(min)));
   const parsed = Number(draft);
   const valid = Number.isFinite(parsed) && parsed >= min && parsed <= max;
   const canSubmit = valid && !busy;
-  // Snap the typed value to the field's step so e.g. an integer-step gain field
-  // never emits a fractional value (the engine rejects non-integer preamp gain).
-  // Clamp in case rounding nudges past an edge.
+  // Snap the typed value to the field's step so e.g. an integer-step field never
+  // emits a fractional value. Clamp in case rounding nudges past an edge.
   const commitValue =
     Number.isFinite(parsed) && Number.isFinite(step) && step > 0
       ? Math.max(min, Math.min(max, Number((Math.round((parsed - min) / step) * step + min).toFixed(5))))
@@ -74,9 +95,9 @@ export function AudioNumberDialog({
         </>
       }
     >
-      <form className={styles.audioDialogForm} onSubmit={submit}>
+      <form className={styles.form} onSubmit={submit}>
         <label htmlFor={inputId}>{fieldLabel}</label>
-        <div className={styles.audioDialogNumberField}>
+        <div className={styles.numberField}>
           <input
             id={inputId}
             ref={inputRef}

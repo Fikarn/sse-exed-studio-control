@@ -32,9 +32,15 @@ export interface ScrubSliderProps {
   /** Fires once when the user finishes a continuous interaction (pointerup,
    *  blur, Enter). Use for debounced/expensive commits. */
   onCommit?: (next: number) => void;
-  /** When provided, double-clicking the track resets value to this and fires
-   *  onChange + onCommit. Defaults disabled. */
+  /** Reset target. Alt+double-click — and Backspace/Delete when focused — reset
+   *  value to this and fire onChange + onCommit. Defaults disabled. (Bare
+   *  double-click is reserved for typed entry; see onRequestNumericValue.) */
   resetValue?: number;
+  /** When provided, a bare double-click (or Enter when focused) requests typed
+   *  numeric entry. The consumer owns the dialog and commits via onChange/
+   *  onCommit; mirrors AudioSliderControl. A synchronously returned number is
+   *  committed immediately (the dialog path returns null and commits later). */
+  onRequestNumericValue?: (currentValue: number) => number | null;
   /** Disabled state. */
   disabled?: boolean;
   /** Extra class on the outer wrapper. */
@@ -98,10 +104,12 @@ interface DragState {
  * pointer-delta calculation and apply fine/coarse modifiers. Matches the Audio
  * fader contract: Cmd/Ctrl = ×0.1 fine, Shift = ×10 coarse, plain = ×1.
  *
- * Double-click resets to `resetValue` when provided. Keyboard nudges retain
- * native semantics (arrows, Home/End, PageUp/Down). ARIA shape mirrors
- * `role="slider"` requirements so screen readers announce the value range
- * + current value text.
+ * Gesture map (mirrors AudioSliderControl + AudioKnob): bare double-click / Enter
+ * open typed numeric entry when `onRequestNumericValue` is wired (else bare
+ * double-click falls back to reset); Alt+double-click and Backspace/Delete reset
+ * to `resetValue`. Keyboard nudges retain native semantics (arrows, Home/End,
+ * PageUp/Down). ARIA shape mirrors `role="slider"` requirements so screen readers
+ * announce the value range + current value text.
  */
 export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function ScrubSlider(
   {
@@ -114,6 +122,7 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
     onChange,
     onCommit,
     resetValue,
+    onRequestNumericValue,
     disabled = false,
     className,
     trackClassName,
@@ -126,6 +135,10 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
 ) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  // Timestamp of the last pointerdown — backs the double-tap gesture. Pointerdown
+  // carries no click count (event.detail is 0 in Chromium), so we time taps
+  // ourselves, mirroring AudioSliderControl. Portable across WebKit + Chromium.
+  const lastPointerDownAtRef = useRef(Number.NEGATIVE_INFINITY);
   const [dragging, setDragging] = useState(false);
   // RAF-throttled onChange dispatch. Pointer events on high-refresh displays
   // can fire at 200+ Hz; React re-renders cascade through the whole workspace
@@ -168,9 +181,52 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
     [max, min, scheduleChange, step, value]
   );
 
+  const resetToValue = useCallback(() => {
+    if (disabled || resetValue === undefined) return;
+    const next = clampValue(snapToStep(resetValue, step, min), min, max);
+    if (next !== value) onChange(next);
+    onCommit?.(next);
+  }, [disabled, max, min, onChange, onCommit, resetValue, step, value]);
+
+  // Typed numeric entry trigger (mirrors AudioSliderControl): the consumer owns
+  // the dialog. A synchronously returned number commits immediately; the dialog
+  // path returns null and commits later via onChange/onCommit.
+  const requestNumericEntry = useCallback(() => {
+    if (disabled || !onRequestNumericValue) return;
+    const returned = onRequestNumericValue(value);
+    if (typeof returned === "number") {
+      const next = clampValue(snapToStep(returned, step, min), min, max);
+      if (next !== value) onChange(next);
+      onCommit?.(next);
+    }
+  }, [disabled, max, min, onChange, onCommit, onRequestNumericValue, step, value]);
+
   const onTrackPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (disabled || event.button !== 0) return;
+      // Double-tap gesture map (mirrors AudioSliderControl's 360ms guard): on the
+      // SECOND tap, before click-to-jump, Alt+double-click resets; bare
+      // double-click opens typed entry when wired, otherwise falls back to reset.
+      const now = performance.now();
+      if (now - lastPointerDownAtRef.current <= 360) {
+        lastPointerDownAtRef.current = Number.NEGATIVE_INFINITY;
+        if (event.altKey) {
+          event.preventDefault();
+          resetToValue();
+          return;
+        }
+        if (onRequestNumericValue) {
+          event.preventDefault();
+          requestNumericEntry();
+          return;
+        }
+        if (resetValue !== undefined) {
+          event.preventDefault();
+          resetToValue();
+          return;
+        }
+      }
+      lastPointerDownAtRef.current = now;
       const track = trackRef.current;
       if (!track) return;
       event.preventDefault();
@@ -190,7 +246,7 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
       setDragging(true);
       if (clickValue !== value) onChange(clickValue);
     },
-    [disabled, max, min, onChange, step, value]
+    [disabled, max, min, onChange, onRequestNumericValue, requestNumericEntry, resetToValue, resetValue, step, value]
   );
 
   const onTrackPointerMove = useCallback(
@@ -224,18 +280,26 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
     [onChange, onCommit, value]
   );
 
-  const onDoubleClick = useCallback(() => {
-    if (disabled || resetValue === undefined) return;
-    const next = clampValue(snapToStep(resetValue, step, min), min, max);
-    if (next !== value) onChange(next);
-    onCommit?.(next);
-  }, [disabled, max, min, onChange, onCommit, resetValue, step, value]);
-
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (disabled) return;
       let next: number;
       switch (event.key) {
+        case "Enter":
+          // Reserved for typed numeric entry (mirrors AudioSliderControl). Inert
+          // when no typed-entry path is wired.
+          if (onRequestNumericValue) {
+            event.preventDefault();
+            requestNumericEntry();
+          }
+          return;
+        case "Backspace":
+        case "Delete":
+          // Reset to default (mirrors AudioKnob). Falls through to the shared
+          // clamp/snap + commit tail below.
+          if (resetValue === undefined) return;
+          next = resetValue;
+          break;
         case "ArrowLeft":
         case "ArrowDown":
           next = value - step;
@@ -266,7 +330,7 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
         onCommit?.(next);
       }
     },
-    [disabled, max, min, onChange, onCommit, step, value]
+    [disabled, max, min, onChange, onCommit, onRequestNumericValue, requestNumericEntry, resetValue, step, value]
   );
 
   // Release the captured pointer if the component unmounts mid-drag — keeps
@@ -308,7 +372,6 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
         onPointerMove={onTrackPointerMove}
         onPointerUp={finishDrag}
         onPointerCancel={finishDrag}
-        onDoubleClick={onDoubleClick}
         onKeyDown={onKeyDown}
       >
         <div className={styles.fill} style={{ width: `${fillPercent}%` }} />

@@ -22,7 +22,7 @@ import {
   PREAMP_GAIN_DEFAULT_DB,
   PREAMP_GAIN_MAX_DB,
 } from "../audioConstants";
-import { AudioNumberDialog } from "./AudioNumberDialog";
+import { NumberEntryDialog } from "@sse/design-system";
 
 const ARC_START_DEG = -135;
 const ARC_END_DEG = 135;
@@ -227,7 +227,7 @@ export function AudioStripPreamp({
         <span className={styles.caption}>Mic Gain</span>
       </span>
       {numberDialogOpen ? (
-        <AudioNumberDialog
+        <NumberEntryDialog
           fieldLabel="Preamp gain"
           initialValue={commitGainValue(currentGain)}
           max={PREAMP_GAIN_MAX_DB}

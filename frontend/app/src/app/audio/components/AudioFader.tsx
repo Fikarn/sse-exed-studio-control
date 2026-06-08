@@ -2,7 +2,7 @@ import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import styles from "./AudioFader.module.css";
 import { faderDbToNormalized, formatAudioDb, normalizedToFaderDb } from "../audioFormatting";
-import { AudioNumberDialog } from "./AudioNumberDialog";
+import { NumberEntryDialog } from "@sse/design-system";
 import { AudioSliderControl } from "./AudioSliderControl";
 
 export function AudioFader({
@@ -50,7 +50,7 @@ export function AudioFader({
       />
       {showValue ? <span className={styles.faderValue}>{formatAudioDb(value)}</span> : null}
       {numberDialogOpen ? (
-        <AudioNumberDialog
+        <NumberEntryDialog
           fieldLabel="Fader level"
           initialValue={Number.isFinite(currentDb) ? Number(currentDb.toFixed(1)) : -60}
           max={6}

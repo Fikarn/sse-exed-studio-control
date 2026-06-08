@@ -19,6 +19,8 @@ export { CommandPalette } from "./components/CommandPalette";
 export type { CommandPaletteProps, PaletteAction } from "./components/CommandPalette";
 export { ConfirmDialog } from "./components/ConfirmDialog";
 export type { ConfirmDialogProps } from "./components/ConfirmDialog";
+export { NumberEntryDialog } from "./components/NumberEntryDialog";
+export type { NumberEntryDialogProps } from "./components/NumberEntryDialog";
 export { ContextMenu } from "./components/ContextMenu";
 export type { ContextMenuItem, ContextMenuItemTone, ContextMenuProps } from "./components/ContextMenu";
 export { ColorPicker } from "./components/ColorPicker";

@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Power } from "lucide-react";
 
-import { ScrubSlider } from "@sse/design-system";
+import { NumberEntryDialog, ScrubSlider } from "@sse/design-system";
 
 import styles from "./LightingRail.module.css";
 
@@ -30,6 +31,7 @@ export function MasterCard({
   eyebrow,
   onToggleAllPower,
 }: MasterCardProps) {
+  const [numberDialogOpen, setNumberDialogOpen] = useState(false);
   const anyOn = fixtureOnCount > 0;
   const sliderDisabled = !enabled || !bridgeReachable;
   const cardClass = anyOn ? `${styles.master} ${styles.masterOn}` : styles.master;
@@ -73,6 +75,10 @@ export function MasterCard({
           value={grandMaster}
           onChange={onGrandMasterChange}
           resetValue={100}
+          onRequestNumericValue={() => {
+            setNumberDialogOpen(true);
+            return null;
+          }}
           disabled={sliderDisabled}
           formatValue={(v) => `${Math.round(v)} %`}
         />
@@ -89,6 +95,23 @@ export function MasterCard({
         <Power aria-hidden="true" size={14} strokeWidth={2} />
         <span>Cut all</span>
       </button>
+
+      {numberDialogOpen ? (
+        <NumberEntryDialog
+          title="Set Grand master"
+          fieldLabel="Grand master"
+          initialValue={Math.round(grandMaster)}
+          min={0}
+          max={100}
+          step={1}
+          suffix="%"
+          onConfirm={(value) => {
+            onGrandMasterChange(value);
+            setNumberDialogOpen(false);
+          }}
+          onCancel={() => setNumberDialogOpen(false)}
+        />
+      ) : null}
     </section>
   );
 }

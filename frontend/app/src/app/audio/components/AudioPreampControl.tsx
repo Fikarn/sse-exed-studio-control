@@ -18,7 +18,7 @@ import {
   PREAMP_ROTATION_ORIGIN_DEG,
   PREAMP_ROTATION_RANGE_DEG,
 } from "../audioConstants";
-import { AudioNumberDialog } from "./AudioNumberDialog";
+import { NumberEntryDialog } from "@sse/design-system";
 
 interface AudioPreampControlProps {
   channelId: string;
@@ -376,7 +376,7 @@ export function AudioPreampControl({
         </span>
       </div>
       {numberDialogOpen ? (
-        <AudioNumberDialog
+        <NumberEntryDialog
           fieldLabel="Preamp gain"
           initialValue={commitGainValue(currentGain)}
           max={PREAMP_GAIN_MAX_DB}
