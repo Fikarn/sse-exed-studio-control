@@ -336,28 +336,30 @@ export function InspectorFixture({
         {onAssignFixtureGroup ? (
           <label className={styles.groupAssignField}>
             <span className={styles.factLabel}>Group</span>
-            <select
-              className={styles.groupAssignSelect}
-              value={fixture.groupId ?? ""}
-              disabled={assignGroupBusy}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                if (value === ASSIGN_NEW_GROUP_VALUE) {
-                  onCreateGroup?.();
-                  return;
-                }
-                onAssignFixtureGroup(fixture.id, value === "" ? null : value);
-              }}
-            >
-              <option value="">Ungrouped</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-              {onCreateGroup ? <option disabled>──────────</option> : null}
-              {onCreateGroup ? <option value={ASSIGN_NEW_GROUP_VALUE}>+ Create new group…</option> : null}
-            </select>
+            <span className={styles.selectWrap}>
+              <select
+                className={styles.groupAssignSelect}
+                value={fixture.groupId ?? ""}
+                disabled={assignGroupBusy}
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  if (value === ASSIGN_NEW_GROUP_VALUE) {
+                    onCreateGroup?.();
+                    return;
+                  }
+                  onAssignFixtureGroup(fixture.id, value === "" ? null : value);
+                }}
+              >
+                <option value="">Ungrouped</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+                {onCreateGroup ? <option disabled>──────────</option> : null}
+                {onCreateGroup ? <option value={ASSIGN_NEW_GROUP_VALUE}>+ Create new group…</option> : null}
+              </select>
+            </span>
           </label>
         ) : (
           <dl className={styles.factGrid}>

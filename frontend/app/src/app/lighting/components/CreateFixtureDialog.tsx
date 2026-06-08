@@ -176,39 +176,43 @@ export function CreateFixtureDialog({
         <label htmlFor={typeId} className={styles.label}>
           Fixture
         </label>
-        <select
-          id={typeId}
-          className={styles.select}
-          value={definitionId}
-          onChange={(event) => setDefinitionId(event.currentTarget.value)}
-        >
-          {groupedDefinitions.map(([group, entries]) => (
-            <optgroup key={group} label={group}>
-              {entries.map((definition) => (
-                <option key={definition.id} value={definition.id} disabled={!isSelectable(definition)}>
-                  {fixtureDefinitionLabel(definition)}
-                  {isSelectable(definition) ? "" : " · verification pending"}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <span className={styles.selectWrap}>
+          <select
+            id={typeId}
+            className={styles.select}
+            value={definitionId}
+            onChange={(event) => setDefinitionId(event.currentTarget.value)}
+          >
+            {groupedDefinitions.map(([group, entries]) => (
+              <optgroup key={group} label={group}>
+                {entries.map((definition) => (
+                  <option key={definition.id} value={definition.id} disabled={!isSelectable(definition)}>
+                    {fixtureDefinitionLabel(definition)}
+                    {isSelectable(definition) ? "" : " · verification pending"}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </span>
 
         <label htmlFor={modeId} className={styles.label}>
           Mode
         </label>
-        <select
-          id={modeId}
-          className={styles.select}
-          value={selectedModeId}
-          onChange={(event) => setSelectedModeId(event.currentTarget.value)}
-        >
-          {(selectedDefinition?.modes ?? []).map((mode) => (
-            <option key={mode.id} value={mode.id}>
-              {mode.displayName} · {mode.channelCount} ch · {mode.capabilities.join(", ") || "metadata"}
-            </option>
-          ))}
-        </select>
+        <span className={styles.selectWrap}>
+          <select
+            id={modeId}
+            className={styles.select}
+            value={selectedModeId}
+            onChange={(event) => setSelectedModeId(event.currentTarget.value)}
+          >
+            {(selectedDefinition?.modes ?? []).map((mode) => (
+              <option key={mode.id} value={mode.id}>
+                {mode.displayName} · {mode.channelCount} ch · {mode.capabilities.join(", ") || "metadata"}
+              </option>
+            ))}
+          </select>
+        </span>
 
         <label htmlFor={universeId} className={styles.label}>
           Universe
