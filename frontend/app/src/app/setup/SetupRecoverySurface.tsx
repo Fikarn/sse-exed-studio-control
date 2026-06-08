@@ -9,6 +9,7 @@ import {
   formatBackupTimestamp,
   getSupportBackups,
   mapStatusBadgeTone,
+  statusToneLabel,
   type SnapshotRecord,
 } from "../shellData";
 import { exportShellDiagnostics, openShellPath } from "../shellCommands";
@@ -17,6 +18,7 @@ import styles from "../OperatorShell.module.css";
 import {
   type ActionFeedback,
   feedbackBadgeTone,
+  formatFailureCode,
   formatFileSize,
   formatPathLabel,
   getFailureTitle,
@@ -197,7 +199,7 @@ export function SetupRecoverySurface({
               <h1 className={styles.setupIncidentTitle}>{getFailureTitle(failure)}</h1>
               <p className={styles.setupIncidentBody}>{summary}</p>
             </div>
-            <StatusBadge label={failure?.code ?? "startup-failed"} tone="error" />
+            <StatusBadge label={formatFailureCode(failure)} tone="error" />
           </div>
 
           {failure?.code === "PROTOCOL_MISMATCH" ? (
@@ -371,10 +373,7 @@ export function SetupRecoverySurface({
               <div key={check.label} className={styles.setupIncidentCheckCard}>
                 <div className={styles.setupIncidentCheckHeader}>
                   <div className={styles.setupIncidentCheckTitle}>{check.label}</div>
-                  <StatusBadge
-                    label={check.tone === "ok" ? "ready" : check.tone}
-                    tone={mapStatusBadgeTone(check.tone)}
-                  />
+                  <StatusBadge label={statusToneLabel(check.tone)} tone={mapStatusBadgeTone(check.tone)} />
                 </div>
                 <div className={styles.setupIncidentHint}>{check.detail}</div>
               </div>

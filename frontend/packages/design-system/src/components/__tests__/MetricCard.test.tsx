@@ -31,4 +31,12 @@ describe("MetricCard", () => {
       unmount();
     }
   });
+
+  it("renders an explicit human label instead of the tone enum when `label` is given", () => {
+    render(<MetricCard caption="Code" label="Attention" tone="warning" value="PROTOCOL_MISMATCH" />);
+    // The human label shows; the raw tone enum does not leak as badge text.
+    const badge = screen.getByText("Attention");
+    expect(badge.className).toMatch(/warning/);
+    expect(screen.queryByText("warning")).toBeNull();
+  });
 });
