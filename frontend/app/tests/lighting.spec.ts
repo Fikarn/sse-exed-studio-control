@@ -464,6 +464,48 @@ test("nudges a fixture Position field from the ScrubLabel slider keyboard", asyn
   await expect(stageX).toHaveAttribute("aria-valuenow", "0");
 });
 
+test("opens typed numeric entry on a lighting intensity slider via Enter and commits", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  // CONTROLS-02: Enter (and bare double-click) on a ScrubSlider opens the shared
+  // number dialog; confirming commits the typed value.
+  const intensity = page.getByRole("slider", { name: "Fixture intensity" });
+  await intensity.focus();
+  await page.keyboard.press("Enter");
+
+  const dialog = page.getByRole("dialog", { name: /Set Fixture intensity/i });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("spinbutton").fill("42");
+  await dialog.getByRole("button", { name: "Set" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(intensity).toHaveAttribute("aria-valuenow", "42");
+});
+
+test("opens lighting intensity typed entry via a bare double-click", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const intensity = page.getByRole("slider", { name: "Fixture intensity" });
+  // Bare double-click now opens typed entry (reset relocated to Alt+double-click).
+  await intensity.dblclick();
+  await expect(page.getByRole("dialog", { name: /Set Fixture intensity/i })).toBeVisible();
+});
+
+test("opens typed numeric entry on the lighting grand master and commits", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const master = page.getByRole("slider", { name: "Grand master intensity" });
+  await master.dblclick();
+
+  const dialog = page.getByRole("dialog", { name: "Set Grand master" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("spinbutton").fill("60");
+  await dialog.getByRole("button", { name: "Set" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(master).toHaveAttribute("aria-valuenow", "60");
+});
+
 test("drags the selected fixture to a new plot position", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 

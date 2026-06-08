@@ -24,7 +24,7 @@ import {
 
 import styles from "./AudioKnob.module.css";
 import { AUDIO_DRAFT_CLEAR_MS, AUDIO_KNOB_DRAG_TRAVEL_PX } from "../audioConstants";
-import { AudioNumberDialog } from "./AudioNumberDialog";
+import { NumberEntryDialog } from "@sse/design-system";
 
 const ARC_START_DEG = -135;
 const ARC_END_DEG = 135;
@@ -293,7 +293,7 @@ export function AudioKnob({
         </>
       )}
       {numberDialogOpen ? (
-        <AudioNumberDialog
+        <NumberEntryDialog
           // C05: operate in RAW engine units — initial value, bounds and step
           // are the knob's own (NOT the rescaled `format` output). The explicit
           // per-site `numericSuffix` carries the unit.

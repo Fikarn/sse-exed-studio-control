@@ -7,6 +7,7 @@ import {
   IconButton,
   InlineRename,
   InspectorSection,
+  NumberEntryDialog,
   ScrubLabel,
   ScrubSlider,
   StatusDot,
@@ -145,6 +146,12 @@ export function InspectorFixture({
   const [cctDraft, setCctDraft] = useState(fixture.cct);
   const [controlDrafts, setControlDrafts] = useState<Record<string, number>>(fixture.controlValues);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // CONTROLS-02: typed numeric entry. A ScrubSlider's bare double-click / Enter
+  // opens this dialog (the slider asks via onRequestNumericValue; the inspector
+  // owns the open state + commit).
+  const [numberDialog, setNumberDialog] = useState<
+    null | { kind: "intensity" } | { kind: "cct" } | { kind: "control"; controlId: string }
+  >(null);
   const renameRef = useRef<InlineRenameHandle | null>(null);
 
   // Position-field drafts. Strings (not numbers) so the user can type
@@ -254,6 +261,13 @@ export function InspectorFixture({
     if (clamped === current) return;
     onSpatialCommit(fixture.id, { [field]: clamped });
   };
+
+  // Resolve the catalog control backing a "control" number-entry dialog (hoisted
+  // out of JSX; an IIFE in JSX is disallowed by the React Compiler lint).
+  const numberDialogControl =
+    numberDialog?.kind === "control"
+      ? (mode?.controls.find((entry) => entry.id === numberDialog.controlId) ?? null)
+      : null;
 
   return (
     <>
@@ -386,6 +400,10 @@ export function InspectorFixture({
                         onControlValuesCommit?.(fixture.id, { [control.id]: rounded });
                       }}
                       resetValue={control.defaultValue}
+                      onRequestNumericValue={() => {
+                        setNumberDialog({ kind: "control", controlId: control.id });
+                        return null;
+                      }}
                       disabled={!fixture.on && control.id !== "fan"}
                       formatValue={(next) => `${Math.round(next)}${control.unit ?? ""}`}
                     />
@@ -412,6 +430,10 @@ export function InspectorFixture({
               onChange={handleIntensityChange}
               onCommit={commitIntensity}
               resetValue={100}
+              onRequestNumericValue={() => {
+                setNumberDialog({ kind: "intensity" });
+                return null;
+              }}
               // Only gate on power state — IPC commits are sub-millisecond and
               // idempotent, so a busy-flag disable would just flicker the slider
               // chrome on every release without preventing anything real.
@@ -433,6 +455,10 @@ export function InspectorFixture({
               onChange={handleCctChange}
               onCommit={commitCct}
               resetValue={Math.round((cctRange.min + cctRange.max) / 2 / 100) * 100}
+              onRequestNumericValue={() => {
+                setNumberDialog({ kind: "cct" });
+                return null;
+              }}
               formatValue={(v) => `${Math.round(v)}K`}
             />
             <div id={cctScaleId} className={styles.cctScale}>
@@ -633,6 +659,58 @@ export function InspectorFixture({
             onDeleteFixture(fixture.id);
           }}
           onCancel={() => setConfirmingDelete(false)}
+        />
+      ) : null}
+      {numberDialog?.kind === "intensity" ? (
+        <NumberEntryDialog
+          title="Set Fixture intensity"
+          fieldLabel="Intensity"
+          initialValue={Math.round(intensityDraft)}
+          min={0}
+          max={100}
+          step={1}
+          suffix="%"
+          onConfirm={(value) => {
+            handleIntensityChange(value);
+            commitIntensity(value);
+            setNumberDialog(null);
+          }}
+          onCancel={() => setNumberDialog(null)}
+        />
+      ) : null}
+      {numberDialog?.kind === "cct" ? (
+        <NumberEntryDialog
+          title="Set Fixture CCT"
+          fieldLabel="Colour temperature"
+          initialValue={Math.round(cctDraft)}
+          min={cctRange.min}
+          max={cctRange.max}
+          step={100}
+          suffix="K"
+          onConfirm={(value) => {
+            handleCctChange(value);
+            commitCct(value);
+            setNumberDialog(null);
+          }}
+          onCancel={() => setNumberDialog(null)}
+        />
+      ) : null}
+      {numberDialogControl ? (
+        <NumberEntryDialog
+          title={`Set ${numberDialogControl.label}`}
+          fieldLabel={numberDialogControl.label}
+          initialValue={Math.round(controlDrafts[numberDialogControl.id] ?? numberDialogControl.defaultValue)}
+          min={numberDialogControl.min}
+          max={numberDialogControl.max}
+          step={numberDialogControl.step}
+          suffix={numberDialogControl.unit ?? undefined}
+          onConfirm={(value) => {
+            const rounded = Math.round(value);
+            setControlDrafts((draft) => ({ ...draft, [numberDialogControl.id]: rounded }));
+            onControlValuesCommit?.(fixture.id, { [numberDialogControl.id]: rounded });
+            setNumberDialog(null);
+          }}
+          onCancel={() => setNumberDialog(null)}
         />
       ) : null}
     </>
