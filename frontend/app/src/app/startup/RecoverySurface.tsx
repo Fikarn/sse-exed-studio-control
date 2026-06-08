@@ -3,7 +3,7 @@ import type { StartupFailure } from "@sse/engine-client";
 
 import { asRecord, type SnapshotRecord } from "../shellData";
 import styles from "../OperatorShell.module.css";
-import { getFailureTitle } from "./startupHelpers";
+import { formatFailureCode, getFailureTitle } from "./startupHelpers";
 
 export function RecoverySurface({
   failure,
@@ -37,12 +37,17 @@ export function RecoverySurface({
             <h1 className={styles.stateTitle}>{getFailureTitle(failure)}</h1>
             <p className={styles.stateSubtitle}>{summary}</p>
           </div>
-          <StatusBadge label={failure?.code ?? "startup-failed"} tone="error" />
+          <StatusBadge label={formatFailureCode(failure)} tone="error" />
         </div>
         <div className={styles.metricGrid}>
-          <MetricCard caption="Stage" tone="error" value={failure?.stage ?? "runtime"} />
-          <MetricCard caption="Code" tone="warning" value={failure?.code ?? "ENGINE_STARTUP_FAILED"} />
-          <MetricCard caption="Recovery mode" tone="ready" value="Setup / Support" />
+          <MetricCard caption="Stage" label="Failed" tone="error" value={failure?.stage ?? "runtime"} />
+          <MetricCard
+            caption="Code"
+            label="Attention"
+            tone="warning"
+            value={failure?.code ?? "ENGINE_STARTUP_FAILED"}
+          />
+          <MetricCard caption="Recovery mode" label="Ready" tone="ready" value="Setup / Support" />
         </div>
         {failure?.code === "PROTOCOL_MISMATCH" ? (
           <div className={styles.protocolSummary}>

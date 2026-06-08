@@ -40,29 +40,56 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
     "ready",
   ] as const;
   const currentIndex = stages.indexOf(lifecycle as (typeof stages)[number]);
+  // STA-08: reserve the success-green tone for the fully-ready lifecycle.
+  // Mid-boot, reached steps read as neutral "connected", not "healthy" green,
+  // so an in-progress boot no longer paints predominantly green.
+  const reachedTone: StatusTone = lifecycle === "ready" ? "healthy" : "connected";
 
   return [
     {
       description: "Start the isolated Rust engine process.",
       label: "Launch engine",
-      tone: currentIndex >= 0 ? "connected" : "idle",
+      tone: currentIndex >= 0 ? reachedTone : "idle",
     },
     {
       description: "Wait for the engine to confirm protocol compatibility.",
       label: "Ready event",
-      tone: currentIndex >= 1 ? "connected" : "idle",
+      tone: currentIndex >= 1 ? reachedTone : "idle",
     },
     {
       description: "Load health, diagnostics, and degraded-state posture.",
       label: "Health snapshot",
-      tone: currentIndex >= 2 ? "connected" : "idle",
+      tone: currentIndex >= 2 ? reachedTone : "idle",
     },
     {
       description: "Load shell routing and commissioning state.",
       label: "App snapshot",
-      tone: currentIndex >= 3 ? "connected" : "idle",
+      tone: currentIndex >= 3 ? reachedTone : "idle",
     },
   ];
+}
+
+// Human label for a startup-step tone (STA-09) — the raw StatusTone enum
+// ("connected"/"idle") must not surface as operator-facing badge text.
+export function stepStatusLabel(tone: StatusTone): string {
+  return tone === "idle" ? "Pending" : "Done";
+}
+
+// Short, human-readable failure-code label for the recovery badges (COPY-04),
+// so SCREAMING_SNAKE / kebab codes (PROTOCOL_MISMATCH / startup-failed) don't
+// surface verbatim as the prominent status tag.
+export function formatFailureCode(failure: StartupFailure | null): string {
+  const code = failure?.code;
+  if (!code) {
+    return "Startup failed";
+  }
+  if (code === "PROTOCOL_MISMATCH") {
+    return "Protocol mismatch";
+  }
+  return code
+    .replace(/[_-]+/g, " ")
+    .toLowerCase()
+    .replace(/^./, (character) => character.toUpperCase());
 }
 
 export function getFailureTitle(startupFailure: StartupFailure | null) {

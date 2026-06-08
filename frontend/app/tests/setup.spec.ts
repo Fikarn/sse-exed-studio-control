@@ -57,7 +57,7 @@ test("opens support mode and exercises backup workflows", async ({ page }) => {
 
 test("shows degraded setup posture from fixtures", async ({ page }) => {
   await openFixture(page, "setup-degraded");
-  await expect(page.getByText("Degraded startup posture")).toBeVisible();
+  await expect(page.getByText("Attention required")).toBeVisible();
   await page.getByRole("button", { name: /^Open support$/ }).click();
   await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
 });
@@ -92,6 +92,6 @@ test("setup-degraded fixture surfaces the recovery + support entry points", asyn
 
   // The degraded state must surface BOTH the diagnostic narrative AND the
   // recovery affordance the operator clicks through to.
-  await expect(page.getByText("Degraded startup posture")).toBeVisible();
+  await expect(page.getByText("Attention required")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open support$/ })).toBeVisible();
 });

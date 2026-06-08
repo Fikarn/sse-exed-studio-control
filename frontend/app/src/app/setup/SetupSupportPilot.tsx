@@ -21,6 +21,7 @@ import {
   getSupportBackups,
   isEditableTarget,
   mapStatusBadgeTone,
+  statusToneLabel,
   type SnapshotRecord,
   type StatusToneLike,
 } from "../shellData";
@@ -342,10 +343,14 @@ export function SetupSupportPilot({
   const shell = asRecord(appSnapshot?.shell);
   const startup = asRecord(appSnapshot?.startup);
   const healthChecks = asRecord(healthSnapshot?.checks);
+  // SET-01: the banner fires on ANY non-ok health tone, so derive its title
+  // from that tone instead of the hardcoded alarming "Degraded startup posture"
+  // (an `attention` posture is not "degraded").
+  const healthTone = healthSnapshot ? asStatusTone(healthSnapshot.status, "info") : "ok";
   const degradedSummary =
-    healthSnapshot && asStatusTone(healthSnapshot.status, "info") !== "ok"
-      ? String(healthSnapshot.summary ?? "Hardware or bridge attention required.")
-      : null;
+    healthTone !== "ok" ? String(healthSnapshot?.summary ?? "Hardware or bridge attention required.") : null;
+  const degradedTitle =
+    healthTone === "error" ? "Startup blocked" : healthTone === "attention" ? "Attention required" : "Startup notice";
   const isReady = commissioningSnapshot?.hasCompletedSetup === true;
   const lastBackup = backups[0];
   const stepIndex = runnerStepOrder.indexOf(activeStepId);
@@ -727,7 +732,7 @@ export function SetupSupportPilot({
       {degradedSummary ? (
         <div className={styles.degradedBanner} role="status">
           <div>
-            <div className={styles.bannerTitle}>Degraded startup posture</div>
+            <div className={styles.bannerTitle}>{degradedTitle}</div>
             <div className={styles.bannerBody}>{degradedSummary}</div>
           </div>
           <div className={styles.bannerActions}>
@@ -807,12 +812,12 @@ export function SetupSupportPilot({
                 <StatusPill
                   label={
                     step.tone === "ok"
-                      ? "complete"
+                      ? "Complete"
                       : step.tone === "error"
-                        ? "error"
+                        ? "Failed"
                         : step.id === activeStepId
-                          ? "current"
-                          : "up next"
+                          ? "Current"
+                          : "Up next"
                   }
                   status={step.tone}
                 />
@@ -962,7 +967,7 @@ export function SetupSupportPilot({
                             <div className={styles.checkTitle}>{check.label}</div>
                             <div className={styles.checkDetail}>{check.detail}</div>
                           </div>
-                          <StatusPill label={check.status === "ok" ? "ready" : check.status} status={check.status} />
+                          <StatusPill label={statusToneLabel(check.status)} status={check.status} />
                         </div>
                         <div className={styles.inlineActions}>
                           <Button
@@ -1022,7 +1027,7 @@ export function SetupSupportPilot({
                   {activeStepId === "verify" ? (
                     <div className={styles.verifyLead}>
                       <StatusPill
-                        label={echoControlId ? "pulse detected" : "waiting for press"}
+                        label={echoControlId ? "Pulse detected" : "Waiting for press"}
                         status={echoControlId ? "ok" : "info"}
                       />
                       <span className={styles.metaCopy}>
@@ -1108,7 +1113,7 @@ export function SetupSupportPilot({
                         to Planning.
                       </p>
                     </div>
-                    <StatusBadge label={isReady ? "ready" : "pending publish"} tone={isReady ? "healthy" : "warning"} />
+                    <StatusBadge label={isReady ? "Ready" : "Pending publish"} tone={isReady ? "healthy" : "warning"} />
                   </div>
                   <div className={styles.metricRow}>
                     <MetricCard
@@ -1217,7 +1222,7 @@ export function SetupSupportPilot({
                 <div className={styles.sectionEyebrow}>Restore</div>
                 <h2 className={styles.sectionTitle}>Backup and recovery</h2>
                 <p className={styles.sectionBody}>
-                  Restore from a native support archive or a legacy `db.json`, then re-probe the affected adapters
+                  Restore from a native support archive or a legacy db.json export, then re-probe the affected adapters
                   before resuming operator work.
                 </p>
               </div>
@@ -1319,7 +1324,7 @@ export function SetupSupportPilot({
                       <div className={styles.checkTitle}>{check.label}</div>
                       <div className={styles.checkDetail}>{check.detail}</div>
                     </div>
-                    <StatusPill label={check.status === "ok" ? "ready" : check.status} status={check.status} />
+                    <StatusPill label={statusToneLabel(check.status)} status={check.status} />
                   </div>
                   <Button
                     onClick={() => {

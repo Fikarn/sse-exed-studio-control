@@ -250,6 +250,22 @@ export function mapStatusBadgeTone(status: StatusToneLike): StatusTone {
   }
 }
 
+// Human-readable label for a StatusToneLike enum, so the raw machine token
+// (`ok`/`attention`/`error`/`info`) never reaches operator-facing badge/pill
+// text (COPY-04 / COPY-09).
+export function statusToneLabel(status: StatusToneLike): string {
+  switch (status) {
+    case "ok":
+      return "Ready";
+    case "attention":
+      return "Attention";
+    case "error":
+      return "Failed";
+    default:
+      return "Pending";
+  }
+}
+
 export function formatLifecycleLabel(lifecycle: ShellState["lifecycle"]) {
   switch (lifecycle) {
     case "launching-process":

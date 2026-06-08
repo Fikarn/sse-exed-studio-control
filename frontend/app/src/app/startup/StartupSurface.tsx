@@ -3,7 +3,7 @@ import type { ShellState } from "@sse/engine-client";
 
 import { formatLifecycleLabel } from "../shellData";
 import styles from "../OperatorShell.module.css";
-import { buildStartupSteps } from "./startupHelpers";
+import { buildStartupSteps, stepStatusLabel } from "./startupHelpers";
 
 export function StartupSurface({
   lifecycle,
@@ -19,18 +19,23 @@ export function StartupSurface({
       <Surface className={styles.stateSurface} padding="lg" tone="raised">
         <div className={styles.stateHeader}>
           <div>
-            <div className={styles.stateEyebrow}>Frontend foundation</div>
+            <div className={styles.stateEyebrow}>Startup</div>
             <h1 className={styles.stateTitle}>Starting operator shell</h1>
             <p className={styles.stateSubtitle}>
-              The replacement shell waits for the engine handshake before operator UI is allowed to render.
+              Connecting to the studio engine. The console opens once the engine confirms it is ready.
             </p>
           </div>
-          <StatusBadge label={formatLifecycleLabel(lifecycle)} tone="connected" />
+          <StatusBadge label={formatLifecycleLabel(lifecycle)} tone={lifecycle === "ready" ? "healthy" : "idle"} />
         </div>
         <div className={styles.metricGrid}>
-          <MetricCard caption="Lifecycle" tone="connected" value={formatLifecycleLabel(lifecycle)} />
-          <MetricCard caption="Target surface" tone="idle" value="Setup / Support" />
-          <MetricCard caption="Render mode" tone="ready" value="Native webview shell" />
+          <MetricCard
+            caption="Lifecycle"
+            label={lifecycle === "ready" ? "Ready" : "Loading"}
+            tone={lifecycle === "ready" ? "healthy" : "idle"}
+            value={formatLifecycleLabel(lifecycle)}
+          />
+          <MetricCard caption="Target surface" label="Pending" tone="idle" value="Setup / Support" />
+          <MetricCard caption="Render mode" label="Active" tone="ready" value="Native webview shell" />
         </div>
         <div className={styles.stepList}>
           {steps.map((step) => (
@@ -39,7 +44,7 @@ export function StartupSurface({
                 <div className={styles.stepLabel}>{step.label}</div>
                 <div className={styles.stepDetail}>{step.description}</div>
               </div>
-              <StatusBadge label={step.tone} tone={step.tone} />
+              <StatusBadge label={stepStatusLabel(step.tone)} tone={step.tone} />
             </div>
           ))}
         </div>
