@@ -28,8 +28,7 @@
 
   .degradedBanner,
   .feedbackBanner,
-  .utilityRow,
-  .footerBar {
+  .utilityRow {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -447,7 +446,10 @@
     opacity: 0.55;
   }
 
-  .footerBar {
+  /* Slice 5 (CHROME-02): the runner footer is now the shared DS HealthBar
+     (full variant). This only handles bottom placement within the runner
+     grid; the bar supplies its own chrome (border-top, gradient, height). */
+  .setupFooter {
     margin-top: auto;
   }
 
@@ -508,7 +510,6 @@
     .degradedBanner,
     .utilityRow,
     .cardHeader,
-    .footerBar,
     .checkHeader,
     .backupRow,
     .sideRow,

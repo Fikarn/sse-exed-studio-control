@@ -30,7 +30,13 @@ export type { TooltipPlacement, TooltipProps } from "./components/Tooltip";
 export { EmptyState, DegradedState } from "./components/OperationalState";
 export type { DegradedStateProps, EmptyStateAction, EmptyStateProps } from "./components/OperationalState";
 export { HealthBar, HealthItem } from "./components/HealthBar";
-export type { HealthBarHint, HealthBarItemData, HealthBarProps, HealthItemProps } from "./components/HealthBar";
+export type {
+  HealthBarHint,
+  HealthBarItemData,
+  HealthBarProps,
+  HealthBarVariant,
+  HealthItemProps,
+} from "./components/HealthBar";
 export { IconButton } from "./components/IconButton";
 export type { IconButtonProps, IconButtonSize, IconButtonTone } from "./components/IconButton";
 export { InlineRename } from "./components/InlineRename";
