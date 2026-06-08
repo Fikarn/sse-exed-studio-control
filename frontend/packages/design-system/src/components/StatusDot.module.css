@@ -15,35 +15,39 @@
     height: 8px;
   }
 
+  /* DES-07 (8e2): recolored off the private, un-themed --color-brand-* palette
+     onto the shared semantic tokens, so the dots match the StatusBadge/StatusPill
+     amber/red/blue AND theme across Studio/Graphite/Bone (the brand-* tokens were
+     not theme-overridden, so the dots were stuck at Studio values). */
   .ok {
-    background: var(--color-brand-green);
+    background: var(--color-primary-500);
   }
 
   .attn {
-    background: var(--color-brand-yellow);
+    background: var(--color-warning-500);
   }
 
   .err {
-    background: var(--color-brand-coral);
+    background: var(--color-danger-500);
   }
 
   .info {
-    background: var(--color-brand-blue-hot);
+    background: var(--color-info-500);
   }
 
   .glow.ok {
-    box-shadow: 0 0 8px var(--color-brand-green);
+    box-shadow: 0 0 8px var(--color-primary-500);
   }
 
   .glow.attn {
-    box-shadow: 0 0 8px var(--color-brand-yellow);
+    box-shadow: 0 0 8px var(--color-warning-500);
   }
 
   .glow.err {
-    box-shadow: 0 0 8px var(--color-brand-coral);
+    box-shadow: 0 0 8px var(--color-danger-500);
   }
 
   .glow.info {
-    box-shadow: 0 0 8px var(--color-brand-blue);
+    box-shadow: 0 0 8px var(--color-info-500);
   }
 }

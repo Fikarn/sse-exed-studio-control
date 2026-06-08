@@ -65,16 +65,18 @@
     background: var(--color-accent-red);
   }
 
+  /* DES-07 (8e2): tokenized off the raw Tailwind rgba() literals onto the shared
+     semantic tokens (matching the .signal colors above) so the band borders theme. */
   .ready {
-    border-color: rgba(34, 197, 94, 0.28);
+    border-color: color-mix(in srgb, var(--color-primary-500) 28%, transparent);
   }
 
   .degraded,
   .warning {
-    border-color: rgba(245, 158, 11, 0.3);
+    border-color: color-mix(in srgb, var(--color-warning-500) 30%, transparent);
   }
 
   .error {
-    border-color: rgba(239, 68, 68, 0.32);
+    border-color: color-mix(in srgb, var(--color-danger-500) 32%, transparent);
   }
 }
