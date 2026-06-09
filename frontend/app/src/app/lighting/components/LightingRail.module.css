@@ -876,7 +876,10 @@
   display: flex;
   gap: 16px;
   padding: 4px 4px 0;
-  margin-top: 4px;
+  /* DENSITY-07/LIG-07 — pin the latched Save changes / Revert row to a stable
+     rail-bottom position instead of floating directly under Groups, so the
+     modified-scene affordance reads as a footer (matches Audio's filled rail). */
+  margin-top: auto;
 }
 
 .action {

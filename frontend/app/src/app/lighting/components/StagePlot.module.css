@@ -117,7 +117,9 @@
 
 .plotPillLabel {
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  /* LGS-07 — scale with operator density like the adjacent StagePlotControls
+     (was a fixed 10px; --operator-font-size-xs carries --operator-ui-scale-factor). */
+  font-size: var(--operator-font-size-xs, 10px);
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
@@ -127,7 +129,7 @@
   font-family: var(--font-family-display);
   font-variation-settings: "opsz" 24;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--operator-font-size-lg, 13px);
 }
 
 .liveGhostLayer {
