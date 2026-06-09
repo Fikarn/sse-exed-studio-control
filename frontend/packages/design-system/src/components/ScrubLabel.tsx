@@ -28,6 +28,12 @@ export interface ScrubLabelProps {
   pixelsPerStep?: number;
   /** Snap step. Defaults to the same as `pixelsPerStep`. */
   step?: number;
+  /** Reset target. Double-click (the 360ms time-based guard) and Backspace/Delete
+   *  when focused reset to this value — mirrors ScrubSlider/AudioKnob. Because the
+   *  paired `<input>`, not the label, owns typed entry, the label has no
+   *  typed-entry gesture to reserve, so a bare double-click resets (matching
+   *  ScrubSlider's no-typed-entry fallback). Unset = no reset gesture. */
+  resetValue?: number;
   /** Disabled state. */
   disabled?: boolean;
   /** Accessible name for the `role="slider"` element. Required in practice
@@ -85,6 +91,9 @@ const DEFAULT_FORMAT = (value: number): string => String(value);
  *
  * Modifiers (mid-drag): Cmd/Ctrl = ×0.1 fine, Shift = ×10 coarse, plain = ×1.
  *
+ * Reset (LGS-06, when `resetValue` is set): double-click the label (360ms guard)
+ * or press Backspace/Delete while it is focused — mirrors ScrubSlider/AudioKnob.
+ *
  * Pair with a matching `<input>` inside a plain wrapper — NOT a `<label>`, since
  * a focusable `role="slider"` is interactive content and must not live inside a
  * label. Give the input its own `aria-label`:
@@ -103,6 +112,7 @@ export function ScrubLabel({
   max,
   pixelsPerStep = 0.1,
   step,
+  resetValue,
   disabled = false,
   ariaLabel,
   formatValue = DEFAULT_FORMAT,
@@ -110,6 +120,7 @@ export function ScrubLabel({
   className,
 }: ScrubLabelProps) {
   const dragRef = useRef<DragState | null>(null);
+  const lastPointerDownAtRef = useRef(Number.NEGATIVE_INFINITY);
   const [scrubbing, setScrubbing] = useState(false);
   const effectiveStep = step ?? pixelsPerStep;
   const valueText = formatValue(value);
@@ -140,9 +151,27 @@ export function ScrubLabel({
     };
   }, []);
 
+  const resetToValue = useCallback(() => {
+    if (disabled || resetValue === undefined) return;
+    const next = clampValue(snapToStep(resetValue, effectiveStep), min, max);
+    if (next !== value) onChange(next);
+    onCommit?.(next);
+  }, [disabled, effectiveStep, max, min, onChange, onCommit, resetValue, value]);
+
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLSpanElement>) => {
       if (disabled || event.button !== 0) return;
+      // Double-tap reset (mirrors ScrubSlider/AudioSliderControl's 360ms guard).
+      // The label has no typed-entry path of its own, so a bare double-click
+      // resets — matching ScrubSlider's no-typed-entry fallback.
+      const now = performance.now();
+      if (resetValue !== undefined && now - lastPointerDownAtRef.current <= 360) {
+        lastPointerDownAtRef.current = Number.NEGATIVE_INFINITY;
+        event.preventDefault();
+        resetToValue();
+        return;
+      }
+      lastPointerDownAtRef.current = now;
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       dragRef.current = {
@@ -152,7 +181,7 @@ export function ScrubLabel({
       };
       setScrubbing(true);
     },
-    [disabled, value]
+    [disabled, resetToValue, resetValue, value]
   );
 
   const onPointerMove = useCallback(
@@ -194,6 +223,13 @@ export function ScrubLabel({
       if (disabled) return;
       let next: number;
       switch (event.key) {
+        case "Backspace":
+        case "Delete":
+          // Reset to default (mirrors ScrubSlider/AudioKnob). Falls through to the
+          // shared clamp/snap + commit tail below.
+          if (resetValue === undefined) return;
+          next = resetValue;
+          break;
         case "ArrowLeft":
         case "ArrowDown":
           next = value - effectiveStep;
@@ -226,7 +262,7 @@ export function ScrubLabel({
         onCommit?.(next);
       }
     },
-    [disabled, effectiveStep, max, min, onChange, onCommit, value]
+    [disabled, effectiveStep, max, min, onChange, onCommit, resetValue, value]
   );
 
   return (

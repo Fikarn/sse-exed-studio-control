@@ -572,6 +572,7 @@ export function InspectorFixture({
                 max={ROTATION_MAX_DEGREES}
                 pixelsPerStep={0.5}
                 step={1}
+                resetValue={0}
                 ariaLabel="Rotation"
                 formatValue={(value) => formatScrubDegrees(normalizeDegrees(value))}
                 className={styles.positionLabel}
@@ -602,6 +603,7 @@ export function InspectorFixture({
                 max={BEAM_ANGLE_MAX_DEGREES}
                 pixelsPerStep={0.5}
                 step={1}
+                resetValue={defaultLightingBeamAngle(fixture.type)}
                 ariaLabel="Beam angle"
                 formatValue={formatScrubDegrees}
                 className={styles.positionLabel}
