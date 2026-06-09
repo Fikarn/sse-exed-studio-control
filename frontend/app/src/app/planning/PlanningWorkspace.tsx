@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 
-import { SegmentedControl, StatusBadge } from "@sse/design-system";
+import { EmptyState, MetricCard, SegmentedControl, StatusBadge } from "@sse/design-system";
 import type { PlanningSnapshot, ShellStore } from "@sse/engine-client";
 
 import {
@@ -1042,20 +1042,16 @@ export function PlanningWorkspaceSurface({
             </div>
             <div className={planningStyles.planningStatRow}>
               <div className={planningStyles.planningStatChip}>
-                <span className={planningStyles.planningStatLabel}>Lanes</span>
-                <span className={planningStyles.planningStatValue}>{counts.projectCount}</span>
+                <MetricCard caption="Lanes" value={String(counts.projectCount)} showBadge={false} />
               </div>
               <div className={planningStyles.planningStatChip}>
-                <span className={planningStyles.planningStatLabel}>On-time</span>
-                <span className={planningStyles.planningStatValue}>{onTimeCount}</span>
+                <MetricCard caption="On-time" value={String(onTimeCount)} showBadge={false} />
               </div>
               <div className={planningStyles.planningStatChip} data-tone={slippedCount > 0 ? "warn" : undefined}>
-                <span className={planningStyles.planningStatLabel}>Slipped</span>
-                <span className={planningStyles.planningStatValue}>{slippedCount}</span>
+                <MetricCard caption="Slipped" value={String(slippedCount)} showBadge={false} />
               </div>
               <div className={planningStyles.planningStatChip} data-tone={blockedCount > 0 ? "danger" : undefined}>
-                <span className={planningStyles.planningStatLabel}>Blocked</span>
-                <span className={planningStyles.planningStatValue}>{blockedCount}</span>
+                <MetricCard caption="Blocked" value={String(blockedCount)} showBadge={false} />
               </div>
             </div>
             <span className={planningStyles.planningSegmentGroup}>
@@ -1419,10 +1415,10 @@ export function PlanningWorkspaceSurface({
           })}
           {projects.length === 0 ? (
             <div className={planningStyles.planningBoardEmptyState}>
-              <div className={planningStyles.planningEmptyTitle}>No projects yet. Press N to start one.</div>
-              <div className={planningStyles.planningEmptyBody}>
-                The board stays visible, but there is no run-of-show data on the current day.
-              </div>
+              <EmptyState
+                title="No projects yet. Press N to start one."
+                message="The board stays visible, but there is no run-of-show data on the current day."
+              />
             </div>
           ) : null}
         </div>
@@ -1477,10 +1473,10 @@ export function PlanningWorkspaceSurface({
 
           {projects.length === 0 ? (
             <div className={planningStyles.planningEmptyState}>
-              <div className={planningStyles.planningEmptyTitle}>No projects yet. Press N to start one.</div>
-              <div className={planningStyles.planningEmptyBody}>
-                The timeline stays visible, but there is no run-of-show data on the current day.
-              </div>
+              <EmptyState
+                title="No projects yet. Press N to start one."
+                message="The timeline stays visible, but there is no run-of-show data on the current day."
+              />
             </div>
           ) : (
             <div className={planningStyles.planningTimeline} ref={planningTimelineRef}>

@@ -6,7 +6,10 @@
   }
 
   .caption {
-    color: var(--color-studio-400);
+    /* --metric-caption-color / --metric-value-color / --metric-value-numeric are optional
+       theming hooks (default to the studio values, so existing consumers are byte-identical);
+       a consumer can set them on an ancestor to theme the metric text (e.g. Planning's chips). */
+    color: var(--metric-caption-color, var(--color-studio-400));
     font-family: var(--font-family-mono);
     font-size: var(--operator-font-size-xs, var(--font-size-xs));
     font-weight: 700;
@@ -22,9 +25,10 @@
   }
 
   .value {
-    color: var(--color-studio-050);
+    color: var(--metric-value-color, var(--color-studio-050));
     font-family: var(--font-family-mono);
     font-size: var(--operator-font-size-lg, var(--font-size-md));
+    font-variant-numeric: var(--metric-value-numeric, normal);
     font-weight: 600;
     letter-spacing: 0;
   }

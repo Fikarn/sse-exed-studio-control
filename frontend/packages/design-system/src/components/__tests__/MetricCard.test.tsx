@@ -39,4 +39,17 @@ describe("MetricCard", () => {
     expect(badge.className).toMatch(/warning/);
     expect(screen.queryByText("warning")).toBeNull();
   });
+
+  it("shows the badge by default (showBadge defaults to true)", () => {
+    render(<MetricCard caption="Lighting" label="Active" tone="ready" value="2 notes" />);
+    expect(screen.getByText("Active")).toBeInTheDocument();
+  });
+
+  it("omits the badge entirely when showBadge is false (bare caption+value chip)", () => {
+    render(<MetricCard caption="Slipped" value="3" tone="warning" showBadge={false} />);
+    expect(screen.getByText("Slipped")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    // No StatusBadge is rendered, so neither the tone enum nor a label leaks.
+    expect(screen.queryByText("warning")).toBeNull();
+  });
 });
