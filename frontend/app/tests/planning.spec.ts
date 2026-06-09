@@ -16,9 +16,12 @@ test("renders the planning timeline from an engine-backed snapshot and toggles b
   await expect(workspace.getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i })).toBeVisible();
   await expect(workspace.getByText("Archive Q3 cue library")).toBeVisible();
   await expect(page.getByTestId("planning-now-playhead")).toBeVisible();
+  // PLA-03/DENSITY-03 (Slice 10c): lanes now fill the measured timeline band up to a 150px
+  // ceiling instead of being pinned at the old fixed 84px cap (which left a vast dead band).
+  // At 2560x1440 with 5 projects the band ÷ 5 exceeds the ceiling, so lanes sit at 150px.
   const boothLaneBounds = await workspace.getByTestId("planning-lane-proj-booth-2").boundingBox();
-  expect(boothLaneBounds?.height ?? 0).toBeGreaterThan(80);
-  expect(boothLaneBounds?.height ?? 0).toBeLessThan(90);
+  expect(boothLaneBounds?.height ?? 0).toBeGreaterThan(120);
+  expect(boothLaneBounds?.height ?? 0).toBeLessThan(151);
 
   await page.keyboard.press("Shift+KeyB");
   await expect(workspace.getByRole("tab", { name: "Board" })).toHaveAttribute("data-active", "true");
