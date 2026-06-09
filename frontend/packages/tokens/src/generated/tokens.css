@@ -182,6 +182,7 @@
   --motion-duration-fast: 120ms;
   --motion-duration-normal: 180ms;
   --motion-duration-slow: 240ms;
+  --motion-duration-pulse: 1200ms;
   --motion-easing-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-easing-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --motion-easing-out: cubic-bezier(0.16, 1, 0.3, 1);

@@ -3,13 +3,16 @@
    that should pierce them (errors). The portal mounts at document.body
    so it isn't subject to per-workspace overflow / transform clipping.
 
-   The app's operator workspaces reserve the bottom edge for the health bar,
-   so the stack docks above that chrome instead of competing with it.
-   --toast-safe-bottom defaults to the health-bar height; surfaces with no
-   footer (pre-ready: startup / recovery / setup-recovery) set it to 0 via
-   `html[data-pre-ready]` so the toast docks at the true edge there (CHROME-08).
-   The portal mounts at document.body — outside .root — so the override is
-   keyed on <html>, the only ancestor that reaches it. */
+   Surfaces with a mounted health bar reserve the bottom edge for it, so the
+   stack docks above that chrome instead of competing with it.
+   --toast-safe-bottom defaults to the health-bar height and collapses to 0
+   wherever no bar is mounted: `html:not(:has([data-health-bar]))` keys on
+   the inert presence marker every DS HealthBar root carries (DENSITY-08 /
+   GLO-11 — covers Planning + setup support mode and live-flips on the
+   Runner↔Support toggle), and `html[data-pre-ready]` keeps the original
+   pre-ready collapse (CHROME-08). The portal mounts at document.body —
+   outside .root — so both overrides are keyed on <html>, the only ancestor
+   that reaches it. */
 
 .stack {
   position: fixed;

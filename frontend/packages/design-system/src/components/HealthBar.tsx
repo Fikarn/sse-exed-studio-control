@@ -67,7 +67,9 @@ export const HealthBar = ({
   if (variant === "caption") {
     const classes = [styles.caption, className].filter(Boolean).join(" ");
     return (
-      <footer className={classes} data-testid={testId}>
+      // data-health-bar: inert presence marker — the app's toast stack keys
+      // its bottom offset on whether ANY health bar is mounted (GLO-11).
+      <footer className={classes} data-health-bar="" data-testid={testId}>
         <div className={styles.captionTelemetry} data-testid={itemsTestId}>
           {items.map((item, idx) => (
             <div key={`${item.label}:${idx}`} className={styles.captionItem}>
@@ -103,7 +105,7 @@ export const HealthBar = ({
 
   const classes = [styles.bar, className].filter(Boolean).join(" ");
   return (
-    <div className={classes} role="status" aria-label="Workspace health" data-testid={testId}>
+    <div className={classes} role="status" aria-label="Workspace health" data-health-bar="" data-testid={testId}>
       {items.map((item, idx) => (
         <HealthItem
           key={`${item.label}:${idx}`}

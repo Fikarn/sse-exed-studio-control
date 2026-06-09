@@ -305,7 +305,8 @@
     "duration": {
       "fast": { "$value": "120ms" },
       "normal": { "$value": "180ms" },
-      "slow": { "$value": "240ms" }
+      "slow": { "$value": "240ms" },
+      "pulse": { "$value": "1200ms" }
     },
     "easing": {
       "standard": { "$value": "cubic-bezier(0.22, 1, 0.36, 1)" },
