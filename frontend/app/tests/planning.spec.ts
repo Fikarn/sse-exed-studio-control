@@ -11,7 +11,9 @@ test("renders the planning timeline from an engine-backed snapshot and toggles b
 
   const workspace = page.getByTestId("planning-workspace");
   await expect(page.getByRole("heading", { name: "Planning timeline" })).toHaveCount(0);
-  await expect(workspace.getByRole("tab", { name: "Timeline" })).toHaveAttribute("data-active", "true");
+  // PLA-06 (Slice 10d-1): the mode + filter toggles are now DS SegmentedControl —
+  // role="radio"/aria-checked (a radiogroup), not the old role="tab"/data-active tablist.
+  await expect(workspace.getByRole("radio", { name: "Timeline" })).toHaveAttribute("aria-checked", "true");
   await expect(workspace.getByText("evening_service")).toBeVisible();
   await expect(workspace.getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i })).toBeVisible();
   await expect(workspace.getByText("Archive Q3 cue library")).toBeVisible();
@@ -24,7 +26,7 @@ test("renders the planning timeline from an engine-backed snapshot and toggles b
   expect(boothLaneBounds?.height ?? 0).toBeLessThan(151);
 
   await page.keyboard.press("Shift+KeyB");
-  await expect(workspace.getByRole("tab", { name: "Board" })).toHaveAttribute("data-active", "true");
+  await expect(workspace.getByRole("radio", { name: "Board" })).toHaveAttribute("aria-checked", "true");
   const boardCard = workspace.getByTestId("planning-board-card-proj-booth-2");
   await expect(boardCard).toBeVisible();
   await expect(boardCard).toHaveAttribute("data-running", "true");
@@ -36,12 +38,12 @@ test("renders the planning timeline from an engine-backed snapshot and toggles b
   await expect(workspace.getByText("No projects in this column.")).toHaveCount(1);
   await expect(workspace.getByText("booth_2")).toBeVisible();
   await page.keyboard.press("Digit4");
-  await expect(workspace.getByRole("tab", { name: "Done" })).toHaveAttribute("data-active", "true");
+  await expect(workspace.getByRole("radio", { name: "Done" })).toHaveAttribute("aria-checked", "true");
   await expect(workspace.getByTestId("planning-board-empty-done")).toHaveAttribute("data-zero-filter", "true");
   await expect(workspace.getByText("No done tasks.")).toBeVisible();
 
   await page.keyboard.press("Shift+KeyT");
-  await expect(workspace.getByRole("tab", { name: "Timeline" })).toHaveAttribute("data-active", "true");
+  await expect(workspace.getByRole("radio", { name: "Timeline" })).toHaveAttribute("aria-checked", "true");
   await expect(workspace.getByText("Filter: done · 0 of 5")).toBeVisible();
   await workspace.getByRole("button", { name: "Clear" }).click();
   await expect(workspace.getByRole("button", { name: /Level-match overflow/i })).toBeVisible();
@@ -304,7 +306,7 @@ test("supports planning toolbar search focus and engine-backed time report", asy
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
-  const timelineTab = workspace.getByRole("tab", { name: "Timeline" });
+  const timelineTab = workspace.getByRole("radio", { name: "Timeline" });
   const search = workspace.getByLabel("Search planning tasks");
 
   await timelineTab.click();
@@ -337,7 +339,7 @@ test("shows the centered empty-state card in planning board mode with no project
   await expect(workspace.getByText("No projects yet. Press N to start one.")).toBeVisible();
 
   await page.keyboard.press("Shift+KeyB");
-  await expect(workspace.getByRole("tab", { name: "Board" })).toHaveAttribute("data-active", "true");
+  await expect(workspace.getByRole("radio", { name: "Board" })).toHaveAttribute("aria-checked", "true");
   await expect(workspace.getByText("No projects yet. Press N to start one.")).toBeVisible();
   await expect(workspace.getByTestId("planning-board-column-todo")).toBeVisible();
   await expect(workspace.getByTestId("planning-board-column-in-progress")).toBeVisible();

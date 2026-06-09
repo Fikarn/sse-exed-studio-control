@@ -157,10 +157,8 @@
    recipe. (CONTROLS-03/Slice 8b made planningBoardCard keyboard-focusable, so
    it now joins the recipe.) */
 .planningToolbarButton:focus-visible,
-.planningModeButton:focus-visible,
 .planningNudgeButton:focus-visible,
 .planningTodayButton:focus-visible,
-.planningFilterButton:focus-visible,
 .planningBoardDetailButton:focus-visible,
 .planningBoardCard:focus-visible,
 .planningBlock:focus-visible,
@@ -678,31 +676,13 @@
   font: var(--font-weight-medium) var(--font-size-xs) / 1.2 var(--font-family-ui);
 }
 
-.planningModeToggle {
+/* PLA-06 (Slice 10d-1): the mode + filter tablists are now DS SegmentedControl
+   (role=radiogroup, neutral selected wash — matches Lighting's StagePlotControls and
+   the shared-primitive look). This span just places the control in the toolbar flow;
+   the control brings its own shell, sizing, focus, and keyboard model. */
+.planningSegmentGroup {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
-}
-
-.planningModeButton {
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  padding: 10px 16px;
-  text-transform: uppercase;
-}
-
-.planningModeButton[data-active="true"] {
-  background: color-mix(in srgb, var(--color-primary-500) 22%, var(--color-surface-700));
-  color: var(--color-text-primary);
 }
 
 .planningNowCard,
@@ -779,14 +759,8 @@
   gap: var(--space-3);
 }
 
-.planningFilterRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.planningFilterButton,
+/* .planningFilterClear is the banner's "Clear filter" button (the filter row itself is now
+   a DS SegmentedControl — see .planningSegmentGroup). */
 .planningFilterClear {
   border: 1px solid color-mix(in srgb, var(--color-border-default) 88%, transparent);
   border-radius: var(--radius-pill);
@@ -797,11 +771,6 @@
   letter-spacing: 0;
   padding: 9px 14px;
   text-transform: uppercase;
-}
-
-.planningFilterButton[data-active="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 44%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 20%, var(--color-surface-700));
 }
 
 .planningTipChip {
