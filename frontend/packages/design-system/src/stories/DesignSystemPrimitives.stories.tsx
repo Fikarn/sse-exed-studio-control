@@ -380,7 +380,7 @@ export const DirectionDPlotMeta: StoryObj<typeof meta> = {
       <div style={dRow}>
         <PlotMeta label="Floor" value="12 m × 8 m" />
         <PlotMeta label="Grid" value="0.5 / 1 / 5 m" />
-        <PlotMeta label="Universe" value="U1 · 512 ch" tone="blue" />
+        <PlotMeta label="Selected" value="Key · Astra 1" tone="selected" />
       </div>
     </div>
   ),

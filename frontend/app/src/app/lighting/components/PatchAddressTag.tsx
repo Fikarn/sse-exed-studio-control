@@ -21,8 +21,8 @@ export function PatchAddressTag({ centerX, centerY, dmxStartAddress }: PatchAddr
         height={height}
         rx={3}
         style={{
-          fill: "var(--color-glass-bg-blue)",
-          stroke: "var(--color-brand-blue-border)",
+          fill: "var(--color-glass-bg)",
+          stroke: "var(--color-border-strong)",
           strokeWidth: 1,
         }}
       />
@@ -34,7 +34,7 @@ export function PatchAddressTag({ centerX, centerY, dmxStartAddress }: PatchAddr
         textAnchor="middle"
         style={{
           fontFamily: "var(--font-family-mono)",
-          fill: "var(--color-brand-blue-hot)",
+          fill: "var(--color-brand-text-primary)",
         }}
       >
         {text}

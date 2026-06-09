@@ -346,7 +346,7 @@ export function StagePlot({
       ) : null}
 
       <div className={styles.plotOverlaysSlot} role="region" aria-label="Stage plot context">
-        {selectedFixture ? <PlotMeta label="Selected" value={selectedFixture.name} tone="blue" /> : null}
+        {selectedFixture ? <PlotMeta label="Selected" value={selectedFixture.name} tone="selected" /> : null}
         <PlotMeta label="Floor" value={`${layout.roomWidthMeters} m × ${layout.roomDepthMeters} m`} />
         <PlotMeta label="Grid" value="0.5 / 1 / 5 m" />
       </div>

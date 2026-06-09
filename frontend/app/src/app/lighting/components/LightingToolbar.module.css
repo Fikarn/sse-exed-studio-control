@@ -197,8 +197,10 @@
 }
 
 .fadeControl:focus-within {
-  border-color: var(--color-brand-blue-border);
-  box-shadow: 0 0 0 2px rgba(63, 112, 200, 0.2);
+  /* LGS-02: focus affordance was an off-vocabulary blue; align to the surface's
+     green focus colour (matches .cell / .modeButton :focus-visible). */
+  border-color: var(--color-brand-green-border);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-green) 22%, transparent);
 }
 
 .fadeLabel,

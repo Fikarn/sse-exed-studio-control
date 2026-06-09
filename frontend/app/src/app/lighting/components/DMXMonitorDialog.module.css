@@ -26,9 +26,13 @@
   border: 1px solid var(--color-bg-stroke);
 }
 
+/* LGS-02: "assigned/patched" was the retired multi-hue blue (and the 9px channel
+   header failed AA at 3.40:1). It now reads as a NEUTRAL elevated keyline —
+   distinct from the flat unassigned cell by elevation + a strong themed border +
+   readable text — so it clears AA in all three themes without an off-palette hue. */
 .legendSwatchAssigned {
-  background: var(--color-brand-blue-soft);
-  border-color: var(--color-brand-blue-border);
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-strong);
 }
 
 .grid {
@@ -60,9 +64,8 @@
 }
 
 .cellAssigned {
-  background: var(--color-brand-blue-soft);
-  border-color: var(--color-brand-blue-border);
-  color: var(--color-brand-blue-hot);
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-strong);
 }
 
 .cell:focus-visible {
@@ -80,7 +83,7 @@
 }
 
 .cellAssigned .cellHeader {
-  color: var(--color-brand-blue);
+  color: var(--color-brand-text-secondary);
 }
 
 .cellValue {
@@ -91,7 +94,7 @@
 }
 
 .cellAssigned .cellValue {
-  color: var(--color-brand-blue-hot);
+  color: var(--color-brand-text-primary);
 }
 
 .cellBar {
@@ -108,5 +111,5 @@
 }
 
 .cellAssigned .cellBarFill {
-  background: var(--color-brand-blue-hot);
+  background: var(--color-brand-text-primary);
 }
