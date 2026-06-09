@@ -95,3 +95,31 @@ test("setup-degraded fixture surfaces the recovery + support entry points", asyn
   await expect(page.getByText("Attention required")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Open support$/ })).toBeVisible();
 });
+
+test("runner panels scroll within their tracks at 1280x800 (SET-11)", async ({ page }) => {
+  // Slice 11 / SET-11: the global overflow:hidden chain used to CLIP any
+  // runner content that exceeded the viewport — at 1280x800 the side cards
+  // painted underneath the pinned footer and could never be reached. The
+  // panels now scroll within their grid tracks. The gesture must be a REAL
+  // wheel scroll: overflow:hidden ancestors still honor programmatic
+  // scrolling (scrollIntoViewIfNeeded passes either way), but swallow user
+  // input — exactly the operator-visible defect this locks against.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openFixture(page, "setup-ready");
+  await expect(page.getByText("Commissioning runner")).toBeVisible();
+
+  // Precondition: the deepest side-card control starts below the fold.
+  const supportDashboard = page.getByRole("button", { name: "Support dashboard" });
+  const before = await supportDashboard.boundingBox();
+  expect(before).not.toBeNull();
+  expect(before!.y + before!.height).toBeGreaterThan(800);
+
+  await page.getByText("Health posture").hover();
+  await page.mouse.wheel(0, 2400);
+  await expect
+    .poll(async () => {
+      const box = await supportDashboard.boundingBox();
+      return box !== null && box.y >= 0 && box.y + box.height <= 800;
+    })
+    .toBe(true);
+});

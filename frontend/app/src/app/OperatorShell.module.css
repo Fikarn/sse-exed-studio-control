@@ -332,8 +332,11 @@ button.lightingDmxDrawerCell {
 .setupRecoveryShell {
   display: grid;
   gap: var(--space-4);
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* SET-11: the shell lives inside PreReadyFrame's overflow:hidden main —
+     the old 100vh/100dvh min-height stretched it past the frame and clipped
+     the bottom card at 1920×1080. Scroll within instead. */
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--space-2) 0;
 }
 
@@ -426,7 +429,16 @@ button.lightingDmxDrawerCell {
   padding: var(--space-3);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-700) 92%, transparent);
+  /* SET-12: 92% → 94% — same wash as the support pilot's card group
+     (.field/.checkCard/.restoreHighlight). */
+  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+}
+
+.setupIncidentEmptyState {
+  /* SET-12: adopt the support pilot's empty-state idiom (.emptyState) —
+     dashed boundary, centered. */
+  border-style: dashed;
+  text-align: center;
 }
 
 .setupIncidentMetaValue {
@@ -448,20 +460,20 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentInput {
+  /* SET-12: aligned with the support pilot's .textField recipe (token
+     min-height/padding, pill radius, surface-900 wash). The operator-md font
+     size is kept as a deliberate readability exception on the incident
+     surface. The one-off white-mix focus ring was removed — the global
+     :focus-visible ring applies. */
   width: 100%;
-  min-height: 44px;
-  padding: 12px 14px;
+  min-height: var(--size-control-height);
+  padding: 0 var(--space-4);
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 94%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
   color: var(--color-text-strong);
   font: var(--font-weight-regular) var(--operator-font-size-md, var(--font-size-md)) / 1.4 var(--font-family-ui);
   letter-spacing: 0;
-}
-
-.setupIncidentInput:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 72%, white 28%);
-  outline-offset: 2px;
 }
 
 .setupIncidentActions,
@@ -539,7 +551,11 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentCheckTitle {
-  font: var(--font-weight-semibold) var(--font-size-md) / 1.2 var(--font-family-ui);
+  /* SET-12: aligned with the support pilot's .checkTitle (display family,
+     strong text). */
+  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.3 var(--font-family-display);
+  color: var(--color-text-strong);
+  letter-spacing: 0;
 }
 
 .setupIncidentDetailList {
@@ -564,8 +580,32 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentRailButton {
-  padding: 12px 14px;
+  /* SET-12: aligned with the support pilot's .railButton shape — pill,
+     transparent, muted resting color. */
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+}
+
+.setupIncidentRailButton:hover {
+  color: var(--color-text-strong);
+}
+
+/* SET-12: backup-row typography aligned with the support pilot's .backupRow
+   strong/small (mono, strong/subtle). Later rules override the shared
+   muted/ui defaults above without splitting them. */
+.setupIncidentBackupRow strong {
+  display: block;
+  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.3 var(--font-family-mono);
+  color: var(--color-text-strong);
+  letter-spacing: 0;
+}
+
+.setupIncidentBackupRow small {
+  color: var(--color-text-subtle);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1.4 var(--font-family-mono);
 }
 
 .stateShell {
@@ -776,10 +816,6 @@ button.planningProjectDetailTaskCard {
 }
 
 @media (max-width: 1440px) {
-  .setupShell {
-    padding: 0 16px;
-  }
-
   .setupUtilityRow {
     flex-direction: column;
     align-items: stretch;
