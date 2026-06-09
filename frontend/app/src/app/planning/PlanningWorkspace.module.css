@@ -784,7 +784,10 @@
       color-mix(in srgb, var(--color-surface-800) 94%, transparent),
       color-mix(in srgb, var(--color-surface-900) 98%, black 2%)
     ),
-    radial-gradient(circle at top right, color-mix(in srgb, var(--color-primary-500) 10%, transparent), transparent 48%);
+    /* PLA-01/CHROME-05: neutral surface lift (was an accent-green --color-primary-500
+       wash) so the field reads near-neutral like the Audio/Lighting canvas and the
+       AppShellFrame ambient — green stays only on active/selected/running affordances. */
+    radial-gradient(circle at top right, color-mix(in srgb, var(--color-surface-700) 55%, transparent), transparent 48%);
   overflow: hidden;
 }
 
@@ -821,7 +824,8 @@
   bottom: 12px;
   width: 1px;
   transform: translateX(-50%);
-  background: color-mix(in srgb, var(--color-border-default) 20%, transparent);
+  /* PLA-11: bumped in concert with the lane-body grid (was 20%) so scale + lane ticks align. */
+  background: color-mix(in srgb, var(--color-border-default) 32%, transparent);
 }
 
 .planningScaleTick {
@@ -887,6 +891,14 @@
   border-bottom: 0;
 }
 
+/* PLA-11: subtle even-row banding strengthens row hierarchy on dense boards (ledger read).
+   .planningTimeline's first child is the absolutely-positioned playhead, so :nth-child(even)
+   resolves to alternating lanes; the neutral wash shows through the transparent lane-body
+   grid + the lane head. Themed via --color-surface-700; no height added (no-scroll-safe). */
+.planningLane:nth-child(even) {
+  background-color: color-mix(in srgb, var(--color-surface-700) 22%, transparent);
+}
+
 .planningLane[data-filter-dimmed="true"] {
   opacity: 0.32;
 }
@@ -914,9 +926,12 @@
 .planningLaneBody {
   position: relative;
   min-width: 0;
+  /* PLA-11: raise the hour/half-hour time-grid alpha (was 18%/8%, near-invisible) so the
+     advertised grid reads on the dark Studio + Graphite fields. Structural alpha bump on the
+     themed --color-border-default (mirrors S9c LGS-05); Bone grid COLOR tuning stays for S14. */
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--color-border-default) 18%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--color-border-default) 8%, transparent) 1px, transparent 1px);
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border-default) 30%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-border-default) 15%, transparent) 1px, transparent 1px);
   background-size:
     calc(100% / var(--planning-hour-count, 13)) 100%,
     calc(100% / var(--planning-half-hour-count, 26)) 100%;
