@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 
-import { StatusBadge } from "@sse/design-system";
+import { SegmentedControl, StatusBadge } from "@sse/design-system";
 import type { PlanningSnapshot, ShellStore } from "@sse/engine-client";
 
 import {
@@ -983,28 +983,18 @@ export function PlanningWorkspaceSurface({
       <div className={planningStyles.planningWorkspaceHeader}>
         <div className={planningStyles.planningToolbar} data-testid="planning-toolbar">
           <div className={planningStyles.planningToolbarActions}>
-            <div className={planningStyles.planningModeToggle} role="tablist" aria-label="Planning mode">
-              <button
-                aria-selected={settings.modeSection === "timeline"}
-                className={planningStyles.planningModeButton}
-                data-active={settings.modeSection === "timeline"}
-                onClick={() => togglePlanningMode("timeline")}
-                role="tab"
-                type="button"
-              >
-                Timeline
-              </button>
-              <button
-                aria-selected={settings.modeSection === "board"}
-                className={planningStyles.planningModeButton}
-                data-active={settings.modeSection === "board"}
-                onClick={() => togglePlanningMode("board")}
-                role="tab"
-                type="button"
-              >
-                Board
-              </button>
-            </div>
+            <span className={planningStyles.planningSegmentGroup}>
+              <SegmentedControl
+                label="Planning mode"
+                size="compact"
+                value={settings.modeSection}
+                onChange={(value) => togglePlanningMode(value as "timeline" | "board")}
+                options={[
+                  { label: "Timeline", value: "timeline" },
+                  { label: "Board", value: "board" },
+                ]}
+              />
+            </span>
             <div className={planningStyles.planningNowCard}>
               <div className={planningStyles.planningNowHeader}>
                 <span className={planningStyles.planningNowLabel}>Now</span>
@@ -1068,29 +1058,23 @@ export function PlanningWorkspaceSurface({
                 <span className={planningStyles.planningStatValue}>{blockedCount}</span>
               </div>
             </div>
-            <div className={planningStyles.planningFilterRow} role="tablist" aria-label="Planning filter">
-              {[
-                { label: "All", value: "all" },
-                { label: "Todo", value: "todo" },
-                { label: "In progress", value: "in-progress" },
-                { label: "Blocked", value: "blocked" },
-                { label: "Done", value: "done" },
-              ].map((filter) => (
-                <button
-                  key={filter.value}
-                  aria-selected={settings.viewFilter === filter.value}
-                  className={planningStyles.planningFilterButton}
-                  data-active={settings.viewFilter === filter.value}
-                  onClick={() =>
-                    updatePlanningViewFilter(filter.value as "all" | "todo" | "in-progress" | "blocked" | "done")
-                  }
-                  role="tab"
-                  type="button"
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
+            <span className={planningStyles.planningSegmentGroup}>
+              <SegmentedControl
+                label="Planning filter"
+                size="compact"
+                value={settings.viewFilter}
+                onChange={(value) =>
+                  updatePlanningViewFilter(value as "all" | "todo" | "in-progress" | "blocked" | "done")
+                }
+                options={[
+                  { label: "All", value: "all" },
+                  { label: "Todo", value: "todo" },
+                  { label: "In progress", value: "in-progress" },
+                  { label: "Blocked", value: "blocked" },
+                  { label: "Done", value: "done" },
+                ]}
+              />
+            </span>
             {settings.modeSection === "timeline" && allTasksUnscheduled ? (
               <div className={planningStyles.planningTipChip}>Drag into a lane to schedule.</div>
             ) : null}
