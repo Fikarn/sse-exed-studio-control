@@ -336,14 +336,21 @@ export function PlanningWorkspaceSurface({
     (_, index) => timelineStartMinute + (index + 1) * 30
   ).filter((minute) => minute % 60 !== 0);
   const timelineLaneHeight = (() => {
-    const defaultLaneHeight = 84;
+    // PLA-03/DENSITY-03: distribute the measured timeline band across the lanes instead of
+    // pinning every board to a fixed 84px cap (which parked few-lane boards at the top over a
+    // large dead band). Lanes now fill up to a 150px ceiling (so a lone task bar doesn't float
+    // in a vast empty lane); dense boards still floor at 48px and overflow:hidden clips beyond,
+    // so no-scroll holds at every viewport. Operator-chosen "measured cap-raise" over a
+    // 1fr-stretch (which would defeat the 48px floor on dense boards).
     const minimumLaneHeight = 48;
+    const maximumLaneHeight = 150;
+    const fallbackLaneHeight = 96;
     if (!planningTimelineViewportHeight || filteredProjects.length === 0) {
-      return defaultLaneHeight;
+      return fallbackLaneHeight;
     }
 
-    const compressedLaneHeight = Math.floor(planningTimelineViewportHeight / filteredProjects.length);
-    return Math.max(minimumLaneHeight, Math.min(defaultLaneHeight, compressedLaneHeight));
+    const filledLaneHeight = Math.floor(planningTimelineViewportHeight / filteredProjects.length);
+    return Math.max(minimumLaneHeight, Math.min(maximumLaneHeight, filledLaneHeight));
   })();
   const planningTimelineVariables = {
     "--planning-half-hour-count": String(Math.max(1, Math.round(timelineRangeMinutes / 30))),
@@ -973,202 +980,208 @@ export function PlanningWorkspaceSurface({
       data-testid="planning-workspace"
       role="region"
     >
-      <div className={planningStyles.planningToolbar} data-testid="planning-toolbar">
-        <div className={planningStyles.planningToolbarActions}>
-          <div className={planningStyles.planningModeToggle} role="tablist" aria-label="Planning mode">
-            <button
-              aria-selected={settings.modeSection === "timeline"}
-              className={planningStyles.planningModeButton}
-              data-active={settings.modeSection === "timeline"}
-              onClick={() => togglePlanningMode("timeline")}
-              role="tab"
-              type="button"
-            >
-              Timeline
-            </button>
-            <button
-              aria-selected={settings.modeSection === "board"}
-              className={planningStyles.planningModeButton}
-              data-active={settings.modeSection === "board"}
-              onClick={() => togglePlanningMode("board")}
-              role="tab"
-              type="button"
-            >
-              Board
-            </button>
-          </div>
-          <div className={planningStyles.planningNowCard}>
-            <div className={planningStyles.planningNowHeader}>
-              <span className={planningStyles.planningNowLabel}>Now</span>
-              <span className={planningStyles.planningNowValue}>{nowLabel}</span>
-            </div>
-            <div className={planningStyles.planningNudgeRow}>
+      <div className={planningStyles.planningWorkspaceHeader}>
+        <div className={planningStyles.planningToolbar} data-testid="planning-toolbar">
+          <div className={planningStyles.planningToolbarActions}>
+            <div className={planningStyles.planningModeToggle} role="tablist" aria-label="Planning mode">
               <button
-                aria-label="View one hour earlier"
-                className={planningStyles.planningNudgeButton}
-                onClick={() => setTimelineOffsetMinutes((current) => current - 60)}
-                type="button"
-              >
-                [
-              </button>
-              <button
-                aria-label="Snap to now"
-                className={planningStyles.planningNudgeButton}
-                onClick={() => snapTimelineToNow()}
-                type="button"
-              >
-                ●
-              </button>
-              <button
-                aria-label="View one hour later"
-                className={planningStyles.planningNudgeButton}
-                onClick={() => setTimelineOffsetMinutes((current) => current + 60)}
-                type="button"
-              >
-                ]
-              </button>
-            </div>
-          </div>
-          <div className={planningStyles.planningDayCard}>
-            <span className={planningStyles.planningNowLabel}>Day</span>
-            <span className={planningStyles.planningNowValue}>{viewDayLabel}</span>
-            {!viewIsToday ? (
-              <button className={planningStyles.planningTodayButton} onClick={() => snapTimelineToNow()} type="button">
-                Today
-              </button>
-            ) : null}
-          </div>
-          <div className={planningStyles.planningStatRow}>
-            <div className={planningStyles.planningStatChip}>
-              <span className={planningStyles.planningStatLabel}>Lanes</span>
-              <span className={planningStyles.planningStatValue}>{counts.projectCount}</span>
-            </div>
-            <div className={planningStyles.planningStatChip}>
-              <span className={planningStyles.planningStatLabel}>On-time</span>
-              <span className={planningStyles.planningStatValue}>{onTimeCount}</span>
-            </div>
-            <div className={planningStyles.planningStatChip} data-tone={slippedCount > 0 ? "warn" : undefined}>
-              <span className={planningStyles.planningStatLabel}>Slipped</span>
-              <span className={planningStyles.planningStatValue}>{slippedCount}</span>
-            </div>
-            <div className={planningStyles.planningStatChip} data-tone={blockedCount > 0 ? "danger" : undefined}>
-              <span className={planningStyles.planningStatLabel}>Blocked</span>
-              <span className={planningStyles.planningStatValue}>{blockedCount}</span>
-            </div>
-          </div>
-          <div className={planningStyles.planningFilterRow} role="tablist" aria-label="Planning filter">
-            {[
-              { label: "All", value: "all" },
-              { label: "Todo", value: "todo" },
-              { label: "In progress", value: "in-progress" },
-              { label: "Blocked", value: "blocked" },
-              { label: "Done", value: "done" },
-            ].map((filter) => (
-              <button
-                key={filter.value}
-                aria-selected={settings.viewFilter === filter.value}
-                className={planningStyles.planningFilterButton}
-                data-active={settings.viewFilter === filter.value}
-                onClick={() =>
-                  updatePlanningViewFilter(filter.value as "all" | "todo" | "in-progress" | "blocked" | "done")
-                }
+                aria-selected={settings.modeSection === "timeline"}
+                className={planningStyles.planningModeButton}
+                data-active={settings.modeSection === "timeline"}
+                onClick={() => togglePlanningMode("timeline")}
                 role="tab"
                 type="button"
               >
-                {filter.label}
+                Timeline
               </button>
-            ))}
-          </div>
-          {settings.modeSection === "timeline" && allTasksUnscheduled ? (
-            <div className={planningStyles.planningTipChip}>Drag into a lane to schedule.</div>
-          ) : null}
-          <input
-            aria-label="Search planning tasks"
-            className={planningStyles.planningSearchInput}
-            onChange={(event) => setPlanningSearchQuery(event.currentTarget.value)}
-            placeholder="Search tasks..."
-            ref={planningSearchInputRef}
-            type="text"
-            value={planningSearchQuery}
-          />
-          <button
-            aria-pressed={planningTimeReportOpen}
-            className={planningStyles.planningToolbarButton}
-            data-active={planningTimeReportOpen}
-            onClick={() => togglePlanningTimeReport()}
-            type="button"
-          >
-            <span className={planningStyles.planningToolbarButtonContent}>
-              <PlanningClockIcon />
-              <span>Time report</span>
-            </span>
-          </button>
-          <button
-            className={planningStyles.planningToolbarButton}
-            disabled={planningBusyAction !== null}
-            onClick={() => void exportPlanningBackup()}
-            type="button"
-          >
-            Backup
-          </button>
-          {projectComposerOpen ? (
-            <div className={planningStyles.planningProjectComposer}>
-              <input
-                aria-label="New project title"
-                className={planningStyles.planningProjectInput}
-                disabled={planningBusyAction !== null}
-                onChange={(event) => setNewProjectTitle(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void createPlanningProject();
+              <button
+                aria-selected={settings.modeSection === "board"}
+                className={planningStyles.planningModeButton}
+                data-active={settings.modeSection === "board"}
+                onClick={() => togglePlanningMode("board")}
+                role="tab"
+                type="button"
+              >
+                Board
+              </button>
+            </div>
+            <div className={planningStyles.planningNowCard}>
+              <div className={planningStyles.planningNowHeader}>
+                <span className={planningStyles.planningNowLabel}>Now</span>
+                <span className={planningStyles.planningNowValue}>{nowLabel}</span>
+              </div>
+              <div className={planningStyles.planningNudgeRow}>
+                <button
+                  aria-label="View one hour earlier"
+                  className={planningStyles.planningNudgeButton}
+                  onClick={() => setTimelineOffsetMinutes((current) => current - 60)}
+                  type="button"
+                >
+                  [
+                </button>
+                <button
+                  aria-label="Snap to now"
+                  className={planningStyles.planningNudgeButton}
+                  onClick={() => snapTimelineToNow()}
+                  type="button"
+                >
+                  ●
+                </button>
+                <button
+                  aria-label="View one hour later"
+                  className={planningStyles.planningNudgeButton}
+                  onClick={() => setTimelineOffsetMinutes((current) => current + 60)}
+                  type="button"
+                >
+                  ]
+                </button>
+              </div>
+            </div>
+            <div className={planningStyles.planningDayCard}>
+              <span className={planningStyles.planningNowLabel}>Day</span>
+              <span className={planningStyles.planningNowValue}>{viewDayLabel}</span>
+              {!viewIsToday ? (
+                <button
+                  className={planningStyles.planningTodayButton}
+                  onClick={() => snapTimelineToNow()}
+                  type="button"
+                >
+                  Today
+                </button>
+              ) : null}
+            </div>
+            <div className={planningStyles.planningStatRow}>
+              <div className={planningStyles.planningStatChip}>
+                <span className={planningStyles.planningStatLabel}>Lanes</span>
+                <span className={planningStyles.planningStatValue}>{counts.projectCount}</span>
+              </div>
+              <div className={planningStyles.planningStatChip}>
+                <span className={planningStyles.planningStatLabel}>On-time</span>
+                <span className={planningStyles.planningStatValue}>{onTimeCount}</span>
+              </div>
+              <div className={planningStyles.planningStatChip} data-tone={slippedCount > 0 ? "warn" : undefined}>
+                <span className={planningStyles.planningStatLabel}>Slipped</span>
+                <span className={planningStyles.planningStatValue}>{slippedCount}</span>
+              </div>
+              <div className={planningStyles.planningStatChip} data-tone={blockedCount > 0 ? "danger" : undefined}>
+                <span className={planningStyles.planningStatLabel}>Blocked</span>
+                <span className={planningStyles.planningStatValue}>{blockedCount}</span>
+              </div>
+            </div>
+            <div className={planningStyles.planningFilterRow} role="tablist" aria-label="Planning filter">
+              {[
+                { label: "All", value: "all" },
+                { label: "Todo", value: "todo" },
+                { label: "In progress", value: "in-progress" },
+                { label: "Blocked", value: "blocked" },
+                { label: "Done", value: "done" },
+              ].map((filter) => (
+                <button
+                  key={filter.value}
+                  aria-selected={settings.viewFilter === filter.value}
+                  className={planningStyles.planningFilterButton}
+                  data-active={settings.viewFilter === filter.value}
+                  onClick={() =>
+                    updatePlanningViewFilter(filter.value as "all" | "todo" | "in-progress" | "blocked" | "done")
                   }
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    closeProjectComposer();
-                  }
-                }}
-                placeholder="New project title"
-                ref={newProjectTitleRef}
-                type="text"
-                value={newProjectTitle}
-              />
+                  role="tab"
+                  type="button"
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+            {settings.modeSection === "timeline" && allTasksUnscheduled ? (
+              <div className={planningStyles.planningTipChip}>Drag into a lane to schedule.</div>
+            ) : null}
+            <input
+              aria-label="Search planning tasks"
+              className={planningStyles.planningSearchInput}
+              onChange={(event) => setPlanningSearchQuery(event.currentTarget.value)}
+              placeholder="Search tasks..."
+              ref={planningSearchInputRef}
+              type="text"
+              value={planningSearchQuery}
+            />
+            <button
+              aria-pressed={planningTimeReportOpen}
+              className={planningStyles.planningToolbarButton}
+              data-active={planningTimeReportOpen}
+              onClick={() => togglePlanningTimeReport()}
+              type="button"
+            >
+              <span className={planningStyles.planningToolbarButtonContent}>
+                <PlanningClockIcon />
+                <span>Time report</span>
+              </span>
+            </button>
+            <button
+              className={planningStyles.planningToolbarButton}
+              disabled={planningBusyAction !== null}
+              onClick={() => void exportPlanningBackup()}
+              type="button"
+            >
+              Backup
+            </button>
+            {projectComposerOpen ? (
+              <div className={planningStyles.planningProjectComposer}>
+                <input
+                  aria-label="New project title"
+                  className={planningStyles.planningProjectInput}
+                  disabled={planningBusyAction !== null}
+                  onChange={(event) => setNewProjectTitle(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void createPlanningProject();
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      closeProjectComposer();
+                    }
+                  }}
+                  placeholder="New project title"
+                  ref={newProjectTitleRef}
+                  type="text"
+                  value={newProjectTitle}
+                />
+                <button
+                  className={planningStyles.planningToolbarButton}
+                  data-primary="true"
+                  disabled={newProjectTitle.trim().length === 0 || planningBusyAction !== null}
+                  onClick={() => void createPlanningProject()}
+                  type="button"
+                >
+                  Add project
+                </button>
+                <button
+                  className={planningStyles.planningToolbarButton}
+                  disabled={planningBusyAction !== null}
+                  onClick={() => closeProjectComposer()}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
               <button
                 className={planningStyles.planningToolbarButton}
                 data-primary="true"
-                disabled={newProjectTitle.trim().length === 0 || planningBusyAction !== null}
-                onClick={() => void createPlanningProject()}
-                type="button"
-              >
-                Add project
-              </button>
-              <button
-                className={planningStyles.planningToolbarButton}
                 disabled={planningBusyAction !== null}
-                onClick={() => closeProjectComposer()}
+                onClick={() => openProjectComposer()}
                 type="button"
               >
-                Cancel
+                New project
               </button>
-            </div>
-          ) : (
-            <button
-              className={planningStyles.planningToolbarButton}
-              data-primary="true"
-              disabled={planningBusyAction !== null}
-              onClick={() => openProjectComposer()}
-              type="button"
-            >
-              New project
-            </button>
-          )}
+            )}
+          </div>
         </div>
+        {planningFeedback ? (
+          <div className={planningStyles.planningToolbarNotice} data-tone={planningFeedback.tone} role="status">
+            {planningFeedback.message}
+          </div>
+        ) : null}
       </div>
-      {planningFeedback ? (
-        <div className={planningStyles.planningToolbarNotice} data-tone={planningFeedback.tone} role="status">
-          {planningFeedback.message}
-        </div>
-      ) : null}
 
       {settings.modeSection === "board" ? (
         <div className={planningStyles.planningBoardShell}>

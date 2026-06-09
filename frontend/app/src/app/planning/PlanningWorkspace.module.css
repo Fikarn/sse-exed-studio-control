@@ -1,10 +1,27 @@
 .planningWorkspace {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  /* PLA-03/DENSITY-03: header (toolbar + optional feedback notice) over a 1fr shell that
+     FILLS the remaining height. Was `auto auto minmax(0,1fr)` with the shell as the 2nd of
+     two children when the notice was absent (the common case) — so the shell sized to content
+     in the auto row and the 1fr row sat empty: the "vast dead band". The notice now lives in
+     the header stack, so the shell is always the 1fr row and the lane band grows to fill. */
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-4);
   height: 100%;
   min-height: 0;
   padding: var(--space-4);
+  /* PLA-10/DENSITY-02: a query container so the toolbar can densify on its own width
+     (independent of the viewport) — keeps it from wrapping into the timeline band at
+     narrow widths. inline-size only constrains the inline axis, so height:100% holds. */
+  container: planning-workspace / inline-size;
+}
+
+/* PLA-03: toolbar + optional feedback notice share one grid row so the shell below always
+   occupies the 1fr track (see .planningWorkspace). */
+.planningWorkspaceHeader {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
 }
 
 .planningToolbar {
@@ -109,6 +126,30 @@
 .planningSearchInput:focus {
   outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);
   outline-offset: 2px;
+}
+
+/* PLA-10/DENSITY-02: when the workspace narrows (e.g. 1280-wide tier), densify the toolbar —
+   tighter gaps, smaller input min-widths, slimmer button padding — so it stays compact and
+   reclaims timeline-band height instead of wrapping a second row into it. Container-width
+   driven (not viewport), so it tracks the actual space the toolbar has. No-scroll re-verified
+   at 2560/1920 (rule does not fire there) and at the 1280 tier (rule fires). */
+@container planning-workspace (max-width: 1300px) {
+  .planningToolbar {
+    gap: var(--space-3);
+  }
+
+  .planningToolbarActions {
+    gap: var(--space-2);
+  }
+
+  .planningSearchInput,
+  .planningProjectInput {
+    min-width: 150px;
+  }
+
+  .planningToolbarButton {
+    padding: 8px 12px;
+  }
 }
 
 /* PLA-04: one keyboard focus ring for every interactive Planning control,
