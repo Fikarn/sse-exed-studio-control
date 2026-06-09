@@ -8,7 +8,7 @@ import { deriveMounting } from "../fixtureMounting";
 import { getFixtureVisualModel, type StagePlotRenderMode } from "../fixtureVisuals";
 import { STUDIO_LAYOUT, type StudioLayout } from "../studioLayout";
 import { useMarqueeSelection } from "../useMarqueeSelection";
-import type { StagePlotViewport } from "../useStagePlotViewport";
+import { computeContentFitTransform, type ContentBBox, type StagePlotViewport } from "../useStagePlotViewport";
 
 import { FixtureOutputFootprint } from "./FixtureOutputFootprint";
 import { FixtureMarker } from "./FixtureMarker";
@@ -79,6 +79,10 @@ export interface StagePlotProps {
 const FALLBACK_X_STEP = 1.5;
 const FALLBACK_Y = 4.0;
 const PLOT_TOP_GUTTER_CM = 56;
+// DENSITY-04 — half-extent pads (cm) so markers/glyphs aren't clipped at the
+// content-frame edge when fitContent computes the bounding box.
+const FIXTURE_PAD_CM = 22;
+const MARK_PAD_CM = 14;
 const POSITION_MATCH_EPSILON_METERS = 0.01;
 const ROTATION_MATCH_EPSILON_DEGREES = 0.5;
 const COMMIT_PREVIEW_TIMEOUT_MS = 1800;
@@ -155,6 +159,62 @@ export function StagePlot({
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
   const floorClipId = `stage-floor-clip-${useId().replace(/:/g, "")}`;
+
+  // DENSITY-04 — bounding box (cm) of the populated rig: fixtures + talent marks +
+  // set elements. Cameras + room walls/booth are excluded so the frame tightens onto
+  // the lit/scanned content rather than re-expanding to the back of the room. Null
+  // when there are no fixtures → fitContent falls back to the full-room frame so the
+  // empty-state CTA reads over the whole studio.
+  const contentBBox = useMemo<ContentBBox | null>(() => {
+    if (fixtures.length === 0) return null;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    const include = (cmX: number, cmY: number, padX: number, padY: number) => {
+      minX = Math.min(minX, cmX - padX);
+      minY = Math.min(minY, cmY - padY);
+      maxX = Math.max(maxX, cmX + padX);
+      maxY = Math.max(maxY, cmY + padY);
+    };
+    fixtures.forEach((fixture, index) => {
+      const { xMeters, yMeters } = meterPositionFor(fixture, index);
+      include(xMeters * 100, yMeters * 100, FIXTURE_PAD_CM, FIXTURE_PAD_CM);
+    });
+    layout.talentMarks.forEach((mark) => include(mark.xMeters * 100, mark.yMeters * 100, MARK_PAD_CM, MARK_PAD_CM));
+    layout.setElements.forEach((element) =>
+      include(
+        element.xMeters * 100,
+        element.yMeters * 100,
+        (element.widthMeters * 100) / 2,
+        (element.depthMeters * 100) / 2
+      )
+    );
+    return { minX, minY, maxX, maxY };
+  }, [fixtures, layout]);
+
+  const fitTarget = useMemo(
+    () => computeContentFitTransform(contentBBox, { widthCm, depthCm, gutterCm: PLOT_TOP_GUTTER_CM }),
+    [contentBBox, widthCm, depthCm]
+  );
+
+  // DENSITY-04 — apply the content frame on first paint when fitContent is the
+  // resting mode, and whenever the operator re-selects Frame. Intentionally keyed
+  // ONLY on zoomMode (not fitTarget/fixtures) so adding / moving / deleting a fixture
+  // does NOT yank the view out from under the operator mid-edit — the Frame button is
+  // the explicit "re-frame now" affordance, exactly like Fit Room / Fill Desk / 100%.
+  useEffect(() => {
+    if (viewport.zoomMode === "fitContent") viewport.fitContent(fitTarget);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-frame only on mode (re)select, see comment above
+  }, [viewport.zoomMode]);
+
+  // DENSITY-04 — double-click / reset returns to the CURRENT mode's resting view. For
+  // fitContent that resting view is the framed transform (not identity), so re-fit
+  // rather than zeroing the transform (which would un-frame while Frame stays active).
+  const handleResetView = () => {
+    if (viewport.zoomMode === "fitContent") viewport.fitContent(fitTarget);
+    else viewport.reset();
+  };
 
   // Track the fixture position while a drag is in flight, then hold the
   // snapped drop position until the engine snapshot refresh lands. This keeps
@@ -380,7 +440,7 @@ export function StagePlot({
           marquee.onPointerUp(event);
         }}
         onWheel={viewport.onWheel}
-        onDoubleClick={viewport.reset}
+        onDoubleClick={handleResetView}
       >
         <g data-inner-content="true" transform={viewport.transform}>
           <defs>
@@ -592,10 +652,11 @@ export function StagePlot({
         renderMode={renderMode}
         onZoomIn={viewport.zoomIn}
         onZoomOut={viewport.zoomOut}
-        onReset={viewport.reset}
+        onReset={handleResetView}
         onFitRoom={viewport.fitRoom}
         onFillDesk={viewport.fillDesk}
         onActualSize={viewport.actualSize}
+        onFitContent={() => viewport.fitContent(fitTarget)}
         onRenderModeChange={onRenderModeChange}
         viewBookmarks={viewport.viewBookmarks}
         onSaveViewBookmark={viewport.saveViewBookmark}

@@ -18,6 +18,8 @@ export interface StagePlotControlsProps {
   onFitRoom: () => void;
   onFillDesk: () => void;
   onActualSize: () => void;
+  /** DENSITY-04 — frame the populated rig (fixtures + talent marks + set). */
+  onFitContent: () => void;
   onRenderModeChange: (mode: StagePlotRenderMode) => void;
   /** Wave 31 — view bookmarks (I7). When omitted, the View slot row is not
    *  rendered. */
@@ -45,6 +47,7 @@ export function StagePlotControls({
   onFitRoom,
   onFillDesk,
   onActualSize,
+  onFitContent,
   onRenderModeChange,
   viewBookmarks,
   onSaveViewBookmark,
@@ -95,6 +98,16 @@ export function StagePlotControls({
         />
       </span>
       <span className={styles.modeGroup} aria-label="Stage plot zoom mode">
+        <Tooltip content="Frame the populated rig — fit fixtures, talent marks, and set to the view" placement="top">
+          <button
+            type="button"
+            className={`${styles.modeButton} ${zoomMode === "fitContent" ? styles.modeButtonActive : ""}`}
+            onClick={onFitContent}
+            aria-pressed={zoomMode === "fitContent"}
+          >
+            Frame
+          </button>
+        </Tooltip>
         <Tooltip content="Fit the full room without stretching spatial proportions" placement="top">
           <button
             type="button"
