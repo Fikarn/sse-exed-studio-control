@@ -349,6 +349,9 @@ export function PlanningWorkspaceSurface({
     "--planning-half-hour-count": String(Math.max(1, Math.round(timelineRangeMinutes / 30))),
     "--planning-hour-count": String(Math.max(1, Math.round(timelineRangeMinutes / 60))),
     "--planning-lane-height": `${timelineLaneHeight}px`,
+    // PLA-09: single source for the 280px label column shared by the scale header, lane
+    // bodies, loading skeleton, and the playhead calc() below — keeps them grid-aligned.
+    "--planning-label-col": "280px",
   } as CSSProperties;
   const hasPlanningSearch = deferredPlanningSearchQuery.length > 0;
   const showSearchZeroResult = hasPlanningSearch && filteredProjects.length === 0;
@@ -1488,7 +1491,7 @@ export function PlanningWorkspaceSurface({
                 className={planningStyles.planningNowPlayhead}
                 data-testid="planning-now-playhead"
                 style={{
-                  left: `calc(280px + (100% - 280px) * ${planningFractionForMinute(
+                  left: `calc(var(--planning-label-col) + (100% - var(--planning-label-col)) * ${planningFractionForMinute(
                     clampedNowMinute,
                     timelineStartMinute,
                     timelineRangeMinutes
