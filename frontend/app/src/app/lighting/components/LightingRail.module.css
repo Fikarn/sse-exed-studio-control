@@ -410,7 +410,7 @@
 }
 
 .tile[data-fading="true"] {
-  border-color: var(--color-brand-blue-border);
+  border-color: var(--color-warning-border);
 }
 
 /* Wave 30b — F10 empty-state CTA wrapper. Pads the rail's empty-state
@@ -449,8 +449,8 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--color-brand-blue);
-  box-shadow: var(--shadow-glow-blue);
+  background: var(--color-warning-500);
+  box-shadow: var(--shadow-glow-amber);
 }
 
 .tilePinAction {
@@ -512,10 +512,14 @@
 }
 
 .tilePreview {
-  border-color: var(--color-brand-blue-border);
-  background: linear-gradient(180deg, var(--color-brand-blue-soft) 0%, rgba(63, 112, 200, 0.06) 100%);
+  border-color: var(--color-warning-border);
+  background: linear-gradient(
+    180deg,
+    var(--color-warning-soft) 0%,
+    color-mix(in srgb, var(--color-warning-500) 6%, transparent) 100%
+  );
   box-shadow:
-    0 0 0 1px rgba(63, 112, 200, 0.22),
+    0 0 0 1px color-mix(in srgb, var(--color-warning-500) 22%, transparent),
     var(--shadow-inset-hi);
 }
 
@@ -577,12 +581,12 @@
 }
 
 .tilePreview .tileBadge {
-  color: var(--color-brand-blue-hot);
+  color: var(--color-warning-500);
 }
 
 .tilePreview .tileBadgeDot {
-  background: var(--color-brand-blue-hot);
-  box-shadow: var(--shadow-glow-blue);
+  background: var(--color-warning-500);
+  box-shadow: var(--shadow-glow-amber);
 }
 
 @keyframes ssePulseGreenDot {

@@ -47,13 +47,13 @@
     box-shadow: 0 0 14px var(--color-brand-yellow);
   }
 
-  .patch {
-    border-color: var(--color-brand-blue-border);
-    background: var(--color-glass-bg-blue);
+  .preview {
+    border-color: var(--color-warning-border);
+    background: var(--color-glass-bg);
   }
 
-  .patch .dot {
-    background: var(--color-brand-blue-hot);
-    box-shadow: 0 0 14px var(--color-brand-blue);
+  .preview .dot {
+    background: var(--color-warning-500);
+    box-shadow: 0 0 14px var(--color-warning-500);
   }
 }

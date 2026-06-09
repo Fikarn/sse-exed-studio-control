@@ -325,7 +325,7 @@ export function StagePlot({
               previewMode
                 ? isSceneModified
                   ? "modified"
-                  : "patch"
+                  : "preview"
                 : isSceneModified && bridgeReachable
                   ? "modified"
                   : "default"
