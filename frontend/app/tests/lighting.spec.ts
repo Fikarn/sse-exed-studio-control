@@ -508,6 +508,11 @@ test("opens typed numeric entry on the lighting grand master and commits", async
 
 test("drags the selected fixture to a new plot position", async ({ page }) => {
   await openFixture(page, "lighting-populated");
+  // Slice 9e: studioFull now rests on the content frame (fitContent). This test's
+  // fixed pixel-delta drag assumes the un-zoomed Fill Desk plot, so select it and
+  // wait for the inner transform to settle to identity before driving the pointer.
+  await page.getByRole("button", { name: "Fill Desk", exact: true }).click();
+  await expect(page.locator('[data-inner-content="true"]')).toHaveAttribute("transform", "translate(0 0) scale(1)");
 
   const fixture = page.getByRole("button", { name: /^Fixture Key,/ });
   const output = page.locator('[data-fixture-output-id="fixture-key"]');
@@ -561,6 +566,11 @@ test("mirrors fixture intensity slider drafts on the stage plot before commit", 
 
 test("rotates the selected fixture from the plot and inspector", async ({ page }) => {
   await openFixture(page, "lighting-populated");
+  // Slice 9e: studioFull now rests on the content frame (fitContent), whose uniform
+  // "meet" scaling changes the screen->plot angle vs. Fill Desk's non-uniform stretch.
+  // This test's pixel-based rotate-handle drag assumes Fill Desk, so select it first.
+  await page.getByRole("button", { name: "Fill Desk", exact: true }).click();
+  await expect(page.locator('[data-inner-content="true"]')).toHaveAttribute("transform", "translate(0 0) scale(1)");
 
   const rotationInput = page.getByLabel("Fixture rotation in degrees");
   await expect(rotationInput).toHaveValue("0");
@@ -645,4 +655,30 @@ test("shows lighting DMX-unreachable posture and blackout hold", async ({ page }
   await expect(page.getByText("All fixtures off")).toBeVisible();
   await expect(page.getByText("Master · 0 / 4 on")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Fixture Key, off,/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("frames the populated rig via the stage-plot Frame mode (DENSITY-04)", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
+
+  const inner = page.locator('[data-inner-content="true"]');
+  const frame = page.getByRole("button", { name: "Frame", exact: true });
+  const fitRoom = page.getByRole("button", { name: "Fit Room", exact: true });
+  const IDENTITY = "translate(0 0) scale(1)";
+
+  // studioFull (2560x1440) now rests on the content frame by default — the rig is
+  // zoomed/panned to fill the canvas, so the inner transform is non-identity.
+  await expect(frame).toHaveAttribute("aria-pressed", "true");
+  await expect(inner).not.toHaveAttribute("transform", IDENTITY);
+
+  // Selecting another mode clears the frame and returns to the identity transform.
+  await fitRoom.click();
+  await expect(fitRoom).toHaveAttribute("aria-pressed", "true");
+  await expect(frame).toHaveAttribute("aria-pressed", "false");
+  await expect(inner).toHaveAttribute("transform", IDENTITY);
+
+  // Re-selecting Frame re-applies the content fit.
+  await frame.click();
+  await expect(frame).toHaveAttribute("aria-pressed", "true");
+  await expect(inner).not.toHaveAttribute("transform", IDENTITY);
 });

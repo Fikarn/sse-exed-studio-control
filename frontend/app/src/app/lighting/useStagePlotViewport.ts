@@ -21,9 +21,70 @@ interface ViewportState {
   zoomMode: StagePlotZoomMode;
 }
 
-export type StagePlotZoomMode = "fitRoom" | "fillDesk" | "actual";
+export type StagePlotZoomMode = "fitRoom" | "fillDesk" | "actual" | "fitContent";
 
 const IDENTITY: ViewportState = { zoom: 1, panX: 0, panY: 0, zoomMode: "fillDesk" };
+
+// DENSITY-04/LIG-02 ("frame to populated bounds"): the `fitContent` mode frames
+// the actual rig (fixtures + talent marks + set) instead of the full empty room.
+// The fit is a {zoom, panX, panY} TRANSFORM fed through the same `animateTo` infra
+// the other modes use (the inner-content <g> = translate(pan) scale(zoom)), so it
+// is container-agnostic (no-scroll-safe), keeps the real-cm grid accurate, and the
+// operator can still pan/zoom afterwards. Pure + unit-tested.
+const FIT_MARGIN = 0.1; // 10% breathing room around the rig bbox, each side
+const MIN_SPAN_CM = 200; // floor the framed span at 2 m so a 1-fixture rig can't blow up the zoom
+
+export interface ContentBBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export interface StagePlotRoomDims {
+  widthCm: number;
+  depthCm: number;
+  gutterCm: number;
+}
+
+export interface StagePlotFitTransform {
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
+const FIT_IDENTITY: StagePlotFitTransform = { zoom: 1, panX: 0, panY: 0 };
+
+/** Compute the {zoom, panX, panY} that frames `bbox` (cm) inside the room viewBox
+ *  with a margin, centered. Returns identity (full-room) for an empty / degenerate
+ *  / non-finite bbox. Zoom is clamped to [MIN_ZOOM, MAX_ZOOM] because `animateTo`
+ *  does not clamp. The transform maps a content point p -> pan + zoom*p (translate
+ *  THEN scale), so we solve pan so the bbox center lands on the viewBox center. */
+export function computeContentFitTransform(bbox: ContentBBox | null, room: StagePlotRoomDims): StagePlotFitTransform {
+  if (!bbox) return FIT_IDENTITY;
+  const { minX, minY, maxX, maxY } = bbox;
+  if (![minX, minY, maxX, maxY].every((value) => Number.isFinite(value))) return FIT_IDENTITY;
+
+  const padX = (maxX - minX) * FIT_MARGIN;
+  const padY = (maxY - minY) * FIT_MARGIN;
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const spanX = Math.max(maxX - minX + padX * 2, MIN_SPAN_CM);
+  const spanY = Math.max(maxY - minY + padY * 2, MIN_SPAN_CM);
+
+  const viewBoxW = room.widthCm;
+  const viewBoxH = room.depthCm + room.gutterCm;
+  const viewBoxCenterX = viewBoxW / 2;
+  const viewBoxCenterY = -room.gutterCm + viewBoxH / 2;
+
+  const zoomRaw = Math.min(viewBoxW / spanX, viewBoxH / spanY);
+  if (!Number.isFinite(zoomRaw) || zoomRaw <= 0) return FIT_IDENTITY;
+  const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomRaw));
+  const panX = viewBoxCenterX - zoom * centerX;
+  const panY = viewBoxCenterY - zoom * centerY;
+  if (!Number.isFinite(panX) || !Number.isFinite(panY)) return FIT_IDENTITY;
+  return { zoom, panX, panY };
+}
 
 function clientToSvg(svg: SVGSVGElement, clientX: number, clientY: number) {
   const ctm = svg.getScreenCTM();
@@ -53,6 +114,9 @@ export interface StagePlotViewport {
   fitRoom: () => void;
   fillDesk: () => void;
   actualSize: () => void;
+  /** DENSITY-04 — frame the populated rig. Pass the precomputed fit transform
+   *  (see `computeContentFitTransform`); animates to it + persists the mode. */
+  fitContent: (target: StagePlotFitTransform) => void;
   /** Wave 31 — view bookmarks (I7). Three numbered slots; null when empty. */
   viewBookmarks: ViewBookmarks;
   /** Save current zoom + pan to slot. Persists to localStorage. */
@@ -109,7 +173,7 @@ function writeBookmarks(next: ViewBookmarks): void {
 const EMPTY_BOOKMARKS: ViewBookmarks = Object.freeze([null, null, null]);
 
 function isStagePlotZoomMode(value: unknown): value is StagePlotZoomMode {
-  return value === "fitRoom" || value === "fillDesk" || value === "actual";
+  return value === "fitRoom" || value === "fillDesk" || value === "actual" || value === "fitContent";
 }
 
 function zoomModeStorageKey(scope: string) {
@@ -167,7 +231,13 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
 
   useEffect(() => {
     const next = readStoredZoomMode(storageScope, defaultZoomMode);
-    setViewportState((current) => ({ ...current, zoomMode: next }));
+    // Non-fitContent modes rest at IDENTITY. When a layout/scope change lands on one
+    // (e.g. a studioFull→compact resize while the rig is framed), reset the transform
+    // so a leftover fitContent frame doesn't persist under a "Fit Room" pane. fitContent
+    // itself re-frames via StagePlot's zoomMode effect, so leave its transform alone.
+    setViewportState((current) =>
+      next === "fitContent" ? { ...current, zoomMode: next } : { ...IDENTITY, zoomMode: next }
+    );
   }, [defaultZoomMode, setViewportState, storageScope]);
 
   const scheduleViewportState = useCallback((next: ViewportState) => {
@@ -342,6 +412,17 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
   const fillDesk = useCallback(() => setZoomMode("fillDesk"), [setZoomMode]);
   const actualSize = useCallback(() => setZoomMode("actual"), [setZoomMode]);
 
+  // fitContent cannot reuse setZoomMode (which always animates to IDENTITY) — the
+  // consumer (StagePlot, which owns the rig geometry + room dims) computes the fit
+  // target and passes it in; we persist the mode + animate to the non-identity target.
+  const fitContent = useCallback(
+    (target: StagePlotFitTransform) => {
+      writeStoredZoomMode(storageScope, "fitContent");
+      animateTo({ ...target, zoomMode: "fitContent" }, 200);
+    },
+    [animateTo, storageScope]
+  );
+
   const saveViewBookmark = useCallback((slot: ViewBookmarkSlot) => {
     setViewBookmarks((prev) => {
       const next = [...prev] as (ViewportState | null)[];
@@ -396,6 +477,7 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
     fitRoom,
     fillDesk,
     actualSize,
+    fitContent,
     viewBookmarks,
     saveViewBookmark,
     recallViewBookmark,

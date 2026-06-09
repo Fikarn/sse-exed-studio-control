@@ -1090,7 +1090,10 @@ export function LightingWorkspaceSurface({
   // consumes the same instance via its `viewport` prop. handleSelectFixture
   // is `useLiveCallback`-stable so closing over it is safe.
   const stagePlotViewport = useStagePlotViewport({
-    defaultZoomMode: operatorLayout.layoutMode === "studioFull" ? "fillDesk" : "fitRoom",
+    // DENSITY-04 — the full-bleed studioFull view now rests on the content frame
+    // (the populated rig fills the canvas instead of stretching the empty room);
+    // compact/utility panes keep the full-room fit for spatial proportion.
+    defaultZoomMode: operatorLayout.layoutMode === "studioFull" ? "fitContent" : "fitRoom",
     onBackgroundClick: () => void handleSelectFixture(null),
     storageScope: operatorLayout.layoutMode,
   });
