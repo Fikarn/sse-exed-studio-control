@@ -300,6 +300,11 @@ export function LightingToolbar({
         data-layout-mode={operatorLayout.layoutMode}
         data-testid="lighting-toolbar"
       >
+        {/* `data-toolbar-primary` tags the toolbar's primary controls. These are
+            NOT a dead/unwired priority system: tests/helpers/lighting.ts and
+            assertLightingResponsive in tests/visual-review.spec.ts query
+            [data-toolbar-primary] to guard that all seven controls render and stay
+            un-clipped at every supported viewport. Keep them in sync with that guard. */}
         <div className={styles.title} data-toolbar-primary="title">
           <Sun aria-hidden="true" className={styles.titleIcon} size={17} strokeWidth={1.75} />
           <span>Lighting</span>

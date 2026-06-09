@@ -12,7 +12,7 @@ const SNAP_METERS = 0.5;
 const KEY_NUDGE_METERS = 0.1;
 const KEY_NUDGE_FAST_METERS = 0.5;
 
-const TALENT_FILL = "rgba(232, 213, 97, 0.12)";
+const TALENT_FILL = "var(--color-studio-talent-fill)";
 const TALENT_STROKE = "var(--color-studio-talent-ring)";
 const TALENT_DOT = "var(--color-studio-talent-dot)";
 

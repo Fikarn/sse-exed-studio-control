@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pencil, Power, Trash2 } from "lucide-react";
 
 import {
@@ -141,7 +141,6 @@ export function InspectorFixture({
   const definition = getFixtureDefinition(catalog, fixture);
   const mode = getFixtureMode(definition, fixture.modeId);
   const cctRange = lightingFixtureCctRange(fixture, catalog);
-  const cctScaleId = useId();
   const [intensityDraft, setIntensityDraft] = useState(fixture.intensity);
   const [cctDraft, setCctDraft] = useState(fixture.cct);
   const [controlDrafts, setControlDrafts] = useState<Record<string, number>>(fixture.controlValues);
@@ -463,7 +462,7 @@ export function InspectorFixture({
               }}
               formatValue={(v) => `${Math.round(v)}K`}
             />
-            <div id={cctScaleId} className={styles.cctScale}>
+            <div className={styles.cctScale}>
               <span>{cctRange.min}K · warm</span>
               <span>{cctRange.max}K · cool</span>
             </div>

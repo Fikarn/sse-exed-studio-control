@@ -79,19 +79,25 @@
   --color-stage-grid-faint: rgba(212, 205, 179, 0.05);
   --color-stage-beam-line: rgba(212, 205, 179, 0.18);
   --color-stage-door-stroke: rgba(212, 205, 179, 0.32);
+  --color-stage-vignette: rgba(0, 0, 0, 0.25);
+  --color-stage-tone-overlay-soft: rgba(7, 12, 22, 0.28);
+  --color-stage-tone-overlay-strong: rgba(7, 12, 22, 0.46);
   --color-studio-wall: #4d5544;
   --color-studio-wall-stroke: #6b7560;
   --color-studio-element: rgba(108, 116, 96, 0.18);
   --color-studio-element-stroke: rgba(108, 116, 96, 0.5);
   --color-studio-talent-ring: rgba(232, 213, 97, 0.45);
   --color-studio-talent-dot: rgba(232, 213, 97, 0.7);
+  --color-studio-talent-fill: rgba(232, 213, 97, 0.12);
   --color-studio-camera-fill: rgba(108, 169, 209, 0.22);
   --color-studio-camera-stroke: rgba(108, 169, 209, 0.6);
   --color-glass-bg: rgba(8, 10, 8, 0.78);
   --color-glass-bg-blue: rgba(7, 12, 22, 0.82);
   --color-glass-bg-strong: rgba(8, 10, 8, 0.85);
   --color-glass-bg-subtle: rgba(8, 10, 8, 0.65);
+  --color-glass-bg-soft: rgba(8, 10, 8, 0.72);
   --color-glass-border: rgba(250, 246, 230, 0.08);
+  --color-scene-minigraph-bg: rgba(3, 5, 4, 0.62);
   --audio-tier-inputs: #d8c483;
   --audio-tier-playback: #d6acce;
   --audio-tier-outputs: #5dc5e8;
@@ -206,6 +212,8 @@
   --color-brand-green: var(--color-primary-500);
   --color-studio-500: var(--color-border-strong);
   --color-studio-600: var(--color-border-default);
+  --color-plot-marquee-fill: var(--color-brand-green-soft);
+  --color-plot-marquee-fill-additive: var(--color-brand-green-glow);
   --audio-warn-fill: var(--color-brand-yellow);
   --audio-warn-soft: var(--color-brand-yellow-soft);
   --audio-warn-border: var(--color-brand-yellow-border);
@@ -224,6 +232,7 @@
   --color-studio-300: var(--color-text-muted);
   --color-studio-400: var(--color-text-subtle);
   --color-studio-050: var(--color-text-strong);
+  --color-plot-guide: var(--color-brand-green);
   --audio-peak-hold-calm: var(--color-text-subtle);
   --shadow-glow-green: 0 0 0 1px var(--color-brand-green), 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
 }

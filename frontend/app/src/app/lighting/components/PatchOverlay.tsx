@@ -10,7 +10,7 @@ export function PatchOverlay({ active, children }: PatchOverlayProps) {
     <g
       style={{
         opacity: active ? 1 : 0,
-        transition: "opacity 180ms ease",
+        transition: "opacity var(--motion-duration-normal) ease",
         pointerEvents: active ? "auto" : "none",
       }}
       aria-hidden={!active}

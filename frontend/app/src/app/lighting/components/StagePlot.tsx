@@ -525,7 +525,7 @@ export function StagePlot({
                   y1={0}
                   x2={xMeters * 100}
                   y2={depthCm}
-                  style={{ stroke: "var(--color-brand-green)", strokeDasharray: "3 3", opacity: 0.65 }}
+                  style={{ stroke: "var(--color-plot-guide)", strokeDasharray: "3 3", opacity: 0.65 }}
                   strokeWidth={1}
                   vectorEffect="non-scaling-stroke"
                 />
@@ -537,7 +537,7 @@ export function StagePlot({
                   y1={yMeters * 100}
                   x2={widthCm}
                   y2={yMeters * 100}
-                  style={{ stroke: "var(--color-brand-green)", strokeDasharray: "3 3", opacity: 0.65 }}
+                  style={{ stroke: "var(--color-plot-guide)", strokeDasharray: "3 3", opacity: 0.65 }}
                   strokeWidth={1}
                   vectorEffect="non-scaling-stroke"
                 />
@@ -557,8 +557,8 @@ export function StagePlot({
               height={marquee.rect.height}
               rx={2}
               style={{
-                fill: marquee.additive ? "var(--color-brand-green-glow)" : "var(--color-brand-green-soft)",
-                stroke: "var(--color-brand-green)",
+                fill: marquee.additive ? "var(--color-plot-marquee-fill-additive)" : "var(--color-plot-marquee-fill)",
+                stroke: "var(--color-plot-guide)",
                 strokeDasharray: "4 3",
                 opacity: 0.5,
               }}
