@@ -7,7 +7,7 @@
   align-items: stretch;
   gap: 1px;
   padding: var(--operator-stage-control-padding, 2px);
-  background: rgba(8, 10, 8, 0.78);
+  background: var(--color-glass-bg);
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-md);
   backdrop-filter: blur(6px);
@@ -64,9 +64,9 @@
   line-height: 1;
   white-space: nowrap;
   transition:
-    background 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease;
+    background var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
+    border-color var(--motion-duration-fast) ease;
 }
 
 .modeButton:hover {
@@ -101,8 +101,8 @@
   font-size: var(--operator-font-size-xl, 14px);
   line-height: 1;
   transition:
-    background 120ms ease,
-    color 120ms ease,
+    background var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
     transform var(--motion-duration-fast) ease,
     box-shadow var(--motion-duration-fast) ease;
 }
@@ -168,9 +168,9 @@
   padding: 0;
   width: var(--operator-stage-control-bookmark-width, 22px);
   transition:
-    background 120ms ease,
-    color 120ms ease,
-    border-color 120ms ease;
+    background var(--motion-duration-fast) ease,
+    color var(--motion-duration-fast) ease,
+    border-color var(--motion-duration-fast) ease;
 }
 
 .bookmarkButton:hover {

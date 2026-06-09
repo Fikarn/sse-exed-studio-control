@@ -88,7 +88,7 @@ const BAR_HEIGHT = 24;
 
 const SHELL_STROKE = "var(--color-fixture-shell-stroke)";
 const SELECTED_STROKE = "var(--color-brand-green)";
-const HIGHLIGHT_OVERLAY_STROKE = "var(--color-status-warning, #ff6b35)";
+const HIGHLIGHT_OVERLAY_STROKE = "var(--color-warning-500)";
 const GHOST_STROKE = "var(--color-fixture-ghost-stroke)";
 
 const LABEL_NAME_FILL = "var(--color-brand-text-secondary)";

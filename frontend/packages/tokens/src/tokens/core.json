@@ -125,7 +125,10 @@
       "gridMinor": { "$value": "rgba(212, 205, 179, 0.10)" },
       "gridFaint": { "$value": "rgba(212, 205, 179, 0.05)" },
       "beamLine": { "$value": "rgba(212, 205, 179, 0.18)" },
-      "doorStroke": { "$value": "rgba(212, 205, 179, 0.32)" }
+      "doorStroke": { "$value": "rgba(212, 205, 179, 0.32)" },
+      "vignette": { "$value": "rgba(0, 0, 0, 0.25)" },
+      "toneOverlaySoft": { "$value": "rgba(7, 12, 22, 0.28)" },
+      "toneOverlayStrong": { "$value": "rgba(7, 12, 22, 0.46)" }
     },
     "studio": {
       "050": { "$value": "{color.text.strong}" },
@@ -141,6 +144,7 @@
       "elementStroke": { "$value": "rgba(108, 116, 96, 0.5)" },
       "talentRing": { "$value": "rgba(232, 213, 97, 0.45)" },
       "talentDot": { "$value": "rgba(232, 213, 97, 0.7)" },
+      "talentFill": { "$value": "rgba(232, 213, 97, 0.12)" },
       "cameraFill": { "$value": "rgba(108, 169, 209, 0.22)" },
       "cameraStroke": { "$value": "rgba(108, 169, 209, 0.6)" }
     },
@@ -149,7 +153,16 @@
       "bgBlue": { "$value": "rgba(7, 12, 22, 0.82)" },
       "bgStrong": { "$value": "rgba(8, 10, 8, 0.85)" },
       "bgSubtle": { "$value": "rgba(8, 10, 8, 0.65)" },
+      "bgSoft": { "$value": "rgba(8, 10, 8, 0.72)" },
       "border": { "$value": "rgba(250, 246, 230, 0.08)" }
+    },
+    "scene": {
+      "minigraphBg": { "$value": "rgba(3, 5, 4, 0.62)" }
+    },
+    "plot": {
+      "guide": { "$value": "{color.brand.green}" },
+      "marqueeFill": { "$value": "{color.brand.greenSoft}" },
+      "marqueeFillAdditive": { "$value": "{color.brand.greenGlow}" }
     }
   },
   "audio": {

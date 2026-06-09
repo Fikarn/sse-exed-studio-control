@@ -9,7 +9,7 @@
   padding: 6px;
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-md);
-  background: rgba(8, 10, 8, 0.72);
+  background: var(--color-glass-bg-soft);
   backdrop-filter: blur(6px);
   pointer-events: none;
 }

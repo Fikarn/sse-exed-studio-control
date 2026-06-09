@@ -951,7 +951,7 @@
   top: 50%;
   transform: translateY(-50%);
   opacity: 0;
-  transition: opacity 120ms var(--motion-easing-standard);
+  transition: opacity var(--motion-duration-fast) var(--motion-easing-standard);
   background: var(--color-bg-soft);
   border-radius: var(--radius-tight-xs);
   padding: 1px;

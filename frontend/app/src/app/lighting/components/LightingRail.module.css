@@ -642,8 +642,8 @@
   gap: 2px;
   padding: 2px;
   border-radius: var(--radius-tight-xs);
-  background: rgba(3, 5, 4, 0.62);
-  border: 1px solid rgba(250, 246, 230, 0.08);
+  background: var(--color-scene-minigraph-bg);
+  border: 1px solid var(--color-glass-border);
   pointer-events: none;
 }
 

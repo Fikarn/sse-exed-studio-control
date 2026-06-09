@@ -3,7 +3,7 @@
   flex-shrink: 0;
   height: 0;
   overflow: hidden;
-  transition: height 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: height var(--motion-duration-normal) var(--motion-easing-standard);
 }
 
 .shellOpen {
