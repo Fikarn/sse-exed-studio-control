@@ -65,8 +65,22 @@
   color: var(--color-brand-green);
 }
 
+/* LIG-03 — degrade, do not destroy. At compact / below-spec windows keep the
+   fixture identity (symbol + count + name) instead of hiding the whole legend;
+   drop the meta / beam / confidence columns and tighten the panel width. The
+   row elements (and their data-testids) stay mounted — the extra spans are
+   hidden, not removed — so fixture-symbol-key + per-row testids survive. */
 @media (max-width: 1440px), (max-height: 880px) {
   .key {
+    max-width: 240px;
+  }
+
+  .row {
+    grid-template-columns: 42px 24px minmax(72px, 1fr);
+  }
+
+  .meta,
+  .confidence {
     display: none;
   }
 }
