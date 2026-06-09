@@ -47,8 +47,10 @@ export function StudioFloor({ layout }: StudioFloorProps) {
           width={layout.walls.controlBoothWindow.widthMeters * 100}
           height={10}
           style={{
-            fill: "var(--color-brand-blue-soft)",
-            stroke: "var(--color-brand-blue-border)",
+            // LGS-02: de-blued control-booth window -> the neutral set-element
+            // family (matches the bench/structure treatment), no retired hue.
+            fill: ELEMENT_FILL,
+            stroke: ELEMENT_STROKE,
             strokeWidth: 1,
           }}
         />

@@ -22,11 +22,11 @@
     font-weight: 500;
   }
 
-  .blue {
-    border-color: var(--color-brand-blue-border);
+  .selected {
+    border-color: var(--color-brand-green-border);
   }
 
-  .blue .value {
-    color: var(--color-brand-blue-hot);
+  .selected .value {
+    color: var(--color-brand-green-hot);
   }
 }
