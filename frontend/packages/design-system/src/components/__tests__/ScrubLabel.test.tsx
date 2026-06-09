@@ -111,4 +111,77 @@ describe("ScrubLabel", () => {
       screen.getByRole("textbox").getAttribute("aria-label")
     );
   });
+
+  // LGS-06 (Slice 9c): resetValue — double-click (timed 360ms guard, two
+  // pointerdowns; event.detail is 0 on pointerdown so it can't be used) and
+  // Backspace/Delete reset to the default, mirroring ScrubSlider/AudioKnob.
+  function pointerDown(slider: HTMLElement) {
+    const Ctor = window.PointerEvent ?? MouseEvent;
+    slider.dispatchEvent(new Ctor("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+  }
+
+  it("resets to resetValue on Backspace and Delete", () => {
+    const onChange = vi.fn();
+    const onCommit = vi.fn();
+    render(
+      <ScrubLabel
+        value={5}
+        min={0}
+        max={10}
+        step={1}
+        resetValue={0}
+        ariaLabel="Stage X"
+        onChange={onChange}
+        onCommit={onCommit}
+      >
+        Stage X (m)
+      </ScrubLabel>
+    );
+    const slider = screen.getByRole("slider", { name: "Stage X" });
+    fireEvent.keyDown(slider, { key: "Backspace" });
+    expect(onChange).toHaveBeenLastCalledWith(0);
+    expect(onCommit).toHaveBeenLastCalledWith(0);
+    onChange.mockClear();
+    fireEvent.keyDown(slider, { key: "Delete" });
+    expect(onChange).toHaveBeenLastCalledWith(0);
+  });
+
+  it("ignores Backspace/Delete when no resetValue is wired", () => {
+    const onChange = vi.fn();
+    render(
+      <ScrubLabel value={5} min={0} max={10} step={1} ariaLabel="Stage X" onChange={onChange}>
+        Stage X (m)
+      </ScrubLabel>
+    );
+    const slider = screen.getByRole("slider", { name: "Stage X" });
+    fireEvent.keyDown(slider, { key: "Backspace" });
+    fireEvent.keyDown(slider, { key: "Delete" });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("resets on a timed double-click (two pointerdowns within 360ms)", () => {
+    const onChange = vi.fn();
+    const onCommit = vi.fn();
+    render(
+      <ScrubLabel
+        value={5}
+        min={0}
+        max={10}
+        step={1}
+        resetValue={0}
+        ariaLabel="Stage X"
+        onChange={onChange}
+        onCommit={onCommit}
+      >
+        Stage X (m)
+      </ScrubLabel>
+    );
+    const slider = screen.getByRole("slider", { name: "Stage X" });
+    slider.setPointerCapture = () => {};
+    slider.releasePointerCapture = () => {};
+    pointerDown(slider); // first tap — begins a (no-op) scrub
+    pointerDown(slider); // second tap within 360ms — resets
+    expect(onChange).toHaveBeenLastCalledWith(0);
+    expect(onCommit).toHaveBeenLastCalledWith(0);
+  });
 });

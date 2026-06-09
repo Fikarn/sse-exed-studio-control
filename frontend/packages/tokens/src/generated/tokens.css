@@ -74,9 +74,9 @@
   --color-fixture-shell-fill: rgba(8, 9, 10, 0.92);
   --color-fixture-shell-stroke: rgba(212, 205, 179, 0.4);
   --color-fixture-ghost-stroke: rgba(153, 186, 146, 0.45);
-  --color-stage-grid-major: rgba(212, 205, 179, 0.20);
-  --color-stage-grid-minor: rgba(212, 205, 179, 0.10);
-  --color-stage-grid-faint: rgba(212, 205, 179, 0.05);
+  --color-stage-grid-major: rgba(212, 205, 179, 0.46);
+  --color-stage-grid-minor: rgba(212, 205, 179, 0.28);
+  --color-stage-grid-faint: rgba(212, 205, 179, 0.12);
   --color-stage-beam-line: rgba(212, 205, 179, 0.18);
   --color-stage-door-stroke: rgba(212, 205, 179, 0.32);
   --color-stage-vignette: rgba(0, 0, 0, 0.25);
