@@ -63,12 +63,12 @@ const dDisplayName: React.CSSProperties = {
   fontSize: 16,
 };
 
-const dModBlue: React.CSSProperties = {
+const dPreviewLabel: React.CSSProperties = {
   fontFamily: "var(--font-family-mono)",
   fontSize: 10,
   letterSpacing: "0.24em",
   textTransform: "uppercase",
-  color: "var(--color-brand-blue-hot)",
+  color: "var(--color-warning-500)",
   fontWeight: 600,
 };
 
@@ -363,9 +363,9 @@ export const DirectionDPlotPill: StoryObj<typeof meta> = {
           </PlotPill>
         </div>
         <div style={dRow}>
-          <PlotPill state="patch">
-            <span style={{ color: "var(--color-brand-text-muted)" }}>Patch mode</span>
-            <span style={dModBlue}>· DMX overlay</span>
+          <PlotPill state="preview">
+            <span style={{ color: "var(--color-brand-text-muted)" }}>Preview</span>
+            <span style={dPreviewLabel}>· Offline edits</span>
           </PlotPill>
         </div>
       </div>

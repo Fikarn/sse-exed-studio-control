@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 
 import styles from "./PlotPill.module.css";
 
-export type PlotPillState = "default" | "modified" | "patch";
+// LGS-02: the third state is the PREVIEW pill (offline scene editing), not a DMX
+// "patch" — renamed off the misnomer and recolored to the sanctioned amber preview
+// tone (matches the preview StatusDot / banner), retiring the multi-hue blue.
+export type PlotPillState = "default" | "modified" | "preview";
 
 export interface PlotPillProps {
   state?: PlotPillState;

@@ -5,9 +5,11 @@
   gap: 18px;
   min-height: 40px;
   padding: 6px 22px;
-  background: linear-gradient(180deg, rgba(63, 112, 200, 0.16), rgba(63, 112, 200, 0.08)), var(--color-bg-default);
-  border-top: 1px solid var(--color-brand-blue-border);
-  border-bottom: 1px solid var(--color-brand-blue-border);
+  background:
+    linear-gradient(180deg, var(--color-warning-soft), color-mix(in srgb, var(--color-warning-500) 8%, transparent)),
+    var(--color-bg-default);
+  border-top: 1px solid var(--color-warning-border);
+  border-bottom: 1px solid var(--color-warning-border);
   box-shadow: var(--shadow-inset-hi);
   color: var(--color-brand-text-primary);
   font-family: var(--font-family-ui);
@@ -30,7 +32,7 @@
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--color-brand-blue-hot);
+  color: var(--color-warning-500);
 }
 
 .detail {

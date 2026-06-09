@@ -48,9 +48,13 @@
   flex-direction: column;
   gap: 3px;
   padding: 9px 11px;
-  border: 1px solid var(--color-brand-blue-border);
+  border: 1px solid var(--color-warning-border);
   border-radius: var(--radius-tight-md);
-  background: linear-gradient(180deg, var(--color-brand-blue-soft) 0%, rgba(63, 112, 200, 0.06) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--color-warning-soft) 0%,
+    color-mix(in srgb, var(--color-warning-500) 6%, transparent) 100%
+  );
   color: var(--color-brand-text-secondary);
   font-size: 11px;
   line-height: 1.35;
@@ -62,7 +66,7 @@
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--color-brand-blue-hot);
+  color: var(--color-warning-500);
 }
 
 .tab {
@@ -179,8 +183,8 @@
 }
 
 .paletteStatus[data-preview-mode="true"] {
-  border-color: var(--color-brand-blue-border);
-  background: var(--color-brand-blue-soft);
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-soft);
 }
 
 .paletteNotice {

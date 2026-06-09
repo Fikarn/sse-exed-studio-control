@@ -38,7 +38,7 @@
 
 .plotShellPreview {
   background:
-    radial-gradient(circle at top, rgba(63, 112, 200, 0.2), transparent 50%),
+    radial-gradient(circle at top, color-mix(in srgb, var(--color-warning-500) 20%, transparent), transparent 50%),
     radial-gradient(circle at top, var(--color-brand-dark-green-ambient), transparent 55%), var(--color-bg-deep);
 }
 
@@ -47,8 +47,8 @@
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
-  background: var(--color-brand-blue);
-  box-shadow: var(--shadow-glow-blue);
+  background: var(--color-warning-500);
+  box-shadow: var(--shadow-glow-amber);
   pointer-events: none;
   z-index: 3;
 }

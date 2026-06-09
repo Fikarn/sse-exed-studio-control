@@ -38,7 +38,9 @@
       "borderStrong": { "$value": "rgba(213, 106, 101, 0.7)" }
     },
     "warning": {
-      "500": { "$value": "#D8A95A" }
+      "500": { "$value": "#D8A95A" },
+      "soft": { "$value": "color-mix(in srgb, var(--color-warning-500) 16%, transparent)" },
+      "border": { "$value": "color-mix(in srgb, var(--color-warning-500) 50%, transparent)" }
     },
     "info": {
       "500": { "$value": "#69A9D1" }
@@ -74,10 +76,6 @@
       "yellowSoft": { "$value": "rgba(232, 213, 97, 0.14)" },
       "yellowGlow": { "$value": "rgba(232, 213, 97, 0.06)" },
       "yellowBorder": { "$value": "rgba(232, 213, 97, 0.5)" },
-      "blue": { "$value": "#3F70C8" },
-      "blueHot": { "$value": "#6A93DC" },
-      "blueSoft": { "$value": "rgba(63, 112, 200, 0.16)" },
-      "blueBorder": { "$value": "rgba(63, 112, 200, 0.55)" },
       "burgundy": { "$value": "#6B1F1F" },
       "burgundySoft": { "$value": "rgba(107, 31, 31, 0.16)" },
       "coral": { "$value": "#ED7C5E" },
@@ -150,7 +148,6 @@
     },
     "glass": {
       "bg": { "$value": "rgba(8, 10, 8, 0.78)" },
-      "bgBlue": { "$value": "rgba(7, 12, 22, 0.82)" },
       "bgStrong": { "$value": "rgba(8, 10, 8, 0.85)" },
       "bgSubtle": { "$value": "rgba(8, 10, 8, 0.65)" },
       "bgSoft": { "$value": "rgba(8, 10, 8, 0.72)" },
@@ -289,9 +286,6 @@
     },
     "glowYellow": {
       "$value": "0 0 0 1px {color.brand.yellow}, 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
-    },
-    "glowBlue": {
-      "$value": "0 0 0 1px {color.brand.blue}, 0 12px 28px rgba(63, 112, 200, 0.20), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
     },
     "glowGreenSm": { "$value": "0 0 12px rgba(153, 186, 146, 0.35)" },
     "glowGreenDot": { "$value": "0 0 5px rgba(153, 186, 146, 0.55)" },

@@ -32,8 +32,8 @@
 
 .toolbar[data-preview-mode="true"]::before {
   height: 2px;
-  background: var(--color-brand-blue);
-  box-shadow: var(--shadow-glow-blue);
+  background: var(--color-warning-500);
+  box-shadow: var(--shadow-glow-amber);
 }
 
 .title {
@@ -66,7 +66,7 @@
 }
 
 .toolbar[data-preview-mode="true"] .titleIcon {
-  color: var(--color-brand-blue-hot);
+  color: var(--color-warning-500);
 }
 
 .patchEyebrow {
@@ -94,9 +94,13 @@
   padding: 0 9px;
   margin-left: 4px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(180deg, var(--color-brand-blue-soft) 0%, rgba(63, 112, 200, 0.06) 100%);
-  border: 1px solid var(--color-brand-blue-border);
-  color: var(--color-brand-blue-hot);
+  background: linear-gradient(
+    180deg,
+    var(--color-warning-soft) 0%,
+    color-mix(in srgb, var(--color-warning-500) 6%, transparent) 100%
+  );
+  border: 1px solid var(--color-warning-border);
+  color: var(--color-warning-500);
   font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-xs, 10px);
   letter-spacing: 0;
