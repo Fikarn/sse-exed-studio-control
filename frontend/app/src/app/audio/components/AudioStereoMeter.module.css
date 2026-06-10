@@ -220,7 +220,7 @@
   grid-column: 1 / -1;
   grid-row: 2;
   color: var(--fg-4);
-  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;
   text-transform: uppercase;
@@ -239,7 +239,7 @@
   right: 2px;
   bottom: clamp(4px, var(--meter-scale-position, 0%), calc(100% - 4px));
   color: var(--fg-4);
-  font: var(--font-weight-medium) 8px / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-4xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   transform: translateY(50%);
   white-space: nowrap;

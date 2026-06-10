@@ -28,7 +28,7 @@
 .snapshotDeckHeader h2 {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--fg);
@@ -36,7 +36,7 @@
 
 .snapshotShortcut {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--audio-caption-muted);
@@ -52,7 +52,7 @@
   background: var(--bg-2);
   color: var(--fg-2);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   padding: 4px 10px 4px 8px;
   border-radius: 5px;
@@ -120,7 +120,7 @@
 /* Slot index — a quiet mono caption, NOT a bordered box. */
 .snapshotSlot {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -128,7 +128,7 @@
 }
 
 .snapshotName {
-  font-size: 12.5px;
+  font-size: var(--font-size-sm-plus);
   font-weight: 600;
   color: var(--fg);
   letter-spacing: -0.01em;
@@ -144,7 +144,7 @@
 
 .snapshotMeta {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   color: var(--audio-caption-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -167,7 +167,7 @@
 
 .snapshotEmpty .snapshotName {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--font-size-3xs-plus);
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -267,14 +267,14 @@
 }
 
 .snapshotPreview strong {
-  font-size: 10.5px;
+  font-size: var(--font-size-2xs-plus);
   font-weight: 600;
   color: var(--fg);
   letter-spacing: -0.01em;
 }
 
 .snapshotPreview small {
-  font-size: 9.5px;
+  font-size: var(--font-size-3xs-plus);
   color: var(--fg-3);
   letter-spacing: 0.02em;
 }
@@ -300,7 +300,7 @@
 
 .snapshotPreviewOverflow {
   color: var(--audio-caption-muted);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

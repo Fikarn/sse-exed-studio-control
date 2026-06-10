@@ -54,7 +54,7 @@
 
 .value {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--font-size-md-tight);
   font-weight: 500;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
@@ -63,7 +63,7 @@
 
 .caption {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--fg-4);

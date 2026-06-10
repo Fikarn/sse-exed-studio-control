@@ -56,7 +56,7 @@
 }
 
 .talkbackName {
-  font-size: 13px;
+  font-size: var(--font-size-md-tight);
   font-weight: 600;
   color: var(--fg);
   letter-spacing: -0.005em;
@@ -65,7 +65,7 @@
 
 .talkbackCap {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-4);
@@ -129,7 +129,7 @@
 
 .masterEyebrow {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);
@@ -137,11 +137,11 @@
 
 .masterArrow {
   color: var(--accent);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 .masterName {
-  font-size: 13px;
+  font-size: var(--font-size-md-tight);
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--accent);
@@ -152,7 +152,7 @@
   align-items: baseline;
   gap: 14px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   color: var(--fg-3);
   letter-spacing: 0.04em;
 }
@@ -181,7 +181,7 @@
 
 .masterChLabel {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--font-size-3xs-plus);
   letter-spacing: 0.12em;
   color: var(--fg-3);
   width: 10px;
@@ -191,7 +191,7 @@
 
 .masterReadout {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--fg-2);
   font-variant-numeric: tabular-nums;
   width: 56px;
@@ -331,7 +331,7 @@
 
 .masterTickLabel {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   color: var(--fg-3);
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
@@ -368,7 +368,7 @@
   border: 1px solid transparent;
   color: var(--fg-2);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   letter-spacing: -0.005em;
   cursor: pointer;
@@ -384,7 +384,7 @@
 
 .controlSub {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   color: var(--fg-4);
   letter-spacing: 0.12em;
   text-transform: uppercase;
