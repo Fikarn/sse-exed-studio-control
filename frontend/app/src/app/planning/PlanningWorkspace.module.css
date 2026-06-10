@@ -709,16 +709,24 @@
   background: color-mix(in srgb, var(--color-danger-500) 12%, var(--color-surface-800));
 }
 
-.planningNowLabel,
-.planningStatLabel {
+/* PLA-06 (Slice 10d-2): the stat chips render via DS MetricCard (showBadge=false). These hooks
+   theme MetricCard's caption/value to Planning's text tokens + tabular-nums (the chip's PLA-05
+   severity tint stays on the wrapper above); the --metric-* fallbacks keep every other
+   MetricCard consumer byte-identical. */
+.planningStatChip {
+  --metric-caption-color: var(--color-text-subtle);
+  --metric-value-color: var(--color-text-strong);
+  --metric-value-numeric: tabular-nums;
+}
+
+.planningNowLabel {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.planningNowValue,
-.planningStatValue {
+.planningNowValue {
   font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-lg)) / 1 var(--font-family-mono);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
@@ -1145,12 +1153,9 @@
   text-align: center;
 }
 
-.planningEmptyTitle {
-  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.2 var(--font-family-display);
-  letter-spacing: 0;
-}
-
-.planningEmptyBody,
+/* .planningBoardEmpty styles the per-column inline "No X tasks." / "No projects in this column."
+   slots (kept hand-built — narrow column filler, not a hero empty-state). The two hero empties
+   (board/timeline no-projects) now render DS EmptyState inside the centering containers. */
 .planningBoardEmpty {
   color: var(--color-text-muted);
   font: var(--font-weight-regular) var(--font-size-md) / 1.5 var(--font-family-ui);

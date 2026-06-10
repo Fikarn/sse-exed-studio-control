@@ -7,17 +7,21 @@ export interface MetricCardProps {
    *  backward compatibility; pass an explicit label so the badge doesn't
    *  echo the machine enum (COPY-04). */
   label?: string;
+  /** Render the status badge beside the value. Defaults to `true`; pass
+   *  `false` for a bare caption+value metric (e.g. a stat chip whose severity
+   *  is carried by its own surrounding chrome). */
+  showBadge?: boolean;
   tone?: StatusTone;
   value: string;
 }
 
-export const MetricCard = ({ caption, label, tone = "idle", value }: MetricCardProps) => {
+export const MetricCard = ({ caption, label, showBadge = true, tone = "idle", value }: MetricCardProps) => {
   return (
     <div className={styles.card}>
       <span className={styles.caption}>{caption}</span>
       <div className={styles.row}>
         <strong className={styles.value}>{value}</strong>
-        <StatusBadge label={label ?? tone} tone={tone} />
+        {showBadge ? <StatusBadge label={label ?? tone} tone={tone} /> : null}
       </div>
     </div>
   );
