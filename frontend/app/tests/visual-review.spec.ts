@@ -356,7 +356,20 @@ test.describe("per-theme foundation", () => {
 // could all silently regress. One state-locking capture each at the primary
 // resolution (these states carry no layout-ladder risk — the populated
 // fixtures own the 6-viewport ladder).
-const STATE_FIXTURES = ["planning-empty", "lighting-empty", "setup-degraded", "audio-state-assumed"] as const;
+// Close-out extension: the remaining degraded postures from the round-2
+// audit's R2-FIX-01 matrix (audio not-verified / offline / action-failed
+// warning bands + the lighting DMX-unreachable posture) join the loop —
+// the full designed-state set is now locked.
+const STATE_FIXTURES = [
+  "planning-empty",
+  "lighting-empty",
+  "setup-degraded",
+  "audio-state-assumed",
+  "audio-not-verified",
+  "audio-offline",
+  "audio-action-failed",
+  "lighting-dmx-unreachable",
+] as const;
 
 test.describe("state coverage", () => {
   test.use({ viewport: { width: 2560, height: 1440 } });

@@ -1653,3 +1653,41 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   }
   await expectNoDocumentScroll(page);
 });
+
+// Round-2 close-out (R2-CTX-01): the DS ContextMenu measures itself and
+// clamps to the viewport (ContextMenu.tsx flips above/left when the bottom/
+// right would clip). No shipped fixture can place a real right-click near
+// the viewport edge — the centered mixer never reaches it — so this locks
+// the clamp with synthetic edge coordinates dispatched at the strip's
+// contextmenu handler, exactly how the close-out probe verified it live.
+test("strip context menu clamps to the viewport at the edges", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openFixture(page, "audio-populated");
+  await expect(page.locator('[data-testid^="audio-strip-"]').first()).toBeVisible();
+
+  const probe = async (clientX: number, clientY: number, label: string) => {
+    await page.keyboard.press("Escape");
+    await page.evaluate(
+      ([x, y]) => {
+        const strip = document.querySelector('[data-testid^="audio-strip-"]');
+        strip?.dispatchEvent(
+          new MouseEvent("contextmenu", { clientX: x, clientY: y, bubbles: true, cancelable: true })
+        );
+      },
+      [clientX, clientY]
+    );
+    const menu = page.getByRole("menu").first();
+    await expect(menu, `${label}: menu opens`).toBeVisible();
+    const box = await menu.boundingBox();
+    expect(box, `${label}: menu has a box`).not.toBeNull();
+    expect(box!.x, `${label}: fits left`).toBeGreaterThanOrEqual(0);
+    expect(box!.y, `${label}: fits top`).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width, `${label}: fits right`).toBeLessThanOrEqual(1281);
+    expect(box!.y + box!.height, `${label}: fits bottom`).toBeLessThanOrEqual(801);
+  };
+
+  await probe(640, 400, "center");
+  await probe(1270, 400, "right edge");
+  await probe(640, 790, "bottom edge");
+  await probe(1270, 790, "corner");
+});
