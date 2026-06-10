@@ -4,6 +4,19 @@ import { OperatorShell } from "../app/OperatorShell";
 
 const meta = {
   component: OperatorShell,
+  // STA-01 (S12): the global.css reset heights only html/body/#root, but
+  // storybook mounts at #storybook-root — its auto height collapsed to 0,
+  // so the shell's height:100% chain resolved to 0 and overflow:hidden
+  // clipped every story to a blank frame (8 of 10 baselines were ONE
+  // byte-identical PNG). Give the story a real viewport-height box. Scoped
+  // here so DS component stories are untouched.
+  decorators: [
+    (Story) => (
+      <div style={{ height: "100vh" }}>
+        <Story />
+      </div>
+    ),
+  ],
   parameters: {
     layout: "fullscreen",
   },

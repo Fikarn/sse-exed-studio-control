@@ -303,8 +303,11 @@ button.lightingDmxDrawerCell {
 }
 
 .setupLoadingLabel {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 28px / 1 var(--font-family-mono);
+  /* STA-12: the primary cold-boot label was a raw 28px that ignored
+     UI-scale; promote it to the operator headline scale (title-xl) and lift
+     the dimmest text ramp one step for the screen's one piece of copy. */
+  color: var(--color-text-muted);
+  font: var(--font-weight-medium) var(--operator-font-size-title-xl, 34px) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -312,14 +315,14 @@ button.lightingDmxDrawerCell {
 .setupLoadingPulse {
   width: min(100%, 420px);
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background:
     linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-warning-500) 88%, white 12%), transparent),
     color-mix(in srgb, var(--color-surface-700) 92%, transparent);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--color-warning-500) 18%, transparent),
     0 0 36px color-mix(in srgb, var(--color-warning-500) 18%, transparent);
-  animation: setupStartupPulse 1.2s ease-in-out infinite;
+  animation: setupStartupPulse var(--motion-duration-pulse) ease-in-out infinite;
 }
 
 /* STA-05: the startup step rail sits under the pulse on the primary cold-boot
@@ -611,13 +614,22 @@ button.lightingDmxDrawerCell {
 .stateShell {
   height: 100%;
   display: grid;
-  place-items: center;
+  /* SET-11d (S12): same clip class S11 fixed in .setupRecoveryShell — this
+     shell lives inside PreReadyFrame's overflow:hidden main. place-items:
+     center clips BOTH ends under overflow (the top stays unreachable even
+     with scroll), so center via the child's auto margins instead and scroll
+     within. These surfaces are unreachable by every shipped fixture and by
+     the production transport (workspace resets to "setup" on every
+     bootstrap) — hardened for pattern parity; S15 decides their fate. */
+  min-height: 0;
+  overflow-y: auto;
   padding: clamp(24px, 4vw, 48px);
   /* PreReadyFrame now supplies the full-height gradient backdrop + crest. */
 }
 
 .stateSurface {
   width: min(1120px, 100%);
+  margin: auto;
   display: grid;
   gap: var(--space-4);
   box-shadow: 0 24px 80px color-mix(in srgb, black 50%, transparent);
@@ -640,7 +652,7 @@ button.lightingDmxDrawerCell {
 
 .stateTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 36px) / 1.05 var(--font-family-display);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-display);
   letter-spacing: 0;
 }
 
@@ -830,7 +842,7 @@ button.planningProjectDetailTaskCard {
   }
 
   .setupLoadingLabel {
-    font-size: 22px;
+    font-size: var(--operator-font-size-title-lg, 22px);
     letter-spacing: 0;
     text-align: center;
   }

@@ -18,6 +18,13 @@ import { fileURLToPath } from "node:url";
 const STORYBOOK_BASE = "http://127.0.0.1:6007";
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 
+// STA-01 (S12): now that the shell stories paint real 2560x1440 frames
+// (height decorator), they are full-app renders — the same capture class as
+// visual-review.spec.ts, which budgets FULL_RENDER_MAX_DIFF_PX=800 for
+// single-frame render noise (slider-fill/grid sub-pixel jitter, font AA).
+// DS component stories keep the strict config default (maxDiffPixels: 100).
+const FULL_RENDER_MAX_DIFF_PX = 800;
+
 interface StoryEntry {
   id: string;
   name: string;
@@ -73,8 +80,15 @@ for (const story of stories) {
     // to settle the paint.
     await page.locator("#storybook-root").first().waitFor({ state: "attached" });
 
+    // STA-01 (S12): a zero-height story root means the baseline is a blank
+    // frame guarding nothing — exactly the silent failure that left 8 shell
+    // baselines byte-identical. Require a real painted box before capture.
+    const rootBox = await page.locator("#storybook-root").first().boundingBox();
+    expect(rootBox?.height, `${story.id} story root must paint at a real height`).toBeGreaterThan(0);
+
     await expect(page).toHaveScreenshot(`${story.id}.png`, {
       mask: liveAudioMasks(page),
+      ...(story.title.startsWith("Shell/") ? { maxDiffPixels: FULL_RENDER_MAX_DIFF_PX } : {}),
     });
   });
 }

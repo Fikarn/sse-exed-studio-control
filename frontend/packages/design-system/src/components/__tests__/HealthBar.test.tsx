@@ -107,4 +107,18 @@ describe("HealthBar", () => {
       expect(spans[1]?.textContent).toBe("next]");
     });
   });
+
+  describe("presence marker", () => {
+    it("carries the inert data-health-bar attribute on both variant roots", () => {
+      // GLO-11 (S12): the app's toast stack keys its bottom offset on
+      // `html:not(:has([data-health-bar]))` — if this marker disappears,
+      // toasts dock at the true edge UNDER the mounted bar.
+      const { unmount } = render(<HealthBar items={ITEMS} testId="full-bar" />);
+      expect(screen.getByTestId("full-bar")).toHaveAttribute("data-health-bar");
+      unmount();
+
+      render(<HealthBar variant="caption" items={ITEMS} testId="caption-bar" />);
+      expect(screen.getByTestId("caption-bar")).toHaveAttribute("data-health-bar");
+    });
+  });
 });

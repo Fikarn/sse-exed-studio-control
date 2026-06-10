@@ -218,6 +218,7 @@ export const tokenValues = {
   "MotionDurationFast": "120ms",
   "MotionDurationNormal": "180ms",
   "MotionDurationSlow": "240ms",
+  "MotionDurationPulse": "1200ms",
   "MotionEasingStandard": "cubic-bezier(0.22, 1, 0.36, 1)",
   "MotionEasingInOut": "cubic-bezier(0.4, 0, 0.2, 1)",
   "MotionEasingOut": "cubic-bezier(0.16, 1, 0.3, 1)",

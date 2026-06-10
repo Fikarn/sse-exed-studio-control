@@ -64,6 +64,17 @@
     --toast-safe-bottom: 0px;
   }
 
+  /* DENSITY-08 / GLO-11 (S12): the offset is really about health-bar
+     PRESENCE, not readiness — ready-but-footerless surfaces (Planning,
+     setup support mode) also docked their toasts 64px above the true edge.
+     Key the offset off the DOM truth: every DS HealthBar root carries an
+     inert data-health-bar attribute, so the offset collapses wherever no
+     bar is mounted and live-flips on the setup Runner↔Support toggle.
+     (The pre-ready rule above is kept — redundant but documents intent.) */
+  html:not(:has([data-health-bar])) {
+    --toast-safe-bottom: 0px;
+  }
+
   body {
     background:
       radial-gradient(circle at top left, rgba(153, 186, 146, 0.1), transparent 34%),
