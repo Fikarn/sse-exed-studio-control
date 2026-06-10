@@ -55,7 +55,7 @@
   background: var(--bg-2);
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);
@@ -136,7 +136,7 @@
 }
 
 .tierTitleBlock > span:last-child {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 500;
@@ -157,7 +157,7 @@
 
 .tierNum {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   color: var(--fg-4);
   letter-spacing: 0.16em;
 }
@@ -173,7 +173,7 @@
 .tierChip {
   appearance: none;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--font-size-3xs-plus);
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -204,7 +204,7 @@
    styled as a quiet mono caption in the tier header. */
 .tierLabel small {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   letter-spacing: 0.08em;
   color: var(--fg-4);
   text-transform: uppercase;
@@ -249,7 +249,7 @@
 
 .tierMixForEyebrow {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--font-size-3xs-plus);
   letter-spacing: 0.12em;
   color: var(--fg-3);
   text-transform: uppercase;
@@ -258,12 +258,12 @@
 
 .tierMixForArrow {
   color: var(--accent);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: 1;
 }
 
 .tierMixForName {
-  font-size: 13px;
+  font-size: var(--font-size-md-tight);
   font-weight: 600;
   color: var(--accent);
   letter-spacing: -0.01em;
@@ -293,7 +293,7 @@
 
 .tierMeterSimChip {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -322,7 +322,7 @@
   border: 0;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   line-height: 1;
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -382,7 +382,7 @@
   padding: 32px;
   color: var(--fg-4);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }

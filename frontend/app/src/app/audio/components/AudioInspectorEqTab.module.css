@@ -96,7 +96,7 @@
   border-radius: var(--radius-tight-sm);
   color: color-mix(in srgb, var(--fg-3) 74%, transparent);
   background: color-mix(in srgb, var(--audio-meter-bg) 62%, transparent);
-  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-4xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
   transform: translateY(-50%);
@@ -127,7 +127,7 @@
   bottom: 6px;
   left: 50%;
   color: color-mix(in srgb, var(--fg-3) 66%, transparent);
-  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-4xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   white-space: nowrap;
   text-transform: uppercase;
@@ -184,7 +184,7 @@
      readout (matches the value line below it) rather than the display
      face. Size/line-height unchanged. */
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -192,7 +192,7 @@
 
 .eqValueBadge span {
   color: var(--accent);
-  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-2xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
 }
 
@@ -218,7 +218,7 @@
     radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.22), transparent 36%),
     color-mix(in srgb, var(--bg-3) 74%, var(--accent) 26%);
   color: var(--fg);
-  font: var(--font-weight-semibold) 8px / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-4xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   transform: translate(-50%, -50%);
   cursor: grab;
@@ -275,7 +275,7 @@
   gap: 8px;
   align-items: center;
   color: var(--fg-3);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -306,7 +306,7 @@
   border-radius: var(--radius-tight-md);
   background: color-mix(in srgb, var(--bg-1) 72%, transparent);
   color: var(--fg-3);
-  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-2xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
   cursor: pointer;
@@ -343,7 +343,7 @@
   align-items: center;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);
@@ -355,7 +355,7 @@
   background: var(--bg-2);
   color: var(--fg-2);
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--font-size-3xs-plus);
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -417,7 +417,7 @@
 
 .eqBandCardHead strong {
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   letter-spacing: -0.005em;
   color: var(--fg);
@@ -425,7 +425,7 @@
 
 .eqBandCardTag {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--fg-4);
@@ -437,7 +437,7 @@
   background: var(--bg);
   color: var(--fg-2);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -471,7 +471,7 @@
 
 .eqBandTypeLabel {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--fg-4);
@@ -491,7 +491,7 @@
   background: var(--bg);
   color: var(--fg-3);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;

@@ -81,7 +81,7 @@
   align-items: center;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   font-weight: 500;
   letter-spacing: 0.16em;
   color: var(--audio-caption-muted);
@@ -97,11 +97,11 @@
 .lanePreampRow > span:last-child,
 .laneIndexRow > span:last-child {
   color: var(--audio-caption-muted);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
 }
 
 .laneName {
-  font-size: 15px;
+  font-size: var(--font-size-lg-tight);
   font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--fg);
@@ -129,7 +129,7 @@
 
 .laneBadge {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   padding: 2px 5px;
@@ -174,7 +174,7 @@
 .laneClipPill {
   appearance: none;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   padding: 2px 5px;
@@ -245,7 +245,7 @@
 
 .outputActiveMark {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   font-weight: 600;
   letter-spacing: 0.18em;
   color: var(--accent);
@@ -260,7 +260,7 @@
 }
 
 .outputNameRow .laneName {
-  font-size: 13px;
+  font-size: var(--font-size-md-tight);
   font-weight: 600;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -281,7 +281,7 @@
   flex-shrink: 0;
   padding: 6px 0 10px 39px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--font-size-md-tight);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -328,7 +328,7 @@
   height: 28px;
   border-radius: 5px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: var(--font-size-xs-plus);
   font-weight: 600;
   letter-spacing: 0.08em;
   /* C12: resting legibility — bump glyph to --fg-2 and give a resting border
@@ -389,7 +389,7 @@
 
 .outputBusHeader small {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   letter-spacing: 0.14em;
   color: var(--audio-caption-muted);
   text-transform: uppercase;
@@ -397,7 +397,7 @@
 
 .outputBusHeader strong {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
@@ -409,7 +409,7 @@
   padding: 0 10px;
   border-radius: 5px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--font-size-2xs-plus);
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--fg-3);
@@ -444,13 +444,13 @@
   justify-content: space-between;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-2xs);
   color: var(--fg-3);
   letter-spacing: 0.02em;
 }
 
 .outputMetricGrid small {
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
   letter-spacing: 0.12em;
   color: var(--audio-caption-muted);
   text-transform: uppercase;
@@ -521,7 +521,7 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--fg-3);
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
   font-weight: 500;
 }
 
@@ -529,7 +529,7 @@
   font-family: var(--font-mono);
   letter-spacing: 0.04em;
   color: var(--fg-4);
-  font-size: 8.5px;
+  font-size: var(--font-size-4xs-plus);
 }
 
 /* Selected bus lights its routing role in the accent. */

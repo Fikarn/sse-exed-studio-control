@@ -9,7 +9,7 @@
 
 .faderValue {
   color: var(--fg);
-  font: var(--font-weight-medium) 10px / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;
   text-transform: none;

@@ -224,12 +224,25 @@
       "display": { "$value": "\"Fraunces Variable\", \"Fraunces\", \"Source Serif 4\", Georgia, serif" }
     },
     "size": {
+      "5xs": { "$value": "7px" },
+      "4xs": { "$value": "8px" },
+      "4xs-plus": { "$value": "8.5px" },
+      "3xs": { "$value": "9px" },
+      "3xs-plus": { "$value": "9.5px" },
       "2xs": { "$value": "10px" },
+      "2xs-plus": { "$value": "10.5px" },
       "xs": { "$value": "11px" },
+      "xs-plus": { "$value": "11.5px" },
       "sm": { "$value": "12px" },
+      "sm-plus": { "$value": "12.5px" },
+      "md-tight": { "$value": "13px" },
       "md": { "$value": "14px" },
+      "lg-tight": { "$value": "15px" },
       "lg": { "$value": "16px" },
-      "xl": { "$value": "20px" }
+      "xl-tight": { "$value": "18px" },
+      "xl": { "$value": "20px" },
+      "2xl": { "$value": "22px" },
+      "3xl": { "$value": "28px" }
     },
     "weight": {
       "regular": { "$value": "400" },

@@ -129,7 +129,7 @@
   border-radius: 0;
   background: transparent;
   color: #8beaff;
-  font: var(--font-weight-semibold) 11px / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-xs) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;
   text-shadow: 0 0 5px rgba(75, 217, 255, 0.66);
@@ -139,7 +139,7 @@
 .preampGainLabel i {
   margin-left: 3px;
   color: rgba(216, 247, 255, 0.5);
-  font-size: 8px;
+  font-size: var(--font-size-4xs);
   font-style: normal;
   text-shadow: none;
 }
@@ -165,7 +165,7 @@
   left: 50%;
   top: 66%;
   min-width: 68px;
-  font-size: 9px;
+  font-size: var(--font-size-3xs);
 }
 
 @container operator-root (max-width: 2100px) {
@@ -178,6 +178,6 @@
     right: 3px;
     bottom: 3px;
     padding: 2px 4px;
-    font-size: 8px;
+    font-size: var(--font-size-4xs);
   }
 }
