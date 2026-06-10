@@ -297,7 +297,12 @@ function renderDraftForm(draft: PaletteDraft, setDraft: (draft: PaletteDraft | n
         ))}
       </div>
       <div className={styles.paletteFormActions}>
-        <Button type="submit" variant="primary" size="compact" leadingVisual={<Save size={13} aria-hidden="true" />}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="compact"
+          leadingVisual={<Save size={13} strokeWidth={1.75} aria-hidden="true" />}
+        >
           Save
         </Button>
         <IconButton tone="ghost" size="sm" icon={X} label="Cancel palette edit" onClick={() => setDraft(null)} />
