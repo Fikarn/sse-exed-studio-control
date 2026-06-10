@@ -82,8 +82,61 @@ export function CommandPalette({
     return () => window.clearTimeout(id);
   }, [open]);
 
-  // Close on Esc or backdrop click handled inline. Escape captured in panel
-  // onKeyDown so it doesn't leak past the palette to other shortcuts.
+  // R2-GLO-01: modal focus contract (mirrors ShellDialog / DS Dialog). The
+  // listener lives on `document`, not the panel — Chromium makes the
+  // scrollable result list sequentially focusable, so focus could walk OUT
+  // of the panel via Tab, after which a panel-scoped Escape handler never
+  // fires again (a stuck overlay, found by the round-2 runtime audit).
+  // While open: Escape closes from anywhere, Tab is trapped to the panel's
+  // focusables (re-homing to the input if focus ever ends up outside), and
+  // focus returns to the invoker on close.
+  useEffect(() => {
+    if (!open) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusables = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+        )
+      ).filter((element) => element.offsetParent !== null || element === document.activeElement);
+
+      const active = document.activeElement;
+      const activeIndex = active instanceof HTMLElement ? focusables.indexOf(active) : -1;
+      if (focusables.length === 0 || activeIndex === -1) {
+        // Focus is outside the panel (or on a non-tabbable like the list) —
+        // re-home it to the search input instead of letting Tab walk the
+        // page behind the modal.
+        event.preventDefault();
+        (focusables[0] ?? inputRef.current)?.focus();
+        return;
+      }
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [open, onClose]);
 
   const visibleActions = useMemo(() => actions.filter((a) => (a.when ? a.when() : true)), [actions]);
 
@@ -210,15 +263,13 @@ export function CommandPalette({
           event.preventDefault();
           activate(flatList[focusIndex]);
           return;
-        case "Escape":
-          event.preventDefault();
-          onClose();
-          return;
+        // Escape is owned by the document-level modal listener (R2-GLO-01)
+        // so it works wherever focus sits.
         default:
           return;
       }
     },
-    [activate, flatList, focusIndex, onClose]
+    [activate, flatList, focusIndex]
   );
 
   if (!open || typeof document === "undefined") return null;
@@ -262,7 +313,10 @@ export function CommandPalette({
             flatList[focusIndex] ? `${inputId}-item-${flatList[focusIndex]!.action.id}` : undefined
           }
         />
-        <ul id={`${inputId}-list`} role="listbox" className={styles.list}>
+        {/* tabIndex=-1: Chromium auto-focuses scrollable containers in the
+            sequential tab order; the listbox is keyboard-driven from the
+            input (aria-activedescendant), so keep it out of the Tab ring. */}
+        <ul id={`${inputId}-list`} role="listbox" className={styles.list} tabIndex={-1}>
           {flatList.length === 0 ? (
             <li className={styles.empty}>{emptyMessage}</li>
           ) : (

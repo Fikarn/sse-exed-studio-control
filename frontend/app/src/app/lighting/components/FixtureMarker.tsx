@@ -683,8 +683,18 @@ export function FixtureMarker({
             pointerEvents="none"
             style={{ stroke: SELECTED_STROKE, opacity: 0.85 }}
           >
-            <animate attributeName="r" values="16;22;16" dur="0.6s" repeatCount="indefinite" />
-            <animate attributeName="opacity" values="0.85;0.35;0.85" dur="0.6s" repeatCount="indefinite" />
+            {/* R2-MOT-03: the pulse is decorative (passive hover echo, not a
+                user-initiated gesture like the identify burst below) — under
+                prefers-reduced-motion the static ring alone carries the
+                chip ↔ marker pairing. Checked at render time: chipHovered
+                re-renders on every hover, so a preference change is picked
+                up on the next hover. */}
+            {typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? null : (
+              <>
+                <animate attributeName="r" values="16;22;16" dur="0.6s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.85;0.35;0.85" dur="0.6s" repeatCount="indefinite" />
+              </>
+            )}
           </circle>
         ) : null}
         {/* Identify-burst pulse ring — total 1.2 s matches engine
