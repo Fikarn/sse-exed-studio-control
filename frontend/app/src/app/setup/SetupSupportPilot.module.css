@@ -58,6 +58,12 @@
     color: var(--color-text-muted);
   }
 
+  .feedbackBanner[data-tone="error"] {
+    /* SET-12: mirror .setupFeedbackBanner[data-tone="error"] so error
+       feedback is tone-coded on both setup surfaces. */
+    border-color: color-mix(in srgb, var(--color-danger-500) 34%, var(--color-border-default));
+  }
+
   .bannerTitle,
   .modeHeadline,
   .sectionTitle {
@@ -148,15 +154,20 @@
   }
 
   .stepButton[data-active="true"] {
-    border-color: rgba(153, 186, 146, 0.42);
+    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
     background:
-      linear-gradient(180deg, rgba(153, 186, 146, 0.18), rgba(153, 186, 146, 0.05)), var(--color-surface-raised);
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-primary-500) 18%, transparent),
+        color-mix(in srgb, var(--color-primary-500) 5%, transparent)
+      ),
+      var(--color-surface-raised);
     transform: translateY(-1px);
     box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
   }
 
   .stepButton[data-status="error"] {
-    border-color: rgba(239, 68, 68, 0.32);
+    border-color: color-mix(in srgb, var(--color-danger-500) 32%, transparent);
   }
 
   .stepNumber {
@@ -204,6 +215,22 @@
 
   .runnerSide {
     align-content: start;
+  }
+
+  /* SET-11: scroll-within safety net. The global overflow:hidden chain
+     (html/body/#root → PreReadyFrame .main) clips any runner/support content
+     that exceeds the viewport — at 1280×800/1440×900/1600×960 the panels
+     visibly crush/overlap today. Each panel scrolls inside its grid track;
+     the negative-margin/padding bleed keeps Surface shadows and focus rings
+     painting inside the scrollport without moving content at rest.
+     (.supportGrid gets the same treatment deliberately — the support deck is
+     unbaselined but clips the same way.) */
+  .runnerMain,
+  .runnerSide,
+  .supportGrid {
+    overflow-y: auto;
+    margin: calc(-1 * var(--space-4));
+    padding: var(--space-4);
   }
 
   .heroSurface,
@@ -269,7 +296,10 @@
   }
 
   .textField:disabled {
-    opacity: 0.7;
+    /* SET-12: align with the S7 disabled recipe — no opacity crush; disabled
+       reads via the desaturated border + full-alpha subtle text (≥3:1). */
+    border-color: color-mix(in srgb, var(--color-border-default) 86%, transparent);
+    color: var(--color-text-subtle);
   }
 
   .checkHeader,
@@ -319,9 +349,14 @@
 
   .pageTab[data-active="true"],
   .dialChip[data-selected="true"] {
-    border-color: rgba(153, 186, 146, 0.42);
+    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
     background:
-      linear-gradient(180deg, rgba(153, 186, 146, 0.18), rgba(153, 186, 146, 0.05)), var(--color-surface-raised);
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-primary-500) 18%, transparent),
+        color-mix(in srgb, var(--color-primary-500) 5%, transparent)
+      ),
+      var(--color-surface-raised);
   }
 
   .deckPreview {
@@ -344,18 +379,23 @@
   }
 
   .deckButton[data-selected="true"] {
-    border-color: rgba(153, 186, 146, 0.42);
+    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
     box-shadow:
-      0 0 0 1px rgba(153, 186, 146, 0.22),
+      0 0 0 1px color-mix(in srgb, var(--color-primary-500) 22%, transparent),
       0 16px 36px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
   }
 
   .deckButton[data-echo="true"],
   .dialChip[data-echo="true"] {
     animation: echoPulse 300ms ease;
-    border-color: rgba(153, 186, 146, 0.42);
+    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
     background:
-      linear-gradient(180deg, rgba(153, 186, 146, 0.2), rgba(153, 186, 146, 0.08)), var(--color-surface-raised);
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-primary-500) 20%, transparent),
+        color-mix(in srgb, var(--color-primary-500) 8%, transparent)
+      ),
+      var(--color-surface-raised);
   }
 
   .deckButton small,
@@ -394,6 +434,13 @@
     font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.3 var(--font-family-mono);
     color: var(--color-text-strong);
     letter-spacing: 0;
+  }
+
+  .backupRow:hover {
+    /* SET-12: the transition above declared border/transform but no :hover
+       existed — adopt the recovery surface's recipe. */
+    border-color: color-mix(in srgb, var(--color-primary-500) 30%, var(--color-border-default));
+    transform: translateY(-1px);
   }
 
   .supportGrid {
@@ -435,8 +482,11 @@
   }
 
   .railButton:hover {
-    border-color: rgba(153, 186, 146, 0.3);
+    /* SET-12: converged on the recovery surface's hover recipe
+       (.setupIncidentRailButton:hover) — primary-over-border mix + lift. */
+    border-color: color-mix(in srgb, var(--color-primary-500) 30%, var(--color-border-default));
     color: var(--color-text-strong);
+    transform: translateY(-1px);
   }
 
   .railButton:disabled {

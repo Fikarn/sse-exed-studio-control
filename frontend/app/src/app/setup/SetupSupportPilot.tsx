@@ -747,7 +747,7 @@ export function SetupSupportPilot({
       ) : null}
 
       {feedback ? (
-        <div className={styles.feedbackBanner} role="status">
+        <div className={styles.feedbackBanner} data-tone={feedback.tone} role="status">
           <StatusPill
             label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
             tone={feedbackStatus(feedback) ?? "info"}

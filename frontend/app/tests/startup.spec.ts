@@ -76,3 +76,32 @@ test("startup-loading fixture hides every operator workspace surface", async ({ 
   await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
   await expect(page.getByTestId("planning-workspace")).toHaveCount(0);
 });
+
+test("recovery shell scrolls within the frame at 1920x1080 (SET-11)", async ({ page }) => {
+  // Slice 11 / SET-11: the recovery shell carried a 100vh/100dvh min-height
+  // inside PreReadyFrame's overflow:hidden main, so the bottom card was
+  // amputated at 1920x1080 with no way to scroll to it. The shell now
+  // scrolls within the frame; this locks that the last reference block can
+  // be brought fully into view.
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openFixture(page, "protocol-mismatch");
+  await expect(page.getByRole("heading", { name: "Protocol mismatch" })).toBeVisible({ timeout: 10000 });
+
+  // Precondition: the last reference block starts below the fold. The
+  // gesture must be a REAL wheel scroll: overflow:hidden ancestors still
+  // honor programmatic scrolling (scrollIntoViewIfNeeded passes either
+  // way), but swallow user input — the operator-visible defect.
+  const updatePosture = page.getByText("Update posture");
+  const before = await updatePosture.boundingBox();
+  expect(before).not.toBeNull();
+  expect(before!.y + before!.height).toBeGreaterThan(1080);
+
+  await page.getByText("What went wrong?").hover();
+  await page.mouse.wheel(0, 2400);
+  await expect
+    .poll(async () => {
+      const box = await updatePosture.boundingBox();
+      return box !== null && box.y >= 0 && box.y + box.height <= 1080;
+    })
+    .toBe(true);
+});
