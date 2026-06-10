@@ -94,13 +94,13 @@ edge context menu: fits viewport; items = Reset to unity / Flip polarity / Renam
 
 ---
 
-## Proposed fix-slice grouping (the continuation plan)
+## Fix-slice grouping — ALL MERGED 2026-06-10
 
-| Slice                                  | Contents                                                                                               | Class                                                   |
-| :------------------------------------- | :----------------------------------------------------------------------------------------------------- | :------------------------------------------------------ |
-| **R2-A — Overlay integrity**           | R2-GLO-01 (palette focus trap + Escape-at-root + focus restore) + R2-GLO-02 (single-modal posture)     | behavioral a11y, baseline-neutral, new keyboard tests   |
-| **R2-B — Reduced-motion completeness** | R2-MOT-01/02/03 (gate the two telemetry smoothings + the hover pulse)                                  | behavioral a11y, baseline-neutral, `emulateMedia` tests |
-| **R2-C — State-coverage baselines**    | R2-FIX-01 (the 4-fixture P1/P2 set at 2560×1440) + optionally the remaining audio degraded trio        | pure baselines (~8–14 PNGs + linux bootstrap)           |
-| **R2-D — Icon convention**             | R2-ICO-01/02 (document the two-tier convention, IconButton size/strokeWidth props, align the outliers) | polish, near-baseline-neutral                           |
+| Slice                                  | Contents                                                                                                                                                               | Status                                                                                                 |
+| :------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------- |
+| **R2-A — Overlay integrity**           | R2-GLO-01 (palette focus trap + Escape-at-document + focus restore) + R2-GLO-02 (single-modal posture)                                                                 | ☑ merged — #162 (2 keyboard tests, counter-factually verified; baseline-neutral)                       |
+| **R2-B — Reduced-motion completeness** | R2-MOT-01 (meter ballistics snap, both consumers) + R2-MOT-03 (pulse gate); **R2-MOT-02 refuted**                                                                      | ☑ merged — #163 (3 Vitest + 1 Playwright `emulateMedia` test; baseline-neutral; audit corrected in-PR) |
+| **R2-C — State-coverage baselines**    | R2-FIX-01: the 4-fixture set at 2560×1440 (audio degraded trio + dmx-unreachable stay functional-only)                                                                 | ☑ merged — #164 (8 PNGs darwin+linux; no-scroll asserted)                                              |
+| **R2-D — Icon convention**             | R2-ICO-01 (the Save outlier) + R2-ICO-02 (convention documented at DS IconButton; prop extension + 1.6 re-weight deliberately NOT shipped — logged in the doc comment) | ☑ merged — #165 (zero baselines moved)                                                                 |
 
-Severity-ordered: R2-A first (the only **high**), then B/C in either order, D last. R2-CTX-01 rides the next live Tauri review session.
+Residuals that intentionally remain open: **R2-CTX-01** (context-menu edge-flip — rides the next live Tauri review session) and the optional R2-C extension (audio not-verified/offline/action-failed + lighting-dmx-unreachable state baselines — the merged mechanism extends when wanted).
