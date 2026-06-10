@@ -74,11 +74,11 @@ edge context menu: fits viewport; items = Reset to unity / Flip polarity / Renam
 
 **Proposal.** Document the two-tier stroke convention where the icons live (a comment block in DS `IconButton` is enough); extend `IconButton` with optional `size`/`strokeWidth` props so the deck's bare `Plus` can join the wrapped path; align or justify the 1.6 and the 18-vs-13 Plus. No baseline movement at rest (hover-only/inert differences) except the SnapshotDeck Plus if resized — verify when fixed.
 
-### R2-CTX-01 — Context-menu viewport-edge flip is unverifiable in the shipped fixtures · info · residual risk
+### R2-CTX-01 — Context-menu viewport-edge flip · ~~info/residual~~ **VERIFIED CLOSED** (close-out probe, 2026-06-10)
 
-**Evidence (live probe).** The strip context menu renders well within bounds (`x:1168 w:180` at 2560) because the centered mixer never reaches the viewport edge; no shipped fixture can place a context-menu trigger near the right/bottom edge, and right-click on empty chrome opens nothing. The danger-item case is likewise absent from the probed menu (Reset to unity / Flip polarity / Rename — no destructive item).
+**Original framing.** A real right-click can't reach the viewport edge in the shipped fixtures (the centered mixer never gets there), so the flip went unverified by the audit's first pass.
 
-**Proposal.** Verify the flip on the live Tauri shell at a narrow viewport during the next operator review session; if a flip defect appears, fix then. Not actionable from fixtures.
+**Closure.** The DS `ContextMenu` measures itself and clamps before paint (`ContextMenu.tsx:37-63`). A close-out probe dispatched synthetic `contextmenu` events with edge coordinates at the strip handler — the exact path a real right-click takes — at 1280×800: center click renders at the pointer (640,400); a right-edge click at x=1270 clamps to x=1092 (1092+180 ≤ 1280); a bottom-edge click at y=790 clamps to y=696 (696+96 ≤ 800); the corner clamps both axes. **The clamp works.** A permanent Playwright test (`audio.spec.ts` "strip context menu clamps to the viewport at the edges") now locks all four positions. The danger-item state is wired (`FixtureMarker.tsx:516` passes `tone: "danger"` for Delete → DS `.itemDanger`) and danger menu paths are functionally exercised (`lighting.spec.ts:334` Delete scene). Nothing remains for the live Tauri session.
 
 ### R2-TOA-01 — Toast queue behavior confirmed; the multi-toast clause stays a deliberate deferral · info
 
@@ -103,4 +103,4 @@ edge context menu: fits viewport; items = Reset to unity / Flip polarity / Renam
 | **R2-C — State-coverage baselines**    | R2-FIX-01: the 4-fixture set at 2560×1440 (audio degraded trio + dmx-unreachable stay functional-only)                                                                 | ☑ merged — #164 (8 PNGs darwin+linux; no-scroll asserted)                                              |
 | **R2-D — Icon convention**             | R2-ICO-01 (the Save outlier) + R2-ICO-02 (convention documented at DS IconButton; prop extension + 1.6 re-weight deliberately NOT shipped — logged in the doc comment) | ☑ merged — #165 (zero baselines moved)                                                                 |
 
-Residuals that intentionally remain open: **R2-CTX-01** (context-menu edge-flip — rides the next live Tauri review session) and the optional R2-C extension (audio not-verified/offline/action-failed + lighting-dmx-unreachable state baselines — the merged mechanism extends when wanted).
+**All residuals closed (2026-06-10 close-out pass):** R2-CTX-01 verified by synthetic-edge probe + locked with a permanent Playwright clamp test (see the finding above); the R2-C extension landed (audio not-verified/offline/action-failed + lighting-dmx-unreachable joined the state-coverage loop — the full designed-state set is baselined); the two outstanding chips (the 8e2 DES-07 rgba residue in DS MeterBridge/OperationalState/IconButton/ToggleButton, and the DS focus-ring token + broken `@sse-exed/tokens` import) closed in their own PR. **Nothing from either audit remains open.**
