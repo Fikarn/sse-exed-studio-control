@@ -247,7 +247,10 @@ function OperatorShellInner() {
       // ⌘K / Ctrl+K — open command palette. Active even when an editable
       // target has focus (Linear / VS Code convention) so operators can
       // jump from the toolbar search into the palette without re-focusing.
+      // R2-GLO-02: single-modal posture — opening the palette dismisses the
+      // shortcut guide so two modal surfaces never stack.
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
+        setShowShortcutGuide(false);
         palette.setOpen(true);
         event.preventDefault();
         return;
