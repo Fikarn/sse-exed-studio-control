@@ -1421,3 +1421,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* S14 — Bone per-surface overrides. The primary/success-mix-white fills are
+   DARK on Bone (the bone primary/success are ink-greens), so the dark-theme
+   label token --color-background-950 (#dcd7c9 on bone) read only 3.43:1 on
+   them; the lightest surface clears 5.37:1. Bone-only — Studio/Graphite keep
+   the shipped pairing. */
+:global([data-theme="bone"]) .planningToolbarButton[data-primary="true"] {
+  color: var(--color-bg-elevated);
+}
+
+:global([data-theme="bone"]) .planningProjectDetailTaskToggle[data-completed="true"],
+:global([data-theme="bone"])
+  .planningProjectDetailChecklistItem[data-done="true"]
+  .planningProjectDetailChecklistToggle {
+  color: var(--color-bg-elevated);
+}

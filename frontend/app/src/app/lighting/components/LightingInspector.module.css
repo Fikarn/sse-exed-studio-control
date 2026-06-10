@@ -229,7 +229,7 @@
   min-height: 54px;
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-sm);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-inset-hairline-bg);
   overflow: hidden;
 }
 
@@ -313,7 +313,7 @@
   appearance: none;
   width: 100%;
   aspect-ratio: 1;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--color-inset-hairline-border);
   border-radius: var(--radius-tight-sm);
   cursor: pointer;
 }
@@ -684,7 +684,7 @@
 }
 
 .colorSwatch {
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--color-inset-hairline-border-soft);
   border-radius: 3px;
   display: inline-block;
   flex-shrink: 0;

@@ -19,10 +19,14 @@
  * cyan, Bone dark-amber); every foreground clears its WCAG AA target in both
  * themes (text 4.5:1, muted/subtle/severity 3:1).
  *
- * SCOPE: core semantic families only. The decorative stage/studio/glass/fixture
- * tokens, the multi-hue brand colors (blue/coral/burgundy/yellow), and the
- * physical `--color-cct-*` light temperatures keep their Studio values here —
- * their per-theme (esp. Bone-light) tuning lands in Slice 14.
+ * SCOPE: core semantic families (Slice 3) + the Slice 14 decorative tuning:
+ * glass, stage-grid, scene-minigraph, shell-backdrop and inset-hairline
+ * families now theme per-surface (Bone gets light-warm equivalents; Graphite
+ * keeps the frozen Studio values where the math shows they already read
+ * correctly on its cool-dark floor). Still intentionally frozen at Studio
+ * values: studio-floor decoratives, fixture SVG identity, the multi-hue brand
+ * colors (coral/burgundy/yellow/sky) and the physical `--color-cct-*` light
+ * temperatures (physics-accurate by design).
  */
 
 :root[data-theme="graphite"] {
@@ -75,6 +79,17 @@
   --color-danger-border-strong: rgba(229, 115, 110, 0.7);
   --color-warning-500: #e0b463;
   --color-info-500: #7fc0e8;
+
+  /* S14 — per-surface decoratives. Glass / stage-grid / minigraph stay at the
+     frozen Studio values BY THE MATH, not by omission: the warm-dark glass
+     rgba(8,10,8,.78) composites over the #07090b graphite floor to #080a09 —
+     ≤2/255 per channel from a pure-cool equivalent; chip text 17.61:1, border
+     1.17:1 (= Studio). The cream grid reads 3.31/1.91/1.23 vs the cool floor
+     (Studio: 3.32/1.91/1.23); minigraph worst CCT bar 8.38:1 (Studio 8.37).
+     Only the shell backdrop re-hues to the cool family. */
+  --color-shell-backdrop-glow: rgba(111, 214, 206, 0.1);
+  --color-shell-backdrop-top: #040608;
+  --color-shell-backdrop-bottom: #070a0d;
 }
 
 :root[data-theme="bone"] {
@@ -109,23 +124,71 @@
   --color-brand-text-muted: #6e6a5a;
   --color-brand-text-faint: #7d7a6c;
 
-  /* primary / brand accent — green darkened to clear AA on the light body */
-  --color-primary-500: #3f6b41;
+  /* primary / brand accent — green darkened to clear AA on the light body.
+     S14 re-derivation: the Slice 3 values carried StatusBadge TEXT over the
+     12–16% self-washes at only 3.7–4.4:1 (the 8e2-logged gap); darkened to
+     clear 4.5:1 over the worst real wash while staying recognizably green.
+     brand-green-hot ≡ 500 on light (the old #487a49 read 4.36:1 on the new
+     light glass). */
+  --color-primary-500: #36603a;
   --color-primary-400: #4e844f;
   --color-primary-700: #2d4f2f;
-  --color-brand-green-hot: #487a49;
-  --color-brand-green-soft: rgba(63, 107, 65, 0.16);
-  --color-brand-green-border: rgba(63, 107, 65, 0.5);
-  --color-brand-green-glow: rgba(63, 107, 65, 0.1);
+  --color-brand-green-hot: #36603a;
+  --color-brand-green-soft: rgba(54, 96, 58, 0.16);
+  --color-brand-green-border: rgba(54, 96, 58, 0.5);
+  --color-brand-green-glow: rgba(54, 96, 58, 0.1);
 
-  /* severity — darkened reds/ambers/blues for AA on light (warning + info
-     auto-corrected by the AA workflow to clear threshold) */
-  --color-danger-500: #b23a30;
-  --color-danger-soft: rgba(178, 58, 48, 0.16);
-  --color-danger-soft-strong: rgba(178, 58, 48, 0.28);
-  --color-danger-glow: rgba(178, 58, 48, 0.06);
-  --color-danger-border: rgba(178, 58, 48, 0.5);
-  --color-danger-border-strong: rgba(178, 58, 48, 0.7);
-  --color-warning-500: #885d10;
-  --color-info-500: #296498;
+  /* severity — S14 re-derivation (was the Slice 3 set tuned to a 3:1 target):
+     badge text over its 12%-on-canvas wash and toast text over 16%-on-soft now
+     clear 4.5:1 (green 4.73 · warning 5.10/4.93 · danger 4.72/4.55 · info
+     5.00); graphics ≥3:1 on every bone surface; hue identity preserved.
+     Logged exception: the transient 28%-wash hover top-stop on danger sits at
+     3.74:1 — pushing past #8e2a22 collapses red→maroon. */
+  --color-danger-500: #9c2f26;
+  --color-danger-soft: rgba(156, 47, 38, 0.16);
+  --color-danger-soft-strong: rgba(156, 47, 38, 0.28);
+  --color-danger-glow: rgba(156, 47, 38, 0.06);
+  --color-danger-border: rgba(156, 47, 38, 0.5);
+  --color-danger-border-strong: rgba(156, 47, 38, 0.7);
+  --color-warning-500: #6f4a0a;
+  --color-info-500: #215586;
+
+  /* S14 — light warm glass. The frozen Studio dark glass composited dark
+     chips onto the light Bone stage and the bone ink text failed AA on them
+     (the 9d-1/9d-2-logged pre-existing gap). rgb(247,244,237) = bg-strong;
+     chip text 13.93:1 over the composited glass, muted 4.68:1, border 1.52:1. */
+  --color-glass-bg: rgba(247, 244, 237, 0.78);
+  --color-glass-bg-strong: rgba(247, 244, 237, 0.85);
+  --color-glass-bg-subtle: rgba(247, 244, 237, 0.65);
+  --color-glass-bg-soft: rgba(247, 244, 237, 0.72);
+  --color-glass-border: rgba(26, 24, 20, 0.2);
+
+  /* S14 — stage grid: warm ink lines for the light floor (the frozen cream
+     was ≈1.0–1.2:1, invisible — the 9c-logged deferral). Alphas solved so
+     each tier matches its Studio ratio over the Studio floor: major 3.28
+     (Studio 3.32), minor 1.92/1.91, faint 1.24/1.23, beam 1.43/1.43, door
+     2.16/2.16. rgb(26,24,20) is the established bone ink. */
+  --color-stage-grid-major: rgba(26, 24, 20, 0.52);
+  --color-stage-grid-minor: rgba(26, 24, 20, 0.31);
+  --color-stage-grid-faint: rgba(26, 24, 20, 0.11);
+  --color-stage-beam-line: rgba(26, 24, 20, 0.18);
+  --color-stage-door-stroke: rgba(26, 24, 20, 0.36);
+
+  /* S14 — minigraph backdrop. The sparkline bars are PHYSICAL CCT pastels
+     (frozen by design, lum .39–.64) — a light backdrop can never carry them
+     (worst 2.2:1), so the chip stays a deliberate dark LED window: solid ink
+     at .85 gives worst-bar 5.07:1 and an 8.69:1 chip edge vs the thumb. */
+  --color-scene-minigraph-bg: rgba(26, 24, 20, 0.85);
+
+  /* S14 — shell/review backdrop: light desk gradient from the bone bg family. */
+  --color-shell-backdrop-glow: rgba(54, 96, 58, 0.1);
+  --color-shell-backdrop-top: #f2eee5;
+  --color-shell-backdrop-bottom: #ded9cc;
+
+  /* S14 — inset hairlines (dark-alpha equivalents of the Studio white-alphas;
+     alphas solved to read equivalently: bg 1.08 vs Studio 1.06, border 1.89
+     vs 1.82, border-soft 1.72 vs 1.69 against the inspector gradient). */
+  --color-inset-hairline-bg: rgba(26, 24, 20, 0.04);
+  --color-inset-hairline-border: rgba(26, 24, 20, 0.3);
+  --color-inset-hairline-border-soft: rgba(26, 24, 20, 0.26);
 }

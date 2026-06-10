@@ -305,20 +305,32 @@ test.describe("studio preview", () => {
   }
 });
 
-// Slice 3 — per-theme foundation. Graphite/Bone become app-wide via the global
-// `data-theme` attribute. This is the baseline INFRA + a representative set
-// (chrome-heavy surfaces at the primary resolution); the full per-theme matrix
-// across every surface/tier is Slice 14. Theming is colour-only, so no-scroll
-// is unaffected and only the at-rest render is captured.
-// NB: audio-populated is intentionally NOT here. Slice 3c re-points the mixer to
-// the global theme (verified: with ?theme=bone the shell gets data-audio-theme=
-// "bone" and --bg resolves to #f3f0e8, and a raw render is correctly light Bone).
-// But `toHaveScreenshot` captures the audio surface dark despite that settled DOM
-// — a harness paint-timing quirk specific to the canvas-heavy mixer, not a 3c bug.
-// The audio per-theme baseline (with the right settle) lands with the full
-// per-theme matrix in Slice 14.
-const PER_THEME_FIXTURES = ["setup-ready", "planning-populated", "lighting-populated"] as const;
+// Slice 3 — per-theme foundation; Slice 14 — the full per-surface set.
+// Graphite/Bone become app-wide via the global `data-theme` attribute. One
+// fixture per surface at the primary resolution: setup (runner), planning,
+// lighting, startup/recovery (protocol-mismatch) and the audio mixer. Theming
+// is colour-only, so no-scroll is unaffected and only the at-rest render is
+// captured. The audio capture needs the explicit theme settle below (the S3-era
+// canvas-dark quirk): the theme attribute lands post-mount, and the screenshot
+// stabilizer could grab the pre-flip frame on the canvas-heavy mixer — so wait
+// until the attribute + the themed background are live before capturing.
+const PER_THEME_FIXTURES = [
+  "setup-ready",
+  "planning-populated",
+  "lighting-populated",
+  "protocol-mismatch",
+  "audio-populated",
+] as const;
 const NON_STUDIO_THEMES = ["graphite", "bone"] as const;
+
+async function settleTheme(page: Page, theme: (typeof NON_STUDIO_THEMES)[number]) {
+  await page.waitForSelector(`html[data-theme="${theme}"]`, { state: "attached" });
+  // Two rAF ticks so the themed custom properties have painted (the audio
+  // meter canvas re-reads its palette from computed styles after the flip).
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  );
+}
 
 test.describe("per-theme foundation", () => {
   test.use({ viewport: { width: 2560, height: 1440 } });
@@ -327,6 +339,7 @@ test.describe("per-theme foundation", () => {
     for (const theme of NON_STUDIO_THEMES) {
       test(`${fixture} @ ${theme}`, async ({ page }) => {
         await gotoFixture(page, fixture, { theme });
+        await settleTheme(page, theme);
         await expect(page).toHaveScreenshot(`${fixture}-${theme}-2560x1440.png`, {
           mask: masksFor(page, fixture),
           maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
