@@ -572,6 +572,11 @@ export function AudioMeterCanvasOverlay({
     let lastPaintedAtMs = performance.now();
     const gradients: GradientCache = new Map();
     const displayStates = new Map<string, MeterDisplayState>();
+    // R2-MOT-01: live MediaQueryList — `.matches` is read per frame so a
+    // preference flip takes effect without restarting the loop. The loop
+    // itself always runs (meters are essential telemetry); only the eased
+    // ballistics snap.
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const requestMeasure = () => {
       needsMeasure = true;
@@ -649,6 +654,7 @@ export function AudioMeterCanvasOverlay({
           nowMs,
           peakHoldEnabled,
           previous: displayStates.get(stateKey),
+          snap: reduceMotion.matches,
           target,
         });
         displayStates.set(stateKey, displayState);

@@ -682,3 +682,28 @@ test("frames the populated rig via the stage-plot Frame mode (DENSITY-04)", asyn
   await expect(frame).toHaveAttribute("aria-pressed", "true");
   await expect(inner).not.toHaveAttribute("transform", IDENTITY);
 });
+
+// R2-B (round-2 audit, R2-MOT-03): the chip-hover marker pulse is decorative
+// (a passive hover echo) — under prefers-reduced-motion the static ring alone
+// must carry the chip ↔ marker pairing, with no SVG <animate> running. The
+// identify burst stays animated by documented design (user-initiated gesture).
+test("chip-hover marker pulse is gated by prefers-reduced-motion", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  const stage = page.getByTestId("lighting-stage");
+  const chip = page
+    .getByRole("list", { name: /selected fixture/ })
+    .getByRole("listitem")
+    .first();
+  await expect(chip).toBeVisible();
+
+  // Default motion: hovering the chip pulses the marker ring via <animate>.
+  await chip.hover();
+  await expect(stage.locator("animate").first()).toBeAttached();
+
+  // Reduced motion: the ring renders static — zero <animate> elements.
+  await page.mouse.move(0, 0);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await chip.hover();
+  await expect(stage.locator("circle[stroke-width='1.6']").first()).toBeAttached();
+  await expect(stage.locator("animate")).toHaveCount(0);
+});

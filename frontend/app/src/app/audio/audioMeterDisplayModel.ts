@@ -152,12 +152,19 @@ export function updateMeterDisplayState({
   nowMs,
   peakHoldEnabled,
   previous,
+  snap = false,
   target,
 }: {
   deltaSeconds: number;
   nowMs: number;
   peakHoldEnabled: boolean;
   previous: MeterDisplayState | undefined;
+  /** R2-MOT-01: under prefers-reduced-motion the meters must keep showing
+   *  live telemetry, but the eased envelope-follower approach is decorative
+   *  motion layered on the data — `snap` bypasses it so the body tracks the
+   *  raw value frame-to-frame. Peak-hold semantics (hold window + fall rate)
+   *  are data, not decoration, and stay as-is. */
+  snap?: boolean;
   target: MeterDisplayTarget;
 }): MeterDisplayState {
   if (!previous) {
@@ -170,8 +177,12 @@ export function updateMeterDisplayState({
     };
   }
 
-  const nextBodyLeftDbfs = approachDbfs(previous.bodyLeftDbfs, target.bodyLeftDbfs, deltaSeconds);
-  const nextBodyRightDbfs = approachDbfs(previous.bodyRightDbfs, target.bodyRightDbfs, deltaSeconds);
+  const nextBodyLeftDbfs = snap
+    ? target.bodyLeftDbfs
+    : approachDbfs(previous.bodyLeftDbfs, target.bodyLeftDbfs, deltaSeconds);
+  const nextBodyRightDbfs = snap
+    ? target.bodyRightDbfs
+    : approachDbfs(previous.bodyRightDbfs, target.bodyRightDbfs, deltaSeconds);
 
   if (!peakHoldEnabled) {
     return {
