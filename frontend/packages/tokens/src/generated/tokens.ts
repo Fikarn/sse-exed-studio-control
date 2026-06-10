@@ -64,6 +64,7 @@ export const tokenValues = {
   "ColorBrandTextMuted": "#8A8470",
   "ColorBrandTextFaint": "#5A5547",
   "ColorScrim": "rgba(0, 0, 0, 0.45)",
+  "ColorFocusRing": "#B6D8AD",
   "ColorShellBackdropGlow": "rgba(153, 186, 146, 0.1)",
   "ColorShellBackdropTop": "#050705",
   "ColorShellBackdropBottom": "#070a08",

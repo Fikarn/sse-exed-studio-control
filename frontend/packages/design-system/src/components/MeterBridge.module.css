@@ -51,16 +51,32 @@
     right: 2px;
   }
 
+  /* DES-07: the gradient tails were raw Tailwind rgba() literals that diverged
+     from the muted semantic accent colors at the gradient head and did not theme.
+     Tokenized onto the same semantic tokens via color-mix so each fill is a single
+     hue ramp and themes across Studio/Graphite/Bone. */
   .signal .fill {
-    background: linear-gradient(180deg, var(--color-accent-green), rgba(34, 197, 94, 0.52));
+    background: linear-gradient(
+      180deg,
+      var(--color-accent-green),
+      color-mix(in srgb, var(--color-primary-500) 52%, transparent)
+    );
   }
 
   .hot .fill {
-    background: linear-gradient(180deg, var(--color-accent-amber), rgba(245, 158, 11, 0.52));
+    background: linear-gradient(
+      180deg,
+      var(--color-accent-amber),
+      color-mix(in srgb, var(--color-warning-500) 52%, transparent)
+    );
   }
 
   .clip .fill {
-    background: linear-gradient(180deg, var(--color-accent-red), rgba(239, 68, 68, 0.52));
+    background: linear-gradient(
+      180deg,
+      var(--color-accent-red),
+      color-mix(in srgb, var(--color-danger-500) 52%, transparent)
+    );
   }
 
   .label {

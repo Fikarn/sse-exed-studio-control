@@ -46,9 +46,12 @@
     border-style: dashed;
   }
 
+  /* DES-07: tokenized off the raw Tailwind amber rgba() literals onto the shared
+     semantic warning token (matching .degraded .icon below) so the degraded wash
+     and border theme across Studio/Graphite/Bone. */
   .degraded {
-    background: rgba(245, 158, 11, 0.08);
-    border-color: rgba(245, 158, 11, 0.3);
+    background: color-mix(in srgb, var(--color-warning-500) 8%, transparent);
+    border-color: color-mix(in srgb, var(--color-warning-500) 30%, transparent);
   }
 
   .degraded .icon {
