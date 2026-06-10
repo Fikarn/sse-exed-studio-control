@@ -35,24 +35,24 @@
 
 Legend: `☐` not started · `◐` in progress · `☑` done · `⤳` rescoped (see log).
 
-| Slice | Title                                                  | Phase         | Status                                                                    | PR             |
-| ----: | :----------------------------------------------------- | :------------ | :------------------------------------------------------------------------ | :------------- |
-|     0 | Finalize in-flight Audio fixes                         | A Foundation  | ☑ done — #125                                                             | #125           |
-|     1 | Token foundation (define)                              | A Foundation  | ☑ done — #126                                                             | #126           |
-|     2 | Overlay plumbing (z-index / scale / focus)             | A Foundation  | ☑ done — #128                                                             | #128           |
-|     3 | Global `[data-theme]` foundation                       | B Theming     | ☑ done — 3a#129 3b#130 3c#131                                             | #129/#130/#131 |
-|     4 | Shell frame for Setup / Startup / Recovery             | C Chrome      | ☑ done — #132                                                             | #132           |
-|     5 | One shared footer / health-bar primitive               | C Chrome      | ☑ done — #133                                                             | #133           |
-|     6 | Unified feedback + amber tone + copy cleanup           | C Chrome      | ☑ done — 6a#135 6b#136 6c#137                                             | #135/#136/#137 |
-|     7 | Tabular-nums + focus rings + severity (adopt)          | D Disciplines | ☑ done — #138                                                             | #138           |
-|     8 | One control contract                                   | D Disciplines | ◐ 8a #139 · 8b #140 · 8c #141 · 8d #142 · 8e1 #143 · 8e2 #144 (closes S8) | #139           |
-|     9 | Lighting deep polish                                   | E Surfaces    | ☑ done — 9a #145 · 9b #146 · 9c #147 · 9d-1 #148 · 9d-2 #149 · 9e #150    | #145–#150      |
-|    10 | Planning deep polish                                   | E Surfaces    | ☑ done — 10a #151 · 10b #152 · 10c #153 · 10d-1 #154 · 10d-2 #155         | #151–#155      |
-|    11 | Setup deep polish                                      | E Surfaces    | ☑ done — #156                                                             | #156           |
-|    12 | Startup / Recovery deep polish                         | E Surfaces    | ☑ done — #157 (12a + 12b)                                                 | #157           |
-|    13 | Audio adopts shared scale/motion → literal 100         | F Closure     | ☑ done — #158                                                             | #158           |
-|    14 | Per-surface Graphite/Bone tuning + per-theme baselines | F Closure     | ☑ done — #159                                                             | #159           |
-|    15 | Round-2 runtime audit                                  | G Round 2     | ☑ done — #160 (audit delivered; fix slices R2-A..D spawned)               | #160           |
+| Slice | Title                                                  | Phase         | Status                                                                 | PR             |
+| ----: | :----------------------------------------------------- | :------------ | :--------------------------------------------------------------------- | :------------- |
+|     0 | Finalize in-flight Audio fixes                         | A Foundation  | ☑ done — #125                                                          | #125           |
+|     1 | Token foundation (define)                              | A Foundation  | ☑ done — #126                                                          | #126           |
+|     2 | Overlay plumbing (z-index / scale / focus)             | A Foundation  | ☑ done — #128                                                          | #128           |
+|     3 | Global `[data-theme]` foundation                       | B Theming     | ☑ done — 3a#129 3b#130 3c#131                                          | #129/#130/#131 |
+|     4 | Shell frame for Setup / Startup / Recovery             | C Chrome      | ☑ done — #132                                                          | #132           |
+|     5 | One shared footer / health-bar primitive               | C Chrome      | ☑ done — #133                                                          | #133           |
+|     6 | Unified feedback + amber tone + copy cleanup           | C Chrome      | ☑ done — 6a#135 6b#136 6c#137                                          | #135/#136/#137 |
+|     7 | Tabular-nums + focus rings + severity (adopt)          | D Disciplines | ☑ done — #138                                                          | #138           |
+|     8 | One control contract                                   | D Disciplines | ☑ done — 8a #139 · 8b #140 · 8c #141 · 8d #142 · 8e1 #143 · 8e2 #144   | #139–#144      |
+|     9 | Lighting deep polish                                   | E Surfaces    | ☑ done — 9a #145 · 9b #146 · 9c #147 · 9d-1 #148 · 9d-2 #149 · 9e #150 | #145–#150      |
+|    10 | Planning deep polish                                   | E Surfaces    | ☑ done — 10a #151 · 10b #152 · 10c #153 · 10d-1 #154 · 10d-2 #155      | #151–#155      |
+|    11 | Setup deep polish                                      | E Surfaces    | ☑ done — #156                                                          | #156           |
+|    12 | Startup / Recovery deep polish                         | E Surfaces    | ☑ done — #157 (12a + 12b)                                              | #157           |
+|    13 | Audio adopts shared scale/motion → literal 100         | F Closure     | ☑ done — #158                                                          | #158           |
+|    14 | Per-surface Graphite/Bone tuning + per-theme baselines | F Closure     | ☑ done — #159                                                          | #159           |
+|    15 | Round-2 runtime audit                                  | G Round 2     | ☑ done — #160 (audit delivered; fix slices R2-A..D spawned)            | #160           |
 
 **Execution order / dependencies:** `0 → 1 → 2 → 3 → {4,5,6} → {7,8} → {9,10,11,12} → 13 → 14 → 15`. Hard deps: **S1 unblocks everything**; S2 needs S1's `--z-*`/scale tokens; S3 needs S1; S4–S8 need S1 (+S3 for theming); S9–S12 adopt S1/S3/S7/S8; S13 needs S1/S3/S5; S14 needs S3 + all surface slices. **Fast coherence win = S1 + S3 + S6.**
 
