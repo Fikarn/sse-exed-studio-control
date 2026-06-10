@@ -158,6 +158,10 @@ export function AudioStableMeterDbPair({
   }, [kind, meterId, store]);
 
   useEffect(() => {
+    // R2-MOT-01: same snap contract as the canvas overlay — the readout keeps
+    // publishing live values, only the eased approach is bypassed.
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
     const resetReadoutState = () => {
       displayStateRef.current = undefined;
       quantizedRef.current = emptyReadoutPair();
@@ -178,6 +182,7 @@ export function AudioStableMeterDbPair({
         nowMs,
         peakHoldEnabled,
         previous: displayStateRef.current,
+        snap: reduceMotion.matches,
         target,
       });
       displayStateRef.current = displayState;

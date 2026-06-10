@@ -42,11 +42,11 @@ edge context menu: fits viewport; items = Reset to unity / Flip polarity / Renam
 
 **Proposal.** Keep the loop; under `matchMedia("(prefers-reduced-motion: reduce)")` skip the ballistics smoothing (snap to the target value). The CSS kill-switch (`global.css:94-103`, DS `overrides.css:1-10`) is verified present but cannot reach this loop.
 
-### R2-MOT-02 — DMX compact strip interpolation ignores `prefers-reduced-motion` · medium · a11y
+### R2-MOT-02 — DMX compact strip interpolation ignores `prefers-reduced-motion` · ~~medium~~ **REFUTED** (R2-B premise check, 2026-06-10)
 
-**Evidence.** `DMXCompactStrip.tsx:177/223` — same class as R2-MOT-01: unconditional rAF; live channel telemetry is essential, the inter-frame color interpolation is decorative.
+**Original claim.** `DMXCompactStrip.tsx:177/223` — unconditional rAF; "the inter-frame color interpolation is decorative."
 
-**Proposal.** Same recipe: keep the loop, snap the interpolation under reduced-motion.
+**Refutation.** Implementation-time inspection of the paint loop found **no interpolation at all**: each frame paints the current cell values directly (`cell.value / 255` → fill alpha, CCT → hue) with no easing, smoothing, or inter-frame blending. The only motion an operator sees is the data itself changing — essential telemetry, exactly the category reduced-motion must NOT freeze. There is nothing decorative to snap; adding a flag would be a no-op. No change shipped.
 
 ### R2-MOT-03 — Fixture-marker chip-hover pulse ignores `prefers-reduced-motion` · low · a11y
 
@@ -54,7 +54,7 @@ edge context menu: fits viewport; items = Reset to unity / Flip polarity / Renam
 
 **Proposal.** Render the static ring without the `<animate>` children when reduced-motion is set.
 
-**Reduced-motion inventory verdict (for the record):** 6 CSS-driven animations correctly covered by the kill-switch; 4 loops OK-essential (stage-plot pan/zoom already gates at `useStagePlotViewport.ts:367` — the 9e work did this right; playhead/session/toast timers are not motion); the 3 violations above are the complete set.
+**Reduced-motion inventory verdict (for the record):** 6 CSS-driven animations correctly covered by the kill-switch; 4 loops OK-essential (stage-plot pan/zoom already gates at `useStagePlotViewport.ts:367` — the 9e work did this right; playhead/session/toast timers are not motion); **2 violations confirmed** (R2-MOT-01 fixed in R2-B with a `snap` flag on `updateMeterDisplayState`, wired in both the canvas overlay and the numeric readout; R2-MOT-03 fixed by gating the `<animate>` children) and **1 refuted** (R2-MOT-02 — see above).
 
 ### R2-FIX-01 — Eleven empty/degraded fixtures exist and are functionally tested, but none is visually baselined · medium · coverage
 
