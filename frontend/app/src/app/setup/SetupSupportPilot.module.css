@@ -166,6 +166,14 @@
     box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
   }
 
+  /* S14 — Bone: the 42% primary border over the active wash computed 1.70:1
+     (sub-perceptible). 80% restores a ~3:1 supplementary keyline (3.35 vs the
+     active wash, 4.27 vs the panel). Bone-only; Studio 2.26 / Graphite 2.46
+     stay as-shipped. */
+  :global([data-theme="bone"]) .stepButton[data-active="true"] {
+    border-color: color-mix(in srgb, var(--color-primary-500) 80%, transparent);
+  }
+
   .stepButton[data-status="error"] {
     border-color: color-mix(in srgb, var(--color-danger-500) 32%, transparent);
   }

@@ -13,9 +13,12 @@
 }
 
 .reviewViewport {
+  /* S14 (THEME-05): the desk-behind-the-shell gradient was raw dark literals
+     that froze on theme switch; the backdrop tokens carry the exact Studio
+     values and re-theme (bone = light desk, graphite = cool-dark). */
   background:
-    radial-gradient(circle at top left, rgba(153, 186, 146, 0.1), transparent 36%),
-    linear-gradient(180deg, #050705 0%, #070a08 100%);
+    radial-gradient(circle at top left, var(--color-shell-backdrop-glow), transparent 36%),
+    linear-gradient(180deg, var(--color-shell-backdrop-top) 0%, var(--color-shell-backdrop-bottom) 100%);
 }
 
 .root {
@@ -85,7 +88,7 @@
   top: 50%;
   left: 50%;
   box-shadow:
-    0 0 0 1px rgba(153, 186, 146, 0.28),
+    0 0 0 1px color-mix(in srgb, var(--color-primary-500) 28%, transparent),
     0 28px 88px rgba(0, 0, 0, 0.48);
   transform: translate(-50%, -50%) scale(var(--operator-review-scale, 1));
   transform-origin: center center;
@@ -183,7 +186,7 @@
   background: color-mix(in srgb, var(--color-bg-raised) 96%, var(--color-brand-green-soft));
   box-shadow:
     var(--shadow-md),
-    0 0 18px rgba(153, 186, 146, 0.18);
+    0 0 18px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
   color: var(--color-brand-text-primary);
   font-family: var(--font-family-mono);
   font-size: 11px;

@@ -51,6 +51,12 @@
   --color-brand-text-muted: #8A8470;
   --color-brand-text-faint: #5A5547;
   --color-scrim: rgba(0, 0, 0, 0.45);
+  --color-shell-backdrop-glow: rgba(153, 186, 146, 0.1);
+  --color-shell-backdrop-top: #050705;
+  --color-shell-backdrop-bottom: #070a08;
+  --color-inset-hairline-bg: rgba(255, 255, 255, 0.03);
+  --color-inset-hairline-border: rgba(255, 255, 255, 0.2);
+  --color-inset-hairline-border-soft: rgba(255, 255, 255, 0.18);
   --color-bg-deep: #08090A;
   --color-bg-canvas: #0D0F0D;
   --color-bg-default: #121412;

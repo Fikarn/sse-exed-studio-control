@@ -440,7 +440,10 @@
   bottom: 5px;
   height: 3px;
   border-radius: var(--radius-pill);
-  background: rgba(139, 176, 205, 0.18);
+  /* S14: the last 9d de-blue straggler (a raw literal, so the token sweep
+     missed it) -> the 9d-1 neutral-elevated family; amber fill vs track
+     6.9-7.4:1 on all three themes. */
+  background: var(--color-bg-elevated);
   overflow: hidden;
   pointer-events: none;
 }
