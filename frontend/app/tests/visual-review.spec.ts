@@ -349,6 +349,30 @@ test.describe("per-theme foundation", () => {
   }
 });
 
+// R2-C (round-2 audit, R2-FIX-01): the designed empty/degraded states were
+// functionally tested but never visually locked — the Planning hero
+// EmptyState, the lighting "No fixtures on the rig yet" canvas state, the
+// setup degraded banner posture and the audio assumed-state warning band
+// could all silently regress. One state-locking capture each at the primary
+// resolution (these states carry no layout-ladder risk — the populated
+// fixtures own the 6-viewport ladder).
+const STATE_FIXTURES = ["planning-empty", "lighting-empty", "setup-degraded", "audio-state-assumed"] as const;
+
+test.describe("state coverage", () => {
+  test.use({ viewport: { width: 2560, height: 1440 } });
+
+  for (const fixture of STATE_FIXTURES) {
+    test(`${fixture} @ 2560x1440`, async ({ page }) => {
+      await gotoFixture(page, fixture);
+      await assertViewportFit(page, { width: 2560, height: 1440, label: "2560x1440" }, fixture);
+      await expect(page).toHaveScreenshot(`${fixture}-2560x1440.png`, {
+        mask: masksFor(page, fixture),
+        maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
+      });
+    });
+  }
+});
+
 test.describe("dpr-independent lighting layout", () => {
   for (const deviceScaleFactor of [1, 2] as const) {
     test(`devicePixelRatio ${deviceScaleFactor}`, async ({ browser }) => {
