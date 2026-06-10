@@ -227,6 +227,7 @@
   --color-success-soft: var(--color-brand-green-soft);
   --color-status-warning: var(--color-warning-500);
   --color-brand-green: var(--color-primary-500);
+  --color-focus-ring: var(--color-primary-400);
   --color-studio-500: var(--color-border-strong);
   --color-studio-600: var(--color-border-default);
   --color-plot-marquee-fill: var(--color-brand-green-soft);

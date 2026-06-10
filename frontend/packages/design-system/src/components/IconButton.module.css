@@ -28,9 +28,12 @@
     opacity: 0.52;
   }
 
+  /* DES-07: tokenized off the raw rgba() literals (sage green = primary-500,
+     Tailwind red = danger-500) onto the shared semantic tokens via color-mix so
+     these states match their accent text and theme across Studio/Graphite/Bone. */
   .button[aria-pressed="true"] {
-    background: rgba(153, 186, 146, 0.14);
-    border-color: rgba(153, 186, 146, 0.42);
+    background: color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
     color: var(--color-accent-green);
   }
 
@@ -45,13 +48,13 @@
   }
 
   .primary {
-    background: rgba(153, 186, 146, 0.16);
-    border-color: rgba(153, 186, 146, 0.42);
+    background: color-mix(in srgb, var(--color-primary-500) 16%, transparent);
+    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
   }
 
   .danger {
-    background: rgba(239, 68, 68, 0.12);
-    border-color: rgba(239, 68, 68, 0.32);
+    background: color-mix(in srgb, var(--color-danger-500) 12%, transparent);
+    border-color: color-mix(in srgb, var(--color-danger-500) 32%, transparent);
   }
 
   .ghost {

@@ -91,6 +91,7 @@
       }
     },
     "scrim": { "$value": "rgba(0, 0, 0, 0.45)" },
+    "focusRing": { "$value": "{color.primary.400}" },
     "shell": {
       "backdropGlow": { "$value": "rgba(153, 186, 146, 0.1)" },
       "backdropTop": { "$value": "#050705" },
