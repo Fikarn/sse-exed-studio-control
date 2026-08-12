@@ -74,7 +74,7 @@ The current intended shape is:
 - single trusted workstation
 - no cloud dependency
 - fixed hardware profile
-- desktop application first, browser support second
+- desktop application only; no browser-served path remains (retired in `v2.1.0`)
 
 Out of scope unless explicitly re-scoped:
 

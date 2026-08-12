@@ -2,10 +2,9 @@
  * AudioStripPreamp — slim 32px arc-knob renderer used inside the channel
  * strip's preamp slot. Mirrors the Console.html prototype rhythm
  * (mini knob | "44 dB · Mic Gain" stacked label) instead of the bitmap
- * panel + LED ring that AudioPreampControl renders for the inspector.
- *
- * The bigger AudioPreampControl is still used in the inspector Preamp pane
- * where its panel material is appropriate.
+ * panel + LED ring that AudioPreampControl rendered for the pre-Console
+ * inspector. AudioPreampControl itself has no live mount since the
+ * 2026-05-27 Console rebuild (hero preamp is AudioKnob-based).
  */
 import {
   useRef,

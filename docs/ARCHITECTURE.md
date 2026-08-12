@@ -74,10 +74,10 @@ Any native studio domain should follow the same shape:
 
 ## Current Module Ownership
 
-- `native/rust-engine/src/planning.rs`: planning storage, snapshots, and mutations
+- `native/rust-engine/src/planning/`: planning storage, snapshots, and mutations
 - `native/rust-engine/src/commissioning.rs`: commissioning state and probe flows
 - `native/rust-engine/src/lighting/`: lighting snapshot, recall, fixture catalog, DMX mapping/validation, scene serialization, and simulated backend boundary
-- `native/rust-engine/src/audio.rs`: audio snapshot, sync, recall, and simulated backend boundary
+- `native/rust-engine/src/audio/`: audio snapshot, sync, recall, and simulated backend boundary
 - `native/rust-engine/src/support.rs`: backup, restore, and diagnostics support flows
 - `native/rust-engine/src/control_surface.rs`: Stream Deck bridge and Companion export generation
 - `frontend/app/src/app/OperatorShell.tsx`: Tauri operator shell surface derived from engine state
