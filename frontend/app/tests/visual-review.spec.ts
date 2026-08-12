@@ -38,8 +38,11 @@ const SIZES: readonly Viewport[] = [
 const STUDIO_PREVIEW_FIXTURES = ["setup-ready", "lighting-populated", "audio-populated", "planning-populated"] as const;
 const STUDIO_PREVIEW_HOST: Viewport = { width: 1512, height: 982, label: "1512x982" };
 
-// Planning fixtures render relative time labels ("in 5 minutes", "ended 1h
-// ago"). Freezing the clock keeps those labels stable across runs.
+// Planning AND lighting fixtures render relative time labels ("in 5 minutes",
+// "last 19h ago" on scene cards). Freezing the clock for every fixture keeps
+// those labels stable across runs — a planning-only guard let the lighting
+// scene-card label drift with wall-clock time until baselines rotted past the
+// diff budget (first hit: lighting-populated bone 2560x1440, 2026-08-12).
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 
 // Live, JS-driven surfaces that drift between captures (meter tracks redraw
@@ -90,9 +93,7 @@ async function gotoFixture(
   fixture: string,
   options: { operatorReview?: "studio"; theme?: "graphite" | "bone" } = {}
 ) {
-  if (fixture.startsWith("planning-")) {
-    await page.clock.setFixedTime(FIXTURE_NOW);
-  }
+  await page.clock.setFixedTime(FIXTURE_NOW);
   const params = new URLSearchParams({ fixture, transport: "fixture" });
   if (options.operatorReview) {
     params.set("operatorReview", options.operatorReview);
