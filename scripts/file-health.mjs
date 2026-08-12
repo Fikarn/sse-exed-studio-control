@@ -19,10 +19,6 @@ const oversizedSourceAllowlist = new Map(
       "lighting integration tests deliberately cover engine-owned fixture, scene, preview, and DMX behavior together",
     ],
     [
-      "frontend/app/tests/operator-shell.spec.ts",
-      "operator shell integration coverage still spans shared workspace flows; split audio-specific cases into a dedicated spec on the next Playwright expansion",
-    ],
-    [
       "frontend/app/src/app/lighting/LightingWorkspace.tsx",
       "lighting orchestrator remains the selected workspace assembly point; keep extracting components as features touch it",
     ],

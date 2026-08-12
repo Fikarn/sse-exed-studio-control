@@ -77,7 +77,7 @@ Run the fast local gate while working:
 npm run dev:check
 ```
 
-`dev:check` is the normal all-around local code-health gate. It runs Prettier check, ESLint, repository script tests, the tracked-file health guard, Rust format check, clippy, protocol artifact check, frontend typecheck, native check, and native tests.
+`dev:check` is the normal all-around local code-health gate. It runs Prettier check, ESLint, repository script tests, the tracked-file health guard, Rust format check, clippy, protocol artifact check, frontend typecheck, frontend tests (Vitest), native check, and native tests.
 
 Launch the selected app for visual review:
 
