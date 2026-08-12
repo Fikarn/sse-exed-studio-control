@@ -1,4 +1,6 @@
-# Audio "Console" Surface — UI/UX Improvement Proposal
+# Audio "Console" Surface — UI/UX Improvement Proposal (archived 2026-08-12)
+
+> Discharged audit, archived 2026-08-12 during the repo-hygiene pass. Every finding is closed in this file's own status tables; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 _Polish + targeted-restructure pass on the freshly-merged Console redesign (PR #111/#112). Audit-only — no files were edited. All proposals are front-end-only, token-disciplined, hold across Studio/Graphite/Bone, and respect the no-scroll fixed-height posture at 2560×1440 (primary) and 1920×1080 (fallback)._
 

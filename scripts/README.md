@@ -7,10 +7,17 @@ root `package.json` (see `scripts:test`, `release:preflight`,
 
 ## Test coverage tiering (plan PR 10 / workstream G1)
 
-The remediation-plan audit categorised 43 scripts by risk. Tests live
-as `*.test.mjs` siblings of the script under test; the
-`scripts:test` lane (now glob-driven via `scripts/**/*.test.mjs`)
-picks them up automatically.
+The remediation-plan audit categorised the scripts by risk (43 at the
+time; 46 non-test scripts as of 2026-08-12). Tests live as
+`*.test.mjs` siblings of the script under test; the `scripts:test`
+lane (now glob-driven via `scripts/**/*.test.mjs`) picks them up
+automatically.
+
+The `_accepted gap_` rows below were audited 2026-08-12: each is
+either exercised end-to-end by a CI lane or requires signing
+identities/hardware a unit test cannot carry. They stay listed so the
+gap remains visible, but no follow-up test is planned unless their
+risk profile changes.
 
 ### Tier 1 — release-critical
 
@@ -22,22 +29,22 @@ here ships broken artifacts or breaks rollback.
 | `native-installer.mjs`                 | `native-installer.test.mjs` (PR 10)               |
 | `native-update-repo.mjs`               | `native-update-repo.test.mjs` (PR 10)             |
 | `write-native-release-checksums.mjs`   | `write-native-release-checksums.test.mjs` (PR 10) |
-| `verify-native-release-artifacts.mjs`  | _follow-up_                                       |
-| `verify-native-release-continuity.mjs` | _follow-up_                                       |
+| `verify-native-release-artifacts.mjs`  | _accepted gap_ (release:verify exercises it)      |
+| `verify-native-release-continuity.mjs` | _accepted gap_ (release:verify exercises it)      |
 | `release/publish-release.mjs`          | `release/publish-release.test.mjs` (PR 10)        |
-| `native-sign-macos.mjs`                | _follow-up_ (requires keychain identities)        |
-| `native-sign-windows.mjs`              | _follow-up_ (requires signtool + cert)            |
+| `native-sign-macos.mjs`                | _accepted gap_ (requires keychain identities)     |
+| `native-sign-windows.mjs`              | _accepted gap_ (requires signtool + cert)         |
 
 ### Tier 2 — build / acceptance
 
 These run during foundation and visual-review lanes.
 
-| Script                                     | Test                                                |
-| ------------------------------------------ | --------------------------------------------------- |
-| `native-acceptance.mjs`                    | _follow-up_ (covered end-to-end by CI's `rust` job) |
-| `native-runtime-harness.mjs`               | _follow-up_                                         |
-| `protocol/generate-protocol-artifacts.mjs` | _follow-up_ (covered by `protocol:check`)           |
-| `tauri-visual-review.mjs`                  | `tauri-visual-review.test.mjs` (PR 10)              |
+| Script                                     | Test                                                   |
+| ------------------------------------------ | ------------------------------------------------------ |
+| `native-acceptance.mjs`                    | _accepted gap_ (covered end-to-end by CI's `rust` job) |
+| `native-runtime-harness.mjs`               | _accepted gap_ (exercised by acceptance lanes)         |
+| `protocol/generate-protocol-artifacts.mjs` | _accepted gap_ (covered by `protocol:check`)           |
+| `tauri-visual-review.mjs`                  | `tauri-visual-review.test.mjs` (PR 10)                 |
 
 ### Tier 3 — utility
 

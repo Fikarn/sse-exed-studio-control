@@ -1,4 +1,6 @@
-# Audio Page UI — Performance & Architecture Review
+# Audio Page UI — Performance & Architecture Review (archived 2026-08-12)
+
+> Historical session plan from the retired `docs/superpowers/plans/` directory, archived 2026-08-12. Current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 > **Status:** Investigation + independent audit pass complete. No code touched. Per user confirmation:
 >

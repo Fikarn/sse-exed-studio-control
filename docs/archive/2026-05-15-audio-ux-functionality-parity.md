@@ -1,4 +1,6 @@
-# Audio UX Functionality Parity Implementation Plan
+# Audio UX Functionality Parity Implementation Plan (archived 2026-08-12)
+
+> Historical session plan from the retired `docs/superpowers/plans/` directory, archived 2026-08-12. Current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` or `superpowers:subagent-driven-development`. Keep the visible progress tracker updated after every goal. Do not start a goal until the prior goal's acceptance checks pass.
 

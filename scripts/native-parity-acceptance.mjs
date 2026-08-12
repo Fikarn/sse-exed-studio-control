@@ -1,5 +1,12 @@
 import { assert } from "./native-runtime-harness.mjs";
 
+// "Parity" here means dev-engine vs packaged-engine parity: this module holds
+// the shared contract assertions that `native-acceptance.mjs` (dev-built
+// engine) and `native-packaged-acceptance.mjs` (packaged engine) both run, so
+// the two runtime forms cannot drift apart. It is unrelated to the retired
+// Electron parity oracle (removed in v2.1.0) — audited and deliberately kept
+// under this name, 2026-08-12.
+
 export async function assertCoreParityContracts(harness, requestIdPrefix, runtimeLabel) {
   const planningTimeReport = await harness.request(`${requestIdPrefix}-planning-time-report`, "planning.report.time");
   assert(

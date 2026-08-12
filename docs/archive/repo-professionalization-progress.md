@@ -1,4 +1,6 @@
-# Repository Professionalization Progress
+# Repository Professionalization Progress (archived 2026-08-12)
+
+> Stale session tracker, archived 2026-08-12. Predates the current single-`main` workflow; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 Status values: `todo`, `in_progress`, `verified`, `blocked:<exact reason>`.
 

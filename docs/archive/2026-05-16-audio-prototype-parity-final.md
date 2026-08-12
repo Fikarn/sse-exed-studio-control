@@ -1,4 +1,6 @@
-# Audio Prototype Parity Final Implementation Plan
+# Audio Prototype Parity Final Implementation Plan (archived 2026-08-12)
+
+> Historical session plan from the retired `docs/superpowers/plans/` directory, archived 2026-08-12. Current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 > For agentic workers: REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` before implementation. Track progress in `docs/audio-prototype-parity-progress.md` after every task.
 

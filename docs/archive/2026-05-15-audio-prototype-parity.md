@@ -1,4 +1,6 @@
-# Audio Prototype Parity Closure Plan
+# Audio Prototype Parity Closure Plan (archived 2026-08-12)
+
+> Historical session plan from the retired `docs/superpowers/plans/` directory, archived 2026-08-12. Current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` when explicitly authorized, otherwise use `superpowers:executing-plans`. Keep the progress tracker updated after every goal. Do not skip acceptance checks.
 

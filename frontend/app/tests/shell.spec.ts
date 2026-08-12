@@ -52,7 +52,7 @@ test("supports shell keyboard overlays and workspace switching", async ({ page }
 // walk focus out to the page behind it, Escape must close it from wherever
 // focus sits, and focus must return to the invoker on close. The pre-fix
 // palette failed all three (probe transcript in
-// program-ux-audit-round-2-2026-06-10.md).
+// docs/archive/program-ux-audit-round-2-2026-06-10.md).
 test("command palette traps focus, closes on Escape from anywhere, and restores focus", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 

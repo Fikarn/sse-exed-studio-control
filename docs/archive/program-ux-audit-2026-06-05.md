@@ -1,4 +1,6 @@
-# SSE ExEd Studio Control — Program-Wide UI/UX & Coherence Audit
+# SSE ExEd Studio Control — Program-Wide UI/UX & Coherence Audit (archived 2026-08-12)
+
+> Discharged audit, archived 2026-08-12 during the repo-hygiene pass. Every finding is closed in this file's own status tables; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 _End-to-end, user-perspective scrutiny of the whole operator console, benchmarked to the freshly-polished **Audio Console**. Audit-only — **no application code was changed**. Every proposal is presentation-only, token-disciplined, holds across Studio / Graphite / Bone, and respects the no-scroll fixed-height posture at 2560×1440 (primary) and 1920×1080 (fallback). Proposals that would need new engine/protocol/OSC data are flagged and given a front-end-only partial instead._
 

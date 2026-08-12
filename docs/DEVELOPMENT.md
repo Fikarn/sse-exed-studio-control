@@ -106,7 +106,7 @@ npm run tauri:package:mac:ifw-local
 npm run tauri:package:win:ifw-staged
 npm run tauri:package:win:ifw-local
 npm run tauri:package:win:evidence
-npm run native:release:win:evidence -- --issue-url https://github.com/Fikarn/sse-exed-studio-control/issues/6
+npm run native:release:win:evidence -- --issue-url <active-evidence-issue-url>
 ```
 
 `npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot, persisted restart, and degraded startup/recovery posture. `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence.

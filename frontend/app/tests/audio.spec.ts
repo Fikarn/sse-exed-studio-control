@@ -353,33 +353,6 @@ test("renders unclipped dBFS scale labels beside every audio meter", async ({ pa
   await expectDbfsScaleLabelsInsideMeters(page, "native 2560 output inspector");
 });
 
-// 2026-05-27 redesign: Overview mini-preview cards replaced by the hero Preamp pane + dedicated EQ/Dyn/Routing tabs.
-test.skip("stacks audio inspector processing previews in Overview", async ({ page }) => {
-  await page.setViewportSize({ width: 2560, height: 1440 });
-  await openFixture(page, "audio-populated");
-
-  await page.getByTestId("audio-strip-audio-input-9").click();
-  await expect(page.getByRole("tab", { name: "Preamp", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expectAudioOverviewProcessingStack(page, "native 2560 selected-channel", 82);
-
-  await page.getByTestId("audio-inspector-eq-mini").click();
-  await expect(page.getByRole("tab", { name: "EQ", exact: true })).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("tab", { name: "Preamp", exact: true })).toHaveAttribute("aria-selected", "true");
-
-  await page.getByTestId("audio-inspector-dynamics-mini").click();
-  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("tab", { name: "Preamp", exact: true })).toHaveAttribute("aria-selected", "true");
-
-  await page.getByTestId("audio-output-audio-mix-main").click();
-  await expect(page.getByTestId("audio-inspector-output")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Output", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tab", { name: "EQ", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Routing", exact: true })).toHaveCount(0);
-});
-
 test("renders live-console meter references instead of loudness readouts", async ({ page }) => {
   await openFixture(page, "audio-populated");
 

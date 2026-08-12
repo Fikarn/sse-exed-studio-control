@@ -1,4 +1,6 @@
-# Audio Console — Claude Design polish implementation spec (2026-06-04)
+# Audio Console — Claude Design polish implementation spec (2026-06-04) (archived 2026-08-12)
+
+> Historical design spec for the merged Audio Console polish (PR #121), archived 2026-08-12. Current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 Implements the polished design in the handoff bundle. The **authoritative source** is the
 prototype's two appended override blocks. Extract them verbatim before implementing:
