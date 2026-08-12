@@ -1,4 +1,6 @@
-# Stage Plot Fixture Identity Implementation Plan
+# Stage Plot Fixture Identity Implementation Plan (archived 2026-08-12)
+
+> Completed plan, archived 2026-08-12 with all slices merged. Kept as the scope + boundary record; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 Status: implemented on `2026-05-03` in branch `codex/stage-plot-fixture-identity-polish`.
 

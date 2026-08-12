@@ -1,4 +1,6 @@
-# Lighting Fixture Catalog Implementation Handoff
+# Lighting Fixture Catalog Implementation Handoff (archived 2026-08-12)
+
+> Completed plan, archived 2026-08-12 with all slices merged. Kept as the scope + boundary record; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 Status: implemented and merged through [PR #73](https://github.com/Fikarn/sse-exed-studio-control/pull/73) on `2026-05-03`. Retain this file as the completed scope record and as the boundary reference for future catalog work.
 

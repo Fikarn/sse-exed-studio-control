@@ -1,4 +1,6 @@
-# SSE ExEd Studio Control — Round-2 Runtime UX Audit (Slice 15)
+# SSE ExEd Studio Control — Round-2 Runtime UX Audit (Slice 15) (archived 2026-08-12)
+
+> Discharged audit, archived 2026-08-12 during the repo-hygiene pass. Every finding is closed in this file's own status tables; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 **Date:** 2026-06-10 · **Branch audited:** `claude/slice-14-per-theme` (Slices 0–14 applied) · **Method:** live Playwright probes against the built app (`?fixture=…&transport=fixture`, 2560×1440) + three targeted code audits (reduced-motion loop inventory, iconography sweep, fixture-coverage matrix). This covers what the 2026-06-05 static audit could not see: interactive states, JS animation loops, overlay stacking, and runtime-only fixtures.
 

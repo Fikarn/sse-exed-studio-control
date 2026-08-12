@@ -1,4 +1,6 @@
-# Responsive Operator Layout Implementation Brief
+# Responsive Operator Layout Implementation Brief (archived 2026-08-12)
+
+> Completed plan, archived 2026-08-12 with all slices merged. Kept as the scope + boundary record; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 Date: 2026-05-03
 

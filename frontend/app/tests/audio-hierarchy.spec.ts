@@ -53,23 +53,6 @@ test("output lane exposes inline Mute; monitor bar owns Dim / Mono / Talkback", 
   }
 });
 
-// 2026-05-27 redesign: per-tier colored identity rails removed; single amber accent (inputs dot / playback hollow dot / outputs accent header).
-test.skip("each mixer tier renders a coloured identity rail", async ({ page }) => {
-  await openFixture(page, "audio-populated");
-  for (const tier of ["hardware-inputs", "software-playback", "hardware-outputs"] as const) {
-    const tierEl = page.locator(`[data-tier="${tier}"]`).first();
-    await expect(tierEl).toBeVisible();
-    const railColor = await tierEl.evaluate((el) => {
-      const before = window.getComputedStyle(el, "::before");
-      return before.backgroundColor;
-    });
-    // The ::before identity rail must paint a visible colour, not be
-    // transparent or unset. Any non-empty / non-transparent rgb value passes.
-    expect(railColor).not.toBe("");
-    expect(railColor).not.toBe("rgba(0, 0, 0, 0)");
-  }
-});
-
 test("1920 fallback keeps the output lane Mute control tappable", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openFixture(page, "audio-1920-fallback");

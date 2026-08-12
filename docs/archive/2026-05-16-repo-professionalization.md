@@ -1,4 +1,6 @@
-# Repository Professionalization Implementation Plan
+# Repository Professionalization Implementation Plan (archived 2026-08-12)
+
+> Historical session plan from the retired `docs/superpowers/plans/` directory, archived 2026-08-12. Current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Update `docs/repo-professionalization-progress.md` after every task status change.
 

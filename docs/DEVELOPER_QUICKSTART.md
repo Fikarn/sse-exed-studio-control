@@ -179,7 +179,7 @@ npm run native:release:mac:local
 Use Windows 11 `x64` for:
 
 ```powershell
-npm run native:release:win:evidence -- --issue-url https://github.com/Fikarn/sse-exed-studio-control/issues/6
+npm run native:release:win:evidence -- --issue-url <active-evidence-issue-url>
 ```
 
 Before release evidence, run:

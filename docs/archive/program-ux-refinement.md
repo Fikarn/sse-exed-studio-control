@@ -1,4 +1,6 @@
-# SSE ExEd Studio Control — Program-Wide UI/UX Refinement Plan
+# SSE ExEd Studio Control — Program-Wide UI/UX Refinement Plan (archived 2026-08-12)
+
+> Completed plan, archived 2026-08-12 with all slices merged. Kept as the scope + boundary record; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 > **Goal:** bring the whole operator console — Lighting, Planning, Setup, Startup/Recovery, the shared chrome, and the design system — up to the polish, coherence, and theme/keyboard/density discipline of the freshly-polished **Audio Console**, so the product feels and behaves like one ultra-premium, gold industry-standard tool end to end.
 >

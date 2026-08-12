@@ -49,25 +49,6 @@ test("health bar drops OSC, Endpoint and Metering rows", async ({ page }) => {
   await expect(topbar).toContainText("Metering");
 });
 
-// 2026-05-27 redesign: the rail mini-meter grid (3 mix targets × 2 sides) is
-// gone. The new AudioMonitorBar exposes a single monitor master meter
-// (`audio-monitor-master-meter`) rather than per-target meters. Skipped
-// until the redesign settles on whether per-target meters move into the
-// mixer itself.
-test.skip("rail mini-meters expose role=meter with aria-valuenow", async ({ page }) => {
-  await openFixture(page, "audio-populated");
-  const rail = page.getByTestId("audio-rail-monitor-card");
-  await expect(rail).toBeVisible();
-  const meters = rail.locator('[role="meter"]');
-  await expect(meters).toHaveCount(6); // 3 mix targets × 2 sides
-  const firstMeter = meters.first();
-  await expect(firstMeter).toHaveAttribute("aria-valuemin", "0");
-  await expect(firstMeter).toHaveAttribute("aria-valuemax", "100");
-  const valuenow = Number(await firstMeter.getAttribute("aria-valuenow"));
-  expect(valuenow).toBeGreaterThanOrEqual(0);
-  expect(valuenow).toBeLessThanOrEqual(100);
-});
-
 test("snapshot diff shows '+N more' when more than two channels changed", async ({ page }) => {
   await openFixture(page, "audio-populated");
   // The interview-block snapshot pre-populates several differing channels;

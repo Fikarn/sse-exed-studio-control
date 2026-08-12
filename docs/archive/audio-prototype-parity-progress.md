@@ -1,4 +1,6 @@
-# Audio Prototype Parity Progress
+# Audio Prototype Parity Progress (archived 2026-08-12)
+
+> Stale session tracker, archived 2026-08-12. Predates the current single-`main` workflow; current truth lives in [`docs/HANDOFF.md`](../HANDOFF.md).
 
 Plan: `docs/superpowers/plans/2026-05-16-audio-prototype-parity-final.md`
 

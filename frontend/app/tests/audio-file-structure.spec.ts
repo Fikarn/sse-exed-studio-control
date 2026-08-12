@@ -15,8 +15,6 @@ const EXPECTED_INSPECTOR_FILES = [
   "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelMeterCard.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelSendActions.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorDynamicsTab.tsx",
-  "frontend/app/src/app/audio/components/inspector/AudioInspectorEqBandTray.tsx",
-  "frontend/app/src/app/audio/components/inspector/AudioInspectorEqLowCutTray.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorEqTab.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorOutputView.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorOverviewCards.tsx",
@@ -59,10 +57,8 @@ const EXPECTED_UTILITY_CSS_MODULES = [
   "frontend/app/src/app/audio/components/AudioFader.module.css",
   "frontend/app/src/app/audio/components/AudioLiveMeterReadout.module.css",
   "frontend/app/src/app/audio/components/AudioMeterCanvasOverlay.module.css",
-  "frontend/app/src/app/audio/components/AudioPreampControl.module.css",
   "frontend/app/src/app/audio/components/AudioSliderControl.module.css",
   "frontend/app/src/app/audio/components/AudioStereoMeter.module.css",
-  "frontend/app/src/app/audio/components/AudioTargetPicker.module.css",
 ];
 
 // Why: the Slice 5 close-out pass also split MixerLane along the Tier vs Lane

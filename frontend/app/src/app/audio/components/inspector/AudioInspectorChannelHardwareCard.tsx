@@ -1,7 +1,8 @@
 /**
  * Hardware / Software mini card for the channel-mode inspector header.
- *   - For preamp-capable channels (front preamps), renders the
- *     AudioPreampControl plus the 48V / Hi-Z / Polarity / AutoSet toggles.
+ *   - For preamp-capable channels (front preamps), renders the 48V / Hi-Z /
+ *     Polarity / AutoSet toggles (the preamp knob itself lives in the hero
+ *     Preamp pane since the 2026-05-27 Console rebuild).
  *   - For software-playback channels, renders the "Playback telemetry not
  *     reported" truth fact and the stereo-link / auto-fade detail grid.
  *
