@@ -396,15 +396,13 @@ export function getLightingFixtures(snapshot: LightingSnapshot | null): Lighting
 export function getLightingScenes(snapshot: LightingSnapshot | null): LightingSceneEntry[] {
   return (snapshot?.scenes ?? []).map((s: LightingSceneSnapshot) => ({
     fixtureCount: s.fixtureCount,
-    fixtureStates: s.fixtureStates.map(
-      (entry: LightingSceneFixtureSnapshot): LightingSceneFixtureEntry => ({
-        cct: entry.cct,
-        controlValues: entry.controlValues,
-        fixtureId: entry.fixtureId,
-        intensity: entry.intensity,
-        on: entry.on,
-      })
-    ),
+    fixtureStates: s.fixtureStates.map((entry: LightingSceneFixtureSnapshot): LightingSceneFixtureEntry => ({
+      cct: entry.cct,
+      controlValues: entry.controlValues,
+      fixtureId: entry.fixtureId,
+      intensity: entry.intensity,
+      on: entry.on,
+    })),
     id: s.id,
     lastRecalled: s.lastRecalled,
     lastRecalledAt: s.lastRecalledAt ?? undefined,
@@ -424,15 +422,13 @@ export function getLightingGroups(snapshot: LightingSnapshot | null): LightingGr
 
 export function getLightingDmxChannels(snapshot: LightingDmxMonitorSnapshot | null): LightingDmxChannelEntry[] {
   return [...(snapshot?.channels ?? [])]
-    .map(
-      (c: LightingDmxChannelSnapshot): LightingDmxChannelEntry => ({
-        channel: c.channel,
-        label: c.label,
-        lightName: c.lightName,
-        universe: c.universe,
-        value: c.value,
-      })
-    )
+    .map((c: LightingDmxChannelSnapshot): LightingDmxChannelEntry => ({
+      channel: c.channel,
+      label: c.label,
+      lightName: c.lightName,
+      universe: c.universe,
+      value: c.value,
+    }))
     .sort((left, right) => {
       const universeDelta = left.universe - right.universe;
       return universeDelta !== 0 ? universeDelta : left.channel - right.channel;
@@ -518,81 +514,71 @@ export function getAudioMixTargets(snapshot: AudioSnapshot | null): AudioMixTarg
 
 export function getAudioSnapshots(snapshot: AudioSnapshot | null): AudioSnapshotEntry[] {
   return [...(snapshot?.snapshots ?? [])]
-    .map(
-      (s: AudioSceneSnapshot): AudioSnapshotEntry => ({
-        id: s.id,
-        contents: s.contents ?? undefined,
-        lastRecalled: s.lastRecalled,
-        lastRecalledAt: s.lastRecalledAt ?? undefined,
-        name: s.name,
-        order: s.order,
-        oscIndex: s.oscIndex,
-        preview: s.preview,
-      })
-    )
+    .map((s: AudioSceneSnapshot): AudioSnapshotEntry => ({
+      id: s.id,
+      contents: s.contents ?? undefined,
+      lastRecalled: s.lastRecalled,
+      lastRecalledAt: s.lastRecalledAt ?? undefined,
+      name: s.name,
+      order: s.order,
+      oscIndex: s.oscIndex,
+      preview: s.preview,
+    }))
     .sort((left, right) => left.order - right.order);
 }
 
 // Planning helpers: thin pass-throughs over typed snapshot.
 export function getPlanningProjects(snapshot: PlanningSnapshot | null): PlanningProjectEntry[] {
   return [...(snapshot?.projects ?? [])]
-    .map(
-      (p: PlanningProjectSnapshot): PlanningProjectEntry => ({
-        description: p.description,
-        id: p.id,
-        lastUpdated: p.lastUpdated || undefined,
-        order: p.order,
-        priority: p.priority,
-        status: p.status,
-        title: p.title,
-      })
-    )
+    .map((p: PlanningProjectSnapshot): PlanningProjectEntry => ({
+      description: p.description,
+      id: p.id,
+      lastUpdated: p.lastUpdated || undefined,
+      order: p.order,
+      priority: p.priority,
+      status: p.status,
+      title: p.title,
+    }))
     .sort((left, right) => left.order - right.order);
 }
 
 export function getPlanningTasks(snapshot: PlanningSnapshot | null): PlanningTaskEntry[] {
   return [...(snapshot?.tasks ?? [])]
-    .map(
-      (t: PlanningTaskSnapshot): PlanningTaskEntry => ({
-        checklist: t.checklist.map(
-          (item: PlanningChecklistSnapshot): PlanningChecklistEntry => ({
-            done: item.done,
-            id: item.id,
-            text: item.text,
-          })
-        ),
-        completed: t.completed,
-        createdAt: t.createdAt || undefined,
-        description: t.description,
-        dueDate: t.dueDate ?? undefined,
-        id: t.id,
-        isRunning: t.isRunning,
-        labels: [...t.labels],
-        lastStarted: t.lastStarted ?? undefined,
-        order: t.order,
-        priority: t.priority,
-        projectId: t.projectId,
-        scheduledDurationSeconds: t.scheduledDurationSeconds ?? undefined,
-        scheduledStart: t.scheduledStart ?? undefined,
-        title: t.title,
-        totalSeconds: t.totalSeconds,
-      })
-    )
+    .map((t: PlanningTaskSnapshot): PlanningTaskEntry => ({
+      checklist: t.checklist.map((item: PlanningChecklistSnapshot): PlanningChecklistEntry => ({
+        done: item.done,
+        id: item.id,
+        text: item.text,
+      })),
+      completed: t.completed,
+      createdAt: t.createdAt || undefined,
+      description: t.description,
+      dueDate: t.dueDate ?? undefined,
+      id: t.id,
+      isRunning: t.isRunning,
+      labels: [...t.labels],
+      lastStarted: t.lastStarted ?? undefined,
+      order: t.order,
+      priority: t.priority,
+      projectId: t.projectId,
+      scheduledDurationSeconds: t.scheduledDurationSeconds ?? undefined,
+      scheduledStart: t.scheduledStart ?? undefined,
+      title: t.title,
+      totalSeconds: t.totalSeconds,
+    }))
     .sort((left, right) => left.order - right.order);
 }
 
 export function getPlanningActivityLog(snapshot: PlanningSnapshot | null): PlanningActivityEntry[] {
   return [...(snapshot?.activityLog ?? [])]
-    .map(
-      (a: PlanningActivitySnapshot): PlanningActivityEntry => ({
-        action: a.action,
-        detail: a.detail,
-        entityId: a.entityId,
-        entityType: a.entityType,
-        id: a.id,
-        timestamp: a.timestamp || undefined,
-      })
-    )
+    .map((a: PlanningActivitySnapshot): PlanningActivityEntry => ({
+      action: a.action,
+      detail: a.detail,
+      entityId: a.entityId,
+      entityType: a.entityType,
+      id: a.id,
+      timestamp: a.timestamp || undefined,
+    }))
     .sort((left, right) => {
       const leftTime = left.timestamp ? Date.parse(left.timestamp) : 0;
       const rightTime = right.timestamp ? Date.parse(right.timestamp) : 0;
