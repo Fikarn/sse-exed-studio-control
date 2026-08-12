@@ -3,8 +3,7 @@ import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@s
 import { getFixtureMode, getFixtureModeForFixture, normalizeCatalogAlias } from "./fixtureCatalog";
 
 type FixturePatchIdentity =
-  | string
-  | Pick<LightingFixtureSnapshot, "definitionId" | "modeId" | "type" | "kind" | "universe" | "dmxStartAddress">;
+  string | Pick<LightingFixtureSnapshot, "definitionId" | "modeId" | "type" | "kind" | "universe" | "dmxStartAddress">;
 
 function fallbackChannelCount(fixtureType: string) {
   switch (normalizeCatalogAlias(fixtureType)) {
