@@ -62,6 +62,20 @@ function shouldFreezeClock(storyId: string) {
   return storyId.includes("planning");
 }
 
+function shouldAwaitAudioHydration(storyId: string) {
+  // GLO-09: the monitor-strip solo chip derives from the audio snapshot,
+  // which hydrates on its own refresh machine after bootstrap — wait for the
+  // shell's hydration marker so ready-frame captures are deterministic.
+  // Pre-ready and setup-modal stories never mount the strip.
+  return (
+    storyId.includes("operatorshell") &&
+    !storyId.includes("bootstrap") &&
+    !storyId.includes("protocol") &&
+    !storyId.includes("startup") &&
+    !storyId.includes("setup")
+  );
+}
+
 for (const story of stories) {
   test(`${story.title} — ${story.name}`, async ({ page }) => {
     if (shouldFreezeClock(story.id)) {
@@ -85,6 +99,10 @@ for (const story of stories) {
     // baselines byte-identical. Require a real painted box before capture.
     const rootBox = await page.locator("#storybook-root").first().boundingBox();
     expect(rootBox?.height, `${story.id} story root must paint at a real height`).toBeGreaterThan(0);
+
+    if (shouldAwaitAudioHydration(story.id)) {
+      await page.waitForSelector("html[data-audio-hydrated]", { state: "attached", timeout: 10_000 });
+    }
 
     await expect(page).toHaveScreenshot(`${story.id}.png`, {
       mask: liveAudioMasks(page),
