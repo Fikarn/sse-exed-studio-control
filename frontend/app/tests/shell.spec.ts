@@ -95,6 +95,32 @@ test("opening the palette dismisses the shortcut guide", async ({ page }) => {
   expect(dialogCount, "exactly one modal surface may be live").toBe(1);
 });
 
+// GLO-02 / CHROME-03 (the S2 "UI-scale escape" deferral, closed): the operator
+// scale tokens are defined for `.root` AND for body[data-operator-scale-host]
+// in one grouped rule, so overlays that portal to document.body (dialogs,
+// palette, context menu, color picker, shortcut guide, toasts) now track the
+// operator UI scale instead of silently falling back to unscaled DS tokens.
+test("operator UI scale reaches portaled overlays", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("app.operator.uiScale", "125");
+  });
+  await openFixture(page, "lighting-populated");
+
+  // Mechanism: the layout provider stamps body as the scale host.
+  await expect(page.locator('body[data-operator-scale-host][data-ui-scale="125"]')).toHaveCount(1);
+
+  // Consumer: a portaled dialog's title reads the title-lg token, so it must
+  // render at 22px * 1.25 = 27.5px rather than the unscaled 22px fallback.
+  await page.getByRole("button", { name: "Add fixture" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add fixture" });
+  await expect(dialog).toBeVisible();
+  const titleSize = await dialog
+    .locator("h2")
+    .first()
+    .evaluate((node) => getComputedStyle(node).fontSize);
+  expect(titleSize).toBe("27.5px");
+});
+
 // GLO-09: latched cross-workspace state (audio SOLO, lighting scene drift)
 // surfaces as persistent attention chips in the shell monitor strip instead of
 // being guarded only by the async leave-prompt. Both flags derive from engine
