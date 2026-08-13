@@ -38,7 +38,6 @@ import type { InspectorTab } from "./components/LightingInspectorTabs";
 import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
 import { DMXCompactStrip } from "./components/DMXCompactStrip";
-import { getFixtureModeForFixture } from "./fixtureCatalog";
 import { fixtureHasCctControl, fixtureStatesEqual, sceneMatchesFixtures } from "./lightingDrift";
 import type { StagePlotRenderMode } from "./fixtureVisuals";
 import { lightingFixtureChannelCount } from "./lightingPatch";
