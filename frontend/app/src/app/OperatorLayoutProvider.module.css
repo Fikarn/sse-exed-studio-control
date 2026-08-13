@@ -21,7 +21,15 @@
     linear-gradient(180deg, var(--color-shell-backdrop-top) 0%, var(--color-shell-backdrop-bottom) 100%);
 }
 
-.root {
+/* Scale tokens are defined for the shell root AND for document.body when the
+   provider stamps `data-operator-scale-host` on it. Overlays portal to body
+   (dialogs, palette, context menu, color picker, shortcut guide, toasts), so
+   without the body copy they escape UI scale entirely — the S2/GLO-02 escape.
+   Keeping ONE grouped rule (never a :root copy — that regressed setup/protocol
+   surfaces in S2) means the factor math can't fork. Layout declarations stay
+   in the .root-only rule below. */
+.root,
+:global(body[data-operator-scale-host]) {
   --operator-ui-scale-factor: 1;
   --operator-font-size-2xs: calc(9px * var(--operator-ui-scale-factor));
   --operator-font-size-xs: calc(10px * var(--operator-ui-scale-factor));
@@ -70,7 +78,9 @@
   --operator-stage-min-width: 640px;
   --operator-stage-min-height: 480px;
   --size-toolbar-height: 44px;
+}
 
+.root {
   height: 100%;
   min-height: 0;
   min-width: 0;
@@ -94,7 +104,8 @@
   transform-origin: center center;
 }
 
-.root[data-ui-scale="90"] {
+.root[data-ui-scale="90"],
+:global(body[data-operator-scale-host][data-ui-scale="90"]) {
   --operator-ui-scale-factor: 0.9;
   --operator-toolbar-gap: 10px;
   --operator-toolbar-padding-x: 18px;
@@ -103,7 +114,8 @@
   --size-toolbar-height: 40px;
 }
 
-.root[data-ui-scale="110"] {
+.root[data-ui-scale="110"],
+:global(body[data-operator-scale-host][data-ui-scale="110"]) {
   --operator-ui-scale-factor: 1.1;
   --operator-toolbar-gap: 15px;
   --operator-toolbar-padding-x: 24px;
@@ -112,7 +124,8 @@
   --size-toolbar-height: 48px;
 }
 
-.root[data-ui-scale="125"] {
+.root[data-ui-scale="125"],
+:global(body[data-operator-scale-host][data-ui-scale="125"]) {
   --operator-ui-scale-factor: 1.25;
   --operator-toolbar-gap: 16px;
   --operator-toolbar-padding-x: 26px;

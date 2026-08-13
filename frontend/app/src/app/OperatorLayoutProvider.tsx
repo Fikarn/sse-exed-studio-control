@@ -166,6 +166,21 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(UI_SCALE_STORAGE_KEY, String(uiScale));
   }, [uiScale]);
 
+  // Overlays (dialogs, palette, context menu, color picker, shortcut guide,
+  // toasts) portal to document.body, outside the `.root` scope that defines
+  // the --operator-* scale tokens. Stamp body so the grouped rule in
+  // OperatorLayoutProvider.module.css also resolves there — same single token
+  // source, never a :root copy (the S2 regression).
+  useEffect(() => {
+    const body = document.body;
+    body.setAttribute("data-operator-scale-host", "");
+    body.setAttribute("data-ui-scale", String(uiScale));
+    return () => {
+      body.removeAttribute("data-operator-scale-host");
+      body.removeAttribute("data-ui-scale");
+    };
+  }, [uiScale]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(REVIEW_SURFACE_STORAGE_KEY, reviewSurface);
