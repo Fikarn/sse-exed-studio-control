@@ -14,10 +14,6 @@
   min-width: 0;
 }
 
-.workspaceCard {
-  padding: var(--space-4);
-}
-
 .actionRow {
   display: flex;
   align-items: center;
