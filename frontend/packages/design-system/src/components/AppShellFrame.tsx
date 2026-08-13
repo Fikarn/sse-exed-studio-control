@@ -16,6 +16,9 @@ export interface MonitorItem {
   label: string;
   detail?: string;
   status: "ok" | "attention" | "error" | "info";
+  /** Where clicking the chip takes the operator; defaults to Setup / Support.
+   *  Latched-state chips (GLO-09) point at their owning workspace instead. */
+  target?: string;
 }
 
 export interface ContextItem {
@@ -94,6 +97,8 @@ export function AppShellFrame({
           {monitorItems.map((item, index) => {
             const key = item.id ?? `${item.status}:${item.label}:${index}`;
             const statusDetail = item.detail ?? item.status;
+            const targetLabel = item.target ?? "Setup";
+            const targetDescription = item.target ?? "Setup / Support";
             const monitorContent = (
               <>
                 <span className={styles.monitorDot} aria-hidden="true" />
@@ -101,7 +106,7 @@ export function AppShellFrame({
                   <span className={styles.monitorLabel}>{item.label}</span>
                   <span className={styles.monitorDetail}>{statusDetail}</span>
                 </span>
-                {onMonitorItemClick ? <span className={styles.monitorTarget}>Setup</span> : null}
+                {onMonitorItemClick ? <span className={styles.monitorTarget}>{targetLabel}</span> : null}
               </>
             );
             const monitorStyle = { "--monitor-tone": toneByStatus[item.status] } as CSSProperties;
@@ -114,8 +119,8 @@ export function AppShellFrame({
                 data-status={item.status}
                 onClick={() => onMonitorItemClick(item)}
                 style={monitorStyle}
-                title={`Open Setup / Support for ${item.label}: ${statusDetail}`}
-                aria-label={`Open Setup / Support for ${item.label}. Current status: ${statusDetail}.`}
+                title={`Open ${targetDescription} for ${item.label}: ${statusDetail}`}
+                aria-label={`Open ${targetDescription} for ${item.label}. Current status: ${statusDetail}.`}
               >
                 {monitorContent}
               </button>

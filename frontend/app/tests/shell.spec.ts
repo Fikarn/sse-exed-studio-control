@@ -120,3 +120,46 @@ test("operator UI scale reaches portaled overlays", async ({ page }) => {
     .evaluate((node) => getComputedStyle(node).fontSize);
   expect(titleSize).toBe("27.5px");
 });
+
+// GLO-09: latched cross-workspace state (audio SOLO, lighting scene drift)
+// surfaces as persistent attention chips in the shell monitor strip instead of
+// being guarded only by the async leave-prompt. Both flags derive from engine
+// snapshots, so the chips survive workspace switches.
+test("audio solo latches a monitor-strip chip that survives workspace switches", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+  const soloChip = page.getByRole("button", { name: /Open Audio for Solo/ });
+  // The fixture transport's synthesized bank ships FX 3/4 pre-soloed, so the
+  // chip is part of the designed rest state.
+  await expect(soloChip).toBeVisible();
+
+  const soloButton = page.getByTestId("audio-strip-audio-playback-3-4").getByRole("button", { name: "Solo FX 3/4" });
+  await expect(soloButton).toHaveAttribute("aria-pressed", "true");
+  await soloButton.click();
+  await expect(soloButton).toHaveAttribute("aria-pressed", "false");
+  await expect(soloChip).toHaveCount(0);
+
+  // Re-latch and confirm the chip survives leaving the audio workspace.
+  await soloButton.click();
+  await expect(soloChip).toBeVisible();
+  await page.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
+  await expect(soloChip).toBeVisible();
+
+  // The chip's click target is the owning workspace, not Setup.
+  await soloChip.click();
+  await expect(page.getByTestId("audio-workspace")).toBeVisible();
+});
+
+test("lighting scene drift latches a monitor-strip chip", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  const driftChip = page.getByRole("button", { name: /Open Lighting for Scene drift/ });
+  await expect(driftChip).toHaveCount(0);
+
+  // Toggle the Front group off — the rig now diverges from the recalled
+  // Warm wash scene, which must latch the drift chip; restoring the group
+  // clears it.
+  await page.getByRole("button", { name: /^Front, 2 fixtures at 67%, on/ }).click();
+  await expect(driftChip).toBeVisible();
+  await page.getByRole("button", { name: /^Front, 2 fixtures/ }).click();
+  await expect(driftChip).toHaveCount(0);
+});

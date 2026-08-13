@@ -9,6 +9,7 @@ import { createShellEnvironment } from "./createShellEnvironment";
 import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
 import { OPERATOR_UI_SCALES } from "./operatorLayout";
 import { buildMonitorItems, isEditableTarget } from "./shellData";
+import { computeLiveSceneDrift } from "./lighting/lightingDrift";
 import { SetupSupportPilot } from "./setup/SetupSupportPilot";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
 import { enterStudioFullscreen, resetWindowLayout, switchToWindowedLayout } from "./shellCommands";
@@ -61,6 +62,28 @@ function OperatorShellInner() {
   const deferredAudioSnapshot = useDeferredValue(shellState.audioSnapshot);
   const deferredPlanningSnapshot = useDeferredValue(shellState.planningSnapshot);
   const deferredSupportSnapshot = useDeferredValue(shellState.supportSnapshot);
+
+  // GLO-09: latched cross-workspace state gets a persistent attention chip in
+  // the monitor strip. Both flags derive from live (non-deferred) snapshots so
+  // the chrome reacts immediately and survives workspace switches. These
+  // hooks must stay ABOVE the shellExperience early returns (hooks order).
+  const lightingSceneDrift = useMemo(
+    () => computeLiveSceneDrift(shellState.lightingSnapshot, shellState.lightingFixtureCatalogSnapshot),
+    [shellState.lightingSnapshot, shellState.lightingFixtureCatalogSnapshot]
+  );
+  const audioSolo = useMemo(
+    () => (shellState.audioSnapshot?.channels ?? []).some((channel) => channel.solo),
+    [shellState.audioSnapshot]
+  );
+
+  // Deterministic-capture marker: the audio snapshot hydrates on its own
+  // refresh machine after bootstrap, so chrome derived from it (the GLO-09
+  // solo chip) would otherwise race visual captures. The visual-review spec
+  // waits for this attribute before screenshotting post-ready fixtures.
+  useEffect(() => {
+    document.documentElement.toggleAttribute("data-audio-hydrated", shellState.audioSnapshot !== null);
+    return () => document.documentElement.removeAttribute("data-audio-hydrated");
+  }, [shellState.audioSnapshot]);
 
   const requestRestart = useLiveCallback(() => {
     setConfirmIntent("restart-engine");
@@ -449,7 +472,7 @@ function OperatorShellInner() {
     return null;
   }
 
-  const monitorItems = buildMonitorItems(shellState.healthSnapshot);
+  const monitorItems = buildMonitorItems(shellState.healthSnapshot, { lightingSceneDrift, audioSolo });
 
   const body =
     activeWorkspace === "lighting" ? (
@@ -480,8 +503,12 @@ function OperatorShellInner() {
         activeWorkspace={activeWorkspace}
         monitorItems={monitorItems}
         workspaces={workspaces}
-        onMonitorItemClick={() => {
-          void tryNavigateWorkspace("setup");
+        onMonitorItemClick={(item) => {
+          // Health chips open Setup / Support; latched chips jump to the
+          // workspace that owns the latched state (same-target clicks no-op).
+          const target =
+            item.id === "latched:scene-drift" ? "lighting" : item.id === "latched:solo" ? "audio" : "setup";
+          void tryNavigateWorkspace(target);
         }}
         onWorkspaceChange={(workspaceId) => {
           void tryNavigateWorkspace(workspaceId as ShellState["activeWorkspace"]);

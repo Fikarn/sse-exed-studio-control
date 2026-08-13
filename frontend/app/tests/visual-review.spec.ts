@@ -104,6 +104,14 @@ async function gotoFixture(
   const response = await page.goto(`/?${params.toString()}`, { waitUntil: "networkidle" });
   expect(response, `fixture ${fixture} should return a document response`).not.toBeNull();
   expect(response!.status(), `fixture ${fixture} should not fail to load`).toBeLessThan(400);
+  // The audio snapshot hydrates on its own refresh machine after bootstrap;
+  // chrome derived from it (the GLO-09 solo chip) would otherwise race the
+  // capture. Pre-ready families never hydrate audio, so they skip the wait.
+  const preReadyFixture =
+    fixture.startsWith("protocol-") || fixture.startsWith("bootstrap-") || fixture.startsWith("startup");
+  if (!preReadyFixture) {
+    await page.waitForSelector("html[data-audio-hydrated]", { state: "attached", timeout: 10_000 });
+  }
 }
 
 async function assertViewportFit(page: Page, size: Viewport, fixture: string) {
