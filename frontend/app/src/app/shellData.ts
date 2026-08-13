@@ -9,7 +9,6 @@ import type {
   LightingDmxChannelSnapshot,
   LightingDmxMonitorSnapshot,
   LightingFixtureSnapshot,
-  LightingGroupSnapshot,
   LightingSceneFixtureSnapshot,
   LightingSceneSnapshot,
   LightingSnapshot,
@@ -412,14 +411,6 @@ export function getLightingScenes(snapshot: LightingSnapshot | null): LightingSc
   }));
 }
 
-export function getLightingGroups(snapshot: LightingSnapshot | null): LightingGroupEntry[] {
-  return (snapshot?.groups ?? []).map((g: LightingGroupSnapshot) => ({
-    fixtureCount: g.fixtureCount,
-    id: g.id,
-    name: g.name,
-  }));
-}
-
 export function getLightingDmxChannels(snapshot: LightingDmxMonitorSnapshot | null): LightingDmxChannelEntry[] {
   return [...(snapshot?.channels ?? [])]
     .map((c: LightingDmxChannelSnapshot): LightingDmxChannelEntry => ({
@@ -664,90 +655,6 @@ export function buildMonitorItems(healthSnapshot: SnapshotRecord | null) {
       status: asStatusTone(checks.controlSurface?.status, "attention"),
     },
   ] as const;
-}
-
-export function buildContextSections(
-  activeWorkspace: ShellState["activeWorkspace"],
-  commissioningSnapshot: SnapshotRecord | null,
-  supportSnapshot: SnapshotRecord | null,
-  lightingSnapshot: LightingSnapshot | null
-) {
-  if (activeWorkspace === "lighting") {
-    const fixtures = getLightingFixtures(lightingSnapshot);
-    const scenes = getLightingScenes(lightingSnapshot);
-    const groups = getLightingGroups(lightingSnapshot);
-    const selectedFixtureId = lightingSnapshot?.selectedFixtureId ?? null;
-    const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
-    const onCount = fixtures.filter((fixture) => fixture.on === true).length;
-
-    return [
-      {
-        title: "Lighting status",
-        items: [
-          {
-            id: "lighting:summary",
-            label: lightingSnapshot?.summary ?? "Awaiting lighting snapshot.",
-          },
-          {
-            id: "lighting:transport",
-            label: `Bridge ${lightingSnapshot?.bridgeIp ?? "unconfigured"} · Universe ${lightingSnapshot?.universe ?? 1}`,
-          },
-          {
-            id: "lighting:adapter",
-            label: `Adapter ${lightingSnapshot?.adapterMode ?? "unknown"}`,
-          },
-        ],
-      },
-      {
-        title: "Lighting context",
-        items: [
-          {
-            id: "lighting:fixtures",
-            label: `Fixtures on ${onCount} / ${fixtures.length}`,
-          },
-          {
-            id: "lighting:inventory",
-            label: `Scenes ${scenes.length} · Groups ${groups.length}`,
-          },
-          {
-            id: "lighting:selection",
-            label: selectedFixture ? `Selected fixture ${selectedFixture.name}` : "No fixture selected.",
-          },
-        ],
-      },
-    ];
-  }
-
-  const checks = getCommissioningChecks(commissioningSnapshot);
-  const backups = getSupportBackups(supportSnapshot);
-
-  return [
-    {
-      title: activeWorkspace === "setup" ? "Runner Status" : "Operator Context",
-      items:
-        checks.length > 0
-          ? checks.map((check) => ({
-              id: `check:${check.id}`,
-              label: `${check.label}: ${check.detail}`,
-            }))
-          : [{ id: "check:empty", label: "Awaiting commissioning data." }],
-    },
-    {
-      title: "Support",
-      items:
-        backups.length > 0
-          ? backups.slice(0, 3).map((backup, index) => ({
-              id: `backup:${backup.path || backup.modifiedAt || index}`,
-              label: `Backup: ${formatBackupTimestamp(backup.modifiedAt)}`,
-            }))
-          : [
-              {
-                id: "backup:empty",
-                label: String(supportSnapshot?.summary ?? "No support exports yet."),
-              },
-            ],
-    },
-  ];
 }
 
 export function isEditableTarget(target: EventTarget | null) {
