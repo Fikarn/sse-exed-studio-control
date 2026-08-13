@@ -633,22 +633,35 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await expect(page.getByTestId("audio-strip-audio-input-12").locator('[data-meter-component="stereo"]')).toHaveCount(
     1
   );
-  const speechLevels: number[] = [];
-  for (const testId of [
-    "audio-strip-audio-input-9",
-    "audio-strip-audio-input-10",
-    "audio-strip-audio-input-11",
-    "audio-strip-audio-input-12",
-  ]) {
-    const seededLevel = await page
-      .getByTestId(testId)
-      .locator('[data-meter-component="stereo"]')
-      .evaluate((node) => Number.parseFloat(getComputedStyle(node).getPropertyValue("--audio-meter-left")));
+  const readSeededLevels = async () => {
+    const levels: number[] = [];
+    for (const testId of [
+      "audio-strip-audio-input-9",
+      "audio-strip-audio-input-10",
+      "audio-strip-audio-input-11",
+      "audio-strip-audio-input-12",
+    ]) {
+      levels.push(
+        await page
+          .getByTestId(testId)
+          .locator('[data-meter-component="stereo"]')
+          .evaluate((node) => Number.parseFloat(getComputedStyle(node).getPropertyValue("--audio-meter-left")))
+      );
+    }
+    return levels;
+  };
+  for (const seededLevel of await readSeededLevels()) {
     expect(seededLevel).toBeGreaterThanOrEqual(20);
     expect(seededLevel).toBeLessThanOrEqual(96);
-    speechLevels.push(seededLevel);
   }
-  expect(new Set(speechLevels.map((value) => Math.round(value))).size).toBeGreaterThan(1);
+  // Four independently-seeded speech envelopes can momentarily round to the
+  // same integer, so a single instantaneous sample flakes (CI run
+  // 31616596501). Poll across sim ticks instead: genuinely distinct seeds
+  // diverge within a tick or two, while a real everything-identical seeding
+  // regression stays collapsed and still times out red.
+  await expect
+    .poll(async () => new Set((await readSeededLevels()).map((value) => Math.round(value))).size, { timeout: 5_000 })
+    .toBeGreaterThan(1);
 
   const programPlaybackMeter = page
     .getByTestId("audio-strip-audio-playback-1-2")
