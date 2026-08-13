@@ -624,13 +624,22 @@ function statusLabelFor(check: { status?: string } | undefined, fallback: string
   }
 }
 
-export function buildMonitorItems(healthSnapshot: SnapshotRecord | null) {
+/** GLO-09: cross-workspace latched state that deserves a persistent chip in
+ *  the shell monitor strip (previously only the async leave-prompt guarded
+ *  it). Both flags derive from engine snapshots, so the chips stay truthful
+ *  across workspace switches. */
+export interface LatchedShellState {
+  lightingSceneDrift: boolean;
+  audioSolo: boolean;
+}
+
+export function buildMonitorItems(healthSnapshot: SnapshotRecord | null, latched?: LatchedShellState) {
   const checks =
     healthSnapshot && typeof healthSnapshot.checks === "object" && healthSnapshot.checks
       ? (healthSnapshot.checks as Record<string, { status?: string; summary?: string }>)
       : {};
 
-  return [
+  const items = [
     {
       id: "lighting",
       label: "Lighting",
@@ -654,7 +663,34 @@ export function buildMonitorItems(healthSnapshot: SnapshotRecord | null) {
       // "attention" makes the three pills agree on tone for the same state.
       status: asStatusTone(checks.controlSurface?.status, "attention"),
     },
-  ] as const;
+  ] as Array<{
+    id: string;
+    label: string;
+    detail: string;
+    status: "ok" | "attention" | "error" | "info";
+    target?: string;
+  }>;
+
+  if (latched?.lightingSceneDrift) {
+    items.push({
+      id: "latched:scene-drift",
+      label: "Scene drift",
+      detail: "unsaved",
+      status: "attention",
+      target: "Lighting",
+    });
+  }
+  if (latched?.audioSolo) {
+    items.push({
+      id: "latched:solo",
+      label: "Solo",
+      detail: "latched",
+      status: "attention",
+      target: "Audio",
+    });
+  }
+
+  return items;
 }
 
 export function isEditableTarget(target: EventTarget | null) {

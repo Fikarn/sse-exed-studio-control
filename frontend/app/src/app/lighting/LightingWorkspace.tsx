@@ -39,6 +39,7 @@ import { LightingRail } from "./components/LightingRail";
 import { LightingToolbar } from "./components/LightingToolbar";
 import { DMXCompactStrip } from "./components/DMXCompactStrip";
 import { getFixtureModeForFixture } from "./fixtureCatalog";
+import { fixtureHasCctControl, fixtureStatesEqual, sceneMatchesFixtures } from "./lightingDrift";
 import type { StagePlotRenderMode } from "./fixtureVisuals";
 import { lightingFixtureChannelCount } from "./lightingPatch";
 import { PreviewBanner } from "./components/PreviewBanner";
@@ -76,18 +77,6 @@ interface FixtureValuePreviewField {
 }
 
 type FixtureValuePreviewFields = Partial<Record<PreviewableFixtureValue, FixtureValuePreviewField>>;
-
-type FixtureSceneComparisonSource = {
-  cct: number;
-  controlValues?: Record<string, number> | null;
-  definitionId: string;
-  id: string;
-  intensity: number;
-  kind: string;
-  modeId: string;
-  on: boolean;
-  type: string;
-};
 
 function clampStudioMeters(value: number, max: number): number {
   return Math.max(0, Math.min(max, value));
@@ -143,40 +132,6 @@ function lightingPaletteMatchesQuery(palette: LightingPaletteSnapshot, query: st
   return `${palette.name} ${palette.kind} ${formatLightingPaletteQuickValue(palette)}`.toLowerCase().includes(query);
 }
 
-function fixtureHasCctControl(
-  fixture: FixtureSceneComparisonSource,
-  catalog: LightingFixtureCatalogSnapshot | null
-): boolean {
-  return (
-    getFixtureModeForFixture(catalog, fixture)?.channels.some((channel) => channel.controlId === "cct") ??
-    Object.prototype.hasOwnProperty.call(fixture.controlValues ?? {}, "cct")
-  );
-}
-
-function sceneMatchesFixtures(
-  fixtures: readonly FixtureSceneComparisonSource[],
-  scene: LightingSceneSnapshot,
-  catalog: LightingFixtureCatalogSnapshot | null
-): boolean {
-  return fixtureStatesEqual(
-    fixtures.map((fixture) => ({
-      id: fixture.id,
-      intensity: fixture.intensity,
-      cct: fixture.cct,
-      on: fixture.on,
-      hasCctControl: fixtureHasCctControl(fixture, catalog),
-      controlValues: fixture.controlValues,
-    })),
-    scene.fixtureStates.map((state) => ({
-      fixtureId: state.fixtureId,
-      intensity: state.intensity,
-      cct: state.cct,
-      on: state.on,
-      controlValues: state.controlValues,
-    }))
-  );
-}
-
 function fixturesWithSceneState(
   fixtures: readonly LightingFixtureSnapshot[],
   scene: LightingSceneSnapshot
@@ -230,48 +185,6 @@ function pushUndoOutcomeToast(toast: ToastApi, outcome: UndoOutcome): void {
     tone: "error",
     message: `Undo failed for "${outcome.label}". The operation is still applied.`,
   });
-}
-
-function fixtureStatesEqual(
-  fixtures: ReadonlyArray<{
-    id: string;
-    intensity: number;
-    cct: number;
-    on: boolean;
-    hasCctControl: boolean;
-    controlValues?: Record<string, number> | null;
-  }>,
-  sceneStates: ReadonlyArray<{
-    fixtureId: string;
-    intensity: number;
-    cct: number;
-    on: boolean;
-    controlValues?: Record<string, number> | null;
-  }>
-): boolean {
-  if (fixtures.length === 0 && sceneStates.length === 0) return true;
-  const sceneById = new Map(sceneStates.map((state) => [state.fixtureId, state]));
-  for (const fixture of fixtures) {
-    const sceneState = sceneById.get(fixture.id);
-    if (!sceneState) {
-      // Fixture present but not in saved scene → drift if currently on.
-      if (fixture.on && fixture.intensity > 0) return false;
-      continue;
-    }
-    if (sceneState.on !== fixture.on) return false;
-    if (sceneState.on && Math.abs(sceneState.intensity - fixture.intensity) > 0.5) return false;
-    if (sceneState.on && fixture.hasCctControl && Math.abs(sceneState.cct - fixture.cct) > 25) {
-      return false;
-    }
-    const keys = new Set([...Object.keys(fixture.controlValues ?? {}), ...Object.keys(sceneState.controlValues ?? {})]);
-    for (const key of keys) {
-      if (key === "intensity" || key === "cct") continue;
-      if (Math.abs((fixture.controlValues?.[key] ?? 0) - (sceneState.controlValues?.[key] ?? 0)) > 0.5) {
-        return false;
-      }
-    }
-  }
-  return true;
 }
 
 function snapshotWithFixtures(
