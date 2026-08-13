@@ -29,15 +29,18 @@ export interface ContextRailEntry {
 }
 
 export interface AppShellFrameProps {
-  title: string;
-  subtitle: string;
-  eyebrow: string;
+  /** Main-header trio: only rendered when `hideMainHeader` is false. The live
+   *  operator shell never renders the header (GLO-07); these stay for future
+   *  header-bearing hosts. */
+  title?: string;
+  subtitle?: string;
+  eyebrow?: string;
   productName?: string;
   clock?: ReactNode;
   monitorItems: readonly MonitorItem[];
   workspaces: readonly RailItem[];
   activeWorkspace: string;
-  contextSections: readonly ContextItem[];
+  contextSections?: readonly ContextItem[];
   children: ReactNode;
   hideMainHeader?: boolean;
   onMonitorItemClick?: (item: MonitorItem) => void;
@@ -60,7 +63,7 @@ export function AppShellFrame({
   monitorItems,
   workspaces,
   activeWorkspace,
-  contextSections,
+  contextSections = [],
   children,
   hideMainHeader = true,
   onMonitorItemClick,

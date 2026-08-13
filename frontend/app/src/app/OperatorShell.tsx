@@ -1,15 +1,14 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Calendar, Mic, Sliders, Sun } from "lucide-react";
 
-import { AppShellFrame, Button } from "@sse/design-system";
+import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
-import { StagePlotPlaceholder } from "@sse/shared-graphics";
 
 import styles from "./OperatorShell.module.css";
 import { createShellEnvironment } from "./createShellEnvironment";
 import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
 import { OPERATOR_UI_SCALES } from "./operatorLayout";
-import { buildContextSections, buildMonitorItems, isEditableTarget } from "./shellData";
+import { buildMonitorItems, isEditableTarget } from "./shellData";
 import { SetupSupportPilot } from "./setup/SetupSupportPilot";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
 import { enterStudioFullscreen, resetWindowLayout, switchToWindowedLayout } from "./shellCommands";
@@ -30,24 +29,6 @@ import { StartupSurface } from "./startup/StartupSurface";
 import { deriveShellExperience } from "./startup/startupHelpers";
 
 type ConfirmIntent = "restart-engine" | null;
-
-function GraphicsWorkspace({ title, subtitle, note }: { title: string; subtitle: string; note: string }) {
-  return (
-    <div className={styles.workspaceBody}>
-      <section className={styles.primaryPanel}>
-        <div className={styles.stagePlot}>
-          <StagePlotPlaceholder title={title} subtitle={subtitle} />
-        </div>
-      </section>
-      <aside className={styles.secondaryPanel}>
-        <div className={styles.metaItem}>
-          <div className={styles.metaLabel}>Shell direction</div>
-          <div className={styles.metaValue}>{note}</div>
-        </div>
-      </aside>
-    </div>
-  );
-}
 
 export function OperatorShell() {
   // Toast portal hosts cross-workspace bottom-right notifications + the ⌘K
@@ -461,43 +442,17 @@ function OperatorShellInner() {
     );
   }
 
-  const monitorItems = buildMonitorItems(shellState.healthSnapshot);
-  const contextSections = buildContextSections(
-    activeWorkspace,
-    shellState.commissioningSnapshot,
-    deferredSupportSnapshot,
-    deferredLightingSnapshot
-  );
+  if (activeWorkspace === "setup") {
+    // Unreachable: every shellExperience (startup/ready/recovery) early-returns
+    // for the setup workspace above. The guard narrows the union so the frame
+    // below models only the three real workspaces (GLO-07 close-out).
+    return null;
+  }
 
-  const degradedSummary =
-    shellState.recovery === "degraded" &&
-    !setupModalActive &&
-    activeWorkspace !== "lighting" &&
-    activeWorkspace !== "audio" &&
-    activeWorkspace !== "planning"
-      ? String(shellState.healthSnapshot?.summary ?? "Hardware or bridge attention required.")
-      : null;
-  const frameContextSections =
-    activeWorkspace === "lighting" || activeWorkspace === "audio" || activeWorkspace === "planning"
-      ? []
-      : contextSections;
-  const hideFrameMainHeader =
-    activeWorkspace === "lighting" || activeWorkspace === "audio" || activeWorkspace === "planning";
+  const monitorItems = buildMonitorItems(shellState.healthSnapshot);
 
   const body =
-    activeWorkspace === "setup" ? (
-      <SetupSupportPilot
-        appSnapshot={shellState.appSnapshot}
-        commissioningSnapshot={shellState.commissioningSnapshot}
-        controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
-        healthSnapshot={shellState.healthSnapshot}
-        liveTransportRequested={environment.liveTransportRequested}
-        onRequestRestart={requestRestart}
-        onShowShortcuts={showShortcuts}
-        store={environment.store}
-        supportSnapshot={deferredSupportSnapshot}
-      />
-    ) : activeWorkspace === "lighting" ? (
+    activeWorkspace === "lighting" ? (
       <LightingWorkspaceSurface
         appSnapshot={shellState.appSnapshot}
         lightingFixtureCatalogSnapshot={deferredLightingFixtureCatalogSnapshot}
@@ -511,17 +466,11 @@ function OperatorShellInner() {
         audioSnapshot={deferredAudioSnapshot}
         store={environment.store}
       />
-    ) : activeWorkspace === "planning" ? (
+    ) : (
       <PlanningWorkspaceSurface
         appSnapshot={shellState.appSnapshot}
         planningSnapshot={deferredPlanningSnapshot}
         store={environment.store}
-      />
-    ) : (
-      <GraphicsWorkspace
-        title="Planning workbench"
-        subtitle="Secondary planning surface in a sidecar posture rather than a co-equal operator workspace."
-        note="Planning migrates last and stays secondary to lighting and audio."
       />
     );
 
@@ -529,15 +478,8 @@ function OperatorShellInner() {
     <>
       <AppShellFrame
         activeWorkspace={activeWorkspace}
-        eyebrow={environment.liveTransportRequested ? "Live transport" : `Fixture ${environment.fixtureId}`}
-        hideMainHeader={hideFrameMainHeader}
         monitorItems={monitorItems}
-        subtitle={
-          shellState.errorSummary ?? String(shellState.appSnapshot?.summary ?? "Story-first operator shell foundation.")
-        }
-        title={activeWorkspace === "setup" ? "Startup, recovery, and setup posture" : "Operator console foundation"}
         workspaces={workspaces}
-        contextSections={frameContextSections}
         onMonitorItemClick={() => {
           void tryNavigateWorkspace("setup");
         }}
@@ -545,25 +487,7 @@ function OperatorShellInner() {
           void tryNavigateWorkspace(workspaceId as ShellState["activeWorkspace"]);
         }}
       >
-        <div className={styles.workspaceStack}>
-          {degradedSummary ? (
-            <div className={styles.statusBanner} role="status">
-              <div>
-                <div className={styles.statusBannerTitle}>Hardware attention required</div>
-                <div className={styles.statusBannerBody}>{degradedSummary}</div>
-              </div>
-              <div className={styles.statusBannerActions}>
-                <Button variant="secondary" onClick={requestRestart}>
-                  Retry bridges
-                </Button>
-                <Button variant="ghost" onClick={showShortcuts}>
-                  Shortcuts
-                </Button>
-              </div>
-            </div>
-          ) : null}
-          {body}
-        </div>
+        <div className={styles.workspaceStack}>{body}</div>
       </AppShellFrame>
       {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
       {confirmIntent === "restart-engine" ? (
