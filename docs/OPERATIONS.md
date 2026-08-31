@@ -92,6 +92,27 @@ To commission it on the workstation:
 2. In `Options → Settings → OSC`, select remote controller `4`: `In Use` checked, compatibility/mode set to `Global OSC`, IP `127.0.0.1`, port incoming `7004`, port outgoing `9004`, and enable the send-changes/send-status details if the dialog offers them. Leave remotes 1-3 untouched in classic mode.
 3. No app restart is needed — the engine re-primes the slot within seconds and the Main Out / Phones meters go live.
 
+### Stream Deck Audio Surface
+
+When the app is on the Audio workspace, the Stream Deck+ is its physical control surface. Companion drives the deck from the generated profile; every deck action calls the same engine audio path as the on-screen console, so the console, the app UI, and the deck cannot disagree.
+
+Layout of the AUDIO deck page:
+
+- Keys, top row: `→ MAIN`, `→ PH 1`, `→ PH 2` set the active mix target (the same engine-persisted selection as the app's output strips — the tier header "Mix for →" and the deck always agree), and `BANK` cycles which strips the dials drive: inputs (the four front preamps) → playback (pairs 1-4) → outputs (Main / Phones 1 / Phones 2, fourth dial idle).
+- Keys, bottom row: `DIM` toggles control-room dim on Main; `GAIN` switches the input dials between send-fader and whole-dB preamp gain; `TALK` is momentary talkback on Main (hold to talk — the engine auto-releases 2 s after the hold stops arriving, so a lost request can never leave talkback open); `SOLO CLR` clears every solo.
+- Touch strip: one segment per strip — name, level in the same dB the on-screen fader shows, `MUTED`, the active-target arrow, and a `•` selection marker. Tapping a segment selects that channel in the app inspector (deliberately silent — strip swipes can register as taps).
+- Dials: rotate rides the strip's level (`0.01` per detent, the app's keyboard step; detents faster than 80 ms apply ×5 like Shift); push toggles the strip's mute.
+
+Trust rules: deck actions pass the same gating as app commands — when audio is not verified, the strip shows the reason (`AUDIO / NOT VERIFIED`) and actions are refused. The deck shows state, not meters, and has no snapshot or 48V controls by design.
+
+Deck freshness comes from the profile's `SSE audio LCD poll` trigger (1 s) plus per-action refreshes; the `SSE follow app - …` triggers flip the deck to the AUDIO / LIGHTS / PROJECTS page whenever the app workspace changes.
+
+To commission or re-commission the deck:
+
+1. Start Companion (it must be running so the export can bind the page-follow triggers to the physical Stream Deck — the export summary reports the bound surface id; without Companion running it falls back to `self` and page-follow will not move the deck).
+2. In Setup step 1, download the Companion profile and import it in Companion's Import / Export page using **Full Reset & Import**. Do not use "Import Preserving Unselected": it keeps any existing generic-http connection and remaps the profile's actions onto that connection's old base URL, and the `$(SSE_Studio_Control:…)` display variables stop resolving.
+3. Walk Setup steps 3-5: on Verify, press the physical controls and watch the matching cell pulse (the bridge stamps every action; the panel polls it live).
+
 ### Control-surface bridge stops responding
 
 1. Open Setup or Support and verify the control-surface base URL is present in native diagnostics.

@@ -102,7 +102,7 @@ Bridge stamps `app.control_surface.last_event` (control id + timestamp) on every
 
 ### S5 — Commission on hardware + docs
 
-Status: pending. Note: repackaging for `native:bridge:win:verify` and the live import require stopping the running operator app first (`release\native\windows` files are locked while it runs) — coordinate with the operator before S5.
+Status: docs complete (OPERATIONS "Stream Deck Audio Surface" section, CHANGELOG entry, protocol v1.md return-shape updates); live hardware pass pending operator coordination. Already done ahead of the live pass: the generated profile was imported into Companion 4.2.6 via Full Reset & Import during S3, so Companion is live-polling the bridge and page-follow is armed. Remaining, in order, with the operator: (1) stop the running app, `npm run native:engine:build` + `npm run tauri:build` + `npm run native:package:win:local`, relaunch; (2) `npm run native:bridge:win:verify`; (3) walk Setup steps 3→5 pressing the physical controls (verify echo is live now); (4) tune detent step / acceleration / strip legibility against the real dials and TotalMix; (5) operator sign-off + Publish.
 
 On the workstation: import the regenerated profile into Companion 4.2.6 (replacing the stale `localhost:3000` config), walk runner steps 3→5, verify each control end-to-end (deck → TotalMix console readback → app UI echo), tune detent step / acceleration / LCD legibility live, operator sign-off, Publish. Docs: OPERATIONS "Stream Deck Audio Surface" section (layout diagram, trigger setup, recovery), CHANGELOG entry. Optional: `#[ignore]` hardware test in the `native:test:hardware` lane (currently empty).
 
