@@ -25,6 +25,7 @@ use crate::planning::{
 };
 use crate::planning_settings::{PLANNING_SETTINGS_PREFIX, SORT_BY_KEY};
 use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
+use crate::shell_settings::{DEFAULT_WORKSPACE, SHELL_SETTINGS_PREFIX, WORKSPACE_KEY};
 use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owned};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -184,8 +185,44 @@ pub fn read_control_surface_context(db_path: &Path) -> Result<Value, ControlSurf
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let context = read_planning_context(db_path, &planning_settings)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
+    let (app_settings, audio_snapshot) = current_audio_snapshot(db_path)?;
+    let bank = audio_deck_bank(&app_settings);
+    let strips = (1..=4)
+        .map(
+            |strip_index| match resolve_audio_deck_strip(&audio_snapshot, &bank, strip_index) {
+                Ok(AudioDeckStrip::Channel(channel)) => json!({
+                    "position": strip_index,
+                    "kind": "channel",
+                    "id": channel.id,
+                    "name": channel.name,
+                }),
+                Ok(AudioDeckStrip::MixTarget(target)) => json!({
+                    "position": strip_index,
+                    "kind": "mixTarget",
+                    "id": target.id,
+                    "name": target.name,
+                }),
+                Err(_) => json!({
+                    "position": strip_index,
+                    "kind": "empty",
+                    "id": Value::Null,
+                    "name": Value::Null,
+                }),
+            },
+        )
+        .collect::<Vec<_>>();
 
     Ok(json!({
+        "workspace": read_active_workspace(db_path)?,
+        "audio": {
+            "status": audio_snapshot.status,
+            "gated": audio_deck_gate_label(&audio_snapshot).is_some(),
+            "bank": bank,
+            "dialMode": audio_deck_dial_mode(&app_settings),
+            "selectedMixTargetId": audio_snapshot.selected_mix_target_id,
+            "selectedChannelId": audio_snapshot.selected_channel_id,
+            "strips": strips,
+        },
         "selectedProject": context.selected_project,
         "projectIndex": context.project_index,
         "projectCount": context.project_count,
@@ -343,34 +380,221 @@ pub fn read_control_surface_lcd_text(
             }
             Ok(String::from("SCENE\\n(none)\\n--"))
         }
-        "audio_ch_nav" | "audio_gain1" | "audio_gain2" | "audio_gain3" => {
-            let channel_index = match key {
-                "audio_ch_nav" => 0,
-                "audio_gain1" => 1,
-                "audio_gain2" => 2,
-                "audio_gain3" => 3,
-                _ => 0,
-            };
-
-            let preamp = audio_snapshot
-                .channels
-                .iter()
-                .filter(|channel| channel.role == AUDIO_ROLE_FRONT_PREAMP)
-                .nth(channel_index);
-            if let Some(channel) = preamp {
-                Ok(format!(
-                    "{}\\n{}dB{}",
-                    truncate(&channel.name, 12),
-                    channel.gain,
-                    if channel.mute { " M" } else { "" }
-                ))
-            } else {
-                Ok(format!("CH {}\\n(none)", channel_index + 1))
-            }
+        "audio_strip_1" | "audio_strip_2" | "audio_strip_3" | "audio_strip_4" => {
+            let strip_index = key
+                .rsplit('_')
+                .next()
+                .and_then(|value| value.parse::<usize>().ok())
+                .unwrap_or(1);
+            Ok(audio_strip_lcd_text(
+                &app_settings,
+                &audio_snapshot,
+                strip_index,
+            ))
         }
+        "audio_key_1" | "audio_key_2" | "audio_key_3" | "audio_key_4" | "audio_key_5"
+        | "audio_key_6" | "audio_key_7" | "audio_key_8" => {
+            let key_index = key
+                .rsplit('_')
+                .next()
+                .and_then(|value| value.parse::<usize>().ok())
+                .unwrap_or(1);
+            Ok(audio_key_lcd_text(
+                &app_settings,
+                &audio_snapshot,
+                key_index,
+            ))
+        }
+        "workspace" => read_active_workspace(db_path),
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported LCD key: {key}"
         ))),
+    }
+}
+
+fn read_active_workspace(db_path: &Path) -> Result<String, ControlSurfaceError> {
+    let shell_settings = list_settings_by_prefix(db_path, SHELL_SETTINGS_PREFIX)
+        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
+    Ok(shell_settings
+        .get(WORKSPACE_KEY)
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| String::from(DEFAULT_WORKSPACE)))
+}
+
+// Mirrors the operator app's fader curve (normalizedToFaderDb in
+// frontend/app/src/app/audio/audioFormatting.ts) — the deck and the screen
+// must always print the same dB number for the same wire value.
+fn audio_fader_db_label(value: f64) -> String {
+    let normalized = if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    if normalized <= 0.0 {
+        return String::from("-\u{221e} dB");
+    }
+    let db = if normalized >= 1.0 {
+        6.0
+    } else if normalized <= 0.7 {
+        -60.0 + (normalized / 0.7) * 50.0
+    } else if normalized <= 0.8 {
+        -10.0 + ((normalized - 0.7) / 0.1) * 10.0
+    } else {
+        ((normalized - 0.8) / 0.2) * 6.0
+    };
+    format!("{db:+.1} dB")
+}
+
+fn audio_deck_gate_label(snapshot: &AudioSnapshot) -> Option<&'static str> {
+    if !snapshot.osc_enabled {
+        return Some("OSC OFF");
+    }
+    match snapshot.status.as_str() {
+        "ready" => None,
+        "attention" => Some("CHECK OSC"),
+        "not-verified" => Some("NOT VERIFIED"),
+        _ => Some("OFFLINE"),
+    }
+}
+
+fn audio_mix_target_short_label(role: &str) -> &'static str {
+    match role {
+        "main-out" => "MAIN",
+        "phones-a" => "PH1",
+        "phones-b" => "PH2",
+        _ => "MIX",
+    }
+}
+
+fn audio_selected_mix_target_label(snapshot: &AudioSnapshot) -> &'static str {
+    snapshot
+        .mix_targets
+        .iter()
+        .find(|target| target.id == snapshot.selected_mix_target_id)
+        .map(|target| audio_mix_target_short_label(&target.role))
+        .unwrap_or("MIX")
+}
+
+fn audio_strip_lcd_text(
+    app_settings: &HashMap<String, String>,
+    snapshot: &AudioSnapshot,
+    strip_index: usize,
+) -> String {
+    if let Some(gate) = audio_deck_gate_label(snapshot) {
+        return format!("AUDIO\\n{gate}");
+    }
+
+    let bank = audio_deck_bank(app_settings);
+    let dial_mode = audio_deck_dial_mode(app_settings);
+    match resolve_audio_deck_strip(snapshot, &bank, strip_index) {
+        Ok(AudioDeckStrip::Channel(channel)) => {
+            let marker = if snapshot.selected_channel_id.as_deref() == Some(channel.id.as_str()) {
+                "\u{2022} "
+            } else {
+                ""
+            };
+            let name = truncate(&channel.name, 10);
+            if bank == "inputs" && dial_mode == "gain" {
+                format!("{marker}{name}\\nGAIN {} dB", channel.gain)
+            } else {
+                let level = channel
+                    .mix_levels
+                    .get(&snapshot.selected_mix_target_id)
+                    .copied()
+                    .unwrap_or(channel.fader);
+                let level_line = if channel.mute {
+                    String::from("MUTED")
+                } else {
+                    audio_fader_db_label(level)
+                };
+                format!(
+                    "{marker}{name}\\n{level_line}\\n\u{2192}{}",
+                    audio_selected_mix_target_label(snapshot)
+                )
+            }
+        }
+        Ok(AudioDeckStrip::MixTarget(target)) => {
+            let marker = if snapshot.selected_mix_target_id == target.id {
+                "\u{2022} "
+            } else {
+                ""
+            };
+            let level_line = if target.mute {
+                String::from("MUTED")
+            } else {
+                audio_fader_db_label(target.volume)
+            };
+            format!(
+                "{marker}{}\\n{level_line}\\nOUTPUT",
+                truncate(&target.name, 10)
+            )
+        }
+        Err(_) => String::from("\u{2014}\\n(no strip)"),
+    }
+}
+
+fn audio_key_lcd_text(
+    app_settings: &HashMap<String, String>,
+    snapshot: &AudioSnapshot,
+    key_index: usize,
+) -> String {
+    let gate = audio_deck_gate_label(snapshot);
+    let main = audio_main_mix_target(snapshot);
+    match key_index {
+        1..=3 => {
+            let role = match key_index {
+                1 => "main-out",
+                2 => "phones-a",
+                _ => "phones-b",
+            };
+            let label = audio_mix_target_short_label(role);
+            let active = snapshot
+                .mix_targets
+                .iter()
+                .find(|target| target.role == role)
+                .is_some_and(|target| target.id == snapshot.selected_mix_target_id);
+            if active {
+                format!("\u{2192} {label}\\n\u{25cf} ACTIVE")
+            } else {
+                format!("\u{2192} {label}\\n")
+            }
+        }
+        4 => format!("BANK\\n{}", audio_deck_bank(app_settings).to_uppercase()),
+        5 => match (gate, main) {
+            (None, Some(main)) => format!("DIM\\n{}", if main.dim { "ON" } else { "OFF" }),
+            _ => String::from("DIM\\n--"),
+        },
+        6 => {
+            if audio_deck_bank(app_settings) == "inputs" {
+                format!(
+                    "GAIN\\n{}",
+                    if audio_deck_dial_mode(app_settings) == "gain" {
+                        "ON"
+                    } else {
+                        "OFF"
+                    }
+                )
+            } else {
+                String::from("GAIN\\nN/A")
+            }
+        }
+        7 => match (gate, main) {
+            (None, Some(main)) => format!("TALK\\n{}", if main.talkback { "LIVE" } else { "HOLD" }),
+            _ => String::from("TALK\\n--"),
+        },
+        8 => {
+            if gate.is_some() {
+                return String::from("SOLO\\n--");
+            }
+            let soloed = snapshot.channels.iter().filter(|entry| entry.solo).count();
+            if soloed > 0 {
+                format!("SOLO\\n{soloed} LIVE")
+            } else {
+                String::from("SOLO\\nCLEAR")
+            }
+        }
+        _ => String::from("--"),
     }
 }
 
@@ -2321,21 +2545,173 @@ mod tests {
     }
 
     #[test]
-    fn audio_lcd_keys_read_real_preamp_state() {
-        let test_dir = ready_audio_test_db("lcd-real");
-        handle_audio_action(test_dir.db_path().as_path(), "dialPress", Some("1"))
-            .expect("mute should engage");
+    fn audio_fader_db_label_mirrors_the_app_curve() {
+        assert_eq!(audio_fader_db_label(0.0), "-\u{221e} dB");
+        assert_eq!(audio_fader_db_label(0.35), "-35.0 dB");
+        assert_eq!(audio_fader_db_label(0.7), "-10.0 dB");
+        assert_eq!(audio_fader_db_label(0.75), "-5.0 dB");
+        assert_eq!(audio_fader_db_label(0.8), "+0.0 dB");
+        assert_eq!(audio_fader_db_label(0.9), "+3.0 dB");
+        assert_eq!(audio_fader_db_label(1.0), "+6.0 dB");
+    }
 
-        let text = read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_ch_nav")
+    #[test]
+    fn audio_strip_lcd_shows_gate_reason_until_verified() {
+        let test_dir = TestDir::new("lcd-gated");
+        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+
+        let text = read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_strip_1")
+            .expect("lcd text should render");
+        assert_eq!(text, "AUDIO\\nNOT VERIFIED");
+        let key_text = read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_key_5")
+            .expect("lcd text should render");
+        assert_eq!(key_text, "DIM\\n--");
+    }
+
+    #[test]
+    fn audio_strip_lcd_renders_live_state_with_selection_and_mute() {
+        let test_dir = ready_audio_test_db("lcd-live");
+        let db_path = test_dir.db_path();
+
+        let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
             .expect("lcd text should render");
         assert!(
             text.contains("Host"),
-            "lcd should show the channel name: {text}"
+            "strip should name the channel: {text}"
         );
-        assert!(text.contains("dB"), "lcd should show a gain value: {text}");
+        assert!(text.contains("dB"), "strip should show a level: {text}");
         assert!(
-            text.ends_with(" M"),
-            "lcd should flag the live mute: {text}"
+            text.contains("\u{2192}MAIN"),
+            "strip should show the active target: {text}"
         );
+
+        handle_audio_action(db_path.as_path(), "stripTap", Some("1"))
+            .expect("tap should select the strip");
+        let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
+            .expect("lcd text should render");
+        assert!(
+            text.starts_with("\u{2022} Host"),
+            "selected strip should carry the marker: {text}"
+        );
+
+        handle_audio_action(db_path.as_path(), "dialPress", Some("1")).expect("mute should engage");
+        let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
+            .expect("lcd text should render");
+        assert!(
+            text.contains("MUTED"),
+            "muted strip should say MUTED instead of a level: {text}"
+        );
+
+        handle_audio_action(db_path.as_path(), "toggleDialMode", None)
+            .expect("gain mode should engage");
+        let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
+            .expect("lcd text should render");
+        assert!(
+            text.contains("GAIN 34 dB"),
+            "gain mode should show the preamp gain: {text}"
+        );
+    }
+
+    #[test]
+    fn audio_key_lcd_reflects_target_bank_and_talk() {
+        let test_dir = ready_audio_test_db("lcd-keys");
+        let db_path = test_dir.db_path();
+
+        assert_eq!(
+            read_control_surface_lcd_text(db_path.as_path(), "audio_key_1")
+                .expect("lcd text should render"),
+            "\u{2192} MAIN\\n\u{25cf} ACTIVE"
+        );
+        assert_eq!(
+            read_control_surface_lcd_text(db_path.as_path(), "audio_key_2")
+                .expect("lcd text should render"),
+            "\u{2192} PH1\\n"
+        );
+
+        handle_audio_action(db_path.as_path(), "setMixTarget", Some("phones-a"))
+            .expect("target switch should succeed");
+        assert_eq!(
+            read_control_surface_lcd_text(db_path.as_path(), "audio_key_2")
+                .expect("lcd text should render"),
+            "\u{2192} PH1\\n\u{25cf} ACTIVE"
+        );
+
+        assert_eq!(
+            read_control_surface_lcd_text(db_path.as_path(), "audio_key_4")
+                .expect("lcd text should render"),
+            "BANK\\nINPUTS"
+        );
+        assert_eq!(
+            read_control_surface_lcd_text(db_path.as_path(), "audio_key_7")
+                .expect("lcd text should render"),
+            "TALK\\nHOLD"
+        );
+        handle_audio_action(db_path.as_path(), "talkOn", None).expect("talk should engage");
+        assert_eq!(
+            read_control_surface_lcd_text(db_path.as_path(), "audio_key_7")
+                .expect("lcd text should render"),
+            "TALK\\nLIVE"
+        );
+        handle_audio_action(db_path.as_path(), "talkOff", None).expect("talk should release");
+
+        assert_eq!(
+            read_control_surface_lcd_text(db_path.as_path(), "audio_key_8")
+                .expect("lcd text should render"),
+            "SOLO\\nCLEAR"
+        );
+    }
+
+    #[test]
+    fn workspace_lcd_key_reads_shell_workspace() {
+        let test_dir = TestDir::new("workspace-key");
+        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+
+        assert_eq!(
+            read_control_surface_lcd_text(test_dir.db_path().as_path(), "workspace")
+                .expect("workspace key should render"),
+            DEFAULT_WORKSPACE
+        );
+
+        set_settings_owned(
+            test_dir.db_path().as_path(),
+            &[(String::from(WORKSPACE_KEY), String::from("audio"))],
+        )
+        .expect("workspace should persist");
+        assert_eq!(
+            read_control_surface_lcd_text(test_dir.db_path().as_path(), "workspace")
+                .expect("workspace key should render"),
+            "audio"
+        );
+    }
+
+    #[test]
+    fn context_includes_workspace_and_audio_deck_block() {
+        let test_dir = ready_audio_test_db("context-audio");
+        let db_path = test_dir.db_path();
+
+        let context = read_control_surface_context(db_path.as_path()).expect("context should load");
+        assert_eq!(context["workspace"], DEFAULT_WORKSPACE);
+        assert_eq!(context["audio"]["bank"], "inputs");
+        assert_eq!(context["audio"]["gated"], false);
+        let strips = context["audio"]["strips"]
+            .as_array()
+            .expect("strips should be an array");
+        assert_eq!(strips.len(), 4);
+        assert_eq!(strips[0]["id"], "audio-input-9");
+
+        handle_audio_action(db_path.as_path(), "cycleBank", None).expect("cycle should succeed");
+        handle_audio_action(db_path.as_path(), "cycleBank", None).expect("cycle should succeed");
+        let context = read_control_surface_context(db_path.as_path()).expect("context should load");
+        assert_eq!(context["audio"]["bank"], "outputs");
+        assert_eq!(context["audio"]["strips"][3]["kind"], "empty");
+    }
+
+    #[test]
+    fn legacy_audio_lcd_keys_are_gone() {
+        let test_dir = ready_audio_test_db("lcd-legacy");
+        assert!(matches!(
+            read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_ch_nav"),
+            Err(ControlSurfaceError::InvalidParams(_))
+        ));
     }
 }

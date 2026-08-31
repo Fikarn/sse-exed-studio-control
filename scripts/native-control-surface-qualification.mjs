@@ -282,7 +282,8 @@ async function main() {
 
     const contextBefore = await fetchJson(`${expectedBaseUrl}/api/deck/context`);
     const lcdProjectNav = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=project_nav`);
-    const lcdAudioBefore = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_ch_nav`);
+    const lcdAudioBefore = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_strip_1`);
+    const lcdWorkspace = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=workspace`);
 
     assert(
       typeof contextBefore.projectCount === "number" &&
@@ -291,12 +292,23 @@ async function main() {
       "Packaged control-surface bridge qualification failed: GET /api/deck/context returned an invalid planning context payload."
     );
     assert(
+      typeof contextBefore.workspace === "string" &&
+        typeof contextBefore.audio?.bank === "string" &&
+        Array.isArray(contextBefore.audio?.strips) &&
+        contextBefore.audio.strips.length === 4,
+      "Packaged control-surface bridge qualification failed: GET /api/deck/context is missing the workspace or audio deck block."
+    );
+    assert(
       typeof lcdProjectNav === "string" && lcdProjectNav.includes("PROJECT"),
       "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=project_nav did not return the expected LCD text."
     );
     assert(
-      typeof lcdAudioBefore === "string" && lcdAudioBefore.includes("dB"),
-      "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=audio_ch_nav did not return the expected audio LCD text."
+      typeof lcdAudioBefore === "string" && lcdAudioBefore.length > 0,
+      "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=audio_strip_1 did not return audio strip text."
+    );
+    assert(
+      typeof lcdWorkspace === "string" && lcdWorkspace.length > 0,
+      "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=workspace did not return the active workspace."
     );
 
     const filterResponse = await postJson(`${expectedBaseUrl}/api/deck/action`, {
@@ -365,16 +377,14 @@ async function main() {
         "Packaged control-surface bridge qualification failed: the deck mute did not land in the real audio.snapshot channel state."
       );
 
-      lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_ch_nav`);
+      lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_strip_1`);
       assert(
-        typeof lcdAudioAfter === "string" &&
-          lcdAudioAfter.includes("dB") &&
-          (!audioResponse.mute || lcdAudioAfter.includes(" M")),
-        "Packaged control-surface bridge qualification failed: audio LCD state did not reflect the mute action."
+        typeof lcdAudioAfter === "string" && (!audioResponse.mute || lcdAudioAfter.includes("MUTED")),
+        "Packaged control-surface bridge qualification failed: audio strip LCD did not reflect the mute action."
       );
       assert(
         lcdAudioAfter !== lcdAudioBefore,
-        "Packaged control-surface bridge qualification failed: audio LCD state did not change after the mute action."
+        "Packaged control-surface bridge qualification failed: audio strip LCD did not change after the mute action."
       );
     } else {
       audioResponse = await postJsonExpectingStatus(
@@ -389,10 +399,10 @@ async function main() {
         typeof audioResponse?.error === "string" && audioResponse.error.length > 0,
         "Packaged control-surface bridge qualification failed: gated audio dialTurn did not return the rejection reason."
       );
-      lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_ch_nav`);
+      lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_strip_1`);
       assert(
-        typeof lcdAudioAfter === "string" && lcdAudioAfter.includes("dB"),
-        "Packaged control-surface bridge qualification failed: audio LCD text stopped rendering in the gated state."
+        typeof lcdAudioAfter === "string" && lcdAudioAfter.startsWith("AUDIO"),
+        "Packaged control-surface bridge qualification failed: gated audio strips must render the gate reason."
       );
     }
 
@@ -400,6 +410,7 @@ async function main() {
       contextBefore,
       lcdProjectNav,
       lcdAudioBefore,
+      lcdWorkspace,
       filterResponse,
       contextAfterFilter,
       planningAfterFilter: {

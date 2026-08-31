@@ -50,6 +50,9 @@ function clamp01(value: number) {
 export const AUDIO_FADER_UNITY = 0.8;
 export const AUDIO_FADER_UNITY_SNAP = 0.02;
 
+// Mirrored in the engine's control-surface bridge (audio_fader_db_label in
+// native/rust-engine/src/control_surface.rs) — the Stream Deck LCD and the
+// on-screen fader must always print the same dB number for the same value.
 export function normalizedToFaderDb(value: number) {
   const normalized = clamp01(value);
   if (normalized <= 0) return Number.NEGATIVE_INFINITY;

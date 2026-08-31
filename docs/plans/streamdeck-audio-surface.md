@@ -84,7 +84,7 @@ Rewire `handle_audio_action` to the vocabulary above; delete `AUDIO_STATE_KEY` a
 
 ### S2 — Engine: LCD + context truth
 
-Status: pending.
+Status: complete (2026-08-31). New LCD keys `audio_strip_1..4` / `audio_key_1..8` / `workspace` render engine-baked text (app-curve dB mirror with the cross-reference comment on both sides; gate reason instead of values when audio is not verified; selection markers, MUTED, GAIN mode, active-target arrows). Context now carries `workspace` plus an `audio` block (bank, dialMode, selection, gated, resolved strips). Legacy `audio_ch_nav`/`audio_gain1-3` keys removed; qualification script asserts the new keys and the context block. Validation: fmt/clippy clean, 232 engine tests green (+6), live spawned-engine probe confirmed all new keys and the context payload.
 
 New LCD keys with engine-side app-curve dB formatting (mirror `audioFormatting.ts:50-73`; comment the mirror obligation both sides), `workspace` key reading `shell.workspace`, context additions. Tests for every key's format, gated rendering, and the workspace read. Validation: as S1.
 
