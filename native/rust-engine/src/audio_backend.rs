@@ -5,7 +5,8 @@ use crate::audio::{
 };
 use crate::audio_meter_fixture::{real_speech_body_level_at, real_speech_peak_level_at};
 use crate::rme_totalmix_osc::{
-    send_totalmix_eq_update, RME_TOTALMIX_OSC_SOURCE, SIMULATED_AUDIO_SOURCE,
+    send_totalmix_channel_update, send_totalmix_eq_update, send_totalmix_mix_target_update,
+    RME_TOTALMIX_OSC_SOURCE, SIMULATED_AUDIO_SOURCE,
 };
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -655,11 +656,11 @@ impl AudioBackend for RmeTotalMixOscBackend {
                 )
             })?;
 
+        let report =
+            send_totalmix_channel_update(&config.send_host, config.send_port, channel, request)?;
+
         Ok(AudioChannelUpdateOutcome {
-            summary: format!(
-                "Native audio state for '{}' was updated. Live meter truth remains sourced from RME TotalMix OSC packets.",
-                channel.name
-            ),
+            summary: totalmix_update_summary(&channel.name, &report),
         })
     }
 
@@ -681,11 +682,15 @@ impl AudioBackend for RmeTotalMixOscBackend {
                 )
             })?;
 
+        let report = send_totalmix_mix_target_update(
+            &config.send_host,
+            config.send_port,
+            &mix_target.id,
+            request,
+        )?;
+
         Ok(AudioMixTargetUpdateOutcome {
-            summary: format!(
-                "Native audio state for '{}' was updated. Live meter truth remains sourced from RME TotalMix OSC packets.",
-                mix_target.name
-            ),
+            summary: totalmix_update_summary(&mix_target.name, &report),
         })
     }
 
@@ -729,6 +734,29 @@ impl AudioBackend for RmeTotalMixOscBackend {
             hardware_status: String::from("pending"),
         })
     }
+}
+
+fn totalmix_update_summary(
+    surface_name: &str,
+    report: &crate::rme_totalmix_osc::TotalMixSendReport,
+) -> String {
+    let mut summary = if report.sent == 0 {
+        format!("Updated local state for '{surface_name}'; no TotalMix OSC command applied.")
+    } else {
+        format!(
+            "Sent {} TotalMix command{} for '{}'; hardware confirmation is pending.",
+            report.sent,
+            if report.sent == 1 { "" } else { "s" },
+            surface_name
+        )
+    };
+    if !report.local_only.is_empty() {
+        summary.push_str(&format!(
+            " App-local only: {}.",
+            report.local_only.join(", ")
+        ));
+    }
+    summary
 }
 
 fn ensure_transport_configured(config: &AudioBackendConfig) -> Result<(), String> {

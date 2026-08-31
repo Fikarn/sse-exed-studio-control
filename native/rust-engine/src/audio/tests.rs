@@ -415,7 +415,7 @@ fn audio_clip_clear_resets_live_rme_clip_latch() {
             state.apply_message(
                 crate::rme_totalmix_osc::RmeTotalMixBus::Input,
                 &rosc::OscMessage {
-                    addr: "/1/level9LeftVal".to_string(),
+                    addr: "/1/level1LeftVal".to_string(),
                     args: vec![rosc::OscType::String("0.0 dB".to_string())],
                 },
                 1_000,
@@ -423,7 +423,7 @@ fn audio_clip_clear_resets_live_rme_clip_latch() {
             state.apply_message(
                 crate::rme_totalmix_osc::RmeTotalMixBus::Input,
                 &rosc::OscMessage {
-                    addr: "/1/level9LeftVal".to_string(),
+                    addr: "/1/level1LeftVal".to_string(),
                     args: vec![rosc::OscType::String("-24.0 dB".to_string())],
                 },
                 1_033,

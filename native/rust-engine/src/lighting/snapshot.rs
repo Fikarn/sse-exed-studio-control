@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::net::Ipv4Addr;
+use std::str::FromStr;
 
 use super::editor_state::*;
 use super::fade::apply_active_fade_sample;
@@ -233,6 +235,65 @@ pub fn read_lighting_dmx_monitor_snapshot(
     });
 
     LightingDmxMonitorSnapshot { channels }
+}
+
+/// One rendered sACN universe: the full 512-slot DMX payload for the wire.
+pub struct LightingUniverseFrame {
+    pub universe: u16,
+    pub slots: [u8; 512],
+}
+
+/// Everything the sACN output lane needs for one transmission pass.
+pub struct LightingSacnOutputState {
+    pub bridge_ip: Ipv4Addr,
+    pub frames: Vec<LightingUniverseFrame>,
+}
+
+/// Renders the current lighting state into per-universe DMX frames for the
+/// native sACN output. Returns `None` while output must stay dark: lighting
+/// disabled, no valid commissioned bridge address, or nothing patched. The
+/// slot values are the same numbers the operator sees in the DMX monitor —
+/// both read through `compute_dmx_channel_data`, so UI and wire cannot drift.
+pub fn read_lighting_sacn_output_state(
+    settings: &HashMap<String, String>,
+) -> Option<LightingSacnOutputState> {
+    let snapshot = read_lighting_snapshot(settings);
+    if !snapshot.enabled || snapshot.fixtures.is_empty() {
+        return None;
+    }
+    let bridge_ip = Ipv4Addr::from_str(snapshot.bridge_ip.trim()).ok()?;
+
+    let channel_data = compute_dmx_channel_data(&snapshot);
+    let mut universes: Vec<i64> = snapshot
+        .fixtures
+        .iter()
+        .map(|fixture| fixture.universe)
+        .filter(|universe| (1..=63999).contains(universe))
+        .collect();
+    universes.sort_unstable();
+    universes.dedup();
+
+    let frames: Vec<LightingUniverseFrame> = universes
+        .into_iter()
+        .map(|universe| {
+            let mut slots = [0_u8; 512];
+            for ((frame_universe, channel), value) in &channel_data {
+                if *frame_universe == universe && (1..=512).contains(channel) {
+                    slots[(*channel - 1) as usize] = (*value).clamp(0, 255) as u8;
+                }
+            }
+            LightingUniverseFrame {
+                universe: universe as u16,
+                slots,
+            }
+        })
+        .collect();
+
+    if frames.is_empty() {
+        return None;
+    }
+
+    Some(LightingSacnOutputState { bridge_ip, frames })
 }
 
 pub fn build_lighting_health_check(settings: &HashMap<String, String>) -> LightingHealthCheck {

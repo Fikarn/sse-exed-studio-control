@@ -29,6 +29,16 @@ This document describes runtime behavior and operator recovery for the native `S
 - Clean-start or reset machines route back to `commissioning`.
 - Corrupt storage, runtime-path failures, and protocol mismatches surface recovery details through the native health and support snapshots.
 
+## Lighting Output
+
+The engine streams the lighting state to the commissioned bridge as unicast sACN (ANSI E1.31) on UDP `5568`.
+
+- Output is active only while all three hold: lighting is enabled, the commissioned bridge IP is a valid IPv4 address, and at least one fixture is patched.
+- While active, the engine transmits the current state continuously: changed frames within one 40 ms tick, unchanged frames re-sent as keep-alives about every 800 ms. Scene fades, the grand master, and identify/highlight/solo overlays are rendered into the wire exactly as the DMX monitor shows them.
+- This is an intentional live-state write on engine start: when the app launches with commissioned lighting, the rig immediately receives the persisted fixture state. Review fixture on/off state before launch if the studio must stay dark.
+- When output becomes ineligible (lighting toggled off, bridge cleared, all fixtures deleted), the engine sends E1.31 stream-terminated packets and stops. Fixtures then hold their last received levels per DMX convention; use Cut all or fixture controls to black out before disabling output.
+- The bridge must be configured to route the app's sACN universe to its DMX/CRMX output, and each physical fixture must match the patched DMX address, mode, and universe shown on the lighting page.
+
 ## Operator Recovery
 
 ### Lights stop responding
@@ -59,6 +69,28 @@ The audio page is a control surface for the fixed RME Fireface UFX III workstati
 4. Run the audio commissioning probe. It passes only after mapped meter packets are received; a successful UDP bind alone is not verification.
 5. If the app reports `STALE` or `OFFLINE`, treat the displayed meters as unavailable until packet flow is restored. Do not trust simulated movement unless the UI explicitly shows simulated input mode.
 6. Treat audio-page meters as live console channel-strip meters: the visible reference is `-18 dBFS`, meter-point over is separate from the latched channel clip state, and the operator can toggle or reset the held peak marks from the audio canvas peak controls.
+
+### Audio Control Output
+
+Audio-page edits are transmitted to TotalMix over the Global OSC remote (send port base `+3`, default `7004`), using RME's official Global OSC protocol (2026-07-21 table). Everything is addressed by 0-based hardware channel number, so the TotalMix mixer layout never shifts control targets, and every value is absolute state — app and console cannot invert against each other.
+
+- Channel faders ride `/mix/{in|pb}/{ch}/{out}/faderlin` (linear 0..1, the app's own fader scale) to the requested submix — Main (out 0), Phones 1 (out 8), or Phones 2 (out 10). Output levels ride `/output/{ch}/faderlin`.
+- Mute (`/input|playback|output/{ch}/mute`), solo (`/mix/{in|pb}/{ch}/0/solo`, main submix), phantom (`/input/{ch}/48v`), phase, pad, instrument, and auto-set are absolute 0/1 states.
+- Dim, mono, and talkback are control-room functions (`/controlroom/dim|mainmono|talkback`) — sent for the main out, app-local for the phones targets.
+- Preamp gain is sent in real dB (`/input/{ch}/gain`) for the front preamps 9-12.
+- The TotalMix Channel Layout gates whether TotalMix accepts control on hidden channels ("Receive on hidden channels" in the Global OSC details); keep the channels the operator drives visible, or enable that option.
+- EQ and Low Cut edits still use the classic page-2 path on the first classic remote; the classic remotes otherwise serve as metering fallback, and the engine keeps pinning their bus/bank each second.
+- Per RME's protocol notes, disable "Follow Submix" / submix lock on the Global OSC remote.
+
+### Metering over Global OSC (TotalMix FX 2.1+)
+
+All metering prefers TotalMix's Global OSC interface on a dedicated fourth remote. The engine listens on receive port base `+3` (default `9004`) and primes/keeps the stream alive with `/sendall` + `/sendstate` to send port base `+3` (default `7004`); `/level/{in|pb|out}/{ch}` peak-dB messages (RME's official Global OSC protocol table, 2026-07-21 revision) feed every meter surface on 0-based hardware channel numbering — inputs 1-12, playback pairs (right channel = left + 1), Main out `0/1`, Phones `8/9` and `10/11`. Hardware numbering never shifts with the mixer layout, so while this stream is live it is the meter authority and the layout-sensitive classic bank levels are suppressed (they remain as fallback if the Global OSC stream stops). Per RME's protocol notes, the Channel Layout still gates Global OSC data for hidden channels — keep the mapped channels (front preamps 9-12, playback pairs in use, Main and Phones outputs) visible in the layout. The slot is inert until commissioned.
+
+To commission it on the workstation:
+
+1. TotalMix FX must be version `2.1` or newer (Global OSC is the 2.1 headline feature; `2.0x` does not have it). The 2.1 beta is distributed on the RME TotalMix FX beta page as a manual file replacement — keep a backup of the previous `TotalMixFX_x64.exe` for rollback.
+2. In `Options → Settings → OSC`, select remote controller `4`: `In Use` checked, compatibility/mode set to `Global OSC`, IP `127.0.0.1`, port incoming `7004`, port outgoing `9004`, and enable the send-changes/send-status details if the dialog offers them. Leave remotes 1-3 untouched in classic mode.
+3. No app restart is needed — the engine re-primes the slot within seconds and the Main Out / Phones meters go live.
 
 ### Control-surface bridge stops responding
 

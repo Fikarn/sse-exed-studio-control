@@ -11,6 +11,7 @@ mod exports;
 mod legacy_import;
 mod lighting;
 mod lighting_backend;
+mod lighting_sacn_output;
 mod parity_fixtures;
 mod planning;
 mod planning_settings;
@@ -375,6 +376,10 @@ fn main() -> io::Result<()> {
     let (output_sender, output_receiver) = mpsc::channel::<Value>();
     spawn_output_writer(output_receiver);
     send_output(&output_sender, app.ready_event())?;
+    lighting_sacn_output::spawn_lighting_sacn_output(
+        planned_paths.db_path.clone(),
+        planned_paths.log_file_path.clone(),
+    );
     if app.should_emit_simulated_audio_meter_ticks() {
         spawn_simulated_audio_meter_ticks(output_sender.clone(), planned_paths.db_path);
     } else if app.should_emit_rme_totalmix_audio_metering() {
