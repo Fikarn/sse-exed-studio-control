@@ -44,6 +44,7 @@ mod types;
 
 pub use channels::*;
 pub use clips::*;
+pub(crate) use helpers::ensure_audio_action_allowed;
 pub use mix_targets::*;
 pub use parse::*;
 pub use settings::*;

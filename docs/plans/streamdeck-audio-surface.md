@@ -78,7 +78,7 @@ After any mutating audio action the bridge emits `audio.changed` so the open Aud
 
 ### S1 — Engine: real audio deck actions
 
-Status: in progress (started 2026-08-31).
+Status: complete (2026-08-31). All vocabulary actions land in the real audio path; shadow blob deleted; legacy `audio_ch_nav`/`audio_gain1-3` LCD keys read real preamp state until S2 replaces them; `switchToDeckMode`/`recallSnapshot` retained (recall now emits `audio.changed`). Validation: `cargo fmt`/`clippy -D warnings` clean, 226 engine tests green (+14 new handler/resolution tests), and a live spawned-engine HTTP probe confirmed gating (409 before probe pass), ×5 fast-turn acceleration, watchdog talkback auto-release with no `talkOff`, and 7 `audio.changed` emissions through the stdout event pipeline. Drive-by fix in the same file: `persist_optional_setting` deleted from a nonexistent `settings` table (now `app_settings`) — latent 500 on the lighting deck's clear-selection path.
 
 Rewire `handle_audio_action` to the vocabulary above; delete `AUDIO_STATE_KEY` and the shadow blob; add gating, per-strip acceleration, the talkback watchdog, and `audio.changed` emission from bridge threads. Strip-resolution table (bank × strip → channel/mixTarget id) with unit tests; action-handler tests against a temp DB (the file currently has zero handler coverage). Update `scripts/native-control-surface-qualification.mjs` audio round-trip to assert a `dialTurn`/`dialPress` lands in `audio.snapshot` (not the removed shadow state). Validation: `npm run native:check`, `npm run native:test`, `npm run rust:clippy`, `npm run native:bridge:win:verify` (packaged).
 

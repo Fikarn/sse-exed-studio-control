@@ -265,7 +265,7 @@ pub(super) fn resolve_audio_config(settings: &HashMap<String, String>) -> AudioB
     }
 }
 
-pub(super) fn ensure_audio_action_allowed(
+pub(crate) fn ensure_audio_action_allowed(
     db_path: &Path,
     snapshot: &AudioSnapshot,
 ) -> Result<(), AudioCommandError> {

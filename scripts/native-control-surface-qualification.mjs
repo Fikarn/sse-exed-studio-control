@@ -122,6 +122,33 @@ async function postJson(url, body) {
   });
 }
 
+async function postJsonExpectingStatus(url, body, expectedStatus) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    assert(
+      response.status === expectedStatus,
+      `Packaged control-surface bridge qualification failed: POST ${url} returned ${response.status} but the qualification expected ${expectedStatus}: ${text}`
+    );
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function writeSummary(qualificationRoot, summary) {
   mkdirSync(qualificationRoot, { recursive: true });
   writeFileSync(path.join(qualificationRoot, "summary.json"), JSON.stringify(summary, null, 2), "utf8");
@@ -303,26 +330,71 @@ async function main() {
       "Packaged control-surface bridge qualification failed: lighting deck-mode changes did not persist into planning.snapshot."
     );
 
-    const audioResponse = await postJson(`${expectedBaseUrl}/api/deck/audio-action`, {
-      action: "toggleMute",
-      value: "1",
+    const mixTargetResponse = await postJson(`${expectedBaseUrl}/api/deck/audio-action`, {
+      action: "setMixTarget",
+      value: "phones-a",
     });
     assert(
-      typeof audioResponse?.mute === "boolean",
-      "Packaged control-surface bridge qualification failed: POST /api/deck/audio-action did not return the channel mute state."
+      mixTargetResponse?.selectedMixTargetId === "audio-mix-phones-a",
+      "Packaged control-surface bridge qualification failed: POST /api/deck/audio-action setMixTarget did not select Phones 1."
     );
 
-    const lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_ch_nav`);
+    const audioAfterMixTarget = await harness.request("bridge-qualification-audio-mix-target", "audio.snapshot");
     assert(
-      typeof lcdAudioAfter === "string" &&
-        lcdAudioAfter.includes("dB") &&
-        lcdAudioAfter.includes(audioResponse.mute ? " M" : "dB"),
-      "Packaged control-surface bridge qualification failed: audio LCD state did not reflect the mute action."
+      audioAfterMixTarget?.selectedMixTargetId === "audio-mix-phones-a",
+      "Packaged control-surface bridge qualification failed: the deck mix-target selection did not round-trip into audio.snapshot."
     );
-    assert(
-      lcdAudioAfter !== lcdAudioBefore,
-      "Packaged control-surface bridge qualification failed: audio LCD state did not change after the mute action."
-    );
+
+    const audioVerified = audioAfterMixTarget?.status === "ready";
+    let audioResponse;
+    let lcdAudioAfter;
+    if (audioVerified) {
+      audioResponse = await postJson(`${expectedBaseUrl}/api/deck/audio-action`, {
+        action: "dialPress",
+        value: "1",
+      });
+      assert(
+        typeof audioResponse?.mute === "boolean",
+        "Packaged control-surface bridge qualification failed: POST /api/deck/audio-action dialPress did not return the channel mute state."
+      );
+
+      const audioAfterPress = await harness.request("bridge-qualification-audio-mute", "audio.snapshot");
+      const pressedChannel = audioAfterPress?.channels?.find((channel) => channel.id === audioResponse.channelId);
+      assert(
+        pressedChannel?.mute === audioResponse.mute,
+        "Packaged control-surface bridge qualification failed: the deck mute did not land in the real audio.snapshot channel state."
+      );
+
+      lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_ch_nav`);
+      assert(
+        typeof lcdAudioAfter === "string" &&
+          lcdAudioAfter.includes("dB") &&
+          (!audioResponse.mute || lcdAudioAfter.includes(" M")),
+        "Packaged control-surface bridge qualification failed: audio LCD state did not reflect the mute action."
+      );
+      assert(
+        lcdAudioAfter !== lcdAudioBefore,
+        "Packaged control-surface bridge qualification failed: audio LCD state did not change after the mute action."
+      );
+    } else {
+      audioResponse = await postJsonExpectingStatus(
+        `${expectedBaseUrl}/api/deck/audio-action`,
+        {
+          action: "dialTurn",
+          value: "1:up",
+        },
+        409
+      );
+      assert(
+        typeof audioResponse?.error === "string" && audioResponse.error.length > 0,
+        "Packaged control-surface bridge qualification failed: gated audio dialTurn did not return the rejection reason."
+      );
+      lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_ch_nav`);
+      assert(
+        typeof lcdAudioAfter === "string" && lcdAudioAfter.includes("dB"),
+        "Packaged control-surface bridge qualification failed: audio LCD text stopped rendering in the gated state."
+      );
+    }
 
     summary.httpChecks = {
       contextBefore,
@@ -337,6 +409,8 @@ async function main() {
       planningAfterDeckMode: {
         deckMode: planningAfterDeckMode?.settings?.deckMode ?? null,
       },
+      mixTargetResponse,
+      audioVerified,
       audioResponse,
       lcdAudioAfter,
     };

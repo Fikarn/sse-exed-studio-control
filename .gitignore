@@ -33,3 +33,4 @@ test-results/
 /audio-page-seed.html
 /audio-page-seed-preview.png
 /seed-audio-prototype.mjs
+native/native-runtime/

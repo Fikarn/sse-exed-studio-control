@@ -375,6 +375,7 @@ fn main() -> io::Result<()> {
 
     let (output_sender, output_receiver) = mpsc::channel::<Value>();
     spawn_output_writer(output_receiver);
+    control_surface::register_control_surface_event_sender(output_sender.clone());
     send_output(&output_sender, app.ready_event())?;
     lighting_sacn_output::spawn_lighting_sacn_output(
         planned_paths.db_path.clone(),
