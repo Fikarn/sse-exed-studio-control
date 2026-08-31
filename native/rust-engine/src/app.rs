@@ -926,7 +926,14 @@ impl EngineApp {
     }
 
     fn read_control_surface_snapshot(&self) -> EngineResult<serde_json::Value> {
-        Ok(serde_json::to_value(build_control_surface_snapshot())?)
+        let mut snapshot = serde_json::to_value(build_control_surface_snapshot())?;
+        if let Some(object) = snapshot.as_object_mut() {
+            object.insert(
+                String::from("lastEvent"),
+                crate::control_surface::control_surface_last_event(&self.runtime.db_path),
+            );
+        }
+        Ok(snapshot)
     }
 
     fn read_health_snapshot(&self) -> EngineResult<serde_json::Value> {

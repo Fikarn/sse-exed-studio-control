@@ -439,6 +439,7 @@ export interface ShellStore {
   exportSupportBackup(): Promise<JsonValue>;
   restoreSupportBackup(path: string): Promise<JsonValue>;
   exportCompanionConfig(baseUrl?: string): Promise<JsonValue>;
+  refreshControlSurfaceSnapshot(): Promise<void>;
   getAudioMeterFrame(): AudioMeterFrame;
   subscribeAudioMeters(listener: () => void): () => void;
   subscribe(listener: () => void): () => void;

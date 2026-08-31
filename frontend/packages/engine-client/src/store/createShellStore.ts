@@ -1129,6 +1129,13 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async exportCompanionConfig(baseUrl?: string) {
       return performRequest("exports.companion.export", baseUrl ? { baseUrl } : {});
     },
+    async refreshControlSurfaceSnapshot() {
+      if (state.lifecycle !== "ready") {
+        return;
+      }
+      const controlSurfaceSnapshot = (await transport.request("controlSurface.snapshot")) as JsonObject;
+      setState({ ...state, controlSurfaceSnapshot });
+    },
     getAudioMeterFrame() {
       return audioMeterFrame;
     },

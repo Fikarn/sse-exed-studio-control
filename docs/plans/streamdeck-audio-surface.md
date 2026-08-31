@@ -96,7 +96,7 @@ Rework `audio_controls()` in `exports.rs`: row-2 strip buttons (text `$(<label>:
 
 ### S4 — Commissioning: make "Verify live echo" real
 
-Status: pending.
+Status: complete (2026-08-31). The bridge stamps `app.control_surface.last_event` ({route, action, value, at}) on every successful deck action; `controlSurface.snapshot` exposes it as `lastEvent`; the Setup pilot polls the snapshot every 500 ms during the verify step only (new `store.refreshControlSurfaceSnapshot()`), matches the event to a control by its `body` (exact value match, selected-page then route-home preference — pure helper `setupControlEcho.ts` with Vitest coverage), and pulses the cell. The decorative signature-diff echo is deleted. Strip cells appear in the map/verify grid with distinct labels (Strip 1-4 / Dial 1-4). Validation: 235 engine tests, frontend typecheck, all Vitest suites, and the full 244-test Playwright run green on the workstation (required `npx playwright install` once — WebKit was missing on this machine, which also explains four cascade failures on the first run).
 
 Bridge stamps `app.control_surface.last_event` (control id + timestamp) on every action; `controlSurface.snapshot` exposes it; `SetupSupportPilot` polls the snapshot (500 ms, verify stage only) and pulses the matching cell — replacing today's decorative diff that can never fire (`build_control_surface_snapshot` is a pure constant). Show the row-2 strip cells in the map/verify grid. Validation: `npm run frontend:typecheck`, `npm run frontend:test`, `npm run frontend:playwright:test`, `npm run tauri:visual:review` (Setup surface changed).
 

@@ -1324,24 +1324,39 @@ fn audio_controls() -> Vec<ControlDef> {
     ];
 
     for strip in 1..=4_usize {
-        let (col, strip_text, strip_key): (&'static str, &'static str, &'static str) = match strip {
+        type StripDef = (
+            &'static str,
+            &'static str,
+            &'static str,
+            &'static str,
+            &'static str,
+        );
+        let (col, strip_label, dial_label, strip_text, strip_key): StripDef = match strip {
             1 => (
                 "0",
+                "Strip 1",
+                "Dial 1",
                 "$(SSE_Studio_Control:lcd_audio_strip_1)",
                 "audio_strip_1",
             ),
             2 => (
                 "1",
+                "Strip 2",
+                "Dial 2",
                 "$(SSE_Studio_Control:lcd_audio_strip_2)",
                 "audio_strip_2",
             ),
             3 => (
                 "2",
+                "Strip 3",
+                "Dial 3",
                 "$(SSE_Studio_Control:lcd_audio_strip_3)",
                 "audio_strip_3",
             ),
             _ => (
                 "3",
+                "Strip 4",
+                "Dial 4",
                 "$(SSE_Studio_Control:lcd_audio_strip_4)",
                 "audio_strip_4",
             ),
@@ -1354,7 +1369,7 @@ fn audio_controls() -> Vec<ControlDef> {
         controls.push(expression_button(
             "2",
             col,
-            "Strip",
+            strip_label,
             strip_text,
             audio_action_with_refreshes(tap_body, &tap_keys),
         ));
@@ -1365,7 +1380,7 @@ fn audio_controls() -> Vec<ControlDef> {
         controls.push(dial(
             "3",
             col,
-            "Dial",
+            dial_label,
             None,
             audio_action_with_refreshes(press, &[strip_key]),
             audio_action_with_refreshes(turn_down, &[strip_key]),

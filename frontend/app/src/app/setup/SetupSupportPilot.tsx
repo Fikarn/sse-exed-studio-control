@@ -25,6 +25,7 @@ import {
   type SnapshotRecord,
   type StatusToneLike,
 } from "../shellData";
+import { findEchoControlId, parseControlSurfaceLastEvent } from "./setupControlEcho";
 import styles from "./SetupSupportPilot.module.css";
 
 type SetupMode = "runner" | "support";
@@ -32,6 +33,7 @@ type RunnerStepId = "import" | "probe" | "map" | "verify" | "publish";
 type FeedbackTone = "error" | "info" | "ok";
 
 interface ControlSurfaceControl {
+  body: { action?: string; value?: string } | null;
   description: string;
   id: string;
   label: string;
@@ -91,8 +93,15 @@ function parseControlSurfacePages(snapshot: SnapshotRecord | null): ControlSurfa
           return [];
         }
 
+        const body = asRecord(controlRecord.body);
         return [
           {
+            body: body
+              ? {
+                  action: typeof body.action === "string" ? body.action : undefined,
+                  value: typeof body.value === "string" ? body.value : undefined,
+                }
+              : null,
             description: String(controlRecord.description ?? "Bridge-mapped control."),
             id: String(controlRecord.id ?? controlRecord.label ?? "control"),
             label: String(controlRecord.label ?? "Control"),
@@ -191,25 +200,6 @@ function feedbackStatus(feedback: ActionFeedback | null) {
   return feedback.tone === "ok" ? "ok" : feedback.tone === "error" ? "error" : "info";
 }
 
-function createControlSignatureMap(snapshot: SnapshotRecord | null) {
-  const signatures = new Map<string, string>();
-  for (const page of parseControlSurfacePages(snapshot)) {
-    for (const control of [...page.buttons, ...page.dials]) {
-      signatures.set(
-        control.id,
-        JSON.stringify({
-          description: control.description,
-          label: control.label,
-          pageId: page.id,
-          position: control.position,
-          type: control.type,
-        })
-      );
-    }
-  }
-  return signatures;
-}
-
 function nextControlId(controls: ControlSurfaceControl[], selectedControlId: string | null, direction: -1 | 1) {
   if (controls.length === 0) {
     return null;
@@ -263,7 +253,7 @@ export function SetupSupportPilot({
   const [audioSendPort, setAudioSendPort] = useState("7001");
   const [audioReceivePort, setAudioReceivePort] = useState("9001");
   const [restorePath, setRestorePath] = useState("");
-  const previousControlSignaturesRef = useRef<Map<string, string>>(new Map());
+  const lastEchoEventAtRef = useRef<number | null>(null);
   const echoTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -300,27 +290,51 @@ export function SetupSupportPilot({
   }, [recommendedStepId]);
 
   useEffect(() => {
-    const nextSignatures = createControlSignatureMap(controlSurfaceSnapshot);
-    if (activeStepId === "verify") {
-      const changedControlId = [...nextSignatures.entries()].find(([id, signature]) => {
-        const previousSignature = previousControlSignaturesRef.current.get(id);
-        return previousSignature !== undefined && previousSignature !== signature;
-      })?.[0];
-
-      if (changedControlId) {
-        setEchoControlId(changedControlId);
-        if (echoTimeoutRef.current !== null) {
-          window.clearTimeout(echoTimeoutRef.current);
-        }
-        echoTimeoutRef.current = window.setTimeout(() => {
-          setEchoControlId(null);
-          echoTimeoutRef.current = null;
-        }, 300);
-      }
+    if (activeStepId !== "verify") {
+      lastEchoEventAtRef.current = null;
+      return;
     }
 
-    previousControlSignaturesRef.current = nextSignatures;
-  }, [activeStepId, controlSurfaceSnapshot]);
+    const pollTimer = window.setInterval(() => {
+      void store.refreshControlSurfaceSnapshot();
+    }, 500);
+    return () => {
+      window.clearInterval(pollTimer);
+    };
+  }, [activeStepId, store]);
+
+  useEffect(() => {
+    if (activeStepId !== "verify") {
+      return;
+    }
+
+    const lastEvent = parseControlSurfaceLastEvent(controlSurfaceSnapshot?.lastEvent);
+    if (!lastEvent) {
+      return;
+    }
+    if (lastEchoEventAtRef.current === null) {
+      // The first observed event predates this verify session; only pulse for
+      // presses that arrive after the operator opened the step.
+      lastEchoEventAtRef.current = lastEvent.at;
+      return;
+    }
+    if (lastEvent.at === lastEchoEventAtRef.current) {
+      return;
+    }
+    lastEchoEventAtRef.current = lastEvent.at;
+
+    const changedControlId = findEchoControlId(pages, lastEvent, selectedPageId || null);
+    if (changedControlId) {
+      setEchoControlId(changedControlId);
+      if (echoTimeoutRef.current !== null) {
+        window.clearTimeout(echoTimeoutRef.current);
+      }
+      echoTimeoutRef.current = window.setTimeout(() => {
+        setEchoControlId(null);
+        echoTimeoutRef.current = null;
+      }, 300);
+    }
+  }, [activeStepId, controlSurfaceSnapshot, pages, selectedPageId]);
 
   useEffect(() => {
     return () => {

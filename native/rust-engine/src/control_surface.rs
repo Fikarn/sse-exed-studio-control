@@ -43,6 +43,7 @@ pub const DEFAULT_CONTROL_SURFACE_PORT: u16 = 38201;
 
 const SELECTED_LIGHT_ID_KEY: &str = "app.control_surface.selected_light_id";
 const SELECTED_SCENE_ID_KEY: &str = "app.control_surface.selected_scene_id";
+const LAST_EVENT_KEY: &str = "app.control_surface.last_event";
 
 const AUDIO_DECK_BANK_KEY: &str = "app.control_surface.audio.bank";
 const AUDIO_DECK_DIAL_MODE_KEY: &str = "app.control_surface.audio.dial_mode";
@@ -611,14 +612,49 @@ pub fn handle_control_surface_http_action(
         .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("action is required")))?;
     let value = body.get("value").and_then(Value::as_str);
 
-    match path {
+    let response = match path {
         "/api/deck/action" => handle_planning_action(db_path, action, value),
         "/api/deck/light-action" => handle_light_action(db_path, action, value),
         "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported action route: {path}"
         ))),
+    };
+    if response.is_ok() {
+        let _ = stamp_control_surface_last_event(db_path, path, action, value);
     }
+    response
+}
+
+fn stamp_control_surface_last_event(
+    db_path: &Path,
+    route: &str,
+    action: &str,
+    value: Option<&str>,
+) -> Result<(), ControlSurfaceError> {
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0);
+    let event = json!({
+        "route": route,
+        "action": action,
+        "value": value,
+        "at": at,
+    });
+    set_settings_owned(
+        db_path,
+        &[(String::from(LAST_EVENT_KEY), event.to_string())],
+    )
+    .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
+}
+
+pub fn control_surface_last_event(db_path: &Path) -> Value {
+    list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+        .ok()
+        .and_then(|settings| settings.get(LAST_EVENT_KEY).cloned())
+        .and_then(|serialized| serde_json::from_str::<Value>(&serialized).ok())
+        .unwrap_or(Value::Null)
 }
 
 fn bind_control_surface_listener(requested_port: u16) -> Result<TcpListener, String> {
@@ -2713,5 +2749,38 @@ mod tests {
             read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_ch_nav"),
             Err(ControlSurfaceError::InvalidParams(_))
         ));
+    }
+
+    #[test]
+    fn successful_actions_stamp_the_last_event_for_verify_echo() {
+        let test_dir = ready_audio_test_db("last-event");
+        let db_path = test_dir.db_path();
+
+        assert!(control_surface_last_event(db_path.as_path()).is_null());
+
+        handle_control_surface_http_action(
+            db_path.as_path(),
+            "/api/deck/audio-action",
+            &json!({"action": "dialPress", "value": "2"}),
+        )
+        .expect("dial press should succeed");
+
+        let event = control_surface_last_event(db_path.as_path());
+        assert_eq!(event["route"], "/api/deck/audio-action");
+        assert_eq!(event["action"], "dialPress");
+        assert_eq!(event["value"], "2");
+        assert!(event["at"].as_u64().unwrap_or(0) > 0);
+
+        let failed = handle_control_surface_http_action(
+            db_path.as_path(),
+            "/api/deck/audio-action",
+            &json!({"action": "nonsense"}),
+        );
+        assert!(failed.is_err());
+        assert_eq!(
+            control_surface_last_event(db_path.as_path())["action"],
+            "dialPress",
+            "failed actions must not stamp the echo event"
+        );
     }
 }
