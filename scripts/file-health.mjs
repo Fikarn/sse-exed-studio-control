@@ -22,6 +22,10 @@ const oversizedSourceAllowlist = new Map(
       "frontend/app/src/app/lighting/LightingWorkspace.tsx",
       "lighting orchestrator remains the selected workspace assembly point; keep extracting components as features touch it",
     ],
+    [
+      "native/rust-engine/src/rme_totalmix_osc.rs",
+      "classic and Global OSC metering/command paths plus their live-verified protocol tables stay colocated; split by remote generation when the next OSC feature touches it",
+    ],
   ].map(([path, reason]) => [path, reason])
 );
 

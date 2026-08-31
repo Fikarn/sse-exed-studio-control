@@ -6,6 +6,7 @@ mod audio_meter_fixture;
 mod bootstrap;
 mod commissioning;
 mod control_surface;
+mod control_surface_audio;
 mod diagnostics;
 mod exports;
 mod legacy_import;
