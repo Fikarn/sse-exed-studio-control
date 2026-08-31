@@ -2,8 +2,33 @@ use crate::bootstrap::RuntimeContext;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::fs;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::time::Duration;
 
 const INSTANCE_ID: &str = "projmgr";
+// Companion connection labels only allow letters, digits, underscore, and dash;
+// every $(label:variable) reference below must use this exact token.
+const INSTANCE_LABEL: &str = "SSE_Studio_Control";
+const GENERIC_HTTP_MODULE_VERSION: &str = "2.7.0";
+const COMPANION_EXPORT_FORMAT_VERSION: u64 = 9;
+const DEFAULT_COMPANION_URL: &str = "http://127.0.0.1:8000";
+
+const AUDIO_LCD_KEYS: &[&str] = &[
+    "audio_strip_1",
+    "audio_strip_2",
+    "audio_strip_3",
+    "audio_strip_4",
+    "audio_key_1",
+    "audio_key_2",
+    "audio_key_3",
+    "audio_key_4",
+    "audio_key_5",
+    "audio_key_6",
+    "audio_key_7",
+    "audio_key_8",
+    "workspace",
+];
 
 #[derive(Debug)]
 pub enum ExportCommandError {
@@ -22,6 +47,10 @@ pub struct CompanionExportSummary {
     pub page_count: usize,
     #[serde(rename = "actionCount")]
     pub action_count: usize,
+    #[serde(rename = "triggerCount")]
+    pub trigger_count: usize,
+    #[serde(rename = "deckSurfaceId")]
+    pub deck_surface_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -86,12 +115,18 @@ pub fn export_companion_config(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or(&runtime.control_surface_bridge.base_url);
-    let config = generate_companion_config(base_url);
+    let deck_surface_id = discover_streamdeck_surface_id();
+    let config = generate_companion_config(base_url, deck_surface_id.as_deref());
     let action_count = count_companion_actions(&config);
     let page_count = config
         .get("pages")
         .and_then(Value::as_object)
         .map(|pages| pages.len())
+        .unwrap_or(0);
+    let trigger_count = config
+        .get("triggers")
+        .and_then(Value::as_object)
+        .map(|triggers| triggers.len())
         .unwrap_or(0);
     let json = serde_json::to_vec_pretty(&config)
         .map_err(|error| ExportCommandError::Storage(error.to_string()))?;
@@ -103,7 +138,59 @@ pub fn export_companion_config(
         base_url: String::from(base_url),
         page_count,
         action_count,
+        trigger_count,
+        deck_surface_id,
     })
+}
+
+// Asks the local Companion for its configured surfaces so the page-follow
+// triggers can bind to the physical Stream Deck+ instead of "self" (which has
+// no meaning in a trigger context). Companion being closed is not an error —
+// the export then targets "self" and the operator re-exports with Companion
+// running to get surface-bound follow.
+fn discover_streamdeck_surface_id() -> Option<String> {
+    let companion_url =
+        std::env::var("SSE_COMPANION_URL").unwrap_or_else(|_| String::from(DEFAULT_COMPANION_URL));
+    let body = fetch_companion_export_json(&companion_url)?;
+    let parsed = serde_json::from_str::<Value>(&body).ok()?;
+    parsed
+        .get("surfaces")
+        .and_then(Value::as_object)?
+        .keys()
+        .find(|key| key.starts_with("streamdeck:"))
+        .cloned()
+}
+
+fn fetch_companion_export_json(companion_url: &str) -> Option<String> {
+    let host_port = companion_url
+        .trim()
+        .strip_prefix("http://")
+        .unwrap_or(companion_url)
+        .trim_end_matches('/');
+    let host = host_port.split(':').next().unwrap_or("127.0.0.1");
+    let stream = TcpStream::connect(host_port).ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .ok()?;
+    let mut stream = stream;
+    // HTTP/1.0 so the server closes the connection instead of chunking.
+    stream
+        .write_all(
+            format!(
+                "GET /int/export/full?format=json HTTP/1.0\r\nHost: {host}\r\nAccept: application/json\r\n\r\n"
+            )
+            .as_bytes(),
+        )
+        .ok()?;
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).ok()?;
+    let response = String::from_utf8_lossy(&response);
+    let (headers, body) = response.split_once("\r\n\r\n")?;
+    if !headers.starts_with("HTTP/1.0 200") && !headers.starts_with("HTTP/1.1 200") {
+        return None;
+    }
+    Some(String::from(body))
 }
 
 pub fn build_control_surface_snapshot() -> ControlSurfaceSnapshot {
@@ -151,36 +238,160 @@ fn count_companion_actions(config: &Value) -> usize {
         .unwrap_or(0)
 }
 
-fn generate_companion_config(base_url: &str) -> Value {
+fn generate_companion_config(base_url: &str, deck_surface_id: Option<&str>) -> Value {
     let mut pages = Map::new();
     pages.insert(
         String::from("1"),
-        build_page("PROJECTS", project_controls()),
+        build_page("sse-page-projects", "PROJECTS", project_controls()),
     );
-    pages.insert(String::from("2"), build_page("TASKS", task_controls()));
-    pages.insert(String::from("3"), build_page("LIGHTS", light_controls()));
-    pages.insert(String::from("4"), build_page("AUDIO", audio_controls()));
+    pages.insert(
+        String::from("2"),
+        build_page("sse-page-tasks", "TASKS", task_controls()),
+    );
+    pages.insert(
+        String::from("3"),
+        build_page("sse-page-lights", "LIGHTS", light_controls()),
+    );
+    pages.insert(
+        String::from("4"),
+        build_page("sse-page-audio", "AUDIO", audio_controls()),
+    );
 
     json!({
-        "version": 6,
+        "version": COMPANION_EXPORT_FORMAT_VERSION,
         "type": "full",
         "pages": pages,
+        "triggers": generate_companion_triggers(deck_surface_id),
+        "triggerCollections": [],
+        "custom_variables": {},
+        "customVariablesCollections": [],
+        "expressionVariables": {},
+        "expressionVariablesCollections": [],
+        "connectionCollections": [],
         "instances": {
             INSTANCE_ID: {
-                "label": "SSE ExEd Studio Control Native",
+                "moduleInstanceType": "connection",
                 "instance_type": "generic-http",
+                "moduleVersionId": GENERIC_HTTP_MODULE_VERSION,
+                "sortOrder": 0,
+                "label": INSTANCE_LABEL,
+                "isFirstInit": false,
                 "config": {
                     "prefix": base_url,
                     "proxyAddress": "",
                     "rejectUnauthorized": true
                 },
-                "isFirstInit": false,
-                "lastUpgradeIndex": 0,
-                "enabled": true,
-                "sortOrder": 0
+                "secrets": {},
+                "lastUpgradeIndex": 1,
+                "enabled": true
             }
         }
     })
+}
+
+fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
+    let controller = deck_surface_id.unwrap_or("self");
+    let mut triggers = Map::new();
+
+    triggers.insert(
+        String::from("sse-trigger-lcd-poll"),
+        json!({
+            "type": "trigger",
+            "options": {
+                "name": "SSE audio LCD poll",
+                "enabled": true,
+                "sortOrder": 0
+            },
+            "actions": trigger_lcd_refreshes(AUDIO_LCD_KEYS),
+            "condition": [],
+            "events": [
+                {
+                    "id": "sse-evt-lcd-poll",
+                    "type": "interval",
+                    "enabled": true,
+                    "options": { "seconds": 1 }
+                }
+            ],
+            "localVariables": []
+        }),
+    );
+
+    for (slug, workspace, page, sort_order) in [
+        ("audio", "audio", 4, 1),
+        ("lighting", "lighting", 3, 2),
+        ("planning", "planning", 1, 3),
+    ] {
+        triggers.insert(
+            format!("sse-trigger-follow-{slug}"),
+            json!({
+                "type": "trigger",
+                "options": {
+                    "name": format!("SSE follow app - {slug}"),
+                    "enabled": true,
+                    "sortOrder": sort_order
+                },
+                "actions": [
+                    {
+                        "id": format!("sse-act-follow-{slug}"),
+                        "definitionId": "set_page",
+                        "connectionId": "internal",
+                        "options": {
+                            "controller_from_variable": false,
+                            "controller": controller,
+                            "controller_variable": "self",
+                            "page_from_variable": false,
+                            "page": page,
+                            "page_variable": "1"
+                        },
+                        "type": "action",
+                        "children": {}
+                    }
+                ],
+                "condition": [
+                    {
+                        "id": format!("sse-cond-follow-{slug}"),
+                        "definitionId": "variable_value",
+                        "connectionId": "internal",
+                        "options": {
+                            "variable": format!("{INSTANCE_LABEL}:lcd_workspace"),
+                            "op": "eq",
+                            "value": workspace
+                        },
+                        "type": "feedback",
+                        "style": {
+                            "color": 16777215,
+                            "bgcolor": 16711680
+                        },
+                        "isInverted": false,
+                        "children": {}
+                    }
+                ],
+                "events": [
+                    {
+                        "id": format!("sse-evt-follow-{slug}"),
+                        "type": "condition_true",
+                        "enabled": true,
+                        "options": {}
+                    }
+                ],
+                "localVariables": []
+            }),
+        );
+    }
+
+    Value::Object(triggers)
+}
+
+fn trigger_lcd_refreshes(keys: &[&str]) -> Vec<Value> {
+    lcd_refreshes(keys)
+        .into_iter()
+        .map(|mut action| {
+            if let Some(object) = action.as_object_mut() {
+                object.insert(String::from("children"), json!({}));
+            }
+            action
+        })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -190,9 +401,11 @@ struct ControlDef {
     label: &'static str,
     is_rotary: bool,
     down: Vec<Value>,
+    up: Vec<Value>,
     rotate_left: Vec<Value>,
     rotate_right: Vec<Value>,
     text_expression: Option<&'static str>,
+    hold_repeats_down: bool,
 }
 
 fn control_surface_page(
@@ -289,10 +502,10 @@ fn control_surface_control(
 
 fn extract_page_nav_target(actions: &[Value]) -> Option<&'static str> {
     for action in actions {
-        if action.get("instance").and_then(Value::as_str) != Some("internal") {
+        if action.get("connectionId").and_then(Value::as_str) != Some("internal") {
             continue;
         }
-        if action.get("action").and_then(Value::as_str) != Some("set_page") {
+        if action.get("definitionId").and_then(Value::as_str) != Some("set_page") {
             continue;
         }
         let page = action
@@ -314,7 +527,7 @@ fn extract_page_nav_target(actions: &[Value]) -> Option<&'static str> {
 
 fn extract_primary_request(actions: &[Value]) -> Option<(String, String, Option<Value>)> {
     for action in actions {
-        let Some(action_name) = action.get("action").and_then(Value::as_str) else {
+        let Some(action_name) = action.get("definitionId").and_then(Value::as_str) else {
             continue;
         };
         let method = match action_name {
@@ -382,8 +595,8 @@ fn dial_rotation_label(actions: &[Value], direction: &str) -> String {
             ("cctUp", _) => String::from("CCT Up"),
             ("selectPrevScene", _) => String::from("Prev Scene"),
             ("selectNextScene", _) => String::from("Next Scene"),
-            ("gainDown", _) => String::from("Gain Down"),
-            ("gainUp", _) => String::from("Gain Up"),
+            ("dialTurn", "left") => String::from("Level Down"),
+            ("dialTurn", "right") => String::from("Level Up"),
             _ => {
                 if direction == "left" {
                     String::from("Previous")
@@ -461,23 +674,35 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
         "resetCct" => String::from("Reset the selected light CCT."),
         "cctDown" => String::from("Lower the selected light CCT."),
         "cctUp" => String::from("Raise the selected light CCT."),
-        "toggleMute" => format!(
-            "Toggle mute on channel {}.",
-            value.unwrap_or_else(|| String::from("the selected"))
-        ),
-        "togglePhantom" => format!(
-            "Toggle 48V on channel {}.",
-            value.unwrap_or_else(|| String::from("the selected"))
-        ),
         "recallSnapshot" => String::from("Recall the current audio snapshot."),
-        "gainDown" => format!(
-            "Lower gain on channel {}.",
+        "dialTurn" => format!(
+            "Ride the level on strip {}.",
+            value
+                .as_deref()
+                .and_then(|value| value.split(':').next())
+                .unwrap_or("the selected")
+        ),
+        "dialPress" => format!(
+            "Toggle mute on strip {}.",
             value.unwrap_or_else(|| String::from("the selected"))
         ),
-        "gainUp" => format!(
-            "Raise gain on channel {}.",
-            value.unwrap_or_else(|| String::from("the selected"))
+        "stripTap" => format!(
+            "Select strip {} in the app inspector.",
+            value.unwrap_or_else(|| String::from("the tapped"))
         ),
+        "setMixTarget" => format!(
+            "Make {} the active mix target.",
+            value
+                .as_deref()
+                .map(format_filter_value)
+                .unwrap_or_else(|| String::from("the selected output"))
+        ),
+        "cycleBank" => String::from("Cycle the dial bank: inputs, playback, outputs."),
+        "toggleDialMode" => String::from("Toggle the input dials between fader and gain."),
+        "dimToggle" => String::from("Toggle control-room dim on the main out."),
+        "talkOn" => String::from("Hold to talk to the phones mixes."),
+        "talkOff" => String::from("Release talkback."),
+        "soloClearAll" => String::from("Clear solo on every audio channel."),
         _ => format!("{interaction} {fallback_label}."),
     }
 }
@@ -504,7 +729,7 @@ fn format_filter_value(value: &str) -> String {
     value.replace('-', " ")
 }
 
-fn build_page(name: &str, controls: Vec<ControlDef>) -> Value {
+fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
     let mut rows = Map::new();
     for control in controls {
         let style = if let Some(expression) = control.text_expression {
@@ -532,27 +757,39 @@ fn build_page(name: &str, controls: Vec<ControlDef>) -> Value {
                 "show_topbar": "default"
             })
         };
+        let run_while_held = if control.hold_repeats_down {
+            control
+                .down
+                .iter()
+                .filter_map(|action| action.get("id").and_then(Value::as_str))
+                .map(String::from)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
         let control_value = json!({
             "type": "button",
-            "options": {
-                "rotaryActions": control.is_rotary,
-                "stepAutoProgress": true
-            },
             "style": style,
+            "options": {
+                "stepProgression": "auto",
+                "stepExpression": "",
+                "rotaryActions": control.is_rotary
+            },
             "feedbacks": [],
             "steps": {
                 "0": {
                     "action_sets": {
                         "down": control.down,
-                        "up": [],
+                        "up": control.up,
                         "rotate_left": control.rotate_left,
                         "rotate_right": control.rotate_right
                     },
                     "options": {
-                        "runWhileHeld": []
+                        "runWhileHeld": run_while_held
                     }
                 }
-            }
+            },
+            "localVariables": []
         });
         rows.entry(control.row.to_string())
             .or_insert_with(|| Value::Object(Map::new()));
@@ -563,6 +800,7 @@ fn build_page(name: &str, controls: Vec<ControlDef>) -> Value {
     }
 
     json!({
+        "id": page_id,
         "name": name,
         "controls": rows,
         "gridSize": {
@@ -663,7 +901,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Project",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_nav)"),
+            Some("$(SSE_Studio_Control:lcd_project_nav)"),
             http_post("/api/deck/action", json!({"action":"openDetail"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -681,7 +919,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Status",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_status)"),
+            Some("$(SSE_Studio_Control:lcd_project_status)"),
             http_post(
                 "/api/deck/action",
                 json!({"action":"setStatus","value":"in-progress"}),
@@ -693,7 +931,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "Priority",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_priority)"),
+            Some("$(SSE_Studio_Control:lcd_project_priority)"),
             Vec::new(),
             http_post("/api/deck/action", json!({"action":"prevPriority"})),
             http_post("/api/deck/action", json!({"action":"nextPriority"})),
@@ -702,7 +940,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Sort",
-            Some("$(SSE ExEd Studio Control Native:lcd_sort_mode)"),
+            Some("$(SSE_Studio_Control:lcd_sort_mode)"),
             http_post("/api/deck/action", json!({"action":"resetSort"})),
             http_post("/api/deck/action", json!({"action":"prevSort"})),
             http_post("/api/deck/action", json!({"action":"nextSort"})),
@@ -771,7 +1009,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Project",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_nav)"),
+            Some("$(SSE_Studio_Control:lcd_project_nav)"),
             http_post("/api/deck/action", json!({"action":"openDetail"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -788,7 +1026,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Task",
-            Some("$(SSE ExEd Studio Control Native:lcd_task_nav)"),
+            Some("$(SSE_Studio_Control:lcd_task_nav)"),
             http_post("/api/deck/action", json!({"action":"toggleTimer"})),
             http_post("/api/deck/action", json!({"action":"selectPrevTask"})),
             http_post("/api/deck/action", json!({"action":"selectNextTask"})),
@@ -797,7 +1035,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "Status",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_status)"),
+            Some("$(SSE_Studio_Control:lcd_project_status)"),
             http_post(
                 "/api/deck/action",
                 json!({"action":"setStatus","value":"in-progress"}),
@@ -809,7 +1047,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Priority",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_priority)"),
+            Some("$(SSE_Studio_Control:lcd_project_priority)"),
             http_post("/api/deck/action", json!({"action":"toggleTaskComplete"})),
             http_post("/api/deck/action", json!({"action":"prevPriority"})),
             http_post("/api/deck/action", json!({"action":"nextPriority"})),
@@ -895,7 +1133,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Light",
-            Some("$(SSE ExEd Studio Control Native:lcd_light_nav)"),
+            Some("$(SSE_Studio_Control:lcd_light_nav)"),
             http_post("/api/deck/light-action", json!({"action":"toggleLight"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -917,7 +1155,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Intensity",
-            Some("$(SSE ExEd Studio Control Native:lcd_light_intensity)"),
+            Some("$(SSE_Studio_Control:lcd_light_intensity)"),
             http_post("/api/deck/light-action", json!({"action":"resetIntensity"})),
             http_post("/api/deck/light-action", json!({"action":"intensityDown"})),
             http_post("/api/deck/light-action", json!({"action":"intensityUp"})),
@@ -926,7 +1164,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "CCT",
-            Some("$(SSE ExEd Studio Control Native:lcd_light_cct)"),
+            Some("$(SSE_Studio_Control:lcd_light_cct)"),
             http_post("/api/deck/light-action", json!({"action":"resetCct"})),
             http_post("/api/deck/light-action", json!({"action":"cctDown"})),
             http_post("/api/deck/light-action", json!({"action":"cctUp"})),
@@ -935,7 +1173,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Scene",
-            Some("$(SSE ExEd Studio Control Native:lcd_scene_nav)"),
+            Some("$(SSE_Studio_Control:lcd_scene_nav)"),
             http_post("/api/deck/light-action", json!({"action":"recallScene"})),
             http_post(
                 "/api/deck/light-action",
@@ -949,162 +1187,193 @@ fn light_controls() -> Vec<ControlDef> {
     ]
 }
 
+const AUDIO_STRIP_LCD_KEYS: &[&str] = &[
+    "audio_strip_1",
+    "audio_strip_2",
+    "audio_strip_3",
+    "audio_strip_4",
+];
+
+fn audio_action_with_refreshes(body: Value, refresh_keys: &[&str]) -> Vec<Value> {
+    http_post("/api/deck/audio-action", body)
+        .into_iter()
+        .chain(lcd_refreshes(refresh_keys))
+        .collect()
+}
+
 fn audio_controls() -> Vec<ControlDef> {
-    vec![
-        button(
+    let mut controls = vec![
+        expression_button(
             "0",
             "0",
-            "<< LIGHTS",
-            page_jump(3)
-                .into_iter()
-                .chain(http_post(
-                    "/api/deck/audio-action",
-                    json!({"action":"switchToDeckMode","value":"light"}),
-                ))
-                .chain(lcd_refreshes(&[
-                    "light_nav",
-                    "light_intensity",
-                    "light_cct",
-                    "scene_nav",
-                ]))
-                .collect(),
-        ),
-        button(
-            "0",
-            "1",
-            "Mute 1",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"1"}),
+            "-> MAIN",
+            "$(SSE_Studio_Control:lcd_audio_key_1)",
+            audio_action_with_refreshes(
+                json!({"action":"setMixTarget","value":"main"}),
+                &[
+                    "audio_key_1",
+                    "audio_key_2",
+                    "audio_key_3",
+                    "audio_strip_1",
+                    "audio_strip_2",
+                    "audio_strip_3",
+                    "audio_strip_4",
+                ],
             ),
         ),
-        button(
+        expression_button(
+            "0",
+            "1",
+            "-> PH 1",
+            "$(SSE_Studio_Control:lcd_audio_key_2)",
+            audio_action_with_refreshes(
+                json!({"action":"setMixTarget","value":"phones-a"}),
+                &[
+                    "audio_key_1",
+                    "audio_key_2",
+                    "audio_key_3",
+                    "audio_strip_1",
+                    "audio_strip_2",
+                    "audio_strip_3",
+                    "audio_strip_4",
+                ],
+            ),
+        ),
+        expression_button(
             "0",
             "2",
-            "Mute 2",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"2"}),
+            "-> PH 2",
+            "$(SSE_Studio_Control:lcd_audio_key_3)",
+            audio_action_with_refreshes(
+                json!({"action":"setMixTarget","value":"phones-b"}),
+                &[
+                    "audio_key_1",
+                    "audio_key_2",
+                    "audio_key_3",
+                    "audio_strip_1",
+                    "audio_strip_2",
+                    "audio_strip_3",
+                    "audio_strip_4",
+                ],
             ),
         ),
-        button(
+        expression_button(
             "0",
             "3",
-            "Mute 3",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"3"}),
+            "BANK",
+            "$(SSE_Studio_Control:lcd_audio_key_4)",
+            audio_action_with_refreshes(
+                json!({"action":"cycleBank"}),
+                &[
+                    "audio_key_4",
+                    "audio_key_6",
+                    "audio_strip_1",
+                    "audio_strip_2",
+                    "audio_strip_3",
+                    "audio_strip_4",
+                ],
             ),
         ),
-        button(
+        expression_button(
             "1",
             "0",
-            "Mute 4",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"4"}),
-            ),
+            "DIM",
+            "$(SSE_Studio_Control:lcd_audio_key_5)",
+            audio_action_with_refreshes(json!({"action":"dimToggle"}), &["audio_key_5"]),
         ),
-        button(
+        expression_button(
             "1",
             "1",
-            "48V 1",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"togglePhantom","value":"1"}),
+            "GAIN",
+            "$(SSE_Studio_Control:lcd_audio_key_6)",
+            audio_action_with_refreshes(
+                json!({"action":"toggleDialMode"}),
+                &[
+                    "audio_key_6",
+                    "audio_strip_1",
+                    "audio_strip_2",
+                    "audio_strip_3",
+                    "audio_strip_4",
+                ],
             ),
         ),
-        button(
+        momentary_button(
             "1",
             "2",
-            "48V 2",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"togglePhantom","value":"2"}),
-            ),
+            "TALK",
+            "$(SSE_Studio_Control:lcd_audio_key_7)",
+            http_post("/api/deck/audio-action", json!({"action":"talkOn"})),
+            audio_action_with_refreshes(json!({"action":"talkOff"}), &["audio_key_7"]),
         ),
-        button(
+        expression_button(
             "1",
             "3",
-            "Recall",
-            http_post("/api/deck/audio-action", json!({"action":"recallSnapshot"})),
-        ),
-        dial(
-            "3",
-            "0",
-            "Ch 1",
-            Some("$(SSE ExEd Studio Control Native:lcd_audio_ch_nav)"),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"1"}),
-            )
-            .into_iter()
-            .chain(lcd_refreshes(&["audio_ch_nav", "audio_gain1"]))
-            .collect(),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainDown","value":"1"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainUp","value":"1"}),
+            "SOLO CLR",
+            "$(SSE_Studio_Control:lcd_audio_key_8)",
+            audio_action_with_refreshes(
+                json!({"action":"soloClearAll"}),
+                &[
+                    "audio_key_8",
+                    "audio_strip_1",
+                    "audio_strip_2",
+                    "audio_strip_3",
+                    "audio_strip_4",
+                ],
             ),
         ),
-        dial(
-            "3",
-            "1",
-            "Ch 2",
-            Some("$(SSE ExEd Studio Control Native:lcd_audio_gain1)"),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"2"}),
+    ];
+
+    for strip in 1..=4_usize {
+        let (col, strip_text, strip_key): (&'static str, &'static str, &'static str) = match strip {
+            1 => (
+                "0",
+                "$(SSE_Studio_Control:lcd_audio_strip_1)",
+                "audio_strip_1",
             ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainDown","value":"2"}),
+            2 => (
+                "1",
+                "$(SSE_Studio_Control:lcd_audio_strip_2)",
+                "audio_strip_2",
             ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainUp","value":"2"}),
+            3 => (
+                "2",
+                "$(SSE_Studio_Control:lcd_audio_strip_3)",
+                "audio_strip_3",
             ),
-        ),
-        dial(
-            "3",
+            _ => (
+                "3",
+                "$(SSE_Studio_Control:lcd_audio_strip_4)",
+                "audio_strip_4",
+            ),
+        };
+        let tap_body = json!({"action":"stripTap","value": strip.to_string()});
+        let mut tap_refreshes = Vec::from(AUDIO_STRIP_LCD_KEYS);
+        tap_refreshes.retain(|key| *key != strip_key);
+        let mut tap_keys: Vec<&str> = vec![strip_key];
+        tap_keys.extend(tap_refreshes);
+        controls.push(expression_button(
             "2",
-            "Ch 3",
-            Some("$(SSE ExEd Studio Control Native:lcd_audio_gain2)"),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"3"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainDown","value":"3"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainUp","value":"3"}),
-            ),
-        ),
-        dial(
+            col,
+            "Strip",
+            strip_text,
+            audio_action_with_refreshes(tap_body, &tap_keys),
+        ));
+
+        let turn_down = json!({"action":"dialTurn","value": format!("{strip}:down")});
+        let turn_up = json!({"action":"dialTurn","value": format!("{strip}:up")});
+        let press = json!({"action":"dialPress","value": strip.to_string()});
+        controls.push(dial(
             "3",
-            "3",
-            "Ch 4",
-            Some("$(SSE ExEd Studio Control Native:lcd_audio_gain3)"),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"4"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainDown","value":"4"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainUp","value":"4"}),
-            ),
-        ),
-    ]
+            col,
+            "Dial",
+            None,
+            audio_action_with_refreshes(press, &[strip_key]),
+            audio_action_with_refreshes(turn_down, &[strip_key]),
+            audio_action_with_refreshes(turn_up, &[strip_key]),
+        ));
+    }
+
+    controls
 }
 
 fn button(
@@ -1119,9 +1388,40 @@ fn button(
         label,
         is_rotary: false,
         down,
+        up: Vec::new(),
         rotate_left: Vec::new(),
         rotate_right: Vec::new(),
         text_expression: None,
+        hold_repeats_down: false,
+    }
+}
+
+fn expression_button(
+    row: &'static str,
+    col: &'static str,
+    label: &'static str,
+    text_expression: &'static str,
+    down: Vec<Value>,
+) -> ControlDef {
+    ControlDef {
+        text_expression: Some(text_expression),
+        ..button(row, col, label, down)
+    }
+}
+
+fn momentary_button(
+    row: &'static str,
+    col: &'static str,
+    label: &'static str,
+    text_expression: &'static str,
+    down: Vec<Value>,
+    up: Vec<Value>,
+) -> ControlDef {
+    ControlDef {
+        up,
+        text_expression: Some(text_expression),
+        hold_repeats_down: true,
+        ..button(row, col, label, down)
     }
 }
 
@@ -1140,29 +1440,33 @@ fn dial(
         label,
         is_rotary: true,
         down,
+        up: Vec::new(),
         rotate_left,
         rotate_right,
         text_expression,
+        hold_repeats_down: false,
     }
 }
 
 fn page_jump(page: i64) -> Vec<Value> {
     vec![json!({
         "id": next_action_id(),
-        "instance": "internal",
-        "action": "set_page",
+        "definitionId": "set_page",
+        "connectionId": "internal",
         "options": {
             "page": page,
             "controller": "self"
-        }
+        },
+        "type": "action",
+        "children": {}
     })]
 }
 
 fn http_post(path: &'static str, body: Value) -> Vec<Value> {
     vec![json!({
         "id": next_action_id(),
-        "instance": INSTANCE_ID,
-        "action": "post",
+        "definitionId": "post",
+        "connectionId": INSTANCE_ID,
         "options": {
             "url": path,
             "header": "",
@@ -1171,7 +1475,8 @@ fn http_post(path: &'static str, body: Value) -> Vec<Value> {
             "result_stringify": true,
             "statusCodeVariable": "",
             "body": body.to_string()
-        }
+        },
+        "type": "action"
     })]
 }
 
@@ -1180,8 +1485,8 @@ fn lcd_refreshes(keys: &[&str]) -> Vec<Value> {
         .map(|key| {
             json!({
                 "id": next_action_id(),
-                "instance": INSTANCE_ID,
-                "action": "get",
+                "definitionId": "get",
+                "connectionId": INSTANCE_ID,
                 "options": {
                     "url": format!("/api/deck/lcd?key={key}"),
                     "header": "",
@@ -1189,7 +1494,8 @@ fn lcd_refreshes(keys: &[&str]) -> Vec<Value> {
                     "jsonResultDataVariable": format!("lcd_{key}"),
                     "result_stringify": false,
                     "statusCodeVariable": ""
-                }
+                },
+                "type": "action"
             })
         })
         .collect()
@@ -1209,16 +1515,21 @@ mod tests {
 
     #[test]
     fn companion_export_contains_native_bridge_instance() {
-        let config = generate_companion_config("http://127.0.0.1:38201");
+        let config = generate_companion_config("http://127.0.0.1:38201", None);
         let prefix = config["instances"][INSTANCE_ID]["config"]["prefix"]
             .as_str()
             .expect("prefix should be a string");
         assert_eq!(prefix, "http://127.0.0.1:38201");
+        assert_eq!(config["instances"][INSTANCE_ID]["label"], INSTANCE_LABEL);
+        assert!(
+            !INSTANCE_LABEL.contains(' '),
+            "Companion connection labels must not contain spaces"
+        );
     }
 
     #[test]
     fn companion_export_uses_override_base_url() {
-        let config = generate_companion_config("http://localhost:3000");
+        let config = generate_companion_config("http://localhost:3000", None);
         let prefix = config["instances"][INSTANCE_ID]["config"]["prefix"]
             .as_str()
             .expect("prefix should be a string");
@@ -1226,16 +1537,114 @@ mod tests {
     }
 
     #[test]
-    fn companion_export_includes_audio_page() {
-        let config = generate_companion_config("http://127.0.0.1:38201");
+    fn companion_export_is_a_native_v9_full_config() {
+        let config = generate_companion_config("http://127.0.0.1:38201", None);
+        assert_eq!(config["version"], COMPANION_EXPORT_FORMAT_VERSION);
+        assert_eq!(config["type"], "full");
         assert_eq!(
             config["pages"].as_object().map(|pages| pages.len()),
             Some(4)
         );
+        assert!(config["pages"]["4"]["id"].is_string());
+        assert!(config.get("surfaces").is_none());
+
+        let sample_action =
+            &config["pages"]["1"]["controls"]["0"]["0"]["steps"]["0"]["action_sets"]["down"][0];
+        assert_eq!(sample_action["connectionId"], INSTANCE_ID);
+        assert_eq!(sample_action["definitionId"], "post");
     }
 
     #[test]
-    fn control_surface_snapshot_matches_legacy_page_model() {
+    fn companion_export_audio_page_maps_the_deck_hardware() {
+        let config = generate_companion_config("http://127.0.0.1:38201", None);
+        let controls = config["pages"]["4"]["controls"]
+            .as_object()
+            .expect("audio controls should exist");
+
+        for row in ["0", "1", "2", "3"] {
+            assert_eq!(
+                controls[row].as_object().map(|columns| columns.len()),
+                Some(4),
+                "audio row {row} should populate all four columns"
+            );
+        }
+
+        let strip_cell = &controls["2"]["0"];
+        assert_eq!(
+            strip_cell["style"]["text"],
+            "$(SSE_Studio_Control:lcd_audio_strip_1)"
+        );
+        let tap_body = strip_cell["steps"]["0"]["action_sets"]["down"][0]["options"]["body"]
+            .as_str()
+            .expect("tap body should exist");
+        assert!(tap_body.contains("stripTap"));
+
+        let encoder = &controls["3"]["0"];
+        assert_eq!(encoder["options"]["rotaryActions"], true);
+        let left_body = encoder["steps"]["0"]["action_sets"]["rotate_left"][0]["options"]["body"]
+            .as_str()
+            .expect("rotate body should exist");
+        assert!(left_body.contains("dialTurn") && left_body.contains("1:down"));
+        let press_body = encoder["steps"]["0"]["action_sets"]["down"][0]["options"]["body"]
+            .as_str()
+            .expect("press body should exist");
+        assert!(press_body.contains("dialPress"));
+
+        let talk = &controls["1"]["2"];
+        let talk_down_id = talk["steps"]["0"]["action_sets"]["down"][0]["id"]
+            .as_str()
+            .expect("talk down action id");
+        let run_while_held = talk["steps"]["0"]["options"]["runWhileHeld"]
+            .as_array()
+            .expect("runWhileHeld should be an array");
+        assert_eq!(run_while_held[0], talk_down_id);
+        let talk_up_body = talk["steps"]["0"]["action_sets"]["up"][0]["options"]["body"]
+            .as_str()
+            .expect("talk up body should exist");
+        assert!(talk_up_body.contains("talkOff"));
+    }
+
+    #[test]
+    fn companion_export_triggers_poll_and_follow_the_app() {
+        let config =
+            generate_companion_config("http://127.0.0.1:38201", Some("streamdeck:TESTSERIAL"));
+        let triggers = config["triggers"]
+            .as_object()
+            .expect("triggers should exist");
+        assert_eq!(triggers.len(), 4);
+
+        let poll = &triggers["sse-trigger-lcd-poll"];
+        assert_eq!(poll["options"]["enabled"], true);
+        assert_eq!(poll["events"][0]["type"], "interval");
+        assert_eq!(poll["events"][0]["options"]["seconds"], 1);
+        assert_eq!(
+            poll["actions"].as_array().map(Vec::len),
+            Some(AUDIO_LCD_KEYS.len())
+        );
+
+        let follow = &triggers["sse-trigger-follow-audio"];
+        assert_eq!(follow["events"][0]["type"], "condition_true");
+        assert_eq!(
+            follow["condition"][0]["options"]["variable"],
+            "SSE_Studio_Control:lcd_workspace"
+        );
+        assert_eq!(follow["condition"][0]["options"]["value"], "audio");
+        assert_eq!(follow["actions"][0]["definitionId"], "set_page");
+        assert_eq!(
+            follow["actions"][0]["options"]["controller"],
+            "streamdeck:TESTSERIAL"
+        );
+        assert_eq!(follow["actions"][0]["options"]["page"], 4);
+
+        let fallback = generate_companion_config("http://127.0.0.1:38201", None);
+        assert_eq!(
+            fallback["triggers"]["sse-trigger-follow-audio"]["actions"][0]["options"]["controller"],
+            "self"
+        );
+    }
+
+    #[test]
+    fn control_surface_snapshot_matches_the_deck_page_model() {
         let snapshot = build_control_surface_snapshot();
         assert_eq!(snapshot.pages.len(), 4);
         assert_eq!(snapshot.pages[0].label, "PROJECTS");
@@ -1269,11 +1678,33 @@ mod tests {
             snapshot.pages[0].dials[0].lcd_key.as_deref(),
             Some("project_nav")
         );
-        assert_eq!(snapshot.pages[3].label, "AUDIO");
-        assert!(snapshot.pages[3]
+
+        let audio = &snapshot.pages[3];
+        assert_eq!(audio.label, "AUDIO");
+        assert_eq!(
+            audio.buttons.len(),
+            12,
+            "audio page should model 8 keys plus 4 touch-strip cells"
+        );
+        assert_eq!(audio.dials.len(), 12);
+        assert!(audio.buttons.iter().any(|control| control
+            .body
+            .as_ref()
+            .is_some_and(
+                |body| body.get("action").and_then(Value::as_str) == Some("setMixTarget")
+            )));
+        let strip_cell = audio
             .buttons
             .iter()
-            .any(|control| control.label == "Recall"
-                && control.url.as_deref() == Some("/api/deck/audio-action")));
+            .find(|control| control.position == 9)
+            .expect("strip cell should sit at position 9");
+        assert_eq!(strip_cell.lcd_key.as_deref(), Some("audio_strip_1"));
+        assert!(audio
+            .dials
+            .iter()
+            .any(|control| control.control_type == "dial-turn-right"
+                && control.body.as_ref().is_some_and(|body| {
+                    body.get("action").and_then(Value::as_str) == Some("dialTurn")
+                })));
     }
 }
