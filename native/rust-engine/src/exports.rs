@@ -263,7 +263,7 @@ fn generate_companion_config(base_url: &str, deck_surface_id: Option<&str>) -> V
         "pages": pages,
         "triggers": generate_companion_triggers(deck_surface_id),
         "triggerCollections": [],
-        "custom_variables": {},
+        "custom_variables": generate_companion_custom_variables(),
         "customVariablesCollections": [],
         "expressionVariables": {},
         "expressionVariablesCollections": [],
@@ -287,6 +287,25 @@ fn generate_companion_config(base_url: &str, deck_surface_id: Option<&str>) -> V
             }
         }
     })
+}
+
+// generic-http's jsonResultDataVariable stores into a pre-existing CUSTOM
+// variable (referenced as $(custom:name)); a missing variable makes the store a
+// silent no-op, so the profile must ship every LCD variable it polls into.
+fn generate_companion_custom_variables() -> Value {
+    let mut variables = Map::new();
+    for (sort_order, key) in AUDIO_LCD_KEYS.iter().enumerate() {
+        variables.insert(
+            format!("lcd_{key}"),
+            json!({
+                "description": "SSE deck LCD text (engine-owned, polled from the bridge)",
+                "defaultValue": "",
+                "persistCurrentValue": false,
+                "sortOrder": sort_order
+            }),
+        );
+    }
+    Value::Object(variables)
 }
 
 fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
@@ -353,7 +372,7 @@ fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
                         "definitionId": "variable_value",
                         "connectionId": "internal",
                         "options": {
-                            "variable": format!("{INSTANCE_LABEL}:lcd_workspace"),
+                            "variable": "custom:lcd_workspace",
                             "op": "eq",
                             "value": workspace
                         },
@@ -901,7 +920,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Project",
-            Some("$(SSE_Studio_Control:lcd_project_nav)"),
+            Some("$(custom:lcd_project_nav)"),
             http_post("/api/deck/action", json!({"action":"openDetail"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -919,7 +938,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Status",
-            Some("$(SSE_Studio_Control:lcd_project_status)"),
+            Some("$(custom:lcd_project_status)"),
             http_post(
                 "/api/deck/action",
                 json!({"action":"setStatus","value":"in-progress"}),
@@ -931,7 +950,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "Priority",
-            Some("$(SSE_Studio_Control:lcd_project_priority)"),
+            Some("$(custom:lcd_project_priority)"),
             Vec::new(),
             http_post("/api/deck/action", json!({"action":"prevPriority"})),
             http_post("/api/deck/action", json!({"action":"nextPriority"})),
@@ -940,7 +959,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Sort",
-            Some("$(SSE_Studio_Control:lcd_sort_mode)"),
+            Some("$(custom:lcd_sort_mode)"),
             http_post("/api/deck/action", json!({"action":"resetSort"})),
             http_post("/api/deck/action", json!({"action":"prevSort"})),
             http_post("/api/deck/action", json!({"action":"nextSort"})),
@@ -1009,7 +1028,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Project",
-            Some("$(SSE_Studio_Control:lcd_project_nav)"),
+            Some("$(custom:lcd_project_nav)"),
             http_post("/api/deck/action", json!({"action":"openDetail"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -1026,7 +1045,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Task",
-            Some("$(SSE_Studio_Control:lcd_task_nav)"),
+            Some("$(custom:lcd_task_nav)"),
             http_post("/api/deck/action", json!({"action":"toggleTimer"})),
             http_post("/api/deck/action", json!({"action":"selectPrevTask"})),
             http_post("/api/deck/action", json!({"action":"selectNextTask"})),
@@ -1035,7 +1054,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "Status",
-            Some("$(SSE_Studio_Control:lcd_project_status)"),
+            Some("$(custom:lcd_project_status)"),
             http_post(
                 "/api/deck/action",
                 json!({"action":"setStatus","value":"in-progress"}),
@@ -1047,7 +1066,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Priority",
-            Some("$(SSE_Studio_Control:lcd_project_priority)"),
+            Some("$(custom:lcd_project_priority)"),
             http_post("/api/deck/action", json!({"action":"toggleTaskComplete"})),
             http_post("/api/deck/action", json!({"action":"prevPriority"})),
             http_post("/api/deck/action", json!({"action":"nextPriority"})),
@@ -1133,7 +1152,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Light",
-            Some("$(SSE_Studio_Control:lcd_light_nav)"),
+            Some("$(custom:lcd_light_nav)"),
             http_post("/api/deck/light-action", json!({"action":"toggleLight"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -1155,7 +1174,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Intensity",
-            Some("$(SSE_Studio_Control:lcd_light_intensity)"),
+            Some("$(custom:lcd_light_intensity)"),
             http_post("/api/deck/light-action", json!({"action":"resetIntensity"})),
             http_post("/api/deck/light-action", json!({"action":"intensityDown"})),
             http_post("/api/deck/light-action", json!({"action":"intensityUp"})),
@@ -1164,7 +1183,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "CCT",
-            Some("$(SSE_Studio_Control:lcd_light_cct)"),
+            Some("$(custom:lcd_light_cct)"),
             http_post("/api/deck/light-action", json!({"action":"resetCct"})),
             http_post("/api/deck/light-action", json!({"action":"cctDown"})),
             http_post("/api/deck/light-action", json!({"action":"cctUp"})),
@@ -1173,7 +1192,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Scene",
-            Some("$(SSE_Studio_Control:lcd_scene_nav)"),
+            Some("$(custom:lcd_scene_nav)"),
             http_post("/api/deck/light-action", json!({"action":"recallScene"})),
             http_post(
                 "/api/deck/light-action",
@@ -1207,7 +1226,7 @@ fn audio_controls() -> Vec<ControlDef> {
             "0",
             "0",
             "-> MAIN",
-            "$(SSE_Studio_Control:lcd_audio_key_1)",
+            "$(custom:lcd_audio_key_1)",
             audio_action_with_refreshes(
                 json!({"action":"setMixTarget","value":"main"}),
                 &[
@@ -1225,7 +1244,7 @@ fn audio_controls() -> Vec<ControlDef> {
             "0",
             "1",
             "-> PH 1",
-            "$(SSE_Studio_Control:lcd_audio_key_2)",
+            "$(custom:lcd_audio_key_2)",
             audio_action_with_refreshes(
                 json!({"action":"setMixTarget","value":"phones-a"}),
                 &[
@@ -1243,7 +1262,7 @@ fn audio_controls() -> Vec<ControlDef> {
             "0",
             "2",
             "-> PH 2",
-            "$(SSE_Studio_Control:lcd_audio_key_3)",
+            "$(custom:lcd_audio_key_3)",
             audio_action_with_refreshes(
                 json!({"action":"setMixTarget","value":"phones-b"}),
                 &[
@@ -1261,7 +1280,7 @@ fn audio_controls() -> Vec<ControlDef> {
             "0",
             "3",
             "BANK",
-            "$(SSE_Studio_Control:lcd_audio_key_4)",
+            "$(custom:lcd_audio_key_4)",
             audio_action_with_refreshes(
                 json!({"action":"cycleBank"}),
                 &[
@@ -1278,14 +1297,14 @@ fn audio_controls() -> Vec<ControlDef> {
             "1",
             "0",
             "DIM",
-            "$(SSE_Studio_Control:lcd_audio_key_5)",
+            "$(custom:lcd_audio_key_5)",
             audio_action_with_refreshes(json!({"action":"dimToggle"}), &["audio_key_5"]),
         ),
         expression_button(
             "1",
             "1",
             "GAIN",
-            "$(SSE_Studio_Control:lcd_audio_key_6)",
+            "$(custom:lcd_audio_key_6)",
             audio_action_with_refreshes(
                 json!({"action":"toggleDialMode"}),
                 &[
@@ -1301,7 +1320,7 @@ fn audio_controls() -> Vec<ControlDef> {
             "1",
             "2",
             "TALK",
-            "$(SSE_Studio_Control:lcd_audio_key_7)",
+            "$(custom:lcd_audio_key_7)",
             http_post("/api/deck/audio-action", json!({"action":"talkOn"})),
             audio_action_with_refreshes(json!({"action":"talkOff"}), &["audio_key_7"]),
         ),
@@ -1309,7 +1328,7 @@ fn audio_controls() -> Vec<ControlDef> {
             "1",
             "3",
             "SOLO CLR",
-            "$(SSE_Studio_Control:lcd_audio_key_8)",
+            "$(custom:lcd_audio_key_8)",
             audio_action_with_refreshes(
                 json!({"action":"soloClearAll"}),
                 &[
@@ -1336,28 +1355,28 @@ fn audio_controls() -> Vec<ControlDef> {
                 "0",
                 "Strip 1",
                 "Dial 1",
-                "$(SSE_Studio_Control:lcd_audio_strip_1)",
+                "$(custom:lcd_audio_strip_1)",
                 "audio_strip_1",
             ),
             2 => (
                 "1",
                 "Strip 2",
                 "Dial 2",
-                "$(SSE_Studio_Control:lcd_audio_strip_2)",
+                "$(custom:lcd_audio_strip_2)",
                 "audio_strip_2",
             ),
             3 => (
                 "2",
                 "Strip 3",
                 "Dial 3",
-                "$(SSE_Studio_Control:lcd_audio_strip_3)",
+                "$(custom:lcd_audio_strip_3)",
                 "audio_strip_3",
             ),
             _ => (
                 "3",
                 "Strip 4",
                 "Dial 4",
-                "$(SSE_Studio_Control:lcd_audio_strip_4)",
+                "$(custom:lcd_audio_strip_4)",
                 "audio_strip_4",
             ),
         };
@@ -1563,6 +1582,15 @@ mod tests {
         assert!(config["pages"]["4"]["id"].is_string());
         assert!(config.get("surfaces").is_none());
 
+        let custom_variables = config["custom_variables"]
+            .as_object()
+            .expect("custom variables should exist");
+        assert_eq!(custom_variables.len(), AUDIO_LCD_KEYS.len());
+        assert!(
+            custom_variables.contains_key("lcd_workspace"),
+            "the polled LCD variables must ship with the profile - generic-http stores are silent no-ops without them"
+        );
+
         let sample_action =
             &config["pages"]["1"]["controls"]["0"]["0"]["steps"]["0"]["action_sets"]["down"][0];
         assert_eq!(sample_action["connectionId"], INSTANCE_ID);
@@ -1585,10 +1613,7 @@ mod tests {
         }
 
         let strip_cell = &controls["2"]["0"];
-        assert_eq!(
-            strip_cell["style"]["text"],
-            "$(SSE_Studio_Control:lcd_audio_strip_1)"
-        );
+        assert_eq!(strip_cell["style"]["text"], "$(custom:lcd_audio_strip_1)");
         let tap_body = strip_cell["steps"]["0"]["action_sets"]["down"][0]["options"]["body"]
             .as_str()
             .expect("tap body should exist");
@@ -1641,7 +1666,7 @@ mod tests {
         assert_eq!(follow["events"][0]["type"], "condition_true");
         assert_eq!(
             follow["condition"][0]["options"]["variable"],
-            "SSE_Studio_Control:lcd_workspace"
+            "custom:lcd_workspace"
         );
         assert_eq!(follow["condition"][0]["options"]["value"], "audio");
         assert_eq!(follow["actions"][0]["definitionId"], "set_page");
