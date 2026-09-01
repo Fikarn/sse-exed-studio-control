@@ -30,7 +30,7 @@
     "@sse/test-fixtures": "file:../packages/test-fixtures",
     "@sse/tokens": "file:../packages/tokens",
     "@tauri-apps/api": "^2.11.0",
-    "fuzzysort": "^3.1.0",
+    "fuzzysort": "^4.0.2",
     "lucide-react": "^1.16.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.7",
