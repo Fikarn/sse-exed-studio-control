@@ -73,24 +73,6 @@ pub(crate) fn audio_deck_gate_label(snapshot: &AudioSnapshot) -> Option<&'static
     }
 }
 
-fn audio_mix_target_short_label(role: &str) -> &'static str {
-    match role {
-        "main-out" => "MAIN",
-        "phones-a" => "PH1",
-        "phones-b" => "PH2",
-        _ => "MIX",
-    }
-}
-
-fn audio_selected_mix_target_label(snapshot: &AudioSnapshot) -> &'static str {
-    snapshot
-        .mix_targets
-        .iter()
-        .find(|target| target.id == snapshot.selected_mix_target_id)
-        .map(|target| audio_mix_target_short_label(&target.role))
-        .unwrap_or("MIX")
-}
-
 pub(crate) fn audio_strip_lcd_text(
     app_settings: &HashMap<String, String>,
     snapshot: &AudioSnapshot,
@@ -109,7 +91,7 @@ pub(crate) fn audio_strip_lcd_text(
             } else {
                 ""
             };
-            let name = truncate(&channel.name, 10);
+            let name = truncate(&channel.name.to_uppercase(), 10);
             if bank == "inputs" && dial_mode == "gain" {
                 format!("{marker}{name}\\nGAIN {} dB", channel.gain)
             } else {
@@ -123,10 +105,7 @@ pub(crate) fn audio_strip_lcd_text(
                 } else {
                     audio_fader_db_label(level)
                 };
-                format!(
-                    "{marker}{name}\\n{level_line}\\n\u{2192}{}",
-                    audio_selected_mix_target_label(snapshot)
-                )
+                format!("{marker}{name}\\n{level_line}")
             }
         }
         Ok(AudioDeckStrip::MixTarget(target)) => {
@@ -141,11 +120,145 @@ pub(crate) fn audio_strip_lcd_text(
                 audio_fader_db_label(target.volume)
             };
             format!(
-                "{marker}{}\\n{level_line}\\nOUTPUT",
-                truncate(&target.name, 10)
+                "{marker}{}\\n{level_line}",
+                truncate(&target.name.to_uppercase(), 10)
             )
         }
-        Err(_) => String::from("\u{2014}\\n(no strip)"),
+        Err(_) => String::from("\u{2014}"),
+    }
+}
+
+pub(crate) fn audio_strip_key_index(key: &str) -> usize {
+    key.trim_start_matches("audio_strip_")
+        .split('_')
+        .next()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(1)
+}
+
+pub(crate) fn audio_strip_state_text(
+    app_settings: &HashMap<String, String>,
+    snapshot: &AudioSnapshot,
+    strip_index: usize,
+) -> String {
+    if audio_deck_gate_label(snapshot).is_some() {
+        return String::from("offline");
+    }
+
+    let bank = audio_deck_bank(app_settings);
+    match resolve_audio_deck_strip(snapshot, &bank, strip_index) {
+        Ok(AudioDeckStrip::Channel(channel)) => {
+            if channel.mute {
+                String::from("muted")
+            } else if snapshot.selected_channel_id.as_deref() == Some(channel.id.as_str()) {
+                String::from("selected")
+            } else {
+                String::from("normal")
+            }
+        }
+        Ok(AudioDeckStrip::MixTarget(target)) => {
+            if target.mute {
+                String::from("muted")
+            } else if snapshot.selected_mix_target_id == target.id {
+                String::from("selected")
+            } else {
+                String::from("normal")
+            }
+        }
+        Err(_) => String::from("empty"),
+    }
+}
+
+pub(crate) fn audio_strip_level_text(
+    app_settings: &HashMap<String, String>,
+    snapshot: &AudioSnapshot,
+    strip_index: usize,
+) -> String {
+    if audio_deck_gate_label(snapshot).is_some() {
+        return String::from("off");
+    }
+
+    let bank = audio_deck_bank(app_settings);
+    let dial_mode = audio_deck_dial_mode(app_settings);
+    let bucket_of = |value: f64| -> u32 { (value.clamp(0.0, 1.0) * 12.0).round() as u32 };
+    match resolve_audio_deck_strip(snapshot, &bank, strip_index) {
+        Ok(AudioDeckStrip::Channel(channel)) => {
+            let bucket = if bank == "inputs" && dial_mode == "gain" {
+                bucket_of(channel.gain as f64 / 75.0)
+            } else {
+                bucket_of(
+                    channel
+                        .mix_levels
+                        .get(&snapshot.selected_mix_target_id)
+                        .copied()
+                        .unwrap_or(channel.fader),
+                )
+            };
+            if channel.mute {
+                format!("m{bucket}")
+            } else {
+                bucket.to_string()
+            }
+        }
+        Ok(AudioDeckStrip::MixTarget(target)) => {
+            let bucket = bucket_of(target.volume);
+            if target.mute {
+                format!("m{bucket}")
+            } else {
+                bucket.to_string()
+            }
+        }
+        Err(_) => String::from("empty"),
+    }
+}
+
+pub(crate) fn audio_state_value_text(
+    app_settings: &HashMap<String, String>,
+    snapshot: &AudioSnapshot,
+    which: &str,
+) -> Result<String, ControlSurfaceError> {
+    match which {
+        "target" => Ok(snapshot
+            .mix_targets
+            .iter()
+            .find(|target| target.id == snapshot.selected_mix_target_id)
+            .map(|target| target.role.clone())
+            .map(|role| {
+                if role == "main-out" {
+                    String::from("main")
+                } else {
+                    role
+                }
+            })
+            .unwrap_or_else(|| String::from("main"))),
+        "bank" => Ok(audio_deck_bank(app_settings)),
+        "mode" => Ok(if audio_deck_bank(app_settings) == "inputs" {
+            audio_deck_dial_mode(app_settings)
+        } else {
+            String::from("n/a")
+        }),
+        "dim" => Ok(audio_main_mix_target(snapshot)
+            .map(|main| if main.dim { "on" } else { "off" })
+            .unwrap_or("off")
+            .to_string()),
+        "talk" => Ok(audio_main_mix_target(snapshot)
+            .map(|main| if main.talkback { "live" } else { "hold" })
+            .unwrap_or("hold")
+            .to_string()),
+        "solo" => Ok(snapshot
+            .channels
+            .iter()
+            .filter(|entry| entry.solo)
+            .count()
+            .to_string()),
+        "gated" => Ok(if audio_deck_gate_label(snapshot).is_some() {
+            String::from("yes")
+        } else {
+            String::from("no")
+        }),
+        other => Err(ControlSurfaceError::InvalidParams(format!(
+            "Unsupported audio state key: {other}"
+        ))),
     }
 }
 
@@ -157,24 +270,11 @@ pub(crate) fn audio_key_lcd_text(
     let gate = audio_deck_gate_label(snapshot);
     let main = audio_main_mix_target(snapshot);
     match key_index {
-        1..=3 => {
-            let role = match key_index {
-                1 => "main-out",
-                2 => "phones-a",
-                _ => "phones-b",
-            };
-            let label = audio_mix_target_short_label(role);
-            let active = snapshot
-                .mix_targets
-                .iter()
-                .find(|target| target.role == role)
-                .is_some_and(|target| target.id == snapshot.selected_mix_target_id);
-            if active {
-                format!("\u{2192} {label}\\n\u{25cf} ACTIVE")
-            } else {
-                format!("\u{2192} {label}\\n")
-            }
-        }
+        // The active mix target reads through the amber feedback on the key;
+        // the label itself stays static.
+        1 => String::from("MAIN"),
+        2 => String::from("PH 1"),
+        3 => String::from("PH 2"),
         4 => format!("BANK\\n{}", audio_deck_bank(app_settings).to_uppercase()),
         5 => match (gate, main) {
             (None, Some(main)) => format!("DIM\\n{}", if main.dim { "ON" } else { "OFF" }),
@@ -1196,6 +1296,85 @@ mod tests {
             .channels
             .iter()
             .all(|entry| !entry.solo));
+    }
+
+    #[test]
+    fn audio_strip_state_and_level_keys_feed_the_deck_feedbacks() {
+        let test_dir = ready_audio_test_db("state-level");
+        let db_path = test_dir.db_path();
+        let settings = || {
+            crate::storage::list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
+                .expect("settings should load")
+        };
+        let snapshot = |settings: &HashMap<String, String>| read_audio_snapshot(settings);
+
+        let app_settings = settings();
+        let live = snapshot(&app_settings);
+        // Fresh ready db: Host is fader 0.78 -> bucket 9, and the engine's
+        // selection fallback makes the first inventory channel (Host) selected.
+        assert_eq!(audio_strip_level_text(&app_settings, &live, 1), "9");
+        assert_eq!(audio_strip_state_text(&app_settings, &live, 1), "selected");
+        assert_eq!(audio_strip_state_text(&app_settings, &live, 2), "normal");
+
+        handle_audio_action(db_path.as_path(), "stripTap", Some("3")).expect("tap selects");
+        handle_audio_action(db_path.as_path(), "dialPress", Some("2")).expect("mute strip 2");
+        let app_settings = settings();
+        let live = snapshot(&app_settings);
+        assert_eq!(audio_strip_state_text(&app_settings, &live, 1), "normal");
+        assert_eq!(audio_strip_state_text(&app_settings, &live, 3), "selected");
+        assert_eq!(audio_strip_state_text(&app_settings, &live, 2), "muted");
+        assert!(
+            audio_strip_level_text(&app_settings, &live, 2).starts_with('m'),
+            "muted strips carry the ember bar prefix"
+        );
+
+        handle_audio_action(db_path.as_path(), "toggleDialMode", None).expect("gain mode");
+        let app_settings = settings();
+        let live = snapshot(&app_settings);
+        // Host preamp default 34 dB over 0-75 -> bucket 5.
+        assert_eq!(audio_strip_level_text(&app_settings, &live, 1), "5");
+        assert_eq!(
+            audio_state_value_text(&app_settings, &live, "mode").expect("mode state"),
+            "gain"
+        );
+
+        handle_audio_action(db_path.as_path(), "cycleBank", None).expect("to playback");
+        handle_audio_action(db_path.as_path(), "cycleBank", None).expect("to outputs");
+        let app_settings = settings();
+        let live = snapshot(&app_settings);
+        assert_eq!(
+            audio_state_value_text(&app_settings, &live, "mode").expect("mode state"),
+            "n/a"
+        );
+        assert_eq!(audio_strip_state_text(&app_settings, &live, 4), "empty");
+        assert_eq!(audio_strip_level_text(&app_settings, &live, 4), "empty");
+        assert_eq!(
+            audio_state_value_text(&app_settings, &live, "target").expect("target state"),
+            "main"
+        );
+        assert_eq!(
+            audio_state_value_text(&app_settings, &live, "gated").expect("gated state"),
+            "no"
+        );
+    }
+
+    #[test]
+    fn audio_state_keys_report_offline_when_gated() {
+        let test_dir = TestDir::new("state-gated");
+        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        let app_settings = crate::storage::list_settings_by_prefix(
+            test_dir.db_path().as_path(),
+            APP_SETTINGS_PREFIX,
+        )
+        .expect("settings should load");
+        let live = read_audio_snapshot(&app_settings);
+
+        assert_eq!(audio_strip_state_text(&app_settings, &live, 1), "offline");
+        assert_eq!(audio_strip_level_text(&app_settings, &live, 1), "off");
+        assert_eq!(
+            audio_state_value_text(&app_settings, &live, "gated").expect("gated state"),
+            "yes"
+        );
     }
 
     #[test]

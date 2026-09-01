@@ -3,7 +3,8 @@ use crate::audio::read_audio_snapshot;
 use crate::bootstrap::RuntimeContext;
 use crate::control_surface_audio::{
     audio_deck_bank, audio_deck_dial_mode, audio_deck_gate_label, audio_key_lcd_text,
-    audio_strip_lcd_text, current_audio_snapshot, handle_audio_action, resolve_audio_deck_strip,
+    audio_state_value_text, audio_strip_key_index, audio_strip_lcd_text, audio_strip_level_text,
+    audio_strip_state_text, current_audio_snapshot, handle_audio_action, resolve_audio_deck_strip,
     AudioDeckStrip,
 };
 use crate::diagnostics::append_log;
@@ -383,6 +384,28 @@ pub fn read_control_surface_lcd_text(
                 key_index,
             ))
         }
+        "audio_strip_1_state"
+        | "audio_strip_2_state"
+        | "audio_strip_3_state"
+        | "audio_strip_4_state" => Ok(audio_strip_state_text(
+            &app_settings,
+            &audio_snapshot,
+            audio_strip_key_index(key),
+        )),
+        "audio_strip_1_level"
+        | "audio_strip_2_level"
+        | "audio_strip_3_level"
+        | "audio_strip_4_level" => Ok(audio_strip_level_text(
+            &app_settings,
+            &audio_snapshot,
+            audio_strip_key_index(key),
+        )),
+        "audio_state_target" | "audio_state_bank" | "audio_state_mode" | "audio_state_dim"
+        | "audio_state_talk" | "audio_state_solo" | "audio_state_gated" => audio_state_value_text(
+            &app_settings,
+            &audio_snapshot,
+            key.trim_start_matches("audio_state_"),
+        ),
         "workspace" => read_active_workspace(db_path),
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported LCD key: {key}"
@@ -1482,13 +1505,13 @@ mod tests {
         let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
             .expect("lcd text should render");
         assert!(
-            text.contains("Host"),
+            text.contains("HOST"),
             "strip should name the channel: {text}"
         );
         assert!(text.contains("dB"), "strip should show a level: {text}");
         assert!(
-            text.contains("\u{2192}MAIN"),
-            "strip should show the active target: {text}"
+            !text.contains("\u{2192}"),
+            "the v2 strip drops the target arrow line: {text}"
         );
 
         handle_audio_action(db_path.as_path(), "stripTap", Some("1"))
@@ -1496,7 +1519,7 @@ mod tests {
         let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
             .expect("lcd text should render");
         assert!(
-            text.starts_with("\u{2022} Host"),
+            text.starts_with("\u{2022} HOST"),
             "selected strip should carry the marker: {text}"
         );
 
@@ -1526,20 +1549,25 @@ mod tests {
         assert_eq!(
             read_control_surface_lcd_text(db_path.as_path(), "audio_key_1")
                 .expect("lcd text should render"),
-            "\u{2192} MAIN\\n\u{25cf} ACTIVE"
+            "MAIN"
         );
         assert_eq!(
             read_control_surface_lcd_text(db_path.as_path(), "audio_key_2")
                 .expect("lcd text should render"),
-            "\u{2192} PH1\\n"
+            "PH 1"
+        );
+        assert_eq!(
+            read_control_surface_lcd_text(db_path.as_path(), "audio_state_target")
+                .expect("state should render"),
+            "main"
         );
 
         handle_audio_action(db_path.as_path(), "setMixTarget", Some("phones-a"))
             .expect("target switch should succeed");
         assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_key_2")
-                .expect("lcd text should render"),
-            "\u{2192} PH1\\n\u{25cf} ACTIVE"
+            read_control_surface_lcd_text(db_path.as_path(), "audio_state_target")
+                .expect("state should render"),
+            "phones-a"
         );
 
         assert_eq!(

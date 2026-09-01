@@ -1,4 +1,7 @@
 use crate::bootstrap::RuntimeContext;
+use crate::exports_audio::{
+    audio_controls, deck_asset, generate_companion_custom_variables, AUDIO_LCD_KEYS,
+};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::fs;
@@ -13,22 +16,6 @@ const INSTANCE_LABEL: &str = "SSE_Studio_Control";
 const GENERIC_HTTP_MODULE_VERSION: &str = "2.7.0";
 const COMPANION_EXPORT_FORMAT_VERSION: u64 = 9;
 const DEFAULT_COMPANION_URL: &str = "http://127.0.0.1:8000";
-
-const AUDIO_LCD_KEYS: &[&str] = &[
-    "audio_strip_1",
-    "audio_strip_2",
-    "audio_strip_3",
-    "audio_strip_4",
-    "audio_key_1",
-    "audio_key_2",
-    "audio_key_3",
-    "audio_key_4",
-    "audio_key_5",
-    "audio_key_6",
-    "audio_key_7",
-    "audio_key_8",
-    "workspace",
-];
 
 #[derive(Debug)]
 pub enum ExportCommandError {
@@ -289,25 +276,6 @@ fn generate_companion_config(base_url: &str, deck_surface_id: Option<&str>) -> V
     })
 }
 
-// generic-http's jsonResultDataVariable stores into a pre-existing CUSTOM
-// variable (referenced as $(custom:name)); a missing variable makes the store a
-// silent no-op, so the profile must ship every LCD variable it polls into.
-fn generate_companion_custom_variables() -> Value {
-    let mut variables = Map::new();
-    for (sort_order, key) in AUDIO_LCD_KEYS.iter().enumerate() {
-        variables.insert(
-            format!("lcd_{key}"),
-            json!({
-                "description": "SSE deck LCD text (engine-owned, polled from the bridge)",
-                "defaultValue": "",
-                "persistCurrentValue": false,
-                "sortOrder": sort_order
-            }),
-        );
-    }
-    Value::Object(variables)
-}
-
 fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
     let controller = deck_surface_id.unwrap_or("self");
     let mut triggers = Map::new();
@@ -414,7 +382,7 @@ fn trigger_lcd_refreshes(keys: &[&str]) -> Vec<Value> {
 }
 
 #[derive(Clone)]
-struct ControlDef {
+pub(crate) struct ControlDef {
     row: &'static str,
     col: &'static str,
     label: &'static str,
@@ -425,6 +393,32 @@ struct ControlDef {
     rotate_right: Vec<Value>,
     text_expression: Option<&'static str>,
     hold_repeats_down: bool,
+    png_asset: Option<&'static str>,
+    text_size: Option<&'static str>,
+    hide_topbar: bool,
+    feedbacks: Vec<Value>,
+}
+
+impl ControlDef {
+    pub(crate) fn png(mut self, asset: &'static str) -> Self {
+        self.png_asset = Some(asset);
+        self
+    }
+
+    pub(crate) fn size(mut self, size: &'static str) -> Self {
+        self.text_size = Some(size);
+        self
+    }
+
+    pub(crate) fn no_topbar(mut self) -> Self {
+        self.hide_topbar = true;
+        self
+    }
+
+    pub(crate) fn with_feedbacks(mut self, feedbacks: Vec<Value>) -> Self {
+        self.feedbacks = feedbacks;
+        self
+    }
 }
 
 fn control_surface_page(
@@ -751,29 +745,39 @@ fn format_filter_value(value: &str) -> String {
 fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
     let mut rows = Map::new();
     for control in controls {
+        let size = control.text_size.unwrap_or("auto");
+        let png64 = control
+            .png_asset
+            .map(|asset| Value::String(String::from(deck_asset(asset))))
+            .unwrap_or(Value::Null);
+        let show_topbar: Value = if control.hide_topbar {
+            Value::Bool(false)
+        } else {
+            Value::String(String::from("default"))
+        };
         let style = if let Some(expression) = control.text_expression {
             json!({
                 "text": expression,
                 "textExpression": true,
-                "size": "auto",
-                "png64": Value::Null,
+                "size": size,
+                "png64": png64,
                 "alignment": "center:center",
                 "pngalignment": "center:center",
                 "color": 16777215,
                 "bgcolor": 0,
-                "show_topbar": "default"
+                "show_topbar": show_topbar
             })
         } else {
             json!({
                 "text": control.label.replace(' ', "\\n"),
                 "textExpression": false,
-                "size": "auto",
-                "png64": Value::Null,
+                "size": size,
+                "png64": png64,
                 "alignment": "center:center",
                 "pngalignment": "center:center",
                 "color": 16777215,
                 "bgcolor": 0,
-                "show_topbar": "default"
+                "show_topbar": show_topbar
             })
         };
         let run_while_held = if control.hold_repeats_down {
@@ -794,7 +798,7 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
                 "stepExpression": "",
                 "rotaryActions": control.is_rotary
             },
-            "feedbacks": [],
+            "feedbacks": control.feedbacks,
             "steps": {
                 "0": {
                     "action_sets": {
@@ -1206,211 +1210,14 @@ fn light_controls() -> Vec<ControlDef> {
     ]
 }
 
-const AUDIO_STRIP_LCD_KEYS: &[&str] = &[
-    "audio_strip_1",
-    "audio_strip_2",
-    "audio_strip_3",
-    "audio_strip_4",
-];
-
-fn audio_action_with_refreshes(body: Value, refresh_keys: &[&str]) -> Vec<Value> {
+pub(crate) fn audio_action_with_refreshes(body: Value, refresh_keys: &[&str]) -> Vec<Value> {
     http_post("/api/deck/audio-action", body)
         .into_iter()
         .chain(lcd_refreshes(refresh_keys))
         .collect()
 }
 
-fn audio_controls() -> Vec<ControlDef> {
-    let mut controls = vec![
-        expression_button(
-            "0",
-            "0",
-            "-> MAIN",
-            "$(custom:lcd_audio_key_1)",
-            audio_action_with_refreshes(
-                json!({"action":"setMixTarget","value":"main"}),
-                &[
-                    "audio_key_1",
-                    "audio_key_2",
-                    "audio_key_3",
-                    "audio_strip_1",
-                    "audio_strip_2",
-                    "audio_strip_3",
-                    "audio_strip_4",
-                ],
-            ),
-        ),
-        expression_button(
-            "0",
-            "1",
-            "-> PH 1",
-            "$(custom:lcd_audio_key_2)",
-            audio_action_with_refreshes(
-                json!({"action":"setMixTarget","value":"phones-a"}),
-                &[
-                    "audio_key_1",
-                    "audio_key_2",
-                    "audio_key_3",
-                    "audio_strip_1",
-                    "audio_strip_2",
-                    "audio_strip_3",
-                    "audio_strip_4",
-                ],
-            ),
-        ),
-        expression_button(
-            "0",
-            "2",
-            "-> PH 2",
-            "$(custom:lcd_audio_key_3)",
-            audio_action_with_refreshes(
-                json!({"action":"setMixTarget","value":"phones-b"}),
-                &[
-                    "audio_key_1",
-                    "audio_key_2",
-                    "audio_key_3",
-                    "audio_strip_1",
-                    "audio_strip_2",
-                    "audio_strip_3",
-                    "audio_strip_4",
-                ],
-            ),
-        ),
-        expression_button(
-            "0",
-            "3",
-            "BANK",
-            "$(custom:lcd_audio_key_4)",
-            audio_action_with_refreshes(
-                json!({"action":"cycleBank"}),
-                &[
-                    "audio_key_4",
-                    "audio_key_6",
-                    "audio_strip_1",
-                    "audio_strip_2",
-                    "audio_strip_3",
-                    "audio_strip_4",
-                ],
-            ),
-        ),
-        expression_button(
-            "1",
-            "0",
-            "DIM",
-            "$(custom:lcd_audio_key_5)",
-            audio_action_with_refreshes(json!({"action":"dimToggle"}), &["audio_key_5"]),
-        ),
-        expression_button(
-            "1",
-            "1",
-            "GAIN",
-            "$(custom:lcd_audio_key_6)",
-            audio_action_with_refreshes(
-                json!({"action":"toggleDialMode"}),
-                &[
-                    "audio_key_6",
-                    "audio_strip_1",
-                    "audio_strip_2",
-                    "audio_strip_3",
-                    "audio_strip_4",
-                ],
-            ),
-        ),
-        momentary_button(
-            "1",
-            "2",
-            "TALK",
-            "$(custom:lcd_audio_key_7)",
-            http_post("/api/deck/audio-action", json!({"action":"talkOn"})),
-            audio_action_with_refreshes(json!({"action":"talkOff"}), &["audio_key_7"]),
-        ),
-        expression_button(
-            "1",
-            "3",
-            "SOLO CLR",
-            "$(custom:lcd_audio_key_8)",
-            audio_action_with_refreshes(
-                json!({"action":"soloClearAll"}),
-                &[
-                    "audio_key_8",
-                    "audio_strip_1",
-                    "audio_strip_2",
-                    "audio_strip_3",
-                    "audio_strip_4",
-                ],
-            ),
-        ),
-    ];
-
-    for strip in 1..=4_usize {
-        type StripDef = (
-            &'static str,
-            &'static str,
-            &'static str,
-            &'static str,
-            &'static str,
-        );
-        let (col, strip_label, dial_label, strip_text, strip_key): StripDef = match strip {
-            1 => (
-                "0",
-                "Strip 1",
-                "Dial 1",
-                "$(custom:lcd_audio_strip_1)",
-                "audio_strip_1",
-            ),
-            2 => (
-                "1",
-                "Strip 2",
-                "Dial 2",
-                "$(custom:lcd_audio_strip_2)",
-                "audio_strip_2",
-            ),
-            3 => (
-                "2",
-                "Strip 3",
-                "Dial 3",
-                "$(custom:lcd_audio_strip_3)",
-                "audio_strip_3",
-            ),
-            _ => (
-                "3",
-                "Strip 4",
-                "Dial 4",
-                "$(custom:lcd_audio_strip_4)",
-                "audio_strip_4",
-            ),
-        };
-        let tap_body = json!({"action":"stripTap","value": strip.to_string()});
-        let mut tap_refreshes = Vec::from(AUDIO_STRIP_LCD_KEYS);
-        tap_refreshes.retain(|key| *key != strip_key);
-        let mut tap_keys: Vec<&str> = vec![strip_key];
-        tap_keys.extend(tap_refreshes);
-        controls.push(expression_button(
-            "2",
-            col,
-            strip_label,
-            strip_text,
-            audio_action_with_refreshes(tap_body, &tap_keys),
-        ));
-
-        let turn_down = json!({"action":"dialTurn","value": format!("{strip}:down")});
-        let turn_up = json!({"action":"dialTurn","value": format!("{strip}:up")});
-        let press = json!({"action":"dialPress","value": strip.to_string()});
-        controls.push(dial(
-            "3",
-            col,
-            dial_label,
-            None,
-            audio_action_with_refreshes(press, &[strip_key]),
-            audio_action_with_refreshes(turn_down, &[strip_key]),
-            audio_action_with_refreshes(turn_up, &[strip_key]),
-        ));
-    }
-
-    controls
-}
-
-fn button(
+pub(crate) fn button(
     row: &'static str,
     col: &'static str,
     label: &'static str,
@@ -1427,10 +1234,14 @@ fn button(
         rotate_right: Vec::new(),
         text_expression: None,
         hold_repeats_down: false,
+        png_asset: None,
+        text_size: None,
+        hide_topbar: false,
+        feedbacks: Vec::new(),
     }
 }
 
-fn expression_button(
+pub(crate) fn expression_button(
     row: &'static str,
     col: &'static str,
     label: &'static str,
@@ -1443,7 +1254,7 @@ fn expression_button(
     }
 }
 
-fn momentary_button(
+pub(crate) fn momentary_button(
     row: &'static str,
     col: &'static str,
     label: &'static str,
@@ -1459,7 +1270,7 @@ fn momentary_button(
     }
 }
 
-fn dial(
+pub(crate) fn dial(
     row: &'static str,
     col: &'static str,
     label: &'static str,
@@ -1479,6 +1290,10 @@ fn dial(
         rotate_right,
         text_expression,
         hold_repeats_down: false,
+        png_asset: None,
+        text_size: None,
+        hide_topbar: false,
+        feedbacks: Vec::new(),
     }
 }
 
@@ -1496,7 +1311,7 @@ fn page_jump(page: i64) -> Vec<Value> {
     })]
 }
 
-fn http_post(path: &'static str, body: Value) -> Vec<Value> {
+pub(crate) fn http_post(path: &'static str, body: Value) -> Vec<Value> {
     vec![json!({
         "id": next_action_id(),
         "definitionId": "post",
@@ -1514,7 +1329,7 @@ fn http_post(path: &'static str, body: Value) -> Vec<Value> {
     })]
 }
 
-fn lcd_refreshes(keys: &[&str]) -> Vec<Value> {
+pub(crate) fn lcd_refreshes(keys: &[&str]) -> Vec<Value> {
     keys.iter()
         .map(|key| {
             json!({
@@ -1535,7 +1350,7 @@ fn lcd_refreshes(keys: &[&str]) -> Vec<Value> {
         .collect()
 }
 
-fn next_action_id() -> String {
+pub(crate) fn next_action_id() -> String {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static ACTION_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -1546,6 +1361,7 @@ fn next_action_id() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::exports_audio::{DECK_AMBER_BG, DECK_MUTED_INK, LEGACY_LCD_KEYS};
 
     #[test]
     fn companion_export_contains_native_bridge_instance() {
@@ -1585,7 +1401,12 @@ mod tests {
         let custom_variables = config["custom_variables"]
             .as_object()
             .expect("custom variables should exist");
-        assert_eq!(custom_variables.len(), AUDIO_LCD_KEYS.len());
+        assert_eq!(
+            custom_variables.len(),
+            AUDIO_LCD_KEYS.len() + LEGACY_LCD_KEYS.len()
+        );
+        assert!(custom_variables.contains_key("lcd_project_nav"));
+        assert!(custom_variables.contains_key("lcd_audio_strip_1_level"));
         assert!(
             custom_variables.contains_key("lcd_workspace"),
             "the polled LCD variables must ship with the profile - generic-http stores are silent no-ops without them"
@@ -1642,6 +1463,58 @@ mod tests {
             .as_str()
             .expect("talk up body should exist");
         assert!(talk_up_body.contains("talkOff"));
+    }
+
+    #[test]
+    fn companion_export_audio_page_carries_the_visual_language() {
+        let config = generate_companion_config("http://127.0.0.1:38201", None);
+        let controls = config["pages"]["4"]["controls"]
+            .as_object()
+            .expect("audio controls should exist");
+
+        let main_key = &controls["0"]["0"];
+        assert_eq!(main_key["style"]["text"], "MAIN");
+        assert_eq!(main_key["style"]["textExpression"], false);
+        assert_eq!(main_key["style"]["show_topbar"], false);
+        assert!(main_key["style"]["png64"]
+            .as_str()
+            .is_some_and(|png| png.starts_with("iVBOR")));
+        let main_feedbacks = main_key["feedbacks"].as_array().expect("feedbacks");
+        assert_eq!(
+            main_feedbacks[0]["options"]["variable"],
+            "custom:lcd_audio_state_target"
+        );
+        assert_eq!(main_feedbacks[0]["options"]["value"], "main");
+        assert_eq!(main_feedbacks[0]["style"]["bgcolor"], DECK_AMBER_BG);
+
+        let talk_key = &controls["1"]["2"];
+        let talk_feedbacks = talk_key["feedbacks"].as_array().expect("feedbacks");
+        assert_eq!(
+            talk_feedbacks[0]["options"]["variable"],
+            "custom:lcd_audio_state_talk"
+        );
+        assert_eq!(talk_feedbacks[0]["options"]["value"], "live");
+
+        let solo_key = &controls["1"]["3"];
+        let solo_feedbacks = solo_key["feedbacks"].as_array().expect("feedbacks");
+        assert_eq!(solo_feedbacks[0]["isInverted"], true);
+        assert_eq!(solo_feedbacks[0]["options"]["value"], "0");
+
+        let strip = &controls["2"]["0"];
+        assert_eq!(strip["style"]["show_topbar"], false);
+        let strip_feedbacks = strip["feedbacks"].as_array().expect("strip feedbacks");
+        // 13 normal + 13 muted bars, off, empty, plus 3 state color feedbacks.
+        assert_eq!(strip_feedbacks.len(), 31);
+        let png_feedbacks = strip_feedbacks
+            .iter()
+            .filter(|fb| fb["style"]["png64"].is_string())
+            .count();
+        assert_eq!(png_feedbacks, 28);
+        assert!(strip_feedbacks.iter().any(|fb| {
+            fb["options"]["variable"] == "custom:lcd_audio_strip_1_state"
+                && fb["options"]["value"] == "muted"
+                && fb["style"]["color"] == DECK_MUTED_INK
+        }));
     }
 
     #[test]

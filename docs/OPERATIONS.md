@@ -100,10 +100,12 @@ Layout of the AUDIO deck page:
 
 - Keys, top row: `→ MAIN`, `→ PH 1`, `→ PH 2` set the active mix target (the same engine-persisted selection as the app's output strips — the tier header "Mix for →" and the deck always agree), and `BANK` cycles which strips the dials drive: inputs (the four front preamps) → playback (pairs 1-4) → outputs (Main / Phones 1 / Phones 2, fourth dial idle).
 - Keys, bottom row: `DIM` toggles control-room dim on Main; `GAIN` switches the input dials between send-fader and whole-dB preamp gain; `TALK` is momentary talkback on Main (hold to talk — the engine auto-releases 2 s after the hold stops arriving, so a lost request can never leave talkback open); `SOLO CLR` clears every solo.
-- Touch strip: one segment per strip — name, level in the same dB the on-screen fader shows, `MUTED`, the active-target arrow, and a `•` selection marker. Tapping a segment selects that channel in the app inspector (deliberately silent — strip swipes can register as taps).
+- Touch strip: one segment per strip — name, level in the same dB the on-screen fader shows, and a drawn fader-position bar with the unity notch at the app scale's `0.8` mark. The bar is position, not a level meter. Muted strips drop to the ember palette with `MUTED`; the selected strip carries the `•` marker and the amber accent. Tapping a segment selects that channel in the app inspector (deliberately silent — strip swipes can register as taps).
 - Dials: rotate rides the strip's level (`0.01` per detent, the app's keyboard step; detents faster than 80 ms apply ×5 like Shift); push toggles the strip's mute.
 
-Trust rules: deck actions pass the same gating as app commands — when audio is not verified, the strip shows the reason (`AUDIO / NOT VERIFIED`) and actions are refused. The deck shows state, not meters, and has no snapshot or 48V controls by design.
+State color follows the app's Console vocabulary: the active mix-target key is solid amber, `TALK` turns green while live, `SOLO CLR` turns warn-yellow with the live count, `DIM` and `GAIN` go amber while engaged, and a non-input dial bank tints the `BANK` key. The colors come from Companion feedbacks on custom variables the engine publishes (`lcd_audio_state_*`, `lcd_audio_strip_N_state/level`); the bar graphics are PNG assets rendered by `scripts/deck-assets.py` and embedded in the exported profile.
+
+Trust rules: deck actions pass the same gating as app commands — when audio is not verified, the strips show the reason (`AUDIO / NOT VERIFIED`), cells grey out, and actions are refused. The deck shows state, not meters, and has no snapshot or 48V controls by design.
 
 Deck freshness comes from the profile's `SSE audio LCD poll` trigger (1 s) plus per-action refreshes; the `SSE follow app - …` triggers flip the deck to the AUDIO / LIGHTS / PROJECTS page whenever the app workspace changes.
 

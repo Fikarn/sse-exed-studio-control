@@ -9,6 +9,7 @@ mod control_surface;
 mod control_surface_audio;
 mod diagnostics;
 mod exports;
+mod exports_audio;
 mod legacy_import;
 mod lighting;
 mod lighting_backend;
