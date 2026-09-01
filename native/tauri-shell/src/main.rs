@@ -1,3 +1,8 @@
+// Release builds are a GUI app: without this, the console-subsystem default
+// opens a terminal on every launch and the engine child inherits it, spilling
+// engine stderr onto the operator monitor. Dev builds keep the console.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod engine;
 
 use engine::{EngineBootstrapSummary, EngineBridge};

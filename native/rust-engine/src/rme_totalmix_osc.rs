@@ -1212,6 +1212,10 @@ fn read_available_packets(
                     Err(error) => eprintln!("RME TotalMix OSC decode failed: {error}"),
                 },
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
+                // Windows surfaces a keepalive sent to a TotalMix remote that is
+                // not listening as ConnectionReset (10054) on the next receive.
+                // A disabled classic slot is a normal state, not an error.
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => break,
                 Err(error) => {
                     eprintln!("RME TotalMix OSC receive failed: {error}");
                     break;

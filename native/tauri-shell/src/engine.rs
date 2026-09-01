@@ -55,13 +55,23 @@ impl EngineBridge {
         create_dir_all(&app_data_dir).map_err(|error| error.to_string())?;
         create_dir_all(&logs_dir).map_err(|error| error.to_string())?;
 
-        let mut child = Command::new(&binary_path)
+        let mut command = Command::new(&binary_path);
+        command
             .env("SSE_PROTOCOL_VERSION", PROTOCOL_VERSION)
             .env("SSE_APP_DATA_DIR", &app_data_dir)
             .env("SSE_LOG_DIR", &logs_dir)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+        // The engine is a console-subsystem binary; without CREATE_NO_WINDOW a
+        // GUI-subsystem shell would pop a fresh terminal for it on Windows.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
+        let mut child = command
             .spawn()
             .map_err(|error| format!("Failed to start engine: {error}"))?;
 
