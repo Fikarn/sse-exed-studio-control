@@ -12,6 +12,9 @@ pub fn update_audio_mix_target(
 ) -> Result<AudioMixTargetSnapshot, AudioCommandError> {
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
+    // Every mix-target field (level, mute, dim, mono, talkback) is a console
+    // write, so the whole request passes the console gate first.
+    ensure_audio_action_allowed(db_path, &snapshot)?;
 
     let outcome = update_default_audio_mix_target(
         &resolve_audio_config(&app_settings),
@@ -72,10 +75,6 @@ pub fn update_audio_mix_target(
             (
                 String::from(AUDIO_MIX_TARGET_STATE_KEY),
                 serialize_json_state(&mix_target_state)?,
-            ),
-            (
-                String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-                String::from("aligned"),
             ),
             (
                 String::from(AUDIO_LAST_ACTION_STATUS_KEY),

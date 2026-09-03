@@ -332,10 +332,12 @@ function activeGroupsForTier(
 function audioCapabilities(snapshot: AudioSnapshot): AudioSnapshot["capabilities"] {
   return (
     snapshot.capabilities ?? {
-      canEditMixerState: snapshot.oscEnabled === true,
-      canSync: snapshot.oscEnabled === true,
+      // Mirrors the engine's `audio_capabilities`: console writes need OSC on
+      // AND a passed audio probe; app-local actions only need OSC on.
+      canEditMixerState: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
+      canSync: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canRecallConsoleSnapshot: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
-      canEditProcessing: snapshot.oscEnabled === true,
+      canEditProcessing: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canClearClips: snapshot.oscEnabled === true,
       canCaptureSnapshot: snapshot.oscEnabled === true,
       canUseMasterView: snapshot.oscEnabled === true,

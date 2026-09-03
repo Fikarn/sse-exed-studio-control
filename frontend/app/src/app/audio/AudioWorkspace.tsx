@@ -237,6 +237,22 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   });
 
+  // Why (2026-09 audit remediation, Slice 1): while the audio probe has not
+  // passed, every console write is refused, so the workspace offers the probe
+  // itself as the recovery action. The transport values come from the engine
+  // snapshot so the probe targets the commissioned ports, never a guess.
+  const runAudioProbe = useLiveCallback(() => {
+    if (!audioSnapshot) return;
+    void performAction("audio-probe", async () => {
+      await store.runCommissioningCheck({
+        receivePort: audioSnapshot.receivePort,
+        sendHost: audioSnapshot.sendHost,
+        sendPort: audioSnapshot.sendPort,
+        target: "audio",
+      });
+    });
+  });
+
   const openSetup = useLiveCallback(() => {
     void performAction("audio-open-setup", async () => {
       await store.setWorkspace("setup");
@@ -632,6 +648,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         onClearAllSolo={clearAllSolo}
         onOpenSetup={openSetup}
         onRecallCurrentSnapshot={recallCurrentSnapshot}
+        onRunAudioProbe={runAudioProbe}
         onSelectTheme={setAudioTheme}
         onSync={syncAudio}
         store={store}
@@ -656,6 +673,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           onOpenSetup={openSetup}
           onRecallSnapshot={recallSnapshot}
           onRenameSnapshot={renameSnapshot}
+          onRunAudioProbe={runAudioProbe}
           onSaveSnapshot={saveSnapshot}
           onSelectChannel={selectChannel}
           onSelectChannelGroup={selectChannelGroup}

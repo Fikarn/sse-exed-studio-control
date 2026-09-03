@@ -153,6 +153,15 @@ jobs:
       - run: npm run native:check
       - run: npm run native:test
       - run: npm run native:acceptance
+        # 2026-09 audit remediation, Slice 1: console writes are refused until
+        # the audio probe passes. Simulated input mode lets the probe pass
+        # honestly on a host without TotalMix (every audio surface labels the
+        # console "test simulation" in this mode), so the acceptance harness
+        # reaches `ready` instead of forging the check key. Scoped to this step
+        # only: `native:test` includes a test that asserts the probe FAILS
+        # without live TotalMix packets, which must keep running unsimulated.
+        env:
+          SSE_AUDIO_SIMULATED_INPUT_MODE: "1"
 
   # plan PR 2 / workstream B4.
   # `tauri:foundation` = protocol:generate + native:engine:build +

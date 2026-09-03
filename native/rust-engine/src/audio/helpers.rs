@@ -271,7 +271,7 @@ pub(crate) fn ensure_audio_action_allowed(
 ) -> Result<(), AudioCommandError> {
     if !snapshot.osc_enabled {
         let message = String::from(
-            "Audio OSC transport is disabled in native audio settings. Re-enable it before sending native audio commands.",
+            "Audio control is switched off in Setup. Turn OSC back on before changing console settings.",
         );
         record_audio_action_failure(db_path, "AUDIO_DISABLED", &message)?;
         return Err(AudioCommandError::Rejected("AUDIO_DISABLED", message));
@@ -282,19 +282,19 @@ pub(crate) fn ensure_audio_action_allowed(
         "attention" => Some((
             "AUDIO_PROBE_FAILED",
             String::from(
-                "Audio transport is in attention state. Fix the OSC configuration and rerun the commissioning audio probe before sending native commands.",
+                "The console link failed its last probe. Check that TotalMix is running with remote 4 in Global OSC mode, then run the audio probe again.",
             ),
         )),
         "not-verified" => Some((
             "AUDIO_NOT_VERIFIED",
             String::from(
-                "Run the commissioning audio probe before syncing the console or recalling snapshots from the native engine.",
+                "Audio is not verified yet. Run the audio probe before changing console settings.",
             ),
         )),
         _ => Some((
             "AUDIO_TRANSPORT_UNAVAILABLE",
             String::from(
-                "Audio transport is unavailable. Configure OSC settings before sending native audio commands.",
+                "The audio console link is not configured. Set the OSC ports in Setup before changing console settings.",
             ),
         )),
     };
@@ -305,6 +305,15 @@ pub(crate) fn ensure_audio_action_allowed(
     }
 
     Ok(())
+}
+
+/// True when the resolved metering source is the simulated input mode
+/// (`SSE_AUDIO_SIMULATED_INPUT_MODE` or the persisted setting). Commissioning
+/// uses this to let the audio probe pass on hosts without TotalMix while the
+/// UI keeps labelling the console "test simulation".
+pub(crate) fn audio_metering_is_simulated(settings: &HashMap<String, String>) -> bool {
+    resolve_audio_config(settings).metering_source
+        == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE
 }
 
 pub(super) fn persist_audio_state(
@@ -440,11 +449,16 @@ pub(super) fn audio_view_mode(settings: &HashMap<String, String>) -> String {
 }
 
 pub(super) fn audio_capabilities(status: &str, osc_enabled: bool) -> AudioCapabilitySnapshot {
+    // Hardware-facing capabilities follow the same gate as the engine commands
+    // (`ensure_audio_action_allowed`): OSC must be on AND the audio probe must
+    // have passed. App-local capabilities (clip latches, snapshot capture, the
+    // master view) only need OSC on, because they never reach TotalMix.
+    let console_ready = osc_enabled && status == "ready";
     AudioCapabilitySnapshot {
-        can_edit_mixer_state: osc_enabled,
-        can_sync: osc_enabled,
-        can_recall_console_snapshot: osc_enabled && status == "ready",
-        can_edit_processing: osc_enabled,
+        can_edit_mixer_state: console_ready,
+        can_sync: console_ready,
+        can_recall_console_snapshot: console_ready,
+        can_edit_processing: console_ready,
         can_clear_clips: osc_enabled,
         can_capture_snapshot: osc_enabled,
         can_use_master_view: osc_enabled,

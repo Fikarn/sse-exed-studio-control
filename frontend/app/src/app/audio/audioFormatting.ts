@@ -221,19 +221,17 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   }
 
   if (String(snapshot?.status ?? "not-verified") !== "ready" || snapshot?.verified !== true) {
-    // Why: when the operator has never pressed Sync, OSC NOT VERIFIED is a
-    // pre-flight reminder, not a fault. Demote to inline indicator next to
-    // the Sync button so it doesn't compete with the SOLO banner for the
-    // operator's eye. Once any sync has been attempted (lastConsoleSyncAt
-    // becomes a non-empty string), promote back to full banner because
-    // the state divergence is now a real operational concern.
-    const everSynced = typeof snapshot?.lastConsoleSyncAt === "string" && snapshot.lastConsoleSyncAt.trim().length > 0;
+    // Why (2026-09 audit remediation, Slice 1): while the audio probe has not
+    // passed, every console write is refused by the engine and disabled on
+    // screen. That state must explain itself and offer the way out, so it is
+    // always a full banner carrying the "Run audio probe" action. (The earlier
+    // Phase 3 demotion to an inline dot predates the gate.)
     return {
-      bannerEligible: everSynced,
+      bannerEligible: true,
       label: "NOT VERIFIED",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "Run Sync before trusting recall or current fader state.",
-      warningTitle: "OSC NOT VERIFIED",
+      warningBody: "Console controls stay locked until the audio probe passes.",
+      warningTitle: "AUDIO NOT VERIFIED",
     };
   }
 

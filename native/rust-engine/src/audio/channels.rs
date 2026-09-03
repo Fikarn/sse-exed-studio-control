@@ -13,29 +13,15 @@ pub fn update_audio_channel(
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
 
-    let config = resolve_audio_config(&app_settings);
-    let outcome = update_default_audio_channel(
-        &config,
-        &crate::audio_backend::AudioBackendInventory {
-            adapter_mode: snapshot.adapter_mode.clone(),
-            channels: snapshot.channels.clone(),
-            mix_targets: snapshot.mix_targets.clone(),
-            snapshots: snapshot.snapshots.clone(),
-        },
-        request,
-    )
-    .map_err(|message| {
-        let code = if message.contains("channel") {
-            "AUDIO_CHANNEL_NOT_FOUND"
-        } else if message.contains("mix target") {
-            "AUDIO_MIX_TARGET_NOT_FOUND"
-        } else {
-            "AUDIO_CHANNEL_UPDATE_FAILED"
-        };
-        let _ = record_audio_action_failure(db_path, code, &message);
-        AudioCommandError::Rejected(code, message)
-    })?;
+    // Gate first: anything that can reach TotalMix needs a verified console
+    // link, exactly like sync, recall and the Stream Deck path. A rename is
+    // app-local and stays allowed while the probe is pending.
+    if channel_request_touches_console(request) {
+        ensure_audio_action_allowed(db_path, &snapshot)?;
+    }
 
+    // Every field is validated BEFORE anything goes on the wire, so a request
+    // carrying one unsupported field can never half-apply to the console.
     let mut channel_state = read_channel_state_map(&app_settings);
     let mut next_state = snapshot
         .channels
@@ -177,18 +163,40 @@ pub fn update_audio_channel(
         }
         next_state.auto_set = auto_set;
     }
+    let config = resolve_audio_config(&app_settings);
+    let outcome = update_default_audio_channel(
+        &config,
+        &crate::audio_backend::AudioBackendInventory {
+            adapter_mode: snapshot.adapter_mode.clone(),
+            channels: snapshot.channels.clone(),
+            mix_targets: snapshot.mix_targets.clone(),
+            snapshots: snapshot.snapshots.clone(),
+        },
+        request,
+    )
+    .map_err(|message| {
+        let code = if message.contains("channel") {
+            "AUDIO_CHANNEL_NOT_FOUND"
+        } else if message.contains("mix target") {
+            "AUDIO_MIX_TARGET_NOT_FOUND"
+        } else {
+            "AUDIO_CHANNEL_UPDATE_FAILED"
+        };
+        let _ = record_audio_action_failure(db_path, code, &message);
+        AudioCommandError::Rejected(code, message)
+    })?;
+
     channel_state.insert(request.channel_id.clone(), next_state);
 
+    // Console-state confidence is deliberately NOT written here: a UDP send
+    // is not a confirmation. Only a completed pull, a fully confirmed push, or
+    // the console-link echo tracker may move it (2026-09 audit remediation).
     persist_audio_state(
         db_path,
         &[
             (
                 String::from(AUDIO_CHANNEL_STATE_KEY),
                 serialize_json_state(&channel_state)?,
-            ),
-            (
-                String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-                String::from("aligned"),
             ),
             (
                 String::from(AUDIO_LAST_ACTION_STATUS_KEY),
@@ -215,12 +223,29 @@ pub fn update_audio_channel(
         })
 }
 
+fn channel_request_touches_console(request: &AudioChannelUpdateRequest) -> bool {
+    request.gain.is_some()
+        || request.fader.is_some()
+        || request.mute.is_some()
+        || request.solo.is_some()
+        || request.phantom.is_some()
+        || request.phase.is_some()
+        || request.pad.is_some()
+        || request.instrument.is_some()
+        || request.auto_set.is_some()
+}
+
 pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioCommandError> {
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     let config = resolve_audio_config(&app_settings);
     let mut channel_state = read_channel_state_map(&app_settings);
     let mut cleared_count = 0usize;
+
+    // Clearing a solo is a console write; the idempotent no-op stays allowed.
+    if snapshot.channels.iter().any(|entry| entry.solo) {
+        ensure_audio_action_allowed(db_path, &snapshot)?;
+    }
 
     for channel in snapshot.channels.iter().filter(|entry| entry.solo) {
         let request = AudioChannelUpdateRequest {
@@ -273,10 +298,6 @@ pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioComman
                 serialize_json_state(&channel_state)?,
             ),
             (
-                String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-                String::from("aligned"),
-            ),
-            (
                 String::from(AUDIO_LAST_ACTION_STATUS_KEY),
                 String::from("succeeded"),
             ),
@@ -294,14 +315,9 @@ pub fn update_audio_channel_eq(
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
-    if !snapshot.capabilities.can_edit_processing {
-        let message = String::from("Audio EQ editing is unavailable while OSC is disabled.");
-        record_audio_action_failure(db_path, "AUDIO_PROCESSING_UNAVAILABLE", &message)?;
-        return Err(AudioCommandError::Rejected(
-            "AUDIO_PROCESSING_UNAVAILABLE",
-            message,
-        ));
-    }
+    // EQ / low-cut edits reach TotalMix over the classic page-2 path, so they
+    // pass the same console gate as faders and mutes.
+    ensure_audio_action_allowed(db_path, &snapshot)?;
 
     let mut channel_state = read_channel_state_map(&app_settings);
     let mut next_state = snapshot

@@ -16,6 +16,7 @@ interface AudioTopBarProps {
   onClearAllSolo: () => void;
   onOpenSetup: () => void;
   onRecallCurrentSnapshot: () => void;
+  onRunAudioProbe: () => void;
   onSelectTheme: (theme: AudioTheme) => void;
   onSync: () => void;
   viewModel: AudioWorkspaceViewModel;
@@ -27,10 +28,16 @@ export function AudioTopBar({
   onClearAllSolo,
   onOpenSetup,
   onRecallCurrentSnapshot,
+  onRunAudioProbe,
   onSelectTheme,
   onSync,
   viewModel,
 }: AudioTopBarProps) {
+  // Why (2026-09 audit remediation, Slice 1): console writes are refused until
+  // the audio probe passes, so the primary action in that state is the probe
+  // itself, not a Sync that would be refused. OSC-disabled keeps the disabled
+  // Sync button as the honest "nothing can happen here" signal.
+  const showProbeInsteadOfSync = !viewModel.capabilities.canSync && viewModel.audioSnapshot.oscEnabled !== false;
   const currentSnapshot = viewModel.selectedSnapshot;
   const oscFact = viewModel.footerTelemetry.osc;
   const meteringFact = viewModel.meterSimulationActive ? "test simulation" : viewModel.footerTelemetry.metering;
@@ -108,26 +115,41 @@ export function AudioTopBar({
       </div>
 
       <div className={styles.actionRow}>
-        <button
-          aria-label="Sync"
-          className={styles.actionButton}
-          disabled={!viewModel.capabilities.canSync}
-          onClick={onSync}
-          type="button"
-          data-testid="audio-topbar-sync"
-        >
-          <RefreshCw size={13} strokeWidth={1.8} aria-hidden="true" />
-          <span>Sync</span>
-          {warningTitle && !viewModel.status.bannerEligible ? (
-            <span
-              className={styles.warnDot}
-              data-testid="audio-toolbar-status-dot"
-              role="status"
-              title={`${warningTitle} — ${viewModel.status.warningBody ?? "press Sync to verify"}`}
-              aria-label={`${warningTitle}. ${viewModel.status.warningBody ?? ""}`}
-            />
-          ) : null}
-        </button>
+        {showProbeInsteadOfSync ? (
+          <button
+            aria-label="Run audio probe"
+            className={styles.actionButton}
+            onClick={onRunAudioProbe}
+            type="button"
+            data-testid="audio-topbar-probe"
+            title="Run the audio probe to verify the TotalMix link and unlock console controls"
+          >
+            <RefreshCw size={13} strokeWidth={1.8} aria-hidden="true" />
+            <span>Run audio probe</span>
+          </button>
+        ) : (
+          <button
+            aria-label="Sync"
+            className={styles.actionButton}
+            disabled={!viewModel.capabilities.canSync}
+            onClick={onSync}
+            type="button"
+            data-testid="audio-topbar-sync"
+            title="Pull the console state from TotalMix — never changes hardware"
+          >
+            <RefreshCw size={13} strokeWidth={1.8} aria-hidden="true" />
+            <span>Sync</span>
+            {warningTitle && !viewModel.status.bannerEligible ? (
+              <span
+                className={styles.warnDot}
+                data-testid="audio-toolbar-status-dot"
+                role="status"
+                title={`${warningTitle} — ${viewModel.status.warningBody ?? "press Sync to verify"}`}
+                aria-label={`${warningTitle}. ${viewModel.status.warningBody ?? ""}`}
+              />
+            ) : null}
+          </button>
+        )}
 
         <button
           className={styles.actionButton}

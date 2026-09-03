@@ -698,6 +698,29 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     `${runtimeLabel} audio.settings.update did not retain the expected operator selection and transport settings.`
   );
 
+  // 2026-09 audit remediation, Slice 1: every console write below is refused
+  // until the audio probe has passed, exactly like the Stream Deck path, so the
+  // probe runs first. On CI `SSE_AUDIO_SIMULATED_INPUT_MODE=1` makes it pass
+  // honestly (simulated console); on the workstation it needs live TotalMix.
+  const audioProbe = await harness.request(`${requestIdPrefix}-audio-probe`, "commissioning.check.run", {
+    target: "audio",
+    sendHost: settings.sendHost,
+    sendPort: settings.sendPort,
+    receivePort: settings.receivePort,
+  });
+  const audioCheck = audioProbe.checks?.find((check) => check.id === "audio");
+  assert(
+    audioCheck && typeof audioCheck.status === "string" && typeof audioCheck.message === "string",
+    `${runtimeLabel} commissioning.check.run did not return a valid audio probe record.`
+  );
+  // There is deliberately no "bind denied" escape any more: if the probe cannot
+  // pass, the engine refuses every console write below, so the harness stops
+  // here with the probe's own reason instead of failing on the first write.
+  assert(
+    audioCheck.status === "passed",
+    `${runtimeLabel} audio probe must pass before console writes are accepted (on a host without TotalMix set SSE_AUDIO_SIMULATED_INPUT_MODE=1): ${audioCheck.message}`
+  );
+
   const updatedMainMix = await harness.request(`${requestIdPrefix}-audio-mix-main`, "audio.mixTarget.update", {
     mixTargetId: "audio-mix-main",
     volume: 0.81,
@@ -773,40 +796,13 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     `${runtimeLabel} audio role-gating did not reject unsupported rear-line phantom changes.`
   );
 
-  const audioProbe = await harness.request(`${requestIdPrefix}-audio-probe`, "commissioning.check.run", {
-    target: "audio",
-    sendHost: settings.sendHost,
-    sendPort: settings.sendPort,
-    receivePort: settings.receivePort,
-  });
-  const audioCheck = audioProbe.checks?.find((check) => check.id === "audio");
-  assert(
-    audioCheck && typeof audioCheck.status === "string" && typeof audioCheck.message === "string",
-    `${runtimeLabel} commissioning.check.run did not return a valid audio probe record.`
-  );
-  const audioProbeBindDenied =
-    audioCheck.status === "failed" &&
-    /could not bind receive port/i.test(audioCheck.message) &&
-    /operation not permitted/i.test(audioCheck.message);
-
-  // CI escape: stock GitHub runners have no RME TotalMix OSC source, so the
-  // probe successfully binds 7001/9001 but never receives meter packets and
-  // fails with "No RME TotalMix OSC meter packets were received…". The
-  // `audioProbeBindDenied` escape above only covers sandboxed-bind failures,
-  // not the no-traffic case. Operators set this env var in their CI workflow
-  // (see `.github/workflows/dev-checks.yml` `native-acceptance` job) to drop
-  // only the audio.sync / audio.snapshot.recall assertions; the rest of the
-  // harness (import → backup → restart → workflow parity → restore → verify
-  // rollback) still runs end-to-end. Local laptop runs without the env var
-  // continue to require live TotalMix exactly as before.
+  // CI escape: `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` drops only the
+  // audio.sync / audio.snapshot.recall assertions, which need a real console to
+  // answer (see `.github/workflows/dev-checks.yml` `rust` job). Everything else
+  // in this harness runs against the same gate the operator faces.
   const skipAudioSync = process.env.SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC === "1";
 
-  if (!audioProbeBindDenied && !skipAudioSync) {
-    assert(
-      audioCheck.status === "passed",
-      `${runtimeLabel} commissioning audio probe did not pass before sync/recall validation: ${audioCheck.message}`
-    );
-
+  if (!skipAudioSync) {
     const synced = await harness.request(`${requestIdPrefix}-audio-sync`, "audio.sync");
     assert(
       synced.synced === true && synced.consoleStateConfidence === "aligned",
@@ -833,11 +829,13 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
   assert(
     mutatedSnapshot.selectedChannelId === "audio-input-12" &&
       mutatedSnapshot.selectedMixTargetId === "audio-mix-phones-a" &&
-      // `skipAudioSync` mirrors the bind-denied skip path because both bypass
-      // the audio.sync + audio.snapshot.recall block above.
-      mutatedSnapshot.consoleStateConfidence === (audioProbeBindDenied || skipAudioSync ? "aligned" : "assumed") &&
-      mutatedSnapshot.lastConsoleSyncReason === (audioProbeBindDenied || skipAudioSync ? null : "snapshot") &&
-      mutatedSnapshot.lastRecalledSnapshotId === (audioProbeBindDenied || skipAudioSync ? null : "snapshot-panel"),
+      // 2026-09 audit remediation, Slice 1: ordinary edits never write
+      // console-state confidence any more (a UDP send is not a confirmation),
+      // so with sync/recall skipped it stays `unknown`. The old expectation
+      // (`aligned` after unconfirmed edits) encoded the audit finding.
+      mutatedSnapshot.consoleStateConfidence === (skipAudioSync ? "unknown" : "assumed") &&
+      mutatedSnapshot.lastConsoleSyncReason === (skipAudioSync ? null : "snapshot") &&
+      mutatedSnapshot.lastRecalledSnapshotId === (skipAudioSync ? null : "snapshot-panel"),
     `${runtimeLabel} audio snapshot did not retain the expected selection and recall markers.`
   );
   assert(

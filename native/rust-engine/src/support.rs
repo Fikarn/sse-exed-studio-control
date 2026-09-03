@@ -1120,6 +1120,13 @@ mod tests {
                     String::from(LIGHTING_SELECTED_FIXTURE_ID_KEY),
                     String::from("fixture-custom-1"),
                 ),
+                // Console writes below are refused until the audio probe has
+                // passed (2026-09 audit remediation, Slice 1); the restore
+                // must roll this key back too.
+                (
+                    String::from("app.commissioning.check.audio.status"),
+                    String::from("passed"),
+                ),
             ],
         )
         .expect("lighting mutations should persist before restore");

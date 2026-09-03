@@ -758,13 +758,78 @@ fn audio_channel_update_persists_front_preamp_controls() {
     assert!(refreshed.instrument);
     assert!(refreshed.auto_set);
     assert_eq!(snapshot.last_action_status, "succeeded");
-    assert_eq!(snapshot.console_state_confidence, "aligned");
+    // 2026-09 audit remediation, Slice 1: an edit is a UDP send, not a
+    // confirmation, so it must never move console-state confidence. The old
+    // assertion ("aligned") encoded the finding.
+    assert_eq!(snapshot.console_state_confidence, "unknown");
+}
+
+/// Binds a loopback receiver on the Global OSC slot (`send_port + 3`) and
+/// points the audio transport at it, so a test can prove whether a command put
+/// anything on the wire. Pair every "nothing was sent" assertion with a
+/// positive control through the same receiver.
+fn bind_console_probe_receiver(db_path: &std::path::Path) -> std::net::UdpSocket {
+    let receiver = std::net::UdpSocket::bind("127.0.0.1:0").expect("loopback receiver should bind");
+    receiver
+        .set_read_timeout(Some(std::time::Duration::from_millis(250)))
+        .expect("read timeout should apply");
+    let slot_port = i64::from(receiver.local_addr().expect("local addr").port());
+    update_audio_settings(
+        db_path,
+        &AudioSettingsUpdateRequest {
+            osc_enabled: None,
+            send_host: Some(String::from("127.0.0.1")),
+            send_port: Some(slot_port - 3),
+            receive_port: None,
+            selected_channel_id: None,
+            selected_mix_target_id: None,
+            expected_peak_data: None,
+            expected_submix_lock: None,
+            expected_compatibility_mode: None,
+            faders_per_bank: None,
+            view_mode: None,
+        },
+    )
+    .expect("transport settings should persist");
+    receiver
+}
+
+fn assert_no_console_datagram(receiver: &std::net::UdpSocket, context: &str) {
+    let mut buffer = [0u8; 2048];
+    match receiver.recv_from(&mut buffer) {
+        Ok((len, _)) => panic!("{context}: expected no OSC datagram but received {len} bytes"),
+        Err(error) => assert!(
+            matches!(
+                error.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ),
+            "{context}: unexpected receive error: {error}"
+        ),
+    }
+}
+
+fn assert_console_datagram_received(receiver: &std::net::UdpSocket, context: &str) {
+    let mut buffer = [0u8; 2048];
+    let (len, _) = receiver
+        .recv_from(&mut buffer)
+        .unwrap_or_else(|error| panic!("{context}: expected an OSC datagram: {error}"));
+    assert!(len > 0, "{context}: datagram should carry an OSC payload");
 }
 
 #[test]
 fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
     let test_dir = TestDir::new("clear-all-solo");
     initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    // Solo is a console write, so this test now runs under the same gate the
+    // operator faces (Slice 1); before it passed without any probe state.
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
 
     for channel_id in ["audio-input-9", "audio-playback-3-4"] {
         update_audio_channel(
@@ -791,7 +856,8 @@ fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
         clear_all_audio_solo(test_dir.db_path().as_path()).expect("clear all solo should succeed");
     assert!(cleared.channels.iter().all(|entry| !entry.solo));
     assert_eq!(cleared.last_action_status, "succeeded");
-    assert_eq!(cleared.console_state_confidence, "aligned");
+    // Clearing solos sends OSC but confirms nothing; confidence stays put.
+    assert_eq!(cleared.console_state_confidence, "unknown");
 
     let idempotent = clear_all_audio_solo(test_dir.db_path().as_path())
         .expect("idempotent clear all solo should succeed");
@@ -802,53 +868,204 @@ fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
     );
 }
 
+// 2026-09 audit remediation, Slice 1 (operator decision 5: match the deck).
+// Replaces `audio_channel_update_succeeds_before_probe_passes`, which asserted
+// that an unverified console link accepted a hardware write and then marked
+// the console "aligned" — the exact behaviour the audit flagged.
 #[test]
-fn audio_channel_update_succeeds_before_probe_passes() {
+fn audio_channel_update_is_refused_before_probe_passes() {
     let test_dir = TestDir::new("channel-not-verified");
     initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
+    let before = read_audio_snapshot(
+        &list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+            .expect("settings should load"),
+    )
+    .channels
+    .into_iter()
+    .find(|entry| entry.id == "audio-input-9")
+    .expect("channel should be present");
+    let request = AudioChannelUpdateRequest {
+        channel_id: String::from("audio-input-9"),
+        mix_target_id: None,
+        name: None,
+        gain: Some(before.gain + 7),
+        fader: None,
+        mute: Some(!before.mute),
+        solo: None,
+        phantom: Some(!before.phantom),
+        phase: Some(!before.phase),
+        pad: None,
+        instrument: Some(!before.instrument),
+        auto_set: Some(!before.auto_set),
+    };
+
+    let error = update_audio_channel(test_dir.db_path().as_path(), &request)
+        .expect_err("hardware-facing channel update must be refused before the probe passes");
+    match error {
+        AudioCommandError::Rejected(code, message) => {
+            assert_eq!(code, "AUDIO_NOT_VERIFIED");
+            assert!(
+                message.contains("Run the audio probe"),
+                "refusal should tell the operator what to do: {message}"
+            );
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+    assert_no_console_datagram(&receiver, "refused channel update");
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    let untouched = snapshot
+        .channels
+        .iter()
+        .find(|entry| entry.id == "audio-input-9")
+        .expect("channel should be present");
+    assert_eq!(
+        untouched.gain, before.gain,
+        "state must not change on refusal"
+    );
+    assert_eq!(untouched.mute, before.mute);
+    assert_eq!(untouched.phantom, before.phantom);
+    assert_eq!(untouched.phase, before.phase);
+    assert_eq!(untouched.instrument, before.instrument);
+    assert_eq!(untouched.auto_set, before.auto_set);
+    assert_eq!(snapshot.status, "not-verified");
+    assert_eq!(snapshot.last_action_status, "failed");
+    assert_eq!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_NOT_VERIFIED")
+    );
+    assert_eq!(snapshot.console_state_confidence, "unknown");
+
+    // Positive control: the same request goes through (and reaches the wire)
+    // once the probe has passed, which proves the receiver would have seen a
+    // datagram above.
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
+    let updated = update_audio_channel(test_dir.db_path().as_path(), &request)
+        .expect("channel update should succeed once the probe passed");
+    assert_eq!(updated.gain, before.gain + 7);
+    assert_eq!(updated.mute, !before.mute);
+    assert_eq!(updated.phantom, !before.phantom);
+    assert_console_datagram_received(&receiver, "allowed channel update");
+}
+
+#[test]
+fn audio_channel_name_only_update_is_allowed_before_probe_passes() {
+    let test_dir = TestDir::new("channel-rename-not-verified");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
 
     let updated = update_audio_channel(
         test_dir.db_path().as_path(),
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-input-9"),
             mix_target_id: None,
-            name: None,
-            gain: Some(38),
+            name: Some(String::from("Guest Mic")),
+            gain: None,
             fader: None,
-            mute: Some(true),
+            mute: None,
             solo: None,
-            phantom: Some(true),
-            phase: Some(true),
+            phantom: None,
+            phase: None,
             pad: None,
-            instrument: Some(true),
-            auto_set: Some(true),
+            instrument: None,
+            auto_set: None,
         },
     )
-    .expect("channel update should still persist local operator state before probe passes");
-
-    assert_eq!(updated.id, "audio-input-9");
-    assert_eq!(updated.gain, 38);
-    assert!(updated.mute);
-    assert!(updated.phantom);
-    assert!(updated.phase);
-    assert!(!updated.pad);
-    assert!(updated.instrument);
-    assert!(updated.auto_set);
+    .expect("a rename is app-local and stays allowed before the probe passes");
+    assert_eq!(updated.name, "Guest Mic");
 
     let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
         .expect("settings should load");
     let snapshot = read_audio_snapshot(&settings);
-    let refreshed = snapshot
-        .channels
-        .iter()
-        .find(|entry| entry.id == "audio-input-9")
-        .expect("updated channel should be present");
-    assert_eq!(refreshed.gain, 38);
-    assert!(refreshed.mute);
-    assert!(refreshed.phantom);
     assert_eq!(snapshot.status, "not-verified");
     assert_eq!(snapshot.last_action_status, "succeeded");
-    assert_eq!(snapshot.console_state_confidence, "aligned");
+    assert_eq!(snapshot.console_state_confidence, "unknown");
+    assert_no_console_datagram(&receiver, "name-only update");
+}
+
+#[test]
+fn audio_channel_update_validates_before_sending() {
+    let test_dir = TestDir::new("channel-validate-first");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    // Bind (which re-points the transport and therefore resets the probe
+    // state) before marking the probe as passed.
+    let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
+
+    // One request carrying an unsupported field (playback gain) and a valid
+    // one (mute): the whole request is rejected and nothing reaches the
+    // console, so the mute can never half-apply.
+    let error = update_audio_channel(
+        test_dir.db_path().as_path(),
+        &AudioChannelUpdateRequest {
+            channel_id: String::from("audio-playback-1-2"),
+            mix_target_id: None,
+            name: None,
+            gain: Some(12),
+            fader: None,
+            mute: Some(true),
+            solo: None,
+            phantom: None,
+            phase: None,
+            pad: None,
+            instrument: None,
+            auto_set: None,
+        },
+    )
+    .expect_err("mixed valid/unsupported request must be rejected as a whole");
+    match error {
+        AudioCommandError::Rejected(code, _) => assert_eq!(code, "AUDIO_CHANNEL_FIELD_UNSUPPORTED"),
+        other => panic!("unexpected error: {other:?}"),
+    }
+    assert_no_console_datagram(&receiver, "rejected mixed request");
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    let untouched = snapshot
+        .channels
+        .iter()
+        .find(|entry| entry.id == "audio-playback-1-2")
+        .expect("playback channel should be present");
+    assert!(!untouched.mute, "the valid half must not have applied");
+
+    // Positive control through the same receiver.
+    update_audio_channel(
+        test_dir.db_path().as_path(),
+        &AudioChannelUpdateRequest {
+            channel_id: String::from("audio-playback-1-2"),
+            mix_target_id: None,
+            name: None,
+            gain: None,
+            fader: None,
+            mute: Some(true),
+            solo: None,
+            phantom: None,
+            phase: None,
+            pad: None,
+            instrument: None,
+            auto_set: None,
+        },
+    )
+    .expect("a valid mute-only update should send");
+    assert_console_datagram_received(&receiver, "valid mute update");
 }
 
 #[test]
@@ -901,47 +1118,75 @@ fn audio_channel_update_rejects_unsupported_gain_controls() {
     );
 }
 
+// Twin of `audio_channel_update_is_refused_before_probe_passes` for the
+// control-room path (replaces `audio_mix_target_update_succeeds_before_probe_passes`).
 #[test]
-fn audio_mix_target_update_succeeds_before_probe_passes() {
+fn audio_mix_target_update_is_refused_before_probe_passes() {
     let test_dir = TestDir::new("mix-target-not-verified");
     initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
+    let request = AudioMixTargetUpdateRequest {
+        mix_target_id: String::from("audio-mix-main"),
+        volume: Some(0.81),
+        mute: Some(true),
+        dim: Some(true),
+        mono: Some(true),
+        talkback: Some(true),
+    };
 
-    let updated = update_audio_mix_target(
-        test_dir.db_path().as_path(),
-        &AudioMixTargetUpdateRequest {
-            mix_target_id: String::from("audio-mix-main"),
-            volume: Some(0.81),
-            mute: Some(true),
-            dim: Some(true),
-            mono: Some(true),
-            talkback: Some(true),
-        },
-    )
-    .expect("mix target update should still persist control-room state before probe passes");
-
-    assert_eq!(updated.id, "audio-mix-main");
-    assert_eq!(updated.volume, 0.81);
-    assert!(updated.mute);
-    assert!(updated.dim);
-    assert!(updated.mono);
-    assert!(updated.talkback);
+    let error = update_audio_mix_target(test_dir.db_path().as_path(), &request)
+        .expect_err("mix target update must be refused before the probe passes");
+    match error {
+        AudioCommandError::Rejected(code, message) => {
+            assert_eq!(code, "AUDIO_NOT_VERIFIED");
+            assert!(message.contains("Run the audio probe"));
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+    assert_no_console_datagram(&receiver, "refused mix target update");
 
     let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
         .expect("settings should load");
     let snapshot = read_audio_snapshot(&settings);
-    let refreshed = snapshot
+    let untouched = snapshot
         .mix_targets
         .iter()
         .find(|entry| entry.id == "audio-mix-main")
-        .expect("updated mix target should be present");
-    assert_eq!(refreshed.volume, 0.81);
-    assert!(refreshed.mute);
-    assert!(refreshed.dim);
-    assert!(refreshed.mono);
-    assert!(refreshed.talkback);
+        .expect("mix target should be present");
+    assert_ne!(untouched.volume, 0.81);
+    assert!(!untouched.mute);
+    assert!(!untouched.dim);
+    assert!(!untouched.mono);
+    assert!(!untouched.talkback);
     assert_eq!(snapshot.status, "not-verified");
+    assert_eq!(snapshot.last_action_status, "failed");
+    assert_eq!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_NOT_VERIFIED")
+    );
+    assert_eq!(snapshot.console_state_confidence, "unknown");
+
+    // Positive control once the probe has passed.
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
+    let updated = update_audio_mix_target(test_dir.db_path().as_path(), &request)
+        .expect("mix target update should succeed once the probe passed");
+    assert_eq!(updated.volume, 0.81);
+    assert!(updated.talkback);
+    assert_console_datagram_received(&receiver, "allowed mix target update");
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
     assert_eq!(snapshot.last_action_status, "succeeded");
-    assert_eq!(snapshot.console_state_confidence, "aligned");
+    // A send is not a confirmation: confidence stays where it was.
+    assert_eq!(snapshot.console_state_confidence, "unknown");
 }
 
 #[test]

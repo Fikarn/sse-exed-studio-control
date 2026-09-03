@@ -28,6 +28,7 @@ export function AudioSignalCanvas({
   onOpenSetup,
   onRecallSnapshot,
   onRenameSnapshot,
+  onRunAudioProbe,
   onSaveSnapshot,
   onSelectChannel,
   onSelectChannelGroup,
@@ -61,6 +62,7 @@ export function AudioSignalCanvas({
   onOpenSetup: () => void;
   onRecallSnapshot: (snapshotId: string) => void;
   onRenameSnapshot: (snapshotId: string, snapshotName: string) => void;
+  onRunAudioProbe: () => void;
   onSaveSnapshot: (snapshotId: string) => void;
   onSelectChannel: (channelId: string | null) => void;
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
@@ -109,16 +111,29 @@ export function AudioSignalCanvas({
           <strong>{viewModel.status.warningTitle}</strong>
           <span>{viewModel.status.warningBody}</span>
           <span className={styles.warningRecoveryActions}>
-            <button
-              disabled={!viewModel.capabilities.canSync}
-              onClick={onSync}
-              title={
-                viewModel.capabilities.canSync ? "Run audio sync" : "Audio sync is unavailable until OSC is enabled"
-              }
-              type="button"
-            >
-              Sync now
-            </button>
+            {viewModel.capabilities.canSync || viewModel.audioSnapshot.oscEnabled === false ? (
+              <button
+                disabled={!viewModel.capabilities.canSync}
+                onClick={onSync}
+                title={
+                  viewModel.capabilities.canSync
+                    ? "Pull the console state from TotalMix"
+                    : "Audio sync is unavailable until OSC is enabled"
+                }
+                type="button"
+              >
+                Sync now
+              </button>
+            ) : (
+              <button
+                data-testid="audio-warning-band-probe"
+                onClick={onRunAudioProbe}
+                title="Run the audio probe to verify the TotalMix link and unlock console controls"
+                type="button"
+              >
+                Run audio probe
+              </button>
+            )}
             <button onClick={onOpenSetup} type="button">
               Setup
             </button>

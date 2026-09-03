@@ -45,13 +45,32 @@ Baselines: committed (win32: 52 visual-review + 23 storybook). Operator hands: n
 
 ## Slice 1 — Gating unification, validate-before-send, CI reachability
 
-Status: planned.
+Status: landed 2026-09-03 (operator verification pending — checklist B6). Commit `Audit S1`.
 
 Scope: `update_audio_channel` / `clear_all_audio_solo` / `update_audio_channel_eq` / `update_audio_mix_target` gate first (`ensure_audio_action_allowed`, hardware fields only; renames stay allowed), validate before sending, stop writing confidence; `audio_capabilities` requires `status == "ready"` for mixer/processing/sync; "Run audio probe" in the audio top bar and `audio.changed { reason: "probe-updated" }` after an audio probe; trust-state banners outrank the solo band; operator copy for refusals; `probe_audio_transport` passes in simulated input mode and the `rust` CI job sets `SSE_AUDIO_SIMULATED_INPUT_MODE=1` so acceptance reaches `ready` honestly.
 Gates before: `tests.rs:806/:905` asserted success + `aligned` while NOT VERIFIED; nothing asserted zero datagrams on refusal.
-Tests added: refusal tests with a zero-datagram loopback receiver; name-only rename allowed; validate-before-send; simulated-mode probe; Playwright disabled-controls + probe button on `audio-not-verified`.
-Tests changed: the two `…_succeeds_before_probe_passes` → `…_is_refused_before_probe_passes` (old: success + aligned; new: refusal + no I/O; decision 5).
-Validation: (filled at landing). Baselines: none. Operator hands: checklist B6.
+Tests added:
+
+- Rust `audio::tests`: `audio_channel_update_is_refused_before_probe_passes` and `audio_mix_target_update_is_refused_before_probe_passes` (loopback receiver bound on the Global OSC slot `send_port + 3`; `AUDIO_NOT_VERIFIED`, state unchanged, confidence `unknown`, **zero datagrams**; then a positive control through the same socket once the probe key is set, so the "nothing was sent" assertion is proven live); `audio_channel_name_only_update_is_allowed_before_probe_passes`; `audio_channel_update_validates_before_sending` (playback `gain` + valid `mute` in one request → `AUDIO_CHANNEL_FIELD_UNSUPPORTED`, zero datagrams, the mute did not half-apply; positive control). `commissioning::tests::audio_probe_passes_in_simulated_input_mode` (setting-driven simulated mode → probe `passed`, audio snapshot `ready`, `can_edit_mixer_state` / `can_sync` true).
+- Playwright `audio.spec.ts` ("audio not verified" case): full `AUDIO NOT VERIFIED` band, no Sync button, `audio-topbar-probe` present, FX 3/4 send slider `aria-disabled="true"`, "Mute Host" disabled; clicking the band's "Run audio probe" removes the band, restores Sync and re-enables both controls.
+
+Tests changed (old → new → why):
+
+- `audio_channel_update_succeeds_before_probe_passes` → `audio_channel_update_is_refused_before_probe_passes`: success + `aligned` while NOT VERIFIED → refusal, no state change, no I/O. Decision 5; the old test pinned the finding.
+- `audio_mix_target_update_succeeds_before_probe_passes` → `audio_mix_target_update_is_refused_before_probe_passes`: same.
+- `audio_channel_update_persists_front_preamp_controls`: final `console_state_confidence == "aligned"` → `"unknown"`. An edit is a UDP send, not a confirmation.
+- `clear_all_audio_solo_returns_full_snapshot_and_is_idempotent`: ran with no probe state → now sets the passed key (solo is a console write); `aligned` → `unknown`.
+- `support::tests::restore_support_backup_round_trips_native_archive`: sets the passed key before its audio mutations (they are gated now); the restore rolls it back with everything else.
+- `audio.spec.ts` not-verified case: status dot + Sync enabled + refusal toast after click → disabled controls + probe button (the old assertions encoded the finding).
+- `scripts/native-parity-acceptance.mjs`: the audio probe now runs **before** the first console write and must pass (the bind-denied escape is gone — the gate would refuse the writes anyway, so the harness stops with the probe's reason); under `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` the post-mutation expectation moved from `consoleStateConfidence === "aligned"` to `"unknown"` (the old value was the finding).
+
+Validation (workstation, 2026-09-03): `cargo test -p studio-control-engine` → 241 passed, 0 failed (238 before: +5 added, −2 replaced); `cargo fmt --all` + `npm run rust:clippy` clean; `npm run frontend:typecheck` clean; `npm run frontend:test` → 44 + 119 passed; `npx playwright test audio.spec.ts` → 39 passed; `npx playwright test visual-review.spec.ts storybook.spec.ts` → 77 passed after the two baseline refreshes below; `npm run native:acceptance` (plain, live TotalMix FX running) → "Native acceptance passed: import, restart, and rollback are deterministic." with the audio probe passing live and sync/recall asserted; CI shape `SSE_AUDIO_SIMULATED_INPUT_MODE=1 SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1 npm run native:acceptance` → passed (probe message "Simulated audio input mode: the audio probe passes without TotalMix (test mode)…", console writes accepted, confidence stays `unknown`); a first CI-shape run failed on the old `aligned` expectation, which is the harness change recorded above; `npm run dev:check` → passed end to end (format, lint, script tests, file health, rustfmt, clippy, protocol, typecheck, Vitest, native check, native test — 241 engine tests) after a prettier pass over four touched files.
+
+Baselines: win32 `audio-not-verified-2560x1440` (full NOT VERIFIED band with "Run audio probe" + Setup, probe button in the top bar, strips/inspector locked) and `audio-offline-2560x1440` (CONSOLE UNREACHABLE band now offers the probe instead of a Sync that would be refused; strips locked). Both captures inspected. linux refresh after Slice 12, darwin pending a macOS host.
+
+Notes: the `rust` CI job sets `SSE_AUDIO_SIMULATED_INPUT_MODE=1` on the `native:acceptance` **step only** — `native:test` contains `audio_probe_fails_without_live_rme_meter_packets`, which must keep running unsimulated. `tauri-workspace-qualification.mjs` already probes before its audio writes and skips that block on CI, so it needed no change. The banner order in `AudioSignalCanvas` already put trust-state bands above the solo band; no change was needed for that scope item.
+
+Operator hands: checklist B6 — reset the audio probe, confirm every fader / mute / 48V / EQ control is disabled with the reason and "Run audio probe", run it, confirm the controls return.
 
 ## Slice 2 — Console link: echo ingestion, confirmation tracking, honest confidence
 

@@ -640,12 +640,31 @@ impl EngineApp {
             // -------------------------------------------------------------
             // Commissioning mutations (M-1event + multi-event variants)
             // -------------------------------------------------------------
-            "commissioning.check.run" => self.dispatch_commissioning_mutate(
-                request,
-                parse_commissioning_check_request,
-                run_commissioning_check,
-                "check-updated",
-            ),
+            "commissioning.check.run" => {
+                // The audio probe outcome drives `audio_capabilities` (console
+                // writes are refused until it passes — 2026-09 audit
+                // remediation, Slice 1), so audio consumers re-derive their
+                // state when an audio probe completes. A rejected request
+                // emits no commissioning event and therefore no audio event.
+                let targets_audio = request
+                    .params
+                    .get("target")
+                    .and_then(|value| value.as_str())
+                    == Some("audio");
+                let mut reply = self.dispatch_commissioning_mutate(
+                    request,
+                    parse_commissioning_check_request,
+                    run_commissioning_check,
+                    "check-updated",
+                );
+                if targets_audio && !reply.events.is_empty() {
+                    reply.events.push(event_message(
+                        EVENT_AUDIO_CHANGED,
+                        json!({ "reason": "probe-updated" }),
+                    ));
+                }
+                reply
+            }
             "commissioning.seedPlanningDemo" => self.dispatch_commissioning_seed(
                 request,
                 parse_commissioning_seed_request,

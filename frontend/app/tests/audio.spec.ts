@@ -294,19 +294,24 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   await expect(page.getByText(/using last synced console state/i)).toBeVisible();
 
   await openFixture(page, "audio-not-verified");
-  // Slice 7 (Phase 3): "OSC NOT VERIFIED — never attempted" demotes from a
-  // full-width warning banner to an inline attention dot next to the Sync
-  // button. The fixture's `lastConsoleSyncAt: null` puts it in the demoted
-  // state; the dot's title still carries the OSC NOT VERIFIED text for
-  // hover / screen-reader access.
-  const statusDot = page.getByTestId("audio-toolbar-status-dot");
-  await expect(statusDot).toBeVisible();
-  await expect(statusDot).toHaveAttribute("title", /OSC NOT VERIFIED/);
+  // 2026-09 audit remediation, Slice 1: until the audio probe passes every
+  // console write is refused by the engine, so the UI must (a) disable the
+  // controls, (b) say why in a full banner, and (c) offer the probe as the
+  // way out. The old assertion (Sync enabled + refusal toast after clicking
+  // it) encoded the finding this slice fixes.
+  const notVerifiedBand = page.getByTestId("audio-warning-band");
+  await expect(notVerifiedBand).toBeVisible();
+  await expect(notVerifiedBand).toContainText("AUDIO NOT VERIFIED");
+  await expect(page.getByTestId("audio-topbar-sync")).toHaveCount(0);
+  await expect(page.getByTestId("audio-topbar-probe")).toBeVisible();
+  await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("button", { name: "Mute Host" })).toBeDisabled();
+  await page.getByTestId("audio-warning-band-probe").click();
+  // The fixture probe passes, which is exactly what unlocks the console.
   await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
   await expect(page.getByTestId("audio-topbar-sync")).toBeEnabled();
   await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).not.toHaveAttribute("aria-disabled", "true");
-  await page.getByTestId("audio-topbar-sync").click();
-  await expect(page.getByText(/Run the commissioning audio probe before syncing/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mute Host" })).toBeEnabled();
 
   await openFixture(page, "audio-osc-disabled");
   await expect(page.getByText("OSC DISABLED", { exact: true })).toBeVisible();

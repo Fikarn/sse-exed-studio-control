@@ -3581,11 +3581,14 @@ function refreshAudioCapabilities(audioSnapshot: JsonObject, state: MutableFixtu
   );
   const audioReady = asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok";
   const oscEnabled = asBoolean(audioSnapshot.oscEnabled, true);
+  // Mirrors the engine's `audio_capabilities`: console writes need OSC on AND
+  // a passed audio probe; app-local actions only need OSC on.
+  const consoleReady = oscEnabled && audioReady;
   audioSnapshot.capabilities = {
-    canEditMixerState: oscEnabled,
-    canSync: oscEnabled,
-    canRecallConsoleSnapshot: oscEnabled && audioReady,
-    canEditProcessing: oscEnabled,
+    canEditMixerState: consoleReady,
+    canSync: consoleReady,
+    canRecallConsoleSnapshot: consoleReady,
+    canEditProcessing: consoleReady,
     canClearClips: oscEnabled,
     canCaptureSnapshot: oscEnabled,
     canUseMasterView: oscEnabled,
@@ -3615,9 +3618,8 @@ function ensureAudioActionAllowed(state: MutableFixtureState) {
   const audioReady = asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok";
 
   if (!audioReady) {
-    throw new Error(
-      "Run the commissioning audio probe before syncing the console or recalling snapshots from the fixture transport."
-    );
+    // Same refusal the engine's `ensure_audio_action_allowed` produces.
+    throw new Error("Audio is not verified yet. Run the audio probe before changing console settings.");
   }
 
   if (!asBoolean(audioSnapshot.oscEnabled, true)) {
@@ -4313,7 +4315,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         return { cleared: true, channelId, summary: audioSnapshot.lastActionMessage };
       }
       case "audio.solo.clearAll": {
-        const audioSnapshot = ensureAudioEditAllowed(state);
+        const audioSnapshot = ensureAudioActionAllowed(state);
         let cleared = 0;
         for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
           if (!channel || !asBoolean(channel.solo, false)) continue;
@@ -4331,7 +4333,20 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         return cloneJson(state.audioSnapshot);
       }
       case "audio.channel.update": {
-        const audioSnapshot = ensureAudioEditAllowed(state);
+        // Mirrors the engine gate: hardware-facing fields need a passed audio
+        // probe; a rename is app-local and stays allowed.
+        const touchesConsole = [
+          "gain",
+          "fader",
+          "mute",
+          "solo",
+          "phantom",
+          "phase",
+          "pad",
+          "instrument",
+          "autoSet",
+        ].some((field) => params[field] !== undefined && params[field] !== null);
+        const audioSnapshot = touchesConsole ? ensureAudioActionAllowed(state) : ensureAudioEditAllowed(state);
         const channelId = asString(params.channelId).trim();
         const channels = asArray(audioSnapshot.channels)
           .map((entry) => asRecord(entry))
@@ -4406,7 +4421,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         return cloneJson(channel);
       }
       case "audio.channel.eq.update": {
-        const audioSnapshot = ensureAudioEditAllowed(state);
+        const audioSnapshot = ensureAudioActionAllowed(state);
         const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
         const eq = normalizeAudioEq(asRecord(channel.eq));
         if ("enabled" in params) eq.enabled = asBoolean(params.enabled, false);
@@ -4484,7 +4499,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         return cloneJson(channel);
       }
       case "audio.mixTarget.update": {
-        const audioSnapshot = ensureAudioEditAllowed(state);
+        const audioSnapshot = ensureAudioActionAllowed(state);
         const mixTargetId = asString(params.mixTargetId).trim();
         const mixTargets = asArray(audioSnapshot.mixTargets)
           .map((entry) => asRecord(entry))
@@ -4611,6 +4626,11 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
 
         synchronizeFixtureState(state);
         emit("commissioning.changed", { reason: "check-updated" });
+        if (target === "audio") {
+          // Mirrors the engine: the audio probe outcome changes the audio
+          // capabilities, so audio consumers re-derive their state.
+          emit("audio.changed", { reason: "probe-updated" });
+        }
         return cloneJson(state.commissioningSnapshot);
       }
       case "commissioning.seedPlanningDemo": {
