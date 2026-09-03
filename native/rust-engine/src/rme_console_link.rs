@@ -526,6 +526,64 @@ pub struct ConsoleLinkState {
     unconfirmed_total: u64,
     unconfirmed_addresses: Vec<String>,
     pull: Option<PullTracker>,
+    push: Option<PushTracker>,
+}
+
+/// Bookkeeping for one snapshot push (Slice 4): how each pushed parameter
+/// fared once its read-back came in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PushProgress {
+    pub total: usize,
+    pub confirmed: usize,
+    pub adjusted: usize,
+    pub unconfirmed: usize,
+    /// Still waiting for a read-back.
+    pub pending: usize,
+    pub unconfirmed_names: Vec<String>,
+    pub adjusted_names: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PushTracker {
+    keys: Vec<ParamKey>,
+    confirmed: Vec<ParamKey>,
+    adjusted: Vec<ParamKey>,
+    unconfirmed: Vec<ParamKey>,
+}
+
+impl PushTracker {
+    fn progress(&self) -> PushProgress {
+        let settled = self.confirmed.len() + self.adjusted.len() + self.unconfirmed.len();
+        PushProgress {
+            total: self.keys.len(),
+            confirmed: self.confirmed.len(),
+            adjusted: self.adjusted.len(),
+            unconfirmed: self.unconfirmed.len(),
+            pending: self.keys.len().saturating_sub(settled),
+            unconfirmed_names: self.unconfirmed.iter().map(ParamKey::describe).collect(),
+            adjusted_names: self.adjusted.iter().map(ParamKey::describe).collect(),
+        }
+    }
+
+    fn note(&mut self, key: &ParamKey, outcome: Classification) {
+        if !self.keys.contains(key) {
+            return;
+        }
+        let bucket = match outcome {
+            Classification::Confirmed => &mut self.confirmed,
+            Classification::Adjusted => &mut self.adjusted,
+            _ => return,
+        };
+        if !bucket.contains(key) {
+            bucket.push(key.clone());
+        }
+    }
+
+    fn note_expired(&mut self, key: &ParamKey) {
+        if self.keys.contains(key) && !self.unconfirmed.contains(key) {
+            self.unconfirmed.push(key.clone());
+        }
+    }
 }
 
 /// Bookkeeping for one console pull (`/sendall 2` + `/sendstate`): what
@@ -646,6 +704,25 @@ fn is_off_send(value: &ConsoleValue) -> bool {
     }
 }
 
+/// Whether a pending send that a completed read-back burst did not mention
+/// counts as confirmed. Live-verified on the studio desk (2026-09-03):
+/// `/sendsubmix 2` lists only nodes above -65 dB, so an off fader and a
+/// solo-off on such a node never appear; `/sendchan` for the right side of a
+/// stereo-linked pair reports only the L/R parameters, so a mute or gain sent
+/// to it is never echoed either. A fader that should be audible but is absent
+/// stays unconfirmed — that is exactly the hidden-channel case where TotalMix
+/// dropped the write.
+fn confirmable_by_absence(request: &ReadbackRequest, key: &ParamKey, value: &ConsoleValue) -> bool {
+    match (request, key) {
+        (ReadbackRequest::Submix { .. }, ParamKey::MixFader { .. }) => is_off_send(value),
+        (ReadbackRequest::Submix { .. }, ParamKey::MixSolo { .. }) => {
+            matches!(value, ConsoleValue::Flag(false))
+        }
+        (ReadbackRequest::Channel { .. }, _) => true,
+        _ => false,
+    }
+}
+
 impl ConsoleLinkState {
     /// Records one outgoing command so its read-back can confirm it. Sending
     /// the same parameter again (a fader drag) restarts its clock and cancels
@@ -691,6 +768,25 @@ impl ConsoleLinkState {
             outputs_seen: Vec::new(),
             mix_nodes_seen: Vec::new(),
         });
+    }
+
+    /// Starts tracking a snapshot push for these parameters. Call before the
+    /// datagrams go out so no read-back is missed.
+    pub fn begin_push(&mut self, keys: Vec<ParamKey>) {
+        self.push = Some(PushTracker {
+            keys,
+            confirmed: Vec::new(),
+            adjusted: Vec::new(),
+            unconfirmed: Vec::new(),
+        });
+    }
+
+    pub fn push_progress(&self) -> Option<PushProgress> {
+        self.push.as_ref().map(PushTracker::progress)
+    }
+
+    pub fn finish_push(&mut self) -> Option<PushProgress> {
+        self.push.take().map(|tracker| tracker.progress())
     }
 
     pub fn pull_progress(&self, now_ms: u64) -> Option<PullProgress> {
@@ -782,6 +878,9 @@ impl ConsoleLinkState {
             if values_match(&pending.value, &parsed.value) {
                 self.pending.remove(&parsed.key);
                 self.confirmed_total = self.confirmed_total.saturating_add(1);
+                if let Some(push) = self.push.as_mut() {
+                    push.note(&parsed.key, Classification::Confirmed);
+                }
                 // During a pull the dump is the truth for everything it
                 // lists, so a confirming value is applied as well (a no-op
                 // when the app already holds it).
@@ -804,6 +903,9 @@ impl ConsoleLinkState {
             }
             self.pending.remove(&parsed.key);
             self.adjusted_total = self.adjusted_total.saturating_add(1);
+            if let Some(push) = self.push.as_mut() {
+                push.note(&parsed.key, Classification::Adjusted);
+            }
             self.queued.push(ConsoleUpdate {
                 key: parsed.key,
                 value: parsed.value,
@@ -868,19 +970,22 @@ impl ConsoleLinkState {
             let Some(outstanding) = self.outstanding.remove(&request) else {
                 continue;
             };
-            let absent_off_sends: Vec<ParamKey> = self
+            let absent_sends: Vec<ParamKey> = self
                 .pending
                 .iter()
                 .filter(|(key, pending)| {
                     request.covers(key)
                         && pending.requested_at_ms == Some(outstanding.requested_at_ms)
-                        && is_off_send(&pending.value)
+                        && confirmable_by_absence(&request, key, &pending.value)
                 })
                 .map(|(key, _)| key.clone())
                 .collect();
-            for key in absent_off_sends {
+            for key in absent_sends {
                 self.pending.remove(&key);
                 self.confirmed_total = self.confirmed_total.saturating_add(1);
+                if let Some(push) = self.push.as_mut() {
+                    push.note(&key, Classification::Confirmed);
+                }
             }
         }
 
@@ -893,6 +998,9 @@ impl ConsoleLinkState {
         for key in expired_keys {
             if let Some(pending) = self.pending.remove(&key) {
                 self.unconfirmed_total = self.unconfirmed_total.saturating_add(1);
+                if let Some(push) = self.push.as_mut() {
+                    push.note_expired(&key);
+                }
                 let description = pending.key.describe();
                 if !self.unconfirmed_addresses.contains(&description) {
                     if self.unconfirmed_addresses.len() >= MAX_UNCONFIRMED_ADDRESSES {
@@ -981,6 +1089,7 @@ impl ConsoleLinkState {
         self.queued.clear();
         self.expired.clear();
         self.pull = None;
+        self.push = None;
         self.connection_lost = false;
     }
 }
@@ -1443,6 +1552,73 @@ mod tests {
         let summary = link.summary(250);
         assert_eq!(summary.confirmed_sends, 1);
         assert_eq!(summary.unconfirmed_sends, 0);
+    }
+
+    #[test]
+    fn channel_readback_that_omits_a_parameter_confirms_it_by_absence() {
+        // The right side of a stereo-linked pair reports only its L/R
+        // parameters; a mute sent to it is never echoed (live, 2026-09-03).
+        let mut link = ConsoleLinkState::default();
+        link.begin_push(vec![ParamKey::ChannelFlag {
+            bus: ConsoleBus::Input,
+            channel: 3,
+            flag: ChannelFlag::Mute,
+        }]);
+        link.register_outgoing(&[(String::from("/input/3/mute"), f(0.0))], 0);
+        assert_eq!(
+            link.due_readbacks(130),
+            vec![(String::from("/sendchan/input/3"), OscType::Float(1.0))]
+        );
+        // The console answers for the channel, but only with L/R parameters.
+        assert_eq!(
+            link.ingest(&msg("/input/3/phase", f(0.0)), 160),
+            Classification::External
+        );
+        link.tick(200);
+        assert_eq!(link.pending_count(), 1, "burst not quiet yet");
+        link.tick(250);
+        assert_eq!(
+            link.pending_count(),
+            0,
+            "absent from the answered burst: confirmed"
+        );
+        let progress = link.finish_push().expect("push in progress");
+        assert_eq!(progress.confirmed, 1);
+        assert_eq!(progress.pending, 0);
+    }
+
+    #[test]
+    fn solo_off_on_an_unlisted_node_confirms_by_absence_but_a_fader_does_not() {
+        let mut link = ConsoleLinkState::default();
+        link.register_outgoing(
+            &[
+                (String::from("/mix/in/8/0/solo"), f(0.0)),
+                (String::from("/mix/pb/6/0/faderlin"), f(0.3)),
+            ],
+            0,
+        );
+        assert_eq!(
+            link.due_readbacks(130).len(),
+            2,
+            "one submix read-back + status marker"
+        );
+        // Only the status marker answers: the submix has no active nodes.
+        link.ingest(&msg("/status/connection", f(1.0)), 160);
+        link.tick(250);
+        assert_eq!(
+            link.pending_count(),
+            1,
+            "solo-off confirmed, the audible fader is not"
+        );
+        link.tick(1_600);
+        assert_eq!(link.pending_count(), 0);
+        let summary = link.summary(1_600);
+        assert_eq!(summary.confirmed_sends, 1);
+        assert_eq!(summary.unconfirmed_sends, 1);
+        assert_eq!(
+            summary.unconfirmed_addresses,
+            vec![String::from("mix pb 6 -> out 0 fader")]
+        );
     }
 
     #[test]

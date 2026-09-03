@@ -968,8 +968,53 @@ function buildAudioChannel(
   };
 }
 
+/// Captured console state for the "Interview block" slot, derived from the
+/// fixture's own channels so a recall pushes a coherent scene: Host's 48V is
+/// flipped relative to the live strip, which is exactly the case Slice 4
+/// refuses to push and lists instead.
+function attachInterviewBlockContents(snapshot: JsonObject) {
+  const channels: JsonObject = {};
+  for (const channel of asArray(snapshot.channels).map((entry) => asRecord(entry))) {
+    if (!channel) continue;
+    const id = asString(channel.id);
+    channels[id] = {
+      name: channel.name ?? null,
+      gain: channel.gain ?? 0,
+      fader: channel.fader ?? 0,
+      clip: false,
+      mixLevels: cloneJson((asRecord(channel.mixLevels) ?? {}) as JsonObject),
+      mute: channel.mute === true,
+      solo: channel.solo === true,
+      phantom: id === "audio-input-9" ? channel.phantom !== true : channel.phantom === true,
+      phase: channel.phase === true,
+      pad: channel.pad === true,
+      instrument: channel.instrument === true,
+      autoSet: channel.autoSet === true,
+      eq: cloneJson((asRecord(channel.eq) ?? {}) as JsonObject),
+      dynamics: cloneJson((asRecord(channel.dynamics) ?? {}) as JsonObject),
+      sendModes: cloneJson((asRecord(channel.sendModes) ?? {}) as JsonObject),
+    };
+  }
+  const mixTargets: JsonObject = {};
+  for (const mixTarget of asArray(snapshot.mixTargets).map((entry) => asRecord(entry))) {
+    if (!mixTarget) continue;
+    mixTargets[asString(mixTarget.id)] = {
+      volume: mixTarget.volume ?? 0,
+      mute: mixTarget.mute === true,
+      dim: mixTarget.dim === true,
+      mono: mixTarget.mono === true,
+      talkback: mixTarget.talkback === true,
+    };
+  }
+  for (const entry of asArray(snapshot.snapshots).map((item) => asRecord(item))) {
+    if (entry && asString(entry.id) === "snapshot-interview-block") {
+      entry.contents = { capturedAt: "2026-04-22T18:40:00+02:00", channels, mixTargets };
+    }
+  }
+}
+
 function buildDefaultAudioSnapshot(): JsonObject {
-  return {
+  const snapshot: JsonObject = {
     status: "ready",
     summary:
       "OSC transport is configured for 127.0.0.1:7001 with receive port 9001. Simulated inventory exposes 18 channels, 3 mix targets, and 5 snapshots for native audio development.",
@@ -1297,6 +1342,8 @@ function buildDefaultAudioSnapshot(): JsonObject {
       },
     ],
   };
+  attachInterviewBlockContents(snapshot);
+  return snapshot;
 }
 
 function buildSeededPlanningSnapshot(): JsonObject {
@@ -4223,13 +4270,14 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           throw new Error(`Audio snapshot '${snapshotId}' is not exposed by the fixture transport.`);
         }
 
+        // Mirrors the engine's recall push (Slice 4): every captured console
+        // value is "pushed" and confirmed by the fixture console, 48V is never
+        // pushed (kept at the console's value and listed), talkback is
+        // momentary and stays.
         const recalledAt = new Date().toISOString();
-        audioSnapshot.lastRecalledSnapshotId = snapshotId;
-        audioSnapshot.lastSnapshotRecallAt = recalledAt;
-        audioSnapshot.consoleStateConfidence = "assumed";
-        audioSnapshot.lastActionStatus = "succeeded";
-        audioSnapshot.lastActionCode = null;
-        audioSnapshot.lastActionMessage = `Recalled ${asString(snapshot.name, snapshotId)}`;
+        const snapshotName = asString(snapshot.name, snapshotId);
+        const phantomDifferences: JsonObject[] = [];
+        let pushed = 0;
         const contents = asRecord(snapshot.contents);
         if (contents) {
           const sceneChannels = asRecord(contents.channels) ?? {};
@@ -4237,28 +4285,65 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
             if (!channel) continue;
             const stateEntry = asRecord(sceneChannels[asString(channel.id)]);
-            if (stateEntry) {
-              Object.assign(channel, cloneJson(stateEntry));
+            if (!stateEntry) continue;
+            const currentPhantom = channel.phantom === true;
+            const targetPhantom = stateEntry.phantom === true;
+            if (asString(channel.role) === "front-preamp" && currentPhantom !== targetPhantom) {
+              phantomDifferences.push({
+                channelId: asString(channel.id),
+                channelName: asString(channel.name, asString(channel.id)),
+                current: currentPhantom,
+                target: targetPhantom,
+              });
             }
+            Object.assign(channel, cloneJson(stateEntry));
+            channel.phantom = currentPhantom;
+            // mute + three sends + solo (+ gain/phase/instrument/autoset on a preamp)
+            pushed += asString(channel.role) === "front-preamp" ? 9 : 5;
           }
           for (const mixTarget of asArray(audioSnapshot.mixTargets).map((entry) => asRecord(entry))) {
             if (!mixTarget) continue;
             const stateEntry = asRecord(sceneMixTargets[asString(mixTarget.id)]);
-            if (stateEntry) {
-              Object.assign(mixTarget, cloneJson(stateEntry));
-            }
+            if (!stateEntry) continue;
+            const currentTalkback = mixTarget.talkback === true;
+            Object.assign(mixTarget, cloneJson(stateEntry));
+            mixTarget.talkback = currentTalkback;
+            pushed += asString(mixTarget.id) === "audio-mix-main" ? 4 : 2;
           }
         }
+        const phantomNote =
+          phantomDifferences.length > 0
+            ? ` · 48V differs on ${phantomDifferences.map((entry) => asString(entry.channelName)).join(", ")}`
+            : "";
+        const summary =
+          pushed > 0
+            ? `Recalled ${snapshotName}: ${pushed} values pushed, ${pushed} confirmed${phantomNote}.`
+            : `Recalled ${snapshotName}: the snapshot has no captured console state, nothing was pushed.`;
+        audioSnapshot.lastRecalledSnapshotId = snapshotId;
+        audioSnapshot.lastSnapshotRecallAt = recalledAt;
+        audioSnapshot.consoleStateConfidence = "aligned";
+        if (pushed > 0) {
+          audioSnapshot.lastConsoleSyncReason = "snapshot-push";
+          audioSnapshot.lastConsoleSyncAt = recalledAt;
+        }
+        audioSnapshot.lastActionStatus = "succeeded";
+        audioSnapshot.lastActionCode = null;
+        audioSnapshot.lastActionMessage = summary;
         state.audioSnapshot = audioSnapshot;
         synchronizeFixtureState(state);
         emit("audio.changed", { reason: "audio-snapshot-recalled" });
         return {
           recalled: true,
           snapshotId,
-          snapshotName: asString(snapshot.name, snapshotId),
+          snapshotName,
           recalledAt,
-          summary: `Audio snapshot '${asString(snapshot.name, snapshotId)}' was recalled.`,
-          consoleStateConfidence: "assumed",
+          summary,
+          consoleStateConfidence: "aligned",
+          pushed,
+          confirmed: pushed,
+          adjusted: 0,
+          unconfirmed: 0,
+          phantomDifferences,
         };
       }
       case "audio.snapshot.create": {

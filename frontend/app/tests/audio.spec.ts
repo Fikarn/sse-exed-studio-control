@@ -1349,6 +1349,38 @@ test("supports audio command palette and shortcut overlay parity", async ({ page
   await expect(shortcuts).toContainText("Open strip actions");
 });
 
+test("snapshot recall reports the push and lists 48V differences without touching them", async ({ page }) => {
+  // 2026-09 audit remediation, Slice 4: a recall pushes the snapshot to the
+  // desk and reports what the console confirmed; 48V is never pushed and each
+  // difference gets its own armed confirm in the report band.
+  await openFixture(page, "audio-populated");
+  const hostStrip = page.getByTestId("audio-strip-audio-input-9");
+  await expect(hostStrip.getByText("48V", { exact: true })).toBeVisible();
+
+  await page.keyboard.press("Shift+Digit3");
+  await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-armed", "true");
+  await page.keyboard.press("Shift+Digit3");
+
+  const report = page.getByTestId("audio-recall-report");
+  await expect(report).toBeVisible();
+  await expect(report).toContainText("Recalled Interview block");
+  await expect(report).toContainText("values pushed");
+  await expect(report).toContainText("48V differs on Host (snapshot off, console on)");
+  // The 48V pill did not move: the recall listed it instead of pushing it.
+  await expect(hostStrip.getByText("48V", { exact: true })).toBeVisible();
+
+  const arm = page.getByTestId("audio-recall-arm-phantom-audio-input-9");
+  await expect(arm).toHaveText(/Arm 48V off/);
+  await arm.click();
+  await expect(arm).toHaveAttribute("data-armed", "true");
+  await expect(arm).toHaveText(/Confirm 48V off/);
+  await arm.click();
+  await expect(hostStrip.getByText("48V", { exact: true })).toHaveCount(0);
+
+  await page.getByTestId("audio-recall-report-dismiss").click();
+  await expect(report).toHaveCount(0);
+});
+
 test("audio command palette snapshot recall arms before applying", async ({ page }) => {
   await openFixture(page, "audio-populated");
 

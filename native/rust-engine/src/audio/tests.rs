@@ -573,21 +573,38 @@ fn audio_snapshot_recall_marks_last_recalled_snapshot() {
     )
     .expect("probe state should persist");
 
-    let result = recall_audio_snapshot(
+    // The built-in "Panel" slot carries no captured console state, so a
+    // recall moves only the markers: nothing is pushed and console-state
+    // confidence is left exactly as it was (Slice 4). The push paths are
+    // covered in `tests_console_link.rs`.
+    let result = recall_audio_snapshot_with_timing(
         test_dir.db_path().as_path(),
         &AudioSnapshotRecallRequest {
             snapshot_id: String::from("snapshot-panel"),
+        },
+        PushTiming {
+            confirm_wait_ms: 200,
+            poll_ms: 10,
         },
     )
     .expect("snapshot recall should succeed");
 
     assert!(result.recalled);
     assert_eq!(result.snapshot_name, "Panel");
+    assert_eq!(result.pushed, 0);
+    assert_eq!(result.confirmed, 0);
+    assert_eq!(result.unconfirmed, 0);
+    assert_eq!(result.console_state_confidence, "unknown");
+    assert!(
+        result.summary.contains("nothing was pushed"),
+        "{}",
+        result.summary
+    );
 
     let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
         .expect("settings should load");
     let snapshot = read_audio_snapshot(&settings);
-    assert_eq!(snapshot.console_state_confidence, "assumed");
+    assert_eq!(snapshot.console_state_confidence, "unknown");
     assert_eq!(
         snapshot.last_recalled_snapshot_id.as_deref(),
         Some("snapshot-panel")
@@ -641,10 +658,14 @@ fn audio_snapshot_crud_uses_persisted_native_state() {
     assert_eq!(updated.snapshot.name, "Podcast A");
     assert_eq!(updated.snapshot.osc_index, 4);
 
-    let recalled = recall_audio_snapshot(
+    let recalled = recall_audio_snapshot_with_timing(
         test_dir.db_path().as_path(),
         &AudioSnapshotRecallRequest {
             snapshot_id: created.snapshot.id.clone(),
+        },
+        PushTiming {
+            confirm_wait_ms: 200,
+            poll_ms: 10,
         },
     )
     .expect("audio snapshot recall should succeed");

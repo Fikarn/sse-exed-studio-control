@@ -936,11 +936,15 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
       const recalled = await harness.request(`${requestIdPrefix}-audio-snapshot-recall`, "audio.snapshot.recall", {
         snapshotId: "snapshot-panel",
       });
+      // Slice 4: recall is a push. On the simulated console it is app-local
+      // and stays aligned; the live lane never recalls (that would push a
+      // snapshot to the real desk — operator checklist B3 covers it).
       assert(
         recalled.recalled === true &&
           recalled.snapshotId === "snapshot-panel" &&
-          recalled.consoleStateConfidence === "assumed",
-        `${runtimeLabel} audio.snapshot.recall did not move the console back into the expected assumed state.`
+          recalled.consoleStateConfidence === "aligned" &&
+          recalled.unconfirmed === 0,
+        `${runtimeLabel} audio.snapshot.recall did not report an aligned, confirmed recall: ${JSON.stringify(recalled)}`
       );
     }
 
@@ -957,7 +961,7 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
         mutatedSnapshot.selectedMixTargetId === "audio-mix-phones-a" &&
         // Ordinary edits never write console-state confidence (Slice 1); sync
         // aligns it and, in the simulated lane, recall marks it assumed.
-        mutatedSnapshot.consoleStateConfidence === (LIVE_CONSOLE ? "aligned" : "assumed") &&
+        mutatedSnapshot.consoleStateConfidence === "aligned" &&
         mutatedSnapshot.lastConsoleSyncReason === (LIVE_CONSOLE ? "console-pull" : "snapshot") &&
         mutatedSnapshot.lastRecalledSnapshotId === (LIVE_CONSOLE ? null : "snapshot-panel"),
       `${runtimeLabel} audio snapshot did not retain the expected selection and recall markers.`

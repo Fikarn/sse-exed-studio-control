@@ -1440,6 +1440,32 @@ pub(crate) fn send_console_pull_request(send_host: &str, send_port: i64) -> Resu
     send_osc_messages(send_host, port, &console_pull_messages())
 }
 
+/// Messages per burst and the pause between bursts when pushing a snapshot.
+/// A full recall is ~60 datagrams; TotalMix's own status cadence is slow, so
+/// the pacing keeps the desk's receive queue shallow.
+const RECALL_BURST_SIZE: usize = 48;
+const RECALL_BURST_PAUSE: Duration = Duration::from_millis(10);
+
+/// Pushes a snapshot to TotalMix phase by phase (mutes on, values, mutes off,
+/// control room), registering every command on the console link so its
+/// read-back can confirm it. Returns the number of datagrams sent.
+pub(crate) fn send_totalmix_recall_plan(
+    send_host: &str,
+    send_port: i64,
+    phases: &[Vec<(String, OscType)>],
+) -> Result<usize, String> {
+    let port = validated_command_port(send_port, GLOBAL_OSC_PORT_OFFSET)?;
+    let mut sent = 0usize;
+    for phase in phases {
+        for burst in phase.chunks(RECALL_BURST_SIZE) {
+            sent += send_osc_messages(send_host, port, burst)?;
+            crate::rme_console_link::register_outgoing_commands(burst);
+            thread::sleep(RECALL_BURST_PAUSE);
+        }
+    }
+    Ok(sent)
+}
+
 /// Test stand-in for the metering thread's per-tick console-link work: read
 /// the slot, service read-backs, flush to the database.
 #[cfg(test)]

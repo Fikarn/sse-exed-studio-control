@@ -797,3 +797,471 @@ fn console_confidence_has_one_writer() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Recall = push (Slice 4). A console model on loopback remembers what the app
+// wrote and answers read-backs from that memory, in dB, like the desk does.
+// ---------------------------------------------------------------------------
+
+struct ConsoleModel {
+    socket: Option<std::net::UdpSocket>,
+    port: u16,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl ConsoleModel {
+    fn bind() -> Self {
+        let socket = std::net::UdpSocket::bind("127.0.0.1:0").expect("console model should bind");
+        socket
+            .set_read_timeout(Some(Duration::from_millis(40)))
+            .expect("read timeout should apply");
+        let port = socket.local_addr().expect("model address").port();
+        Self {
+            socket: Some(socket),
+            port,
+            stop: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            handle: None,
+        }
+    }
+
+    fn start(&mut self, reply_to_port: u16) {
+        let socket = self.socket.take().expect("model socket");
+        let stop = self.stop.clone();
+        self.handle = Some(std::thread::spawn(move || {
+            let send = |address: String, value: f32| {
+                let packet = rosc::OscPacket::Message(rosc::OscMessage {
+                    addr: address,
+                    args: vec![rosc::OscType::Float(value)],
+                });
+                if let Ok(bytes) = rosc::encoder::encode(&packet) {
+                    let _ = socket.send_to(&bytes, ("127.0.0.1", reply_to_port));
+                }
+            };
+            let mut values: HashMap<String, f32> = HashMap::new();
+            let mut buffer = [0u8; 2048];
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let Ok((len, _)) = socket.recv_from(&mut buffer) else {
+                    continue;
+                };
+                let Ok((_, rosc::OscPacket::Message(message))) =
+                    rosc::decoder::decode_udp(&buffer[..len])
+                else {
+                    continue;
+                };
+                let parts: Vec<&str> = message.addr.trim_start_matches('/').split('/').collect();
+                match parts.as_slice() {
+                    ["sendall"] | ["sendstate"] => {
+                        send(String::from("/status/connection"), 1.0);
+                        send(String::from("/status/dsp"), 8.0);
+                    }
+                    ["sendsettings"] => {
+                        for function in ["dim", "mainmono", "talkback"] {
+                            let address = format!("/controlroom/{function}");
+                            let value = values.get(&address).copied().unwrap_or(0.0);
+                            send(address, value);
+                        }
+                    }
+                    ["sendchan", bus, channel] => {
+                        let prefix = format!("/{bus}/{channel}/");
+                        let snapshot: Vec<(String, f32)> = values
+                            .iter()
+                            .filter(|(address, _)| address.starts_with(&prefix))
+                            .map(|(address, value)| (address.clone(), *value))
+                            .collect();
+                        for (address, value) in snapshot {
+                            if address.ends_with("/faderlin") {
+                                let db = fader_curve::fader_lin_to_db(f64::from(value))
+                                    .unwrap_or(-300.0);
+                                send(format!("{prefix}volume"), db as f32);
+                            } else {
+                                send(address, value);
+                            }
+                        }
+                    }
+                    ["sendsubmix", output] => {
+                        let snapshot: Vec<(String, f32)> = values
+                            .iter()
+                            .filter(|(address, _)| {
+                                let segments: Vec<&str> =
+                                    address.trim_start_matches('/').split('/').collect();
+                                segments.first() == Some(&"mix") && segments.get(3) == Some(output)
+                            })
+                            .map(|(address, value)| (address.clone(), *value))
+                            .collect();
+                        for (address, value) in snapshot {
+                            if let Some(base) = address.strip_suffix("/faderlin") {
+                                // `/sendsubmix 2` lists only nodes above -65 dB.
+                                if let Some(db) = fader_curve::fader_lin_to_db(f64::from(value)) {
+                                    send(format!("{base}/fader"), db as f32);
+                                }
+                            } else {
+                                send(address, value);
+                            }
+                        }
+                    }
+                    _ => {
+                        if let Some(rosc::OscType::Float(value)) = message.args.first() {
+                            values.insert(message.addr.clone(), *value);
+                        }
+                    }
+                }
+            }
+        }));
+    }
+}
+
+impl Drop for ConsoleModel {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+fn channel_request(channel_id: &str) -> AudioChannelUpdateRequest {
+    AudioChannelUpdateRequest {
+        channel_id: String::from(channel_id),
+        mix_target_id: None,
+        name: None,
+        gain: None,
+        fader: None,
+        mute: None,
+        solo: None,
+        phantom: None,
+        phase: None,
+        pad: None,
+        instrument: None,
+        auto_set: None,
+    }
+}
+
+fn mix_target_request(mix_target_id: &str) -> AudioMixTargetUpdateRequest {
+    AudioMixTargetUpdateRequest {
+        mix_target_id: String::from(mix_target_id),
+        volume: None,
+        mute: None,
+        dim: None,
+        mono: None,
+        talkback: None,
+    }
+}
+
+#[test]
+fn recall_plan_orders_mutes_first_and_never_touches_48v_talkback_or_pad() {
+    let current = read_audio_snapshot(&HashMap::new());
+    let mut contents = super::helpers::capture_audio_scene_contents(&current, None);
+    let host_now = current
+        .channels
+        .iter()
+        .find(|entry| entry.id == "audio-input-9")
+        .expect("host");
+    {
+        let host = contents
+            .channels
+            .get_mut("audio-input-9")
+            .expect("host in contents");
+        host.mute = true;
+        host.gain = 30;
+        host.phantom = !host_now.phantom;
+        host.phase = true;
+        host.pad = true;
+        host.mix_levels.insert(String::from("audio-mix-main"), 0.5);
+        host.mix_levels
+            .insert(String::from("audio-mix-phones-a"), 0.0);
+    }
+    {
+        let playback = contents
+            .channels
+            .get_mut("audio-playback-3-4")
+            .expect("playback 3/4 in contents");
+        playback.mute = false;
+        playback.solo = true;
+    }
+    {
+        let main = contents
+            .mix_targets
+            .get_mut("audio-mix-main")
+            .expect("main in contents");
+        main.mute = false;
+        main.volume = 0.61;
+        main.dim = true;
+        main.mono = false;
+        main.talkback = true;
+        let phones = contents
+            .mix_targets
+            .get_mut("audio-mix-phones-a")
+            .expect("phones a in contents");
+        phones.mute = true;
+    }
+
+    let plan = super::recall::build_recall_plan(&current, &contents);
+    assert_eq!(plan.phases.len(), 4);
+    let addresses = |phase: usize| -> Vec<String> {
+        plan.phases[phase]
+            .iter()
+            .map(|(address, _)| address.clone())
+            .collect()
+    };
+    let mutes_on = addresses(0);
+    assert!(mutes_on.contains(&String::from("/input/8/mute")));
+    assert!(mutes_on.contains(&String::from("/output/8/mute")));
+    assert!(!mutes_on.contains(&String::from("/playback/2/mute")));
+    let values = addresses(1);
+    assert!(values.contains(&String::from("/mix/in/8/0/faderlin")));
+    assert!(values.contains(&String::from("/mix/in/8/8/faderlin")));
+    assert!(values.contains(&String::from("/input/8/gain")));
+    assert!(values.contains(&String::from("/input/8/phase")));
+    assert!(values.contains(&String::from("/mix/pb/2/0/solo")));
+    assert!(values.contains(&String::from("/output/0/faderlin")));
+    let mutes_off = addresses(2);
+    assert!(mutes_off.contains(&String::from("/playback/2/mute")));
+    assert!(mutes_off.contains(&String::from("/output/0/mute")));
+    assert_eq!(
+        addresses(3),
+        vec![
+            String::from("/controlroom/dim"),
+            String::from("/controlroom/mainmono")
+        ]
+    );
+    let everything: Vec<String> = (0..4).flat_map(addresses).collect();
+    assert!(
+        everything.iter().all(|address| !address.contains("48v")
+            && !address.contains("talkback")
+            && !address.contains("pad")),
+        "48V, talkback and pad are never pushed"
+    );
+    let host_main = plan.phases[1]
+        .iter()
+        .find(|(address, _)| address == "/mix/in/8/0/faderlin")
+        .map(|(_, value)| value.clone());
+    assert_eq!(host_main, Some(rosc::OscType::Float(0.5)));
+    assert_eq!(plan.message_count(), everything.len());
+    assert!(!plan.keys.is_empty());
+    assert!(plan.keys.len() <= plan.message_count());
+    assert_eq!(
+        plan.phantom_differences,
+        vec![PhantomDifference {
+            channel_id: String::from("audio-input-9"),
+            channel_name: host_now.name.clone(),
+            current: host_now.phantom,
+            target: !host_now.phantom,
+        }]
+    );
+
+    let (channels, mix_targets) = super::recall::recalled_state_maps(&current, &contents);
+    assert_eq!(
+        channels["audio-input-9"].phantom, host_now.phantom,
+        "48V keeps the console's value in app state"
+    );
+    assert!(channels["audio-input-9"].mute);
+    assert!(
+        !mix_targets["audio-mix-main"].talkback,
+        "talkback is never recalled"
+    );
+    assert!(mix_targets["audio-mix-main"].dim);
+}
+
+#[test]
+fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
+    let _serial = serialize_shared_link();
+    let mut console = ConsoleModel::bind();
+    let slot = crate::rme_totalmix_osc::bind_test_global_slot(console.port);
+    console.start(slot.local_port());
+    let test_dir = pull_test_db("recall-push-confirmed", console.port);
+    crate::rme_totalmix_osc::mark_console_link_slot(true);
+    let _pump = SlotPump::start(slot, test_dir.db_path());
+    let db = test_dir.db_path();
+
+    // The scene worth keeping: Host muted at 30 dB with its main send at the
+    // curve knee, Main dimmed at half fader.
+    let mut host = channel_request("audio-input-9");
+    host.mute = Some(true);
+    host.gain = Some(30);
+    host.fader = Some(649.0 / 1023.0);
+    update_audio_channel(&db, &host).expect("host edit should send");
+    let mut main = mix_target_request("audio-mix-main");
+    main.dim = Some(true);
+    main.volume = Some(0.5);
+    update_audio_mix_target(&db, &main).expect("main edit should send");
+    std::thread::sleep(Duration::from_millis(500));
+    let created = create_audio_snapshot(
+        &db,
+        &AudioSnapshotCreateRequest {
+            name: String::from("Podcast"),
+            osc_index: 6,
+            capture_current_state: Some(true),
+        },
+    )
+    .expect("snapshot capture should succeed");
+
+    // Drift away from it.
+    let mut drift = channel_request("audio-input-9");
+    drift.mute = Some(false);
+    drift.gain = Some(45);
+    update_audio_channel(&db, &drift).expect("drift edit should send");
+    let mut main_drift = mix_target_request("audio-mix-main");
+    main_drift.dim = Some(false);
+    update_audio_mix_target(&db, &main_drift).expect("main drift should send");
+    std::thread::sleep(Duration::from_millis(500));
+
+    let result = recall_audio_snapshot_with_timing(
+        &db,
+        &AudioSnapshotRecallRequest {
+            snapshot_id: created.snapshot.id.clone(),
+        },
+        PushTiming {
+            confirm_wait_ms: 1_500,
+            poll_ms: 10,
+        },
+    )
+    .expect("recall should push and confirm");
+    assert!(result.pushed > 20, "{}", result.summary);
+    assert_eq!(result.unconfirmed, 0, "{}", result.summary);
+    assert_eq!(result.adjusted, 0, "{}", result.summary);
+    assert_eq!(result.confirmed, result.pushed, "{}", result.summary);
+    assert_eq!(result.console_state_confidence, "aligned");
+    assert!(result.phantom_differences.is_empty());
+    assert!(result.summary.contains("confirmed"), "{}", result.summary);
+
+    let settings = list_settings_by_prefix(&db, APP_SETTINGS_PREFIX).expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "aligned");
+    assert_eq!(
+        snapshot.last_console_sync_reason.as_deref(),
+        Some("snapshot-push")
+    );
+    assert_eq!(
+        snapshot.last_recalled_snapshot_id.as_deref(),
+        Some(created.snapshot.id.as_str())
+    );
+    let host_after = snapshot
+        .channels
+        .iter()
+        .find(|entry| entry.id == "audio-input-9")
+        .expect("host");
+    assert!(host_after.mute);
+    assert_eq!(host_after.gain, 30);
+    assert!((host_after.mix_levels["audio-mix-main"] - 649.0 / 1023.0).abs() < 0.002);
+    let main_after = snapshot
+        .mix_targets
+        .iter()
+        .find(|entry| entry.id == "audio-mix-main")
+        .expect("main");
+    assert!(main_after.dim);
+    assert!((main_after.volume - 0.5).abs() < 0.002);
+}
+
+#[test]
+fn recall_without_console_answer_stays_assumed_and_lists_unconfirmed() {
+    let _serial = serialize_shared_link();
+    let mut fake = FakeTotalMix::bind();
+    let slot = crate::rme_totalmix_osc::bind_test_global_slot(fake.port);
+    fake.start(slot.local_port(), Vec::new(), false, false);
+    let test_dir = pull_test_db("recall-push-unconfirmed", fake.port);
+    crate::rme_totalmix_osc::mark_console_link_slot(true);
+    let _pump = SlotPump::start(slot, test_dir.db_path());
+    let db = test_dir.db_path();
+    let created = create_audio_snapshot(
+        &db,
+        &AudioSnapshotCreateRequest {
+            name: String::from("Silent desk"),
+            osc_index: 7,
+            capture_current_state: Some(true),
+        },
+    )
+    .expect("snapshot capture should succeed");
+
+    let result = recall_audio_snapshot_with_timing(
+        &db,
+        &AudioSnapshotRecallRequest {
+            snapshot_id: created.snapshot.id.clone(),
+        },
+        PushTiming {
+            confirm_wait_ms: 300,
+            poll_ms: 10,
+        },
+    )
+    .expect("recall itself succeeds; the console just never confirms");
+    assert!(result.pushed > 20);
+    assert_eq!(result.confirmed, 0);
+    assert_eq!(result.unconfirmed, result.pushed, "{}", result.summary);
+    assert_eq!(result.console_state_confidence, "assumed");
+    assert!(result.summary.contains("unconfirmed"), "{}", result.summary);
+
+    let settings = list_settings_by_prefix(&db, APP_SETTINGS_PREFIX).expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "assumed");
+    assert_eq!(
+        snapshot.last_console_sync_reason.as_deref(),
+        Some("snapshot")
+    );
+    assert_eq!(
+        snapshot.last_recalled_snapshot_id.as_deref(),
+        Some(created.snapshot.id.as_str())
+    );
+}
+
+#[test]
+fn recall_in_simulated_mode_is_app_local_and_aligned() {
+    let test_dir = TestDir::new("recall-simulated");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from("app.commissioning.check.audio.status"),
+                String::from("passed"),
+            ),
+            (
+                String::from(AUDIO_METERING_SOURCE_KEY),
+                String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+            ),
+        ],
+    )
+    .expect("settings should persist");
+    let db = test_dir.db_path();
+    let mut host = channel_request("audio-input-9");
+    host.mute = Some(true);
+    update_audio_channel(&db, &host).expect("simulated edit should apply");
+    let created = create_audio_snapshot(
+        &db,
+        &AudioSnapshotCreateRequest {
+            name: String::from("Sim scene"),
+            osc_index: 5,
+            capture_current_state: Some(true),
+        },
+    )
+    .expect("snapshot capture should succeed");
+    let mut unmute = channel_request("audio-input-9");
+    unmute.mute = Some(false);
+    update_audio_channel(&db, &unmute).expect("simulated edit should apply");
+
+    let result = recall_audio_snapshot(
+        &db,
+        &AudioSnapshotRecallRequest {
+            snapshot_id: created.snapshot.id.clone(),
+        },
+    )
+    .expect("simulated recall should succeed");
+    assert_eq!(result.pushed, 0);
+    assert_eq!(result.console_state_confidence, "aligned");
+    assert!(
+        result.summary.contains("simulated console"),
+        "{}",
+        result.summary
+    );
+
+    let settings = list_settings_by_prefix(&db, APP_SETTINGS_PREFIX).expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "aligned");
+    assert_eq!(
+        snapshot.last_console_sync_reason.as_deref(),
+        Some("snapshot")
+    );
+    assert!(snapshot
+        .channels
+        .iter()
+        .any(|entry| entry.id == "audio-input-9" && entry.mute));
+}

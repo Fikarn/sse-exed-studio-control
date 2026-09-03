@@ -469,6 +469,32 @@ pub struct AudioSnapshotRecallResult {
     pub summary: String,
     #[serde(rename = "consoleStateConfidence")]
     pub console_state_confidence: String,
+    /// Console parameters the recall pushed to TotalMix (0 when simulated or
+    /// when the snapshot carries no captured state).
+    pub pushed: i64,
+    /// Pushed parameters the console read back with the pushed value.
+    pub confirmed: i64,
+    /// Pushed parameters the console read back with a different value (the
+    /// console won; app state follows).
+    pub adjusted: i64,
+    /// Pushed parameters the console never confirmed.
+    pub unconfirmed: i64,
+    /// 48V is never pushed: these channels differ between the snapshot and
+    /// the console and each needs its own armed confirm.
+    #[serde(rename = "phantomDifferences")]
+    pub phantom_differences: Vec<PhantomDifference>,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+pub struct PhantomDifference {
+    #[serde(rename = "channelId")]
+    pub channel_id: String,
+    #[serde(rename = "channelName")]
+    pub channel_name: String,
+    /// What the console has (kept in app state).
+    pub current: bool,
+    /// What the snapshot wanted.
+    pub target: bool,
 }
 
 #[derive(Debug)]

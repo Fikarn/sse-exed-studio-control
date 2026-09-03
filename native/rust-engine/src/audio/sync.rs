@@ -24,7 +24,8 @@ use crate::rme_console_link::{
     link_now_ms, shared_console_link, ConsoleBus, ConsoleLinkState, PullProgress,
 };
 use crate::rme_totalmix_osc::{
-    global_channel_target, global_output_channel, send_console_pull_request, SIMULATED_AUDIO_SOURCE,
+    global_channel_surface, global_channel_target, global_output_channel, global_output_mix_target,
+    send_console_pull_request, SIMULATED_AUDIO_SOURCE,
 };
 
 use super::helpers::*;
@@ -207,11 +208,23 @@ fn pull_console_state(
 
     let synced_at = current_timestamp(db_path)?;
     let connection = lock_link(&link).connection_label();
+    // The desk reports every hardware channel (94 on a UFX III); the operator
+    // cares about the ones the app models.
+    let channels_modelled = progress
+        .channels_seen
+        .iter()
+        .filter(|(bus, channel)| global_channel_surface(bus.word(), *channel).is_some())
+        .count();
+    let outputs_modelled = progress
+        .outputs_seen
+        .iter()
+        .filter(|output| global_output_mix_target(**output).is_some())
+        .count();
     let summary_base = format!(
         "Pulled {} values from TotalMix · {} channels · {} outputs · {} mix nodes",
         progress.parsed_messages,
-        progress.channels_seen.len(),
-        progress.outputs_seen.len(),
+        channels_modelled,
+        outputs_modelled,
         progress.mix_nodes_seen.len()
     );
 
@@ -270,8 +283,8 @@ fn pull_console_state(
         summary,
         console_state_confidence: String::from("aligned"),
         pulled_values: progress.parsed_messages as i64,
-        channels: progress.channels_seen.len() as i64,
-        mix_targets: progress.outputs_seen.len() as i64,
+        channels: channels_modelled as i64,
+        mix_targets: outputs_modelled as i64,
         complete: true,
         connection,
     })

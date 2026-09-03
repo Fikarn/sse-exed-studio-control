@@ -42,12 +42,6 @@ struct AudioMeterFrame {
 }
 
 #[derive(Debug)]
-pub struct AudioSnapshotRecallOutcome {
-    pub snapshot_name: String,
-    pub summary: String,
-}
-
-#[derive(Debug)]
 pub struct AudioChannelUpdateOutcome {
     pub summary: String,
 }
@@ -65,15 +59,10 @@ pub struct AudioEqUpdateOutcome {
 
 pub trait AudioBackend {
     fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory;
-    // Sync is a console pull owned by `audio::sync` (2026-09 audit
-    // remediation, Slice 3); it needs the console link and the database, so
-    // it is not a backend method.
-    fn recall_snapshot(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        snapshot_id: &str,
-    ) -> Result<AudioSnapshotRecallOutcome, String>;
+    // Sync (a console pull) and recall (a console push) are owned by
+    // `audio::sync` / `audio::snapshots` (2026-09 audit remediation, Slices 3
+    // and 4); they need the console link and the database, so they are not
+    // backend methods.
     fn update_channel(
         &self,
         config: &AudioBackendConfig,
@@ -363,31 +352,6 @@ impl AudioBackend for SimulatedAudioBackend {
         }
     }
 
-    fn recall_snapshot(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        snapshot_id: &str,
-    ) -> Result<AudioSnapshotRecallOutcome, String> {
-        ensure_transport_configured(config)?;
-
-        let snapshot = inventory
-            .snapshots
-            .iter()
-            .find(|entry| entry.id == snapshot_id)
-            .ok_or_else(|| {
-                format!("Audio snapshot '{snapshot_id}' is not exposed by the backend.")
-            })?;
-
-        Ok(AudioSnapshotRecallOutcome {
-            snapshot_name: snapshot.name.clone(),
-            summary: format!(
-                "Simulated audio snapshot '{}' was recalled over {}:{} / {}.",
-                snapshot.name, config.send_host, config.send_port, config.receive_port
-            ),
-        })
-    }
-
     fn update_channel(
         &self,
         config: &AudioBackendConfig,
@@ -555,31 +519,6 @@ impl AudioBackend for RmeTotalMixOscBackend {
             clear_mix_target_meter(mix_target);
         }
         inventory
-    }
-
-    fn recall_snapshot(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        snapshot_id: &str,
-    ) -> Result<AudioSnapshotRecallOutcome, String> {
-        ensure_transport_configured(config)?;
-
-        let snapshot = inventory
-            .snapshots
-            .iter()
-            .find(|entry| entry.id == snapshot_id)
-            .ok_or_else(|| {
-                format!("Audio snapshot '{snapshot_id}' is not exposed by the backend.")
-            })?;
-
-        Ok(AudioSnapshotRecallOutcome {
-            snapshot_name: snapshot.name.clone(),
-            summary: format!(
-                "Native audio snapshot '{}' was recalled. RME OSC snapshot-write control is outside this metering pass.",
-                snapshot.name
-            ),
-        })
     }
 
     fn update_channel(
@@ -1092,18 +1031,6 @@ pub fn read_default_audio_inventory(config: &AudioBackendConfig) -> AudioBackend
     }
 }
 
-pub fn recall_default_audio_snapshot(
-    config: &AudioBackendConfig,
-    inventory: &AudioBackendInventory,
-    snapshot_id: &str,
-) -> Result<AudioSnapshotRecallOutcome, String> {
-    if config.metering_source == SIMULATED_AUDIO_SOURCE {
-        SimulatedAudioBackend.recall_snapshot(config, inventory, snapshot_id)
-    } else {
-        RmeTotalMixOscBackend.recall_snapshot(config, inventory, snapshot_id)
-    }
-}
-
 pub fn update_default_audio_channel(
     config: &AudioBackendConfig,
     inventory: &AudioBackendInventory,
@@ -1176,17 +1103,6 @@ mod tests {
         assert_eq!(inventory.channels.len(), 18);
         assert_eq!(inventory.mix_targets.len(), 3);
         assert_eq!(inventory.snapshots.len(), 3);
-    }
-
-    #[test]
-    fn simulated_audio_backend_rejects_unknown_snapshot() {
-        let config = valid_config();
-        let inventory = read_default_audio_inventory(&config);
-
-        let error = recall_default_audio_snapshot(&config, &inventory, "snapshot-missing")
-            .expect_err("unknown snapshot should be rejected");
-
-        assert!(error.contains("snapshot-missing"));
     }
 
     #[test]

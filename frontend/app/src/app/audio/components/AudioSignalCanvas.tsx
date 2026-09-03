@@ -3,6 +3,7 @@ import type { ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioSignalCanvas.module.css";
 import type { AudioArmedAction } from "../audioArming";
+import type { AudioRecallReport } from "../audioRecallReport";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import type { AudioChannelGroupSelectionRequest, AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioSnapshotDeck } from "./AudioSnapshotDeck";
@@ -26,6 +27,9 @@ export function AudioSignalCanvas({
   onCaptureSnapshot,
   onDeleteSnapshot,
   onOpenSetup,
+  recallReport,
+  onDismissRecallReport,
+  onArmPhantomFromRecall,
   onRecallSnapshot,
   onRenameSnapshot,
   onRunAudioProbe,
@@ -60,6 +64,9 @@ export function AudioSignalCanvas({
   onCaptureSnapshot: () => void;
   onDeleteSnapshot: (snapshotId: string, snapshotName: string) => void;
   onOpenSetup: () => void;
+  recallReport: AudioRecallReport | null;
+  onDismissRecallReport: () => void;
+  onArmPhantomFromRecall: (channelId: string, channelName: string, phantom: boolean) => void;
   onRecallSnapshot: (snapshotId: string) => void;
   onRenameSnapshot: (snapshotId: string, snapshotName: string) => void;
   onRunAudioProbe: () => void;
@@ -136,6 +143,50 @@ export function AudioSignalCanvas({
             )}
             <button onClick={onOpenSetup} type="button">
               Setup
+            </button>
+          </span>
+        </div>
+      ) : null}
+
+      {/* 2026-09 audit remediation, Slice 4: a recall pushes the snapshot to
+          the desk and says what the console confirmed. 48V is never pushed —
+          each difference gets its own armed confirm right here. */}
+      {recallReport ? (
+        <div
+          className={styles.warningBand}
+          data-variant="compact"
+          data-tone={recallReport.unconfirmed > 0 ? "attention" : "ok"}
+          data-testid="audio-recall-report"
+          role="status"
+        >
+          <strong>Recalled {recallReport.snapshotName}</strong>
+          <span>{recallReport.summaryLine}</span>
+          <span className={styles.warningRecoveryActions}>
+            {recallReport.phantomDifferences.map((difference) => {
+              const armKey = `phantom:${difference.channelId}:${difference.target}`;
+              return (
+                <button
+                  data-armed={armedAction?.key === armKey ? "true" : "false"}
+                  data-testid={`audio-recall-arm-phantom-${difference.channelId}`}
+                  key={difference.channelId}
+                  onClick={() =>
+                    onArmPhantomFromRecall(difference.channelId, difference.channelName, difference.target)
+                  }
+                  title={`${difference.target ? "Enable" : "Disable"} 48V on ${difference.channelName} — arm, then press again to apply`}
+                  type="button"
+                >
+                  {armedAction?.key === armKey ? "Confirm" : "Arm"} 48V {difference.target ? "on" : "off"} ·{" "}
+                  {difference.channelName}
+                </button>
+              );
+            })}
+            <button
+              aria-label="Dismiss recall report"
+              data-testid="audio-recall-report-dismiss"
+              onClick={onDismissRecallReport}
+              type="button"
+            >
+              Dismiss
             </button>
           </span>
         </div>

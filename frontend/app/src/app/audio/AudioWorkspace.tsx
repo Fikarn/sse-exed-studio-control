@@ -12,6 +12,7 @@ import { useAudioOptimisticSettings, type OptimisticAudioSettings } from "./hook
 import { useAudioPaletteRegistration } from "./hooks/useAudioPaletteRegistration";
 import { createAudioControlDraftStore } from "./audioControlDraftStore";
 import { AUDIO_FADER_UNITY, type AudioFeedbackTone } from "./audioFormatting";
+import { parseAudioRecallReport, type AudioRecallReport } from "./audioRecallReport";
 import {
   audioChannelSupportsPhase,
   buildAudioViewModel,
@@ -99,6 +100,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [bankIndex, setBankIndex] = useState(0);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<AudioWorkspaceFeedback | null>(null);
+  // 2026-09 audit remediation, Slice 4: what the last recall pushed and what
+  // the console confirmed, incl. the 48V differences that need arming.
+  const [recallReport, setRecallReport] = useState<AudioRecallReport | null>(null);
   const [recentlyRecalledSnapshotId, setRecentlyRecalledSnapshotId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<AudioContextMenuState | null>(null);
   const draftStoreRef = useRef<ReturnType<typeof createAudioControlDraftStore> | null>(null);
@@ -271,10 +275,15 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       },
       () => {
         void performAction(`audio-snapshot-${snapshotId}`, async () => {
-          await store.recallAudioSnapshot(snapshotId);
+          const result = await store.recallAudioSnapshot(snapshotId);
+          setRecallReport(parseAudioRecallReport(result));
         });
       }
     );
+  });
+
+  const dismissRecallReport = useLiveCallback(() => {
+    setRecallReport(null);
   });
 
   const recallCurrentSnapshot = useLiveCallback(() => {
@@ -408,6 +417,12 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       );
     }
   );
+
+  // A recall never pushes 48V; the report lists each difference and this is
+  // the same armed flow the inspector uses.
+  const armPhantomFromRecall = useLiveCallback((channelId: string, channelName: string, phantom: boolean) => {
+    togglePhantom({ channelId, channelName, phantom });
+  });
 
   const updateChannelEq = useLiveCallback((request: AudioEqUpdate) => {
     void performAction(`audio-channel-eq-${request.channelId}`, async () => {
@@ -674,6 +689,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           onRecallSnapshot={recallSnapshot}
           onRenameSnapshot={renameSnapshot}
           onRunAudioProbe={runAudioProbe}
+          recallReport={recallReport}
+          onDismissRecallReport={dismissRecallReport}
+          onArmPhantomFromRecall={armPhantomFromRecall}
           onSaveSnapshot={saveSnapshot}
           onSelectChannel={selectChannel}
           onSelectChannelGroup={selectChannelGroup}
