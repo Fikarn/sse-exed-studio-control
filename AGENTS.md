@@ -121,7 +121,7 @@ When the selected Tauri shell is open for user inspection, that exact running sh
 
 - Engine tests: `cargo test` under `native/rust-engine/`. `#[ignore]`-marked tests are hardware-bound and skipped by default; run them via `npm run native:test:hardware` on the operator workstation.
 - Frontend unit/component tests: `npm run frontend:test` (Vitest + `@testing-library/react`). Specs colocated as `*.test.ts` / `*.test.tsx` under each workspace.
-- Frontend Playwright + visual baselines: `npm run frontend:playwright:test`. `visual-review.spec.ts` commits `toHaveScreenshot` baselines under `frontend/app/tests/__visual__/visual-review.spec.ts-snapshots/` (per-platform `*-darwin.png` / `*-linux.png` files); the CI `frontend-e2e` job re-runs them and uploads diffs + the Playwright report as artifacts. `storybook.spec.ts` does the same for the Storybook static build.
+- Frontend Playwright + visual baselines: `npm run frontend:playwright:test`. `visual-review.spec.ts` commits `toHaveScreenshot` baselines under `frontend/app/tests/__visual__/visual-review.spec.ts-snapshots/` (per-platform `*-darwin.png` / `*-linux.png` / `*-win32.png` files; win32 is the studio workstation's local gate, linux is CI, darwin is refreshed on the macOS release host); the CI `frontend-e2e` job re-runs them and uploads diffs + the Playwright report as artifacts. `storybook.spec.ts` does the same for the Storybook static build.
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
 - Target-host lanes: macOS and Windows native verification are both blocking release gates. Treat a Windows target-host failure the same as a macOS failure.
 
