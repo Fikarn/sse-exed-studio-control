@@ -525,6 +525,105 @@ pub struct ConsoleLinkState {
     external_total: u64,
     unconfirmed_total: u64,
     unconfirmed_addresses: Vec<String>,
+    pull: Option<PullTracker>,
+}
+
+/// Bookkeeping for one console pull (`/sendall 2` + `/sendstate`): what
+/// arrived, when the burst went quiet, and which mix nodes the console listed
+/// (so the caller can treat the ones it omitted as off).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PullProgress {
+    pub started_at_ms: u64,
+    /// Every non-level datagram since the pull began, parsed or not.
+    pub control_messages: u64,
+    /// Messages the link could map to a parameter the app models.
+    pub parsed_messages: u64,
+    pub last_message_age_ms: Option<u64>,
+    pub status_seen: bool,
+    pub channels_seen: Vec<(ConsoleBus, usize)>,
+    pub outputs_seen: Vec<usize>,
+    pub mix_nodes_seen: Vec<(ConsoleBus, usize, usize)>,
+}
+
+impl PullProgress {
+    /// The dump has ended: something arrived and the console has been quiet
+    /// for `quiet_ms`.
+    pub fn is_complete(&self, quiet_ms: u64) -> bool {
+        self.control_messages > 0
+            && self
+                .last_message_age_ms
+                .map(|age| age >= quiet_ms)
+                .unwrap_or(false)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PullTracker {
+    started_at_ms: u64,
+    control_messages: u64,
+    parsed_messages: u64,
+    last_message_at_ms: Option<u64>,
+    status_seen: bool,
+    channels_seen: Vec<(ConsoleBus, usize)>,
+    outputs_seen: Vec<usize>,
+    mix_nodes_seen: Vec<(ConsoleBus, usize, usize)>,
+}
+
+impl PullTracker {
+    fn progress(&self, now_ms: u64) -> PullProgress {
+        PullProgress {
+            started_at_ms: self.started_at_ms,
+            control_messages: self.control_messages,
+            parsed_messages: self.parsed_messages,
+            last_message_age_ms: self
+                .last_message_at_ms
+                .map(|last| now_ms.saturating_sub(last)),
+            status_seen: self.status_seen,
+            channels_seen: self.channels_seen.clone(),
+            outputs_seen: self.outputs_seen.clone(),
+            mix_nodes_seen: self.mix_nodes_seen.clone(),
+        }
+    }
+
+    fn note_key(&mut self, key: &ParamKey) {
+        self.parsed_messages = self.parsed_messages.saturating_add(1);
+        match key {
+            ParamKey::ChannelFlag {
+                bus: ConsoleBus::Output,
+                channel,
+                ..
+            }
+            | ParamKey::OutputVolume { output: channel } => {
+                if !self.outputs_seen.contains(channel) {
+                    self.outputs_seen.push(*channel);
+                }
+            }
+            ParamKey::ChannelFlag { bus, channel, .. } => {
+                if !self.channels_seen.contains(&(*bus, *channel)) {
+                    self.channels_seen.push((*bus, *channel));
+                }
+            }
+            ParamKey::InputGain { channel } => {
+                if !self.channels_seen.contains(&(ConsoleBus::Input, *channel)) {
+                    self.channels_seen.push((ConsoleBus::Input, *channel));
+                }
+            }
+            ParamKey::MixFader {
+                bus,
+                channel,
+                output,
+            } => {
+                if !self.mix_nodes_seen.contains(&(*bus, *channel, *output)) {
+                    self.mix_nodes_seen.push((*bus, *channel, *output));
+                }
+            }
+            ParamKey::StatusConnection | ParamKey::StatusDevice | ParamKey::StatusDsp => {
+                self.status_seen = true;
+            }
+            ParamKey::MixSolo { .. } | ParamKey::ControlRoom(_) | ParamKey::SnapshotLoad { .. } => {
+            }
+        }
+    }
 }
 
 fn values_match(sent: &ConsoleValue, reported: &ConsoleValue) -> bool {
@@ -579,11 +678,44 @@ impl ConsoleLinkState {
         }
     }
 
+    /// Starts tracking a console pull. The caller sends `/sendall 2` +
+    /// `/sendstate` itself; the metering thread keeps ingesting as usual.
+    pub fn begin_pull(&mut self, now_ms: u64) {
+        self.pull = Some(PullTracker {
+            started_at_ms: now_ms,
+            control_messages: 0,
+            parsed_messages: 0,
+            last_message_at_ms: None,
+            status_seen: false,
+            channels_seen: Vec::new(),
+            outputs_seen: Vec::new(),
+            mix_nodes_seen: Vec::new(),
+        });
+    }
+
+    pub fn pull_progress(&self, now_ms: u64) -> Option<PullProgress> {
+        self.pull.as_ref().map(|tracker| tracker.progress(now_ms))
+    }
+
+    /// Ends the pull and returns what it saw.
+    pub fn finish_pull(&mut self, now_ms: u64) -> Option<PullProgress> {
+        self.pull.take().map(|tracker| tracker.progress(now_ms))
+    }
+
     pub fn ingest(&mut self, message: &OscMessage, now_ms: u64) -> Classification {
+        if !message.addr.starts_with("/level/") {
+            if let Some(tracker) = self.pull.as_mut() {
+                tracker.control_messages = tracker.control_messages.saturating_add(1);
+                tracker.last_message_at_ms = Some(now_ms);
+            }
+        }
         let Some(parsed) = parse_console_message(message) else {
             return Classification::Ignored;
         };
         self.last_echo_at_ms = Some(now_ms);
+        if let Some(tracker) = self.pull.as_mut() {
+            tracker.note_key(&parsed.key);
+        }
 
         let mut newest_request_at: Option<u64> = None;
         for (request, outstanding) in self.outstanding.iter_mut() {
@@ -645,16 +777,28 @@ impl ConsoleLinkState {
             _ => {}
         }
 
+        let pulling = self.pull.is_some();
         if let Some(pending) = self.pending.get(&parsed.key) {
             if values_match(&pending.value, &parsed.value) {
                 self.pending.remove(&parsed.key);
                 self.confirmed_total = self.confirmed_total.saturating_add(1);
+                // During a pull the dump is the truth for everything it
+                // lists, so a confirming value is applied as well (a no-op
+                // when the app already holds it).
+                if pulling {
+                    self.queued.push(ConsoleUpdate {
+                        key: parsed.key,
+                        value: parsed.value,
+                        adjusted: false,
+                    });
+                }
                 return Classification::Confirmed;
             }
-            let reply_is_stale = match newest_request_at {
-                Some(requested_at) => pending.sent_at_ms > requested_at,
-                None => true,
-            };
+            let reply_is_stale = !pulling
+                && match newest_request_at {
+                    Some(requested_at) => pending.sent_at_ms > requested_at,
+                    None => true,
+                };
             if reply_is_stale {
                 return Classification::Stale;
             }
@@ -779,7 +923,6 @@ impl ConsoleLinkState {
 
     /// Forgets the unconfirmed history, e.g. after a complete console pull has
     /// re-established the truth.
-    #[allow(dead_code)] // Slice 3 (Sync = console pull) calls this after a complete dump.
     pub fn reset_unconfirmed(&mut self) {
         self.unconfirmed_total = 0;
         self.unconfirmed_addresses.clear();
@@ -800,6 +943,11 @@ impl ConsoleLinkState {
         self.connection
     }
 
+    /// `connected` / `disconnected` / `unknown`, for results and summaries.
+    pub fn connection_label(&self) -> String {
+        String::from(self.connection.as_str())
+    }
+
     pub fn summary(&self, now_ms: u64) -> ConsoleLinkSummary {
         ConsoleLinkSummary {
             slot_bound: self.slot_bound,
@@ -815,6 +963,25 @@ impl ConsoleLinkState {
             external_changes: self.external_total,
             active_snapshot: self.active_snapshot,
         }
+    }
+}
+
+/// Tests that drive the process-wide link (pull tests, the loopback read-back
+/// test) hold this so they do not answer each other's read-backs.
+#[cfg(test)]
+pub(crate) static SHARED_LINK_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+#[cfg(test)]
+impl ConsoleLinkState {
+    /// Forgets pending sends, queued updates and any pull, so a test starts
+    /// from a quiet link regardless of what ran before it.
+    pub fn reset_for_test(&mut self) {
+        self.pending.clear();
+        self.outstanding.clear();
+        self.queued.clear();
+        self.expired.clear();
+        self.pull = None;
+        self.connection_lost = false;
     }
 }
 
@@ -1305,6 +1472,86 @@ mod tests {
         );
         link.reset_unconfirmed();
         assert_eq!(link.summary(1_700).unconfirmed_sends, 0);
+    }
+
+    #[test]
+    fn pull_applies_every_dump_value_even_when_it_confirms_a_pending_send() {
+        // Outside a pull a confirming reply is not re-applied (the app already
+        // holds the value). During a pull the dump is authoritative, so it is
+        // queued too — otherwise a value that happened to match an in-flight
+        // send would never reach the database if the app's copy was stale.
+        let mut link = ConsoleLinkState::default();
+        link.register_outgoing(&[(String::from("/input/8/mute"), f(1.0))], 0);
+        assert_eq!(
+            link.ingest(&msg("/input/8/mute", f(1.0)), 50),
+            Classification::Confirmed
+        );
+        assert!(
+            link.take_queued().is_empty(),
+            "no pull: confirmation queues nothing"
+        );
+
+        link.register_outgoing(&[(String::from("/input/8/mute"), f(1.0))], 100);
+        link.register_outgoing(&[(String::from("/input/8/gain"), f(41.0))], 100);
+        link.begin_pull(120);
+        assert_eq!(
+            link.ingest(&msg("/input/8/mute", f(1.0)), 150),
+            Classification::Confirmed
+        );
+        // A different value during a pull is never "stale": the console wins.
+        assert_eq!(
+            link.ingest(&msg("/input/8/gain", f(33.0)), 151),
+            Classification::Adjusted
+        );
+        let queued = link.take_queued();
+        assert_eq!(queued.len(), 2);
+        assert_eq!(queued[0].value, ConsoleValue::Flag(true));
+        assert!(!queued[0].adjusted);
+        assert_eq!(queued[1].value, ConsoleValue::Db(33.0));
+        assert!(queued[1].adjusted);
+        assert_eq!(link.pending_count(), 0);
+    }
+
+    #[test]
+    fn pull_tracker_counts_the_dump_and_reports_quiet() {
+        let mut link = ConsoleLinkState::default();
+        assert!(link.pull_progress(0).is_none());
+        link.begin_pull(100);
+        let early = link.pull_progress(150).expect("pull in progress");
+        assert_eq!(early.control_messages, 0);
+        assert!(!early.is_complete(300), "nothing arrived yet");
+
+        // The dump: status first, then parameters, including an EQ detail
+        // message the app does not model (counts as traffic, not as parsed).
+        link.ingest(&msg("/status/connection", f(1.0)), 160);
+        link.ingest(&msg("/input/8/mute", f(0.0)), 170);
+        link.ingest(&msg("/input/8/gain", f(41.0)), 171);
+        link.ingest(&msg("/input/8/eq/band1freq", f(100.0)), 172);
+        link.ingest(&msg("/output/8/volume", f(-16.6)), 180);
+        link.ingest(&msg("/mix/in/8/8/fader", f(0.0)), 190);
+        link.ingest(&msg("/mix/pb/2/0/fader", f(-6.0)), 191);
+        link.ingest(&msg("/level/in/8", f(-20.0)), 400);
+
+        let progress = link.pull_progress(420).expect("pull in progress");
+        assert_eq!(progress.control_messages, 7, "levels are not dump traffic");
+        assert_eq!(progress.parsed_messages, 6);
+        assert!(progress.status_seen);
+        assert_eq!(progress.channels_seen, vec![(ConsoleBus::Input, 8)]);
+        assert_eq!(progress.outputs_seen, vec![8]);
+        assert_eq!(
+            progress.mix_nodes_seen,
+            vec![(ConsoleBus::Input, 8, 8), (ConsoleBus::Playback, 2, 0)]
+        );
+        assert_eq!(progress.last_message_age_ms, Some(229));
+        assert!(!progress.is_complete(300));
+        assert!(link.pull_progress(500).unwrap().is_complete(300));
+
+        let finished = link.finish_pull(500).expect("pull should finish");
+        assert_eq!(finished.parsed_messages, 6);
+        assert!(link.pull_progress(600).is_none());
+        // Traffic after the pull is no longer counted against it.
+        link.ingest(&msg("/input/9/mute", f(1.0)), 700);
+        assert!(link.finish_pull(700).is_none());
     }
 
     #[test]

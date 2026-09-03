@@ -1283,7 +1283,7 @@ struct BoundRmeSlot {
     socket: UdpSocket,
 }
 
-struct GlobalOscSlot {
+pub(crate) struct GlobalOscSlot {
     send_port: u16,
     socket: UdpSocket,
     last_rx_at: Option<Instant>,
@@ -1305,7 +1305,7 @@ fn bind_global_slot(send_port: i64, receive_port: i64) -> Option<GlobalOscSlot> 
     })
 }
 
-fn read_global_packets(
+pub(crate) fn read_global_packets(
     slot: &mut GlobalOscSlot,
     state: &Arc<Mutex<RmeTotalMixMeterState>>,
     now_ms: u64,
@@ -1351,7 +1351,7 @@ fn route_global_packet(packet: &OscPacket, state: &Arc<Mutex<RmeTotalMixMeterSta
 const LINK_FLUSH_INTERVAL: Duration =
     Duration::from_millis(crate::rme_console_link::FLUSH_INTERVAL_MS);
 
-fn mark_console_link_slot(bound: bool) {
+pub(crate) fn mark_console_link_slot(bound: bool) {
     if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
         link.slot_bound = bound;
     }
@@ -1359,7 +1359,7 @@ fn mark_console_link_slot(bound: bool) {
 
 /// Advances the console link's clocks and sends the read-backs that are due
 /// (`/sendchan/…`, `/sendsubmix/…`, `/sendsettings`) over the Global slot.
-fn service_console_link(slot: &GlobalOscSlot, send_host: &str) {
+pub(crate) fn service_console_link(slot: &GlobalOscSlot, send_host: &str) {
     let now_ms = crate::rme_console_link::link_now_ms();
     let requests = match crate::rme_console_link::shared_console_link().lock() {
         Ok(mut link) => {
@@ -1386,7 +1386,7 @@ fn service_console_link(slot: &GlobalOscSlot, send_host: &str) {
 
 /// Persists whatever the console link produced since the last flush and tells
 /// every consumer through `audio.changed { reason: "console-echo" }`.
-fn flush_console_link_to_db(db_path: &std::path::Path) {
+pub(crate) fn flush_console_link_to_db(db_path: &std::path::Path) {
     match crate::audio::flush_console_link(db_path) {
         Ok(report) if report.changed() => {
             crate::engine_events::emit_audio_changed_with(serde_json::json!({
@@ -1412,15 +1412,84 @@ fn refresh_global_slot(slot: &GlobalOscSlot, send_host: &str) {
     if host.is_empty() {
         return;
     }
-    for address in ["/sendall", "/sendstate"] {
+    for (address, value) in console_pull_messages() {
         let Ok(bytes) = encoder::encode(&OscPacket::Message(OscMessage {
-            addr: String::from(address),
-            args: vec![OscType::Int(1)],
+            addr: address,
+            args: vec![value],
         })) else {
             continue;
         };
         let _ = slot.socket.send_to(&bytes, (host, slot.send_port));
     }
+}
+
+/// `/sendall 2` (every parameter; mix nodes only above -65 dB) followed by
+/// `/sendstate` (status incl. `/status/connection`): the console pull.
+pub(crate) fn console_pull_messages() -> Vec<(String, OscType)> {
+    vec![
+        (String::from("/sendall"), OscType::Float(2.0)),
+        (String::from("/sendstate"), OscType::Float(1.0)),
+    ]
+}
+
+/// Asks TotalMix for a full dump over the Global OSC remote (`send_port + 3`).
+/// The replies land on the metering thread's slot socket and flow through the
+/// console link; `audio::sync` waits for the burst to go quiet.
+pub(crate) fn send_console_pull_request(send_host: &str, send_port: i64) -> Result<usize, String> {
+    let port = validated_command_port(send_port, GLOBAL_OSC_PORT_OFFSET)?;
+    send_osc_messages(send_host, port, &console_pull_messages())
+}
+
+/// Test stand-in for the metering thread's per-tick console-link work: read
+/// the slot, service read-backs, flush to the database.
+#[cfg(test)]
+pub(crate) fn pump_global_slot_for_test(
+    slot: &mut GlobalOscSlot,
+    send_host: &str,
+    db_path: &std::path::Path,
+) {
+    let state = shared_meter_state();
+    read_global_packets(slot, &state, monotonic_now_ms());
+    service_console_link(slot, send_host);
+    flush_console_link_to_db(db_path);
+}
+
+/// A Global OSC slot on an ephemeral loopback port whose read-backs go to
+/// `send_port` (a fake console in tests).
+#[cfg(test)]
+pub(crate) fn bind_test_global_slot(send_port: u16) -> GlobalOscSlot {
+    let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("test global slot should bind");
+    socket
+        .set_nonblocking(true)
+        .expect("test global slot should be non-blocking");
+    GlobalOscSlot {
+        send_port,
+        socket,
+        last_rx_at: None,
+    }
+}
+
+#[cfg(test)]
+impl GlobalOscSlot {
+    pub(crate) fn local_port(&self) -> u16 {
+        self.socket.local_addr().expect("slot address").port()
+    }
+}
+
+/// The real Global OSC slot (`send_port`, `receive_port` already +3) for the
+/// hardware-lane pull test.
+#[cfg(test)]
+pub(crate) fn bind_live_global_slot_for_test(
+    send_port: u16,
+    receive_port: u16,
+) -> Option<GlobalOscSlot> {
+    let socket = UdpSocket::bind(("0.0.0.0", receive_port)).ok()?;
+    socket.set_nonblocking(true).ok()?;
+    Some(GlobalOscSlot {
+        send_port,
+        socket,
+        last_rx_at: None,
+    })
 }
 
 // TotalMix OSC banks index the *visible mixer layout*, not hardware channel
@@ -2353,6 +2422,12 @@ mod tests {
         };
         // Fake TotalMix: receives the read-back request on the slot's send
         // port and answers on the slot socket, like the real console does.
+        let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Ok(mut link) = shared_console_link().lock() {
+            link.reset_for_test();
+        }
         let (fake_totalmix, fake_port) = bind_test_receiver();
         let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("global slot socket should bind");
         socket
@@ -2481,20 +2556,27 @@ mod tests {
 
         super::refresh_global_slot(&slot, "127.0.0.1");
 
-        let mut addresses = Vec::new();
-        let mut buffer = [0u8; 512];
-        for _ in 0..2 {
-            let (read, _from) = receiver
-                .recv_from(&mut buffer)
-                .expect("refresh messages should arrive");
-            let packet = rosc::decoder::decode_udp(&buffer[..read])
-                .expect("refresh should decode as OSC")
-                .1;
-            if let OscPacket::Message(message) = packet {
-                addresses.push(message.addr);
-            }
-        }
-        assert_eq!(addresses, vec!["/sendall", "/sendstate"]);
+        // `/sendall 2` asks for every parameter with mix nodes above -65 dB
+        // (RME protocol table); `/sendstate 1` adds the status messages.
+        let received = receive_messages(&receiver, 2);
+        assert_eq!(
+            received,
+            vec![
+                (String::from("/sendall"), Some(2.0)),
+                (String::from("/sendstate"), Some(1.0)),
+            ]
+        );
+    }
+
+    #[test]
+    fn send_console_pull_request_targets_the_global_slot() {
+        let (receiver, port) = bind_test_receiver();
+        let sent = super::send_console_pull_request("127.0.0.1", i64::from(port) - 3)
+            .expect("pull request should send");
+        assert_eq!(sent, 2);
+        let received = receive_messages(&receiver, 2);
+        assert_eq!(received[0], (String::from("/sendall"), Some(2.0)));
+        assert_eq!(received[1], (String::from("/sendstate"), Some(1.0)));
     }
 
     #[test]

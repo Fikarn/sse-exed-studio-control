@@ -42,11 +42,6 @@ struct AudioMeterFrame {
 }
 
 #[derive(Debug)]
-pub struct AudioSyncOutcome {
-    pub summary: String,
-}
-
-#[derive(Debug)]
 pub struct AudioSnapshotRecallOutcome {
     pub snapshot_name: String,
     pub summary: String,
@@ -70,11 +65,9 @@ pub struct AudioEqUpdateOutcome {
 
 pub trait AudioBackend {
     fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory;
-    fn sync_console(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-    ) -> Result<AudioSyncOutcome, String>;
+    // Sync is a console pull owned by `audio::sync` (2026-09 audit
+    // remediation, Slice 3); it needs the console link and the database, so
+    // it is not a backend method.
     fn recall_snapshot(
         &self,
         config: &AudioBackendConfig,
@@ -370,31 +363,6 @@ impl AudioBackend for SimulatedAudioBackend {
         }
     }
 
-    fn sync_console(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-    ) -> Result<AudioSyncOutcome, String> {
-        ensure_transport_configured(config)?;
-
-        if inventory.channels.is_empty() || inventory.mix_targets.is_empty() {
-            return Err(String::from(
-                "Audio inventory is empty, so the simulated backend cannot stage a console sync.",
-            ));
-        }
-
-        Ok(AudioSyncOutcome {
-            summary: format!(
-                "Simulated console sync staged {} channels and {} mix targets over {}:{} / {}.",
-                inventory.channels.len(),
-                inventory.mix_targets.len(),
-                config.send_host,
-                config.send_port,
-                config.receive_port
-            ),
-        })
-    }
-
     fn recall_snapshot(
         &self,
         config: &AudioBackendConfig,
@@ -587,30 +555,6 @@ impl AudioBackend for RmeTotalMixOscBackend {
             clear_mix_target_meter(mix_target);
         }
         inventory
-    }
-
-    fn sync_console(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-    ) -> Result<AudioSyncOutcome, String> {
-        ensure_transport_configured(config)?;
-
-        if inventory.channels.is_empty() || inventory.mix_targets.is_empty() {
-            return Err(String::from(
-                "Audio inventory is empty, so the RME TotalMix OSC backend cannot prepare the console surface.",
-            ));
-        }
-
-        Ok(AudioSyncOutcome {
-            summary: format!(
-                "RME TotalMix OSC metering is configured for {} channels and {} mix targets over receive ports {}-{}.",
-                inventory.channels.len(),
-                inventory.mix_targets.len(),
-                config.receive_port,
-                config.receive_port + 2
-            ),
-        })
     }
 
     fn recall_snapshot(
@@ -1148,17 +1092,6 @@ pub fn read_default_audio_inventory(config: &AudioBackendConfig) -> AudioBackend
     }
 }
 
-pub fn sync_default_audio_console(
-    config: &AudioBackendConfig,
-    inventory: &AudioBackendInventory,
-) -> Result<AudioSyncOutcome, String> {
-    if config.metering_source == SIMULATED_AUDIO_SOURCE {
-        SimulatedAudioBackend.sync_console(config, inventory)
-    } else {
-        RmeTotalMixOscBackend.sync_console(config, inventory)
-    }
-}
-
 pub fn recall_default_audio_snapshot(
     config: &AudioBackendConfig,
     inventory: &AudioBackendInventory,
@@ -1243,17 +1176,6 @@ mod tests {
         assert_eq!(inventory.channels.len(), 18);
         assert_eq!(inventory.mix_targets.len(), 3);
         assert_eq!(inventory.snapshots.len(), 3);
-    }
-
-    #[test]
-    fn simulated_audio_backend_syncs_when_transport_and_inventory_exist() {
-        let config = valid_config();
-        let inventory = read_default_audio_inventory(&config);
-
-        let outcome =
-            sync_default_audio_console(&config, &inventory).expect("simulated sync should succeed");
-
-        assert!(outcome.summary.contains("Simulated console sync"));
     }
 
     #[test]

@@ -918,11 +918,19 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
       `${runtimeLabel} audio role-gating did not reject unsupported rear-line phantom changes.`
     );
 
+    // Slice 3: sync is a console pull. Simulated: aligned by construction.
+    // Live: a complete dump with real values, read-only towards the desk.
     const synced = await harness.request(`${requestIdPrefix}-audio-sync`, "audio.sync");
     assert(
-      synced.synced === true && synced.consoleStateConfidence === "aligned",
-      `${runtimeLabel} audio.sync did not report an aligned console state.`
+      synced.synced === true && synced.consoleStateConfidence === "aligned" && synced.complete === true,
+      `${runtimeLabel} audio.sync did not report an aligned, complete console pull: ${JSON.stringify(synced)}`
     );
+    if (LIVE_CONSOLE) {
+      assert(
+        synced.pulledValues > 100 && synced.connection === "connected",
+        `${runtimeLabel} live console pull returned too little: ${JSON.stringify(synced)}`
+      );
+    }
 
     if (!LIVE_CONSOLE) {
       const recalled = await harness.request(`${requestIdPrefix}-audio-snapshot-recall`, "audio.snapshot.recall", {
@@ -950,7 +958,7 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
         // Ordinary edits never write console-state confidence (Slice 1); sync
         // aligns it and, in the simulated lane, recall marks it assumed.
         mutatedSnapshot.consoleStateConfidence === (LIVE_CONSOLE ? "aligned" : "assumed") &&
-        mutatedSnapshot.lastConsoleSyncReason === (LIVE_CONSOLE ? "manual-sync" : "snapshot") &&
+        mutatedSnapshot.lastConsoleSyncReason === (LIVE_CONSOLE ? "console-pull" : "snapshot") &&
         mutatedSnapshot.lastRecalledSnapshotId === (LIVE_CONSOLE ? null : "snapshot-panel"),
       `${runtimeLabel} audio snapshot did not retain the expected selection and recall markers.`
     );
@@ -983,16 +991,19 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
         `${runtimeLabel} audio snapshot did not retain the expected rear-line state.`
       );
     }
+    // On the live lane the sync above pulled the desk's own values back
+    // through RME's fader curve, so faders compare within one console step.
+    const nearFader = (actual, expected) => typeof actual === "number" && Math.abs(actual - expected) < 0.003;
     assert(
       mutatedPlayback &&
         mutatedPlayback.mute === true &&
         (LIVE_CONSOLE || mutatedPlayback.solo === true) &&
-        mutatedPlayback.mixLevels?.[targets.playbackSendTargetId] === targets.playbackFader,
+        nearFader(mutatedPlayback.mixLevels?.[targets.playbackSendTargetId], targets.playbackFader),
       `${runtimeLabel} audio snapshot did not retain the expected playback send state.`
     );
     assert(
       mutatedMixTarget &&
-        mutatedMixTarget.volume === 0.81 &&
+        nearFader(mutatedMixTarget.volume, 0.81) &&
         mutatedMixTarget.dim === true &&
         mutatedMixTarget.mono === true &&
         mutatedMixTarget.talkback === true,

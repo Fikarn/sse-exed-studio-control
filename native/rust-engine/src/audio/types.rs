@@ -423,6 +423,18 @@ pub struct AudioSyncResult {
     pub summary: String,
     #[serde(rename = "consoleStateConfidence")]
     pub console_state_confidence: String,
+    /// Console parameters the pull could map to app state (0 when simulated).
+    #[serde(rename = "pulledValues")]
+    pub pulled_values: i64,
+    /// Distinct hardware channels the dump reported.
+    pub channels: i64,
+    /// Distinct hardware outputs the dump reported.
+    #[serde(rename = "mixTargets")]
+    pub mix_targets: i64,
+    /// The dump ended (went quiet) before the timeout.
+    pub complete: bool,
+    /// `connected` / `disconnected` / `unknown` / `simulated`.
+    pub connection: String,
 }
 
 #[derive(Debug, Serialize)]

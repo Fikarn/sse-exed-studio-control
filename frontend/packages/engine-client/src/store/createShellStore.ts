@@ -516,26 +516,10 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return applyPatchedAudioSnapshot(patchAudioClipClear(currentAudioSnapshot, params), "audio.changed");
     }
 
-    if (method === "audio.sync") {
-      const record = asRecord(result);
-      return applyPatchedAudioSnapshot(
-        {
-          ...currentAudioSnapshot,
-          consoleStateConfidence:
-            typeof record?.consoleStateConfidence === "string"
-              ? record.consoleStateConfidence
-              : currentAudioSnapshot.consoleStateConfidence,
-          lastActionCode: null,
-          lastActionMessage:
-            typeof record?.summary === "string" ? record.summary : currentAudioSnapshot.lastActionMessage,
-          lastActionStatus: "succeeded",
-          lastConsoleSyncAt: new Date().toISOString(),
-          lastConsoleSyncReason: "manual sync",
-        },
-        "audio.changed"
-      );
-    }
-
+    // `audio.sync` is deliberately not patched locally (2026-09 audit
+    // remediation, Slice 3): a sync is now a console pull that rewrites
+    // channel and mix-target state engine-side, so the only truthful thing to
+    // show is a fresh `audio.snapshot`. Returning false triggers that refresh.
     return false;
   };
 

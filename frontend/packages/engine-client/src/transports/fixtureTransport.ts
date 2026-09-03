@@ -4179,20 +4179,37 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       case "audio.sync": {
         const audioSnapshot = ensureAudioActionAllowed(state);
         const syncedAt = new Date().toISOString();
+        // Mirrors the engine's console pull (Slice 3): the fixture console
+        // already mirrors the app, so the pull reports what it "read" and
+        // marks the state aligned.
+        const channelCount = asArray(audioSnapshot.channels).length;
+        const mixTargetCount = asArray(audioSnapshot.mixTargets).length;
+        const pulledValues = channelCount * 4 + mixTargetCount * 2;
+        const summary = `Pulled ${pulledValues} values from the fixture console · ${channelCount} channels · ${mixTargetCount} outputs`;
         audioSnapshot.consoleStateConfidence = "aligned";
         audioSnapshot.lastConsoleSyncAt = syncedAt;
-        audioSnapshot.lastConsoleSyncReason = "manual sync";
+        audioSnapshot.lastConsoleSyncReason = "console-pull";
         audioSnapshot.lastActionStatus = "succeeded";
         audioSnapshot.lastActionCode = null;
-        audioSnapshot.lastActionMessage = "Sync succeeded";
+        audioSnapshot.lastActionMessage = summary;
+        const consoleLink = asRecord(audioSnapshot.consoleLink);
+        if (consoleLink) {
+          consoleLink.lastPullAt = syncedAt;
+          consoleLink.lastPullValues = pulledValues;
+        }
         state.audioSnapshot = audioSnapshot;
         synchronizeFixtureState(state);
         emit("audio.changed", { reason: "audio-sync-completed" });
         return {
           synced: true,
           syncedAt,
-          summary: "Simulated console sync completed.",
+          summary,
           consoleStateConfidence: "aligned",
+          pulledValues,
+          channels: channelCount,
+          mixTargets: mixTargetCount,
+          complete: true,
+          connection: "simulated",
         };
       }
       case "audio.snapshot.recall": {
