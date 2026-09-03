@@ -962,7 +962,9 @@ mod tests {
                     lighting_bridge_ip: None,
                     lighting_universe: None,
                     audio_send_host: Some(String::from("127.0.0.1")),
-                    audio_send_port: Some(7_001),
+                    // A dead send port: the probe's bus pins must never reach
+                    // the studio's real TotalMix remotes on 7001-7003.
+                    audio_send_port: Some(1),
                     audio_receive_port: Some(19_001),
                 },
             )

@@ -595,6 +595,15 @@ fn send_osc_messages(
     if messages.is_empty() {
         return Ok(0);
     }
+    #[cfg(test)]
+    if test_guard_blocks_console_port(send_port) {
+        eprintln!(
+            "test guard: dropped {} TotalMix datagram(s) aimed at {}:{send_port}",
+            messages.len(),
+            send_host.trim()
+        );
+        return Ok(messages.len());
+    }
 
     let socket = UdpSocket::bind(("0.0.0.0", 0))
         .map_err(|error| format!("TotalMix OSC send socket could not bind: {error}"))?;
@@ -613,6 +622,22 @@ fn send_osc_messages(
     }
 
     Ok(messages.len())
+}
+
+/// Engine unit tests also run on the studio workstation, where TotalMix really
+/// listens on 7001-7004 — and until 2026-09-03 `cargo test` wrote its fixture
+/// values to the live desk (Host mic phase-inverted and in instrument mode,
+/// preamp 12 with 48V, Main dimmed and mono, playback 1/2 soloed into Main).
+/// Tests that want to observe datagrams bind a loopback receiver on an
+/// ephemeral port; anything still aimed at a TotalMix remote port is dropped
+/// unless the hardware lane opts in with `SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1`.
+#[cfg(test)]
+fn test_guard_blocks_console_port(port: u16) -> bool {
+    const TOTALMIX_REMOTE_PORTS: std::ops::RangeInclusive<u16> = 7001..=7010;
+    let writes_allowed = std::env::var("SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES")
+        .map(|value| value == "1")
+        .unwrap_or(false);
+    TOTALMIX_REMOTE_PORTS.contains(&port) && !writes_allowed
 }
 
 fn totalmix_channel_target(channel_id: &str) -> Option<(&'static str, usize)> {
@@ -2393,6 +2418,55 @@ mod tests {
             !link.has_pending(&key),
             "the read-back reply should confirm the send"
         );
+    }
+
+    #[test]
+    fn test_guard_drops_sends_to_real_totalmix_ports_only() {
+        // The studio workstation runs this suite with TotalMix listening on
+        // 7001-7004; nothing a test sends may reach it.
+        assert!(super::test_guard_blocks_console_port(7001));
+        assert!(super::test_guard_blocks_console_port(7004));
+        assert!(!super::test_guard_blocks_console_port(19_004));
+        assert!(!super::test_guard_blocks_console_port(1));
+
+        let request = AudioChannelUpdateRequest {
+            channel_id: String::from("audio-input-9"),
+            mix_target_id: None,
+            name: None,
+            gain: None,
+            fader: None,
+            mute: Some(true),
+            solo: None,
+            phantom: None,
+            phase: None,
+            pad: None,
+            instrument: None,
+            auto_set: None,
+        };
+        let snapshot = read_audio_snapshot(&HashMap::new());
+        let channel = snapshot
+            .channels
+            .iter()
+            .find(|channel| channel.id == "audio-input-9")
+            .expect("default snapshot should expose front preamp 9");
+        // Aimed at the default remote (7001 + 3): reported as sent, never
+        // put on the wire.
+        let report = super::send_totalmix_channel_update("127.0.0.1", 7001, channel, &request)
+            .expect("guarded send should not error");
+        assert_eq!(report.sent, 1);
+
+        // Aimed at a loopback receiver on an ephemeral port: delivered.
+        let (receiver, port) = bind_test_receiver();
+        let report = super::send_totalmix_channel_update(
+            "127.0.0.1",
+            i64::from(port) - 3,
+            channel,
+            &request,
+        )
+        .expect("loopback send should succeed");
+        assert_eq!(report.sent, 1);
+        let received = receive_messages(&receiver, 1);
+        assert_eq!(received[0].0, "/input/8/mute");
     }
 
     #[test]

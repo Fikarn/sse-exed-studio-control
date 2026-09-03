@@ -91,7 +91,7 @@ Frontend and selected shell:
 Native and release:
 
 - `npm run native:check` — `cargo check --workspace` under `native/`.
-- `npm run native:test` — `cargo test --workspace` under `native/` (excludes `#[ignore]` tests).
+- `npm run native:test` — `cargo test --workspace` under `native/` (excludes `#[ignore]` tests). Test builds drop every OSC datagram aimed at a TotalMix remote port (7001–7010), so the suite is safe to run on the studio workstation; `SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1` lifts that guard for a deliberate hardware-lane test only.
 - `npm run native:test:hardware` — opt-in lane that runs `cargo test --workspace -- --ignored`, exercising device-bound tests against a connected RME UFX III / Stream Deck / TotalMix OSC host. CI does not run this; the operator workstation does. See `docs/DEVELOPMENT.md §Opt-in real-hardware lane`.
 - `npm run native:engine:build` — build `studio-control-engine`.
 - `npm run native:foundation` — native shipping foundation lane.
