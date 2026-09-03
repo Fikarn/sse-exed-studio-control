@@ -191,10 +191,7 @@ pub fn update_audio_settings(
             format!("app.commissioning.check.{AUDIO_CHECK_ID}.checked_at"),
             String::new(),
         ));
-        updates.push((
-            String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-            String::from("unknown"),
-        ));
+        updates.push(confidence_setting(ConsoleConfidence::Unknown));
         updates.push((String::from(AUDIO_LAST_CONSOLE_SYNC_AT_KEY), String::new()));
         updates.push((
             String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),

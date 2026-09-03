@@ -6,10 +6,12 @@ import { fileURLToPath } from "node:url";
 
 import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import {
+  acceptanceEngineEnv,
   assertAudioWorkflowParity,
   assertCoreParityContracts,
   assertLightingWorkflowParity,
   assertPlanningWorkflowParity,
+  awaitConsoleLinkQuiet,
 } from "./native-parity-acceptance.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 import {
@@ -210,9 +212,16 @@ async function main() {
 
   console.log(`Packaged native acceptance root: ${acceptanceRoot}`);
   console.log("Step 1: import legacy workstation data through the packaged shell.");
-  runPackagedSmoke(packaged, acceptanceRoot, runtime, "import", "commissioning", {
-    SSE_LEGACY_DB_PATH: fixturePath,
-  });
+  runPackagedSmoke(
+    packaged,
+    acceptanceRoot,
+    runtime,
+    "import",
+    "commissioning",
+    acceptanceEngineEnv({
+      SSE_LEGACY_DB_PATH: fixturePath,
+    })
+  );
 
   console.log("Step 2: verify imported state and export a backup through the packaged engine.");
   const firstRun = new EngineHarness({
@@ -220,9 +229,9 @@ async function main() {
     appDataDir: runtime.appDataDir,
     logsDir: runtime.logsDir,
     engineExecutable: packaged.enginePath,
-    env: {
+    env: acceptanceEngineEnv({
       SSE_DISABLE_AUTO_IMPORT: "1",
-    },
+    }),
   });
 
   let backupPath;
@@ -250,6 +259,7 @@ async function main() {
       `Expected packaged commissioning update to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
     );
 
+    await awaitConsoleLinkQuiet(firstRun, "packaged-installed-audio-quiet");
     const exportSummary = await firstRun.request("packaged-support-backup-export", "support.backup.export");
     backupPath = exportSummary.path;
     assert(backupPath && existsSync(backupPath), "Expected packaged backup export to create an archive.");
@@ -260,9 +270,16 @@ async function main() {
   }
 
   console.log("Step 3: relaunch the packaged shell against the same app-data directory.");
-  runPackagedSmoke(packaged, acceptanceRoot, runtime, "restart", "dashboard", {
-    SSE_DISABLE_AUTO_IMPORT: "1",
-  });
+  runPackagedSmoke(
+    packaged,
+    acceptanceRoot,
+    runtime,
+    "restart",
+    "dashboard",
+    acceptanceEngineEnv({
+      SSE_DISABLE_AUTO_IMPORT: "1",
+    })
+  );
 
   console.log(
     "Step 4: verify planning workflow parity, restore the backup, and verify rollback through the packaged engine."
@@ -272,9 +289,9 @@ async function main() {
     appDataDir: runtime.appDataDir,
     logsDir: runtime.logsDir,
     engineExecutable: packaged.enginePath,
-    env: {
+    env: acceptanceEngineEnv({
       SSE_DISABLE_AUTO_IMPORT: "1",
-    },
+    }),
   });
 
   try {
@@ -304,7 +321,7 @@ async function main() {
       "packaged-lighting-snapshot-restart",
       "lighting.snapshot"
     );
-    const restartedAudioSnapshot = await secondRun.request("packaged-audio-snapshot-restart", "audio.snapshot");
+    const restartedAudioSnapshot = await awaitConsoleLinkQuiet(secondRun, "packaged-restart-audio-quiet");
 
     const workflowMutations = await assertPlanningWorkflowParity(
       secondRun,
@@ -354,7 +371,7 @@ async function main() {
       "packaged-lighting-snapshot-restored",
       "lighting.snapshot"
     );
-    const restoredAudioSnapshot = await secondRun.request("packaged-audio-snapshot-restored", "audio.snapshot");
+    const restoredAudioSnapshot = await awaitConsoleLinkQuiet(secondRun, "packaged-restored-audio-quiet");
     const restoredAppSnapshot = await secondRun.request("packaged-app-snapshot-restored", "app.snapshot");
 
     assert(
@@ -422,7 +439,8 @@ async function main() {
     assert(
       restoredAudioSnapshot.channels?.some(
         (channel) =>
-          channel.id === "audio-input-12" &&
+          channel.id === audioMutations.targets.frontChannelId &&
+          channel.name === audioMutations.baselineFront.name &&
           channel.gain === audioMutations.baselineFront.gain &&
           channel.phantom === audioMutations.baselineFront.phantom &&
           channel.pad === audioMutations.baselineFront.pad &&
@@ -435,22 +453,22 @@ async function main() {
     assert(
       restoredAudioSnapshot.channels?.some(
         (channel) =>
-          channel.id === "audio-playback-1-2" &&
+          channel.id === audioMutations.targets.playbackChannelId &&
           channel.mute === audioMutations.baselinePlayback.mute &&
           channel.solo === audioMutations.baselinePlayback.solo &&
-          channel.mixLevels?.["audio-mix-phones-a"] ===
-            audioMutations.baselinePlayback.mixLevels?.["audio-mix-phones-a"]
+          channel.mixLevels?.[audioMutations.targets.playbackSendTargetId] ===
+            audioMutations.baselinePlayback.mixLevels?.[audioMutations.targets.playbackSendTargetId]
       ),
       "Expected packaged restore to return the playback send state to the restart baseline."
     );
     assert(
       restoredAudioSnapshot.mixTargets?.some(
         (target) =>
-          target.id === "audio-mix-main" &&
-          target.volume === audioMutations.baselineMainMix.volume &&
-          target.dim === audioMutations.baselineMainMix.dim &&
-          target.mono === audioMutations.baselineMainMix.mono &&
-          target.talkback === audioMutations.baselineMainMix.talkback
+          target.id === audioMutations.targets.mixTargetId &&
+          target.volume === audioMutations.baselineMixTarget.volume &&
+          target.dim === audioMutations.baselineMixTarget.dim &&
+          target.mono === audioMutations.baselineMixTarget.mono &&
+          target.talkback === audioMutations.baselineMixTarget.talkback
       ),
       "Expected packaged restore to return the control-room mix state to the restart baseline."
     );
@@ -471,9 +489,16 @@ async function main() {
   }
 
   console.log("Step 5: relaunch the packaged shell after restore against preserved app data.");
-  runPackagedSmoke(packaged, acceptanceRoot, runtime, "post-restore", "dashboard", {
-    SSE_DISABLE_AUTO_IMPORT: "1",
-  });
+  runPackagedSmoke(
+    packaged,
+    acceptanceRoot,
+    runtime,
+    "post-restore",
+    "dashboard",
+    acceptanceEngineEnv({
+      SSE_DISABLE_AUTO_IMPORT: "1",
+    })
+  );
 
   console.log("Packaged native acceptance passed: import, restart, restore, and relaunch are deterministic.");
 }

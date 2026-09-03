@@ -7,6 +7,71 @@ import { assert } from "./native-runtime-harness.mjs";
 // Electron parity oracle (removed in v2.1.0) — audited and deliberately kept
 // under this name, 2026-08-12.
 
+// 2026-09 audit remediation, Slice 2 — the acceptance lanes and the studio
+// console. By default the harness runs the engine in simulated audio input
+// mode, so `npm run native:acceptance` never writes to a real TotalMix: the
+// audio probe passes honestly, sync / recall answer from the simulated
+// console, and the assertions cover the full control vocabulary. Setting
+// `SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1` on the workstation opts into the
+// live lane: the engine binds the real Global OSC remote, the console link
+// confirms every write by read-back, only surfaces the studio does not use
+// are written (Phones 2, playback 7/8), and everything is restored in a
+// `finally`. Before this the plain lane pushed test values to the live desk
+// (main volume / dim / mono / talkback, preamp 12 gain + 48V, a solo on the
+// main mix) and left them there.
+export const LIVE_CONSOLE = process.env.SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE === "1";
+
+/** Engine environment for an acceptance run: simulated console unless live. */
+export function acceptanceEngineEnv(extra = {}) {
+  return LIVE_CONSOLE ? { ...extra } : { SSE_AUDIO_SIMULATED_INPUT_MODE: "1", ...extra };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Resolves with an `audio.snapshot` once the engine's console link has
+ * settled: no pending sends and no new confirmations / adjustments / external
+ * changes across two polls. Returns immediately when no live link is bound
+ * (simulated console, OSC off). On the live lane it first gives the metering
+ * thread a moment to bind the Global slot so the initial `/sendall` ingest is
+ * not mistaken for silence.
+ */
+export async function awaitConsoleLinkQuiet(harness, requestIdPrefix, { timeoutMs = 10_000 } = {}) {
+  const startedAt = Date.now();
+  let previous = null;
+  let poll = 0;
+  for (;;) {
+    const snapshot = await harness.request(`${requestIdPrefix}-${poll++}`, "audio.snapshot");
+    const link = snapshot.consoleLink;
+    const elapsed = Date.now() - startedAt;
+    if (!link || link.slotBound !== true) {
+      if (LIVE_CONSOLE && elapsed < 2_000) {
+        await sleep(250);
+        continue;
+      }
+      return snapshot;
+    }
+    const settled =
+      previous !== null &&
+      link.pendingSends === 0 &&
+      link.externalChanges === previous.externalChanges &&
+      link.confirmedSends === previous.confirmedSends &&
+      link.adjustedSends === previous.adjustedSends;
+    if (settled) {
+      return snapshot;
+    }
+    if (elapsed > timeoutMs) {
+      throw new Error(
+        `Console link did not settle within ${timeoutMs} ms (pending ${link.pendingSends}, unconfirmed ${link.unconfirmedSends}).`
+      );
+    }
+    previous = link;
+    await sleep(400);
+  }
+}
+
 export async function assertCoreParityContracts(harness, requestIdPrefix, runtimeLabel) {
   const planningTimeReport = await harness.request(`${requestIdPrefix}-planning-time-report`, "planning.report.time");
   assert(
@@ -673,14 +738,39 @@ export async function assertLightingWorkflowParity(harness, requestIdPrefix, run
 }
 
 export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtimeLabel) {
-  const baselineSnapshot = await harness.request(`${requestIdPrefix}-audio-snapshot-baseline`, "audio.snapshot");
-  const baselineFront = audioChannelById(baselineSnapshot, "audio-input-12");
-  const baselineMainMix = audioMixTargetById(baselineSnapshot, "audio-mix-main");
-  const baselinePlayback = audioChannelById(baselineSnapshot, "audio-playback-1-2");
+  // 2026-09 audit remediation, Slice 2: with the console link active the
+  // engine keeps ingesting what TotalMix reports, so every baseline and every
+  // compare waits for the link to settle first.
+  const baselineSnapshot = await awaitConsoleLinkQuiet(harness, `${requestIdPrefix}-audio-quiet-baseline`);
 
-  assert(baselineFront, `${runtimeLabel} audio.snapshot is missing front preamp audio-input-12.`);
-  assert(baselineMainMix, `${runtimeLabel} audio.snapshot is missing audio-mix-main.`);
-  assert(baselinePlayback, `${runtimeLabel} audio.snapshot is missing audio-playback-1-2.`);
+  // Surfaces under test. The default (simulated console) exercises the full
+  // main / front-preamp / rear-line / playback vocabulary. The live lane picks
+  // surfaces the studio desk does not use — Phones 2 and the playback pair
+  // 7/8 — because the harness's writes really reach the hardware there, and
+  // it never solos the main mix, never toggles 48V / phase / AutoSet on a
+  // real preamp, and never recalls a snapshot (Slice 4 makes recall push).
+  const targets = LIVE_CONSOLE
+    ? {
+        mixTargetId: "audio-mix-phones-b",
+        frontChannelId: "audio-input-12",
+        playbackChannelId: "audio-playback-7-8",
+        playbackSendTargetId: "audio-mix-phones-b",
+        playbackFader: 0.02,
+      }
+    : {
+        mixTargetId: "audio-mix-main",
+        frontChannelId: "audio-input-12",
+        playbackChannelId: "audio-playback-1-2",
+        playbackSendTargetId: "audio-mix-phones-a",
+        playbackFader: 0.61,
+      };
+  const baselineFront = audioChannelById(baselineSnapshot, targets.frontChannelId);
+  const baselineMixTarget = audioMixTargetById(baselineSnapshot, targets.mixTargetId);
+  const baselinePlayback = audioChannelById(baselineSnapshot, targets.playbackChannelId);
+
+  assert(baselineFront, `${runtimeLabel} audio.snapshot is missing front preamp ${targets.frontChannelId}.`);
+  assert(baselineMixTarget, `${runtimeLabel} audio.snapshot is missing ${targets.mixTargetId}.`);
+  assert(baselinePlayback, `${runtimeLabel} audio.snapshot is missing ${targets.playbackChannelId}.`);
 
   const settings = await harness.request(`${requestIdPrefix}-audio-settings`, "audio.settings.update", {
     selectedChannelId: "audio-input-12",
@@ -700,8 +790,9 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
 
   // 2026-09 audit remediation, Slice 1: every console write below is refused
   // until the audio probe has passed, exactly like the Stream Deck path, so the
-  // probe runs first. On CI `SSE_AUDIO_SIMULATED_INPUT_MODE=1` makes it pass
-  // honestly (simulated console); on the workstation it needs live TotalMix.
+  // probe runs first. By default the harness runs the engine in simulated
+  // audio input mode (see `acceptanceEngineEnv`), where the probe passes
+  // honestly; the live lane needs TotalMix streaming meters.
   const audioProbe = await harness.request(`${requestIdPrefix}-audio-probe`, "commissioning.check.run", {
     target: "audio",
     sendHost: settings.sendHost,
@@ -713,164 +804,215 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     audioCheck && typeof audioCheck.status === "string" && typeof audioCheck.message === "string",
     `${runtimeLabel} commissioning.check.run did not return a valid audio probe record.`
   );
-  // There is deliberately no "bind denied" escape any more: if the probe cannot
-  // pass, the engine refuses every console write below, so the harness stops
-  // here with the probe's own reason instead of failing on the first write.
+  // There is deliberately no "bind denied" escape: if the probe cannot pass,
+  // the engine refuses every console write below, so the harness stops here
+  // with the probe's own reason instead of failing on the first write.
   assert(
     audioCheck.status === "passed",
-    `${runtimeLabel} audio probe must pass before console writes are accepted (on a host without TotalMix set SSE_AUDIO_SIMULATED_INPUT_MODE=1): ${audioCheck.message}`
+    `${runtimeLabel} audio probe must pass before console writes are accepted: ${audioCheck.message}`
   );
 
-  const updatedMainMix = await harness.request(`${requestIdPrefix}-audio-mix-main`, "audio.mixTarget.update", {
-    mixTargetId: "audio-mix-main",
-    volume: 0.81,
-    dim: true,
-    mono: true,
-    talkback: true,
-  });
-  assert(
-    updatedMainMix.id === "audio-mix-main" &&
-      updatedMainMix.volume === 0.81 &&
-      updatedMainMix.dim === true &&
-      updatedMainMix.mono === true &&
-      updatedMainMix.talkback === true,
-    `${runtimeLabel} audio.mixTarget.update did not persist the expected control-room mix state.`
-  );
-
-  const updatedFront = await harness.request(`${requestIdPrefix}-audio-front-preamp`, "audio.channel.update", {
-    channelId: "audio-input-12",
-    gain: 40,
-    phantom: true,
-    instrument: true,
-    autoSet: true,
-    phase: true,
-  });
-  assert(
-    updatedFront.id === "audio-input-12" &&
-      updatedFront.gain === 40 &&
-      updatedFront.phantom === true &&
-      updatedFront.pad === baselineFront.pad &&
-      updatedFront.instrument === true &&
-      updatedFront.autoSet === true &&
-      updatedFront.phase === true,
-    `${runtimeLabel} audio.channel.update did not persist the expected writable front-preamp controls.`
-  );
-
-  const updatedRear = await harness.request(`${requestIdPrefix}-audio-rear-line`, "audio.channel.update", {
-    channelId: "audio-input-1",
-    mute: true,
-    phase: true,
-  });
-  assert(
-    updatedRear.id === "audio-input-1" && updatedRear.mute === true && updatedRear.phase === true,
-    `${runtimeLabel} audio.channel.update did not persist the expected rear-line operator state.`
-  );
-
-  const updatedPlayback = await harness.request(`${requestIdPrefix}-audio-playback`, "audio.channel.update", {
-    channelId: "audio-playback-1-2",
-    fader: 0.61,
-    mixTargetId: "audio-mix-phones-a",
-    mute: true,
-    solo: true,
-  });
-  assert(
-    updatedPlayback.id === "audio-playback-1-2" &&
-      updatedPlayback.fader === 0.61 &&
-      updatedPlayback.mute === true &&
-      updatedPlayback.solo === true &&
-      updatedPlayback.mixLevels?.["audio-mix-phones-a"] === 0.61,
-    `${runtimeLabel} audio.channel.update did not persist the expected playback send state.`
-  );
-
-  let unsupportedFieldRejected = false;
   try {
-    await harness.request(`${requestIdPrefix}-audio-rear-line-unsupported`, "audio.channel.update", {
-      channelId: "audio-input-1",
-      phantom: true,
+    // Control-room mix target. On the live lane this is Phones 2: volume and
+    // mute reach the (unused) hardware output, while dim / mono / talkback are
+    // main-only functions the engine keeps app-local and reports as such.
+    const updatedMixTarget = await harness.request(`${requestIdPrefix}-audio-mix-target`, "audio.mixTarget.update", {
+      mixTargetId: targets.mixTargetId,
+      volume: 0.81,
+      dim: true,
+      mono: true,
+      talkback: true,
     });
-  } catch (error) {
-    unsupportedFieldRejected = String(error.message).includes("AUDIO_CHANNEL_FIELD_UNSUPPORTED");
-  }
-  assert(
-    unsupportedFieldRejected,
-    `${runtimeLabel} audio role-gating did not reject unsupported rear-line phantom changes.`
-  );
+    assert(
+      updatedMixTarget.id === targets.mixTargetId &&
+        updatedMixTarget.volume === 0.81 &&
+        updatedMixTarget.dim === true &&
+        updatedMixTarget.mono === true &&
+        updatedMixTarget.talkback === true,
+      `${runtimeLabel} audio.mixTarget.update did not persist the expected control-room mix state.`
+    );
 
-  // CI escape: `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` drops only the
-  // audio.sync / audio.snapshot.recall assertions, which need a real console to
-  // answer (see `.github/workflows/dev-checks.yml` `rust` job). Everything else
-  // in this harness runs against the same gate the operator faces.
-  const skipAudioSync = process.env.SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC === "1";
+    if (LIVE_CONSOLE) {
+      // A rename is app-local (Slice 1 keeps it ungated) and proves the
+      // channel update path without touching a real preamp.
+      const renamed = await harness.request(`${requestIdPrefix}-audio-front-preamp`, "audio.channel.update", {
+        channelId: targets.frontChannelId,
+        name: "Parity Preamp",
+      });
+      assert(
+        renamed.id === targets.frontChannelId &&
+          renamed.name === "Parity Preamp" &&
+          renamed.gain === baselineFront.gain &&
+          renamed.phantom === baselineFront.phantom,
+        `${runtimeLabel} audio.channel.update did not persist the expected app-local rename.`
+      );
+    } else {
+      const updatedFront = await harness.request(`${requestIdPrefix}-audio-front-preamp`, "audio.channel.update", {
+        channelId: targets.frontChannelId,
+        gain: 40,
+        phantom: true,
+        instrument: true,
+        autoSet: true,
+        phase: true,
+      });
+      assert(
+        updatedFront.id === targets.frontChannelId &&
+          updatedFront.gain === 40 &&
+          updatedFront.phantom === true &&
+          updatedFront.pad === baselineFront.pad &&
+          updatedFront.instrument === true &&
+          updatedFront.autoSet === true &&
+          updatedFront.phase === true,
+        `${runtimeLabel} audio.channel.update did not persist the expected writable front-preamp controls.`
+      );
 
-  if (!skipAudioSync) {
+      // Line input 1 is hidden in the studio's TotalMix layout: the console
+      // drops writes to it and the read-back makes the console win, so this
+      // stays in the simulated lane.
+      const updatedRear = await harness.request(`${requestIdPrefix}-audio-rear-line`, "audio.channel.update", {
+        channelId: "audio-input-1",
+        mute: true,
+        phase: true,
+      });
+      assert(
+        updatedRear.id === "audio-input-1" && updatedRear.mute === true && updatedRear.phase === true,
+        `${runtimeLabel} audio.channel.update did not persist the expected rear-line operator state.`
+      );
+    }
+
+    const playbackRequest = {
+      channelId: targets.playbackChannelId,
+      fader: targets.playbackFader,
+      mixTargetId: targets.playbackSendTargetId,
+      mute: true,
+    };
+    if (!LIVE_CONSOLE) {
+      // Solo acts on the main submix; never on the live desk.
+      playbackRequest.solo = true;
+    }
+    const updatedPlayback = await harness.request(
+      `${requestIdPrefix}-audio-playback`,
+      "audio.channel.update",
+      playbackRequest
+    );
+    assert(
+      updatedPlayback.id === targets.playbackChannelId &&
+        updatedPlayback.fader === targets.playbackFader &&
+        updatedPlayback.mute === true &&
+        (LIVE_CONSOLE || updatedPlayback.solo === true) &&
+        updatedPlayback.mixLevels?.[targets.playbackSendTargetId] === targets.playbackFader,
+      `${runtimeLabel} audio.channel.update did not persist the expected playback send state.`
+    );
+
+    let unsupportedFieldRejected = false;
+    try {
+      await harness.request(`${requestIdPrefix}-audio-rear-line-unsupported`, "audio.channel.update", {
+        channelId: "audio-input-1",
+        phantom: true,
+      });
+    } catch (error) {
+      unsupportedFieldRejected = String(error.message).includes("AUDIO_CHANNEL_FIELD_UNSUPPORTED");
+    }
+    assert(
+      unsupportedFieldRejected,
+      `${runtimeLabel} audio role-gating did not reject unsupported rear-line phantom changes.`
+    );
+
     const synced = await harness.request(`${requestIdPrefix}-audio-sync`, "audio.sync");
     assert(
       synced.synced === true && synced.consoleStateConfidence === "aligned",
       `${runtimeLabel} audio.sync did not report an aligned console state.`
     );
 
-    const recalled = await harness.request(`${requestIdPrefix}-audio-snapshot-recall`, "audio.snapshot.recall", {
-      snapshotId: "snapshot-panel",
-    });
+    if (!LIVE_CONSOLE) {
+      const recalled = await harness.request(`${requestIdPrefix}-audio-snapshot-recall`, "audio.snapshot.recall", {
+        snapshotId: "snapshot-panel",
+      });
+      assert(
+        recalled.recalled === true &&
+          recalled.snapshotId === "snapshot-panel" &&
+          recalled.consoleStateConfidence === "assumed",
+        `${runtimeLabel} audio.snapshot.recall did not move the console back into the expected assumed state.`
+      );
+    }
+
+    // Let the read-backs for the writes above confirm (or the console win)
+    // before judging what the engine retained.
+    const mutatedSnapshot = await awaitConsoleLinkQuiet(harness, `${requestIdPrefix}-audio-quiet-mutated`);
+    const mutatedFront = audioChannelById(mutatedSnapshot, targets.frontChannelId);
+    const mutatedRear = audioChannelById(mutatedSnapshot, "audio-input-1");
+    const mutatedPlayback = audioChannelById(mutatedSnapshot, targets.playbackChannelId);
+    const mutatedMixTarget = audioMixTargetById(mutatedSnapshot, targets.mixTargetId);
+
     assert(
-      recalled.recalled === true &&
-        recalled.snapshotId === "snapshot-panel" &&
-        recalled.consoleStateConfidence === "assumed",
-      `${runtimeLabel} audio.snapshot.recall did not move the console back into the expected assumed state.`
+      mutatedSnapshot.selectedChannelId === "audio-input-12" &&
+        mutatedSnapshot.selectedMixTargetId === "audio-mix-phones-a" &&
+        // Ordinary edits never write console-state confidence (Slice 1); sync
+        // aligns it and, in the simulated lane, recall marks it assumed.
+        mutatedSnapshot.consoleStateConfidence === (LIVE_CONSOLE ? "aligned" : "assumed") &&
+        mutatedSnapshot.lastConsoleSyncReason === (LIVE_CONSOLE ? "manual-sync" : "snapshot") &&
+        mutatedSnapshot.lastRecalledSnapshotId === (LIVE_CONSOLE ? null : "snapshot-panel"),
+      `${runtimeLabel} audio snapshot did not retain the expected selection and recall markers.`
     );
+    if (LIVE_CONSOLE) {
+      assert(
+        mutatedFront &&
+          mutatedFront.name === "Parity Preamp" &&
+          mutatedFront.gain === baselineFront.gain &&
+          mutatedFront.phantom === baselineFront.phantom &&
+          mutatedFront.phase === baselineFront.phase,
+        `${runtimeLabel} audio snapshot did not retain the expected app-local front-preamp rename.`
+      );
+      assert(
+        mutatedSnapshot.consoleLink?.unconfirmedSends === 0,
+        `${runtimeLabel} console link reported unconfirmed sends: ${JSON.stringify(mutatedSnapshot.consoleLink)}`
+      );
+    } else {
+      assert(
+        mutatedFront &&
+          mutatedFront.gain === 40 &&
+          mutatedFront.phantom === true &&
+          mutatedFront.pad === baselineFront.pad &&
+          mutatedFront.instrument === true &&
+          mutatedFront.autoSet === true &&
+          mutatedFront.phase === true,
+        `${runtimeLabel} audio snapshot did not retain the expected front-preamp state.`
+      );
+      assert(
+        mutatedRear && mutatedRear.mute === true && mutatedRear.phase === true,
+        `${runtimeLabel} audio snapshot did not retain the expected rear-line state.`
+      );
+    }
+    assert(
+      mutatedPlayback &&
+        mutatedPlayback.mute === true &&
+        (LIVE_CONSOLE || mutatedPlayback.solo === true) &&
+        mutatedPlayback.mixLevels?.[targets.playbackSendTargetId] === targets.playbackFader,
+      `${runtimeLabel} audio snapshot did not retain the expected playback send state.`
+    );
+    assert(
+      mutatedMixTarget &&
+        mutatedMixTarget.volume === 0.81 &&
+        mutatedMixTarget.dim === true &&
+        mutatedMixTarget.mono === true &&
+        mutatedMixTarget.talkback === true,
+      `${runtimeLabel} audio snapshot did not retain the expected control-room state.`
+    );
+  } finally {
+    if (LIVE_CONSOLE) {
+      await restoreLiveConsoleWrites(harness, requestIdPrefix, {
+        targets,
+        baselineMixTarget,
+        baselinePlayback,
+        baselineFront,
+      });
+    }
   }
 
-  const mutatedSnapshot = await harness.request(`${requestIdPrefix}-audio-snapshot-mutated`, "audio.snapshot");
-  const mutatedFront = audioChannelById(mutatedSnapshot, "audio-input-12");
-  const mutatedRear = audioChannelById(mutatedSnapshot, "audio-input-1");
-  const mutatedPlayback = audioChannelById(mutatedSnapshot, "audio-playback-1-2");
-  const mutatedMainMix = audioMixTargetById(mutatedSnapshot, "audio-mix-main");
-
-  assert(
-    mutatedSnapshot.selectedChannelId === "audio-input-12" &&
-      mutatedSnapshot.selectedMixTargetId === "audio-mix-phones-a" &&
-      // 2026-09 audit remediation, Slice 1: ordinary edits never write
-      // console-state confidence any more (a UDP send is not a confirmation),
-      // so with sync/recall skipped it stays `unknown`. The old expectation
-      // (`aligned` after unconfirmed edits) encoded the audit finding.
-      mutatedSnapshot.consoleStateConfidence === (skipAudioSync ? "unknown" : "assumed") &&
-      mutatedSnapshot.lastConsoleSyncReason === (skipAudioSync ? null : "snapshot") &&
-      mutatedSnapshot.lastRecalledSnapshotId === (skipAudioSync ? null : "snapshot-panel"),
-    `${runtimeLabel} audio snapshot did not retain the expected selection and recall markers.`
-  );
-  assert(
-    mutatedFront &&
-      mutatedFront.gain === 40 &&
-      mutatedFront.phantom === true &&
-      mutatedFront.pad === baselineFront.pad &&
-      mutatedFront.instrument === true &&
-      mutatedFront.autoSet === true &&
-      mutatedFront.phase === true,
-    `${runtimeLabel} audio snapshot did not retain the expected front-preamp state.`
-  );
-  assert(
-    mutatedRear && mutatedRear.mute === true && mutatedRear.phase === true,
-    `${runtimeLabel} audio snapshot did not retain the expected rear-line state.`
-  );
-  assert(
-    mutatedPlayback &&
-      mutatedPlayback.mute === true &&
-      mutatedPlayback.solo === true &&
-      mutatedPlayback.mixLevels?.["audio-mix-phones-a"] === 0.61,
-    `${runtimeLabel} audio snapshot did not retain the expected playback send state.`
-  );
-  assert(
-    mutatedMainMix &&
-      mutatedMainMix.volume === 0.81 &&
-      mutatedMainMix.dim === true &&
-      mutatedMainMix.mono === true &&
-      mutatedMainMix.talkback === true,
-    `${runtimeLabel} audio snapshot did not retain the expected control-room state.`
-  );
-
   return {
+    targets,
     baselineFront,
-    baselineMainMix,
+    baselineMixTarget,
     baselinePlayback,
     baselineSelectedChannelId: baselineSnapshot.selectedChannelId,
     baselineSelectedMixTargetId: baselineSnapshot.selectedMixTargetId,
@@ -883,4 +1025,32 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     baselineLastSnapshotRecallAt: baselineSnapshot.lastSnapshotRecallAt ?? null,
     baselineConsoleStateConfidence: baselineSnapshot.consoleStateConfidence,
   };
+}
+
+// Puts the live desk back exactly as the baseline saw it. Runs in `finally`,
+// so a failed assertion never leaves the studio console mutated.
+async function restoreLiveConsoleWrites(
+  harness,
+  requestIdPrefix,
+  { targets, baselineMixTarget, baselinePlayback, baselineFront }
+) {
+  await harness.request(`${requestIdPrefix}-audio-live-restore-mix`, "audio.mixTarget.update", {
+    mixTargetId: targets.mixTargetId,
+    volume: baselineMixTarget.volume,
+    mute: baselineMixTarget.mute,
+    dim: baselineMixTarget.dim,
+    mono: baselineMixTarget.mono,
+    talkback: baselineMixTarget.talkback,
+  });
+  await harness.request(`${requestIdPrefix}-audio-live-restore-playback`, "audio.channel.update", {
+    channelId: targets.playbackChannelId,
+    mixTargetId: targets.playbackSendTargetId,
+    fader: baselinePlayback.mixLevels?.[targets.playbackSendTargetId] ?? 0,
+    mute: baselinePlayback.mute,
+  });
+  await harness.request(`${requestIdPrefix}-audio-live-restore-front`, "audio.channel.update", {
+    channelId: targets.frontChannelId,
+    name: baselineFront.name,
+  });
+  await awaitConsoleLinkQuiet(harness, `${requestIdPrefix}-audio-live-restore-quiet`);
 }

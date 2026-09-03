@@ -324,6 +324,50 @@ pub(super) fn persist_audio_state(
         .map_err(|error| AudioCommandError::Storage(error.to_string()))
 }
 
+/// Serialises every read-modify-write of the two JSON state blobs
+/// (`channels_state`, `mix_targets_state`). SQLite already serialises the
+/// writes themselves; this protects the read → modify → write window against
+/// the console-link flush on the metering thread. Lock order everywhere:
+/// `AUDIO_STATE_LOCK` first, then the shared console link.
+static AUDIO_STATE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+pub(super) fn lock_audio_state() -> std::sync::MutexGuard<'static, ()> {
+    AUDIO_STATE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The only vocabulary for console-state confidence. `Aligned` is written
+/// solely after a complete console pull or a fully confirmed push; `Assumed`
+/// when a push starts or a send goes unconfirmed; `Unknown` when the
+/// transport changes, the console reports disconnected, or a pull fails.
+/// Ordinary edits never write confidence at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConsoleConfidence {
+    Aligned,
+    Assumed,
+    Unknown,
+}
+
+impl ConsoleConfidence {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Aligned => "aligned",
+            Self::Assumed => "assumed",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// The single producer of the confidence setting write; every persist batch
+/// that moves confidence goes through here (see the source-scan test).
+pub(crate) fn confidence_setting(value: ConsoleConfidence) -> (String, String) {
+    (
+        String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
+        String::from(value.as_str()),
+    )
+}
+
 pub(super) fn record_audio_action_failure(
     db_path: &Path,
     code: &str,

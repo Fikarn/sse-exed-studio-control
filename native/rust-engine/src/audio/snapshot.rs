@@ -118,6 +118,7 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
         view_mode,
         capabilities,
         console_state_confidence,
+        console_link: console_link_snapshot(settings),
         last_console_sync_at,
         last_console_sync_reason,
         last_recalled_snapshot_id,

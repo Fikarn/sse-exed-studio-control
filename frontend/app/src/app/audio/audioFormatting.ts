@@ -207,6 +207,19 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     };
   }
 
+  if (snapshot?.consoleLink?.connection === "disconnected") {
+    // 2026-09 audit remediation, Slice 2: TotalMix itself reports over the
+    // Global OSC link that the interface is gone (`/status/connection 0`).
+    // Nothing the app sends reaches hardware in that state.
+    return {
+      bannerEligible: true,
+      label: "DISCONNECTED",
+      tone: "error" satisfies StatusToneLike,
+      warningBody: "TotalMix reports the UFX III is disconnected. Check the interface's USB link and power.",
+      warningTitle: "CONSOLE DISCONNECTED",
+    };
+  }
+
   if (String(snapshot?.status ?? "not-verified") === "attention") {
     return {
       bannerEligible: true,

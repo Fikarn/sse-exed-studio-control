@@ -238,10 +238,7 @@ fn parity_app_setting_overrides(fixture_id: ParityFixtureId) -> Vec<(String, Str
                 String::from("app.audio.expected_compatibility_mode"),
                 String::from("false"),
             ),
-            (
-                String::from("app.audio.console_state_confidence"),
-                String::from("assumed"),
-            ),
+            crate::audio::confidence_setting(crate::audio::ConsoleConfidence::Assumed),
             (
                 String::from("app.audio.last_console_sync_at"),
                 String::new(),

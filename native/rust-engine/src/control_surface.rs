@@ -25,7 +25,6 @@ use crate::planning::{
     PlanningCommandError, PlanningContextSnapshot,
 };
 use crate::planning_settings::{PLANNING_SETTINGS_PREFIX, SORT_BY_KEY};
-use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
 use crate::shell_settings::{DEFAULT_WORKSPACE, SHELL_SETTINGS_PREFIX, WORKSPACE_KEY};
 use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owned};
 use serde::Serialize;
@@ -35,7 +34,6 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::mpsc::Sender;
-use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 
@@ -66,7 +64,6 @@ type LightingDeckFixtureState = LightingEditorFixtureState;
 type LightingDeckSceneState = LightingEditorSceneState;
 type LightingDeckSceneFixtureState = LightingEditorSceneFixtureState;
 
-static CONTROL_SURFACE_EVENT_SENDER: OnceLock<Sender<Value>> = OnceLock::new();
 #[derive(Debug)]
 pub enum ControlSurfaceError {
     InvalidParams(String),
@@ -102,17 +99,15 @@ pub fn resolve_control_surface_port() -> u16 {
         .unwrap_or(DEFAULT_CONTROL_SURFACE_PORT)
 }
 
+/// The bridge shares the engine-wide out-of-band event sender
+/// (`engine_events`) with the console link; kept under its historical name
+/// for the startup wiring in `main.rs`.
 pub fn register_control_surface_event_sender(sender: Sender<Value>) {
-    let _ = CONTROL_SURFACE_EVENT_SENDER.set(sender);
+    crate::engine_events::register_engine_event_sender(sender);
 }
 
 pub(crate) fn emit_audio_changed() {
-    if let Some(sender) = CONTROL_SURFACE_EVENT_SENDER.get() {
-        let _ = sender.send(event_message(
-            EVENT_AUDIO_CHANGED,
-            json!({ "reason": "control-surface" }),
-        ));
-    }
+    crate::engine_events::emit_audio_changed("control-surface");
 }
 
 pub fn start_control_surface_bridge(

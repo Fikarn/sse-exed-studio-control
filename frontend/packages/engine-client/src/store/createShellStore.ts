@@ -433,6 +433,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
   let audioMeterSequence = 0;
   let audioLocalMutationDepth = 0;
   let audioRefreshSuppressUntilMs = 0;
+  // A console echo (TotalMix reporting a change, or an unconfirmed send) that
+  // arrived while a local mutation was in flight; replayed once it finishes.
+  let audioEchoRefreshPending = false;
 
   const setState = (nextState: ShellState) => {
     state = nextState;
@@ -722,6 +725,19 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         return;
       }
       if (event.event === "audio.changed") {
+        // 2026-09 audit remediation, Slice 2: a console echo is the console's
+        // truth (an operator move at TotalMix, an adjusted or unconfirmed
+        // send). It must not be swallowed by the 250 ms tail suppression that
+        // protects a local edit from its own event; it only waits for an
+        // in-flight local mutation to finish, then refreshes once.
+        if (payload?.reason === "console-echo") {
+          if (audioLocalMutationDepth > 0) {
+            audioEchoRefreshPending = true;
+            return;
+          }
+          void refreshAudioSnapshot(event.event);
+          return;
+        }
         if (audioLocalMutationDepth > 0 || currentMonotonicTimestampMs() < audioRefreshSuppressUntilMs) {
           return;
         }
@@ -895,6 +911,10 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return result;
     } finally {
       audioLocalMutationDepth = Math.max(0, audioLocalMutationDepth - 1);
+      if (audioLocalMutationDepth === 0 && audioEchoRefreshPending) {
+        audioEchoRefreshPending = false;
+        void refreshAudioSnapshot("audio.changed");
+      }
     }
   };
 

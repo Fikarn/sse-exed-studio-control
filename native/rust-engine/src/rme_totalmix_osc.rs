@@ -328,19 +328,6 @@ impl RmeTotalMixMeterState {
         true
     }
 
-    pub fn apply_global_packet(&mut self, packet: &OscPacket, now_ms: u64) -> bool {
-        match packet {
-            OscPacket::Message(message) => self.apply_global_message(message, now_ms),
-            OscPacket::Bundle(bundle) => {
-                let mut mapped = false;
-                for packet in &bundle.content {
-                    mapped |= self.apply_global_packet(packet, now_ms);
-                }
-                mapped
-            }
-        }
-    }
-
     pub fn apply_packet(&mut self, bus: RmeTotalMixBus, packet: &OscPacket, now_ms: u64) -> bool {
         match packet {
             OscPacket::Message(message) => self.apply_message(bus, message, now_ms),
@@ -747,7 +734,7 @@ pub struct TotalMixSendReport {
 /// word plus the 0-based hardware channel number (left channel of a stereo
 /// pair, per RME's protocol table). Hardware numbering never shifts with
 /// the TotalMix mixer layout.
-fn global_channel_target(surface_id: &str) -> Option<(&'static str, usize)> {
+pub(crate) fn global_channel_target(surface_id: &str) -> Option<(&'static str, usize)> {
     if let Some(raw) = surface_id.strip_prefix("audio-input-") {
         let number = raw.parse::<usize>().ok()?;
         if (1..=12).contains(&number) {
@@ -769,11 +756,34 @@ fn global_channel_target(surface_id: &str) -> Option<(&'static str, usize)> {
 /// channel of the pair): Main = AN 1/2, Phones 1 = PH 9/10, Phones 2 =
 /// PH 11/12. Doubles as the submix address for `/mix/{in|pb}/{ch}/{out}/…`
 /// sends.
-fn global_output_channel(mix_target_id: &str) -> Option<usize> {
+pub(crate) fn global_output_channel(mix_target_id: &str) -> Option<usize> {
     match mix_target_id {
         "audio-mix-main" => Some(0),
         "audio-mix-phones-a" => Some(8),
         "audio-mix-phones-b" => Some(10),
+        _ => None,
+    }
+}
+
+/// Inverse of [`global_channel_target`]: the app surface for a hardware
+/// channel the console reported. Right channels of stereo pairs and channels
+/// outside the modelled range map to nothing.
+pub(crate) fn global_channel_surface(bus_word: &str, channel: usize) -> Option<String> {
+    match bus_word {
+        "input" if channel < 12 => Some(format!("audio-input-{}", channel + 1)),
+        "playback" if channel.is_multiple_of(2) && channel <= 10 => {
+            Some(format!("audio-playback-{}-{}", channel + 1, channel + 2))
+        }
+        _ => None,
+    }
+}
+
+/// Inverse of [`global_output_channel`].
+pub(crate) fn global_output_mix_target(output: usize) -> Option<&'static str> {
+    match output {
+        0 => Some("audio-mix-main"),
+        8 => Some("audio-mix-phones-a"),
+        10 => Some("audio-mix-phones-b"),
         _ => None,
     }
 }
@@ -878,6 +888,9 @@ pub fn send_totalmix_channel_update(
     }
 
     report.sent = send_osc_messages(send_host, port, &messages)?;
+    // Registered after the datagrams left: the console link now expects each
+    // parameter to read back with this value (rme_console_link).
+    crate::rme_console_link::register_outgoing_commands(&messages);
     Ok(report)
 }
 
@@ -936,6 +949,7 @@ pub fn send_totalmix_mix_target_update(
     }
 
     report.sent = send_osc_messages(send_host, port, &messages)?;
+    crate::rme_console_link::register_outgoing_commands(&messages);
     Ok(report)
 }
 
@@ -1006,6 +1020,7 @@ pub fn spawn_rme_totalmix_audio_metering(sender: Sender<Value>, db_path: PathBuf
         let mut last_publish_at: Option<Instant> = None;
         let mut last_status_publish_at: Option<Instant> = None;
         let mut last_keepalive_at: Option<Instant> = None;
+        let mut last_link_flush_at: Option<Instant> = None;
 
         loop {
             let now = Instant::now();
@@ -1033,6 +1048,7 @@ pub fn spawn_rme_totalmix_audio_metering(sender: Sender<Value>, db_path: PathBuf
                 {
                     sockets = bind_slots(snapshot.send_port, snapshot.receive_port);
                     global_slot = bind_global_slot(snapshot.send_port, snapshot.receive_port);
+                    mark_console_link_slot(global_slot.is_some());
                     bound_key = Some(key);
                     last_keepalive_at = None;
                 } else if snapshot.metering_source != RME_TOTALMIX_OSC_SOURCE
@@ -1040,6 +1056,7 @@ pub fn spawn_rme_totalmix_audio_metering(sender: Sender<Value>, db_path: PathBuf
                 {
                     sockets.clear();
                     global_slot = None;
+                    mark_console_link_slot(false);
                     bound_key = None;
                 }
                 cached_snapshot = Some(snapshot);
@@ -1079,6 +1096,16 @@ pub fn spawn_rme_totalmix_audio_metering(sender: Sender<Value>, db_path: PathBuf
             read_available_packets(&sockets, state.clone(), now_ms);
             if let Some(slot) = global_slot.as_mut() {
                 read_global_packets(slot, &state, now_ms);
+                if let Some((send_host, _, _)) = bound_key.as_ref() {
+                    service_console_link(slot, send_host);
+                }
+            }
+            if last_link_flush_at
+                .map(|last| now.duration_since(last) >= LINK_FLUSH_INTERVAL)
+                .unwrap_or(true)
+            {
+                flush_console_link_to_db(&db_path);
+                last_link_flush_at = Some(now);
             }
 
             let state_snapshot = state
@@ -1264,13 +1291,89 @@ fn read_global_packets(
             Ok((len, _source)) => {
                 slot.last_rx_at = Some(Instant::now());
                 if let Ok((_remainder, packet)) = decoder::decode_udp(&buffer[..len]) {
-                    if let Ok(mut state) = state.lock() {
-                        state.apply_global_packet(&packet, now_ms);
-                    }
+                    route_global_packet(&packet, state, now_ms);
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
             Err(_) => break,
+        }
+    }
+}
+
+/// Global OSC traffic splits two ways: `/level/*` feeds the meter state,
+/// everything else (control parameters, `/status/*`, snapshot flags) feeds the
+/// console link, which decides whether it confirms one of the app's own sends
+/// or is a change to apply.
+fn route_global_packet(packet: &OscPacket, state: &Arc<Mutex<RmeTotalMixMeterState>>, now_ms: u64) {
+    match packet {
+        OscPacket::Message(message) => {
+            if message.addr.starts_with("/level/") {
+                if let Ok(mut state) = state.lock() {
+                    state.apply_global_message(message, now_ms);
+                }
+            } else if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
+                link.ingest(message, crate::rme_console_link::link_now_ms());
+            }
+        }
+        OscPacket::Bundle(bundle) => {
+            for inner in &bundle.content {
+                route_global_packet(inner, state, now_ms);
+            }
+        }
+    }
+}
+
+const LINK_FLUSH_INTERVAL: Duration =
+    Duration::from_millis(crate::rme_console_link::FLUSH_INTERVAL_MS);
+
+fn mark_console_link_slot(bound: bool) {
+    if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
+        link.slot_bound = bound;
+    }
+}
+
+/// Advances the console link's clocks and sends the read-backs that are due
+/// (`/sendchan/…`, `/sendsubmix/…`, `/sendsettings`) over the Global slot.
+fn service_console_link(slot: &GlobalOscSlot, send_host: &str) {
+    let now_ms = crate::rme_console_link::link_now_ms();
+    let requests = match crate::rme_console_link::shared_console_link().lock() {
+        Ok(mut link) => {
+            link.slot_bound = true;
+            link.tick(now_ms);
+            link.due_readbacks(now_ms)
+        }
+        Err(_) => Vec::new(),
+    };
+    let host = send_host.trim();
+    if host.is_empty() {
+        return;
+    }
+    for (address, value) in requests {
+        let Ok(bytes) = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: address,
+            args: vec![value],
+        })) else {
+            continue;
+        };
+        let _ = slot.socket.send_to(&bytes, (host, slot.send_port));
+    }
+}
+
+/// Persists whatever the console link produced since the last flush and tells
+/// every consumer through `audio.changed { reason: "console-echo" }`.
+fn flush_console_link_to_db(db_path: &std::path::Path) {
+    match crate::audio::flush_console_link(db_path) {
+        Ok(report) if report.changed() => {
+            crate::engine_events::emit_audio_changed_with(serde_json::json!({
+                "reason": "console-echo",
+                "applied": report.applied,
+                "unconfirmed": report.unconfirmed,
+                "connectionLost": report.connection_lost,
+            }));
+        }
+        Ok(_) => {}
+        Err(error) => {
+            eprintln!("Console link flush failed: {error:?}");
         }
     }
 }
@@ -2215,6 +2318,81 @@ mod tests {
             &message("/1/level1LeftVal", OscType::String("-3.0 dB".to_string())),
             4_000,
         ));
+    }
+
+    #[test]
+    fn service_console_link_reads_back_over_the_global_slot_and_confirms() {
+        use crate::rme_console_link::{
+            link_now_ms, shared_console_link, ChannelFlag, ConsoleBus, ConsoleValue, ParamKey,
+            READBACK_DELAY_MS,
+        };
+        // Fake TotalMix: receives the read-back request on the slot's send
+        // port and answers on the slot socket, like the real console does.
+        let (fake_totalmix, fake_port) = bind_test_receiver();
+        let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("global slot socket should bind");
+        socket
+            .set_nonblocking(true)
+            .expect("slot socket should be non-blocking");
+        let slot_port = socket.local_addr().expect("slot addr").port();
+        let mut slot = super::GlobalOscSlot {
+            send_port: fake_port,
+            socket,
+            last_rx_at: None,
+        };
+        let key = ParamKey::ChannelFlag {
+            bus: ConsoleBus::Input,
+            channel: 11,
+            flag: ChannelFlag::Mute,
+        };
+        {
+            let link = shared_console_link();
+            let mut link = link.lock().expect("link lock");
+            link.register_send(key.clone(), ConsoleValue::Flag(true), link_now_ms());
+        }
+        std::thread::sleep(Duration::from_millis(READBACK_DELAY_MS + 20));
+        super::service_console_link(&slot, "127.0.0.1");
+
+        // The read-back for input 11 must reach the fake console (other tests
+        // may have queued unrelated read-backs on the shared link).
+        let mut saw_readback = false;
+        for _ in 0..64 {
+            let mut buffer = [0u8; 512];
+            let Ok((read, _)) = fake_totalmix.recv_from(&mut buffer) else {
+                break;
+            };
+            if let Ok((_, OscPacket::Message(message))) = rosc::decoder::decode_udp(&buffer[..read])
+            {
+                if message.addr == "/sendchan/input/11" {
+                    assert_eq!(message.args, vec![OscType::Float(1.0)]);
+                    saw_readback = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            saw_readback,
+            "the console link should ask TotalMix to report input 11"
+        );
+
+        // The fake console reports the channel; the link confirms the send.
+        let reply = encoder::encode(&OscPacket::Message(OscMessage {
+            addr: String::from("/input/11/mute"),
+            args: vec![OscType::Float(1.0)],
+        }))
+        .expect("reply should encode");
+        fake_totalmix
+            .send_to(&reply, ("127.0.0.1", slot_port))
+            .expect("reply should send");
+        std::thread::sleep(Duration::from_millis(30));
+        let state = shared_meter_state();
+        super::read_global_packets(&mut slot, &state, monotonic_now_ms());
+
+        let link = shared_console_link();
+        let link = link.lock().expect("link lock");
+        assert!(
+            !link.has_pending(&key),
+            "the read-back reply should confirm the send"
+        );
     }
 
     #[test]

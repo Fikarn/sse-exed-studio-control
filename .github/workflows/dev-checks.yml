@@ -123,17 +123,14 @@ jobs:
 
   # plan PR 2 / workstream B3 (extends).
   # The plan says "Extends the existing `rust` job with `npm run
-  # native:acceptance` after `native:test`." native:acceptance requires
-  # real RME TotalMix OSC packets on 127.0.0.1; on stock GitHub runners
-  # there are none, so we opt into the new
-  # `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` escape that mirrors the
-  # existing `audioProbeBindDenied` skip — the rest of the harness
-  # (import → backup → restart → workflow parity → restore → verify
-  # rollback) still runs end-to-end. See plan Follow-ups.
+  # native:acceptance` after `native:test`." Since the 2026-09 audit
+  # remediation (Slice 2) the acceptance harness runs the engine in simulated
+  # audio input mode by default, so it needs no TotalMix and never writes to a
+  # console; the audio probe, sync and recall assertions all run against the
+  # simulated console. The live lane (`SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1`)
+  # exists only for the studio workstation.
   rust:
     runs-on: ubuntu-latest
-    env:
-      SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -153,15 +150,6 @@ jobs:
       - run: npm run native:check
       - run: npm run native:test
       - run: npm run native:acceptance
-        # 2026-09 audit remediation, Slice 1: console writes are refused until
-        # the audio probe passes. Simulated input mode lets the probe pass
-        # honestly on a host without TotalMix (every audio surface labels the
-        # console "test simulation" in this mode), so the acceptance harness
-        # reaches `ready` instead of forging the check key. Scoped to this step
-        # only: `native:test` includes a test that asserts the probe FAILS
-        # without live TotalMix packets, which must keep running unsimulated.
-        env:
-          SSE_AUDIO_SIMULATED_INPUT_MODE: "1"
 
   # plan PR 2 / workstream B4.
   # `tauri:foundation` = protocol:generate + native:engine:build +

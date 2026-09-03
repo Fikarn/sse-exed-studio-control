@@ -10,6 +10,7 @@ pub fn update_audio_channel(
     db_path: &Path,
     request: &AudioChannelUpdateRequest,
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
 
@@ -236,6 +237,7 @@ fn channel_request_touches_console(request: &AudioChannelUpdateRequest) -> bool 
 }
 
 pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     let config = resolve_audio_config(&app_settings);
@@ -313,6 +315,7 @@ pub fn update_audio_channel_eq(
     db_path: &Path,
     request: &AudioEqUpdateRequest,
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     // EQ / low-cut edits reach TotalMix over the classic page-2 path, so they

@@ -40,6 +40,8 @@ pub struct AudioSnapshot {
     pub capabilities: AudioCapabilitySnapshot,
     #[serde(rename = "consoleStateConfidence")]
     pub console_state_confidence: String,
+    #[serde(rename = "consoleLink")]
+    pub console_link: AudioConsoleLinkSnapshot,
     #[serde(rename = "lastConsoleSyncAt")]
     pub last_console_sync_at: Option<String>,
     #[serde(rename = "lastConsoleSyncReason")]
@@ -102,6 +104,63 @@ pub struct AudioChannelSnapshot {
 }
 
 #[derive(Debug, Serialize, Clone)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct AudioConsoleLinkSnapshot {
+    /// The engine holds the Global OSC receive port (`receive_port + 3`).
+    #[serde(rename = "slotBound")]
+    pub slot_bound: bool,
+    /// `connected` / `disconnected` from TotalMix's `/status/connection`,
+    /// `unknown` until the console has reported.
+    pub connection: String,
+    pub device: Option<String>,
+    #[serde(rename = "dspLoad")]
+    pub dsp_load: Option<f64>,
+    #[serde(rename = "lastEchoAgeMs")]
+    pub last_echo_age_ms: Option<i64>,
+    #[serde(rename = "pendingSends")]
+    pub pending_sends: i64,
+    #[serde(rename = "unconfirmedSends")]
+    pub unconfirmed_sends: i64,
+    #[serde(rename = "unconfirmedAddresses")]
+    pub unconfirmed_addresses: Vec<String>,
+    #[serde(rename = "confirmedSends")]
+    pub confirmed_sends: i64,
+    #[serde(rename = "adjustedSends")]
+    pub adjusted_sends: i64,
+    #[serde(rename = "externalChanges")]
+    pub external_changes: i64,
+    /// TotalMix's own active snapshot slot (1-based), when it reported one.
+    #[serde(rename = "activeConsoleSnapshot")]
+    pub active_console_snapshot: Option<i64>,
+    #[serde(rename = "lastPullAt")]
+    pub last_pull_at: Option<String>,
+    #[serde(rename = "lastPullValues")]
+    pub last_pull_values: Option<i64>,
+}
+
+impl Default for AudioConsoleLinkSnapshot {
+    fn default() -> Self {
+        Self {
+            slot_bound: false,
+            connection: String::from("unknown"),
+            device: None,
+            dsp_load: None,
+            last_echo_age_ms: None,
+            pending_sends: 0,
+            unconfirmed_sends: 0,
+            unconfirmed_addresses: Vec::new(),
+            confirmed_sends: 0,
+            adjusted_sends: 0,
+            external_changes: 0,
+            active_console_snapshot: None,
+            last_pull_at: None,
+            last_pull_values: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct AudioCapabilitySnapshot {
@@ -247,21 +306,33 @@ pub struct AudioSceneSnapshot {
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct StoredAudioChannelState {
+    // Every field defaults so a blob written by a future engine (or one
+    // missing a field) never drops the whole channel map on read.
     #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub gain: i64,
+    #[serde(default)]
     pub fader: f64,
     #[serde(default)]
     pub clip: bool,
     #[serde(rename = "mixLevels")]
+    #[serde(default)]
     pub mix_levels: HashMap<String, f64>,
+    #[serde(default)]
     pub mute: bool,
+    #[serde(default)]
     pub solo: bool,
+    #[serde(default)]
     pub phantom: bool,
+    #[serde(default)]
     pub phase: bool,
+    #[serde(default)]
     pub pad: bool,
+    #[serde(default)]
     pub instrument: bool,
     #[serde(rename = "autoSet")]
+    #[serde(default)]
     pub auto_set: bool,
     #[serde(default = "default_audio_eq_snapshot")]
     pub eq: AudioEqSnapshot,
@@ -276,10 +347,15 @@ pub struct StoredAudioChannelState {
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct StoredAudioMixTargetState {
+    #[serde(default)]
     pub volume: f64,
+    #[serde(default)]
     pub mute: bool,
+    #[serde(default)]
     pub dim: bool,
+    #[serde(default)]
     pub mono: bool,
+    #[serde(default)]
     pub talkback: bool,
 }
 

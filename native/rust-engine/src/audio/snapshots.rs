@@ -10,6 +10,7 @@ pub fn recall_audio_snapshot(
     db_path: &Path,
     request: &AudioSnapshotRecallRequest,
 ) -> Result<AudioSnapshotRecallResult, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     ensure_audio_action_allowed(db_path, &snapshot)?;
@@ -45,10 +46,7 @@ pub fn recall_audio_snapshot(
         })?;
 
     let mut updates = vec![
-        (
-            String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-            String::from("assumed"),
-        ),
+        confidence_setting(ConsoleConfidence::Assumed),
         (
             String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),
             String::from("snapshot"),

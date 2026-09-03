@@ -10,6 +10,7 @@ pub fn update_audio_mix_target(
     db_path: &Path,
     request: &AudioMixTargetUpdateRequest,
 ) -> Result<AudioMixTargetSnapshot, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     // Every mix-target field (level, mute, dim, mono, talkback) is a console

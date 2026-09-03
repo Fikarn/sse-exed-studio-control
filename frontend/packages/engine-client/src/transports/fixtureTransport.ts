@@ -3581,6 +3581,26 @@ function refreshAudioCapabilities(audioSnapshot: JsonObject, state: MutableFixtu
   );
   const audioReady = asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok";
   const oscEnabled = asBoolean(audioSnapshot.oscEnabled, true);
+  // Every audio snapshot carries the console-link summary the engine exposes
+  // (rme_console_link); fixtures that predate it get the idle default.
+  if (!asRecord(audioSnapshot.consoleLink)) {
+    audioSnapshot.consoleLink = {
+      slotBound: false,
+      connection: "unknown",
+      device: null,
+      dspLoad: null,
+      lastEchoAgeMs: null,
+      pendingSends: 0,
+      unconfirmedSends: 0,
+      unconfirmedAddresses: [],
+      confirmedSends: 0,
+      adjustedSends: 0,
+      externalChanges: 0,
+      activeConsoleSnapshot: null,
+      lastPullAt: null,
+      lastPullValues: null,
+    };
+  }
   // Mirrors the engine's `audio_capabilities`: console writes need OSC on AND
   // a passed audio probe; app-local actions only need OSC on.
   const consoleReady = oscEnabled && audioReady;

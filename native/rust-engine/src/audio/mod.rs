@@ -22,6 +22,8 @@ const AUDIO_EXPECTED_COMPATIBILITY_MODE_KEY: &str = "app.audio.expected_compatib
 const AUDIO_FADERS_PER_BANK_KEY: &str = "app.audio.faders_per_bank";
 const AUDIO_VIEW_MODE_KEY: &str = "app.audio.view_mode";
 const AUDIO_METERING_SOURCE_KEY: &str = "app.audio.metering_source";
+const AUDIO_LAST_CONSOLE_PULL_AT_KEY: &str = "app.audio.last_console_pull_at";
+const AUDIO_LAST_CONSOLE_PULL_VALUES_KEY: &str = "app.audio.last_console_pull_values";
 const AUDIO_CUSTOM_SNAPSHOT_ID_PREFIX: &str = "audio-snapshot-custom-";
 
 const DEFAULT_AUDIO_OSC_ENABLED: bool = true;
@@ -33,6 +35,8 @@ const DEFAULT_AUDIO_METERING_SOURCE: &str = crate::rme_totalmix_osc::RME_TOTALMI
 
 mod channels;
 mod clips;
+mod console_link;
+pub mod fader_curve;
 mod helpers;
 mod mix_targets;
 mod parse;
@@ -44,7 +48,10 @@ mod types;
 
 pub use channels::*;
 pub use clips::*;
-pub(crate) use helpers::{audio_metering_is_simulated, ensure_audio_action_allowed};
+pub use console_link::*;
+pub(crate) use helpers::{
+    audio_metering_is_simulated, confidence_setting, ensure_audio_action_allowed, ConsoleConfidence,
+};
 pub use mix_targets::*;
 pub use parse::*;
 pub use settings::*;

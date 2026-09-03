@@ -22,10 +22,7 @@ pub fn sync_audio_console(db_path: &Path) -> Result<AudioSyncResult, AudioComman
     persist_audio_state(
         db_path,
         &[
-            (
-                String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-                String::from("aligned"),
-            ),
+            confidence_setting(ConsoleConfidence::Aligned),
             (
                 String::from(AUDIO_LAST_CONSOLE_SYNC_AT_KEY),
                 synced_at.clone(),
