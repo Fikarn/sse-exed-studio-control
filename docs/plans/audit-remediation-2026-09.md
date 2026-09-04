@@ -254,11 +254,29 @@ Operator hands: checklist B7 — on the studio monitor at 1920×1080 no tier scr
 
 ## Slice 10 — Bone header, microtype floor, legibility spec
 
-Status: planned.
+Status: landed 2026-09-04 (operator verification pending — an eyeball pass on the studio monitor). Commit `Audit S10`.
 
 Scope: `--color-shell-header-bottom` token per theme; audio microtype ≥ 9.5 px via `--audio-type-micro`; text never painted `--fg-4`; Studio/Graphite `--audio-caption-muted` → `--fg-3` raised to 0.56; DS HealthBar caption literal → token; `audio-legibility.spec.ts` (font floor, contrast ≥ 3:1, nav labels ≥ 4.5:1 per theme); CSS literal scan.
-Gates before: per-theme baselines pinned the broken render; no contrast or font-floor test.
-Tests added / changed: per the plan. Validation: (filled at landing). Baselines: bone 2560 all fixtures, all audio sizes, footer everywhere. Operator hands: eyeball on the studio monitor.
+
+What the gates asserted before: nothing measured type size or contrast anywhere. The per-theme visual baselines pinned the broken Bone header (a near-black band with dark nav labels) as the expected render, and every 8 / 8.5 / 9 px caption painted with the 22 %-alpha hairline colour sat inside audio baselines that could only ever confirm it had not changed.
+
+What landed:
+
+- Tokens: `color.shell.headerBottom` (#060706, the former Studio literal), `color.shell.headerTextMuted` (→ brand text-muted) and four `color.shell.actionGlass*` highlights in `core.json`; `themes.css` overrides Graphite's header bottom (#050708) and gives Bone a light header bottom (#d3cec0), dark-alpha glass highlights and a darker header text (#5a5648 — Bone's brand text-muted reads 3.45:1 on the light header; this clears 4.66:1 on #d3cec0 and 5.2:1 on #ded9cc). `AppShellFrame.module.css` and `NavItem.module.css` read only tokens now; a design-system Vitest (`AppShellFrame.module.test.ts`) fails if a hex / rgb / hsl literal returns. Routine call: the plan named only the header-bottom token; the header text token was needed to make Bone's nav labels pass the 4.5:1 rule the plan set, and the glass highlights were the literals the plan asked to tokenise.
+- Audio microtype: `.audioShell` defines `--audio-type-micro: var(--font-size-3xs-plus)` (9.5 px) and `--audio-caption-muted: var(--fg-3)`; `--fg-3` is raised 0.50 → 0.56 alpha on Studio and Graphite (Bone already used `--fg-3` at 0.6). A mechanical pass over the live audio stylesheets moved every `var(--font-size-4xs)`, `-4xs-plus` and `-3xs` (font-size and `font:` shorthand) to `--audio-type-micro` — 36 sites across 14 files — and every `color: var(--fg-4)` text paint to `--audio-caption-muted` (26 sites; `border-color: var(--fg-4)` hairlines untouched). `AudioHealthBar` maps `--hb-fg-muted` to `--audio-caption-muted`. The dead `AudioRail` / `AudioToolbar` hosts were left alone.
+- Design-system `HealthBar.module.css`: both 9 px caption literals → `var(--font-size-3xs-plus)` (the footer sits inside `audio-workspace`, so it is under the same floor; every surface with a footer moved).
+- `tests/helpers/openFixture.ts` gains the `theme` option the visual spec already used privately.
+- CHANGELOG (Fixed).
+
+Tests added: `audio-legibility.spec.ts` — for `audio-populated` at 2560×1440 and 1920×1080 in Studio and Bone: no rendered text under `audio-workspace` below 9.5 px (aria-hidden, disabled, hidden and zero-size text skipped), no text whose computed colour equals the resolved `--fg-4`, every visible text run ≥ 3:1 against its effective background (alpha colours composited over the nearest solid ancestor surface; gradients count their own background-color and the walk continues, because the DOM cannot be rasterised here); and for all three themes the workspace navigation labels ≥ 4.5:1 against both ends of the header gradient, read back from the header's own tokens. `AppShellFrame.module.test.ts` (design system): no colour literals, header bottom and glass tokens present. The spec's first run reported 29 false Bone failures because the body background is transparent here and text under gradient housings was compared against black — the heuristic was corrected (page ground = first opaque body/html background, else the shell's `--bg`) before the real Bone nav-label failure was fixed with the header text token.
+
+Tests changed: none.
+
+Validation (workstation, 2026-09-04): `npm run frontend:tokens:build` (generated `tokens.css` carries the six new shell tokens); `frontend:typecheck` clean; Vitest 55 (app) + 122 (design system, +3) + 4; eslint + prettier clean; Playwright `audio-legibility.spec.ts` 7 passed; full Playwright suite (`npx playwright test`, behaviour + visual + Storybook) → 258 passed after refreshing 42 win32 baselines; `npm run dev:check` → passed.
+
+Baselines moved: 42 win32 — every `audio-populated` render (1280 → 2560, bone, graphite, studio preview) and the four audio state fixtures at 2560 (captions now 9.5 px and `--fg-3`), `setup-ready` at every size plus bone / graphite / preview and `setup-degraded`, `lighting-populated` at every size plus bone / graphite / preview, `lighting-empty`, `lighting-dmx-unreachable` (footers: the HealthBar caption), `planning-populated @ bone` (header only), and the Storybook `Setup Required / Ready / Degraded`, `Lighting Populated` and the three `HealthBar` primitive stories. Diffs inspected: the Bone audio render shows the light header with dark nav labels and readable captions; the lighting 2560 diff is the footer caption only; the audio 2560 diff is captions throughout the Console; the planning Bone diff is the header only. Linux after Slice 12; darwin pending.
+
+Operator hands: eyeball on the studio monitor — Bone chrome header reads as one light surface with dark labels; Console captions (strip meta, tier eyebrows, monitor scale, snapshot slot labels, footer) are readable from the operating position.
 
 ## Slice 11 — Close confirmation + graceful engine stop
 

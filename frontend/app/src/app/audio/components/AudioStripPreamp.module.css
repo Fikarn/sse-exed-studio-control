@@ -63,8 +63,8 @@
 
 .caption {
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }

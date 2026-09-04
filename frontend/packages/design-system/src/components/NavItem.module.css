@@ -4,7 +4,9 @@
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--color-brand-text-muted);
+    /* Themed with the header: bone needs a darker muted than its body text to
+       clear 4.5:1 on the light header (2026-09 audit Slice 10). */
+    color: var(--color-shell-header-text-muted);
 
     position: relative;
     padding: 11px 18px;

@@ -95,7 +95,13 @@
     "shell": {
       "backdropGlow": { "$value": "rgba(153, 186, 146, 0.1)" },
       "backdropTop": { "$value": "#050705" },
-      "backdropBottom": { "$value": "#070a08" }
+      "backdropBottom": { "$value": "#070a08" },
+      "headerBottom": { "$value": "#060706" },
+      "headerTextMuted": { "$value": "{color.brand.text.muted}" },
+      "actionGlassTop": { "$value": "rgba(250, 246, 230, 0.045)" },
+      "actionGlassBottom": { "$value": "rgba(250, 246, 230, 0.012)" },
+      "actionGlassHoverTop": { "$value": "rgba(250, 246, 230, 0.065)" },
+      "actionGlassHoverBottom": { "$value": "rgba(250, 246, 230, 0.018)" }
     },
     "inset": {
       "hairlineBg": { "$value": "rgba(255, 255, 255, 0.03)" },

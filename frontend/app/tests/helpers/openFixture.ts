@@ -13,7 +13,11 @@ export const fixtureMap = JSON.parse(
   readFileSync(new URL("../../../packages/test-fixtures/src/fixtures.json", import.meta.url), "utf-8")
 ) as Record<string, { audioSnapshot?: AudioSnapshot }>;
 
-export async function openFixture(page: Page, fixtureId: string, options?: { operatorReview?: "studio" }) {
+export async function openFixture(
+  page: Page,
+  fixtureId: string,
+  options?: { operatorReview?: "studio"; theme?: "graphite" | "bone" }
+) {
   if (fixtureId.startsWith("planning-")) {
     await page.clock.setFixedTime(FIXTURE_NOW);
   }
@@ -21,6 +25,9 @@ export async function openFixture(page: Page, fixtureId: string, options?: { ope
     fixture: fixtureId,
     transport: "fixture",
   });
+  if (options?.theme) {
+    params.set("theme", options.theme);
+  }
   if (options?.operatorReview) {
     params.set("operatorReview", options.operatorReview);
   }

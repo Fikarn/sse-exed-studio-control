@@ -96,7 +96,7 @@
   border-radius: var(--radius-tight-sm);
   color: color-mix(in srgb, var(--fg-3) 74%, transparent);
   background: color-mix(in srgb, var(--audio-meter-bg) 62%, transparent);
-  font: var(--font-weight-semibold) var(--font-size-4xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
   transform: translateY(-50%);
@@ -127,7 +127,7 @@
   bottom: 6px;
   left: 50%;
   color: color-mix(in srgb, var(--fg-3) 66%, transparent);
-  font: var(--font-weight-semibold) var(--font-size-4xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   white-space: nowrap;
   text-transform: uppercase;
@@ -218,7 +218,7 @@
     radial-gradient(circle at 36% 32%, rgba(255, 255, 255, 0.22), transparent 36%),
     color-mix(in srgb, var(--bg-3) 74%, var(--accent) 26%);
   color: var(--fg);
-  font: var(--font-weight-semibold) var(--font-size-4xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   transform: translate(-50%, -50%);
   cursor: grab;
@@ -425,10 +425,10 @@
 
 .eqBandCardTag {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .eqBandCardHead button {
@@ -437,7 +437,7 @@
   background: var(--bg);
   color: var(--fg-2);
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -471,10 +471,10 @@
 
 .eqBandTypeLabel {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .eqTypeRow {
@@ -491,7 +491,7 @@
   background: var(--bg);
   color: var(--fg-3);
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;

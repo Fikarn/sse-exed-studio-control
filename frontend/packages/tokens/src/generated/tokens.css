@@ -54,6 +54,11 @@
   --color-shell-backdrop-glow: rgba(153, 186, 146, 0.1);
   --color-shell-backdrop-top: #050705;
   --color-shell-backdrop-bottom: #070a08;
+  --color-shell-header-bottom: #060706;
+  --color-shell-action-glass-top: rgba(250, 246, 230, 0.045);
+  --color-shell-action-glass-bottom: rgba(250, 246, 230, 0.012);
+  --color-shell-action-glass-hover-top: rgba(250, 246, 230, 0.065);
+  --color-shell-action-glass-hover-bottom: rgba(250, 246, 230, 0.018);
   --color-inset-hairline-bg: rgba(255, 255, 255, 0.03);
   --color-inset-hairline-border: rgba(255, 255, 255, 0.2);
   --color-inset-hairline-border-soft: rgba(255, 255, 255, 0.18);
@@ -228,6 +233,7 @@
   --color-status-warning: var(--color-warning-500);
   --color-brand-green: var(--color-primary-500);
   --color-focus-ring: var(--color-primary-400);
+  --color-shell-header-text-muted: var(--color-brand-text-muted);
   --color-studio-500: var(--color-border-strong);
   --color-studio-600: var(--color-border-default);
   --color-plot-marquee-fill: var(--color-brand-green-soft);

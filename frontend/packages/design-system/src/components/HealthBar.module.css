@@ -41,7 +41,8 @@
 
   .label {
     font-family: var(--font-family-mono);
-    font-size: 9px;
+    /* 2026-09 audit Slice 10: 9 px literal → the 9.5 px microtype floor. */
+    font-size: var(--font-size-3xs-plus);
     letter-spacing: 0;
     text-transform: uppercase;
     color: var(--color-brand-text-muted);
@@ -141,7 +142,8 @@
     border-top: 1px solid var(--hb-line);
     background: var(--hb-bg);
     font-family: var(--hb-font-mono);
-    font-size: 9px;
+    /* 2026-09 audit Slice 10: 9 px literal → the 9.5 px microtype floor. */
+    font-size: var(--font-size-3xs-plus);
     letter-spacing: 0.12em;
     color: var(--hb-fg-muted);
     text-transform: uppercase;

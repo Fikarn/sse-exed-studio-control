@@ -47,8 +47,8 @@
 .dynamicsAxisLabel {
   position: absolute;
   z-index: 1;
-  color: var(--fg-4);
-  font: var(--font-weight-medium) var(--font-size-4xs) / 1 var(--font-family-mono);
+  color: var(--audio-caption-muted);
+  font: var(--font-weight-medium) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   pointer-events: none;
 }
@@ -95,8 +95,8 @@
 }
 
 .dynamicsReadoutCluster small {
-  color: var(--fg-4);
-  font: var(--font-weight-medium) var(--font-size-4xs) / 1 var(--font-family-mono);
+  color: var(--audio-caption-muted);
+  font: var(--font-weight-medium) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -163,7 +163,7 @@
   padding: 0 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   background: transparent;
   font-style: normal;
   cursor: pointer;
@@ -205,7 +205,7 @@
 
 .processingControl span {
   color: var(--fg-3);
-  font: var(--font-weight-semibold) var(--font-size-3xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }

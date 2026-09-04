@@ -55,7 +55,7 @@
 
 .inspectorTabs button[aria-disabled="true"],
 .inspectorTabs button[disabled] {
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   cursor: not-allowed;
 }
 
@@ -160,7 +160,7 @@
 
 .inspectorTag {
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   font-weight: 600;
   letter-spacing: 0.08em;
   padding: 2px 6px;
@@ -244,7 +244,7 @@
   align-items: center;
   gap: 14px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.12em;
   color: var(--audio-caption-muted);
 }
@@ -394,7 +394,7 @@
 
 .detailGrid small {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.14em;
   color: var(--audio-caption-muted);
   text-transform: uppercase;
@@ -508,7 +508,7 @@
   display: flex;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   color: var(--fg-3);
 }
 
@@ -661,7 +661,7 @@
 }
 
 .eqPreviewCard [data-eq-preview-badge] span {
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
 }
 
 /* ── Full graph-panel head (EQ / Dynamics tab shared layout) ───────────────

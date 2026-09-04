@@ -39,10 +39,10 @@
 
 .caption {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-align: center;
   white-space: nowrap;
 }
@@ -79,7 +79,7 @@
 }
 
 .valueInsideUnit {
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);

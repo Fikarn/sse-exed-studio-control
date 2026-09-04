@@ -68,10 +68,10 @@
 
 .talkbackCap {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   margin-top: 2px;
   font-weight: 500;
   display: block;
@@ -348,7 +348,7 @@
 
 .masterTickLabel {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   color: var(--fg-3);
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
@@ -401,8 +401,8 @@
 
 .controlSub {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
-  color: var(--fg-4);
+  font-size: var(--audio-type-micro);
+  color: var(--audio-caption-muted);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 500;

@@ -50,7 +50,7 @@
 }
 
 .meterValuePair i {
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   font-style: normal;
   text-align: center;
 }

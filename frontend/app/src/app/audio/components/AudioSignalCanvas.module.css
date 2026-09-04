@@ -243,6 +243,6 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-3xs-plus);
   letter-spacing: 0.04em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   margin-left: 4px;
 }

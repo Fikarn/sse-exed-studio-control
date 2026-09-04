@@ -13,7 +13,7 @@
 .audioFooter {
   --hb-bg: var(--bg);
   --hb-line: var(--line);
-  --hb-fg-muted: var(--fg-4);
+  --hb-fg-muted: var(--audio-caption-muted);
   --hb-fg: var(--fg-3);
   --hb-fg-strong: var(--fg-2);
   --hb-fg-hover: var(--fg);

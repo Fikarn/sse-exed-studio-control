@@ -20,14 +20,14 @@
 
 .laneTagGroup {
   color: var(--accent);
-  font: var(--font-weight-semibold) var(--font-size-3xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .laneTagFormat {
-  color: var(--fg-4);
-  font: var(--font-weight-medium) var(--font-size-4xs) / 1 var(--font-family-mono);
+  color: var(--audio-caption-muted);
+  font: var(--font-weight-medium) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }

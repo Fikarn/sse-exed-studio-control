@@ -90,6 +90,10 @@
   --color-shell-backdrop-glow: rgba(111, 214, 206, 0.1);
   --color-shell-backdrop-top: #040608;
   --color-shell-backdrop-bottom: #070a0d;
+  /* 2026-09 audit Slice 10: the shell header gradient's bottom stop was a
+     Studio-only literal in AppShellFrame.module.css; it now themes with the
+     cool-dark floor (bg-deep #07090b → #050708). */
+  --color-shell-header-bottom: #050708;
 }
 
 :root[data-theme="bone"] {
@@ -184,6 +188,22 @@
   --color-shell-backdrop-glow: rgba(54, 96, 58, 0.1);
   --color-shell-backdrop-top: #f2eee5;
   --color-shell-backdrop-bottom: #ded9cc;
+  /* 2026-09 audit Slice 10: the shell header used to end in the Studio literal
+     #060706 on every theme, which painted a near-black band with dark nav
+     labels on the light Bone chrome. The header now ends one step below the
+     bone bg-deep (#ded9cc → #d3cec0), and the header's action-chip glass
+     highlights are dark-alpha equivalents of the Studio cream alphas (the S14
+     inset-hairline pattern). */
+  --color-shell-header-bottom: #d3cec0;
+  /* Header text (product name, nav labels, monitor labels): bone's brand
+     text-muted (#6e6a5a) reads 3.45:1 on the light header; this darker step
+     clears 4.5:1 against both gradient stops (4.66 on #d3cec0, 5.2 on #ded9cc)
+     — audio-legibility.spec.ts asserts it. */
+  --color-shell-header-text-muted: #5a5648;
+  --color-shell-action-glass-top: rgba(26, 24, 20, 0.045);
+  --color-shell-action-glass-bottom: rgba(26, 24, 20, 0.012);
+  --color-shell-action-glass-hover-top: rgba(26, 24, 20, 0.065);
+  --color-shell-action-glass-hover-bottom: rgba(26, 24, 20, 0.018);
 
   /* S14 — inset hairlines (dark-alpha equivalents of the Studio white-alphas;
      alphas solved to read equivalently: bg 1.08 vs Studio 1.06, border 1.89

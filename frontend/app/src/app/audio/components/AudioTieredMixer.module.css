@@ -81,7 +81,7 @@
 
 .mixerTier[data-tier="software-playback"] .tierLabel {
   background: var(--bg);
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .mixerTier[data-tier="software-playback"] .tierTitleBlock > span:last-child::before {
@@ -146,7 +146,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   width: 14px;
   height: 14px;
 }
@@ -158,7 +158,7 @@
 .tierNum {
   font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   letter-spacing: 0.16em;
 }
 
@@ -204,9 +204,9 @@
    styled as a quiet mono caption in the tier header. */
 .tierLabel small {
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.08em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-transform: uppercase;
   justify-self: end;
   white-space: nowrap;
@@ -226,7 +226,7 @@
   font-family: var(--font-ui);
   text-transform: none;
   letter-spacing: 0.005em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   padding-left: 11px;
   border-left: 1px solid var(--line);
 }
@@ -293,7 +293,7 @@
 
 .tierMeterSimChip {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -380,7 +380,7 @@
   display: grid;
   place-items: center;
   padding: 32px;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   letter-spacing: 0.12em;

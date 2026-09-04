@@ -81,7 +81,7 @@
   align-items: center;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   font-weight: 500;
   letter-spacing: 0.16em;
   color: var(--audio-caption-muted);
@@ -97,7 +97,7 @@
 .lanePreampRow > span:last-child,
 .laneIndexRow > span:last-child {
   color: var(--audio-caption-muted);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
 }
 
 .laneName {
@@ -129,7 +129,7 @@
 
 .laneBadge {
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   padding: 2px 5px;
@@ -174,7 +174,7 @@
 .laneClipPill {
   appearance: none;
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   padding: 2px 5px;
@@ -245,7 +245,7 @@
 
 .outputActiveMark {
   font-family: var(--font-mono);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   font-weight: 600;
   letter-spacing: 0.18em;
   color: var(--accent);
@@ -389,7 +389,7 @@
 
 .outputBusHeader small {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.14em;
   color: var(--audio-caption-muted);
   text-transform: uppercase;
@@ -450,7 +450,7 @@
 }
 
 .outputMetricGrid small {
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.12em;
   color: var(--audio-caption-muted);
   text-transform: uppercase;
@@ -528,15 +528,15 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--fg-3);
-  font-size: var(--font-size-3xs);
+  font-size: var(--audio-type-micro);
   font-weight: 500;
 }
 
 .outputFooterDest {
   font-family: var(--font-mono);
   letter-spacing: 0.04em;
-  color: var(--fg-4);
-  font-size: var(--font-size-4xs-plus);
+  color: var(--audio-caption-muted);
+  font-size: var(--audio-type-micro);
 }
 
 /* Selected bus lights its routing role in the accent. */

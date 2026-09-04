@@ -22,9 +22,11 @@
 
   --fg: #efebe1;
   --fg-2: rgba(239, 235, 225, 0.68);
-  /* C10: nudge muted text up (0.44 → 0.50) for a small cross-theme legibility
-     win alongside the Bone AA fixes. */
-  --fg-3: rgba(239, 235, 225, 0.5);
+  /* C10 nudged muted text 0.44 → 0.50; 2026-09 audit Slice 10 raises it to
+     0.56 (≈ 5:1 on the console ground) because every caption that used to
+     paint --fg-4 (0.22, ≈ 1.6:1 — unreadable on the studio monitor) now paints
+     --audio-caption-muted = --fg-3. --fg-4 stays for hairlines and borders. */
+  --fg-3: rgba(239, 235, 225, 0.56);
   --fg-4: rgba(239, 235, 225, 0.22);
 
   --line: rgba(239, 235, 225, 0.07);
@@ -145,7 +147,11 @@
      lifts it to --fg-3 (AA), so it stays a real semantic token (kept live in
      the inspector / mixer lane / snapshot deck). --fg-4 itself stays reserved
      for hairlines/dots/thumbs. */
-  --audio-caption-muted: var(--fg-4);
+  --audio-caption-muted: var(--fg-3);
+  /* 2026-09 audit Slice 10: the microtype floor. Every audio caption that sat
+     at 8 / 8.5 / 9 px (font-size-4xs, -4xs-plus, -3xs) reads this token, so
+     nothing in the Console renders below 9.5 px (audio-legibility.spec.ts). */
+  --audio-type-micro: var(--font-size-3xs-plus);
   --audio-accent: var(--accent);
   --audio-hot: var(--accent);
   --audio-talk: var(--accent);
@@ -197,7 +203,7 @@
   --fg-2: rgba(232, 237, 240, 0.66);
   /* C10: nudge muted text up (0.42 → 0.50) for a small cross-theme legibility
      win alongside the Bone AA fixes. */
-  --fg-3: rgba(232, 237, 240, 0.5);
+  --fg-3: rgba(232, 237, 240, 0.56);
   --fg-4: rgba(232, 237, 240, 0.2);
 
   --line: rgba(232, 237, 240, 0.07);

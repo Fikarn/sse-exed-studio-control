@@ -29,11 +29,13 @@
   justify-content: space-between;
   gap: var(--operator-shell-header-gap, 18px);
   padding: 0 var(--operator-shell-header-padding-x, 24px) 0 var(--operator-shell-header-padding-left, 36px);
-  background: linear-gradient(180deg, var(--color-bg-deep) 0%, #060706 100%);
+  /* 2026-09 audit Slice 10: both gradient stops are theme tokens — the bottom
+     stop used to be a Studio literal that Bone inherited as a black band. */
+  background: linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-shell-header-bottom) 100%);
   border-bottom: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-lg, 13px);
-  color: var(--color-brand-text-muted);
+  color: var(--color-shell-header-text-muted);
   position: relative;
   overflow: hidden;
   min-width: 0;
@@ -115,7 +117,9 @@
   padding: 0 9px;
   border: 1px solid var(--color-bg-stroke);
   border-radius: var(--radius-tight-sm);
-  background: linear-gradient(180deg, rgba(250, 246, 230, 0.045), rgba(250, 246, 230, 0.012)), var(--color-bg-soft);
+  background:
+    linear-gradient(180deg, var(--color-shell-action-glass-top), var(--color-shell-action-glass-bottom)),
+    var(--color-bg-soft);
   color: var(--color-brand-text-secondary);
   font-family: var(--font-family-ui);
   font-size: calc(11.5px * var(--operator-ui-scale-factor, 1));
@@ -137,7 +141,9 @@ button.monitorAction {
 button.monitorAction:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--monitor-tone, var(--color-bg-border)) 20%, var(--color-bg-border));
-  background: linear-gradient(180deg, rgba(250, 246, 230, 0.065), rgba(250, 246, 230, 0.018)), var(--color-bg-raised);
+  background:
+    linear-gradient(180deg, var(--color-shell-action-glass-hover-top), var(--color-shell-action-glass-hover-bottom)),
+    var(--color-bg-raised);
   color: var(--color-brand-text-primary);
 }
 

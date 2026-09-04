@@ -68,9 +68,9 @@
 }
 
 .statKey {
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.16em;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-transform: uppercase;
   font-weight: 500;
   line-height: 1;
@@ -192,10 +192,10 @@
 
 .snapshotPillLabel {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
 }
 
 .snapshotPillName {
