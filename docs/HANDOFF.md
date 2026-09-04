@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the top-level engineering handoff for the repository as of `2026-06-10` (dependency maintenance current through `2026-08-12`).
+This is the top-level engineering handoff for the repository as of `2026-09-04`.
 
 Read this first before resuming product, release, or cleanup work. Use it as the entry point into the more detailed documents linked below.
 
@@ -24,6 +24,8 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - **Audio page rebuilt as the operator's "Console" surface, superseding the Phase 3 gold-standard audio UI.** Phase 3 closed (`#88`–`#97`), then on 2026-05-27 the operator commissioned a full rebuild from a Claude Design prototype. The audio page is now a single warm-amber Studio theme (Graphite/Bone alternates), a top stat bar + a single horizontal Inputs → Playback → Outputs mixer + a slim right inspector (hero preamp knob, all-bands EQ knob grid, dynamics knobs, routing) + a bottom monitor bar, built on a new reusable SVG-rotary `AudioKnob` (plus `AudioStripPreamp`, `AudioTopBar`, `AudioMonitorBar`); `AudioRail` is retained only as dead code. The full `frontend:playwright:test` suite is green, preamp gain is whole-dB-only (engine constraint; `AudioKnob`/`AudioNumberDialog` snap to `step`), and the snapshot deck is a uniform single-row 8-slot grid with a header capture action. The audio page is now pixel-regression-tested: `liveAudioMasks` in `visual-review.spec.ts` was narrowed from the full-workspace `audio-meter-canvas` overlay (which blanked the whole surface) to just the live regions — `[data-meter-component="stereo"]`, `[data-mini-meter-kind]`, the monitor master meter, and `[data-meter-readout-mode]` numerals — so the mixer / inspector / snapshot-deck / top + monitor bar layout is in the diff. The unmasked full-page baselines (audio + lighting / planning / setup) use a looser `maxDiffPixels` (`FULL_RENDER_MAX_DIFF_PX`) to absorb Linux AA jitter, and CI runs all JavaScript actions on Node 24 (`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`).
 
 - **Audio "Console" UX polish (2026-06-02, branch `claude/audio-ux-polish` — merged 2026-06-05 via PR #121).** A 21-finding front-end-only refinement pass over the Console surface, driven by an adversarially-verified UX audit committed at `docs/archive/audio-ux-audit-2026-06-02.md`. It closed two shipped defects (the inspector send/fader/action controls left unstyled by five undefined CSS classes; the "Listen" button that silently drove the −20 dB Dim), drove status severity into the chrome (`--danger` dot + warning band on faults), and added a persistent SOLO indicator + `⌥S`, typed knob entry, inspector-tab keyboard accelerators, per-theme meter contrast + Bone-theme AA, a `--control-disabled-opacity` token, ~44 px of reclaimed vertical budget, and a token/scale normalization (the legacy `--audio-*` fork migrated onto the canonical `--bg/--fg/--accent` set; ~75 font literals moved onto the loaded Inter/JetBrains faces, so sans text no longer falls back to system-ui). Five batch commits plus one visual-evidence commit on the branch; `npm run dev:check` and the audio Playwright behavior specs are green; the `darwin` audio visual baselines were regenerated (`linux` siblings refresh on the first CI run) and `FULL_RENDER_MAX_DIFF_PX` was raised 400→800 to absorb the enlarged meter-sim + Inter-AA jitter. The native `2560×1440` operator sign-off and the `linux` baseline refresh were both done at merge time. On top of the audit, #121 also reconciled the operator's Claude Design prototype on the same branch — carved/molded faders + unity detents, meters ported into the live 30 Hz canvas (fixed cream→amber→red dBFS zones, cylindrical glass, mono single-bar), tier-header title-over-meta cards, output-lane routing footers, an inspector EQ mini-preview, the input `MIC/MONO` identity chip, and restored channel-strip fill heights (`flex:1 1 240px` + `align-self:stretch`) — with the `darwin` + `linux` audio visual baselines regenerated (linux bootstrapped from CI's first-run artifact) and the full `dev:check` + Playwright matrix green. Native review also reversed C15: the master monitor meter is now a view-only live meter (the #111-dropped live mini-meter wiring restored so it tracks Main Out), not a draggable level control.
+
+- **2026-09 audit remediation (branch `audit-remediation-2026-09`, 13 slices, landed 2026-09-04, not yet pushed).** The 2026-09-02 program audit found the audio console lying about the RME desk. The remediation makes it truthful: the engine reads TotalMix back over Global OSC remote 4 and confirms every send (`aligned` is written only after a complete pull or a fully confirmed push), Sync is a real pull, Recall pushes everything except 48V (listed per channel), fader dB follows RME's published curve (unity at step 836 of 1023), talkback is momentary on every surface with a 2 s engine watchdog, console writes are refused until the audio probe passes, Publish needs every probe green or an explicit override, arm-then-apply has a 350 ms dwell, the 1920×1080 monitor gets a compact density that never scrolls, the Bone header and the Console's 9.5 px type floor are legible and measured, closing the window asks first and stops the engine gracefully, shortcut labels follow the host OS, DMX reads decimal, and sample planning asks before seeding. The ledger `docs/plans/audit-remediation-2026-09.md` is the authoritative record (per-slice gate honesty, tests added / changed, validation, baselines) and its Appendix B is the operator hardware checklist that is still unsigned.
 
 ## Start Here
 
@@ -82,6 +84,8 @@ The highest-value unresolved work is:
    Fixture definitions, DMX footprints, DMX labels/encoders, universe-aware overlap validation, scene serialization, and persisted compatibility live in `native/rust-engine/src/lighting/`. Frontend code may mirror catalog metadata for fixture transport tests and render controls/shapes from snapshots, but it must not own device policy. Do not add GDTF import, Sidus Bluetooth discovery, firmware update, or vendor auto-configuration without a new scoped plan.
 8. Preserve stage-plot smoothness.
    Fixture drag, rotation, scene recall, and value slider edits now rely on short-lived render previews so the marker, output beam, active scene pill, and scene rail selection stay visually continuous while engine IPC catches up. Future changes should keep that preview layer render-only and clear it when authoritative snapshots match.
+9. Close out the 2026-09 audit remediation.
+   Sign the operator hardware checklist (`docs/plans/audit-remediation-2026-09.md` Appendix B — TotalMix talkback channel assignment first, then B1-B8), push `audit-remediation-2026-09` (it sits on the unpushed `studio-bringup-sacn-globalosc` Stream Deck work) so CI refreshes the linux visual baselines from the `playwright-test-results` artifact, and record the darwin baselines on the next macOS host visit. Until then `frontend-e2e` is expected red on linux for the 25 + 42 + … baselines moved by Slices 5-12.
 
 ## Execution Queue
 
@@ -100,6 +104,10 @@ Completed rollout record:
 - [Issue #5: Checkpoint D: plan Qt fallback retirement](https://github.com/Fikarn/sse-exed-studio-control/issues/5), executed through [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](./archive/QT_FALLBACK_RETIREMENT_AUDIT.md)
 
 ## Recent Session Record
+
+### 2026-09 audit remediation (Slices 0-13)
+
+Branch `audit-remediation-2026-09`, one commit per slice (`Audit S<N>: …`), ledger `docs/plans/audit-remediation-2026-09.md`. Ground truth: RME's Global OSC table (TotalMix FX 2.1, 2026-07-21) and live probing on the studio UFX III — TotalMix does not echo a write to its sender (confirmation is by read-back), dumps report dB, hidden layout channels drop writes, and the desk had no talkback channel assigned. Engine: `rme_console_link.rs` + `audio/console_link.rs` (ingest, classification, flush, confidence writer), `audio/sync.rs` pull, recall push plan, `audio/fader_curve.rs`, `audio/talkback.rs` watchdog + `audio.talkback.hold`, publish gate, graceful `EngineBridge::stop`. Frontend: gate-aware controls with **Run audio probe**, recall band with per-channel 48V arming, `useMomentaryTalkback`, arm dwell, compact density, shell header tokens + `audio-legibility.spec.ts`, close dialog, `shared/shortcutGlyphs.ts`. Final lanes on the workstation (2026-09-04): `dev:check`, full Playwright (261), `native:acceptance`, `native:test:hardware` (live pull on the desk), Windows packaging + bridge verify + smoke. Open: operator checklist, push / PR, linux and darwin baselines.
 
 ### Audio page gold-standard and Scaled Studio Preview fidelity
 
@@ -258,6 +266,7 @@ Native baseline:
 ```bash
 npm run native:check
 npm run native:test
+npm run native:test:hardware   # studio workstation only: live read-only pull from TotalMix
 npm run native:foundation
 npm run frontend:foundation
 npm run tauri:foundation

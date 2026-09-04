@@ -1,6 +1,6 @@
 # Audit remediation 2026-09
 
-Status: approved by the operator 2026-09-03; in execution on branch `audit-remediation-2026-09` (cut from `studio-bringup-sacn-globalosc`, which must land first).
+Status: all 13 slices landed on branch `audit-remediation-2026-09` on 2026-09-04 (cut from `studio-bringup-sacn-globalosc`, which must land first; nothing pushed or merged). Open: the operator hardware checklist in Appendix B (unsigned — the operator was away while Slices 9-13 landed), the linux visual-baseline refresh (needs the branch pushed so CI produces the artifact) and the darwin baselines (next macOS host visit). Hardware-facing slices stay `landed (operator verification pending)` until their checklist item is signed.
 
 Tracking: the per-slice `Status:` lines below are the authoritative execution record. Each slice lands as its own commit `Audit S<N>: <what landed>` (baseline refreshes as `Audit S<N> (baselines): …`); any divergence from a slice's written scope gets a bold `**Rescope:**` paragraph under that slice per the AGENTS.md rescope protocol — no silent substitution. Every slice records three things before it closes: what the existing gates asserted before the change, the tests added that would have caught the original finding, and every test that had to change (old assertion → new assertion → reason).
 
@@ -331,9 +331,39 @@ Operator hands: none — glyphs, copy and the confirm are visible on the next la
 
 ## Slice 13 — Docs, CHANGELOG, final lanes, operator sign-off
 
-Status: planned.
+Status: landed 2026-09-04 (engineering complete; operator sign-off open). Commit `Audit S13`.
 
-Scope: OPERATIONS / HARDWARE_PROFILE / DEVELOPMENT / HANDOFF / AGENTS updates; CHANGELOG `[Unreleased]` bullets verified; final lanes (`dev:check`, `frontend:playwright:test`, `native:acceptance` without the skip flag, `native:test:hardware`, `native:bridge:win:verify`, `tauri:build` → `native:package:win:local` → smokes); Appendix B signed by the operator; every slice closed `complete (date)`.
+Scope: OPERATIONS / HARDWARE_PROFILE / DEVELOPMENT / HANDOFF updates; CHANGELOG `[Unreleased]` verified; final lanes; memory note; operator checklist handed over.
+
+What landed:
+
+- `docs/OPERATIONS.md`: "Audio stops responding" now starts from the Console badge and names the way out of every state (NOT VERIFIED → Run audio probe, DISCONNECTED, OFFLINE / STALE, ASSUMED → Sync, TALKBACK REFUSED); the metering checklist says Global OSC remote 4 is preferred and remotes 1-3 are the fallback, and notes the simulated-mode probe; "Audio Control Output" gains the console-link paragraph (read-back confirmation, Confirmed / Adjusted / External, `aligned` only after a complete pull or a fully confirmed push), Sync = pull with its two refusal codes, Recall = push except 48V, gating and validate-before-send, and the arm dwell; "Recommended Checks Before A Live Session" mentions compact density on the 1920 monitor and adds the **Console link checklist before a live session** (desk → app follow, Sync, snapshot push with the 48V band, talkback hold, deck mirror + Companion re-import).
+- `docs/HARDWARE_PROFILE.md`: the 1920×1080 minimum now states the compact density rule (< 2200 px: 4 / 4 / 3 strips, 380 px inspector, nothing scrolls; 2560: 4 / 6 / 3, 504 px).
+- `docs/DEVELOPMENT.md`: the opt-in hardware lane no longer claims to run zero tests — it runs `live_totalmix_pull_round_trip` (read-only pull from the studio TotalMix).
+- `docs/HANDOFF.md`: dated 2026-09-04; a Current Operating Truth bullet for the remediation; blocker 9 (sign the checklist, push so CI refreshes linux baselines, darwin later); a Recent Session Record entry; `native:test:hardware` in the native validation baseline.
+- CHANGELOG `[Unreleased]` verified against the plan's consolidation list: Added — console link (S2), talkback hold (S6), publish gate (S8), close confirmation (S11), seed confirm (S12); Changed — Sync = pull (S3), Recall = push (S4), fader curve (S5), compact 1920 (S9), OS glyphs and decimal DMX (S12); Fixed — gating + never `aligned` after an unconfirmed send + validate-before-send (S1), tests and acceptance no longer write to the desk (S2), arm dwell (S7), Bone header + microtype (S10), operator copy (S12). Nothing was missing; no bullet was rewritten.
+- Developer docs already carried `Ctrl+K` from Slice 12; `AGENTS.md` needed no change (the CI flag table was corrected in Slice 1, the stale-dist note added in Slice 5).
+
+Final lanes (studio workstation, 2026-09-04, after Slice 12's commit `dbd4489`):
+
+| Lane                                                                                            | Result                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev:check` (Slice 12, code state)                                                      | passed — format, lint, scripts tests, file health, rust fmt + clippy, protocol check, typecheck, Vitest 59 + 122 + 4, native check, 300 engine/shell tests                                                                                                   |
+| `npm run frontend:playwright:test`                                                              | 261 passed (build + Storybook + behaviour + visual + Storybook baselines; win32)                                                                                                                                                                             |
+| `npm run native:acceptance` (no skip flag)                                                      | passed — import, restart and rollback deterministic; audio sync / recall markers cleared by restore                                                                                                                                                          |
+| parity acceptance (`scripts/native-parity-acceptance.mjs`, simulated input mode, as CI runs it) | exercised inside `npm run native:acceptance` via `assertAudioWorkflowParity` — `audio.sync` asserted an aligned, complete pull and `audio.snapshot.recall` an aligned, confirmed push against the simulated engine (both request ids present in the run log) |
+| `npm run native:test:hardware`                                                                  | 1 passed — `live_totalmix_pull_round_trip` pulled the real desk over remote 4 (read-only)                                                                                                                                                                    |
+| `npm run tauri:build`                                                                           | release shell built                                                                                                                                                                                                                                          |
+| `npm run native:package:win:local`                                                              | bundle + `SSE-ExEd-Studio-Control-Native-windows.zip` written under `release/native/windows/`                                                                                                                                                                |
+| `npm run native:bridge:win:verify`                                                              | passed — packaged bridge bound on 127.0.0.1 and served the deck routes                                                                                                                                                                                       |
+| `npm run native:package:win:smoke` / `:clean-smoke`                                             | passed (`dashboard` and `clean-start` scenarios)                                                                                                                                                                                                             |
+| `npm run dev:check` (Slice 13, docs state)                                                      | passed (docs state; 300 engine/shell tests)                                                                                                                                                                                                                  |
+
+Tests added / changed: none (docs slice).
+
+Baselines: win32 current through Slice 12 (Slices 5, 6, 9, 10, 12 moved 26 + 3 + 6 + 42 + 25 PNGs, all inspected). linux: not refreshed — the procedure needs the CI `playwright-test-results` artifact and the branch is not pushed (operator's call); `frontend-e2e` will be red on linux until then. darwin: pending.
+
+Operator hands (all still open on 2026-09-04 — the operator was away from Slice 9 onward): Appendix B items 1-8 plus the Slice 10 eyeball pass. Order suggested: assign the TotalMix talkback channel (B5 prerequisite), then B6 (gating), B2 (Sync), B3 (Recall), B4 + Companion re-import (fader curve), B5 (talkback), B7 (1920 monitor), Slice 10 eyeball, B8 (close). Each hardware-facing slice's `Status:` flips from `landed (operator verification pending)` to `complete (date)` only when its item is signed.
 
 ## Appendix A — Gate honesty map (finding → guard after this plan)
 
@@ -357,6 +387,8 @@ Scope: OPERATIONS / HARDWARE_PROFILE / DEVELOPMENT / HANDOFF / AGENTS updates; C
 | Untracked win32 baselines                      | committed in Slice 0                                                                                                                                   |
 
 ## Appendix B — Operator hardware checklist
+
+Sign-off state (2026-09-04): none signed yet — every item below is open. Sign each with the date next to the item; the matching slice's `Status:` then flips to `complete`.
 
 1. TotalMix remote 4 (Global OSC, in 7004 / out 9004): "Send changes" on, "Follow Submix" off, remote active.
 2. After Slice 3: move a fader and toggle a mute in TotalMix → app follows within ~1 s; press Sync → toast reports the value count, badge aligned, nothing moved in TotalMix.
