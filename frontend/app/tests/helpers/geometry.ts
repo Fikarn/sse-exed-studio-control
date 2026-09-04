@@ -63,6 +63,20 @@ export function boxesIntersect(first: RequiredBox, second: RequiredBox) {
   );
 }
 
+// 2026-09 audit Slice 9: the mixer tiers scroll INSIDE overflow-x:auto lane
+// grids under an overflow:hidden shell, so expectNoDocumentScroll can never
+// see a lane overflow. This reads the element's own scroll width instead.
+export async function expectNoHorizontalOverflow(locator: Locator, label: string) {
+  const metrics = await locator.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(
+    metrics.scrollWidth,
+    `${label} scrolls horizontally (${metrics.scrollWidth} > ${metrics.clientWidth})`
+  ).toBeLessThanOrEqual(metrics.clientWidth + 1);
+}
+
 export async function expectNoElementOverflow(locator: Locator, label: string) {
   const metrics = await locator.evaluate((element) => ({
     clientHeight: element.clientHeight,

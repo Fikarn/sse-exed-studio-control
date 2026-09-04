@@ -228,12 +228,29 @@ Operator hands: none. The operator-visible behaviour on the workstation: Publish
 
 ## Slice 9 — 1920×1080 compact density + overflow test
 
-Status: planned.
+Status: landed 2026-09-04 (operator verification pending — checklist B7 on the studio monitor). Commit `Audit S9`.
 
 Scope: audio density from `bodyWidth < 2200`; view-model table desktop 4/6/12, compact 4/4/8; remove the `[data-layout-mode="studioFull"]` 504 px inspector override that out-specified the 380 px container rule; compact tier columns and 176 px output lanes; `expectNoHorizontalOverflow` helper.
-Gates before: the 1920 test checked visibility, document scroll and vertical containment only.
-Tests added: lane-grid/inspector/workspace no-overflow at 1920, 4/4/3 strips, inspector 380 ± 1, banking, compact view-model Vitest, desktop assertions at 2560. Tests changed: none.
-Validation: (filled at landing). Baselines: audio 1280–1920. Operator hands: checklist B7.
+
+What the gates asserted before: the 1920 test checked that surfaces were visible, that the document did not scroll (`expectNoDocumentScroll`) and that lane cards stayed inside their tier grids vertically. The tiers scroll inside `overflow-x: auto` lane grids under an `overflow: hidden` shell, so a horizontal overflow of every tier was invisible to all three; the density constant was hard-wired to `"desktop"`; no test touched the inspector width.
+
+What landed:
+
+- `AudioWorkspace`: density is derived from the operator root width (`useOperatorLayout().bodyWidth < AUDIO_COMPACT_DENSITY_MAX_WIDTH` → `compact`, else `desktop`; constant 2200 in `audioConstants.ts`); `data-density` follows it, the view model rebuilds on it, and the meter overlay already re-measures on that attribute. The Scaled Studio Preview measures its 2560 logical root (`ResizeObserver` `contentRect`), so it stays desktop; the layout mode (`studioFull` from 1920 up) is untouched and `viewport-contract.spec.ts` still passes unchanged.
+- `audioViewModel.audioBankSizes(density, fadersPerBank)`: one explicit table — desktop 4 inputs / 6 playback pairs / 12 strips, compact 4 / 4 / 8, legacy touch 8 / 4 / 8 — replacing the two ternaries. `AudioDensityMode` gains `"compact"`.
+- CSS: the `[data-layout-mode="studioFull"] .audioShell .audioBody { 504px }` override is deleted (it out-specified the ≤ 2100 px container rule and gave the 1920 monitor the 2560 inspector); `[data-density="compact"] .tieredMixer` columns 1 : 1 : 1.25; `[data-density="compact"] .outputLane` 176 px (min 160). At 1920 the three tiers get ≈ 455 / 455 / 569 px and three 176 px output lanes fit with room to spare.
+- Test ids: `audio-tier-lanes-hardware-outputs` on the output lane grid, `audio-inspector` on the inspector root.
+- CHANGELOG (Changed).
+
+Tests added: `tests/helpers/geometry.ts::expectNoHorizontalOverflow` (element scroll width vs client width); in the 1920 test: `data-density="compact"`, 4 / 4 / 3 strips, no horizontal overflow on both source lane grids, the output lane grid, the mixer, the inspector and the workspace, inspector width 380 ± 1 px, `]` reveals `audio-strip-audio-playback-9-10` (bank 2 also does not overflow) and `[` returns; the 2560 desk test asserts `data-density="desktop"` and six playback strips; the Scaled Studio Preview test asserts the preview stays desktop; `audioViewModel.test.ts` (new) pins the three-row bank table and the `fadersPerBank` cap; `audio-constants.spec.ts` pins 2200.
+
+Tests changed: none (the existing 1920 assertions all still hold and stay in place).
+
+Validation (workstation, 2026-09-04): `frontend:typecheck` clean; Vitest 55 (app, +4) + 119 + 4; eslint + prettier clean; Playwright `audio.spec.ts viewport-contract.spec.ts audio-constants.spec.ts audio-hierarchy.spec.ts audio-talkback.spec.ts audio-arm-countdown.spec.ts audio-meter-gating.spec.ts setup.spec.ts` → 73 passed (dist rebuilt first; the first 1920 run failed once on my own selector — the output-lane count matched the lanes' footers too — fixed with a direct-child selector, no product change); visual lanes → 77 passed after refreshing 5 win32 baselines; `npm run dev:check` → passed (282 engine tests).
+
+Baselines moved: 5 win32 — `audio-populated` at 1280×800, 1440×900, 1600×960, 1728×1117 and 1920×1080 (every render below 2200 px is now the compact layout: four playback strips, 176 px output lanes, 380 px inspector). The 2560 renders, the bone / graphite 2560 renders, the Scaled Studio Preview render and both audio Storybook baselines are byte-identical to before, which is the desktop-unchanged guarantee. Diff and new 1920 render inspected: no tier scrollbar, three full output lanes, inspector at 380. Linux after Slice 12; darwin pending.
+
+Operator hands: checklist B7 — on the studio monitor at 1920×1080 no tier scrolls sideways and the Console shows 4 inputs, 4 playback pairs and 3 outputs; `]` pages to playback 9/10 and 11/12.
 
 ## Slice 10 — Bone header, microtype floor, legibility spec
 

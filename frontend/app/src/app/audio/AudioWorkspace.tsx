@@ -5,13 +5,18 @@ import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "@sse/design-sy
 import { Pencil, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import styles from "./AudioWorkspace.module.css";
-import { AUDIO_ARM_TIMEOUT_MS, AUDIO_DRAFT_CLEAR_MS, AUDIO_RECALL_PULSE_MS } from "./audioConstants";
+import {
+  AUDIO_COMPACT_DENSITY_MAX_WIDTH,
+  AUDIO_ARM_TIMEOUT_MS,
+  AUDIO_DRAFT_CLEAR_MS,
+  AUDIO_RECALL_PULSE_MS,
+} from "./audioConstants";
 import { useAudioArming } from "./hooks/useAudioArming";
 import { useAudioKeyboardShortcuts } from "./hooks/useAudioKeyboardShortcuts";
 import { useAudioOptimisticSettings, type OptimisticAudioSettings } from "./hooks/useAudioOptimisticSettings";
 import { useAudioPaletteRegistration } from "./hooks/useAudioPaletteRegistration";
 import { createAudioControlDraftStore } from "./audioControlDraftStore";
-import { AUDIO_FADER_UNITY, type AudioFeedbackTone } from "./audioFormatting";
+import { AUDIO_FADER_UNITY, type AudioDensityMode, type AudioFeedbackTone } from "./audioFormatting";
 import { parseAudioRecallReport, type AudioRecallReport } from "./audioRecallReport";
 import {
   audioChannelSupportsPhase,
@@ -84,8 +89,6 @@ const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
   "software-playback": [],
 };
 
-const AUDIO_DENSITY_MODE = "desktop";
-
 // Console redesign themes (Studio / Graphite / Bone) — applied via the
 // `data-audio-theme` attribute on the shell; CSS in AudioWorkspace.module.css
 // overrides Audio's private token family per theme. Slice 3c: the active theme
@@ -119,7 +122,13 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   // Slice 3c — follow the global theme rather than an audio-local state, so the
   // mixer re-themes in lockstep with the chrome (seam closed). The switcher in
   // AudioTopBar drives the same global setter.
-  const { theme: audioTheme, setTheme: setAudioTheme } = useOperatorLayout();
+  const { bodyWidth, theme: audioTheme, setTheme: setAudioTheme } = useOperatorLayout();
+  // 2026-09 audit Slice 9 (operator decision 6): below 2200 px of operator
+  // root the Console runs at compact density — 4 inputs, 4 playback pairs, 3
+  // outputs per bank, 380 px inspector — so the 1920×1080 studio monitor never
+  // scrolls a tier sideways. The Scaled Studio Preview measures its 2560
+  // logical root and stays desktop; the layout mode (studioFull) is untouched.
+  const density: AudioDensityMode = bodyWidth < AUDIO_COMPACT_DENSITY_MAX_WIDTH ? "compact" : "desktop";
   const warningBandRef = useRef<HTMLDivElement | null>(null);
   const recallPulseTimerRef = useRef<number | null>(null);
 
@@ -139,9 +148,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       appSnapshot,
       audioSnapshot: audioSnapshotForView,
       bankIndex,
-      density: AUDIO_DENSITY_MODE,
+      density,
     });
-  }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex]);
+  }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex, density]);
 
   const { armedAction, armOrApplyAction, cancelArmedAction, clearArmedAction } = useAudioArming({
     setFeedback,
@@ -658,7 +667,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     <div
       className={styles.audioShell}
       data-audio-theme={audioTheme}
-      data-density={AUDIO_DENSITY_MODE}
+      data-density={density}
       data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
       data-meter-simulation-state={viewModel.meterSimulationState}
       data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}

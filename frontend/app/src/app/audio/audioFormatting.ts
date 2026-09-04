@@ -13,7 +13,10 @@ import { formatBackupTimestamp, type StatusToneLike } from "../shellData";
  * so an operator never has to ask "which level am I looking at?". If a future
  * polish pass wants to unify any pair, do it intentionally — don't drift.
  */
-export type AudioDensityMode = "desktop" | "touch";
+// desktop: operator root 2200 px and wider (the 2560×1440 studio surface);
+// compact: narrower roots such as the 1920×1080 fallback (2026-09 audit
+// Slice 9); touch: the legacy toolbar mode with no live caller.
+export type AudioDensityMode = "compact" | "desktop" | "touch";
 export type AudioFeedbackTone = "error" | "info" | "ok";
 
 export interface AudioStatusDescriptor {

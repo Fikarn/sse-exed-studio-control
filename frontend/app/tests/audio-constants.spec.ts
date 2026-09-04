@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import {
   AUDIO_ARM_MIN_DWELL_MS,
   AUDIO_ARM_TIMEOUT_MS,
+  AUDIO_COMPACT_DENSITY_MAX_WIDTH,
   AUDIO_DRAFT_CLEAR_MS,
   AUDIO_THROTTLE_EQ_MS,
   AUDIO_THROTTLE_FADER_MS,
@@ -24,6 +25,8 @@ test.describe("audio constants module", () => {
     expect(AUDIO_ARM_TIMEOUT_MS).toBe(4500);
     // 2026-09 audit Slice 7: the confirm must come after this dwell.
     expect(AUDIO_ARM_MIN_DWELL_MS).toBe(350);
+    // 2026-09 audit Slice 9: compact density below 2200 px (1920×1080 fallback).
+    expect(AUDIO_COMPACT_DENSITY_MAX_WIDTH).toBe(2200);
     expect(AUDIO_THROTTLE_FADER_MS).toBe(75);
     expect(AUDIO_THROTTLE_EQ_MS).toBe(500);
     expect(AUDIO_DRAFT_CLEAR_MS).toBe(250);

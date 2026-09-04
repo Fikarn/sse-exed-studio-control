@@ -249,7 +249,7 @@ export function AudioTieredMixer({
             </div>
           </div>
         </div>
-        <div className={styles.outputLaneGrid}>
+        <div className={styles.outputLaneGrid} data-testid="audio-tier-lanes-hardware-outputs">
           {viewModel.hardwareOutputs.mixTargets.map((mixTarget, index) => (
             <AudioOutputLane
               actionsAllowed={viewModel.actionsAllowed}

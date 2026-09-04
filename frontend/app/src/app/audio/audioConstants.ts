@@ -25,6 +25,14 @@ export const AUDIO_ARM_TIMEOUT_MS = 4500;
 // 2026-09 audit remediation, Slice 7.
 export const AUDIO_ARM_MIN_DWELL_MS = 350;
 
+// Why: below this operator-root width the Console runs at compact density
+// (4 inputs / 4 playback pairs / 3 outputs per bank, 380 px inspector) so the
+// 1920×1080 studio monitor never scrolls a tier sideways; from here up it is
+// the 2560 desktop density (4 / 6 / 3, 504 px inspector). The Scaled Studio
+// Preview measures its 2560 logical root, so it stays desktop.
+// 2026-09 audit remediation, Slice 9 (operator decision 6).
+export const AUDIO_COMPACT_DENSITY_MAX_WIDTH = 2200;
+
 // Why: rail prototype monitor level used as fallback when no draft/value is
 // present for the selected mix target's volume. Expressed in dBFS, converted
 // via `faderDbToNormalized` at the call site.

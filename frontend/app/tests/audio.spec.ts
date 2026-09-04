@@ -31,7 +31,13 @@ import {
   readSnapshotThumbHeights,
   saveAudioSnapshot,
 } from "./helpers/audio";
-import { expectAspectRatio, expectNoDocumentScroll, expectNoElementOverflow } from "./helpers/geometry";
+import {
+  expectAspectRatio,
+  expectNoDocumentScroll,
+  expectNoElementOverflow,
+  expectNoHorizontalOverflow,
+  readRequiredBox,
+} from "./helpers/geometry";
 import {
   EXPECTED_DBFS_SCALE_LABELS,
   expectDbfsScaleLabelsInsideMeters,
@@ -69,6 +75,12 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   const workspace = page.getByTestId("audio-workspace");
   await expect(workspace).toBeVisible();
   await expect(workspace).toHaveAttribute("data-output-role", "main-out");
+  // 2026-09 audit Slice 9: the 2560 surface is desktop density — six playback
+  // pairs on the first bank.
+  await expect(workspace).toHaveAttribute("data-density", "desktop");
+  await expect(
+    page.locator('[data-testid="audio-tier-lanes-software-playback"] [data-testid^="audio-strip-"]')
+  ).toHaveCount(6);
   // 2026-05-27 redesign: a single amber accent (#f5a524) replaces the
   // per-output cyan (#5dc5e8). --audio-accent now resolves to --accent for
   // every output role.
@@ -1600,6 +1612,8 @@ test("renders audio scaled studio preview as the 2560 studio surface", async ({ 
   await page.setViewportSize({ width: 1512, height: 982 });
   await openFixture(page, "audio-populated", { operatorReview: "studio" });
   await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
+  // Slice 9: the preview measures its 2560 logical root, so density stays desktop.
+  await expect(page.getByTestId("audio-workspace")).toHaveAttribute("data-density", "desktop");
   const previewDetails = await readAudioLayoutDetails();
   expect(previewDetails.root).toMatchObject({
     layoutHeight: "1440",
@@ -1650,6 +1664,42 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   // snapshot deck's own header.
   await expect(page.getByTestId("audio-snapshot-deck").getByText("Snapshots")).toBeVisible();
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Touch" })).toHaveCount(0);
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
+
+  // 2026-09 audit Slice 9 (operator decision 6): below 2200 px the Console runs
+  // at compact density — 4 inputs, 4 playback pairs, 3 outputs per bank, a
+  // 380 px inspector — and no tier, the mixer, the inspector or the workspace
+  // scrolls sideways. The old test read the document only; the tiers scroll
+  // inside overflow-x:auto grids under an overflow:hidden shell, so it never
+  // saw the 1920 overflow the audit found.
+  await expect(workspace).toHaveAttribute("data-density", "compact");
+  await expect(
+    page.locator('[data-testid="audio-tier-lanes-hardware-inputs"] [data-testid^="audio-strip-"]')
+  ).toHaveCount(4);
+  await expect(
+    page.locator('[data-testid="audio-tier-lanes-software-playback"] [data-testid^="audio-strip-"]')
+  ).toHaveCount(4);
+  await expect(
+    page.locator('[data-testid="audio-tier-lanes-hardware-outputs"] > [data-testid^="audio-output-"]')
+  ).toHaveCount(3);
+  for (const testId of [
+    "audio-tier-lanes-hardware-inputs",
+    "audio-tier-lanes-software-playback",
+    "audio-tier-lanes-hardware-outputs",
+    "audio-tiered-mixer",
+    "audio-inspector",
+    "audio-workspace",
+  ]) {
+    await expectNoHorizontalOverflow(page.getByTestId(testId), `1920 ${testId}`);
+  }
+  const inspectorBox = await readRequiredBox(page, "audio-inspector");
+  expect(Math.abs(inspectorBox.width - 380), "1920 inspector width should be 380 px").toBeLessThanOrEqual(1);
+  // The other two playback pairs are one bank away and come back with "[".
+  await expect(page.getByTestId("audio-strip-audio-playback-9-10")).toHaveCount(0);
+  await page.keyboard.press("BracketRight");
+  await expect(page.getByTestId("audio-strip-audio-playback-9-10")).toBeVisible();
+  await expectNoHorizontalOverflow(page.getByTestId("audio-tier-lanes-software-playback"), "1920 playback bank 2");
+  await page.keyboard.press("BracketLeft");
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
 
   await expectAudioWorkspaceGeometry(page);

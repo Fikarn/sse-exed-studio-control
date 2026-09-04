@@ -387,6 +387,15 @@
   text-transform: uppercase;
 }
 
+/* 2026-09 audit Slice 9: compact density (operator root narrower than 2200 px,
+   e.g. the 1920×1080 studio monitor). The view model shows 4 inputs, 4 playback
+   pairs and 3 outputs per bank; the columns share the width 1 : 1 : 1.25 so the
+   outputs column keeps room for three 176 px lanes and no tier scrolls
+   sideways (budget at 1920: ~1480 px for the three tiers → ~455 / 455 / 569). */
+[data-density="compact"] .tieredMixer {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
+}
+
 @container operator-root (max-width: 1600px) {
   .tieredMixer {
     gap: 8px;

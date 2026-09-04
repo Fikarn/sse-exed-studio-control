@@ -480,6 +480,13 @@
   min-width: 160px;
 }
 
+/* 2026-09 audit Slice 9: compact density — three 176 px output lanes fit the
+   ~569 px outputs column at 1920×1080 without a horizontal scroll. */
+[data-density="compact"] .outputLane {
+  width: 176px;
+  min-width: 160px;
+}
+
 .outputLane[data-selected="true"] {
   border-color: var(--accent);
   box-shadow:

@@ -145,7 +145,7 @@ export function AudioInspector({
   }, [activeTab, onActiveTabChange, outputSelectionOnly]);
 
   return (
-    <aside className={styles.inspector} data-source-tier={viewModel.selectedSourceTier}>
+    <aside className={styles.inspector} data-source-tier={viewModel.selectedSourceTier} data-testid="audio-inspector">
       <AudioInspectorTabStrip
         activeTab={activeTab}
         onActiveTabChange={onActiveTabChange}

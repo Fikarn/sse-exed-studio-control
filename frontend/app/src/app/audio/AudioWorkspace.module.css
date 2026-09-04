@@ -481,6 +481,8 @@
   }
 }
 
-[data-layout-mode="studioFull"] .audioShell .audioBody {
-  grid-template-columns: minmax(0, 1fr) 504px;
-}
+/* 2026-09 audit Slice 9: the former `[data-layout-mode="studioFull"] .audioShell
+   .audioBody { 504px }` override is gone. It out-specified the ≤ 2100 px
+   container rule above, so the 1920×1080 studio monitor (studioFull from
+   1920 up) got a 504 px inspector and its tiers scrolled sideways. The 504 px
+   inspector now lives only under the ≥ 2200 px container query. */
