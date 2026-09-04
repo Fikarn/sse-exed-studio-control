@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -100,6 +100,9 @@ function readJson(pathname) {
 
 function launchTauriShell({ appDataDir, commandPath, extraEnv = {}, logsDir, statusPath, updateRepoDir }) {
   const child = spawn(npmCommand, ["run", "tauri:dev", "--workspace", "frontend/app"], {
+    // Windows: npm is npm.cmd, and Node >= 18.20 refuses to spawn .cmd files
+    // without a shell (EINVAL, CVE-2024-27980 hardening).
+    shell: process.platform === "win32",
     cwd: rootDir,
     detached: process.platform !== "win32",
     env: {
@@ -184,6 +187,13 @@ async function dispatchCommand(session, child, action, payload = {}) {
   };
 }
 
+function killWindowsProcessTree(pid) {
+  if (!pid) {
+    return;
+  }
+  spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+}
+
 async function closeTauriShell(child) {
   if (child.exitCode !== null) {
     return;
@@ -191,7 +201,10 @@ async function closeTauriShell(child) {
 
   try {
     if (process.platform === "win32") {
-      child.kill("SIGTERM");
+      // npm.cmd -> node -> tauri.js -> vite + cargo -> shell: killing only the
+      // npm parent leaves vite holding the dev port and the shell alive, and
+      // the next step's port preflight then fails. Kill the whole tree.
+      killWindowsProcessTree(child.pid);
     } else if (child.pid) {
       process.kill(-child.pid, "SIGTERM");
     }
@@ -210,7 +223,7 @@ async function closeTauriShell(child) {
   if (child.exitCode === null) {
     try {
       if (process.platform === "win32") {
-        child.kill("SIGKILL");
+        killWindowsProcessTree(child.pid);
       } else if (child.pid) {
         process.kill(-child.pid, "SIGKILL");
       }
@@ -280,10 +293,12 @@ async function runSetupSupportQualification() {
       section: "commissioning",
     });
 
+    // No hardware on this host: explicit probe override (2026-09 audit Slice 8).
     const publishStatus = await dispatchCommand(firstSession, firstRun, "updateCommissioning", {
       request: {
         runnerStage: "publish",
         stage: "ready",
+        overrideProbes: true,
       },
     });
     assert(

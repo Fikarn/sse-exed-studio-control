@@ -25,7 +25,7 @@ test("walks the fixture-backed commissioning runner and support actions", async 
   await page.getByRole("tab", { name: /Probe hardware/i }).click();
   await page.getByLabel("Lighting bridge IP").fill("192.168.1.80");
   await page.getByRole("button", { name: "Run all probes" }).click();
-  await expect(page.getByText("All commissioning probes completed.")).toBeVisible();
+  await expect(page.getByText("All 3 commissioning probes passed.")).toBeVisible();
 
   await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
   await page.getByRole("button", { name: "Continue to verify" }).click();
@@ -35,6 +35,49 @@ test("walks the fixture-backed commissioning runner and support actions", async 
   await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
 
   await page.getByRole("button", { name: "Publish setup" }).click();
+  await expect(page.getByTestId("planning-workspace")).toBeVisible();
+});
+
+test("publish refuses failing probes until the operator overrides explicitly", async ({ page }) => {
+  // 2026-09 audit remediation, Slice 8 (operator decision 7). Before this the
+  // walk-through above was the only publish coverage and it asserted nothing
+  // about probes: "Run all probes" said "completed" whatever the probes
+  // returned, and Publish unlocked the dashboard regardless.
+  await openFixture(page, "setup-required");
+
+  // Same entry as the walk-through: the Import step first, so the Probe tab
+  // opens without the skip-ahead prompt.
+  await page.getByRole("tab", { name: /Import profile/i }).click();
+  await page.getByRole("button", { name: "Download profile" }).click();
+  await expect(page.getByText(/Exported Companion profile to/)).toBeVisible();
+
+  await page.getByRole("tab", { name: /Probe hardware/i }).click();
+  await page.getByLabel("Lighting bridge IP").fill("0.0.0.0");
+  await page.getByRole("button", { name: "Run all probes" }).click();
+  await expect(page.getByText(/2 of 3 probes passed/)).toBeVisible();
+  await expect(page.getByText(/Lighting Bridge Probe: Bridge 0\.0\.0\.0 did not answer/)).toBeVisible();
+  // A failed probe never advances the runner on its own.
+  await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
+
+  // Jumping straight to Publish asks whether to skip the unconfirmed steps.
+  await page.getByRole("tab", { name: /Publish/i }).click();
+  await page.getByRole("dialog", { name: "Skip ahead?" }).getByRole("button", { name: "Skip ahead" }).click();
+  await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
+  await page.getByRole("button", { name: "Publish setup" }).click();
+  const dialog = page.getByRole("dialog", { name: "Publish with failing probes?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Lighting Bridge Probe");
+  await expect(dialog).toContainText("did not answer");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
+  await expect(page.getByTestId("planning-workspace")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Publish setup" }).click();
+  await page
+    .getByRole("dialog", { name: "Publish with failing probes?" })
+    .getByRole("button", { name: "Publish anyway" })
+    .click();
   await expect(page.getByTestId("planning-workspace")).toBeVisible();
 });
 

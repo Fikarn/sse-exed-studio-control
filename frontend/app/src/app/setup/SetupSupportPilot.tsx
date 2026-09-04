@@ -2,6 +2,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Button,
+  ConfirmDialog,
   HealthBar,
   type HealthBarItemData,
   MetricCard,
@@ -30,6 +31,16 @@ import styles from "./SetupSupportPilot.module.css";
 
 type SetupMode = "runner" | "support";
 type RunnerStepId = "import" | "probe" | "map" | "verify" | "publish";
+
+// The three engine commissioning probes. Fixture snapshots may carry extra
+// label-only check entries; the publish gate (2026-09 audit Slice 8) counts
+// only these, exactly as the engine does.
+const PROBE_CHECK_IDS = new Set(["control-surface", "lighting", "audio"]);
+
+function probeChecks<T extends { id: string }>(entries: T[]) {
+  const known = entries.filter((entry) => PROBE_CHECK_IDS.has(entry.id));
+  return known.length > 0 ? known : entries;
+}
 type FeedbackTone = "error" | "info" | "ok";
 
 interface ControlSurfaceControl {
@@ -243,6 +254,9 @@ export function SetupSupportPilot({
   const [pendingStepId, setPendingStepId] = useState<RunnerStepId | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
+  // 2026-09 audit Slice 8: probes that are not green when the operator asks
+  // to publish; non-null opens the "Publish with failing probes?" confirm.
+  const [publishOverridePrompt, setPublishOverridePrompt] = useState<string[] | null>(null);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [selectedControlId, setSelectedControlId] = useState<string | null>(null);
   const [echoControlId, setEchoControlId] = useState<string | null>(null);
@@ -497,30 +511,57 @@ export function SetupSupportPilot({
       target: "lighting",
       universe: Number(lightingUniverse),
     });
-    await store.runCommissioningCheck({
+    const latest = await store.runCommissioningCheck({
       receivePort: Number(audioReceivePort),
       sendHost: audioSendHost.trim(),
       sendPort: Number(audioSendPort),
       target: "audio",
     });
 
+    // 2026-09 audit Slice 8: report what the probes actually returned, and
+    // never advance past a probe that did not pass. The check-run result is
+    // the commissioning snapshot; fall back to the store's copy if a
+    // transport answers with something else.
+    const fromResult = getCommissioningChecks(asRecord(latest));
+    const results = probeChecks(
+      fromResult.length > 0 ? fromResult : getCommissioningChecks(asRecord(store.getSnapshot().commissioningSnapshot))
+    );
+    const notPassed = results.filter((check) => check.status !== "ok");
+    if (notPassed.length > 0) {
+      return {
+        message: `${results.length - notPassed.length} of ${results.length} probes passed — ${notPassed
+          .map((check) => `${check.label}: ${check.detail}`)
+          .join("; ")}`,
+        tone: "error" as const,
+      };
+    }
+
     if (advance) {
       await activateStep("map");
     }
 
     return {
-      message: "All commissioning probes completed.",
+      message: `All ${results.length} commissioning probes passed.`,
       tone: "ok" as const,
     };
   };
 
-  const publishSetup = async () => {
-    await store.updateCommissioning({ runnerStage: "publish", stage: "ready" });
+  const publishSetup = async (overrideProbes = false) => {
+    // The engine refuses `ready` while a probe is not passed unless the
+    // override is explicit (COMMISSIONING_PROBES_INCOMPLETE otherwise); the
+    // refusal, should the UI's view be stale, surfaces as this action's error.
+    await store.updateCommissioning({
+      runnerStage: "publish",
+      stage: "ready",
+      ...(overrideProbes ? { overrideProbes: true } : {}),
+    });
     const backup = asRecord(await store.exportSupportBackup());
     await store.setWorkspace("planning");
 
     return {
-      message: `Setup published and support backup written to ${String(backup?.path ?? "the backup directory")}.`,
+      message: overrideProbes
+        ? `Setup published with a probe override (recorded in the setup summary) and support backup written to ${String(backup?.path ?? "the backup directory")}.`
+        : `Setup published and support backup written to ${String(backup?.path ?? "the backup directory")}.`,
       tone: "ok" as const,
     };
   };
@@ -651,7 +692,14 @@ export function SetupSupportPilot({
       return;
     }
 
-    void performAction("publish-setup", publishSetup);
+    // 2026-09 audit Slice 8: a probe that is not green needs the operator's
+    // explicit decision before publish; the dialog names each one.
+    const notPassed = probeChecks(checks).filter((check) => check.status !== "ok");
+    if (notPassed.length > 0) {
+      setPublishOverridePrompt(notPassed.map((check) => `${check.label} — ${check.detail}`));
+      return;
+    }
+    void performAction("publish-setup", () => publishSetup());
   });
 
   const moveControlSelection = useLiveCallback((direction: -1 | 1) => {
@@ -1148,7 +1196,17 @@ export function SetupSupportPilot({
                     />
                   </div>
                   <div className={styles.readinessList}>
-                    <div>Lighting, audio, and control-surface probes should all be green before publish.</div>
+                    <div>
+                      Lighting, audio, and control-surface probes must all be green before publish; publishing with a
+                      probe that is not green asks for an explicit override and records it.
+                    </div>
+                    {typeof commissioningSnapshot?.publishOverrideAt === "string" &&
+                    commissioningSnapshot.publishOverrideAt ? (
+                      <div data-testid="setup-publish-override-note">
+                        Published with a probe override at{" "}
+                        {formatBackupTimestamp(commissioningSnapshot.publishOverrideAt)}.
+                      </div>
+                    ) : null}
                     <div>Support backup export is part of publish, not a post-commissioning chore.</div>
                     <div>The shell asks for the routing change, then reloads from engine snapshots.</div>
                   </div>
@@ -1471,6 +1529,34 @@ export function SetupSupportPilot({
           </Surface>
         </div>
       )}
+
+      {publishOverridePrompt ? (
+        <ConfirmDialog
+          body={
+            <>
+              <p>These probes are not green:</p>
+              <ul>
+                {publishOverridePrompt.map((entry) => (
+                  <li key={entry}>{entry}</li>
+                ))}
+              </ul>
+              <p>
+                Publishing anyway unlocks operator mode with unverified hardware. The override is recorded in the setup
+                summary and the engine log.
+              </p>
+            </>
+          }
+          cancelLabel="Cancel"
+          confirmLabel="Publish anyway"
+          danger
+          onCancel={() => setPublishOverridePrompt(null)}
+          onConfirm={() => {
+            setPublishOverridePrompt(null);
+            void performAction("publish-setup", () => publishSetup(true));
+          }}
+          title="Publish with failing probes?"
+        />
+      ) : null}
 
       {pendingStepId ? (
         <div className={styles.jumpScrim} role="presentation">

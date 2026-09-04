@@ -33,6 +33,12 @@ export interface CommissioningUpdateRequest {
   stage?: CommissioningStage;
   runnerStage?: RunnerStage;
   hardwareProfile?: string;
+  /**
+   * 2026-09 audit Slice 8: `stage: "ready"` is refused by the engine while
+   * any commissioning probe is not passed (`COMMISSIONING_PROBES_INCOMPLETE`)
+   * unless this is `true` — the operator's explicit, recorded decision.
+   */
+  overrideProbes?: boolean;
 }
 
 export interface LightingSettingsUpdateRequest {

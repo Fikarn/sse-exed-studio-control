@@ -1,4 +1,7 @@
-use crate::app_state::{build_app_snapshot, parse_commissioning_update, APP_SETTINGS_PREFIX};
+use crate::app_state::{
+    build_app_snapshot, parse_commissioning_override, parse_commissioning_update,
+    APP_SETTINGS_PREFIX, COMMISSIONING_COMPLETED_KEY,
+};
 use crate::audio::{
     build_audio_health_check, clear_all_audio_solo, clear_audio_clips, create_audio_snapshot,
     delete_audio_snapshot, hold_audio_talkback, parse_audio_channel_update_request,
@@ -13,6 +16,9 @@ use crate::audio::{
     update_audio_settings, update_audio_snapshot, AudioCommandError,
 };
 use crate::bootstrap::{bootstrap_runtime, RuntimeContext};
+use crate::commissioning::{
+    evaluate_publish_gate, publish_override_timestamp, PublishGate, PUBLISH_OVERRIDE_AT_KEY,
+};
 use crate::commissioning::{
     parse_commissioning_check_request, parse_commissioning_seed_request,
     read_commissioning_snapshot, run_commissioning_check, seed_sample_planning_data,
@@ -749,7 +755,10 @@ impl EngineApp {
                     },
                 }
             }
-            "commissioning.update" => match parse_commissioning_update(&request.params) {
+            "commissioning.update" => match parse_commissioning_update(&request.params)
+                .map_err(CommissioningUpdateRefusal::InvalidParams)
+                .and_then(|updates| self.gate_commissioning_publish(updates, &request.params))
+            {
                 Ok(updates) => match set_settings(&self.runtime.db_path, &updates) {
                     Ok(()) => match self.read_app_snapshot() {
                         Ok(result) => Self::reply_with_app_and_commissioning_change(
@@ -768,7 +777,15 @@ impl EngineApp {
                         error.to_string(),
                     )),
                 },
-                Err(message) => Self::reply(invalid_params(request.id, message)),
+                Err(CommissioningUpdateRefusal::InvalidParams(message)) => {
+                    Self::reply(invalid_params(request.id, message))
+                }
+                Err(CommissioningUpdateRefusal::ProbesIncomplete(message)) => Self::reply(
+                    error_response(request.id, "COMMISSIONING_PROBES_INCOMPLETE", message),
+                ),
+                Err(CommissioningUpdateRefusal::Storage(message)) => {
+                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                }
             },
             "settings.update" => match parse_settings_update(&request.params) {
                 Ok(updates) => match set_settings(&self.runtime.db_path, &updates) {
@@ -1627,6 +1644,57 @@ impl EngineApp {
                 }),
             )],
         }
+    }
+}
+
+enum CommissioningUpdateRefusal {
+    InvalidParams(String),
+    ProbesIncomplete(String),
+    Storage(String),
+}
+
+impl EngineApp {
+    /// 2026-09 audit Slice 8 (operator decision 7): publishing (`stage:
+    /// ready`) is refused while any commissioning probe is not `passed`,
+    /// unless the request carries the explicit `overrideProbes: true`. An
+    /// override is recorded (`app.commissioning.publish_override_at`) and
+    /// logged; a clean publish clears any earlier marker. Requests that do
+    /// not publish pass through untouched.
+    fn gate_commissioning_publish(
+        &self,
+        mut updates: Vec<(&'static str, String)>,
+        params: &serde_json::Value,
+    ) -> Result<Vec<(&'static str, String)>, CommissioningUpdateRefusal> {
+        let override_probes = parse_commissioning_override(params)
+            .map_err(CommissioningUpdateRefusal::InvalidParams)?;
+        let publishing = updates
+            .iter()
+            .any(|(key, value)| *key == COMMISSIONING_COMPLETED_KEY && value == "true");
+        if !publishing {
+            return Ok(updates);
+        }
+        let settings = list_settings_by_prefix(&self.runtime.db_path, APP_SETTINGS_PREFIX)
+            .map_err(|error| CommissioningUpdateRefusal::Storage(error.to_string()))?;
+        match evaluate_publish_gate(&settings, override_probes) {
+            PublishGate::Clear => updates.push((PUBLISH_OVERRIDE_AT_KEY, String::new())),
+            PublishGate::Refused { message } => {
+                return Err(CommissioningUpdateRefusal::ProbesIncomplete(message));
+            }
+            PublishGate::Overridden { failing } => {
+                let at = publish_override_timestamp(&self.runtime.db_path)
+                    .map_err(|error| CommissioningUpdateRefusal::Storage(error.to_string()))?;
+                let _ = append_log(
+                    &self.runtime.log_file_path,
+                    "WARN",
+                    &format!(
+                        "Commissioning published with a probe override at {at}: {}",
+                        failing.join(", ")
+                    ),
+                );
+                updates.push((PUBLISH_OVERRIDE_AT_KEY, at));
+            }
+        }
+        Ok(updates)
     }
 }
 

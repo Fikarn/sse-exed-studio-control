@@ -119,6 +119,128 @@ impl EngineProcess {
     }
 }
 
+fn response_with_id(id: &'static str) -> impl Fn(&Value) -> bool {
+    move |value| {
+        value.get("type").and_then(Value::as_str) == Some("response")
+            && value.get("id").and_then(Value::as_str) == Some(id)
+    }
+}
+
+// 2026-09 audit remediation, Slice 8 (operator decision 7): a fresh
+// workstation has run no probe, so `stage: ready` must be refused and name
+// every probe; the explicit override publishes and is recorded.
+#[test]
+fn commissioning_publish_is_refused_until_probes_pass_or_the_operator_overrides() {
+    let mut engine = EngineProcess::spawn("publish-gate");
+    engine.wait_for("engine.ready event", |value| {
+        value.get("type").and_then(Value::as_str) == Some("event")
+            && value.get("event").and_then(Value::as_str) == Some("engine.ready")
+    });
+
+    engine.send(&json!({
+        "type": "request",
+        "id": "publish-1",
+        "method": "commissioning.update",
+        "params": { "stage": "ready" }
+    }));
+    let refused = engine.wait_for("publish refusal", response_with_id("publish-1"));
+    assert_eq!(
+        refused.get("ok").and_then(Value::as_bool),
+        Some(false),
+        "publishing with no probe run must be refused (got {refused})"
+    );
+    assert_eq!(
+        refused.pointer("/error/code").and_then(Value::as_str),
+        Some("COMMISSIONING_PROBES_INCOMPLETE"),
+        "{refused}"
+    );
+    let message = refused
+        .pointer("/error/message")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    for probe in [
+        "Control Surface Probe not run",
+        "Lighting Bridge Probe not run",
+        "Audio OSC Probe not run",
+    ] {
+        assert!(message.contains(probe), "{message}");
+    }
+
+    engine.send(&json!({
+        "type": "request",
+        "id": "snapshot-1",
+        "method": "commissioning.snapshot",
+        "params": {}
+    }));
+    let before = engine.wait_for("snapshot before override", response_with_id("snapshot-1"));
+    assert_eq!(
+        before
+            .pointer("/result/hasCompletedSetup")
+            .and_then(Value::as_bool),
+        Some(false),
+        "a refused publish must leave setup incomplete (got {before})"
+    );
+    assert!(
+        before
+            .pointer("/result/publishOverrideAt")
+            .is_none_or(Value::is_null),
+        "{before}"
+    );
+
+    engine.send(&json!({
+        "type": "request",
+        "id": "publish-2",
+        "method": "commissioning.update",
+        "params": { "stage": "ready", "overrideProbes": true }
+    }));
+    let published = engine.wait_for("overridden publish", response_with_id("publish-2"));
+    assert_eq!(
+        published.get("ok").and_then(Value::as_bool),
+        Some(true),
+        "the explicit override must publish (got {published})"
+    );
+    assert_eq!(
+        published
+            .pointer("/result/startup/targetSurface")
+            .and_then(Value::as_str),
+        Some("dashboard"),
+        "{published}"
+    );
+
+    engine.send(&json!({
+        "type": "request",
+        "id": "snapshot-2",
+        "method": "commissioning.snapshot",
+        "params": {}
+    }));
+    let after = engine.wait_for("snapshot after override", response_with_id("snapshot-2"));
+    assert_eq!(
+        after
+            .pointer("/result/hasCompletedSetup")
+            .and_then(Value::as_bool),
+        Some(true),
+        "{after}"
+    );
+    let override_at = after
+        .pointer("/result/publishOverrideAt")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    assert!(
+        !override_at.is_empty(),
+        "an override must be recorded ({after})"
+    );
+    let readiness = after
+        .pointer("/result/readinessSummary")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    assert!(
+        readiness.contains(&format!("Published with a probe override at {override_at}")),
+        "{readiness}"
+    );
+
+    engine.shutdown();
+}
+
 #[test]
 fn engine_boots_dispatches_a_request_and_exits_cleanly() {
     let mut engine = EngineProcess::spawn("ping");

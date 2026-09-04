@@ -251,8 +251,10 @@ async function main() {
     assert(initialPlanningSnapshot.counts?.projectCount === 2, "Expected packaged import project count to be 2.");
     assert(initialPlanningSnapshot.counts?.taskCount === 3, "Expected packaged import task count to be 3.");
 
+    // No hardware on this host: explicit probe override (2026-09 audit Slice 8).
     const commissioningUpdate = await firstRun.request("packaged-commissioning-ready", "commissioning.update", {
       stage: "ready",
+      overrideProbes: true,
     });
     assert(
       commissioningUpdate.startup?.targetSurface === "dashboard",

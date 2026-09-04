@@ -28,6 +28,14 @@ pub const AUDIO_RECEIVE_PORT_KEY: &str = "app.commissioning.audio.receive_port";
 pub const CONTROL_SURFACE_CHECK_ID: &str = "control-surface";
 pub const LIGHTING_CHECK_ID: &str = "lighting";
 pub const AUDIO_CHECK_ID: &str = "audio";
+/// Set when the operator published with `overrideProbes: true` while a probe
+/// was not `passed` (2026-09 audit Slice 8); empty after a clean publish.
+pub const PUBLISH_OVERRIDE_AT_KEY: &str = "app.commissioning.publish_override_at";
+const PROBE_CHECKS: [(&str, &str); 3] = [
+    (CONTROL_SURFACE_CHECK_ID, "Control Surface Probe"),
+    (LIGHTING_CHECK_ID, "Lighting Bridge Probe"),
+    (AUDIO_CHECK_ID, "Audio OSC Probe"),
+];
 
 const DEFAULT_LIGHTING_UNIVERSE: i64 = 1;
 const DEFAULT_AUDIO_SEND_HOST: &str = "127.0.0.1";
@@ -72,6 +80,10 @@ pub struct CommissioningSnapshotPayload {
     pub config_summary: String,
     #[serde(rename = "readinessSummary")]
     pub readiness_summary: String,
+    /// When the last publish overrode incomplete probes (`None` after a
+    /// clean publish or before any publish).
+    #[serde(rename = "publishOverrideAt", default)]
+    pub publish_override_at: Option<String>,
     #[serde(rename = "planningProjectCount")]
     pub planning_project_count: usize,
     #[serde(rename = "planningTaskCount")]
@@ -289,6 +301,10 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
         audio.send_port,
         audio.receive_port
     );
+    let publish_override_at = app_settings
+        .get(PUBLISH_OVERRIDE_AT_KEY)
+        .filter(|value| !value.trim().is_empty())
+        .cloned();
     let readiness_summary = if commissioning.has_completed_setup {
         format!(
             "{} of {} commissioning probes passed. Startup routes directly into the dashboard.",
@@ -424,7 +440,12 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
         hardware_profile: commissioning.hardware_profile,
         summary,
         config_summary,
-        readiness_summary,
+        readiness_summary: with_publish_override_note(
+            readiness_summary,
+            publish_override_at.as_deref(),
+            commissioning.has_completed_setup,
+        ),
+        publish_override_at,
         planning_project_count: planning_counts.0,
         planning_task_count: planning_counts.1,
         sample_seed_available: true,
@@ -669,6 +690,76 @@ fn current_timestamp(connection: &rusqlite::Connection) -> Result<String, rusqli
     })
 }
 
+fn with_publish_override_note(
+    readiness_summary: String,
+    publish_override_at: Option<&str>,
+    has_completed_setup: bool,
+) -> String {
+    match publish_override_at {
+        Some(at) if has_completed_setup => {
+            format!("{readiness_summary} Published with a probe override at {at}.")
+        }
+        _ => readiness_summary,
+    }
+}
+
+/// Every commissioning probe that is not `passed`, worded for the operator:
+/// "Audio OSC Probe failed", "Lighting Bridge Probe not run".
+pub fn failing_probes(settings: &HashMap<String, String>) -> Vec<String> {
+    PROBE_CHECKS
+        .iter()
+        .filter_map(|(check_id, label)| {
+            let status = settings
+                .get(&check_status_key(check_id))
+                .map(String::as_str)
+                .unwrap_or("idle");
+            match status {
+                "passed" => None,
+                "failed" => Some(format!("{label} failed")),
+                "idle" => Some(format!("{label} not run")),
+                other => Some(format!("{label} {other}")),
+            }
+        })
+        .collect()
+}
+
+/// Outcome of the publish gate (2026-09 audit Slice 8, operator decision 7).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PublishGate {
+    /// Every probe passed: publish, and clear any earlier override marker.
+    Clear,
+    /// A probe is not passed and the request did not override.
+    Refused { message: String },
+    /// A probe is not passed and the operator overrode explicitly: publish
+    /// and record the exception.
+    Overridden { failing: Vec<String> },
+}
+
+pub fn evaluate_publish_gate(
+    settings: &HashMap<String, String>,
+    override_probes: bool,
+) -> PublishGate {
+    let failing = failing_probes(settings);
+    if failing.is_empty() {
+        return PublishGate::Clear;
+    }
+    if override_probes {
+        return PublishGate::Overridden { failing };
+    }
+    PublishGate::Refused {
+        message: format!(
+            "Publish refused: {}. Run the probes until they pass, or publish with the explicit override to record the exception.",
+            failing.join(", ")
+        ),
+    }
+}
+
+/// Timestamp recorded under `PUBLISH_OVERRIDE_AT_KEY` for an overridden publish.
+pub fn publish_override_timestamp(db_path: &Path) -> EngineResult<String> {
+    let connection = open_connection(db_path)?;
+    Ok(current_timestamp(&connection)?)
+}
+
 fn read_check_snapshot(
     settings: &HashMap<String, String>,
     check_id: &str,
@@ -879,6 +970,99 @@ mod tests {
         assert!(snapshot.summary.contains("2 projects"));
         assert!(snapshot.config_summary.contains("Lighting bridge"));
         assert!(snapshot.readiness_summary.contains("Startup still routes"));
+    }
+
+    #[test]
+    fn publish_gate_refuses_until_every_probe_passed_and_records_an_override() {
+        // 2026-09 audit Slice 8. Nothing has run: every probe is "not run".
+        let mut settings: HashMap<String, String> = HashMap::new();
+        let super::PublishGate::Refused { message } =
+            super::evaluate_publish_gate(&settings, false)
+        else {
+            panic!("a fresh workstation must not publish");
+        };
+        assert!(message.starts_with("Publish refused: "), "{message}");
+        assert!(
+            message.contains("Control Surface Probe not run"),
+            "{message}"
+        );
+        assert!(
+            message.contains("Lighting Bridge Probe not run"),
+            "{message}"
+        );
+        assert!(message.contains("Audio OSC Probe not run"), "{message}");
+
+        settings.insert(
+            super::check_status_key(super::CONTROL_SURFACE_CHECK_ID),
+            String::from("passed"),
+        );
+        settings.insert(
+            super::check_status_key(super::LIGHTING_CHECK_ID),
+            String::from("failed"),
+        );
+        let super::PublishGate::Refused { message } =
+            super::evaluate_publish_gate(&settings, false)
+        else {
+            panic!("a failed probe must refuse");
+        };
+        assert!(
+            message.contains("Lighting Bridge Probe failed"),
+            "{message}"
+        );
+        assert!(message.contains("Audio OSC Probe not run"), "{message}");
+        assert!(!message.contains("Control Surface"), "{message}");
+
+        assert_eq!(
+            super::evaluate_publish_gate(&settings, true),
+            super::PublishGate::Overridden {
+                failing: vec![
+                    String::from("Lighting Bridge Probe failed"),
+                    String::from("Audio OSC Probe not run"),
+                ],
+            }
+        );
+
+        settings.insert(
+            super::check_status_key(super::LIGHTING_CHECK_ID),
+            String::from("passed"),
+        );
+        settings.insert(
+            super::check_status_key(super::AUDIO_CHECK_ID),
+            String::from("passed"),
+        );
+        assert_eq!(
+            super::evaluate_publish_gate(&settings, false),
+            super::PublishGate::Clear
+        );
+        // An override with nothing to override records nothing.
+        assert_eq!(
+            super::evaluate_publish_gate(&settings, true),
+            super::PublishGate::Clear
+        );
+    }
+
+    #[test]
+    fn readiness_summary_names_a_probe_override_only_after_publish() {
+        assert_eq!(
+            super::with_publish_override_note(
+                String::from("All good."),
+                Some("2026-09-04T10:00:00Z"),
+                true
+            ),
+            "All good. Published with a probe override at 2026-09-04T10:00:00Z."
+        );
+        assert_eq!(
+            super::with_publish_override_note(
+                String::from("Pending."),
+                Some("2026-09-04T10:00:00Z"),
+                false
+            ),
+            "Pending."
+        );
+        assert_eq!(
+            super::with_publish_override_note(String::from("All good."), None, true),
+            "All good."
+        );
     }
 
     #[test]

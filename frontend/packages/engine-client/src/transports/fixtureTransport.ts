@@ -3194,8 +3194,12 @@ function synchronizeFixtureState(state: MutableFixtureState) {
       ? "Verification complete. Publish to unlock operator mode."
       : "Complete commissioning to unlock operator mode.";
   state.commissioningSnapshot.configSummary = `Profile '${hardwareProfile}'. Lighting bridge '${asString(state.commissioningSnapshot.lighting.bridgeIp, "unconfigured")}' on universe ${asNumber(state.commissioningSnapshot.lighting.universe, 1)}. Audio send ${asString(state.commissioningSnapshot.audio.sendHost, "127.0.0.1")}:${asNumber(state.commissioningSnapshot.audio.sendPort, 7001)} and receive ${asNumber(state.commissioningSnapshot.audio.receivePort, 9001)}.`;
+  const publishOverrideAt =
+    typeof state.commissioningSnapshot.publishOverrideAt === "string"
+      ? state.commissioningSnapshot.publishOverrideAt
+      : null;
   state.commissioningSnapshot.readinessSummary = hasCompletedSetup
-    ? `${passedChecks} of ${checks.length} commissioning probes passed. Startup routes directly into the dashboard.`
+    ? `${passedChecks} of ${checks.length} commissioning probes passed. Startup routes directly into the dashboard.${publishOverrideAt ? ` Published with a probe override at ${publishOverrideAt}.` : ""}`
     : `${passedChecks} of ${checks.length} commissioning probes passed. Planning store has ${planningProjectCount} projects and ${planningTaskCount} tasks. Startup remains on Setup until publish.`;
   state.commissioningSnapshot.steps = buildCommissioningSteps(
     runnerStage,
@@ -4682,6 +4686,22 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         return cloneJson(mixTarget);
       }
       case "commissioning.update": {
+        if (params.stage === "ready") {
+          // 2026-09 audit Slice 8: mirror the engine's publish gate. Publishing
+          // is refused while a probe is not passed unless overrideProbes is
+          // explicit; an override is recorded, a clean publish clears it.
+          const probeIds = new Set(["control-surface", "lighting", "audio"]);
+          const failing = ensureCommissioningChecks(state)
+            .filter((check) => probeIds.has(asString(check.id)))
+            .filter((check) => asString(check.status) !== "passed" && asString(check.status) !== "ok")
+            .map((check) => `${asString(check.label)} ${asString(check.status) === "failed" ? "failed" : "not run"}`);
+          if (failing.length > 0 && params.overrideProbes !== true) {
+            throw new Error(
+              `Publish refused: ${failing.join(", ")}. Run the probes until they pass, or publish with the explicit override to record the exception.`
+            );
+          }
+          state.commissioningSnapshot.publishOverrideAt = failing.length > 0 ? new Date().toISOString() : null;
+        }
         if (typeof params.stage === "string") {
           state.commissioningSnapshot.stage = params.stage as CommissioningStage;
           state.commissioningSnapshot.runnerStage = normalizeRunnerStage(
@@ -4728,7 +4748,18 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             throw new Error("universe must be between 1 and 63999");
           }
           state.commissioningSnapshot.lighting = { bridgeIp, universe };
-          updateFixtureCheck(state, "lighting", "passed", `Bridge probe reached ${bridgeIp} on universe ${universe}.`);
+          // 2026-09 audit Slice 8: a deterministic failure so specs can drive
+          // the publish gate — 0.0.0.0 is never a reachable bridge.
+          if (bridgeIp === "0.0.0.0") {
+            updateFixtureCheck(state, "lighting", "failed", `Bridge ${bridgeIp} did not answer the sACN probe.`);
+          } else {
+            updateFixtureCheck(
+              state,
+              "lighting",
+              "passed",
+              `Bridge probe reached ${bridgeIp} on universe ${universe}.`
+            );
+          }
         } else if (target === "audio") {
           const sendHost = asString(
             params.sendHost,
@@ -4749,12 +4780,17 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
             throw new Error("sendPort and receivePort must be between 1 and 65535");
           }
           state.commissioningSnapshot.audio = { sendHost, sendPort, receivePort };
-          updateFixtureCheck(
-            state,
-            "audio",
-            "passed",
-            `OSC transport config accepted for ${sendHost} (send ${sendPort}, receive ${receivePort}).`
-          );
+          if (sendPort === 1) {
+            // Deterministic failure for the publish-gate specs (Slice 8).
+            updateFixtureCheck(state, "audio", "failed", `No TotalMix answer on ${sendHost}:${sendPort}.`);
+          } else {
+            updateFixtureCheck(
+              state,
+              "audio",
+              "passed",
+              `OSC transport config accepted for ${sendHost} (send ${sendPort}, receive ${receivePort}).`
+            );
+          }
         } else if (target === "control-surface") {
           updateFixtureCheck(
             state,

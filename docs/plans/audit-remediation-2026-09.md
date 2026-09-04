@@ -202,12 +202,29 @@ Baselines moved: none. Operator hands: none — the behaviour is fully covered b
 
 ## Slice 8 — Publish gate with explicit override
 
-Status: planned.
+Status: complete 2026-09-04 (no hardware hands). Commit `Audit S8`.
 
 Scope: engine refuses `stage: ready` while any probe is not `passed` (`COMMISSIONING_PROBES_INCOMPLETE`) unless `overrideProbes: true` (recorded); `runAllProbes` reports failures honestly and stops advancing; Publish confirm names failing probes; fixture transport can fail probes; automation scripts carry the override explicitly.
-Gates before: publish asserted as "planning visible"; two scripts published with zero probes.
-Tests added: engine refusal/override tests; Playwright failing-probe → dialog → cancel/confirm. Tests changed: none expected.
-Validation: (filled at landing). Baselines: none. Operator hands: none.
+
+What the gates asserted before: `setup.spec.ts` walked the runner and asserted only that Planning became visible after Publish; "Run all probes" returned the constant "All commissioning probes completed." whatever the probes said and advanced regardless; the engine's `commissioning.update` never looked at the probes; `native-acceptance.mjs`, `native-packaged-acceptance.mjs` and `tauri-setup-support-qualification.mjs` all published with zero probes run (three scripts, not the two the plan counted); the fixture transport could not fail a probe; no engine test covered `stage: ready` at all.
+
+What landed:
+
+- `commissioning.rs`: `failing_probes(settings)` ("Audio OSC Probe failed", "Lighting Bridge Probe not run"), `evaluate_publish_gate(settings, override) -> PublishGate::{Clear, Refused{message}, Overridden{failing}}`, `publish_override_timestamp`, `PUBLISH_OVERRIDE_AT_KEY = app.commissioning.publish_override_at`; the commissioning snapshot gains `publishOverrideAt` (serde default) and the readiness summary appends "Published with a probe override at …" once published.
+- `app_state.rs::parse_commissioning_override` (`overrideProbes`, absent/null = false, non-boolean = invalid params). `app.rs`: the `commissioning.update` arm runs `gate_commissioning_publish` before writing — requests that do not publish pass through; a publish with a non-passed probe and no override answers `COMMISSIONING_PROBES_INCOMPLETE` with the probe list; an override records the timestamp and writes a WARN line to the engine log; a clean publish clears the marker.
+- Frontend: `CommissioningUpdateRequest.overrideProbes?`; the Setup runner's `runAllProbes` reads the probes back ("2 of 3 probes passed — Lighting Bridge Probe: Bridge 0.0.0.0 did not answer the sACN probe.", error tone) and only advances when all three passed; Publish with a non-green probe opens `ConfirmDialog` "Publish with failing probes?" (danger, lists "<probe> — <message>", "Publish anyway" sends the override); the publish step states the rule and shows the recorded override; the runner counts only the three engine probe ids because fixture snapshots also carry three legacy label-only check entries (visible in the fixture probe grid as extra cards — pre-existing fixture shape, not touched). Fixture transport mirrors the refusal and the override marker and fails probes deterministically (lighting `0.0.0.0`, audio send port `1`).
+- Scripts: the three publishing scripts pass `overrideProbes: true` with a comment. Two Windows fixes were needed to run the qualification lane on the workstation at all, both pre-existing: `spawn("npm.cmd")` without a shell is refused by Node ≥ 18.20 (EINVAL), and `closeTauriShell` killed only the npm parent so vite kept port 4173 and step 2's preflight failed — it now kills the process tree (`taskkill /T`). Routine calls, recorded here; neither changes what the lane asserts.
+- CHANGELOG (Added).
+
+Tests added: engine `publish_gate_refuses_until_every_probe_passed_and_records_an_override`, `readiness_summary_names_a_probe_override_only_after_publish`; end-to-end (real binary) `commissioning_publish_is_refused_until_probes_pass_or_the_operator_overrides` (refusal code + all three probes named, snapshot still incomplete, override publishes to `dashboard`, `publishOverrideAt` set and echoed in the readiness summary); Playwright `setup.spec.ts` "publish refuses failing probes until the operator overrides explicitly" (failed lighting probe → "2 of 3 probes passed" with the message, runner stays on Probe, Publish → dialog names the probe → Cancel keeps Setup, Publish anyway → Planning).
+
+Tests changed (old → new, why): `setup.spec.ts` walk-through expects "All 3 commissioning probes passed." instead of "All commissioning probes completed." (the old string was constant and said nothing about outcomes). The three automation scripts now publish with the explicit override (old: implicit publish with zero probes — exactly the audit finding).
+
+Validation (workstation, 2026-09-04): `cargo test -p studio-control-engine` (13 commissioning/app_state tests in the filtered run; full suite 282 passed in dev:check), `cargo test --test end_to_end` 2 passed, `cargo test --test contract` 4 passed; fmt + clippy clean (one `map_or` → `is_none_or` lint in the new e2e test); `frontend:typecheck` clean; Vitest 51 + 119 + 4; eslint/prettier clean; Playwright `setup.spec.ts` 9 passed (dist rebuilt); `npm run native:acceptance` (simulated console) passed with the override; `npm run tauri:setup-support:qualify` passed all three steps after the two Windows fixes (evidence `summary.json` in the temp evidence dir, publish check `commissioning-publish-unlocks-dashboard`), no shell/engine/vite process or port left behind; visual lanes → 8 win32 Setup baselines refreshed; `npm run dev:check` → passed.
+
+Baselines moved: 8 win32 — `setup-ready` at 1728×1117, 1920×1080, 2560×1440, graphite and bone; `setup-degraded` 2560×1440; Storybook `Shell/OperatorShell — Setup Ready` and `— Setup Degraded`. Diff inspected: only the publish step's first readiness sentence (now states the green-probes rule and the override). Linux after Slice 12; darwin pending.
+
+Operator hands: none. The operator-visible behaviour on the workstation: Publish with any probe not green opens the confirm; the recorded override shows in the publish step and the setup summary.
 
 ## Slice 9 — 1920×1080 compact density + overflow test
 

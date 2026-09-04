@@ -310,6 +310,17 @@ pub fn parse_commissioning_update(params: &Value) -> Result<Vec<(&'static str, S
     Ok(updates)
 }
 
+/// `overrideProbes` on `commissioning.update` (2026-09 audit Slice 8): the
+/// operator's explicit decision to publish while a probe is not passed.
+/// Absent or null means no override.
+pub fn parse_commissioning_override(params: &Value) -> Result<bool, String> {
+    match params.get("overrideProbes") {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Bool(value)) => Ok(*value),
+        Some(_) => Err(String::from("overrideProbes must be a boolean")),
+    }
+}
+
 fn parse_bool(value: &str) -> Option<bool> {
     match value {
         "true" => Some(true),
