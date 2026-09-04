@@ -59,6 +59,7 @@ type AudioDynamicsUpdate = Parameters<ShellStore["updateAudioChannelDynamics"]>[
 type AudioEqUpdate = Parameters<ShellStore["updateAudioChannelEq"]>[0];
 type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
+type AudioTalkbackHold = Parameters<ShellStore["holdAudioTalkback"]>[0];
 type AudioSettingsUpdate = Parameters<ShellStore["updateAudioSettings"]>[0];
 
 interface AudioContextMenuState {
@@ -457,6 +458,18 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   });
 
+  // Talkback holds bypass performAction on purpose: a hold re-sends every
+  // 750 ms, and a heartbeat must not clear an armed action, flash the busy
+  // state or wipe feedback. Errors still surface as feedback.
+  const holdTalkback = useLiveCallback((request: AudioTalkbackHold) => {
+    void store.holdAudioTalkback(request).catch((error) => {
+      setFeedback({
+        message: error instanceof Error ? error.message : "Talkback could not be changed.",
+        tone: "error",
+      });
+    });
+  });
+
   const clearAllSolo = useLiveCallback(() => {
     void performAction("audio-clear-all-solo", async () => {
       await store.clearAllAudioSolo();
@@ -734,7 +747,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         />
       </div>
 
-      <AudioMonitorBar onUpdateMixTarget={updateMixTarget} viewModel={viewModel} />
+      <AudioMonitorBar onHoldTalkback={holdTalkback} onUpdateMixTarget={updateMixTarget} viewModel={viewModel} />
 
       <AudioMeterCanvasOverlay
         peakHoldEnabled={peakHoldEnabled}

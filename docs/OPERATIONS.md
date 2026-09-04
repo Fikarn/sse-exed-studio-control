@@ -77,6 +77,7 @@ Audio-page edits are transmitted to TotalMix over the Global OSC remote (send po
 - Channel faders ride `/mix/{in|pb}/{ch}/{out}/faderlin` (linear 0..1, the app's own fader scale; the dB the app prints for a position follows RME's published fader curve, unity at step 836 of 1023) to the requested submix — Main (out 0), Phones 1 (out 8), or Phones 2 (out 10). Output levels ride `/output/{ch}/faderlin`.
 - Mute (`/input|playback|output/{ch}/mute`), solo (`/mix/{in|pb}/{ch}/0/solo`, main submix), phantom (`/input/{ch}/48v`), phase, pad, instrument, and auto-set are absolute 0/1 states.
 - Dim, mono, and talkback are control-room functions (`/controlroom/dim|mainmono|talkback`) — sent for the main out, app-local for the phones targets.
+- Talkback is momentary on every surface: hold the Talkback button or `T` in the app, or `TALK` on the deck. The app re-sends the hold every 750 ms and the engine releases 2 s after the last hold from any surface, so a dropped request, a closed window or an unplugged deck can never leave talkback open, and a click never latches. A graceful engine stop releases an active hold; a hard kill cannot — if the engine dies mid-hold, release talkback in TotalMix.
 - Preamp gain is sent in real dB (`/input/{ch}/gain`) for the front preamps 9-12.
 - The TotalMix Channel Layout gates whether TotalMix accepts control on hidden channels ("Receive on hidden channels" in the Global OSC details); keep the channels the operator drives visible, or enable that option.
 - EQ and Low Cut edits still use the classic page-2 path on the first classic remote; the classic remotes otherwise serve as metering fallback, and the engine keeps pinning their bus/bank each second.
@@ -91,6 +92,7 @@ To commission it on the workstation:
 1. TotalMix FX must be version `2.1` or newer (Global OSC is the 2.1 headline feature; `2.0x` does not have it). The 2.1 beta is distributed on the RME TotalMix FX beta page as a manual file replacement — keep a backup of the previous `TotalMixFX_x64.exe` for rollback.
 2. In `Options → Settings → OSC`, select remote controller `4`: `In Use` checked, compatibility/mode set to `Global OSC`, IP `127.0.0.1`, port incoming `7004`, port outgoing `9004`, and enable the send-changes/send-status details if the dialog offers them. Leave remotes 1-3 untouched in classic mode.
 3. No app restart is needed — the engine re-primes the slot within seconds and the Main Out / Phones meters go live.
+4. For talkback, assign the studio's talkback microphone as the Talkback input channel in `Options → Settings → Mixer` (TotalMix reports the choice as `/controlroom/talkchannel`; `-1` means none). With no channel assigned TotalMix ignores `/controlroom/talkback` from every remote and answers `0`; the app then shows `TALKBACK REFUSED` with this instruction and the deck's `TALK` key never goes green. Found live on the studio UFX III on 2026-09-04 — the channel was unassigned.
 
 ### Stream Deck Audio Surface
 

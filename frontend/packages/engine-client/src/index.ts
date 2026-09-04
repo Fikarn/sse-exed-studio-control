@@ -26,6 +26,7 @@ export type {
   AudioSnapshotCreateRequest,
   AudioSnapshotDeleteRequest,
   AudioSnapshotUpdateRequest,
+  AudioTalkbackHoldRequest,
   LightingPaletteApplyRequest,
   LightingPaletteCreateRequest,
   LightingPaletteUpdateRequest,

@@ -1,12 +1,13 @@
 use crate::app_state::{build_app_snapshot, parse_commissioning_update, APP_SETTINGS_PREFIX};
 use crate::audio::{
     build_audio_health_check, clear_all_audio_solo, clear_audio_clips, create_audio_snapshot,
-    delete_audio_snapshot, parse_audio_channel_update_request, parse_audio_clip_clear_request,
-    parse_audio_dynamics_update_request, parse_audio_eq_update_request,
-    parse_audio_mix_target_update_request, parse_audio_send_mode_update_request,
-    parse_audio_settings_update_request, parse_audio_snapshot_create_request,
-    parse_audio_snapshot_delete_request, parse_audio_snapshot_recall_request,
-    parse_audio_snapshot_update_request, read_audio_snapshot, recall_audio_snapshot,
+    delete_audio_snapshot, hold_audio_talkback, parse_audio_channel_update_request,
+    parse_audio_clip_clear_request, parse_audio_dynamics_update_request,
+    parse_audio_eq_update_request, parse_audio_mix_target_update_request,
+    parse_audio_send_mode_update_request, parse_audio_settings_update_request,
+    parse_audio_snapshot_create_request, parse_audio_snapshot_delete_request,
+    parse_audio_snapshot_recall_request, parse_audio_snapshot_update_request,
+    parse_audio_talkback_hold_request, read_audio_snapshot, recall_audio_snapshot,
     sync_audio_console, update_audio_channel, update_audio_channel_dynamics,
     update_audio_channel_eq, update_audio_channel_send_mode, update_audio_mix_target,
     update_audio_settings, update_audio_snapshot, AudioCommandError,
@@ -456,6 +457,7 @@ impl EngineApp {
                 update_audio_settings,
                 "settings-updated",
             ),
+            "audio.talkback.hold" => self.dispatch_audio_talkback_hold(request),
 
             // -------------------------------------------------------------
             // Planning mutations (M-1event with derived event payload)
@@ -1184,6 +1186,49 @@ impl EngineApp {
         match parse(&request.params) {
             Ok(parsed) => self.run_audio_mutate(request.id, |db| handler(db, &parsed), reason),
             Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    /// `audio.talkback.hold` announces `audio.changed` only when talkback
+    /// actually changed: the frontend re-sends the hold every 750 ms while
+    /// the operator holds, and those heartbeats must not fan out as events.
+    fn dispatch_audio_talkback_hold(&self, request: RequestEnvelope) -> EngineReply {
+        let parsed = match parse_audio_talkback_hold_request(&request.params) {
+            Ok(parsed) => parsed,
+            Err(message) => return Self::reply(invalid_params(request.id, message)),
+        };
+        match hold_audio_talkback(&self.runtime.db_path, &parsed) {
+            Ok(result) => {
+                let response = ok_response(
+                    request.id,
+                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                );
+                if result.changed {
+                    let reason = if result.talkback {
+                        "talkback-engaged"
+                    } else {
+                        "talkback-released"
+                    };
+                    Self::reply_with_audio_change(response, reason)
+                } else {
+                    Self::reply(response)
+                }
+            }
+            Err(AudioCommandError::Rejected(code, message)) => {
+                Self::reply(error_response(request.id, code, message))
+            }
+            Err(AudioCommandError::Storage(message)) => {
+                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+            }
+        }
+    }
+
+    /// Graceful stop (stdin closed): release any talkback the engine is still
+    /// holding for a surface that can no longer release it.
+    pub fn shutdown(&self) {
+        let released = crate::audio::release_all_talkback_holds(&self.runtime.db_path);
+        if released > 0 {
+            eprintln!("Released {released} talkback hold(s) on shutdown");
         }
     }
 

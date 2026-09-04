@@ -31,6 +31,9 @@
   font-family: var(--font-ui);
   text-align: left;
   cursor: pointer;
+  /* Momentary control: a touch hold must not scroll or select. */
+  touch-action: none;
+  user-select: none;
   transition:
     color var(--motion-duration-fast) var(--easing),
     box-shadow var(--motion-duration-fast) var(--easing),
@@ -96,6 +99,20 @@
 
 .talkbackButton[data-active="true"] .talkbackCap {
   color: rgba(0, 0, 0, 0.5);
+}
+
+/* Holding but not live: the operator is pressing and the desk has not (or
+   has refused to) put talkback on — data-active follows the engine state, so
+   a refused hold never paints the full "live" fill. Ring + glyph only. */
+.talkbackButton[data-holding="true"]:not([data-active="true"]) {
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    var(--housing-shadow);
+}
+
+.talkbackButton[data-holding="true"]:not([data-active="true"]) .talkbackGlyph {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .talkbackButton[data-active="true"] .talkbackGlyph {

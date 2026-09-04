@@ -670,6 +670,70 @@ fn unconfirmed_sends_downgrade_confidence_to_assumed() {
     assert!(message.contains("Press Sync"), "{message}");
 }
 
+// 2026-09 audit Slice 6, from the live check: TotalMix answers a talkback
+// write with 0 when no talkback input channel is assigned. The app must show
+// the reason and stop holding instead of quietly flipping the button back.
+#[test]
+fn console_refusing_talkback_records_the_reason_and_drops_the_hold() {
+    let test_dir = TestDir::new("talkback-refused");
+    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[
+            (
+                String::from("app.commissioning.check.audio.status"),
+                String::from("passed"),
+            ),
+            (
+                String::from("app.audio.send_host"),
+                String::from("127.0.0.1"),
+            ),
+            (
+                String::from("app.audio.metering_source"),
+                String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+            ),
+        ],
+    )
+    .expect("ready audio settings should persist");
+
+    let mut request = mix_target_request("audio-mix-main");
+    request.talkback = Some(true);
+    update_audio_mix_target(test_dir.db_path().as_path(), &request).expect("talkback on");
+    assert!(talkback_hold_deadline(test_dir.db_path().as_path(), "audio-mix-main").is_some());
+
+    let refused = crate::rme_console_link::ConsoleUpdate {
+        key: crate::rme_console_link::ParamKey::ControlRoom(
+            crate::rme_console_link::ControlRoomFunction::Talkback,
+        ),
+        value: crate::rme_console_link::ConsoleValue::Flag(false),
+        adjusted: true,
+    };
+    let report = apply_console_activity(test_dir.db_path().as_path(), &[refused], &[], false)
+        .expect("refusal should apply");
+    assert_eq!(report.applied, 1);
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    let main = snapshot
+        .mix_targets
+        .iter()
+        .find(|entry| entry.id == "audio-mix-main")
+        .expect("main mix");
+    assert!(!main.talkback, "the console's off wins");
+    assert_eq!(snapshot.last_action_status, "failed");
+    assert_eq!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_TALKBACK_REFUSED")
+    );
+    let message = snapshot.last_action_message.unwrap_or_default();
+    assert!(message.contains("talkback input channel"), "{message}");
+    assert!(
+        talkback_hold_deadline(test_dir.db_path().as_path(), "audio-mix-main").is_none(),
+        "a refused talkback drops the hold"
+    );
+}
+
 #[test]
 fn console_disconnect_resets_confidence_to_unknown() {
     let test_dir = TestDir::new("console-disconnect");

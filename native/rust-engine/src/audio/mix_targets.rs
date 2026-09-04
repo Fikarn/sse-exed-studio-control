@@ -86,6 +86,17 @@ pub fn update_audio_mix_target(
         ],
     )?;
 
+    // Talkback is momentary on every surface (2026-09 audit, Slice 6): any
+    // caller that turns it on arms the watchdog, any caller that turns it off
+    // clears it, so nothing can latch talkback by construction.
+    if let Some(talkback) = request.talkback {
+        if talkback {
+            super::talkback::arm_talkback_hold(db_path, &request.mix_target_id);
+        } else {
+            super::talkback::clear_talkback_hold(db_path, &request.mix_target_id);
+        }
+    }
+
     let refreshed = read_audio_snapshot(&load_audio_settings(db_path)?);
     refreshed
         .mix_targets

@@ -4,10 +4,13 @@ import type { ShellStore } from "@sse/engine-client";
 import styles from "./AudioMonitorBar.module.css";
 import { formatAudioDb, formatMeterPercent } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
+import { useMomentaryTalkback } from "../hooks/useMomentaryTalkback";
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
+type AudioTalkbackHold = Parameters<ShellStore["holdAudioTalkback"]>[0];
 
 interface AudioMonitorBarProps {
+  onHoldTalkback: (request: AudioTalkbackHold) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
   viewModel: AudioWorkspaceViewModel;
 }
@@ -26,7 +29,7 @@ const SCALE_TICKS: { db: number; pct: number; label: string }[] = [
   { db: 0, pct: 100, label: "0" },
 ];
 
-export function AudioMonitorBar({ onUpdateMixTarget, viewModel }: AudioMonitorBarProps) {
+export function AudioMonitorBar({ onHoldTalkback, onUpdateMixTarget, viewModel }: AudioMonitorBarProps) {
   const selectedMixTarget = viewModel.selectedMixTarget ?? viewModel.mixTargets[0] ?? null;
 
   const meterLeftPct = selectedMixTarget ? percentNumber(selectedMixTarget.meterLeft) : 0;
@@ -47,12 +50,17 @@ export function AudioMonitorBar({ onUpdateMixTarget, viewModel }: AudioMonitorBa
   const masterDb = selectedMixTarget ? formatAudioDb(selectedMixTarget.volume) : "—";
   const actionsAllowed = viewModel.actionsAllowed;
 
-  const setControl = (control: "talkback" | "dim" | "mono") => () => {
+  // Talkback is a hold, never a toggle (2026-09 audit Slice 6): the hook owns
+  // engage / heartbeat / release for the button and for the page-wide T key.
+  const talkback = useMomentaryTalkback({
+    enabled: Boolean(selectedMixTarget) && actionsAllowed,
+    hold: (engaged) => {
+      if (selectedMixTarget) onHoldTalkback({ mixTargetId: selectedMixTarget.id, engaged });
+    },
+  });
+
+  const setControl = (control: "dim" | "mono") => () => {
     if (!selectedMixTarget) return;
-    if (control === "talkback") {
-      onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, talkback: !selectedMixTarget.talkback });
-      return;
-    }
     if (control === "dim") {
       onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, dim: !selectedMixTarget.dim });
       return;
@@ -74,10 +82,12 @@ export function AudioMonitorBar({ onUpdateMixTarget, viewModel }: AudioMonitorBa
           className={styles.talkbackButton}
           data-active={talkbackOn}
           data-control="talk"
+          data-holding={talkback.holding ? "true" : undefined}
           data-testid="audio-monitor-talkback"
           disabled={!selectedMixTarget || !actionsAllowed}
-          onClick={setControl("talkback")}
+          title="Hold to talk to the monitor output; release to stop. Or hold T."
           type="button"
+          {...talkback.buttonProps}
         >
           <span className={styles.talkbackGlyph} aria-hidden="true">
             <svg width="10" height="13" viewBox="0 0 10 13" fill="none">
@@ -87,7 +97,7 @@ export function AudioMonitorBar({ onUpdateMixTarget, viewModel }: AudioMonitorBa
           </span>
           <span>
             <span className={styles.talkbackName}>Talkback</span>
-            <span className={styles.talkbackCap}>Press · Hold M</span>
+            <span className={styles.talkbackCap}>Hold · T</span>
           </span>
         </button>
       </div>

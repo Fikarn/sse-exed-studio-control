@@ -19,6 +19,7 @@ export const REQUEST_METHODS = [
   "audio.snapshot.recall",
   "audio.snapshot.update",
   "audio.sync",
+  "audio.talkback.hold",
   "commissioning.check.run",
   "commissioning.seedPlanningDemo",
   "commissioning.snapshot",

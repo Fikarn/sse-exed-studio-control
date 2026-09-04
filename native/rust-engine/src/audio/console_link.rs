@@ -128,6 +128,39 @@ pub(crate) fn apply_console_activity(
             ),
         ));
     }
+    // A talkback the app asked for that the console answered with "off" is a
+    // refusal, not a mystery. Live on the studio UFX III (2026-09-04): with
+    // no talkback input channel assigned in TotalMix (`/controlroom/talkchannel
+    // -1`) the desk ignores `/controlroom/talkback 1` from every remote and
+    // reports 0, so the app must say so instead of silently flipping back —
+    // and the hold is dropped so the watchdog has nothing to release.
+    let talkback_refused = updates.iter().any(|update| {
+        update.adjusted
+            && matches!(
+                update.key,
+                ParamKey::ControlRoom(ControlRoomFunction::Talkback)
+            )
+            && matches!(update.value, ConsoleValue::Flag(false))
+    });
+    if talkback_refused {
+        super::talkback::clear_talkback_hold(db_path, MAIN_MIX_TARGET_ID);
+        writes.push((
+            String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+            String::from("failed"),
+        ));
+        writes.push((
+            String::from(AUDIO_LAST_ACTION_CODE_KEY),
+            String::from("AUDIO_TALKBACK_REFUSED"),
+        ));
+        writes.push((
+            String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+            String::from(
+                "TotalMix kept talkback off. Assign a talkback input channel in TotalMix \
+                 (Options › Settings › Mixer › Talkback); with none assigned the desk \
+                 ignores talkback from every remote.",
+            ),
+        ));
+    }
     if connection_lost {
         writes.push(confidence_setting(ConsoleConfidence::Unknown));
     }

@@ -1,10 +1,11 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::audio::fader_curve::fader_lin_to_db;
 use crate::audio::{
-    clear_all_audio_solo, ensure_audio_action_allowed, parse_audio_snapshot_recall_request,
-    read_audio_snapshot, recall_audio_snapshot, update_audio_channel, update_audio_mix_target,
-    update_audio_settings, AudioChannelUpdateRequest, AudioCommandError,
-    AudioMixTargetUpdateRequest, AudioSettingsUpdateRequest, AudioSnapshot,
+    clear_all_audio_solo, ensure_audio_action_allowed, hold_audio_talkback,
+    parse_audio_snapshot_recall_request, read_audio_snapshot, recall_audio_snapshot,
+    update_audio_channel, update_audio_mix_target, update_audio_settings,
+    AudioChannelUpdateRequest, AudioCommandError, AudioMixTargetUpdateRequest,
+    AudioSettingsUpdateRequest, AudioSnapshot, AudioTalkbackHoldRequest,
 };
 use crate::control_surface::{
     clamp_i64, cycle_value, emit_audio_changed, map_planning_error, truncate, ControlSurfaceError,
@@ -13,9 +14,8 @@ use crate::planning::{parse_planning_settings_update, update_planning_settings};
 use crate::storage::{list_settings_by_prefix, set_settings_owned};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Mutex, OnceLock};
-use std::thread;
 use std::time::{Duration, Instant};
 
 const AUDIO_DECK_BANK_KEY: &str = "app.control_surface.audio.bank";
@@ -24,7 +24,6 @@ const AUDIO_DECK_BANK_CYCLE: &[&str] = &["inputs", "playback", "outputs"];
 const AUDIO_DECK_FADER_STEP: f64 = 0.01;
 const AUDIO_DECK_FAST_TURN_WINDOW: Duration = Duration::from_millis(80);
 const AUDIO_DECK_FAST_TURN_MULTIPLIER: f64 = 5.0;
-const AUDIO_DECK_TALK_RELEASE: Duration = Duration::from_secs(2);
 const AUDIO_ROLE_FRONT_PREAMP: &str = "front-preamp";
 const AUDIO_ROLE_PLAYBACK_PAIR: &str = "playback-pair";
 const AUDIO_MAIN_MIX_TARGET_ROLE: &str = "main-out";
@@ -38,8 +37,6 @@ pub(crate) enum AudioDeckStrip {
 }
 
 static AUDIO_DIAL_TURN_TIMES: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
-static AUDIO_TALK_DEADLINES: OnceLock<Mutex<HashMap<PathBuf, Instant>>> = OnceLock::new();
-static AUDIO_TALK_WATCHDOG: OnceLock<()> = OnceLock::new();
 
 /// Deck LCD dB label: RME's fader curve (`audio::fader_curve`), the same law
 /// the on-screen fader prints (`audioFormatting.ts`), so the deck and the app
@@ -763,34 +760,23 @@ fn handle_audio_dim_toggle(db_path: &Path) -> Result<Value, ControlSurfaceError>
     Ok(json!({ "mixTargetId": updated.id, "dim": updated.dim }))
 }
 
+/// Deck TALK key: the same momentary hold as the app's button and `T` key
+/// (`audio::hold_audio_talkback`, 2026-09 audit Slice 6). Companion re-sends
+/// `talkOn` while the key is held and `talkOff` on release; the shared
+/// watchdog releases 2 s after the last `talkOn` if the release never comes.
 fn handle_audio_talk(db_path: &Path, engage: bool) -> Result<Value, ControlSurfaceError> {
-    let (_, snapshot) = current_audio_snapshot(db_path)?;
-    let main = audio_main_mix_target(&snapshot).ok_or_else(|| {
-        ControlSurfaceError::Rejected(String::from("No main output mix target is available."))
-    })?;
-    let main_id = main.id.clone();
-    let currently_on = main.talkback;
-
-    if engage {
-        ensure_audio_action_allowed(db_path, &snapshot).map_err(map_audio_error)?;
-        arm_audio_talk_watchdog(db_path);
-        if !currently_on {
-            let mut request = audio_mix_target_update_request(&main_id);
-            request.talkback = Some(true);
-            update_audio_mix_target(db_path, &request).map_err(map_audio_error)?;
-            emit_audio_changed();
-        }
-        Ok(json!({ "mixTargetId": main_id, "talkback": true }))
-    } else {
-        clear_audio_talk_deadline(db_path);
-        if currently_on {
-            let mut request = audio_mix_target_update_request(&main_id);
-            request.talkback = Some(false);
-            update_audio_mix_target(db_path, &request).map_err(map_audio_error)?;
-            emit_audio_changed();
-        }
-        Ok(json!({ "mixTargetId": main_id, "talkback": false }))
+    let result = hold_audio_talkback(
+        db_path,
+        &AudioTalkbackHoldRequest {
+            mix_target_id: None,
+            engaged: engage,
+        },
+    )
+    .map_err(map_audio_error)?;
+    if result.changed {
+        emit_audio_changed();
     }
+    Ok(json!({ "mixTargetId": result.mix_target_id, "talkback": result.talkback }))
 }
 
 fn handle_audio_solo_clear_all(db_path: &Path) -> Result<Value, ControlSurfaceError> {
@@ -802,79 +788,12 @@ fn handle_audio_solo_clear_all(db_path: &Path) -> Result<Value, ControlSurfaceEr
     Ok(json!({ "cleared": soloed }))
 }
 
-fn arm_audio_talk_watchdog(db_path: &Path) {
-    let deadlines = AUDIO_TALK_DEADLINES.get_or_init(|| Mutex::new(HashMap::new()));
-    if let Ok(mut deadlines) = deadlines.lock() {
-        deadlines.insert(
-            db_path.to_path_buf(),
-            Instant::now() + AUDIO_DECK_TALK_RELEASE,
-        );
-    }
-    AUDIO_TALK_WATCHDOG.get_or_init(|| {
-        thread::spawn(run_audio_talk_watchdog);
-    });
-}
-
-fn clear_audio_talk_deadline(db_path: &Path) {
-    if let Some(deadlines) = AUDIO_TALK_DEADLINES.get() {
-        if let Ok(mut deadlines) = deadlines.lock() {
-            deadlines.remove(db_path);
-        }
-    }
-}
-
-fn run_audio_talk_watchdog() {
-    loop {
-        thread::sleep(Duration::from_millis(250));
-        let Some(deadlines) = AUDIO_TALK_DEADLINES.get() else {
-            continue;
-        };
-        let expired: Vec<PathBuf> = {
-            let Ok(mut deadlines) = deadlines.lock() else {
-                continue;
-            };
-            let now = Instant::now();
-            let expired = deadlines
-                .iter()
-                .filter(|(_, deadline)| now >= **deadline)
-                .map(|(path, _)| path.clone())
-                .collect::<Vec<_>>();
-            for path in &expired {
-                deadlines.remove(path);
-            }
-            expired
-        };
-        for db_path in expired {
-            if let Err(error) = release_audio_talkback(&db_path) {
-                eprintln!(
-                    "Control-surface talkback watchdog release failed: {}",
-                    error.message()
-                );
-            }
-        }
-    }
-}
-
-fn release_audio_talkback(db_path: &Path) -> Result<(), ControlSurfaceError> {
-    let (_, snapshot) = current_audio_snapshot(db_path)?;
-    let Some(main) = audio_main_mix_target(&snapshot) else {
-        return Ok(());
-    };
-    if !main.talkback {
-        return Ok(());
-    }
-    let mut request = audio_mix_target_update_request(&main.id);
-    request.talkback = Some(false);
-    update_audio_mix_target(db_path, &request).map_err(map_audio_error)?;
-    emit_audio_changed();
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::storage::initialize_database;
     use std::fs;
+    use std::path::PathBuf;
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -1236,6 +1155,11 @@ mod tests {
             .expect("talk on should succeed");
         assert_eq!(result["talkback"], true);
         assert!(
+            crate::audio::talkback_hold_deadline(test_dir.db_path().as_path(), "audio-mix-main")
+                .is_some(),
+            "deck talkOn arms the shared watchdog"
+        );
+        assert!(
             audio_snapshot_for(&test_dir)
                 .mix_targets
                 .iter()
@@ -1247,6 +1171,11 @@ mod tests {
         let result = handle_audio_action(test_dir.db_path().as_path(), "talkOff", None)
             .expect("talk off should succeed");
         assert_eq!(result["talkback"], false);
+        assert!(
+            crate::audio::talkback_hold_deadline(test_dir.db_path().as_path(), "audio-mix-main")
+                .is_none(),
+            "deck talkOff clears the shared watchdog"
+        );
         assert!(
             !audio_snapshot_for(&test_dir)
                 .mix_targets
@@ -1262,10 +1191,13 @@ mod tests {
         let test_dir = ready_audio_test_db("talk-release");
         handle_audio_action(test_dir.db_path().as_path(), "talkOn", None)
             .expect("talk on should succeed");
-        clear_audio_talk_deadline(test_dir.db_path().as_path());
 
-        release_audio_talkback(test_dir.db_path().as_path())
-            .expect("watchdog release should succeed");
+        // What the shared watchdog does when the deck's talkOff never arrives.
+        assert!(crate::audio::release_talkback_hold(
+            test_dir.db_path().as_path(),
+            "audio-mix-main"
+        )
+        .expect("watchdog release should succeed"));
         assert!(
             !audio_snapshot_for(&test_dir)
                 .mix_targets

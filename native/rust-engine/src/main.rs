@@ -425,6 +425,10 @@ fn main() -> io::Result<()> {
         }
     }
 
+    // stdin closed: the shell is going away. Release talkback holds before we
+    // do (2026-09 audit, Slice 6) — a hard kill cannot, and that is documented.
+    app.shutdown();
+
     Ok(())
 }
 

@@ -160,6 +160,16 @@ export interface AudioMixTargetUpdateRequest {
   talkback?: boolean;
 }
 
+/**
+ * `audio.talkback.hold` (2026-09 audit Slice 6): talkback is momentary.
+ * `engaged: true` engages or re-arms the hold (the frontend re-sends it every
+ * 750 ms while held), `false` releases it. `mixTargetId` defaults to Main.
+ */
+export interface AudioTalkbackHoldRequest {
+  mixTargetId?: string;
+  engaged: boolean;
+}
+
 export interface PlanningProjectCreateRequest {
   title: string;
   description?: string;
@@ -398,6 +408,7 @@ export interface ShellStore {
   updateAudioChannelDynamics(request: AudioDynamicsUpdateRequest): Promise<JsonValue>;
   updateAudioChannelSendMode(request: AudioSendModeUpdateRequest): Promise<JsonValue>;
   updateAudioMixTarget(request: AudioMixTargetUpdateRequest): Promise<JsonValue>;
+  holdAudioTalkback(request: AudioTalkbackHoldRequest): Promise<JsonValue>;
   updateAudioSettings(request: AudioSettingsUpdateRequest): Promise<JsonValue>;
   updateLightingSettings(request: LightingSettingsUpdateRequest): Promise<JsonValue>;
   createLightingGroup(name: string): Promise<JsonValue>;

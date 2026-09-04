@@ -1,6 +1,7 @@
 use serde_json::Value;
 
 use super::helpers::*;
+use super::talkback::AudioTalkbackHoldRequest;
 use super::types::*;
 
 pub fn parse_audio_snapshot_recall_request(
@@ -172,6 +173,24 @@ pub fn parse_audio_mix_target_update_request(
         dim,
         mono,
         talkback,
+    })
+}
+
+pub fn parse_audio_talkback_hold_request(
+    params: &Value,
+) -> Result<AudioTalkbackHoldRequest, String> {
+    let engaged = params
+        .get("engaged")
+        .and_then(Value::as_bool)
+        .ok_or_else(|| String::from("engaged (boolean) is required"))?;
+    let mix_target_id = match params.get("mixTargetId") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(value)) if !value.trim().is_empty() => Some(String::from(value.trim())),
+        Some(_) => return Err(String::from("mixTargetId must be a non-empty string")),
+    };
+    Ok(AudioTalkbackHoldRequest {
+        mix_target_id,
+        engaged,
     })
 }
 

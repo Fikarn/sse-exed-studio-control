@@ -4611,6 +4611,41 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         emit("audio.changed", { reason: "audio-channel-send-updated" });
         return cloneJson(channel);
       }
+      case "audio.talkback.hold": {
+        // 2026-09 audit Slice 6: momentary talkback, mirroring the engine.
+        // Engaging passes the console gate; a heartbeat while already on
+        // changes nothing; releasing turns it off; only real changes announce.
+        const engaged = params.engaged === true;
+        const audioSnapshot = engaged ? ensureAudioActionAllowed(state) : ensureAudioSnapshotAvailable(state);
+        const mixTargets = asArray(audioSnapshot.mixTargets)
+          .map((entry) => asRecord(entry))
+          .filter((entry): entry is JsonObject => entry !== null);
+        const requestedId = typeof params.mixTargetId === "string" ? params.mixTargetId.trim() : "";
+        const mixTarget = requestedId
+          ? mixTargets.find((entry) => asString(entry.id) === requestedId)
+          : (mixTargets.find((entry) => asString(entry.role) === "main-out") ?? mixTargets[0]);
+        if (!mixTarget) {
+          throw new Error(
+            requestedId
+              ? `Audio mix target '${requestedId}' is not exposed by the fixture transport.`
+              : "No main output mix target is available."
+          );
+        }
+        const mixTargetId = asString(mixTarget.id);
+        const changed = (mixTarget.talkback === true) !== engaged;
+        if (changed) {
+          mixTarget.talkback = engaged;
+          audioSnapshot.lastActionStatus = "succeeded";
+          audioSnapshot.lastActionCode = null;
+          audioSnapshot.lastActionMessage = engaged
+            ? `Talkback on ${asString(mixTarget.name, mixTargetId)}`
+            : `Talkback released on ${asString(mixTarget.name, mixTargetId)}`;
+          state.audioSnapshot = audioSnapshot;
+          synchronizeFixtureState(state);
+          emit("audio.changed", { reason: engaged ? "talkback-engaged" : "talkback-released" });
+        }
+        return { mixTargetId, talkback: engaged, changed };
+      }
       case "audio.mixTarget.update": {
         const audioSnapshot = ensureAudioActionAllowed(state);
         const mixTargetId = asString(params.mixTargetId).trim();

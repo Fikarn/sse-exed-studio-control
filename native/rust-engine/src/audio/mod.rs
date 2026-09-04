@@ -45,6 +45,7 @@ mod settings;
 mod snapshot;
 mod snapshots;
 mod sync;
+mod talkback;
 mod types;
 
 pub use channels::*;
@@ -60,6 +61,9 @@ pub use settings::*;
 pub use snapshot::*;
 pub use snapshots::*;
 pub use sync::*;
+#[cfg(test)]
+pub(crate) use talkback::talkback_hold_deadline;
+pub use talkback::*;
 pub use types::*;
 
 #[cfg(test)]
