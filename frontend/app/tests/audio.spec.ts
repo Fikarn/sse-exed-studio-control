@@ -167,7 +167,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-feeding", "true");
   await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Software");
-  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Playback telemetry not reported");
+  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("No playback stats from the driver");
   await expect(page.getByTestId("audio-inspector-channel")).not.toContainText("Buffer status");
   await expect(page.getByTestId("audio-inspector-channel").getByRole("button", { name: "Stereo link" })).toHaveCount(0);
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Stereo link");
@@ -306,7 +306,7 @@ test("audio topbar setup action opens the setup workspace", async ({ page }) => 
 test("renders audio degraded and loading fixture states", async ({ page }) => {
   await openFixture(page, "audio-state-assumed");
   await expect(page.getByText("STATE ASSUMED", { exact: true })).toBeVisible();
-  await expect(page.getByText(/using last synced console state/i)).toBeVisible();
+  await expect(page.getByText(/showing the last state the console confirmed/i)).toBeVisible();
 
   await openFixture(page, "audio-not-verified");
   // 2026-09 audit remediation, Slice 1: until the audio probe passes every

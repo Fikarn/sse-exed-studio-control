@@ -839,7 +839,7 @@ fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Resul
 
     if rme_totalmix_osc::wait_for_live_metering(Duration::from_millis(1_500)) {
         Ok(format!(
-            "RME TotalMix OSC metering verified for {}. Configure slots with send ports {}-{} and receive ports {}-{}; live meter packets are arriving.",
+            "TotalMix on {} is sending meter data (port incoming {}-{}, port outgoing {}-{}).",
             host,
             send_port,
             send_port.saturating_add(2),
@@ -848,7 +848,7 @@ fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Resul
         ))
     } else {
         Err(format!(
-            "No RME TotalMix OSC meter packets were received for {}. Configure three TotalMix OSC remote slots, set their outgoing ports to {}-{}, incoming ports to {}-{}, enable Send Peak Level, then rerun this probe.",
+            "No meter data arrived from TotalMix on {} within 1.5 s. In TotalMix Options › Settings › OSC, set remote controllers 1–3 to port outgoing {}-{} and port incoming {}-{}, turn on Send Peak Level Data, keep remote 4 in Global OSC mode, then run this probe again.",
             host,
             receive_port,
             receive_port.saturating_add(2),
@@ -1163,7 +1163,7 @@ mod tests {
             assert!(
                 audio_check
                     .message
-                    .contains("No RME TotalMix OSC meter packets")
+                    .contains("No meter data arrived from TotalMix")
                     || audio_check
                         .message
                         .contains("Audio OSC probe could not allocate a send socket"),
@@ -1172,7 +1172,7 @@ mod tests {
             );
             if audio_check
                 .message
-                .contains("No RME TotalMix OSC meter packets")
+                .contains("No meter data arrived from TotalMix")
             {
                 assert!(audio_check.message.contains("19001-19003"));
             }

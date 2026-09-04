@@ -101,7 +101,7 @@ The production target is fullscreen `2560x1440` on a fixed second monitor. Retin
 For built-in-display development, use the scaled studio preview workflow from [DEVELOPMENT.md](./DEVELOPMENT.md):
 
 - run the app with `npm run tauri:dev`
-- open `⌘K` and run `Studio Preview: Enter 2560x1440 Review`
+- open the command palette (`Ctrl+K`, `⌘K` on macOS) and run `Studio Preview: Enter 2560x1440 Review`
 - review the proportional `2560x1440` studio canvas scaled into the current window
 - exit scaled preview before judging native compact/windowed behavior
 - keep `npm run tauri:visual:review` as the repeatable capture lane

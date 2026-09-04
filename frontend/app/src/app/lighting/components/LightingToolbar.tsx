@@ -26,6 +26,7 @@ import {
 
 import { Button, ContextMenu, StatusDot, Tooltip, type ContextMenuItem } from "@sse/design-system";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import { useOperatorLayout } from "../../OperatorLayoutProvider";
 import { ShortcutOverlay } from "../../shared/ShortcutOverlay";
 import styles from "./LightingToolbar.module.css";
@@ -204,7 +205,7 @@ export function LightingToolbar({
           aria-pressed={soloActive}
           disabled={previewMode || (!hasSelection && !soloActive)}
         >
-          Solo <kbd className={styles.kbd}>⇧H</kbd>
+          Solo <kbd className={styles.kbd}>{formatShortcut(["shift", "H"])}</kbd>
         </Button>
       </Tooltip>
 
@@ -221,7 +222,7 @@ export function LightingToolbar({
           leadingVisual={<Locate aria-hidden="true" size={13} strokeWidth={1.75} />}
           disabled={previewMode || !hasSelection}
         >
-          Find <kbd className={styles.kbd}>⇧I</kbd>
+          Find <kbd className={styles.kbd}>{formatShortcut(["shift", "I"])}</kbd>
         </Button>
       </Tooltip>
     </>

@@ -166,3 +166,25 @@ test("runner panels scroll within their tracks at 1280x800 (SET-11)", async ({ p
     })
     .toBe(true);
 });
+
+// 2026-09 audit remediation, Slice 12: seeding demo planning data is a
+// confirmed action (it used to fire on a single click next to the profile
+// download).
+test("loading sample planning asks for confirmation first", async ({ page }) => {
+  await openFixture(page, "setup-required");
+  await page.getByRole("tab", { name: /Import profile/i }).click();
+
+  await page.getByRole("button", { name: "Load sample planning" }).click();
+  const dialog = page.getByRole("dialog", { name: "Load sample planning data?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(/adds the bundled sample projects/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/Loaded the bundled sample planning data/)).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Load sample planning" }).click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Load sample planning" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText(/Loaded the bundled sample planning data/)).toBeVisible();
+});

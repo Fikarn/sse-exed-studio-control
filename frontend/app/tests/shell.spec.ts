@@ -202,3 +202,34 @@ test("lighting scene drift latches a monitor-strip chip", async ({ page }) => {
   await page.getByRole("button", { name: /^Front, 2 fixtures/ }).click();
   await expect(driftChip).toHaveCount(0);
 });
+
+// 2026-09 audit remediation, Slice 12: shortcut hints render for the host OS.
+// The studio workstation is Windows; the Mac glyphs used to appear everywhere
+// with "(Ctrl+K on Windows)" footnotes.
+test("shortcut labels follow the host platform", async ({ page }) => {
+  const apple = process.platform === "darwin";
+  const paletteLabel = apple ? "⌘K" : "Ctrl+K";
+  const monitorLabel = apple ? "⌘⇧M" : "Ctrl+Shift+M";
+
+  await openFixture(page, "audio-populated");
+  await expect(page.locator("[data-health-bar] kbd").first()).toHaveText(paletteLabel);
+
+  await page.keyboard.press("Shift+/");
+  const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(overlay).toBeVisible();
+  const paletteRow = overlay.locator("li", { hasText: "Open command palette" }).first();
+  await expect(paletteRow.locator("kbd").first()).toHaveText(apple ? "⌘" : "Ctrl");
+  await expect(overlay.getByText(/Ctrl\+K on Windows/)).toHaveCount(0);
+  await expect(overlay.getByText(/Ctrl substitutes/)).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(overlay).toBeHidden();
+
+  await page.keyboard.press(modifierShortcut("KeyK"));
+  const palette = page.getByRole("dialog", { name: /command palette/i });
+  await expect(palette).toBeVisible();
+  await expect(palette.getByText(apple ? "⌘⇧R" : "Ctrl+Shift+R", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await openFixture(page, "lighting-populated");
+  await expect(page.locator("[data-health-bar] kbd", { hasText: monitorLabel })).toHaveCount(1);
+});

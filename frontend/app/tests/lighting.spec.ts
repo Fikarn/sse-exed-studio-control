@@ -634,7 +634,12 @@ test("opens the compact DMX strip and expands it to the full monitor", async ({ 
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Patched to a fixture")).toBeVisible();
   await expect(dialog.getByRole("grid", { name: "DMX universe U1 channels" })).toBeVisible();
-  await expect(dialog.locator('[title="Ch 1 · Key · Dimmer"]')).toBeVisible();
+  const keyDimmer = dialog.locator('[title="Ch 1 · Key · Dimmer"]');
+  await expect(keyDimmer).toBeVisible();
+  // 2026-09 audit remediation, Slice 12: DMX values read as decimal 0–255
+  // (they used to be two-digit hex). Key's dimmer resolves to 194 here (≈76 % of 255).
+  await expect(keyDimmer.getByTestId("dmx-cell-value")).toHaveText("194");
+  await expect(dialog.getByTestId("dmx-cell-value").filter({ hasText: /[A-F]/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 });

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { HealthBar, type HealthBarItemData } from "@sse/design-system";
 import type { LightingDmxMonitorSnapshot, LightingSnapshot } from "@sse/engine-client";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import styles from "./LightingHealthBar.module.css";
 
 // Driven by Vite's `define` from the root package.json. Bump the release
@@ -155,9 +156,9 @@ export function LightingHealthBar({
     <HealthBar
       items={items}
       hints={[
-        { kbd: "⌘ K", label: "command palette" },
+        { kbd: formatShortcut(["mod", "K"]), label: "command palette" },
         { kbd: "?", label: "shortcuts" },
-        { kbd: "⌘ ⇧ M", label: "full DMX monitor" },
+        { kbd: formatShortcut(["mod", "shift", "M"]), label: "full DMX monitor" },
       ]}
       actions={dmxToggleAction}
     />

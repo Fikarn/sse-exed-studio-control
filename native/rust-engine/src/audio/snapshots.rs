@@ -40,10 +40,7 @@ pub fn recall_audio_snapshot_with_timing(
             .find(|entry| entry.id == request.snapshot_id)
             .cloned()
             .ok_or_else(|| {
-                let message = format!(
-                    "Audio snapshot '{}' is not exposed by the native engine.",
-                    request.snapshot_id
-                );
+                let message = format!("Snapshot '{}' no longer exists.", request.snapshot_id);
                 let _ = record_audio_action_failure(db_path, "AUDIO_SNAPSHOT_NOT_FOUND", &message);
                 AudioCommandError::Rejected("AUDIO_SNAPSHOT_NOT_FOUND", message)
             })?;
@@ -372,10 +369,7 @@ pub fn update_audio_snapshot(
             .ok_or_else(|| {
                 AudioCommandError::Rejected(
                     "AUDIO_SNAPSHOT_NOT_FOUND",
-                    format!(
-                        "Audio snapshot '{}' is not exposed by the native engine.",
-                        request.snapshot_id
-                    ),
+                    format!("Snapshot '{}' no longer exists.", request.snapshot_id),
                 )
             })?;
         if let Some(name) = &request.name {
@@ -443,10 +437,7 @@ pub fn delete_audio_snapshot(
         .ok_or_else(|| {
             AudioCommandError::Rejected(
                 "AUDIO_SNAPSHOT_NOT_FOUND",
-                format!(
-                    "Audio snapshot '{}' is not exposed by the native engine.",
-                    request.snapshot_id
-                ),
+                format!("Snapshot '{}' no longer exists.", request.snapshot_id),
             )
         })?;
     let clear_last_recalled =

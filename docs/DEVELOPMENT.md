@@ -175,7 +175,7 @@ Retina MacBook panels can have enough physical pixels for the target operator su
 Use **Scaled Studio Preview** for normal built-in-display human review:
 
 1. Build the Rust engine with `npm run native:engine:build` if `native/target/debug/studio-control-engine` is missing or stale, then run the app with `npm run tauri:dev`.
-2. Open the command palette with `⌘K`.
+2. Open the command palette with `Ctrl+K` (`⌘K` on macOS).
 3. Run `Studio Preview: Enter 2560x1440 Review`.
 4. Review the proportional `2560x1440` studio canvas scaled into the current window.
 5. Run `Studio Preview: Exit Review` before judging native compact/windowed behavior.

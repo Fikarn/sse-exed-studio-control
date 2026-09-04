@@ -164,7 +164,7 @@ fn resolve_talkback_target<'a>(
             .ok_or_else(|| {
                 AudioCommandError::Rejected(
                     "AUDIO_MIX_TARGET_NOT_FOUND",
-                    format!("Audio mix target '{id}' is not exposed by the engine."),
+                    format!("Output '{id}' is not part of this console."),
                 )
             }),
         None => snapshot

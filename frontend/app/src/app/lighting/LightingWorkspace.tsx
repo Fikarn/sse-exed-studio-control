@@ -14,6 +14,7 @@ import type {
   ShellStore,
 } from "@sse/engine-client";
 
+import { formatShortcut } from "../shared/shortcutGlyphs";
 import { usePalette } from "../shared/paletteContext";
 import { useOperatorLayout } from "../OperatorLayoutProvider";
 import { useToast, type ToastApi } from "../shared/toastContext";
@@ -1716,7 +1717,7 @@ export function LightingWorkspaceSurface({
         label: "Save as new scene…",
         group: "Scene",
         keywords: ["save", "new", "duplicate"],
-        shortcut: "⇧S",
+        shortcut: formatShortcut(["shift", "S"]),
         action: () => setSaveSceneAsOpen(true),
         when: () => !inPatchMode,
       },
@@ -1733,7 +1734,7 @@ export function LightingWorkspaceSurface({
         label: "Open full DMX monitor",
         group: "Lighting",
         keywords: ["dmx", "monitor", "channels"],
-        shortcut: "⌘⇧M",
+        shortcut: formatShortcut(["mod", "shift", "M"]),
         action: () => setDmxMonitorOpen(true),
       },
       {
@@ -2284,7 +2285,7 @@ export function LightingWorkspaceSurface({
     switch (outcome.kind) {
       case "ok":
         toast.push({
-          message: `${kind === "Undo" ? "Undid" : "Redid"} ‘${outcome.label}’ · ${kind === "Undo" ? "⌘⇧Z to redo" : "⌘Z to undo"}`,
+          message: `${kind === "Undo" ? "Undid" : "Redid"} ‘${outcome.label}’ · ${kind === "Undo" ? `${formatShortcut(["mod", "shift", "Z"])} to redo` : `${formatShortcut(["mod", "Z"])} to undo`}`,
           tone: "ok",
         });
         break;
@@ -3004,14 +3005,21 @@ export function LightingWorkspaceSurface({
 
       {confirmCutAllOpen ? (
         <ConfirmDialog
-          title="Cut all fixtures?"
+          title={previewMode ? "Cut all fixtures in the preview?" : "Cut all fixtures?"}
           body={
-            <>
-              This sends every fixture to <strong>off</strong> immediately. Saved scenes are unaffected — recall any
-              scene to restore the rig.
-            </>
+            previewMode ? (
+              <>
+                This cuts the <strong>preview</strong> only — every previewed fixture goes to off. The live rig is
+                untouched until you apply the preview.
+              </>
+            ) : (
+              <>
+                This sends every fixture to <strong>off</strong> immediately. Saved scenes are unaffected — recall any
+                scene to restore the rig.
+              </>
+            )
           }
-          confirmLabel="Cut all"
+          confirmLabel={previewMode ? "Cut preview" : "Cut all"}
           cancelLabel="Cancel"
           danger
           busy={busyActions.has("lighting-blackout")}

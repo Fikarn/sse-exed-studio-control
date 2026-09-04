@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 
+import { shortcutParts } from "./shortcutGlyphs";
 import styles from "./ShortcutOverlay.module.css";
 
 interface ShortcutEntry {
@@ -15,19 +16,20 @@ interface ShortcutSection {
 }
 
 // Static shortcut catalogue. New shortcuts added to the app should land here
-// so the `?` overlay stays comprehensive. Sections grouped by surface; the
+// so the `?` overlay stays comprehensive. Modifier tokens ("mod", "alt",
+// "shift") render per platform via shortcutGlyphs. Sections grouped by surface; the
 // search field substring-matches across every entry's description + keys.
 const SHORTCUTS: readonly ShortcutSection[] = [
   {
     heading: "Shell",
     entries: [
-      { keys: ["⌘", "K"], description: "Open command palette (Ctrl+K on Windows)" },
+      { keys: ["mod", "K"], description: "Open command palette" },
       { keys: ["?"], description: "Toggle this shortcuts overlay" },
       { keys: ["Esc"], description: "Close current overlay / clear selection" },
-      { keys: ["⌘/Ctrl", "1–4"], description: "Switch workspaces (Setup, Lighting, Audio, Planning)" },
-      { keys: ["Shift", "S"], description: "Open Setup / Support" },
+      { keys: ["mod", "1–4"], description: "Switch workspaces (Setup, Lighting, Audio, Planning)" },
+      { keys: ["shift", "S"], description: "Open Setup / Support" },
       { keys: ["A"], description: "Open Audio workspace" },
-      { keys: ["⌘/Ctrl", "Shift", "R"], description: "Restart the engine bridge" },
+      { keys: ["mod", "shift", "R"], description: "Restart the engine bridge" },
     ],
   },
   {
@@ -37,8 +39,8 @@ const SHORTCUTS: readonly ShortcutSection[] = [
         keys: ["S"],
         description: "Smart save — save changes if active scene is drifted, else create a new scene",
       },
-      { keys: ["⌘", "S"], description: "Save changes to the active scene (no-op if no drift)" },
-      { keys: ["⌘", "Shift", "S"], description: "Save as new scene (opens a name dialog)" },
+      { keys: ["mod", "S"], description: "Save changes to the active scene (no-op if no drift)" },
+      { keys: ["mod", "shift", "S"], description: "Save as new scene (opens a name dialog)" },
       { keys: ["1–9"], description: "Recall scene 1–9 (numbered slots)" },
       { keys: ["T"], description: "Cycle scene recall fade time" },
     ],
@@ -47,15 +49,15 @@ const SHORTCUTS: readonly ShortcutSection[] = [
     heading: "Lighting · selection + edit",
     entries: [
       { keys: ["Esc"], description: "Clear fixture selection (also clears Highlight / Solo / Find)" },
-      { keys: ["Shift", "Click"], description: "Add fixture to selection (multi-select)" },
-      { keys: ["⌘", "A"], description: "Select all fixtures" },
-      { keys: ["⌘", "F"], description: "Focus toolbar search" },
-      { keys: ["⌘", "Z"], description: "Undo last fixture create / delete" },
-      { keys: ["⌘", "Shift", "Z"], description: "Redo" },
+      { keys: ["shift", "Click"], description: "Add fixture to selection (multi-select)" },
+      { keys: ["mod", "A"], description: "Select all fixtures" },
+      { keys: ["mod", "F"], description: "Focus toolbar search" },
+      { keys: ["mod", "Z"], description: "Undo last fixture create / delete" },
+      { keys: ["mod", "shift", "Z"], description: "Redo" },
       { keys: ["F2"], description: "Rename focused scene tile (inline)" },
       { keys: ["H"], description: "Toggle Highlight on the current selection" },
-      { keys: ["Shift", "H"], description: "Toggle Solo on the current selection (dim everything else)" },
-      { keys: ["Shift", "I"], description: "Find — pulse the selection in turn so you can locate each fixture" },
+      { keys: ["shift", "H"], description: "Toggle Solo on the current selection (dim everything else)" },
+      { keys: ["shift", "I"], description: "Find — pulse the selection in turn so you can locate each fixture" },
     ],
   },
   {
@@ -64,45 +66,45 @@ const SHORTCUTS: readonly ShortcutSection[] = [
   },
   {
     heading: "Lighting · palettes",
-    entries: [{ keys: ["⌘/Ctrl", "Shift", "P"], description: "Open palette quick apply" }],
+    entries: [{ keys: ["mod", "shift", "P"], description: "Open palette quick apply" }],
   },
   {
     heading: "Lighting · stage plot",
     entries: [
       { keys: ["←", "→", "↑", "↓"], description: "Nudge selected fixture by 0.1 m" },
-      { keys: ["Shift", "←", "→", "↑", "↓"], description: "Nudge selected fixture by 0.5 m" },
+      { keys: ["shift", "←", "→", "↑", "↓"], description: "Nudge selected fixture by 0.5 m" },
       { keys: ["Wheel"], description: "Zoom · drag to pan (middle mouse) · double-click to reset" },
       { keys: ["Drag"], description: "Marquee-select fixtures (Shift+drag adds to selection)" },
-      { keys: ["⌥", "Drag"], description: "Drop a fixture without 0.5 m snap (free positioning)" },
-      { keys: ["Shift", "1", "2", "3"], description: "Recall view bookmark slot 1 / 2 / 3" },
-      { keys: ["⌘", "Shift", "1", "2", "3"], description: "Save current view to bookmark slot 1 / 2 / 3" },
+      { keys: ["alt", "Drag"], description: "Drop a fixture without 0.5 m snap (free positioning)" },
+      { keys: ["shift", "1", "2", "3"], description: "Recall view bookmark slot 1 / 2 / 3" },
+      { keys: ["mod", "shift", "1", "2", "3"], description: "Save current view to bookmark slot 1 / 2 / 3" },
     ],
   },
   {
     heading: "Lighting · sliders",
     entries: [
-      { keys: ["Shift", "Drag"], description: "Fine adjust (×0.1) on intensity / CCT / scrub-labels" },
-      { keys: ["⌘", "Drag"], description: "Coarse adjust (×10) on intensity / CCT / scrub-labels" },
+      { keys: ["shift", "Drag"], description: "Fine adjust (×0.1) on intensity / CCT / scrub-labels" },
+      { keys: ["mod", "Drag"], description: "Coarse adjust (×10) on intensity / CCT / scrub-labels" },
       { keys: ["Double-click"], description: "Reset slider to its default value" },
     ],
   },
   {
     heading: "Lighting · monitor",
-    entries: [{ keys: ["⌘", "Shift", "M"], description: "Open the full DMX monitor" }],
+    entries: [{ keys: ["mod", "shift", "M"], description: "Open the full DMX monitor" }],
   },
   {
     heading: "Audio",
     entries: [
       { keys: ["[", "]"], description: "Page through Audio source banks" },
       { keys: ["1–8"], description: "Select a visible source strip" },
-      { keys: ["Shift", "1–8"], description: "Arm or apply audio snapshot recall" },
+      { keys: ["shift", "1–8"], description: "Arm or apply audio snapshot recall" },
       { keys: ["←", "→"], description: "Move between Submix output targets" },
       { keys: ["M", "S"], description: "Mute / solo the selected strip" },
       { keys: ["T"], description: "Hold to talk to the monitor output (release stops)" },
       { keys: ["P", "E", "D", "R"], description: "Inspector tabs: Preamp / EQ / Dyn / Routing" },
       { keys: ["U"], description: "Reset selected Audio fader to unity" },
-      { keys: ["⌥", "C"], description: "Clear held audio clip indicators" },
-      { keys: ["⌘/Ctrl", "S"], description: "Arm or apply current audio snapshot save" },
+      { keys: ["alt", "C"], description: "Clear held audio clip indicators" },
+      { keys: ["mod", "S"], description: "Arm or apply current audio snapshot save" },
       { keys: ["Right-click"], description: "Open strip actions: reset, polarity, rename" },
       { keys: ["Esc"], description: "Close Audio menu or return inspector to Channel" },
     ],
@@ -110,12 +112,12 @@ const SHORTCUTS: readonly ShortcutSection[] = [
   {
     heading: "Planning",
     entries: [
-      { keys: ["Shift", "B"], description: "Toggle Board view" },
-      { keys: ["Shift", "T"], description: "Toggle Timeline view" },
+      { keys: ["shift", "B"], description: "Toggle Board view" },
+      { keys: ["shift", "T"], description: "Toggle Timeline view" },
       { keys: ["[", "]"], description: "Move the time window" },
       { keys: ["0"], description: "Snap timeline view back to now" },
-      { keys: ["Shift", "[", "]"], description: "Change the Planning day" },
-      { keys: ["Shift", "←", "→"], description: "Nudge the selected schedule block" },
+      { keys: ["shift", "[", "]"], description: "Change the Planning day" },
+      { keys: ["shift", "←", "→"], description: "Nudge the selected schedule block" },
       { keys: ["0–4"], description: "Filter Planning board columns" },
     ],
   },
@@ -123,7 +125,7 @@ const SHORTCUTS: readonly ShortcutSection[] = [
     heading: "Setup · runner",
     entries: [
       { keys: ["Tab"], description: "Move forward through runner steps" },
-      { keys: ["Shift", "Tab"], description: "Move back through runner steps" },
+      { keys: ["shift", "Tab"], description: "Move back through runner steps" },
       { keys: ["Enter"], description: "Invoke the runner footer primary action" },
       { keys: ["J", "K"], description: "Move through binding details in Map and Verify" },
       { keys: ["1–4"], description: "Jump to a page in the Setup Map" },
@@ -133,7 +135,7 @@ const SHORTCUTS: readonly ShortcutSection[] = [
 
 function matches(query: string, section: ShortcutSection, entry: ShortcutEntry): boolean {
   if (!query) return true;
-  const haystack = `${section.heading} ${entry.description} ${entry.keys.join(" ")}`.toLowerCase();
+  const haystack = `${section.heading} ${entry.description} ${shortcutParts(entry.keys).join(" ")}`.toLowerCase();
   return query
     .toLowerCase()
     .split(/\s+/)
@@ -236,7 +238,7 @@ export function ShortcutOverlay({ onClose }: ShortcutOverlayProps) {
                   {section.entries.map((entry, index) => (
                     <li key={`${section.heading}-${index}`} className={styles.row}>
                       <span className={styles.keys}>
-                        {entry.keys.map((key, keyIndex) => (
+                        {shortcutParts(entry.keys).map((key, keyIndex) => (
                           <kbd key={keyIndex} className={styles.kbd}>
                             {key}
                           </kbd>
@@ -250,8 +252,6 @@ export function ShortcutOverlay({ onClose }: ShortcutOverlayProps) {
             ))
           )}
         </div>
-
-        <div className={styles.footer}>On Windows, Ctrl substitutes for ⌘.</div>
       </div>
     </div>,
     document.body

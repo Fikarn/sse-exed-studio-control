@@ -4,6 +4,7 @@ import { Calendar, Mic, Sliders, Sun } from "lucide-react";
 import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
 
+import { formatShortcut } from "./shared/shortcutGlyphs";
 import styles from "./OperatorShell.module.css";
 import { createShellEnvironment } from "./createShellEnvironment";
 import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
@@ -174,7 +175,7 @@ function OperatorShellInner() {
         label: "Switch to Setup / Support",
         group: "Workspace",
         keywords: ["setup", "support", "pilot"],
-        shortcut: "⇧S",
+        shortcut: formatShortcut(["shift", "S"]),
         action: () => void tryNavigateWorkspace("setup"),
       },
       {
@@ -182,7 +183,7 @@ function OperatorShellInner() {
         label: "Switch to Lighting",
         group: "Workspace",
         keywords: ["lighting", "lights", "rig"],
-        shortcut: "⌘1",
+        shortcut: formatShortcut(["mod", "1"]),
         action: () => void tryNavigateWorkspace("lighting"),
       },
       {
@@ -198,7 +199,7 @@ function OperatorShellInner() {
         label: "Switch to Planning",
         group: "Workspace",
         keywords: ["planning", "tasks", "projects"],
-        shortcut: "⌘4",
+        shortcut: formatShortcut(["mod", "4"]),
         action: () => void tryNavigateWorkspace("planning"),
       },
       {
@@ -206,7 +207,7 @@ function OperatorShellInner() {
         label: "Restart engine bridge",
         group: "System",
         keywords: ["restart", "reset", "bridge", "recover"],
-        shortcut: "⌘⇧R",
+        shortcut: formatShortcut(["mod", "shift", "R"]),
         action: () => setConfirmIntent("restart-engine"),
       },
       {
@@ -404,7 +405,7 @@ function OperatorShellInner() {
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (
           <ShellDialog
-            body="Restarting the engine bridge clears the current shell session and repeats the startup handshake."
+            body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
             confirmLabel="Restart bridge"
             onCancel={() => setConfirmIntent(null)}
             onConfirm={() => void performRestart()}
@@ -425,7 +426,7 @@ function OperatorShellInner() {
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (
           <ShellDialog
-            body="Restarting the engine bridge clears the current shell session and repeats the startup handshake."
+            body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
             confirmLabel="Restart bridge"
             onCancel={() => setConfirmIntent(null)}
             onConfirm={() => void performRestart()}
@@ -456,7 +457,7 @@ function OperatorShellInner() {
         {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
         {confirmIntent === "restart-engine" ? (
           <ShellDialog
-            body="Restarting the engine bridge closes the current shell session, re-runs protocol negotiation, and reloads commissioning/support state."
+            body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
             confirmLabel="Restart bridge"
             onCancel={() => setConfirmIntent(null)}
             onConfirm={() => void performRestart()}
@@ -578,7 +579,7 @@ function OperatorShellInner() {
       {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
       {confirmIntent === "restart-engine" ? (
         <ShellDialog
-          body="Restarting the engine bridge closes the current shell session, re-runs protocol negotiation, and reloads commissioning/support state."
+          body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
           confirmLabel="Restart bridge"
           onCancel={() => setConfirmIntent(null)}
           onConfirm={() => void performRestart()}

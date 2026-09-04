@@ -1,6 +1,7 @@
 import type { ShellStore } from "@sse/engine-client";
 import { RefreshCw, RotateCcw, Settings } from "lucide-react";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import styles from "./AudioTopBar.module.css";
 import type { AudioTheme } from "../AudioWorkspace";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
@@ -78,9 +79,13 @@ export function AudioTopBar({
           disabled={!canClearSolo}
           onClick={onClearAllSolo}
           title={
-            soloActive ? `${soloCount} channel${soloCount === 1 ? "" : "s"} soloed — clear (⌥S)` : "No channels soloed"
+            soloActive
+              ? `${soloCount} channel${soloCount === 1 ? "" : "s"} soloed — clear (${formatShortcut(["alt", "S"])})`
+              : "No channels soloed"
           }
-          aria-label={soloActive ? `Solo — ${soloCount} engaged, clear (⌥S)` : "Solo — none engaged"}
+          aria-label={
+            soloActive ? `Solo — ${soloCount} engaged, clear (${formatShortcut(["alt", "S"])})` : "Solo — none engaged"
+          }
         >
           <span className={styles.statKey}>Solo</span>
           <span className={styles.statValue} data-tone={soloActive ? "error" : undefined}>

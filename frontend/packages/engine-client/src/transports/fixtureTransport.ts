@@ -1008,7 +1008,7 @@ function buildDefaultAudioSnapshot(): JsonObject {
   const snapshot: JsonObject = {
     status: "ready",
     summary:
-      "OSC transport is configured for 127.0.0.1:7001 with receive port 9001. Simulated inventory exposes 18 channels, 3 mix targets, and 5 snapshots for native audio development.",
+      "Test mode: the console is simulated and nothing reaches TotalMix. 18 channels, 3 outputs and 5 snapshots.",
     adapterMode: "simulated",
     sendHost: "127.0.0.1",
     sendPort: 7001,
@@ -3535,14 +3535,14 @@ function synchronizeFixtureState(state: MutableFixtureState) {
     return channels.some((entry) => asString(entry.id) === selected) ? selected : null;
   })();
   audioSnapshotRecord.summary = !audioSnapshotRecord.oscEnabled
-    ? `OSC transport is disabled in native audio settings. Last configured endpoint is ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} with receive ports ${audioSnapshotRecord.receivePort}-${audioSnapshotRecord.receivePort + 2}.`
+    ? `OSC control is switched off in Setup. The last endpoint was ${audioSnapshotRecord.sendHost}:${audioSnapshotRecord.sendPort} (receive ports ${audioSnapshotRecord.receivePort}-${audioSnapshotRecord.receivePort + 2}).`
     : audioSnapshotRecord.meteringSource === "simulated"
-      ? `Audio fixture metering is in explicit simulated input mode for UI testing.`
+      ? `Test mode: the console is simulated and nothing reaches TotalMix.`
       : audioSnapshotRecord.status === "ready"
-        ? `RME TotalMix OSC metering is live for ${audioSnapshotRecord.sendHost} with send ports ${audioSnapshotRecord.sendPort}-${audioSnapshotRecord.sendPort + 2} and receive ports ${audioSnapshotRecord.receivePort}-${audioSnapshotRecord.receivePort + 2}.`
+        ? `TotalMix on ${audioSnapshotRecord.sendHost} is answering (send ${audioSnapshotRecord.sendPort}-${audioSnapshotRecord.sendPort + 2}, receive ${audioSnapshotRecord.receivePort}-${audioSnapshotRecord.receivePort + 2}).`
         : audioSnapshotRecord.status === "attention"
-          ? `RME TotalMix OSC metering is offline for ${audioSnapshotRecord.sendHost}.`
-          : `RME TotalMix OSC metering is not verified for ${audioSnapshotRecord.sendHost}.`;
+          ? `No meter data from TotalMix on ${audioSnapshotRecord.sendHost}.`
+          : `TotalMix on ${audioSnapshotRecord.sendHost} is not verified yet — run the audio probe.`;
   refreshAudioCapabilities(audioSnapshotRecord, state);
   state.audioSnapshot = audioSnapshotRecord;
   refreshFixtureAudioMetering(state);

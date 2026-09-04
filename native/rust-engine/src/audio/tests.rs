@@ -1097,7 +1097,7 @@ fn audio_channel_update_rejects_unsupported_gain_controls() {
     match error {
         AudioCommandError::Rejected(code, message) => {
             assert_eq!(code, "AUDIO_CHANNEL_FIELD_UNSUPPORTED");
-            assert!(message.contains("does not expose gain"));
+            assert!(message.contains("has no preamp gain"));
         }
         other => panic!("unexpected error: {other:?}"),
     }

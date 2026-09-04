@@ -366,7 +366,7 @@ impl AudioBackend for SimulatedAudioBackend {
             .find(|entry| entry.id == request.channel_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio channel '{}' is not exposed by the backend.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 )
             })?;
@@ -378,7 +378,7 @@ impl AudioBackend for SimulatedAudioBackend {
                 .any(|entry| entry.id == mix_target_id)
             {
                 return Err(format!(
-                    "Audio mix target '{}' is not exposed by the backend.",
+                    "Output '{}' is not part of this console.",
                     mix_target_id
                 ));
             }
@@ -446,7 +446,7 @@ impl AudioBackend for SimulatedAudioBackend {
             .find(|entry| entry.id == request.mix_target_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio mix target '{}' is not exposed by the backend.",
+                    "Output '{}' is not part of this console.",
                     request.mix_target_id
                 )
             })?;
@@ -493,7 +493,7 @@ impl AudioBackend for SimulatedAudioBackend {
             .find(|entry| entry.id == request.channel_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio channel '{}' is not exposed by the backend.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 )
             })?;
@@ -534,7 +534,7 @@ impl AudioBackend for RmeTotalMixOscBackend {
             .find(|entry| entry.id == request.channel_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio channel '{}' is not exposed by the backend.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 )
             })?;
@@ -560,7 +560,7 @@ impl AudioBackend for RmeTotalMixOscBackend {
             .find(|entry| entry.id == request.mix_target_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio mix target '{}' is not exposed by the backend.",
+                    "Output '{}' is not part of this console.",
                     request.mix_target_id
                 )
             })?;
@@ -590,7 +590,7 @@ impl AudioBackend for RmeTotalMixOscBackend {
             .find(|entry| entry.id == request.channel_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio channel '{}' is not exposed by the backend.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 )
             })?;
@@ -600,7 +600,7 @@ impl AudioBackend for RmeTotalMixOscBackend {
         if sent == 0 {
             return Ok(AudioEqUpdateOutcome {
                 summary: format!(
-                    "Updated local EQ state for '{}'; TotalMix exposes no OSC command for that field.",
+                    "Saved the EQ change for '{}' in the app only — TotalMix has no remote control for that field.",
                     channel.name
                 ),
                 hardware_status: String::from("local"),
@@ -609,7 +609,7 @@ impl AudioBackend for RmeTotalMixOscBackend {
 
         Ok(AudioEqUpdateOutcome {
             summary: format!(
-                "Sent {} TotalMix EQ command{} for '{}'; hardware confirmation is pending.",
+                "Sent {} EQ change{} for '{}' to TotalMix — waiting for the console to confirm.",
                 sent,
                 if sent == 1 { "" } else { "s" },
                 channel.name
@@ -624,10 +624,10 @@ fn totalmix_update_summary(
     report: &crate::rme_totalmix_osc::TotalMixSendReport,
 ) -> String {
     let mut summary = if report.sent == 0 {
-        format!("Updated local state for '{surface_name}'; no TotalMix OSC command applied.")
+        format!("Saved '{surface_name}' in the app only — nothing to send to TotalMix.")
     } else {
         format!(
-            "Sent {} TotalMix command{} for '{}'; hardware confirmation is pending.",
+            "Sent {} change{} for '{}' to TotalMix — waiting for the console to confirm.",
             report.sent,
             if report.sent == 1 { "" } else { "s" },
             surface_name
@@ -635,7 +635,7 @@ fn totalmix_update_summary(
     };
     if !report.local_only.is_empty() {
         summary.push_str(&format!(
-            " App-local only: {}.",
+            " Kept in the app only: {}.",
             report.local_only.join(", ")
         ));
     }

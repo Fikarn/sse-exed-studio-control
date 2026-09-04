@@ -202,7 +202,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "DISABLED",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "Page is read-only until transport is re-enabled.",
+      warningBody: "OSC control is switched off in Setup. The Console is read-only until it is switched back on.",
       warningTitle: "OSC DISABLED",
     };
   }
@@ -228,7 +228,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       warningBody:
         typeof snapshot?.lastActionMessage === "string" && snapshot.lastActionMessage.trim().length > 0
           ? snapshot.lastActionMessage
-          : "Audio may still be passing, but control state is not current.",
+          : "Audio may still pass, but the app cannot see or change the console right now.",
       warningTitle: "CONSOLE UNREACHABLE",
     };
   }
@@ -253,7 +253,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "STALE",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "No recent TotalMix OSC meter packets are arriving.",
+      warningBody: "No meter data has arrived from TotalMix for a few seconds.",
       warningTitle: "RME METERING STALE",
     };
   }
@@ -263,7 +263,8 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "OFFLINE",
       tone: "error" satisfies StatusToneLike,
-      warningBody: "Configure TotalMix OSC Send Peak Level and rerun the audio probe.",
+      warningBody:
+        "TotalMix is not sending meter data. In TotalMix Options › Settings › OSC, turn on Send Peak Level Data, then run the audio probe again.",
       warningTitle: "RME METERING OFFLINE",
     };
   }
@@ -273,7 +274,8 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "ASSUMED",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "Using last synced console state. Run Sync before trusting recall or current fader state.",
+      warningBody:
+        "Showing the last state the console confirmed. Press Sync to pull the current state from TotalMix before trusting faders or recall.",
       warningTitle: "STATE ASSUMED",
     };
   }

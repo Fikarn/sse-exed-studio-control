@@ -2,6 +2,7 @@ import { Clock3, TimerReset } from "lucide-react";
 
 import { HealthBar, type HealthBarHint, type HealthBarItemData } from "@sse/design-system";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import styles from "./AudioHealthBar.module.css";
 import { formatAudioTimestamp } from "../audioFormatting";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
@@ -33,7 +34,7 @@ export function AudioHealthBar({ viewModel }: { viewModel: AudioWorkspaceViewMod
   ];
 
   const shortcuts: HealthBarHint[] = [
-    { kbd: "⌘K", label: "Command palette" },
+    { kbd: formatShortcut(["mod", "K"]), label: "Command palette" },
     { kbd: "?", label: "Shortcuts" },
     { kbd: "[", label: "Bank prev" },
     { kbd: "]", label: "Bank next", kbdAfter: true },

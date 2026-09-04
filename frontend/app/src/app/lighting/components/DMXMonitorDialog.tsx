@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Button, Dialog } from "@sse/design-system";
 import type { LightingDmxMonitorSnapshot } from "@sse/engine-client";
 
+import { formatDmxValue } from "../lightingHelpers";
 import styles from "./DMXMonitorDialog.module.css";
 
 const TOTAL_CHANNELS = 512;
@@ -53,11 +54,6 @@ function buildCells(snapshot: LightingDmxMonitorSnapshot | null, universe: numbe
     }
   }
   return cells;
-}
-
-function toHex(value: number): string {
-  const clamped = Math.max(0, Math.min(255, Math.round(value)));
-  return clamped.toString(16).padStart(2, "0").toUpperCase();
 }
 
 export function DMXMonitorDialog({ universe, snapshot, reachable, onClose }: DMXMonitorDialogProps) {
@@ -122,7 +118,9 @@ export function DMXMonitorDialog({ universe, snapshot, reachable, onClose }: DMX
                         <span className={styles.cellHeader}>
                           <span>{String(cell.channel).padStart(3, "0")}</span>
                         </span>
-                        <span className={styles.cellValue}>{toHex(cell.value)}</span>
+                        <span className={styles.cellValue} data-testid="dmx-cell-value">
+                          {formatDmxValue(cell.value)}
+                        </span>
                         <span className={styles.cellBar}>
                           <span className={styles.cellBarFill} style={{ width: `${fillPercent}%` }} />
                         </span>

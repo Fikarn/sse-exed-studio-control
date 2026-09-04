@@ -194,9 +194,12 @@ export function formatLightingValueRange(min: number, max: number, suffix: strin
   return min === max ? `${min}${suffix}` : `${min}-${max}${suffix}`;
 }
 
+// 2026-09 audit remediation, Slice 12: DMX values read as decimal 0–255,
+// the way every lighting desk and fixture menu shows them (they used to be
+// two-digit hex).
 export function formatDmxValue(value: number) {
   const normalized = Math.max(0, Math.min(255, Math.round(value)));
-  return normalized.toString(16).toUpperCase().padStart(2, "0");
+  return String(normalized);
 }
 
 // ---------------------------------------------------------------------------

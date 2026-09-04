@@ -158,8 +158,8 @@ export function AudioInspectorChannelHardwareCard({
       ) : (
         <div className={styles.softwarePanelStack}>
           <div className={styles.unavailableTelemetry} data-testid="audio-playback-telemetry-unavailable">
-            <strong>Playback telemetry not reported</strong>
-            <span>Driver buffer and latency are not exposed by the current engine snapshot.</span>
+            <strong>No playback stats from the driver</strong>
+            <span>Buffer size and latency appear here once the audio driver reports them.</span>
           </div>
           <div className={styles.detailGrid}>
             <span>

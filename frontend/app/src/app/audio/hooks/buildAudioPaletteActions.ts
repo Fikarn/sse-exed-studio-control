@@ -12,6 +12,7 @@
  */
 import type { PaletteAction } from "@sse/design-system";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import { AUDIO_FADER_UNITY } from "../audioFormatting";
 import type { AudioPaletteRegistrationModel } from "./useAudioPaletteRegistration";
 import type { AudioChannelGroupSelectionRequest } from "../audioViewModel";
@@ -91,7 +92,7 @@ export function buildAudioPaletteActions(args: BuildAudioPaletteActionsArgs): Pa
     label: `Recall snapshot ${index + 1}`,
     group: "Snapshots",
     keywords: ["audio", "snapshot", "recall", snapshot.name, `${index + 1}`],
-    shortcut: `⇧${index + 1}`,
+    shortcut: formatShortcut(["shift", String(index + 1)]),
     action: () => recallSnapshot(snapshot.id),
   }));
 
@@ -132,7 +133,7 @@ export function buildAudioPaletteActions(args: BuildAudioPaletteActionsArgs): Pa
       label: "Clear all solo",
       group: "Actions",
       keywords: ["audio", "solo", "clear"],
-      shortcut: "⌥S",
+      shortcut: formatShortcut(["alt", "S"]),
       action: clearAllSolo,
     },
     {
@@ -140,7 +141,7 @@ export function buildAudioPaletteActions(args: BuildAudioPaletteActionsArgs): Pa
       label: "Clear clips",
       group: "Actions",
       keywords: ["audio", "clip", "clear", "reset"],
-      shortcut: "⌥C",
+      shortcut: formatShortcut(["alt", "C"]),
       action: () => clearClips(),
     },
     {
@@ -230,7 +231,7 @@ export function buildAudioPaletteActions(args: BuildAudioPaletteActionsArgs): Pa
       label: "Save current snapshot",
       group: "Actions",
       keywords: ["audio", "snapshot", "save", paletteSelectedSnapshot?.name ?? ""],
-      shortcut: "⌘S",
+      shortcut: formatShortcut(["mod", "S"]),
       action: saveCurrentSnapshot,
     },
     {

@@ -7,6 +7,7 @@ import type {
   LightingFixtureSnapshot,
 } from "@sse/engine-client";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import { lightingFixtureColorHex } from "../lightingHelpers";
 import { lightingFixtureChannelCount } from "../lightingPatch";
 
@@ -284,7 +285,7 @@ export function DMXCompactStrip({
         className={styles.expandButton}
         onClick={onOpenMonitor}
         aria-label="Open full DMX monitor"
-        title="Open full DMX monitor (⌘ ⇧ M)"
+        title={`Open full DMX monitor (${formatShortcut(["mod", "shift", "M"])})`}
       >
         <Maximize2 aria-hidden="true" size={11} strokeWidth={2} />
       </button>

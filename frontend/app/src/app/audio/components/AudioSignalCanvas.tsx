@@ -1,6 +1,7 @@
 import { useEffect, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
 import type { ShellStore } from "@sse/engine-client";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import styles from "./AudioSignalCanvas.module.css";
 import type { AudioArmedAction } from "../audioArming";
 import type { AudioRecallReport } from "../audioRecallReport";
@@ -230,7 +231,7 @@ export function AudioSignalCanvas({
                 onClick={onClearAllSolo}
                 type="button"
               >
-                Clear all solo <kbd>⌥S</kbd>
+                Clear all solo <kbd>{formatShortcut(["alt", "S"])}</kbd>
               </button>
             </div>
           ) : null}
@@ -250,7 +251,7 @@ export function AudioSignalCanvas({
                 }
                 type="button"
               >
-                Clear clips <kbd>⌥C</kbd>
+                Clear clips <kbd>{formatShortcut(["alt", "C"])}</kbd>
               </button>
             </div>
           ) : null}

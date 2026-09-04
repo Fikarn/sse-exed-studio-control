@@ -969,7 +969,7 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
 
     let transport_summary = if !osc_enabled {
         format!(
-            "OSC transport is disabled in native audio settings. Last configured endpoint is {}:{} with receive ports {}-{}.",
+            "OSC control is switched off in Setup. The last endpoint was {}:{} (receive ports {}-{}).",
             config.send_host,
             config.send_port,
             config.receive_port,
@@ -977,13 +977,13 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
         )
     } else if metering_source == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE {
         format!(
-            "Audio metering is in explicit simulated input mode. Simulated inventory exposes {} channels, {} mix targets, and {} snapshots for UI testing.",
+            "Test mode: the console is simulated and nothing reaches TotalMix. {} channels, {} outputs and {} snapshots.",
             channel_count, mix_target_count, snapshot_count
         )
     } else {
         match status {
             "ready" => format!(
-                "RME TotalMix OSC metering is live for {} with send ports {}-{} and receive ports {}-{}. Inventory exposes {} channels, {} mix targets, and {} snapshots.",
+                "TotalMix on {} is answering (port incoming {}-{}, port outgoing {}-{}): {} channels, {} outputs and {} snapshots.",
                 config.send_host,
                 config.send_port,
                 config.send_port.saturating_add(2),
@@ -994,7 +994,7 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
                 snapshot_count
             ),
             "attention" => format!(
-                "RME TotalMix OSC metering is offline for {}. Verify the three OSC remote slots and Send Peak Level settings for send ports {}-{} and receive ports {}-{}.",
+                "No meter data from TotalMix on {}. In TotalMix Options › Settings › OSC, check remote controllers 1–3 (port incoming {}-{}, port outgoing {}-{}), turn on Send Peak Level Data, and keep remote 4 in Global OSC mode.",
                 config.send_host,
                 config.send_port,
                 config.send_port.saturating_add(2),
@@ -1002,7 +1002,7 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
                 config.receive_port.saturating_add(2)
             ),
             _ => format!(
-                "RME TotalMix OSC metering is not verified. Configure three TotalMix OSC remotes for send ports {}-{} and receive ports {}-{}, enable Send Peak Level, then rerun the audio probe.",
+                "TotalMix is not verified yet. In TotalMix Options › Settings › OSC, set remote controllers 1–3 to port incoming {}-{} and port outgoing {}-{}, turn on Send Peak Level Data, then run the audio probe.",
                 config.send_port,
                 config.send_port.saturating_add(2),
                 config.receive_port,

@@ -257,6 +257,9 @@ export function SetupSupportPilot({
   // 2026-09 audit Slice 8: probes that are not green when the operator asks
   // to publish; non-null opens the "Publish with failing probes?" confirm.
   const [publishOverridePrompt, setPublishOverridePrompt] = useState<string[] | null>(null);
+  // 2026-09 audit remediation, Slice 12: seeding demo planning data is a
+  // confirmed action, not a single click next to the profile download.
+  const [seedPlanningPrompt, setSeedPlanningPrompt] = useState(false);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [selectedControlId, setSelectedControlId] = useState<string | null>(null);
   const [echoControlId, setEchoControlId] = useState<string | null>(null);
@@ -951,12 +954,7 @@ export function SetupSupportPilot({
                     >
                       Download Companion profile
                     </Button>
-                    <Button
-                      onClick={() => {
-                        void performAction("seed-planning-inline", loadSamplePlanning);
-                      }}
-                      variant="ghost"
-                    >
+                    <Button onClick={() => setSeedPlanningPrompt(true)} variant="ghost">
                       Load sample planning
                     </Button>
                   </div>
@@ -1529,6 +1527,25 @@ export function SetupSupportPilot({
           </Surface>
         </div>
       )}
+
+      {seedPlanningPrompt ? (
+        <ConfirmDialog
+          body={
+            <p>
+              This adds the bundled sample projects, tasks and schedule blocks to Planning, next to anything already
+              there. Use it for commissioning and training only.
+            </p>
+          }
+          cancelLabel="Cancel"
+          confirmLabel="Load sample planning"
+          onCancel={() => setSeedPlanningPrompt(false)}
+          onConfirm={() => {
+            setSeedPlanningPrompt(false);
+            void performAction("seed-planning-inline", loadSamplePlanning);
+          }}
+          title="Load sample planning data?"
+        />
+      ) : null}
 
       {publishOverridePrompt ? (
         <ConfirmDialog

@@ -3,6 +3,7 @@ import { Bookmark, Minus, Plus, RotateCcw } from "lucide-react";
 
 import { ContextMenu, SegmentedControl, Tooltip, type ContextMenuItem } from "@sse/design-system";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import type { StagePlotRenderMode } from "../fixtureVisuals";
 import type { StagePlotZoomMode, ViewBookmarks, ViewBookmarkSlot } from "../useStagePlotViewport";
 
@@ -163,7 +164,7 @@ export function StagePlotControls({
             const filled = Boolean(viewBookmarks?.[slot]);
             const tooltip = filled
               ? `Recall view ${slot + 1} · Shift+${slot + 1}. Right-click for options.`
-              : `Empty slot ${slot + 1}. Right-click to save current view · ⌘⇧${slot + 1}.`;
+              : `Empty slot ${slot + 1}. Right-click to save current view · ${formatShortcut(["mod", "shift", String(slot + 1)])}.`;
             return (
               <Tooltip key={slot} content={tooltip} placement="top">
                 <button

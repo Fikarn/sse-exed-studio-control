@@ -47,7 +47,7 @@ pub fn update_audio_mix_target(
             AudioCommandError::Rejected(
                 "AUDIO_MIX_TARGET_NOT_FOUND",
                 format!(
-                    "Audio mix target '{}' is not exposed by the engine.",
+                    "Output '{}' is not part of this console.",
                     request.mix_target_id
                 ),
             )
@@ -106,7 +106,7 @@ pub fn update_audio_mix_target(
             AudioCommandError::Rejected(
                 "AUDIO_MIX_TARGET_NOT_FOUND",
                 format!(
-                    "Audio mix target '{}' is not exposed by the engine.",
+                    "Output '{}' is not part of this console.",
                     request.mix_target_id
                 ),
             )
