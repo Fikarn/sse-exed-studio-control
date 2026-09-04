@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
+import { AUDIO_ARM_MIN_DWELL_MS } from "../../src/app/audio/audioConstants";
 import {
   boxesIntersect,
   expectInsideBox,
@@ -206,6 +207,7 @@ export async function saveAudioSnapshot(page: Page, snapshotId: string) {
   await expect(saveButton).toBeEnabled();
   await saveButton.click();
   await expect(saveButton).toHaveAttribute("data-armed", "true");
+  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50); // confirm after the arm dwell (Slice 7)
   await saveButton.click();
 }
 

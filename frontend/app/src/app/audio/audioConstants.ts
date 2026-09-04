@@ -17,6 +17,14 @@
 // Source: previously inline at AudioWorkspace.tsx:103.
 export const AUDIO_ARM_TIMEOUT_MS = 4500;
 
+// Why: arm-then-apply minimum dwell. A second activation of the same armed
+// key inside this window is ignored and the arm stays, so a double-click, a
+// bounced pointer or a held key's auto-repeat can never arm and apply a 48V
+// change, a snapshot recall or a snapshot overwrite in one motion. 350 ms is
+// past any double-click interval and well inside AUDIO_ARM_TIMEOUT_MS.
+// 2026-09 audit remediation, Slice 7.
+export const AUDIO_ARM_MIN_DWELL_MS = 350;
+
 // Why: rail prototype monitor level used as fallback when no draft/value is
 // present for the selected mix target's volume. Expressed in dBFS, converted
 // via `faderDbToNormalized` at the call site.

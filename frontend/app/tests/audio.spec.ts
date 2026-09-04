@@ -17,6 +17,7 @@ import {
   normalizedToFaderDb,
 } from "../src/app/audio/audioFormatting";
 
+import { AUDIO_ARM_MIN_DWELL_MS } from "../src/app/audio/audioConstants";
 import {
   COMPACT_PREAMP_ASPECT_RATIO,
   NARROW_PREAMP_ASPECT_RATIO,
@@ -202,6 +203,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
 
   await page.keyboard.press("Shift+Digit3");
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-armed", "true");
+  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50); // the confirm must come after the arm dwell (Slice 7)
   await page.keyboard.press("Shift+Digit3");
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-current", "true");
   await expect(page.getByTestId("audio-toolbar-current-snapshot")).toHaveText("Recalled Interview block");
@@ -951,6 +953,13 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
   await expect(phantom).not.toHaveAttribute("data-armed", "true");
   await expect(phantom).toHaveText("48V");
   await phantom.click();
+  await expect(phantom).toHaveAttribute("data-armed", "true");
+  // 2026-09 audit Slice 7: a second click inside the dwell is a double-click,
+  // not a confirm — 48V must not move and the arm must stay.
+  await phantom.click();
+  await expect(phantom).toHaveAttribute("data-armed", "true");
+  await expect(phantom).toHaveAttribute("data-active", phantomBefore ?? "");
+  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
   await phantom.click();
   await expect(phantom).not.toHaveAttribute("data-active", phantomBefore ?? "");
 
@@ -1360,6 +1369,7 @@ test("snapshot recall reports the push and lists 48V differences without touchin
 
   await page.keyboard.press("Shift+Digit3");
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-armed", "true");
+  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
   await page.keyboard.press("Shift+Digit3");
 
   const report = page.getByTestId("audio-recall-report");
@@ -1375,6 +1385,7 @@ test("snapshot recall reports the push and lists 48V differences without touchin
   await arm.click();
   await expect(arm).toHaveAttribute("data-armed", "true");
   await expect(arm).toHaveText(/Confirm 48V off/);
+  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
   await arm.click();
   await expect(hostStrip.getByText("48V", { exact: true })).toHaveCount(0);
 
@@ -1389,6 +1400,7 @@ test("audio command palette snapshot recall arms before applying", async ({ page
   await page.getByPlaceholder(/Type a command/i).fill("snapshot 1");
   await page.getByRole("option", { name: /Recall snapshot 1/ }).click();
   await expect(page.locator('[data-snapshot-slot][data-armed="true"]')).toHaveCount(1);
+  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
 
   await page.keyboard.press(modifierShortcut("K"));
   await page.getByPlaceholder(/Type a command/i).fill("snapshot 1");

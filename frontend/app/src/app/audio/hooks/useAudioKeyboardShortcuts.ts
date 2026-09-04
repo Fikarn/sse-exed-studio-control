@@ -130,7 +130,10 @@ export function useAudioKeyboardShortcuts({
       return;
     }
     if (cmdOrCtrl && !event.altKey && key === "s") {
-      saveCurrentSnapshot();
+      // A held key auto-repeats; a repeat is never the confirming press of an
+      // armed action (2026-09 audit Slice 7 — the dwell in useAudioArming is
+      // the second guard).
+      if (!event.repeat) saveCurrentSnapshot();
       event.preventDefault();
       return;
     }
@@ -147,7 +150,8 @@ export function useAudioKeyboardShortcuts({
     if (plain && event.shiftKey && /^Digit[1-8]$/.test(event.code)) {
       const snapshot = viewModel.snapshots[Number(event.code.replace("Digit", "")) - 1];
       if (snapshot) {
-        recallSnapshot(snapshot.id);
+        // Key repeat arms once and never confirms (2026-09 audit Slice 7).
+        if (!event.repeat) recallSnapshot(snapshot.id);
         event.preventDefault();
       }
       return;

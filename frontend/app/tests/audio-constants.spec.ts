@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  AUDIO_ARM_MIN_DWELL_MS,
   AUDIO_ARM_TIMEOUT_MS,
   AUDIO_DRAFT_CLEAR_MS,
   AUDIO_THROTTLE_EQ_MS,
@@ -21,6 +22,8 @@ import { createAudioControlDraftStore } from "../src/app/audio/audioControlDraft
 test.describe("audio constants module", () => {
   test("publishes the timing and range constants that were previously inlined", () => {
     expect(AUDIO_ARM_TIMEOUT_MS).toBe(4500);
+    // 2026-09 audit Slice 7: the confirm must come after this dwell.
+    expect(AUDIO_ARM_MIN_DWELL_MS).toBe(350);
     expect(AUDIO_THROTTLE_FADER_MS).toBe(75);
     expect(AUDIO_THROTTLE_EQ_MS).toBe(500);
     expect(AUDIO_DRAFT_CLEAR_MS).toBe(250);

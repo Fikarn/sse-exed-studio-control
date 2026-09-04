@@ -179,12 +179,26 @@ Operator hands: checklist B5 — first assign the studio's talkback microphone a
 
 ## Slice 7 — Arm-then-apply minimum dwell
 
-Status: planned.
+Status: complete 2026-09-04 (no hardware hands). Commit `Audit S7`.
 
 Scope: `AUDIO_ARM_MIN_DWELL_MS = 350`; same-key activation inside the dwell keeps the arm; key repeat ignored.
-Gates before: four specs double-activated immediately and expected the apply.
-Tests added: immediate second click keeps the arm and issues no recall; key repeat ignored; constant pinned. Tests changed: `audio-arm-countdown.spec.ts:39-44`, `audio.spec.ts:202-204, :947-948, ~:1353` wait ≥ 400 ms between activations (the immediate double-fire was the defect).
-Validation: (filled at landing). Baselines: none. Operator hands: none.
+
+What the gates asserted before: `useAudioArming` applied on any same-key activation, however soon. Five spec sites (not four — the palette recall test and the shared `saveAudioSnapshot` helper double-fired too) activated twice back to back and expected the apply: `audio-arm-countdown.spec.ts` second test, `audio.spec.ts` Shift+3 recall (twice), the 48V pill double click, the recall-report "Arm 48V" button, the palette recall, and `tests/helpers/audio.ts::saveAudioSnapshot`. Nothing asserted anything about a repeat or a held key.
+
+What landed:
+
+- `audioConstants.ts`: `AUDIO_ARM_MIN_DWELL_MS = 350` (past any double-click interval, well inside the 4.5 s arm window).
+- `useAudioArming.armOrApplyAction`: a same-key activation less than the dwell after `armedAt` returns without applying and without touching the arm (the countdown keeps running, no toast). The hook takes an optional monotonic `now` so the unit test can drive the clock.
+- `useAudioKeyboardShortcuts`: the Shift+digit recall and Cmd/Ctrl+S save paths ignore `event.repeat` (a held key arms once and never confirms); the dwell is the second guard for anything that gets through.
+- CHANGELOG (Fixed).
+
+Tests added: `useAudioArming.test.tsx` (same key inside the dwell keeps the arm and does not apply, after the dwell applies once; a different key re-arms immediately; timeout expiry still clears; constant pinned below the timeout); `audio-arm-countdown.spec.ts` "a second click inside the dwell keeps the arm; after the dwell it applies the recall" (asserts `audio.snapshot.recall` count 0 then 1) and "a held Shift+digit arms once and its key repeats never apply" (Playwright marks repeated `keyboard.down` as `repeat: true`); `audio-constants.spec.ts` pins 350; `audio.spec.ts` 48V case now asserts the immediate second click leaves the arm and the pill untouched.
+
+Tests changed (old → new, why): `audio-arm-countdown.spec.ts` second test (click, click → applied) → click, click keeps the arm, wait out the dwell, click → applied; `audio.spec.ts` Shift+3 recall ×2 (lines ~203, ~1361), 48V pill click ×2 (~947), recall-report Arm button click ×2 (~1375), palette recall ×2 (~1387) and `helpers/audio.ts::saveAudioSnapshot` all wait `AUDIO_ARM_MIN_DWELL_MS + 50` before the confirming activation. Why: the immediate double-fire was the defect the audit named; the old assertions locked it in.
+
+Validation (workstation, 2026-09-04): `frontend:typecheck` clean; Vitest 51 (app, +3) + 119 + 4; eslint + prettier clean; Playwright `audio-arm-countdown.spec.ts audio-constants.spec.ts audio.spec.ts audio-hierarchy.spec.ts audio-talkback.spec.ts audio-meter-gating.spec.ts` → 60 passed (dist rebuilt first); `npm run dev:check` → passed. Visual lanes not run: no markup or style changed (nothing renders differently within the dwell).
+
+Baselines moved: none. Operator hands: none — the behaviour is fully covered by the specs; on the studio machine a double-click on a 48V pill should now leave it armed with the countdown running.
 
 ## Slice 8 — Publish gate with explicit override
 
