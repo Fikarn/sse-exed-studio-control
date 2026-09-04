@@ -7,6 +7,7 @@ import {
   createFixtureTransport,
 } from "../../packages/engine-client/src/transports/fixtureTransport";
 import {
+  AUDIO_FADER_UNITY,
   dbfsToMeterPercent,
   faderDbToNormalized,
   formatAudioDb,
@@ -797,7 +798,7 @@ test("fixture simulated output submix uses TotalMix fader gain curve", async () 
           dim: false,
           mono: false,
           mute: false,
-          volume: mixTarget.id === "audio-mix-main" ? 0.8 : mixTarget.volume,
+          volume: mixTarget.id === "audio-mix-main" ? AUDIO_FADER_UNITY : mixTarget.volume,
         })),
         selectedChannelId: "audio-input-9",
         selectedMixTargetId: "audio-mix-main",
@@ -812,10 +813,10 @@ test("fixture simulated output submix uses TotalMix fader gain curve", async () 
     };
   }
 
-  const unity = await readSingleSourceSubmix(0.8);
+  const unity = await readSingleSourceSubmix(AUDIO_FADER_UNITY);
   expect(unity.main.meterLevel).toBeCloseTo(unity.host.meterLevel, 4);
 
-  const minusTen = await readSingleSourceSubmix(0.7);
+  const minusTen = await readSingleSourceSubmix(faderDbToNormalized(-10));
   expect(minusTen.main.meterLevel / minusTen.host.meterLevel).toBeCloseTo(10 ** (-10 / 20), 4);
 });
 
@@ -1074,7 +1075,7 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
   await page.keyboard.press("Enter");
   const faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
   await expect(faderDialog).toBeVisible();
-  await faderDialog.getByLabel("Fader level").fill("-60");
+  await faderDialog.getByLabel("Fader level").fill("-65"); // off on RME's curve (2026-09 audit Slice 5)
   await faderDialog.getByRole("button", { name: "Set" }).click();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
   await currentSnapshot.hover();
@@ -1144,7 +1145,7 @@ test("shows numeric snapshot before and after preview text", async ({ page }) =>
   await page.keyboard.press("Enter");
   const faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
   await expect(faderDialog).toBeVisible();
-  await faderDialog.getByLabel("Fader level").fill("-60");
+  await faderDialog.getByLabel("Fader level").fill("-65"); // off on RME's curve (2026-09 audit Slice 5)
   await faderDialog.getByRole("button", { name: "Set" }).click();
 
   await currentSnapshot.hover();
@@ -1395,13 +1396,17 @@ test("audio command palette snapshot recall arms before applying", async ({ page
   await expect(page.locator('[data-snapshot-slot][data-armed="true"]')).toHaveCount(0);
 });
 
-test("formats audio faders with the prototype TotalMix-style law", () => {
+test("formats audio faders with RME's TotalMix fader curve", () => {
+  // 2026-09 audit Slice 5: RME's published curve, unity at step 836 of 1023.
+  // The old assertions here (0.7 = -10 dB, 0.8 = 0 dB) pinned a prototype law.
   expect(normalizedToFaderDb(0)).toBe(Number.NEGATIVE_INFINITY);
-  expect(normalizedToFaderDb(0.7)).toBeCloseTo(-10, 5);
-  expect(normalizedToFaderDb(0.8)).toBeCloseTo(0, 5);
+  expect(normalizedToFaderDb(0.5)).toBeCloseTo(-12.125, 2);
+  expect(normalizedToFaderDb(AUDIO_FADER_UNITY)).toBeCloseTo(0, 5);
   expect(normalizedToFaderDb(1)).toBeCloseTo(6, 5);
-  expect(faderDbToNormalized(0)).toBeCloseTo(0.8, 5);
-  expect(formatAudioDb(0.8)).toBe("0.0 dB");
+  expect(faderDbToNormalized(0)).toBeCloseTo(836 / 1023, 5);
+  expect(faderDbToNormalized(-6)).toBeCloseTo(649 / 1023, 5);
+  expect(formatAudioDb(AUDIO_FADER_UNITY)).toBe("0.0 dB");
+  expect(formatAudioDb(0.8)).toBe("-0.6 dB");
   expect(formatAudioDb(1)).toBe("+6.0 dB");
 });
 
@@ -1491,7 +1496,7 @@ test("audio workspace custom faders drag and accept numeric dB entry", async ({ 
   await page.keyboard.press("Enter");
   faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
   await expect(faderDialog).toBeVisible();
-  await faderDialog.getByLabel("Fader level").fill("-60");
+  await faderDialog.getByLabel("Fader level").fill("-65"); // off on RME's curve (2026-09 audit Slice 5)
   await faderDialog.getByRole("button", { name: "Set" }).click();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
 

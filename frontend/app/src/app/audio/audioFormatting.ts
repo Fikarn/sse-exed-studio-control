@@ -1,4 +1,4 @@
-import type { AudioSnapshot } from "@sse/engine-client";
+import { AUDIO_FADER_UNITY, faderDbToLin, faderLinToDb, type AudioSnapshot } from "@sse/engine-client";
 
 import { formatBackupTimestamp, type StatusToneLike } from "../shellData";
 
@@ -47,27 +47,24 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
-export const AUDIO_FADER_UNITY = 0.8;
+// Unity (0 dB) is RME's fader step 836 of 1023 (0.8172). The curve itself
+// lives in @sse/engine-client (audio/faderCurve.ts) so the fixture transport
+// and the app share one implementation; the engine mirrors it in
+// audio/fader_curve.rs, and the Stream Deck LCD (audio_fader_db_label in
+// native/rust-engine/src/control_surface_audio.rs) prints through that copy,
+// so the deck and the on-screen fader always show the same dB for the same
+// position. 2026-09 audit remediation, Slice 5 (operator decision 3).
+export { AUDIO_FADER_UNITY };
 export const AUDIO_FADER_UNITY_SNAP = 0.02;
 
-// Mirrored in the engine's control-surface bridge (audio_fader_db_label in
-// native/rust-engine/src/control_surface.rs) — the Stream Deck LCD and the
-// on-screen fader must always print the same dB number for the same value.
+/** Fader position (0..1) to the dB TotalMix shows; -Infinity when off. */
 export function normalizedToFaderDb(value: number) {
-  const normalized = clamp01(value);
-  if (normalized <= 0) return Number.NEGATIVE_INFINITY;
-  if (normalized >= 1) return 6;
-  if (normalized <= 0.7) return -60 + (normalized / 0.7) * 50;
-  if (normalized <= AUDIO_FADER_UNITY) return -10 + ((normalized - 0.7) / 0.1) * 10;
-  return ((normalized - AUDIO_FADER_UNITY) / 0.2) * 6;
+  return faderLinToDb(clamp01(value));
 }
 
+/** dB to fader position (0..1); off (-65 dB and below, -Infinity, NaN) is 0. */
 export function faderDbToNormalized(db: number) {
-  if (!Number.isFinite(db)) return 0;
-  const clamped = Math.max(-60, Math.min(6, db));
-  if (clamped <= -10) return ((clamped + 60) / 50) * 0.7;
-  if (clamped <= 0) return 0.7 + ((clamped + 10) / 10) * 0.1;
-  return AUDIO_FADER_UNITY + (clamped / 6) * 0.2;
+  return faderDbToLin(db);
 }
 
 export function snapFaderValue(value: number) {

@@ -366,18 +366,20 @@ fn simulated_output_submix_uses_totalmix_fader_gain_curve() {
         false,
         0.25,
         0.25,
-        0.8,
+        super::fader_curve::AUDIO_FADER_UNITY,
     )];
-    let mut mix_targets = vec![meter_test_mix_target(0.8)];
+    let mut mix_targets = vec![meter_test_mix_target(super::fader_curve::AUDIO_FADER_UNITY)];
 
     super::snapshot::apply_mix_target_metering(&channels, &mut mix_targets);
     assert_meter_close(mix_targets[0].meter_left, 0.25);
     assert_meter_close(mix_targets[0].meter_right, 0.25);
 
+    // -10 dB on RME's curve (2026-09 audit Slice 5; the old law put it at 0.7).
+    let minus_ten_db_position = super::fader_curve::fader_db_to_lin(-10.0);
     channels[0]
         .mix_levels
-        .insert(String::from("audio-mix-main"), 0.7);
-    channels[0].fader = 0.7;
+        .insert(String::from("audio-mix-main"), minus_ten_db_position);
+    channels[0].fader = minus_ten_db_position;
     super::snapshot::apply_mix_target_metering(&channels, &mut mix_targets);
     let minus_ten_db_gain = 10.0_f64.powf(-10.0 / 20.0);
     assert_meter_close(mix_targets[0].meter_left, 0.25 * minus_ten_db_gain);

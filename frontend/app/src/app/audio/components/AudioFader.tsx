@@ -3,6 +3,7 @@ import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import styles from "./AudioFader.module.css";
 import { faderDbToNormalized, formatAudioDb, normalizedToFaderDb } from "../audioFormatting";
 import { NumberEntryDialog } from "@sse/design-system";
+import { FADER_MAX_DB, FADER_OFF_DB } from "@sse/engine-client";
 import { AudioSliderControl } from "./AudioSliderControl";
 
 export function AudioFader({
@@ -21,6 +22,7 @@ export function AudioFader({
   value: number;
 }) {
   const [numberDialogOpen, setNumberDialogOpen] = useState(false);
+  // Typed entry spans TotalMix's fader range: -65 dB (and below) is off, +6 dB is the top.
   const currentDb = normalizedToFaderDb(value);
   const openNumberDialog = () => {
     if (!disabled) setNumberDialogOpen(true);
@@ -52,9 +54,9 @@ export function AudioFader({
       {numberDialogOpen ? (
         <NumberEntryDialog
           fieldLabel="Fader level"
-          initialValue={Number.isFinite(currentDb) ? Number(currentDb.toFixed(1)) : -60}
-          max={6}
-          min={-60}
+          initialValue={Number.isFinite(currentDb) ? Number(currentDb.toFixed(1)) : FADER_OFF_DB}
+          max={FADER_MAX_DB}
+          min={FADER_OFF_DB}
           onCancel={() => setNumberDialogOpen(false)}
           onConfirm={(nextDb) => {
             setNumberDialogOpen(false);

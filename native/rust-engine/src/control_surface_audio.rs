@@ -1,4 +1,5 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
+use crate::audio::fader_curve::fader_lin_to_db;
 use crate::audio::{
     clear_all_audio_solo, ensure_audio_action_allowed, parse_audio_snapshot_recall_request,
     read_audio_snapshot, recall_audio_snapshot, update_audio_channel, update_audio_mix_target,
@@ -40,25 +41,18 @@ static AUDIO_DIAL_TURN_TIMES: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLo
 static AUDIO_TALK_DEADLINES: OnceLock<Mutex<HashMap<PathBuf, Instant>>> = OnceLock::new();
 static AUDIO_TALK_WATCHDOG: OnceLock<()> = OnceLock::new();
 
+/// Deck LCD dB label: RME's fader curve (`audio::fader_curve`), the same law
+/// the on-screen fader prints (`audioFormatting.ts`), so the deck and the app
+/// always show the same dB for the same position.
 fn audio_fader_db_label(value: f64) -> String {
-    let normalized = if value.is_finite() {
-        value.clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    if normalized <= 0.0 {
+    let position = if value.is_finite() { value } else { 0.0 };
+    let Some(db) = fader_lin_to_db(position) else {
         return String::from("-\u{221e} dB");
-    }
-    let db = if normalized >= 1.0 {
-        6.0
-    } else if normalized <= 0.7 {
-        -60.0 + (normalized / 0.7) * 50.0
-    } else if normalized <= 0.8 {
-        -10.0 + ((normalized - 0.7) / 0.1) * 10.0
-    } else {
-        ((normalized - 0.8) / 0.2) * 6.0
     };
-    format!("{db:+.1} dB")
+    // One decimal, and never "-0.0" at unity.
+    let rounded = (db * 10.0).round() / 10.0;
+    let rounded = if rounded == 0.0 { 0.0 } else { rounded };
+    format!("{rounded:+.1} dB")
 }
 
 pub(crate) fn audio_deck_gate_label(snapshot: &AudioSnapshot) -> Option<&'static str> {
@@ -1378,13 +1372,22 @@ mod tests {
     }
 
     #[test]
-    fn audio_fader_db_label_mirrors_the_app_curve() {
+    // Same anchors as the frontend (engine-client faderCurve.test.ts and
+    // audioFormatting.test.ts): RME published fader curve, unity at 836/1023.
+    fn audio_fader_db_label_prints_the_rme_fader_curve() {
         assert_eq!(audio_fader_db_label(0.0), "-\u{221e} dB");
-        assert_eq!(audio_fader_db_label(0.35), "-35.0 dB");
-        assert_eq!(audio_fader_db_label(0.7), "-10.0 dB");
-        assert_eq!(audio_fader_db_label(0.75), "-5.0 dB");
-        assert_eq!(audio_fader_db_label(0.8), "+0.0 dB");
-        assert_eq!(audio_fader_db_label(0.9), "+3.0 dB");
+        assert_eq!(audio_fader_db_label(f64::NAN), audio_fader_db_label(0.0));
+        assert_eq!(audio_fader_db_label(0.35), "-23.0 dB");
+        assert_eq!(audio_fader_db_label(0.5), "-12.1 dB");
+        assert_eq!(audio_fader_db_label(649.0 / 1023.0), "-6.0 dB");
+        assert_eq!(audio_fader_db_label(0.7), "-3.8 dB");
+        assert_eq!(audio_fader_db_label(0.75), "-2.2 dB");
+        assert_eq!(audio_fader_db_label(0.8), "-0.6 dB");
+        assert_eq!(
+            audio_fader_db_label(crate::audio::fader_curve::AUDIO_FADER_UNITY),
+            "+0.0 dB"
+        );
+        assert_eq!(audio_fader_db_label(0.9), "+2.7 dB");
         assert_eq!(audio_fader_db_label(1.0), "+6.0 dB");
     }
 }

@@ -1,3 +1,4 @@
+import { faderLinToDb } from "../audio/faderCurve";
 import type { EventEnvelope, EventName, JsonObject, JsonValue, RequestMethod } from "../generated/protocol";
 import type {
   CommissioningCheckTarget,
@@ -49,7 +50,6 @@ interface AudioMeterState {
 
 const AUDIO_METERING_TICK_MS = 33;
 const AUDIO_METERING_CADENCE_HZ = 30;
-const AUDIO_FADER_UNITY = 0.8;
 const AUDIO_METER_FLOOR_DBFS = -60;
 const AUDIO_METER_PEAK_WARNING_DBFS = -3;
 const AUDIO_METER_OVER_DBFS = 0;
@@ -107,20 +107,11 @@ function dbfsToNormalized(dbfs: number) {
   return 10 ** (Math.max(AUDIO_METER_FLOOR_DBFS, Math.min(0, dbfs)) / 20);
 }
 
+// Simulated submix gain follows RME's fader curve (audio/faderCurve.ts), the
+// same law the engine's simulated metering uses (audio/snapshot.rs).
 function totalMixFaderGain(value: number) {
-  const normalized = clampNumber(value, 0, 1);
-  if (normalized <= 0) return 0;
-
-  const db =
-    normalized >= 1
-      ? 6
-      : normalized <= 0.7
-        ? -60 + (normalized / 0.7) * 50
-        : normalized <= AUDIO_FADER_UNITY
-          ? -10 + ((normalized - 0.7) / 0.1) * 10
-          : ((normalized - AUDIO_FADER_UNITY) / 0.2) * 6;
-
-  return 10 ** (db / 20);
+  const db = faderLinToDb(clampNumber(value, 0, 1));
+  return Number.isFinite(db) ? 10 ** (db / 20) : 0;
 }
 
 function normalizeTalentMarks(value: unknown): JsonObject[] {

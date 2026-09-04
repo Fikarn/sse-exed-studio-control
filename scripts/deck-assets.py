@@ -6,8 +6,10 @@
 #
 # Design: 144x144 canvas (2x the Companion 72px button canvas, scaled by
 # Companion per surface). Bars sit in the bottom band with the unity notch at
-# the app fader scale's 0.8 mark; icons are transparent-background glyphs so
-# feedback bgcolor changes show through beneath them.
+# RME's 0 dB fader position (step 836 of 1023 = the app's AUDIO_FADER_UNITY,
+# see native/rust-engine/src/audio/fader_curve.rs; 2026-09 audit Slice 5);
+# icons are transparent-background glyphs so feedback bgcolor changes show
+# through beneath them.
 
 import base64
 from pathlib import Path
@@ -24,7 +26,7 @@ GLYPH = (169, 156, 120, 230)  # #A99C78
 
 BAR_X0, BAR_X1 = 8, 136
 BAR_Y0, BAR_Y1 = 118, 138
-UNITY_X = BAR_X0 + round((BAR_X1 - BAR_X0) * 0.8)
+UNITY_X = BAR_X0 + round((BAR_X1 - BAR_X0) * 836 / 1023)
 
 FILL_NORMAL = ((138, 106, 31), (232, 177, 61))  # amber ramp
 FILL_MUTED = ((90, 36, 28), (194, 87, 66))  # ember ramp

@@ -2,11 +2,10 @@ use std::collections::HashMap;
 
 use crate::audio_backend::read_default_audio_inventory;
 
+use super::fader_curve::fader_lin_to_db;
 use super::helpers::*;
 use super::types::*;
 use super::*;
-
-const AUDIO_FADER_UNITY: f64 = 0.8;
 
 pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot {
     let config = resolve_audio_config(settings);
@@ -229,27 +228,11 @@ pub(super) fn apply_mix_target_metering(
     }
 }
 
+/// Simulated submix gain follows RME's fader curve (`fader_curve.rs`), the
+/// same law the fixture transport and the on-screen labels use.
 fn totalmix_fader_gain(value: f64) -> f64 {
-    let normalized = if value.is_finite() {
-        value.clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    if normalized <= 0.0 {
-        return 0.0;
-    }
-
-    let db = if normalized >= 1.0 {
-        6.0
-    } else if normalized <= 0.7 {
-        -60.0 + (normalized / 0.7) * 50.0
-    } else if normalized <= AUDIO_FADER_UNITY {
-        -10.0 + ((normalized - 0.7) / 0.1) * 10.0
-    } else {
-        ((normalized - AUDIO_FADER_UNITY) / 0.2) * 6.0
-    };
-
-    10.0_f64.powf(db / 20.0)
+    let position = if value.is_finite() { value } else { 0.0 };
+    fader_lin_to_db(position).map_or(0.0, |db| 10.0_f64.powf(db / 20.0))
 }
 
 pub fn refresh_audio_snapshot_metering(

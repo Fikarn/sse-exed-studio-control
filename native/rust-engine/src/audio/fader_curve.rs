@@ -10,17 +10,25 @@
 //! Live-verified on the studio UFX III (2026-09-03): sending
 //! `/mix/pb/6/10/faderlin 0.02` made TotalMix report `-61.97441 dB`, which is
 //! `fader_lin_to_db(0.02)` to five decimals.
+//!
+//! Since the 2026-09 audit (Slice 5) this is also the law behind every dB the
+//! operator reads: the Stream Deck LCD labels (`control_surface_audio.rs`),
+//! the simulated metering (`audio/snapshot.rs`) and, mirrored line for line in
+//! `frontend/packages/engine-client/src/audio/faderCurve.ts`, the on-screen
+//! faders and the fixture transport. The anchor tests on both sides pin the
+//! same table.
 
 /// TotalMix fader resolution: positions are `0..=1023` steps mapped onto 0..1.
 pub const FADER_POSITION_STEPS: f64 = 1023.0;
-/// Below this the console treats the fader as off (`-∞`); TotalMix itself
-/// reports off nodes as `-300 dB` and omits them from `/sendall 2` dumps.
-#[allow(dead_code)] // Slice 5 moves the app's fader labels onto this curve.
+/// At or below this the console treats the fader as off (`-∞`); TotalMix
+/// itself reports off nodes as `-300 dB` and omits them from `/sendall 2`
+/// dumps. Mirrored as `FADER_OFF_DB` in the frontend curve module.
+#[allow(dead_code)] // Documented threshold; comparisons use OFF_THRESHOLD_DB.
 pub const FADER_OFF_DB: f64 = -65.0;
 /// Top of the fader.
 pub const FADER_MAX_DB: f64 = 6.0;
 /// Unity gain (0 dB) as a linear fader position: step 836 of 1023.
-#[allow(dead_code)] // Slice 5 replaces the app's 0.80 unity with this value.
+#[allow(dead_code)] // Test anchor; the app owns "unity" (engine-client faderCurve.ts).
 pub const AUDIO_FADER_UNITY: f64 = 836.0 / 1023.0;
 
 const KNEE_POSITION: f64 = 649.0;

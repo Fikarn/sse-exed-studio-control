@@ -237,14 +237,17 @@
 }
 
 /* ── Unity (0 dB) reference detents ───────────────────────────────────────────
-   DP1 (channel-strip-refine): 0 dB sits at 80% of every fader's throw, so two
-   small notches flank the slot at that line as a fixed reference to null faders
-   against. They tuck behind the cap exactly when the fader is at unity. */
+   DP1 (channel-strip-refine): two small notches flank the slot at the 0 dB
+   line as a fixed reference to null faders against; they tuck behind the cap
+   exactly when the fader is at unity. 0 dB is RME's fader step 836 of 1023
+   (81.7% of the throw — 2026-09 audit Slice 5); the component sets
+   --audio-fader-unity from AUDIO_FADER_UNITY so this file never carries its
+   own copy of the number. */
 .sliderControl[data-orientation="vertical"]::before,
 .sliderControl[data-orientation="vertical"]::after {
   content: "";
   position: absolute;
-  bottom: 80%;
+  bottom: calc(100% * var(--audio-fader-unity));
   width: 5px;
   height: 2px;
   border-radius: 1px;

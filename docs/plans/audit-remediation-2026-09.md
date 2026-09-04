@@ -119,12 +119,35 @@ Baselines: the 7 win32 audio captures above (snapshot deck tile only); linux aft
 
 ## Slice 5 — RME fader curve everywhere
 
-Status: planned.
+Status: landed 2026-09-04 (operator verification pending — checklist B4 + Companion re-import). Commit `Audit S5`.
 
 Scope: `audio/fader_curve.rs` + `audioFormatting.ts` + `fixtureTransport.ts` on RME's `CalcFaderDB`/`CalcFaderLin`; `AUDIO_FADER_UNITY = 836/1023`; notch CSS from a variable; deck bar assets regenerated (`scripts/deck-assets.py`); Companion profile re-export.
-Gates before: `audioFormatting.test.ts` and `audio_fader_db_label_mirrors_the_app_curve` pinned the wrong curve.
-Tests added: RME anchor tables both sides, round trips, deck label parity. Tests changed: the two curve tests and the Playwright dB assertions that hard-coded 0.8 (they encoded the wrong curve).
-Validation: (filled at landing). Baselines: all audio sizes + audio stories (win32 now, linux after Slice 12). Operator hands: checklist B4 + Companion re-import.
+
+What the gates asserted before: `audioFormatting.test.ts` and the Playwright test "formats audio faders with the prototype TotalMix-style law" pinned 0.7 → −10 dB and 0.8 → 0 dB; `audio_fader_db_label_mirrors_the_app_curve` pinned the same law for the deck LCD; `simulated_output_submix_uses_totalmix_fader_gain_curve` used 0.8 as unity and 0.7 as −10 dB; the `audio.spec.ts` single-source-submix test used the 0.8 / 0.7 literals; three Playwright sites typed −60 dB to mean "no send" (the old curve's floor). Nothing compared any of them with RME's published curve, and the engine, the app and the fixture transport each carried their own copy of the prototype law.
+
+What landed:
+
+- One TypeScript implementation, `frontend/packages/engine-client/src/audio/faderCurve.ts` (mirrors `audio/fader_curve.rs`; `AUDIO_FADER_UNITY = 836/1023`, `FADER_OFF_DB = −65`, `FADER_MAX_DB = +6`), exported from `@sse/engine-client`. `audioFormatting.ts` re-exports the constant and routes `normalizedToFaderDb` / `faderDbToNormalized` through it; the fixture transport's simulated submix gain uses it (its private 0.8 copy deleted). A typed `0` lands exactly on the unity constant.
+- Engine: `control_surface_audio::audio_fader_db_label` and `audio/snapshot.rs::totalmix_fader_gain` call `fader_curve::fader_lin_to_db`; both private prototype-law copies are gone. The deck label keeps its `+0.0 dB` style and never prints `-0.0`.
+- Unity notch: `AudioSliderControl` sets `--audio-fader-unity` from `AUDIO_FADER_UNITY` and the CSS notch is `calc(100% * var(--audio-fader-unity))`. Routine call (not a rescope): the plan said to declare the variable in `AudioWorkspace.module.css`; declaring it on the component that draws the notch keeps a single source and covers sliders rendered outside the workspace.
+- Typed dB entry (`AudioFader`) spans −65 … +6 dB; −65 dB and below is off, as in TotalMix.
+- `scripts/deck-assets.py` `UNITY_X` → 836/1023; the 26 bar PNG/.b64 pairs regenerated (notch moved from x = 110 to x = 113 on the 144 px canvas). Icons and the strip assets came out byte-identical, which also confirms the Pillow output is reproducible.
+- `docs/OPERATIONS.md` (`faderlin` clause, deck unity note plus the re-export / Full Reset & Import step), CHANGELOG bullet.
+
+Tests added: engine-client `faderCurve.test.ts` (RME anchors including the live 0.02 → −61.974 dB reading, a 1023-step round trip, off / −300 dB sentinel / non-finite handling); `audioFormatting.test.ts` anchor table, dB round trips, −65 dB = off, `formatAudioDb(0.8) = "-0.6 dB"`; Rust `audio_fader_db_label_prints_the_rme_fader_curve` at the same anchors (the Slice 2 `fader_curve_matches_rme_published_anchors` already pins the engine curve).
+
+Tests changed (old → new → why):
+
+- `audioFormatting.test.ts` curve block: unity 0.8 → 0 dB, 1.0 → exactly 6, −60 dB → position 0, breakpoint round trip at 0.7 / 0.75 → RME anchors (0.5 → −12.125, 649/1023 → −6, 0.7 → −3.847, 0.8 → −0.565, …), −65 dB → 0, −60 dB → 0.0333, round trips in both directions. Why: the old table encoded a prototype law TotalMix never used (decision 3).
+- `audio.spec.ts` "formats audio faders with the prototype TotalMix-style law" → "… with RME's TotalMix fader curve" (same reason); the single-source-submix test uses `AUDIO_FADER_UNITY` and `faderDbToNormalized(-10)` instead of 0.8 / 0.7; three "Fader level" entries `fill("-60")` → `fill("-65")` because −60 dB is a real send level on RME's curve and −65 dB is off — the assertions that follow (`data-no-send`, snapshot preview text) are unchanged.
+- Rust `audio_fader_db_label_mirrors_the_app_curve` (0.35 → −35.0, 0.7 → −10.0, 0.75 → −5.0, 0.8 → +0.0, 0.9 → +3.0, 1.0 → +6.0) → `…prints_the_rme_fader_curve` (0.35 → −23.0, 0.5 → −12.1, 649/1023 → −6.0, 0.7 → −3.8, 0.75 → −2.2, 0.8 → −0.6, unity → +0.0, 0.9 → +2.7, 1.0 → +6.0, NaN → −∞).
+- Rust `simulated_output_submix_uses_totalmix_fader_gain_curve`: unity 0.8 → `fader_curve::AUDIO_FADER_UNITY`, the −10 dB position 0.7 → `fader_db_to_lin(-10.0)`; the physics it asserts (−10 dB = 0.316×, dim 0.42×) is unchanged.
+
+Validation (workstation, 2026-09-04): engine-client Vitest 4 passed (2 files); app Vitest 44 passed; `frontend:typecheck` clean; eslint and prettier clean on the touched files; `cargo test -p studio-control-engine` → 273 passed, 1 ignored (live); `cargo fmt --check` and clippy clean; `python scripts/deck-assets.py` → 52 files changed, all 26 bar pairs and nothing else; Playwright `audio.spec.ts audio-hierarchy.spec.ts audio-arm-countdown.spec.ts audio-meter-gating.spec.ts` → 50 passed after rebuilding `dist` (the first run, against the previous evening's build, failed the three −65 dB entries because the dialog still had the old −60 dB minimum — the Playwright `webServer` is `vite preview` over `frontend/app/dist`, so behaviour specs need `npm run build --workspace frontend/app` after source edits; noted in AGENTS.md); visual lanes → 77 passed after refreshing 12 win32 audio baselines; `npm run dev:check` → passed.
+
+Baselines moved: 12 win32 — `audio-populated` at 1440×900, 1600×960, 1728×1117, 1920×1080, 2560×1440, studio-preview 1512×982, bone and graphite 2560×1440; `audio-state-assumed`, `audio-not-verified`, `audio-offline`, `audio-action-failed` at 2560×1440. Diffs inspected: only the per-strip dB readouts, the monitor-bar MAIN level, the inspector send readout, the unity notches (up about 1.7 % of the throw) and the Guest 1 fader cap (its fixture value 0.8 is no longer unity, so its `data-unity` border went). `audio-populated` 1280×800 re-rendered byte-identical and the two audio Storybook baselines stayed within tolerance, so neither was rewritten. Linux siblings refresh after Slice 12 (CI `frontend-e2e` expected red from this slice on); darwin pending.
+
+Operator hands: checklist B4 — TotalMix fader at 0 dB → app reads 0.0 dB with the cap on the notch, −6 dB → −6.0 dB, deck LCD prints the same — plus re-export the Companion profile from Setup and Full Reset & Import it so the touch-strip bars carry the new notch.
 
 ## Slice 6 — Talkback momentary, shared watchdog, `audio.talkback.hold`
 
