@@ -280,12 +280,27 @@ Operator hands: eyeball on the studio monitor — Bone chrome header reads as on
 
 ## Slice 11 — Close confirmation + graceful engine stop
 
-Status: planned.
+Status: landed 2026-09-04 (operator verification pending — checklist B8: X / Alt+F4 on the real shell). Commit `Audit S11`.
 
-Scope: `CloseRequested` → `prevent_close` + `shell://close-requested` unless confirmed or `SSE_SHELL_SKIP_CLOSE_CONFIRM=1`; `shell_confirm_close` (flag, graceful `EngineBridge::stop`, destroy); frontend listener → unsaved-scene guard → `ShellDialog`; fixture hook for Playwright.
-Gates before: nothing; automation kills the process or uses `--smoke-test`.
-Tests added: close-policy unit test; `shell.spec.ts` dialog. Native close path is operator-verified and not CI-covered.
-Validation: (filled at landing). Baselines: none. Operator hands: checklist B8.
+Scope: `CloseRequested` → `prevent_close` + `shell://close-requested` unless confirmed or `SSE_SHELL_SKIP_CLOSE_CONFIRM=1`; `shell_confirm_close` (flag, graceful `EngineBridge::stop`, close); frontend listener → unsaved-scene guard → `ShellDialog`; fixture hook for Playwright.
+
+What the gates asserted before: nothing covered closing. README and OPERATIONS both stated that closing the window asks for confirmation; the shell had no `CloseRequested` handling beyond persisting window preferences, `EngineBridge::stop` was a hard `kill`, and every automation lane either ran `--smoke-test` (no window) or stopped the process tree.
+
+What landed:
+
+- Shell crate (`native/tauri-shell`): `EngineState.close_confirmed: AtomicBool`; a pure `close_policy(confirmed, skip_env) -> Prevent | Allow` (`SSE_SHELL_SKIP_CLOSE_CONFIRM=1` is the only opt-out); the main window's `CloseRequested` hook calls `api.prevent_close()` and emits `shell://close-requested` while the policy says Prevent, and otherwise falls through to the existing preference persistence; new `shell_confirm_close` command (registered in both handler lists) sets the flag, stops the engine and closes the window (`close()`, `destroy()` as fallback) so the preference persistence still runs. `EngineBridge::stop` is graceful: it drops the engine's stdin, waits up to `ENGINE_STOP_GRACE` (2 s) via `wait_for_exit`, and kills only a lingering child — the engine's request loop ends on EOF and `EngineApp::shutdown` (Slice 6) releases any talkback hold; engine restarts go through the same path. Routine call: `close()` instead of the plan's `destroy()`, so the confirmed close persists the window preferences like any other close; `destroy()` remains the fallback.
+- Frontend: `shellCommands.onShellCloseRequested` (Tauri `listen`, guarded by `tauriAvailable`, safe to unsubscribe before the subscription resolves) and `confirmShellClose`; `OperatorShell` gains `confirmIntent = "close-window"`, `requestClose` (runs `attemptLeaveCurrentWorkspace` first — the lighting unsaved-scene prompt — then opens the dialog), `performClose`, and renders the "Close Studio Control?" `ShellDialog` next to the restart dialog in all six shell states (startup, setup-startup, recovery, degraded, operator) so a close request is never swallowed. Body copy: "Closing ends the console link. TotalMix keeps its current state, sACN output stops and fixtures hold their last levels, and the Stream Deck goes idle." `window.__SSE_TEST_REQUEST_CLOSE__` is the browser / fixture stand-in for the native event.
+- Docs: OPERATIONS §Shutdown rewritten to describe what actually happens (confirmation in every state, graceful stop and the 2 s grace, what the hardware does, the hard-kill talkback caveat, the automation opt-out); README's existing sentence is now true. CHANGELOG (Added).
+
+Tests added: shell crate `close_is_prevented_until_confirmed_or_opted_out` (eight policy cases) and `wait_for_exit_sees_a_prompt_exit_and_gives_up_on_a_lingering_child` (real child processes); `shell.spec.ts` "closing the window asks for confirmation; Cancel and Escape keep the session" (hook → dialog with the hardware copy → Cancel keeps the workspace; hook → Escape; hook → confirm closes only the dialog outside Tauri).
+
+Tests changed: none.
+
+Validation (workstation, 2026-09-04): `cargo test -p sse-exed-tauri-shell` → 12 passed (+2); `cargo fmt --check` + workspace clippy clean; `frontend:typecheck` clean; Vitest 55 + 122 + 4; eslint + prettier clean; Playwright `shell.spec.ts` 7 passed (dist rebuilt); `npm run tauri:setup-support:qualify` → passed (real dev shell boots with the new hook and command registered, engine bridge round trips, nothing left running); `npm run dev:check` → passed; `npm run tauri:foundation` (protocol generate, engine build, release `tauri:build`, `tauri:smoke`) → passed.
+
+Not CI-covered, by design: the native close path (X / Alt+F4 → dialog → confirm → graceful stop → quit) needs a real window; Playwright drives the same dialog through the window hook, and the policy and the graceful wait are unit-tested.
+
+Baselines moved: none. Operator hands: checklist B8 — press X or Alt+F4 → the dialog appears (also during startup/recovery); Cancel keeps the session; Confirm quits and no `studio-control-engine.exe` remains in Task Manager; with a talkback hold active at that moment TotalMix releases it.
 
 ## Slice 12 — Extras: key glyphs, operator copy, DMX decimal, seed confirm
 

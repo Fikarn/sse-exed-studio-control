@@ -129,18 +129,32 @@ impl EngineBridge {
             .map_err(|error| format!("Invalid engine response: {error}"))
     }
 
+    /// Stops the engine gracefully (2026-09 audit Slice 11): close its stdin
+    /// so the request loop ends — the engine releases any talkback hold on
+    /// its way out — wait up to `ENGINE_STOP_GRACE` for it to exit, and kill
+    /// it only if it does not. Used by the close confirmation and by engine
+    /// restarts alike.
     pub fn stop(&self) -> Result<(), String> {
         let mut process_guard = self
             .process
             .lock()
             .map_err(|_| "Engine bridge poisoned".to_string())?;
 
-        if let Some(mut process) = process_guard.take() {
-            process
-                .child
-                .kill()
-                .map_err(|error| format!("Failed to stop engine process: {error}"))?;
-            let _ = process.child.wait();
+        if let Some(process) = process_guard.take() {
+            let EngineProcess {
+                mut child,
+                stdin,
+                binary_path: _,
+            } = process;
+            // The only other holder of the stdin Arc is a write_request that
+            // has already returned, so dropping ours closes the pipe.
+            drop(stdin);
+            if !wait_for_exit(&mut child, ENGINE_STOP_GRACE) {
+                child
+                    .kill()
+                    .map_err(|error| format!("Failed to stop engine process: {error}"))?;
+                let _ = child.wait();
+            }
         }
 
         self.pending
@@ -189,6 +203,26 @@ impl EngineBridge {
             .flush()
             .map_err(|error| format!("Failed to flush engine request: {error}"))?;
         Ok(())
+    }
+}
+
+/// How long a graceful stop waits for the engine to exit after stdin closes
+/// before falling back to a kill.
+pub const ENGINE_STOP_GRACE: Duration = Duration::from_secs(2);
+
+/// Polls `child` until it exits or `grace` elapses. True when it exited.
+fn wait_for_exit(child: &mut Child, grace: Duration) -> bool {
+    let deadline = std::time::Instant::now() + grace;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => return true,
+            Ok(None) => {}
+            Err(_) => return false,
+        }
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(25));
     }
 }
 
@@ -423,6 +457,47 @@ mod tests {
                 .iter()
                 .find_map(|(key, value)| (*key == name).then(|| OsString::from(value)))
         }
+    }
+
+    fn short_lived_process() -> std::process::Command {
+        if cfg!(windows) {
+            let mut command = std::process::Command::new("cmd");
+            command.args(["/C", "exit 0"]);
+            command
+        } else {
+            std::process::Command::new("true")
+        }
+    }
+
+    fn lingering_process() -> std::process::Command {
+        if cfg!(windows) {
+            let mut command = std::process::Command::new("cmd");
+            command.args(["/C", "ping -n 30 127.0.0.1 > nul"]);
+            command
+        } else {
+            let mut command = std::process::Command::new("sleep");
+            command.arg("30");
+            command
+        }
+    }
+
+    // 2026-09 audit Slice 11: the graceful stop must notice a prompt exit and
+    // must give up (so the caller kills) when the child lingers.
+    #[test]
+    fn wait_for_exit_sees_a_prompt_exit_and_gives_up_on_a_lingering_child() {
+        let mut quick = short_lived_process()
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .expect("short-lived process should spawn");
+        assert!(wait_for_exit(&mut quick, Duration::from_secs(5)));
+
+        let mut slow = lingering_process()
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .expect("lingering process should spawn");
+        assert!(!wait_for_exit(&mut slow, Duration::from_millis(150)));
+        slow.kill().expect("lingering process should be killable");
+        let _ = slow.wait();
     }
 
     #[test]

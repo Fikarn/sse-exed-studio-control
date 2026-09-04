@@ -12,7 +12,10 @@ This document describes runtime behavior and operator recovery for the native `S
 
 ### Shutdown
 
-- Closing the main window asks for confirmation before the app fully quits.
+- Closing the main window (the X button, Alt+F4, or the system close) asks for confirmation first, in every shell state including startup and recovery. If a lighting scene has unsaved changes, that prompt comes first.
+- Confirming stops the engine gracefully: the shell closes the engine's stdin, the engine's request loop ends and releases any talkback hold on its way out, and the shell waits up to two seconds before it would force-kill. Then the window closes and the app quits. Engine restarts use the same graceful stop.
+- What the hardware does: TotalMix keeps whatever state it has (nothing is recalled or reset), sACN output stops and fixtures hold their last levels, and the Stream Deck goes idle. A hard kill of the engine (task manager, power loss) cannot release talkback — release it in TotalMix.
+- Automation that must close the shell without a dialog sets `SSE_SHELL_SKIP_CLOSE_CONFIRM=1`; the smoke and qualification lanes do not need it (they run `--smoke-test` or stop the process tree).
 - The engine remains the owner of persisted state, recovery details, and device-facing safety behavior.
 - Logs and support diagnostics stay available from the native recovery and support surfaces.
 

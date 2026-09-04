@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type { JsonValue } from "@sse/engine-client";
+
+/** Raised by the native shell when a window close still needs confirming. */
+export const SHELL_CLOSE_REQUESTED_EVENT = "shell://close-requested";
 
 function tauriAvailable() {
   return "__TAURI_INTERNALS__" in window;
@@ -42,6 +46,38 @@ export async function enterStudioFullscreen() {
 export async function switchToWindowedLayout() {
   if (tauriAvailable()) {
     await invoke("shell_use_windowed_layout");
+  }
+}
+
+/**
+ * 2026-09 audit Slice 11: the native shell prevents a window close until the
+ * operator confirms and raises this event instead. Outside Tauri (browser,
+ * fixtures) nothing is subscribed; the returned function always unsubscribes
+ * safely, even if the subscription has not resolved yet.
+ */
+export function onShellCloseRequested(listener: () => void): () => void {
+  if (!tauriAvailable()) {
+    return () => {};
+  }
+  let disposed = false;
+  let unlisten: UnlistenFn | null = null;
+  void listen(SHELL_CLOSE_REQUESTED_EVENT, () => listener()).then((stop) => {
+    if (disposed) {
+      stop();
+    } else {
+      unlisten = stop;
+    }
+  });
+  return () => {
+    disposed = true;
+    unlisten?.();
+  };
+}
+
+/** The operator confirmed the close: the shell stops the engine gracefully and closes. */
+export async function confirmShellClose() {
+  if (tauriAvailable()) {
+    await invoke("shell_confirm_close");
   }
 }
 

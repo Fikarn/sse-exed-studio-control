@@ -13,17 +13,48 @@ use std::fs::{create_dir_all, read_to_string, remove_file, write};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use studio_control_protocol::RequestEnvelope;
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Monitor, PhysicalPosition, PhysicalSize,
-    WebviewWindow,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Monitor, PhysicalPosition,
+    PhysicalSize, WebviewWindow,
 };
 
 struct EngineState {
     bridge: EngineBridge,
+    /// Set by `shell_confirm_close` once the operator confirmed the close
+    /// dialog; the `CloseRequested` hook lets the window close only then
+    /// (2026-09 audit Slice 11).
+    close_confirmed: AtomicBool,
+}
+
+/// Raised on the main window when the operator asks to close it and the
+/// close still needs confirming; the frontend answers with the dialog and
+/// `shell_confirm_close`.
+const SHELL_CLOSE_REQUESTED_EVENT: &str = "shell://close-requested";
+/// Automation that must close the shell without a dialog sets this to `1`.
+const SHELL_SKIP_CLOSE_CONFIRM_ENV: &str = "SSE_SHELL_SKIP_CLOSE_CONFIRM";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ClosePolicy {
+    /// Keep the window, ask the operator.
+    Prevent,
+    /// Let the close through.
+    Allow,
+}
+
+/// Pure close policy: a close goes through once the operator confirmed it or
+/// when automation opted out of the dialog; anything else is prevented and
+/// turned into a `shell://close-requested` event.
+fn close_policy(confirmed: bool, skip_confirm_env: Option<&str>) -> ClosePolicy {
+    if confirmed || skip_confirm_env.map(str::trim) == Some("1") {
+        ClosePolicy::Allow
+    } else {
+        ClosePolicy::Prevent
+    }
 }
 
 #[cfg(feature = "test-bridge")]
@@ -664,6 +695,24 @@ fn engine_stop(state: tauri::State<'_, EngineState>) -> Result<(), String> {
     state.bridge.stop()
 }
 
+/// The operator confirmed "Close Studio Control?": stop the engine gracefully
+/// (its stdin closes, its loop ends and releases any talkback hold, two
+/// seconds of grace before a kill), mark the close confirmed so the
+/// `CloseRequested` hook lets it through, then close the window — which also
+/// persists the window preferences on the way out.
+#[tauri::command]
+fn shell_confirm_close(app: AppHandle, state: tauri::State<'_, EngineState>) -> Result<(), String> {
+    state.close_confirmed.store(true, Ordering::SeqCst);
+    if let Err(error) = state.bridge.stop() {
+        eprintln!("Engine stop before close failed: {error}");
+    }
+    let window = main_window(&app)?;
+    window
+        .close()
+        .or_else(|_| window.destroy())
+        .map_err(|error| format!("Failed to close the main window: {error}"))
+}
+
 #[tauri::command]
 fn engine_summary(
     state: tauri::State<'_, EngineState>,
@@ -991,6 +1040,7 @@ fn main() {
     let builder = tauri::Builder::default()
         .manage(EngineState {
             bridge: EngineBridge::default(),
+            close_confirmed: AtomicBool::new(false),
         })
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -999,6 +1049,21 @@ fn main() {
                 restore_or_route_initial_window(&app_handle, &window);
                 let window_for_events = window.clone();
                 window.on_window_event(move |event| {
+                    // 2026-09 audit Slice 11: closing asks first. Until the
+                    // operator confirms (or automation opts out), keep the
+                    // window and let the frontend raise the dialog.
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        let confirmed = app_handle
+                            .state::<EngineState>()
+                            .close_confirmed
+                            .load(Ordering::SeqCst);
+                        let skip = env::var(SHELL_SKIP_CLOSE_CONFIRM_ENV).ok();
+                        if close_policy(confirmed, skip.as_deref()) == ClosePolicy::Prevent {
+                            api.prevent_close();
+                            let _ = window_for_events.emit(SHELL_CLOSE_REQUESTED_EVENT, ());
+                            return;
+                        }
+                    }
                     if !matches!(
                         event,
                         tauri::WindowEvent::Resized(_)
@@ -1026,6 +1091,7 @@ fn main() {
         shell_enter_studio_fullscreen,
         shell_use_windowed_layout,
         shell_reset_window_layout,
+        shell_confirm_close,
         shell_test_bridge_config,
         shell_test_bridge_write_status,
         shell_test_bridge_read_command
@@ -1041,12 +1107,32 @@ fn main() {
         shell_export_diagnostics,
         shell_enter_studio_fullscreen,
         shell_use_windowed_layout,
-        shell_reset_window_layout
+        shell_reset_window_layout,
+        shell_confirm_close
     ]);
 
     builder
         .run(tauri::generate_context!())
         .expect("failed to run tauri shell");
+}
+
+#[cfg(test)]
+mod shell_close_policy_tests {
+    use super::*;
+
+    // 2026-09 audit Slice 11: the only two ways past the close dialog are the
+    // operator's confirmation and the explicit automation opt-out.
+    #[test]
+    fn close_is_prevented_until_confirmed_or_opted_out() {
+        assert_eq!(close_policy(false, None), ClosePolicy::Prevent);
+        assert_eq!(close_policy(false, Some("0")), ClosePolicy::Prevent);
+        assert_eq!(close_policy(false, Some("")), ClosePolicy::Prevent);
+        assert_eq!(close_policy(false, Some("true")), ClosePolicy::Prevent);
+        assert_eq!(close_policy(true, None), ClosePolicy::Allow);
+        assert_eq!(close_policy(false, Some("1")), ClosePolicy::Allow);
+        assert_eq!(close_policy(false, Some(" 1 ")), ClosePolicy::Allow);
+        assert_eq!(close_policy(true, Some("0")), ClosePolicy::Allow);
+    }
 }
 
 #[cfg(test)]

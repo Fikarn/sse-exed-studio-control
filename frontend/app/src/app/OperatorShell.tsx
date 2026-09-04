@@ -12,7 +12,13 @@ import { buildMonitorItems, isEditableTarget } from "./shellData";
 import { computeLiveSceneDrift } from "./lighting/lightingDrift";
 import { SetupSupportPilot } from "./setup/SetupSupportPilot";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
-import { enterStudioFullscreen, resetWindowLayout, switchToWindowedLayout } from "./shellCommands";
+import {
+  confirmShellClose,
+  enterStudioFullscreen,
+  onShellCloseRequested,
+  resetWindowLayout,
+  switchToWindowedLayout,
+} from "./shellCommands";
 import { useTauriShellTestBridge } from "./tauriShellTestBridge";
 import { AudioWorkspace } from "./audio/AudioWorkspace";
 import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
@@ -29,7 +35,17 @@ import { SetupStartupSurface } from "./startup/SetupStartupSurface";
 import { StartupSurface } from "./startup/StartupSurface";
 import { deriveShellExperience } from "./startup/startupHelpers";
 
-type ConfirmIntent = "restart-engine" | null;
+type ConfirmIntent = "restart-engine" | "close-window" | null;
+
+declare global {
+  interface Window {
+    /** Browser / fixture stand-in for the native close request (Playwright). */
+    __SSE_TEST_REQUEST_CLOSE__?: () => void;
+  }
+}
+
+const CLOSE_DIALOG_BODY =
+  "Closing ends the console link. TotalMix keeps its current state, sACN output stops and fixtures hold their last levels, and the Stream Deck goes idle.";
 
 export function OperatorShell() {
   // Toast portal hosts cross-workspace bottom-right notifications + the ⌘K
@@ -97,6 +113,31 @@ function OperatorShellInner() {
     setConfirmIntent(null);
     await environment.store.restart();
   });
+
+  // 2026-09 audit Slice 11: closing the window asks first. The native shell
+  // prevents the close and raises shell://close-requested; the lighting
+  // unsaved-scene guard runs before the close dialog, exactly like a
+  // workspace switch. Confirming hands back to the shell, which stops the
+  // engine gracefully and closes the window.
+  const requestClose = useLiveCallback(async () => {
+    const allowed = await attemptLeaveCurrentWorkspace();
+    if (!allowed) return;
+    setConfirmIntent("close-window");
+  });
+
+  const performClose = useLiveCallback(async () => {
+    setConfirmIntent(null);
+    await confirmShellClose();
+  });
+
+  useEffect(() => {
+    const unlisten = onShellCloseRequested(() => void requestClose());
+    window.__SSE_TEST_REQUEST_CLOSE__ = () => void requestClose();
+    return () => {
+      unlisten();
+      delete window.__SSE_TEST_REQUEST_CLOSE__;
+    };
+  }, [requestClose]);
 
   const tryNavigateWorkspace = useLiveCallback(async (target: ShellState["activeWorkspace"]) => {
     // Same-target clicks shouldn't trigger the prompt.
@@ -337,6 +378,19 @@ function OperatorShellInner() {
     return () => document.documentElement.removeAttribute("data-pre-ready");
   }, [shellExperience]);
 
+  // Rendered next to the restart dialog in every shell state (startup,
+  // recovery, operator) so a close request is never swallowed.
+  const closeDialog =
+    confirmIntent === "close-window" ? (
+      <ShellDialog
+        body={CLOSE_DIALOG_BODY}
+        confirmLabel="Close Studio Control"
+        onCancel={() => setConfirmIntent(null)}
+        onConfirm={() => void performClose()}
+        title="Close Studio Control?"
+      />
+    ) : null;
+
   if (setupModalActive && shellExperience === "startup") {
     return (
       <>
@@ -357,6 +411,7 @@ function OperatorShellInner() {
             title="Restart engine bridge?"
           />
         ) : null}
+        {closeDialog}
       </>
     );
   }
@@ -377,6 +432,7 @@ function OperatorShellInner() {
             title="Restart engine bridge?"
           />
         ) : null}
+        {closeDialog}
       </>
     );
   }
@@ -407,6 +463,7 @@ function OperatorShellInner() {
             title="Restart engine bridge?"
           />
         ) : null}
+        {closeDialog}
       </>
     );
   }
@@ -436,6 +493,7 @@ function OperatorShellInner() {
             title="Retry startup?"
           />
         ) : null}
+        {closeDialog}
       </>
     );
   }
@@ -461,6 +519,7 @@ function OperatorShellInner() {
             title="Retry startup?"
           />
         ) : null}
+        {closeDialog}
       </>
     );
   }
@@ -526,6 +585,7 @@ function OperatorShellInner() {
           title="Restart engine bridge?"
         />
       ) : null}
+      {closeDialog}
     </>
   );
 }

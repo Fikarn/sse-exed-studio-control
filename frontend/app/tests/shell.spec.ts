@@ -48,6 +48,45 @@ test("supports shell keyboard overlays and workspace switching", async ({ page }
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
 });
 
+declare global {
+  interface Window {
+    __SSE_TEST_REQUEST_CLOSE__?: () => void;
+  }
+}
+
+// 2026-09 audit remediation, Slice 11: README and OPERATIONS promised a close
+// confirmation that did not exist — the X button killed the shell and the
+// engine with it. The native shell now prevents the close and raises
+// shell://close-requested; in the browser the same request comes through the
+// window hook. The native close itself is operator-verified (checklist B8).
+test("closing the window asks for confirmation; Cancel and Escape keep the session", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  const workspace = page.getByTestId("lighting-workspace");
+  await expect(workspace).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Close Studio Control?" });
+
+  await page.evaluate(() => window.__SSE_TEST_REQUEST_CLOSE__?.());
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("TotalMix keeps its current state");
+  await expect(dialog).toContainText("fixtures hold their last levels");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(workspace).toBeVisible();
+
+  await page.evaluate(() => window.__SSE_TEST_REQUEST_CLOSE__?.());
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(workspace).toBeVisible();
+
+  // Confirming outside Tauri only closes the dialog — there is no shell to
+  // stop; in the native shell this is where shell_confirm_close runs.
+  await page.evaluate(() => window.__SSE_TEST_REQUEST_CLOSE__?.());
+  await dialog.getByRole("button", { name: "Close Studio Control" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(workspace).toBeVisible();
+});
+
 // R2-A (round-2 audit, R2-GLO-01): the palette is a modal — Tab must never
 // walk focus out to the page behind it, Escape must close it from wherever
 // focus sits, and focus must return to the invoker on close. The pre-fix
