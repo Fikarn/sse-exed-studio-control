@@ -1,0 +1,296 @@
+/* ==========================================================================
+   Studio Control — the A system's tokens, as one proposal file (2026-09-06)
+
+   This is the token set every A mock renders from, consolidated: three themes
+   (the existing data-theme keys studio / graphite / bone), one material model,
+   four role hues, a type scale, four radii, the chrome budget per viewport,
+   the elevation recipes and the motion policy. It is a docs proposal: the plan's
+   Slice 1 folds these into frontend/packages/tokens (core.json + themes.css)
+   with the old names kept as aliases until Slice 11. Nothing here is loaded by
+   the app.
+
+   Reading order: material → inks → roles → display inks → signal → type →
+   radii → chrome → elevation → motion.
+   ========================================================================== */
+
+/* ---- 1. Material and inks per theme -------------------------------------- */
+/* studio: a dim control room. Matte black chassis, black backlit displays. */
+:root,
+:root[data-theme="studio"] {
+  --bg: #0b0b0d; /* chassis floor (level 0) */
+  --bay: #060607; /* recessed bay the canvas sits in (level -1) */
+  --panel: #111114; /* plate (level +1), bottom of its vertical gradient */
+  --panel-top: #17171b; /* plate, top of its gradient */
+  --key: #1b1c21; /* key (level +2), bottom of its gradient */
+  --key-top: #26272e; /* key, top of its gradient */
+  --well: #000000; /* display floor (a backlit well), the same in every theme */
+  --line: rgba(255, 255, 255, 0.09); /* hairline */
+  --line-2: rgba(255, 255, 255, 0.2); /* stronger hairline, unlit lamp, kbd border */
+  --sheen: rgba(255, 255, 255, 0.08); /* the 1 px top highlight of a plate or key */
+  --shade: rgba(0, 0, 0, 0.6); /* the shade under a key or a cap */
+  --well-shade: rgba(0, 0, 0, 0.85); /* the inset shade at the top of a well */
+  --text: #f4f4f5;
+  --text-2: #a6a6ad; /* muted: 7.8:1 on --bg, 6.9:1 on --panel, 6.2:1 on --key */
+  --accent: #f4f4f5; /* selection keyline: neutral, so colour stays for state */
+}
+/* graphite: brushed cool steel. */
+:root[data-theme="graphite"] {
+  --bg: #13151a;
+  --bay: #0c0d11;
+  --panel: #1a1d24;
+  --panel-top: #20242c;
+  --key: #262a33;
+  --key-top: #31363f;
+  --well: #07080b;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-2: rgba(255, 255, 255, 0.22);
+  --sheen: rgba(255, 255, 255, 0.09);
+  --shade: rgba(0, 0, 0, 0.55);
+  --well-shade: rgba(0, 0, 0, 0.8);
+  --text: #f2f4f8;
+  --text-2: #a9b0bc;
+  --accent: #f2f4f8;
+}
+/* bone: a light workshop chassis under daylight; displays stay backlit. */
+:root[data-theme="bone"] {
+  --bg: #f1f0ec;
+  --bay: #e5e4df;
+  --panel: #fbfbfa;
+  --panel-top: #ffffff;
+  --key: #f6f6f4;
+  --key-top: #ffffff;
+  --well: #101012;
+  --line: rgba(0, 0, 0, 0.12);
+  --line-2: rgba(0, 0, 0, 0.3);
+  --sheen: rgba(255, 255, 255, 0.9);
+  --shade: rgba(0, 0, 0, 0.14);
+  --well-shade: rgba(0, 0, 0, 0.8);
+  --text: #1b1b1d;
+  --text-2: #5d5e64;
+  --accent: #1b1b1d;
+}
+
+/* ---- 2. Role hues: hue names the family, form names the meaning ----------- */
+/* amber = engaged (a toggle that is on, the active mix target, solo, dim, mono, peak hold), attention as a lamp or keyline, armed */
+/* green = live (a held key, a running timer) and ok (lamps, VERIFIED, READY) */
+/* red   = hazard (48 V on, clip, cut all) and error (OFFLINE, DISCONNECTED, FAILED, UNREACHABLE) */
+/* blue  = information / offline editing (PREVIEW) — the fourth and last hue */
+:root,
+:root[data-theme="studio"],
+:root[data-theme="graphite"] {
+  --amber: #f0b35b;
+  --amber-top: #f8c977;
+  --amber-ink: #1a1000;
+  --amber-text: #f0b35b;
+  --bloom-amber: rgba(240, 179, 91, 0.45);
+  --green: #3ddc7a;
+  --green-top: #66e99a;
+  --green-ink: #04200f;
+  --green-text: #3ddc7a;
+  --bloom-green: rgba(61, 220, 122, 0.5);
+  --red: #ff6161;
+  --red-ink: #230505;
+  --red-text: #ff6b6b;
+  --bloom-red: rgba(255, 97, 97, 0.5);
+  --blue-text: #7cc4ff;
+  --bloom-blue: rgba(124, 196, 255, 0.45);
+  --primary: #eeeef0;
+  --primary-top: #ffffff;
+  --primary-ink: #0b0b0d;
+  --primary-sheen: rgba(255, 255, 255, 0.6);
+  --cap: #f4f4f7;
+  --cap-2: #d3d3d9;
+  --cap-sheen: rgba(255, 255, 255, 0.7);
+  --cap-line: #0b0b0d;
+}
+:root[data-theme="graphite"] {
+  --green-text: #46d67c;
+  --red: #ff6b6b;
+  --red-text: #ff7676;
+  --blue-text: #8ccaff;
+  --primary: #eef0f4;
+  --primary-ink: #13151a;
+  --cap: #eceef3;
+  --cap-2: #c9cdd6;
+  --cap-line: #13151a;
+}
+:root[data-theme="bone"] {
+  /* fills keep the same hue with a dark ink; the text variants are darkened to clear 4.5:1 on the light chassis */
+  --amber: #e9a83e;
+  --amber-top: #f4bd5c;
+  --amber-ink: #1a1000;
+  --amber-text: #8a5a00;
+  --bloom-amber: rgba(233, 168, 62, 0.5);
+  --green: #2fbf6a;
+  --green-top: #52d287;
+  --green-ink: #04200f;
+  --green-text: #1a6b36;
+  --bloom-green: rgba(47, 191, 106, 0.4);
+  --red: #c62d2a;
+  --red-ink: #ffffff;
+  --red-text: #b3261e;
+  --bloom-red: rgba(198, 45, 42, 0.35);
+  --blue-text: #0b62c2;
+  --bloom-blue: rgba(11, 98, 194, 0.3);
+  --primary: #1b1b1d;
+  --primary-top: #2c2c30;
+  --primary-ink: #ffffff;
+  --primary-sheen: rgba(255, 255, 255, 0.14);
+  --cap: #2c2d33;
+  --cap-2: #141517;
+  --cap-sheen: rgba(255, 255, 255, 0.18);
+  --cap-line: #ffffff;
+}
+
+/* ---- 3. Display inks: a well is a black backlit display in every theme ---- */
+/* Everything printed on a well uses these, never the chassis inks. Scoping them on .well is what fixed every light-theme failure. */
+.well {
+  --well-text: #f4f4f5;
+  --well-text-2: #a6a6ad;
+  --green-text: #3ddc7a;
+  --amber-text: #f0b35b;
+  --red-text: #ff6b6b;
+  --blue-text: #7cc4ff;
+  --bloom-green: rgba(61, 220, 122, 0.5);
+  --bloom-amber: rgba(240, 179, 91, 0.45);
+  --bloom-red: rgba(255, 97, 97, 0.5);
+  --bloom-blue: rgba(124, 196, 255, 0.45);
+}
+:root[data-theme="bone"] .well {
+  --well-text-2: #b3b3b8;
+}
+
+/* ---- 4. Signal: the meter ramp and its peak -------------------------------- */
+:root {
+  --m-lo: #2ee06a;
+  --m-mid: #ffd23f;
+  --m-hot: #ff8a3d;
+  --m-over: #ff4d4d;
+  --peak: #ffffff;
+  --bloom-white: rgba(255, 255, 255, 0.45);
+}
+/* ramp stops on a 0..100 % well: green to 70 % (−18 dBFS), yellow to 90 % (−6), orange to 95 % (−3), red above */
+:root {
+  --meter-ramp-v: linear-gradient(
+    to top,
+    var(--m-lo) 0%,
+    var(--m-lo) 70%,
+    var(--m-mid) 70%,
+    var(--m-mid) 90%,
+    var(--m-hot) 90%,
+    var(--m-hot) 95%,
+    var(--m-over) 95%,
+    var(--m-over) 100%
+  );
+}
+:root {
+  --meter-ramp-h: linear-gradient(
+    to right,
+    var(--m-lo) 0%,
+    var(--m-lo) 70%,
+    var(--m-mid) 70%,
+    var(--m-mid) 90%,
+    var(--m-hot) 90%,
+    var(--m-hot) 95%,
+    var(--m-over) 95%,
+    var(--m-over) 100%
+  );
+}
+/* colour temperature track, the one other gradient that is information */
+:root {
+  --cct-track: linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff);
+}
+
+/* ---- 5. Type: one scale, chosen for 27 inches at 60–80 cm ----------------- */
+:root {
+  --ui: "Inter", system-ui, sans-serif; /* everything read as language */
+  --mono: "JetBrains Mono", ui-monospace, monospace; /* values, state words, key caps */
+  --t-tick: 12px; /* floor: scale ticks, eyebrows, secondary meta — never read to act (10 arcmin capitals at 70 cm) */
+  --t-label: 13px; /* labels and rows read to act, hints, kbd */
+  --t-body: 14px; /* body, command keys, rows */
+  --t-name: 15px; /* list names (snapshots, projects, steps) */
+  --t-value: 16px; /* strip names, printed values, section titles */
+  --t-word: 20px; /* take-time words: key caps on big keys, strip dB, Setup lead */
+  --t-state: 24px; /* the state word, inspector titles */
+  --t-hero-small: 32px; /* the hero at 1920 and 1280, Setup's step title */
+  --t-hero: 44px; /* the one number read from a metre away: main level, grand master, the focused dB */
+  --lh-tight: 1;
+  --lh-text: 1.35;
+  --tracking-cap: 0.04em; /* uppercase mono key caps and state words */
+  --tracking-eyebrow: 0.06em;
+}
+
+/* ---- 6. Radii: four values ------------------------------------------------- */
+:root {
+  --r4: 4px;
+  --r8: 8px;
+  --r12: 12px;
+  --pill: 999px;
+}
+/* 4: caps, fields, kbd, small lamps' boxes · 8: keys, wells, cards · 12: the state display, the bay screen, the plot, the drawer · pill: lamps and latch chips */
+
+/* ---- 7. Chrome budget per viewport ---------------------------------------- */
+:root {
+  --h-header: 56px;
+  --h-footer: 40px;
+  --w-cluster: 424px;
+  --w-plate: 416px;
+  --h-state: 180px;
+  --gutter: 16px;
+  --w-strip: 120px;
+  --w-drawer: 0px;
+}
+[data-vw="1920"] {
+  --h-header: 52px;
+  --h-footer: 36px;
+  --w-cluster: 360px;
+  --w-plate: 360px;
+  --h-state: 168px;
+  --gutter: 12px;
+  --w-strip: 98px;
+}
+[data-vw="1280"] {
+  --h-header: 48px;
+  --h-footer: 32px;
+  --w-cluster: 232px;
+  --w-plate: 0px;
+  --h-state: 140px;
+  --gutter: 8px;
+  --w-strip: 84px;
+  --w-drawer: 360px;
+}
+
+/* ---- 8. Elevation recipes: one light, from above -------------------------- */
+:root {
+  --elev-plate: inset 0 1px 0 var(--sheen); /* level +1: a brushed plate; background linear-gradient(180deg, var(--panel-top), var(--panel)) */
+  --elev-bay: inset 0 2px 10px var(--well-shade); /* level -1: the recessed bay */
+  --elev-well: inset 0 2px 6px var(--well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05); /* a display */
+  --elev-key:
+    inset 0 1px 0 var(--sheen), 0 1px 2px var(--shade); /* level +2: a machined key; background linear-gradient(180deg, var(--key-top), var(--key)) */
+  --elev-key-lit-amber: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 14px var(--bloom-amber);
+  --elev-key-lit-green: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 18px var(--bloom-green);
+  --elev-cap: inset 0 1px 0 var(--cap-sheen), 0 2px 4px var(--shade); /* a fader cap */
+  --elev-lamp: 0 0 10px; /* + the role's bloom colour; unlit lamps have none */
+  --elev-peak: 0 0 6px var(--bloom-white);
+  --elev-float: 0 12px 32px rgba(0, 0, 0, 0.6); /* level +3: the utility drawer; the only large blur */
+}
+/* Rules the census enforces: no outer shadow with a negative offset; blur over 8 px only as a bloom on a lit lamp, a lit key or the level +3 drawer; gradients only as material (plates, keys, caps at ≤ 6 % luminance difference) or as signal (meter ramps and their glow, the CCT track); the state display's radial tint is the state's own colour at ≤ 16 %. */
+
+/* ---- 9. Motion ------------------------------------------------------------- */
+:root {
+  --motion-lamp: 0ms; /* a lamp or a lit fill switches; it does not ramp (≤ 60 ms budget) */
+  --motion-press: 100ms; /* key press feedback */
+  --motion-state: 160ms; /* a badge word or keyline changing */
+  --motion-enter: 200ms; /* drawer, dialog, toast entering (8 px rise + fade) */
+  --motion-exit: 120ms;
+  --motion-move: 160ms; /* bank change, tab change */
+  --ease-mech: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Nothing on an idle surface animates; hover never moves anything; live signal (meters, countdown bars) runs at frame rate with the engine's ballistics; prefers-reduced-motion removes enter / exit / move and the meter display smoothing, never the lamps. */
+
+/* ---- 10. Targets ---------------------------------------------------------- */
+:root {
+  --target-min: 24px;
+  --target-take: 28px;
+  --target-take-studio: 32px;
+}

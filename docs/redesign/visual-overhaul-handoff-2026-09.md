@@ -40,3 +40,19 @@ Read this first in the new session. It says what the operator wants, what alread
 2. Look at the current program at 1:1: the `2560x1440` Studio captures of `audio-populated`, `lighting-populated`, `planning-populated`, `setup-ready`, and the prior candidate's renders in `mocks-v1.1/`.
 3. Produce three to five genuinely different concepts for the Audio Console at `2560x1440`, one self-contained HTML mock each under `docs/redesign/assets/concepts/`, rendered at 1:1 with the probe and measured; concepts that differ in composition, hierarchy and material logic, not skins. For each: two sentences (what it gives the operator at a glance; what it costs), the measured numbers, and a recommendation. The prior candidate may be one of them only if it is re-argued.
 4. Stop for the operator's choice. Then: the blocked states, Lighting, Planning, Setup, `1920x1080` and `1280x800`, the three themes, the system behind it, and a revised sliced plan.
+
+## Status 2026-09-06
+
+Step 3 is done and measured: four concepts (`assets/concepts/A-cockpit.html`, `B-ledger.html`, `C-signal-flow.html`, `D-strip-and-stage.html`) plus the prior candidate re-measured, all passing pixel-sampled contrast in three themes at a 12 px floor with four radii and no idle motion. The assessment, numbers and recommendation (A, runner-up D) are in `console-concepts-2026-09.md`; the renders and the new probes (`probe/concepts.mjs`, `concept_contrast.py`, `cropfails.py`) are in the evidence folder under `concepts/`. Waiting for the operator's choice before step 4.
+
+The operator chose **A, Cockpit** the same day. Step 4's Console part is done: `assets/concepts/A-cockpit.html` now carries the reworked material and every engine state (`?state=…`), written up with numbers in `console-a-states-2026-09.md`; the flat version is kept as `A-cockpit-v1-flat.html`. Next: Lighting, Planning and Setup on the cluster rule, then `1920×1080` and `1280×800`, the three themes, the system, the plan.
+
+Lighting, Planning and Setup are now drawn in A's language with their own blocked states (`assets/concepts/A-lighting.html`, `A-planning.html`, `A-setup.html`), written up in `workspaces-a-2026-09.md`; the evidence set is 49 boards, all passing. Next: `1920×1080` and `1280×800`, the three themes as tokens, the system, the plan.
+
+## Status 2026-09-07
+
+The design pass is complete. Every A mock lays itself out for the three viewports (`?vw=`), the token set is proposed in `system/tokens-a-2026-09.css` + `.json`, the specimen board is `assets/concepts/A-system-sheet.html`, the system is written up in `system-a-2026-09.md`, and the sliced plan is `docs/plans/visual-overhaul-a-2026-09.md` (decisions D1–D14 await the operator; no source edited until then). The evidence set is 69 boards, all passing.
+
+**2026-09-07, operator ruling and polish pass.** `2560×1440` is the only resolution that matters; `1920×1080` and `1280×800` are no longer relevant. The viewport modes stay in the mocks as a fallback; the plan's D4 is rewritten, D9 withdrawn, every gate at 2560 only. A polish pass at 2560 followed: `docs/redesign/polish-a-2026-09.md`. Still no source, token or test edits and nothing committed.
+
+**2026-09-07, plan approved.** The operator approved D1–D14 as recommended and confirmed D4 (2560×1440 only) and D9 (utility mode withdrawn). Implementation starts in a new session from `docs/plans/visual-overhaul-a-2026-09-session-prompt.md`, Slice 0 first. Nothing from this design pass is committed yet: the mocks, the token proposal, the write-ups, the plan and this status are untracked or modified on `ui-gold-standard-2026-09`.

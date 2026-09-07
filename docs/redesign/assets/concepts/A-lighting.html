@@ -1,0 +1,1688 @@
+<!doctype html>
+<html lang="en" data-theme="studio" data-states="ready,unreachable,unsaved,preview">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Lighting · Concept A — Cockpit · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         LIGHTING in Concept A's language (Cockpit).
+         Cluster (424 px, left): the state display (bridge REACHABLE / UNREACHABLE /
+         UNSAVED / PREVIEW, the engine's sentence, the way out), then the take-time
+         keys — LIGHTING on, CUT ALL, the grand master, the two scenes, the two
+         groups — then the standing actions. Bay: the stage plot as a backlit screen,
+         12 m × 8 m at real scale, fixtures at real positions, beams tinted by colour
+         temperature, the camera and the subject marks. Plate (416 px, right): the
+         selected fixture. Material v2, same tokens as the Console.
+         ?theme=studio|graphite|bone · ?state=ready|unreachable|unsaved|preview
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --blue-text: #7cc4ff;
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+        --cap: #f4f4f7;
+        --cap-2: #d3d3d9;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #0b0b0d;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --blue-text: #8ccaff;
+        --bloom-blue: rgba(140, 202, 255, 0.45);
+        --cap: #eceef3;
+        --cap-2: #c9cdd6;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #13151a;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --blue-text: #0b62c2;
+        --bloom-blue: rgba(11, 98, 194, 0.3);
+        --cap: #2c2d33;
+        --cap-2: #141517;
+        --cap-sheen: rgba(255, 255, 255, 0.18);
+        --cap-line: #ffffff;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      kbd {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        border: 1px solid var(--line-2);
+        border-radius: var(--r4);
+        padding: 3px 5px;
+      }
+      .muted {
+        color: var(--text-2);
+      }
+
+      /* ---- material ---- */
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --blue-text: #7cc4ff;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.on .hint,
+      .key.on kbd {
+        color: var(--amber-ink);
+        border-color: rgba(0, 0, 0, 0.35);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      .key.primary kbd {
+        color: var(--primary-ink);
+        border-color: currentColor;
+        opacity: 0.85;
+      }
+      .key.cut {
+        color: var(--red-text);
+        border-color: var(--red-text);
+      }
+      .key.cut .hint {
+        color: var(--red-text);
+      }
+      .key.info {
+        border-color: var(--blue-text);
+        color: var(--blue-text);
+      }
+      .key.info .hint {
+        color: var(--blue-text);
+      }
+      .key.sm {
+        min-height: 32px;
+        font-size: 13px;
+        padding: 0 10px;
+      }
+      .key.sm b {
+        font: 600 13px/1 var(--mono);
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+      .lamp.blue {
+        background: var(--blue-text);
+        box-shadow: 0 0 10px var(--bloom-blue);
+      }
+
+      /* ---- shell ---- */
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .wordmark .sub {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0.02em;
+      }
+      .fix {
+        display: grid;
+        grid-template-columns: 14px 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        min-height: 44px;
+        padding: 0 12px;
+        text-align: left;
+      }
+      .fix .name {
+        font: 600 15px/1.2 var(--ui);
+      }
+      .fix .meta {
+        grid-column: 2;
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        margin-top: 3px;
+      }
+      .fix .v {
+        grid-row: 1 / span 2;
+        grid-column: 3;
+        font: 600 14px/1 var(--mono);
+      }
+      .fix .v.off {
+        color: var(--text-2);
+        font-weight: 500;
+      }
+      .fix.sel {
+        border: 2px solid var(--accent);
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: 12px;
+      }
+      .tab {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r8);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab kbd {
+        padding: 2px 4px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .lampchip.red,
+      .lampchip.red b {
+        color: var(--red-text);
+      }
+      .lampchip.red {
+        border-color: var(--red-text);
+      }
+      .lampchip.blue,
+      .lampchip.blue b {
+        color: var(--blue-text);
+      }
+      .lampchip.blue {
+        border-color: var(--blue-text);
+      }
+      .lampchip[hidden] {
+        display: none;
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 12px;
+      }
+
+      /* ---- body ---- */
+      .body {
+        display: grid;
+        grid-template-columns: 424px 1fr 416px;
+        min-height: 0;
+      }
+      .cluster {
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .state {
+        height: 180px;
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .state.tone-ok {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state.tone-attention {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-error {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-info {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(124, 196, 255, 0.16), transparent 60%), var(--well);
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .state .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .state-word {
+        font: 600 24px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state.tone-attention .state-word {
+        color: var(--amber-text);
+      }
+      .state.tone-error .state-word {
+        color: var(--red-text);
+      }
+      .state.tone-info .state-word {
+        color: var(--blue-text);
+      }
+      .state-sub {
+        font: 500 14px/1.35 var(--ui);
+        color: var(--well-text);
+      }
+      .state-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        align-self: start;
+      }
+      .state-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .state-actions .key {
+        min-height: 32px;
+        font-size: 13px;
+      }
+      .row2 {
+        display: flex;
+        gap: 12px;
+      }
+      .key.master {
+        flex: 2;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 88px;
+      }
+      .key.master .cap {
+        font-size: 20px;
+      }
+      .key.cut {
+        flex: 1;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 88px;
+      }
+      .label {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .level {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .hero {
+        font: 600 44px/1 var(--mono);
+        letter-spacing: -0.02em;
+      }
+      .hslider {
+        position: relative;
+        height: 34px;
+        border-radius: var(--r8);
+      }
+      .hslider .track {
+        position: absolute;
+        left: 17px;
+        right: 17px;
+        top: 50%;
+        height: 4px;
+        margin-top: -2px;
+        background: var(--line-2);
+        border-radius: var(--pill);
+      }
+      .hslider .cap {
+        position: absolute;
+        top: 3px;
+        width: 34px;
+        height: 26px;
+        margin-left: -17px;
+        border-radius: var(--r4);
+        background: linear-gradient(180deg, var(--cap), var(--cap-2));
+        box-shadow:
+          inset 0 1px 0 var(--cap-sheen),
+          0 2px 4px var(--shade);
+      }
+      .hslider .cap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--cap-line);
+      }
+      .hslider.cct .track {
+        height: 8px;
+        margin-top: -4px;
+        background: linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff);
+      }
+      .sec {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .sec-head .title {
+        font: 600 16px/1 var(--ui);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .sec-head .title span {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .sec-head .keys {
+        display: flex;
+        gap: 6px;
+      }
+      .row2.tight {
+        gap: 8px;
+      }
+      .row2.tight .key {
+        flex: 1;
+        padding: 0 6px;
+      }
+      .key.snap {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 4px;
+        min-height: 68px;
+        padding: 0 12px;
+        position: relative;
+        overflow: hidden;
+      }
+      .key.snap .n {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .key.snap .name {
+        font: 600 15px/1.2 var(--ui);
+      }
+      .key.snap .tag {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .key.snap.current {
+        border: 2px solid var(--accent);
+      }
+      .key.snap.current .tag {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .grow {
+        display: grid;
+        grid-template-columns: 118px 1fr 56px;
+        align-items: center;
+        column-gap: 10px;
+      }
+      .grow .gname {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 600 15px/1 var(--ui);
+      }
+      .grow .gmeta {
+        grid-column: 1;
+        font: 400 12px/1 var(--ui);
+        color: var(--text-2);
+        margin-top: -4px;
+      }
+      .grow .hslider {
+        height: 30px;
+        grid-row: 1 / span 2;
+        grid-column: 2;
+      }
+      .grow .hslider .cap {
+        top: 2px;
+        height: 24px;
+        width: 28px;
+        margin-left: -14px;
+      }
+      .grow .gval {
+        grid-row: 1 / span 2;
+        grid-column: 3;
+        font: 600 16px/1 var(--mono);
+        text-align: right;
+      }
+      .actions {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .actions .key {
+        flex: 1;
+        min-height: 40px;
+        padding: 0 8px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      /* ---- bay: the stage plot ---- */
+      .bay {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+      }
+      .plot-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 32px;
+      }
+      .plot-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .plot-head .d {
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .plot-head .right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .plot-head .lock-note {
+        display: none;
+        font: 600 13px/1 var(--ui);
+        color: var(--red-text);
+      }
+      .locked .plot-head .lock-note {
+        display: inline;
+      }
+      .plot-wrap {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+      }
+      .plot {
+        width: 1688px;
+        height: 1125px;
+        border-radius: var(--r12);
+        position: relative;
+        overflow: hidden;
+      }
+      .plot svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .plot text {
+        font: 500 12px var(--mono);
+        fill: var(--well-text-2);
+      }
+      .plot text.name {
+        font: 600 14px var(--ui);
+        fill: var(--well-text);
+      }
+      .plot text.meta {
+        font: 500 12px var(--mono);
+        fill: var(--well-text-2);
+      }
+      .plot text.mark {
+        font: 600 13px var(--ui);
+        fill: var(--well-text);
+      }
+      .plot .gridline {
+        stroke: rgba(255, 255, 255, 0.06);
+      }
+      .plot .gridline.major {
+        stroke: rgba(255, 255, 255, 0.12);
+      }
+      .plot .sym {
+        fill: #1b1c21;
+        stroke: rgba(255, 255, 255, 0.5);
+        stroke-width: 1.5;
+      }
+      .plot .sym.sel {
+        stroke: var(--accent);
+        stroke-width: 2.5;
+      }
+      .plot .sym.off {
+        stroke: rgba(255, 255, 255, 0.28);
+        stroke-dasharray: 4 3;
+      }
+      .preview .plot {
+        outline: 2px solid var(--blue-text);
+        outline-offset: -2px;
+      }
+
+      /* ---- inspector ---- */
+      .inspector {
+        border-left: 1px solid var(--line);
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .insp-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+      .insp-keys {
+        display: flex;
+        gap: 8px;
+      }
+      .insp-keys .key {
+        flex: 1;
+        min-height: 36px;
+      }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .section-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .section-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .ctl {
+        display: grid;
+        grid-template-columns: 1fr 96px;
+        align-items: center;
+        gap: 12px;
+      }
+      .ctl .v {
+        font: 600 20px/1 var(--mono);
+        text-align: right;
+      }
+      .ctl-label {
+        display: flex;
+        justify-content: space-between;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .ctl-label b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .field {
+        border-radius: var(--r8);
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .field .v {
+        font: 600 16px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .readouts {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        row-gap: 10px;
+        align-items: center;
+        font: 500 14px/1 var(--ui);
+      }
+      .readouts .v {
+        font: 600 16px/1 var(--mono);
+      }
+      .danger {
+        margin-top: auto;
+      }
+
+      /* ---- footer ---- */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .footer .hints {
+        margin-left: auto;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+      }
+      .footer .hints span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* ---- states ---- */
+      .locked .key[data-take]:not(.state-key),
+      .locked .hslider[data-take] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .locked .key[data-take]:not(.state-key) {
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+      }
+      .locked .key.on[data-take] {
+        color: var(--amber-text);
+        border-color: var(--amber-text);
+      }
+      .locked .hslider[data-take] .cap {
+        background: transparent;
+        border: 2px dashed var(--cap);
+        box-shadow: none;
+      }
+      .locked .hslider[data-take] .cap::after {
+        display: none;
+      }
+      .unsaved .key.snap.current {
+        border-color: var(--amber-text);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 0 14px var(--bloom-amber);
+      }
+
+      /* ---- viewports ---- */
+      .short {
+        display: none;
+      }
+      #board[data-vw="1920"] {
+        grid-template-rows: 52px 1fr 36px;
+      }
+      #board[data-vw="1920"] .body {
+        grid-template-columns: 360px 1fr 360px;
+      }
+      #board[data-vw="1920"] .shell {
+        gap: 20px;
+        padding: 0 16px;
+      }
+      #board[data-vw="1920"] .cluster {
+        padding: 12px 12px 16px;
+        gap: 12px;
+      }
+      #board[data-vw="1920"] .state {
+        height: 168px;
+        padding: 12px 14px;
+      }
+      #board[data-vw="1920"] .key.master,
+      #board[data-vw="1920"] .key.cut {
+        min-height: 72px;
+      }
+      #board[data-vw="1920"] .hero {
+        font-size: 32px;
+      }
+      #board[data-vw="1920"] .hslider {
+        height: 30px;
+      }
+      #board[data-vw="1920"] .hslider .cap {
+        height: 22px;
+      }
+      #board[data-vw="1920"] .key.snap {
+        min-height: 60px;
+      }
+      #board[data-vw="1920"] .actions .key {
+        min-height: 36px;
+        font-size: 12px;
+        padding: 0 4px;
+      }
+      #board[data-vw="1920"] .sec-head .title span {
+        display: none;
+      }
+      #board[data-vw="1920"] .bay {
+        padding: 12px;
+      }
+      #board[data-vw="1920"] .plot {
+        width: 1176px;
+        height: 784px;
+      }
+      #board[data-vw="1920"] .inspector {
+        padding: 14px 12px;
+        gap: 12px;
+      }
+      #board[data-vw="1920"] .insp-head h2 {
+        font-size: 20px;
+      }
+      #board[data-vw="1920"] .footer {
+        padding: 0 16px;
+        gap: 18px;
+      }
+      #board[data-vw="1280"] {
+        grid-template-rows: 48px 1fr 32px;
+      }
+      #board[data-vw="1280"] .body {
+        grid-template-columns: 232px 1fr 0px;
+      }
+      #board[data-vw="1280"] .shell {
+        gap: 14px;
+        padding: 0 12px;
+      }
+      #board[data-vw="1280"] .shell .tabs {
+        margin-left: 4px;
+        gap: 2px;
+      }
+      #board[data-vw="1280"] .shell .tab {
+        height: 32px;
+        padding: 0 10px;
+      }
+      #board[data-vw="1280"] .shell kbd,
+      #board[data-vw="1280"] .long {
+        display: none;
+      }
+      #board[data-vw="1280"] .short {
+        display: inline;
+      }
+      #board[data-vw="1280"] .lampchip {
+        height: 28px;
+        padding: 0 8px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .clock {
+        margin-left: 4px;
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .cluster {
+        padding: 8px 8px 10px;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .state {
+        height: 140px;
+        padding: 10px 12px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .state-word {
+        font-size: 20px;
+      }
+      #board[data-vw="1280"] .state-sub {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .state-meta {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .state-actions .key {
+        min-height: 28px;
+        font-size: 12px;
+        padding: 0 8px;
+      }
+      #board[data-vw="1280"] .row2 {
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .key.master,
+      #board[data-vw="1280"] .key.cut {
+        min-height: 44px;
+        gap: 0;
+      }
+      #board[data-vw="1280"] .key.master .cap,
+      #board[data-vw="1280"] .key.cut .cap {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .key.master .hint,
+      #board[data-vw="1280"] .key.cut .hint {
+        display: none;
+      }
+      #board[data-vw="1280"] .key.cut {
+        padding: 0 4px;
+      }
+      #board[data-vw="1280"] .row2.tight {
+        flex-direction: column;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .actions .key:last-child {
+        display: none;
+      }
+      #board[data-vw="1280"] .hero {
+        font-size: 32px;
+      }
+      #board[data-vw="1280"] .hslider {
+        height: 28px;
+      }
+      #board[data-vw="1280"] .hslider .cap {
+        height: 20px;
+      }
+      #board[data-vw="1280"] .sec {
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .sec-head .title {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .sec-head .title span {
+        display: none;
+      }
+      #board[data-vw="1280"] .key.sm {
+        min-height: 28px;
+        font-size: 12px;
+        padding: 0 6px;
+      }
+      #board[data-vw="1280"] .key.snap {
+        min-height: 48px;
+        padding: 0 8px;
+        gap: 2px;
+      }
+      #board[data-vw="1280"] .key.snap .n {
+        display: none;
+      }
+      #board[data-vw="1280"] .key.snap .name {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .key.snap .tag {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .sec.groups {
+        display: none;
+      }
+      #board[data-vw="1280"] .actions .key {
+        min-height: 34px;
+        font-size: 12px;
+        padding: 0 6px;
+      }
+      #board[data-vw="1280"] .actions .key kbd {
+        display: none;
+      }
+      #board[data-vw="1280"] .bay {
+        padding: 8px;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .plot-head {
+        height: 28px;
+      }
+      #board[data-vw="1280"] .plot-head .d {
+        display: none;
+      }
+      #board[data-vw="1280"] .plot-head .right .key.sm {
+        min-height: 28px;
+      }
+      #board[data-vw="1280"] .plot {
+        width: 1002px;
+        height: 668px;
+      }
+      #board[data-vw="1280"] .inspector {
+        display: none;
+      }
+      #board[data-vw="1280"] .footer {
+        padding: 0 12px;
+        gap: 14px;
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .footer .hints span:nth-child(n + 4) {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="A-lighting">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control<span class="sub">SSE Executive Education</span></div>
+        <nav class="tabs">
+          <button class="tab" data-key>
+            <span class="long">Setup / Support</span><span class="short">Setup</span> <kbd>Ctrl 1</kbd>
+          </button>
+          <button class="tab on" data-key>Lighting <kbd>Ctrl 2</kbd></button>
+          <button class="tab" data-key>Audio <kbd>Ctrl 3</kbd></button>
+          <button class="tab" data-key>Planning <kbd>Ctrl 4</kbd></button>
+        </nav>
+        <div class="health">
+          <button class="lampchip" id="hdrLighting" data-key>
+            <i class="lamp ok"></i><b>Lighting</b> <span>ok</span>
+          </button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Audio</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Surface</b> ok</button>
+          <button class="lampchip amber" data-key><i class="lamp amber"></i><b>Solo</b> 1</button>
+          <button class="lampchip amber" id="hdrScene" data-key hidden>
+            <i class="lamp amber"></i><b>Scene</b> unsaved
+          </button>
+          <div class="clock">09:11</div>
+        </div>
+      </header>
+
+      <div class="body">
+        <aside class="cluster plate" data-region="cluster">
+          <div class="state well tone-ok" id="state" data-region="state">
+            <div class="state-top">
+              <i class="lamp ok" id="stateLamp"></i>
+              <div class="state-word" id="stateWord">REACHABLE</div>
+            </div>
+            <div class="state-sub" id="stateSub">Apollo bridge · 192.168.1.80 · universe 1 · 12 of 512 channels</div>
+            <div class="state-meta" id="stateMeta">
+              Scene Warm wash · saved · recalled yesterday 13:42 · 3 of 4 fixtures on
+            </div>
+            <div class="state-actions" id="stateActions"></div>
+          </div>
+
+          <div class="row2">
+            <button class="key master on" data-key data-take aria-label="Lighting on, press to switch the rig off">
+              <span class="cap">Lighting</span><span class="hint">on · 3 of 4 fixtures lit</span>
+            </button>
+            <button class="key cut" data-key data-take aria-label="Cut all fixtures to 0 %">
+              <span class="cap">Cut all</span><span class="hint">all to 0 %</span>
+            </button>
+          </div>
+
+          <div>
+            <div class="level">
+              <div class="label">Grand master</div>
+              <div class="hero">100 %</div>
+            </div>
+            <div
+              class="hslider well"
+              data-key
+              data-take
+              role="slider"
+              aria-label="Grand master"
+              style="margin-top: 8px"
+            >
+              <div class="track"></div>
+              <div class="cap" style="left: calc(17px + 100% - 34px)"></div>
+            </div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-head">
+              <div class="title">Scenes <span>2 saved · press to recall</span></div>
+              <div class="keys">
+                <button class="key sm" data-key aria-label="Recall fade time">Fade <b>0.0 s</b></button>
+              </div>
+            </div>
+            <button class="key snap current" id="sceneCurrent" data-key data-take aria-label="Recall Warm wash">
+              <span class="n">1 · Opening look · fade in 1.2 s</span><span class="name">Warm wash</span
+              ><span class="tag" id="sceneTag">Current · saved · recalled yesterday 13:42</span>
+            </button>
+            <button class="key snap" data-key data-take aria-label="Recall Interview">
+              <span class="n">2 · Interview look · fade in 1.5 s</span><span class="name">Interview</span
+              ><span class="tag">not recalled yet · 4 fixtures</span>
+            </button>
+            <div class="row2 tight">
+              <button class="key sm" data-key data-take aria-label="Save scene, press twice">Save · press twice</button
+              ><button class="key sm" data-key>Save as new…</button>
+            </div>
+          </div>
+
+          <div class="sec groups">
+            <div class="sec-head">
+              <div class="title">Groups <span>2 · one level for all their fixtures</span></div>
+              <button class="key sm" data-key>New group</button>
+            </div>
+            <div class="grow">
+              <span class="gname"><i class="lamp amber"></i>Front</span>
+              <div class="hslider well" data-key data-take role="slider" aria-label="Front level">
+                <div class="track"></div>
+                <div class="cap" style="left: calc(17px + 67% - 0.67 * 34px)"></div>
+              </div>
+              <span class="gval">67 %</span>
+              <span class="gmeta">Key · Fill</span>
+            </div>
+            <div class="grow">
+              <span class="gname"><i class="lamp amber"></i>Back</span>
+              <div class="hslider well" data-key data-take role="slider" aria-label="Back level">
+                <div class="track"></div>
+                <div class="cap" style="left: calc(17px + 32% - 0.32 * 34px)"></div>
+              </div>
+              <span class="gval">32 %</span>
+              <span class="gmeta">Back · Warm wash</span>
+            </div>
+          </div>
+
+          <div class="sec fixtures">
+            <div class="sec-head">
+              <div class="title">Fixtures <span>4 · 3 on · press to select, the plot follows</span></div>
+            </div>
+            <button class="key fix sel" data-key data-take>
+              <i class="lamp amber"></i><span class="name">Key</span
+              ><span class="meta">Astra Bi-Color · DMX 1 · Front</span><span class="v">76 % · 3200 K</span>
+            </button>
+            <button class="key fix" data-key data-take>
+              <i class="lamp amber"></i><span class="name">Fill</span
+              ><span class="meta">Astra Bi-Color · DMX 21 · Front</span><span class="v">58 % · 4300 K</span>
+            </button>
+            <button class="key fix" data-key data-take>
+              <i class="lamp"></i><span class="name">Back</span><span class="meta">Infinibar PB12 · DMX 41 · Back</span
+              ><span class="v off">off</span>
+            </button>
+            <button class="key fix" data-key data-take>
+              <i class="lamp amber"></i><span class="name">Warm wash</span><span class="meta">wash · DMX 61 · Back</span
+              ><span class="v">64 % · 3000 K</span>
+            </button>
+          </div>
+
+          <div class="actions">
+            <button class="key primary" data-key>Add fixture</button>
+            <button class="key" data-key>Patch <kbd>P</kbd></button>
+            <button class="key" id="previewKey" data-key>Preview <kbd>B</kbd></button>
+            <button class="key" data-key>DMX monitor</button>
+          </div>
+        </aside>
+
+        <main class="bay" data-region="plot">
+          <div class="plot-head">
+            <span class="t">Stage plot</span
+            ><span class="d"
+              >12 m × 8 m · grid 1 m · fixtures at their real positions · beams tinted by colour temperature</span
+            >
+            <span class="lock-note" id="lockNote"></span>
+            <span class="right"
+              ><button class="key sm" data-key>Fit room</button
+              ><button class="key sm" data-key>Patch mode <kbd>P</kbd></button
+              ><button class="key sm" data-key>Search <kbd>Ctrl F</kbd></button></span
+            >
+          </div>
+          <div class="plot-wrap"><div class="plot well" id="plot"></div></div>
+        </main>
+
+        <aside class="inspector plate" data-region="inspector">
+          <div class="insp-head">
+            <div>
+              <h2>Key</h2>
+              <div class="sub">Astra Bi-Color · 2 channels · DMX 1–2 on universe 1 · group Front</div>
+            </div>
+            <button class="key sm" data-key>Rename</button>
+          </div>
+          <div class="insp-keys">
+            <button class="key" style="flex: 2" data-key data-take aria-label="Identify, 1.2 second burst while held">
+              Identify · hold for a 1.2 s burst
+            </button>
+            <button class="key on" data-key data-take aria-label="Fixture on, press to switch off">On</button>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Levels</span><span class="d">live on the rig</span></div>
+            <div class="ctl-label"><b>Intensity</b><span>0 – 100 %</span></div>
+            <div class="ctl">
+              <div class="hslider well" data-key data-take role="slider" aria-label="Intensity">
+                <div class="track"></div>
+                <div class="cap" style="left: calc(17px + 76% - 0.76 * 34px)"></div>
+              </div>
+              <div class="v">76 %</div>
+            </div>
+            <div class="ctl-label"><b>Colour temperature</b><span>2700 K warm – 6500 K cool</span></div>
+            <div class="ctl">
+              <div class="hslider well cct" data-key data-take role="slider" aria-label="Colour temperature">
+                <div class="track"></div>
+                <div class="cap" style="left: calc(17px + 13.2% - 0.132 * 34px)"></div>
+              </div>
+              <div class="v">3200 K</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">Position</span><span class="d">metres from the room's top-left corner</span>
+            </div>
+            <div class="fields">
+              <div class="field well"><span class="l">Stage X</span><span class="v">2.9 m</span></div>
+              <div class="field well"><span class="l">Stage Y</span><span class="v">2.1 m</span></div>
+              <div class="field well"><span class="l">Rig height</span><span class="v">4.2 m</span></div>
+              <div class="field well"><span class="l">Rotation</span><span class="v">0°</span></div>
+              <div class="field well"><span class="l">Beam angle</span><span class="v">38°</span></div>
+              <div class="field well"><span class="l">Kind</span><span class="v">area</span></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Patch</span><span class="d">no overlaps on universe 1</span></div>
+            <div class="fields">
+              <div class="field well"><span class="l">DMX start</span><span class="v">1</span></div>
+              <div class="field well"><span class="l">Mode</span><span class="v">2 ch · dimmer, CCT</span></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">In scene Warm wash</span><span class="d">what the saved scene holds</span>
+            </div>
+            <div class="readouts">
+              <span>Saved intensity</span><span class="v">76 %</span> <span>Saved colour temperature</span
+              ><span class="v">3200 K</span> <span>Saved state</span><span class="v">on</span>
+            </div>
+          </div>
+
+          <div class="danger insp-keys"><button class="key" data-key>Delete fixture…</button></div>
+        </aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Bridge <b id="ftBridge">192.168.1.80 · U1</b></span>
+        <span class="item">Channels <b>12 / 512</b></span>
+        <span class="item">Fixtures <b>4 / 4 patched</b></span>
+        <span class="item">Scene <b id="ftScene">saved</b></span>
+        <div class="hints">
+          <span><kbd>Ctrl K</kbd> Palette</span>
+          <span><kbd>?</kbd> Shortcuts</span>
+          <span><kbd>P</kbd> Patch</span>
+          <span><kbd>B</kbd> Preview</span>
+          <span><kbd>Ctrl Shift M</kbd> DMX monitor</span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      // ---- viewport ----
+      const params = new URLSearchParams(location.search);
+      const VW = (params.get("vw") || "2560x1440").split("x").map(Number);
+      const board = document.getElementById("board");
+      board.style.width = VW[0] + "px";
+      board.style.height = VW[1] + "px";
+      board.dataset.vw = VW[0] >= 2560 ? "2560" : VW[0] >= 1920 ? "1920" : "1280";
+      // ---- the rig from the lighting-populated fixture: positions are fractions of the 12 m × 8 m room; the plot is drawn at its rendered size ----
+      const plotEl = document.getElementById("plot");
+      const W = plotEl.clientWidth,
+        H = plotEl.clientHeight,
+        MX = W / 12,
+        MY = H / 8;
+      const FIX = [
+        {
+          name: "Key",
+          type: "Astra Bi-Color",
+          x: 0.24,
+          y: 0.26,
+          rot: 0,
+          beam: 38,
+          on: true,
+          int: 76,
+          cct: 3200,
+          kind: "area",
+          dmx: 1,
+          sel: true,
+        },
+        {
+          name: "Fill",
+          type: "Astra Bi-Color",
+          x: 0.74,
+          y: 0.28,
+          rot: 0,
+          beam: 50,
+          on: true,
+          int: 58,
+          cct: 4300,
+          kind: "area",
+          dmx: 21,
+        },
+        {
+          name: "Back",
+          type: "Infinibar PB12",
+          x: 0.5,
+          y: 0.62,
+          rot: 180,
+          beam: 120,
+          on: false,
+          int: 0,
+          cct: 5600,
+          kind: "bar",
+          dmx: 41,
+        },
+        {
+          name: "Warm wash",
+          type: "wash",
+          x: 0.82,
+          y: 0.62,
+          rot: 215,
+          beam: 60,
+          on: true,
+          int: 64,
+          cct: 3000,
+          kind: "wash",
+          dmx: 61,
+        },
+      ];
+      const CAMERA = { x: 0.16, y: 0.84, rot: 12 },
+        SUBJECT = { x: 0.5, y: 0.54 };
+      const cctRgb = (k) =>
+        k <= 3100 ? "255,160,80" : k <= 3600 ? "255,178,104" : k <= 4600 ? "255,226,190" : "196,222,255";
+      function plot() {
+        let s = "";
+        for (let i = 0; i <= 24; i++) {
+          const x = (i * MX) / 2;
+          s += `<line class="gridline ${i % 2 ? "" : "major"}" x1="${x}" y1="0" x2="${x}" y2="${H}"/>`;
+        }
+        for (let j = 0; j <= 16; j++) {
+          const y = (j * MY) / 2;
+          s += `<line class="gridline ${j % 2 ? "" : "major"}" x1="0" y1="${y}" x2="${W}" y2="${y}"/>`;
+        }
+        for (let m = 0; m <= 10; m += 2) s += `<text x="${m * MX + 6}" y="16">${m} m</text>`;
+        s += `<text x="${W - 6}" y="16" text-anchor="end">12 m</text>`;
+        for (let m = 2; m <= 8; m += 2) s += `<text x="6" y="${m * MY - 6}">${m} m</text>`;
+        // beams first, symbols on top
+        for (const f of FIX) {
+          const px = f.x * W,
+            py = f.y * H,
+            a = (f.rot * Math.PI) / 180,
+            h = ((f.beam / 2) * Math.PI) / 180,
+            L = 3.7 * MX;
+          const p1 = [px + L * Math.sin(a - h), py + L * Math.cos(a - h)],
+            p2 = [px + L * Math.sin(a + h), py + L * Math.cos(a + h)];
+          const rgb = cctRgb(f.cct);
+          if (f.on)
+            s += `<path d="M${px} ${py} L${p1[0]} ${p1[1]} L${p2[0]} ${p2[1]} Z" fill="rgba(${rgb},${(0.26 * f.int) / 100})" stroke="rgba(${rgb},0.35)" stroke-width="1"/>`;
+          else
+            s += `<path d="M${px} ${py} L${p1[0]} ${p1[1]} L${p2[0]} ${p2[1]} Z" fill="none" stroke="rgba(255,255,255,0.14)" stroke-dasharray="6 6"/>`;
+        }
+        for (const f of FIX) {
+          const px = f.x * W,
+            py = f.y * H,
+            cls = `sym ${f.sel ? "sel" : ""} ${f.on ? "" : "off"}`;
+          if (f.kind === "bar")
+            s += `<rect class="${cls}" x="${px - 75}" y="${py - 9}" width="150" height="18" rx="6" transform="rotate(${f.rot} ${px} ${py})"/>`;
+          else if (f.kind === "wash") s += `<circle class="${cls}" cx="${px}" cy="${py}" r="20"/>`;
+          else
+            s += `<rect class="${cls}" x="${px - 28}" y="${py - 17}" width="56" height="34" rx="6" transform="rotate(${f.rot} ${px} ${py})"/>`;
+          if (f.on) s += `<circle cx="${px}" cy="${py}" r="5" fill="rgb(${cctRgb(f.cct)})"/>`;
+          s += `<text class="name" x="${px}" y="${py + 44}" text-anchor="middle">${f.name}</text>`;
+          s += `<text class="meta" x="${px}" y="${py + 62}" text-anchor="middle">${f.on ? `${f.int} % · ${f.cct} K` : "off"} · DMX ${f.dmx}</text>`;
+        }
+        const cx = CAMERA.x * W,
+          cy = CAMERA.y * H,
+          sx = SUBJECT.x * W,
+          sy = SUBJECT.y * H;
+        s += `<g transform="rotate(${CAMERA.rot} ${cx} ${cy})"><rect x="${cx - 22}" y="${cy - 14}" width="44" height="28" rx="5" fill="#1b1c21" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/><circle cx="${cx + 22}" cy="${cy}" r="7" fill="#1b1c21" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/></g>`;
+        s += `<text class="mark" x="${cx}" y="${cy + 38}" text-anchor="middle">Camera</text>`;
+        s += `<circle cx="${sx}" cy="${sy}" r="18" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2"/><circle cx="${sx}" cy="${sy}" r="4" fill="rgba(255,255,255,0.8)"/>`;
+        s += `<text class="mark" x="${sx}" y="${sy + 40}" text-anchor="middle">Subject</text>`;
+        document.getElementById("plot").innerHTML = `<svg viewBox="0 0 ${W} ${H}" aria-label="Stage plot">${s}</svg>`;
+      }
+      plot();
+
+      // ---- states the engine can report for the rig ----
+      const STATES = {
+        ready: {
+          tone: "ok",
+          word: "REACHABLE",
+          sub: "Apollo bridge · 192.168.1.80 · universe 1 · 12 of 512 channels",
+          meta: "Scene Warm wash · saved · recalled yesterday 13:42 · 3 of 4 fixtures on",
+          hdr: ["ok", "ok"],
+        },
+        unreachable: {
+          tone: "error",
+          word: "UNREACHABLE",
+          sub: "Lighting commands won't reach the rig until the bridge at 192.168.1.80 responds. Check the network connection or run the bridge probe in Setup.",
+          meta: "DMX link lost · the plot shows the last confirmed state",
+          actions: [["Run bridge probe", "primary"]],
+          locked: "locked · the rig is not answering",
+          hdr: ["red", "unreachable"],
+          footer: "192.168.1.80 · U1 · lost",
+        },
+        unsaved: {
+          tone: "attention",
+          word: "UNSAVED",
+          sub: "Warm wash has changes on the rig that the scene does not hold yet. Save to keep them, or recall the scene to discard them.",
+          meta: "Apollo bridge · 192.168.1.80 · universe 1 · 2 fixtures changed since the recall",
+          actions: [
+            ["Save · press twice", "primary"],
+            ["Discard changes…", ""],
+          ],
+          unsaved: true,
+          hdr: ["amber", "scene unsaved"],
+          footerScene: "unsaved",
+        },
+        preview: {
+          tone: "info",
+          word: "PREVIEW",
+          sub: "Editing offline. The rig is unchanged until you save or discard.",
+          meta: "Apollo bridge · 192.168.1.80 · universe 1 · edits so far: 1 fixture",
+          actions: [
+            ["Save to the rig", "primary"],
+            ["Discard preview", ""],
+          ],
+          preview: true,
+          hdr: ["blue", "preview"],
+          footerScene: "preview",
+        },
+      };
+      function applyState(name) {
+        const s = STATES[name] || STATES.ready;
+        const board = document.getElementById("board");
+        board.classList.toggle("locked", !!s.locked);
+        board.classList.toggle("unsaved", !!s.unsaved);
+        board.classList.toggle("preview", !!s.preview);
+        board.dataset.state = name;
+        const st = document.getElementById("state");
+        st.className = "state well tone-" + s.tone;
+        document.getElementById("stateLamp").className =
+          "lamp " + (s.tone === "ok" ? "ok" : s.tone === "attention" ? "amber" : s.tone === "info" ? "blue" : "red");
+        document.getElementById("stateWord").textContent = s.word;
+        document.getElementById("stateSub").textContent = s.sub;
+        document.getElementById("stateMeta").textContent = s.meta;
+        document.getElementById("stateActions").innerHTML = (s.actions || [])
+          .map(([l, c]) => `<button class="key state-key ${c}" data-key>${l}</button>`)
+          .join("");
+        const hdr = document.getElementById("hdrLighting");
+        hdr.className = "lampchip " + (s.hdr[0] === "ok" ? "" : s.hdr[0]);
+        hdr.querySelector(".lamp").className = "lamp " + (s.hdr[0] === "ok" ? "ok" : s.hdr[0]);
+        hdr.querySelector("span").textContent = s.hdr[1];
+        document.getElementById("hdrScene").hidden = !s.unsaved;
+        document.getElementById("lockNote").textContent = s.locked || "";
+        document.querySelectorAll("[data-take]:not(.state-key)").forEach((el) => {
+          if (s.locked) el.setAttribute("aria-disabled", "true");
+          else el.removeAttribute("aria-disabled");
+        });
+        document.getElementById("sceneTag").textContent = s.unsaved
+          ? "Current · unsaved changes on the rig"
+          : "Current · saved · recalled yesterday 13:42";
+        const pk = document.getElementById("previewKey");
+        pk.className = "key " + (s.preview ? "info" : "");
+        pk.innerHTML = s.preview ? "Preview · on <kbd>B</kbd>" : "Preview <kbd>B</kbd>";
+        if (s.footer) document.getElementById("ftBridge").textContent = s.footer;
+        document.getElementById("ftScene").textContent = s.footerScene || "saved";
+      }
+      if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+      applyState(params.get("state") || "ready");
+      let one = false;
+      function fit() {
+        const k = Math.min(1, innerWidth / VW[0], innerHeight / VW[1]);
+        document.getElementById("board").style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      addEventListener("resize", fit);
+      addEventListener("keydown", (e) => {
+        if (e.key === "1") {
+          one = !one;
+          fit();
+        }
+        if (e.key === "s") document.documentElement.dataset.theme = "studio";
+        if (e.key === "g") document.documentElement.dataset.theme = "graphite";
+        if (e.key === "b") document.documentElement.dataset.theme = "bone";
+      });
+      fit();
+    </script>
+  </body>
+</html>

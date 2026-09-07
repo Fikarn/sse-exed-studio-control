@@ -1,0 +1,1360 @@
+<!doctype html>
+<html lang="en" data-theme="studio">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · System sheet A · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         SYSTEM SHEET A — every primitive the four workspaces are built from, in one
+         board, rendered from the same tokens (docs/redesign/system/tokens-a-2026-09.css)
+         in three themes and measured like a workspace board.
+         Columns: type and colour roles · material, keys and wells · state displays,
+         lamps, motion and chrome. ?theme=studio|graphite|bone
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --blue-text: #7cc4ff;
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+        --m-lo: #2ee06a;
+        --m-mid: #ffd23f;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #f4f4f7;
+        --cap-2: #d3d3d9;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #0b0b0d;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --blue-text: #8ccaff;
+        --bloom-blue: rgba(140, 202, 255, 0.45);
+        --m-lo: #2ee06a;
+        --m-mid: #ffd23f;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #eceef3;
+        --cap-2: #c9cdd6;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #13151a;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --blue-text: #0b62c2;
+        --bloom-blue: rgba(11, 98, 194, 0.3);
+        --m-lo: #2ee06a;
+        --m-mid: #ffd23f;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #2c2d33;
+        --cap-2: #141517;
+        --cap-sheen: rgba(255, 255, 255, 0.18);
+        --cap-line: #ffffff;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      kbd {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        border: 1px solid var(--line-2);
+        border-radius: var(--r4);
+        padding: 3px 5px;
+      }
+      .muted {
+        color: var(--text-2);
+      }
+      .mono {
+        font-family: var(--mono);
+      }
+
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --blue-text: #7cc4ff;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+        color: var(--well-text);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.on .hint,
+      .key.on kbd {
+        color: var(--amber-ink);
+        border-color: rgba(0, 0, 0, 0.35);
+      }
+      .key.live {
+        background: linear-gradient(180deg, var(--green-top), var(--green));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--green-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 18px var(--bloom-green);
+      }
+      .key.live .hint,
+      .key.live kbd {
+        color: var(--green-ink);
+        border-color: rgba(0, 0, 0, 0.35);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      .key.danger {
+        color: var(--red-text);
+        border-color: var(--red-text);
+      }
+      .key.locked {
+        opacity: 0.55;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+        cursor: not-allowed;
+      }
+      .key.armed {
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        border: 2px solid var(--amber-text);
+        background: var(--well);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          0 0 14px var(--bloom-amber);
+        color: var(--well-text);
+        position: relative;
+        overflow: hidden;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .key.armed .tag {
+        font: 600 12px/1 var(--ui);
+        color: var(--amber-text);
+      }
+      .key.armed .count {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 4px;
+        width: 87%;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .key.hazard {
+        color: var(--red-text);
+        font: 600 13px/1 var(--mono);
+      }
+      .key.hazard .lamp {
+        width: 7px;
+        height: 7px;
+        background: var(--red-text);
+        box-shadow: 0 0 8px var(--bloom-red);
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+      .lamp.blue {
+        background: var(--blue-text);
+        box-shadow: 0 0 10px var(--bloom-blue);
+      }
+      .seg {
+        display: flex;
+        gap: 6px;
+        padding: 4px;
+        border-radius: var(--r12);
+      }
+      .seg .key {
+        flex: 1;
+        min-height: 40px;
+        border-radius: var(--r8);
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--well-text);
+      }
+      .seg .key .cap {
+        font-size: 14px;
+      }
+      .seg .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .lampchip.red,
+      .lampchip.red b {
+        color: var(--red-text);
+      }
+      .lampchip.red {
+        border-color: var(--red-text);
+      }
+      .lampchip.blue,
+      .lampchip.blue b {
+        color: var(--blue-text);
+      }
+      .lampchip.blue {
+        border-color: var(--blue-text);
+      }
+
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .shell .d {
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .shell .right {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 16px;
+        padding: 16px;
+        min-height: 0;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .sec {
+        border-radius: var(--r12);
+        border: 1px solid var(--line);
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .sec-head .t {
+        font: 600 16px/1 var(--ui);
+      }
+      .sec-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 150px 1fr;
+        align-items: center;
+        column-gap: 12px;
+        min-height: 30px;
+      }
+      .row .l {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .spec {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .t12 {
+        font: 500 12px/1.2 var(--mono);
+      }
+      .t13 {
+        font: 500 13px/1.2 var(--ui);
+      }
+      .t14 {
+        font: 500 14px/1.2 var(--ui);
+      }
+      .t15 {
+        font: 600 15px/1.2 var(--ui);
+      }
+      .t16 {
+        font: 600 16px/1.2 var(--ui);
+      }
+      .t20 {
+        font: 600 20px/1.1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .t24 {
+        font: 600 24px/1.1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .t32 {
+        font: 600 32px/1 var(--mono);
+        letter-spacing: -0.02em;
+      }
+      .t44 {
+        font: 600 44px/1 var(--mono);
+        letter-spacing: -0.02em;
+      }
+      .roles {
+        display: grid;
+        grid-template-columns: 90px 1fr 1fr 1fr 1fr;
+        align-items: center;
+        gap: 8px 10px;
+      }
+      .roles .h {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .roles .n {
+        font: 600 14px/1 var(--ui);
+      }
+      .lw {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .lw.amber {
+        color: var(--amber-text);
+      }
+      .lw.green {
+        color: var(--green-text);
+      }
+      .lw.red {
+        color: var(--red-text);
+      }
+      .lw.blue {
+        color: var(--blue-text);
+      }
+      .kl {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0 10px;
+        border-radius: var(--r8);
+        border: 1px dashed var(--amber-text);
+        font: 600 13px/1 var(--ui);
+        color: var(--amber-text);
+      }
+      .kl.sel {
+        border: 2px solid var(--accent);
+        color: var(--text);
+      }
+      .kl.blue {
+        border-color: var(--blue-text);
+        color: var(--blue-text);
+        border-style: solid;
+      }
+      .kl.red {
+        border-color: var(--red-text);
+        color: var(--red-text);
+        border-style: solid;
+      }
+      .copy {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 16px;
+        font: 500 13px/1.35 var(--ui);
+      }
+      .copy b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .copy .x {
+        color: var(--text-2);
+      }
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+      .tile {
+        height: 104px;
+        border-radius: var(--r8);
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        font: 600 14px/1 var(--ui);
+      }
+      .tile .d {
+        font: 500 12px/1.3 var(--mono);
+        color: var(--text-2);
+      }
+      .tile.bay {
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+        border: 1px solid var(--line);
+      }
+      .tile.chassis {
+        background: var(--bg);
+        border: 1px solid var(--line);
+      }
+      .tile.plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+        border: 1px solid var(--line);
+      }
+      .tile.wellt {
+        color: var(--well-text);
+      }
+      .tile.wellt .d {
+        color: var(--well-text-2);
+      }
+      .tile.keyt {
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+      }
+      .tile.lit {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .tile.lit .d {
+        color: var(--amber-ink);
+      }
+      .tile.float {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        border: 1px solid var(--line-2);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+      }
+      .keys {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .keys .key {
+        min-height: 40px;
+      }
+      .keys .key.talk {
+        flex-direction: column;
+        gap: 6px;
+        min-height: 64px;
+        min-width: 150px;
+      }
+      .keys .key.armed {
+        min-height: 64px;
+        padding: 8px 12px 14px;
+      }
+      .keys .key.talk .cap {
+        font-size: 16px;
+      }
+      .wells {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 16px;
+        align-items: center;
+      }
+      .wells .l {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .readout {
+        height: 40px;
+        border-radius: var(--r8);
+        font: 600 20px/1 var(--mono);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .hslider {
+        position: relative;
+        height: 34px;
+        border-radius: var(--r8);
+      }
+      .hslider .track {
+        position: absolute;
+        left: 17px;
+        right: 17px;
+        top: 50%;
+        height: 4px;
+        margin-top: -2px;
+        background: var(--line-2);
+        border-radius: var(--pill);
+      }
+      .hslider .unity {
+        position: absolute;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        background: var(--well-text);
+        left: calc(17px + 81.72% - 0.8172 * 34px);
+      }
+      .hslider .cap {
+        position: absolute;
+        top: 3px;
+        width: 34px;
+        height: 26px;
+        margin-left: -17px;
+        border-radius: var(--r4);
+        background: linear-gradient(180deg, var(--cap), var(--cap-2));
+        box-shadow:
+          inset 0 1px 0 var(--cap-sheen),
+          0 2px 4px var(--shade);
+      }
+      .hslider .cap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--cap-line);
+      }
+      .hslider.doubt {
+        border: 1px dashed var(--amber-text);
+      }
+      .hslider.cct .track {
+        height: 8px;
+        margin-top: -4px;
+        background: linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff);
+      }
+      .hbar {
+        position: relative;
+        height: 20px;
+        border-radius: var(--r4);
+        overflow: hidden;
+      }
+      .hbar .ramp,
+      .hbar .glow {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to right,
+          var(--m-lo) 0%,
+          var(--m-lo) 70%,
+          var(--m-mid) 70%,
+          var(--m-mid) 90%,
+          var(--m-hot) 90%,
+          var(--m-hot) 95%,
+          var(--m-over) 95%,
+          var(--m-over) 100%
+        );
+        clip-path: inset(0 8% 0 0);
+      }
+      .hbar .glow {
+        filter: blur(6px);
+        opacity: 0.55;
+      }
+      .hbar .peak {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 96%;
+        width: 2px;
+        background: #fff;
+        box-shadow: 0 0 6px var(--bloom-white);
+      }
+      .hbar .ref {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 70%;
+        border-left: 1px dashed rgba(255, 255, 255, 0.45);
+      }
+      .field {
+        border-radius: var(--r8);
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field .fl {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .field .fv {
+        font: 600 16px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .states {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .state {
+        height: 156px;
+        border-radius: var(--r12);
+        padding: 12px 14px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: 6px;
+        overflow: hidden;
+      }
+      .vocab {
+        display: grid;
+        grid-template-columns: 96px 1fr 1fr;
+        gap: 6px 12px;
+        font: 500 13px/1.35 var(--ui);
+        align-items: start;
+      }
+      .vocab .h {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .vocab .w {
+        font: 600 13px/1.5 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .vocab .w.ok {
+        color: var(--green-text);
+      }
+      .vocab .w.att {
+        color: var(--amber-text);
+      }
+      .vocab .w.err {
+        color: var(--red-text);
+      }
+      .vocab .w.info {
+        color: var(--blue-text);
+      }
+      .forms {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+      .forms .l {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        margin-bottom: 6px;
+      }
+      .meter-empty {
+        position: relative;
+        height: 20px;
+        border-radius: var(--r4);
+      }
+      .meter-empty .ref {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 70%;
+        border-left: 1px dashed rgba(255, 255, 255, 0.45);
+      }
+      .state.tone-ok {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state.tone-attention {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-error {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-info {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(124, 196, 255, 0.16), transparent 60%), var(--well);
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .state .lamp {
+        width: 12px;
+        height: 12px;
+      }
+      .state-word {
+        font: 600 20px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state.tone-attention .state-word {
+        color: var(--amber-text);
+      }
+      .state.tone-error .state-word {
+        color: var(--red-text);
+      }
+      .state.tone-info .state-word {
+        color: var(--blue-text);
+      }
+      .state-sub {
+        font: 500 13px/1.35 var(--ui);
+      }
+      .state-code {
+        font: 500 12px/1.3 var(--mono);
+        color: var(--well-text-2);
+      }
+      .state-actions .key {
+        min-height: 28px;
+        font-size: 12px;
+      }
+      .state-actions .key.primary {
+        color: var(--primary-ink);
+      }
+      .lamps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .table {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 4px 16px;
+        font: 500 13px/1.35 var(--ui);
+      }
+      .table .h {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding-bottom: 4px;
+      }
+      .table .v {
+        font: 600 13px/1.35 var(--mono);
+      }
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="A-system-sheet">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control</div>
+        <div class="d">
+          System sheet A · the primitives the four workspaces are built from · one token set, three themes
+        </div>
+        <div class="right">
+          <span class="lampchip"><i class="lamp ok"></i><b>Lighting</b> ok</span>
+          <span class="lampchip amber"><i class="lamp amber"></i><b>Audio</b> assumed</span>
+          <span class="lampchip red"><i class="lamp red"></i><b>Surface</b> unreachable</span>
+          <span class="lampchip amber"><i class="lamp amber"></i><b>Solo</b> 1</span>
+        </div>
+      </header>
+
+      <div class="cols">
+        <!-- column 1: type, roles, copy -->
+        <div class="col">
+          <section class="sec plate" data-region="type">
+            <div class="sec-head">
+              <span class="t">Type</span
+              ><span class="d">Inter for language, JetBrains Mono for values · one scale for every viewport</span>
+            </div>
+            <div class="row">
+              <span class="l">12 tick</span
+              ><span class="spec t12 muted">-60 -40 -30 -20 -18 -12 -6 -3 0 · eyebrows · never read to act</span>
+            </div>
+            <div class="row">
+              <span class="l">13 label</span><span class="spec t13">Preamp 1 · mic · hold T · into Phones 1 and 2</span>
+            </div>
+            <div class="row">
+              <span class="l">14 body</span
+              ><span class="spec t14">Console controls stay locked until the audio probe passes.</span>
+            </div>
+            <div class="row">
+              <span class="l">15 name</span><span class="spec t15">Interview block · booth_2 · Probe hardware</span>
+            </div>
+            <div class="row">
+              <span class="l">16 value</span
+              ><span class="spec t16">Guest 1 · Sends · <span class="mono">-14.6 dB</span></span>
+            </div>
+            <div class="row"><span class="l">20 word</span><span class="spec t20">Talkback · +2.1 dB</span></div>
+            <div class="row">
+              <span class="l">24 state</span><span class="spec t24" style="color: var(--green-text)">VERIFIED</span>
+            </div>
+            <div class="row"><span class="l">32 hero small</span><span class="spec t32">-1.2 dB</span></div>
+            <div class="row"><span class="l">44 hero</span><span class="spec t44">100 %</span></div>
+          </section>
+
+          <section class="sec plate" data-region="roles">
+            <div class="sec-head">
+              <span class="t">Colour roles</span
+              ><span class="d">hue names the family, form names the meaning · colour never stands alone</span>
+            </div>
+            <div class="roles">
+              <span class="h">Hue</span><span class="h">Lamp + word</span><span class="h">Keyline (attention)</span
+              ><span class="h">Lit key (engaged / live / hazard)</span><span class="h">Text</span>
+              <span class="n">Amber</span><span class="lw amber"><i class="lamp amber"></i>ASSUMED</span
+              ><span class="kl">unconfirmed</span
+              ><button class="key on" data-key><span class="cap">Main Out</span></button
+              ><span class="t14" style="color: var(--amber-text)">1 solo · FX 3/4</span> <span class="n">Green</span
+              ><span class="lw green"><i class="lamp ok"></i>VERIFIED</span
+              ><span class="kl" style="border-color: var(--green-text); color: var(--green-text); border-style: solid"
+                >passed</span
+              ><button class="key live" data-key><span class="cap">Talkback</span></button
+              ><span class="t14" style="color: var(--green-text)">42 values confirmed</span> <span class="n">Red</span
+              ><span class="lw red"><i class="lamp red"></i>OFFLINE</span
+              ><span class="kl red">locked · unreachable</span
+              ><button class="key hazard" data-key><i class="lamp"></i>48 V</button
+              ><span class="t14" style="color: var(--red-text)">Cut all · Delete…</span> <span class="n">Blue</span
+              ><span class="lw blue"><i class="lamp blue"></i>PREVIEW</span><span class="kl blue">editing offline</span
+              ><span class="muted t13">no lit form</span
+              ><span class="t14" style="color: var(--blue-text)">the rig is unchanged</span>
+              <span class="n">Neutral</span><span class="lw"><i class="lamp"></i>off</span
+              ><span class="kl sel">selected</span><button class="key primary" data-key>Sync from TotalMix</button
+              ><span class="t14 muted">muted · secondary</span>
+            </div>
+          </section>
+
+          <section class="sec plate" data-region="copy">
+            <div class="sec-head">
+              <span class="t">Copy</span><span class="d">written for the person at the desk</span>
+            </div>
+            <div class="copy">
+              <span
+                ><b>Commands</b> are sentence-case verbs with objects:
+                <span class="x">Run audio probe · Save scene · Export backup</span></span
+              >
+              <span
+                ><b>Key caps</b> are the deck's words, mono, uppercase:
+                <span class="x">TALKBACK · DIM · MONO · → MAIN · M · S · 48 V</span></span
+              >
+              <span
+                ><b>State words</b> are the engine's, mono, uppercase:
+                <span class="x">VERIFIED · NOT VERIFIED · ASSUMED · OFFLINE · REACHABLE · READY</span></span
+              >
+              <span
+                ><b>Sentences</b> are the engine's, verbatim; a raw code prints small beneath, never first:
+                <span class="x">AUDIO_SNAPSHOT_RECALL_FAILED</span></span
+              >
+              <span
+                ><b>Numbers</b> carry sign and unit:
+                <span class="x"
+                  >-3.8 dB · +2.1 dB · 32 dB · 3200 K · 76 % · 18:24 · 85 min · 1h 18m · U1 · 192.168.1.80</span
+                ></span
+              >
+              <span
+                ><b>Names</b>: TotalMix, the UFX III, the bridge, the deck, Companion, the rig; never engine, backend,
+                transport, IPC</span
+              >
+            </div>
+          </section>
+
+          <section class="sec plate" data-region="vocabulary">
+            <div class="sec-head">
+              <span class="t">State vocabulary</span
+              ><span class="d">every word is the engine's · one form each · the shell lamp mirrors the worst</span>
+            </div>
+            <div class="vocab">
+              <span class="h">Workspace</span><span class="h">Words</span><span class="h">Way out</span>
+              <span>Console</span
+              ><span
+                ><span class="w ok">VERIFIED</span> ·
+                <span class="w att">NOT VERIFIED · ASSUMED · STALE · DISABLED</span> ·
+                <span class="w err">OFFLINE · DISCONNECTED · ACTION FAILED · TALKBACK REFUSED</span></span
+              ><span>Run audio probe · Sync from TotalMix · Open Setup · Dismiss</span> <span>Lighting</span
+              ><span
+                ><span class="w ok">REACHABLE</span> · <span class="w att">UNSAVED</span> ·
+                <span class="w err">UNREACHABLE</span> · <span class="w info">PREVIEW</span></span
+              ><span>Run bridge probe · Save · press twice · Discard changes… · Save to the rig</span>
+              <span>Planning</span><span><span class="w ok">ON TIME</span> · <span class="w att">SLIPPED</span></span
+              ><span>derived from the day's counts until the engine owns a planning status</span> <span>Setup</span
+              ><span><span class="w ok">READY</span> · <span class="w att">DEGRADED · SETUP REQUIRED</span></span
+              ><span>Run all probes · Start with Import profile · Publish with override…</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- column 2: material, keys, wells -->
+        <div class="col">
+          <section class="sec plate" data-region="material">
+            <div class="sec-head">
+              <span class="t">Material</span
+              ><span class="d">one light from above · five levels · displays are backlit in every theme</span>
+            </div>
+            <div class="tiles">
+              <div class="tile bay">Bay<span class="d">−1 · inset 0 2px 10px</span></div>
+              <div class="tile chassis">Chassis<span class="d">0 · flat</span></div>
+              <div class="tile plate">Plate<span class="d">+1 · gradient + sheen</span></div>
+              <div class="tile well wellt">Well<span class="d">display · inset shade</span></div>
+              <div class="tile keyt">Key<span class="d">+2 · sheen + 2 px shade</span></div>
+              <div class="tile lit">Lit key<span class="d">fill + 14 px bloom</span></div>
+              <div class="tile float">Drawer<span class="d">+3 · 0 12px 32px</span></div>
+              <div class="tile chassis">
+                <span>Blooms</span><span class="d">only on lit lamps, lit keys, the peak</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="sec plate" data-region="keys">
+            <div class="sec-head">
+              <span class="t">Keys</span
+              ><span class="d">every pressable thing · ≥ 24 px, take-time ≥ 28 px, 32 px in the studio</span>
+            </div>
+            <div class="keys">
+              <button class="key" data-key>Command</button>
+              <button class="key primary" data-key>Primary command</button>
+              <button class="key danger" data-key><span class="cap" style="font-size: 14px">Cut all</span></button>
+              <button class="key" data-key><span class="cap">Dim</span></button>
+              <button class="key on" data-key><span class="cap">Dim</span><span class="hint">engaged</span></button>
+              <button class="key talk live" data-key>
+                <span class="cap">Talkback</span><span class="hint">live · for the hold</span>
+              </button>
+              <button class="key armed" data-key>
+                <span class="tag">ARMED · press again · 3.9 s</span><span>Interview block</span><i class="count"></i>
+              </button>
+              <button class="key locked" data-key><span class="cap">Mono</span></button>
+              <button class="key hazard" data-key><i class="lamp"></i>48 V</button>
+            </div>
+            <div class="seg well" style="max-width: 420px">
+              <button class="key on" data-key><span class="cap">Main Out</span></button>
+              <button class="key" data-key><span class="cap">Phones 1</span></button>
+              <button class="key" data-key><span class="cap">Phones 2</span></button>
+            </div>
+          </section>
+
+          <section class="sec plate" data-region="wells">
+            <div class="sec-head">
+              <span class="t">Wells</span><span class="d">anything that shows or takes a value</span>
+            </div>
+            <div class="wells">
+              <span class="l">readout · confirmed</span>
+              <div class="readout well">-3.8 dB</div>
+              <span class="l">readout · unconfirmed</span>
+              <div class="readout well" style="border: 1px dashed var(--amber-text); color: var(--amber-text)">
+                -3.8 dB
+              </div>
+              <span class="l">slider · unity notch</span>
+              <div class="hslider well" data-key>
+                <div class="track"></div>
+                <div class="unity"></div>
+                <div class="cap" style="left: calc(17px + 70% - 0.7 * 34px)"></div>
+              </div>
+              <span class="l">colour temperature</span>
+              <div class="hslider well cct" data-key>
+                <div class="track"></div>
+                <div class="cap" style="left: calc(17px + 13% - 0.13 * 34px)"></div>
+              </div>
+              <span class="l">meter · −18 ref · peak</span>
+              <div class="hbar well">
+                <div class="glow"></div>
+                <div class="ramp"></div>
+                <div class="ref"></div>
+                <div class="peak"></div>
+              </div>
+              <span class="l">field</span>
+              <div class="field well"><span class="fl">Stage X</span><span class="fv">2.9 m</span></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- column 3: state displays, lamps, motion, chrome -->
+        <div class="col">
+          <section class="sec plate" data-region="states">
+            <div class="sec-head">
+              <span class="t">State displays</span
+              ><span class="d">the first element of every cluster · fixed height · word, sentence, way out</span>
+            </div>
+            <div class="states">
+              <div class="state well tone-ok">
+                <div class="state-top"><i class="lamp ok"></i><span class="state-word">VERIFIED</span></div>
+                <div class="state-sub">Console · TotalMix on the UFX III · 42 values confirmed</div>
+                <div></div>
+              </div>
+              <div class="state well tone-attention">
+                <div class="state-top"><i class="lamp amber"></i><span class="state-word">NOT VERIFIED</span></div>
+                <div class="state-sub">Console controls stay locked until the audio probe passes.</div>
+                <div class="state-actions"><button class="key primary" data-key>Run audio probe</button></div>
+              </div>
+              <div class="state well tone-error">
+                <div class="state-top"><i class="lamp red"></i><span class="state-word">OFFLINE</span></div>
+                <div class="state-sub">
+                  Audio may still pass, but the app cannot see or change the console right now.<br /><span
+                    class="state-code"
+                    >Console did not answer OSC ping · AUDIO_SYNC_FAILED</span
+                  >
+                </div>
+                <div class="state-actions"><button class="key primary" data-key>Run audio probe</button></div>
+              </div>
+              <div class="state well tone-info">
+                <div class="state-top"><i class="lamp blue"></i><span class="state-word">PREVIEW</span></div>
+                <div class="state-sub">Editing offline. The rig is unchanged until you save or discard.</div>
+                <div class="state-actions">
+                  <button class="key primary" data-key>Save to the rig</button
+                  ><button class="key" data-key>Discard</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="sec plate" data-region="lamps">
+            <div class="sec-head">
+              <span class="t">Lamps and latches</span
+              ><span class="d"
+                >the shell mirrors the worst state a workspace shows · a latch is a state the operator must see from
+                anywhere</span
+              >
+            </div>
+            <div class="lamps">
+              <span class="lampchip"><i class="lamp ok"></i><b>Audio</b> ok</span>
+              <span class="lampchip amber"><i class="lamp amber"></i><b>Audio</b> not verified</span>
+              <span class="lampchip red"><i class="lamp red"></i><b>Audio</b> offline</span>
+              <span class="lampchip blue"><i class="lamp blue"></i><b>Lighting</b> preview</span>
+              <span class="lampchip amber"><i class="lamp amber"></i><b>Solo</b> 1</span>
+              <span class="lampchip amber"><i class="lamp amber"></i><b>Scene</b> unsaved</span>
+              <span class="lampchip"><i class="lamp"></i><b>Surface</b> off</span>
+            </div>
+          </section>
+
+          <section class="sec plate" data-region="motion">
+            <div class="sec-head">
+              <span class="t">Motion</span><span class="d">nothing on an idle surface moves · hover moves nothing</span>
+            </div>
+            <div class="table">
+              <span class="h">Purpose</span><span class="h">Duration</span><span class="h">Easing</span>
+              <span>A lamp or a lit fill switches</span><span class="v">0 ms</span><span class="v">none</span>
+              <span>A key press</span><span class="v">100 ms</span><span class="v">mechanical</span>
+              <span>A state word or keyline changes</span><span class="v">160 ms</span><span class="v">out</span>
+              <span>Drawer, dialog, toast enter · exit</span><span class="v">200 · 120 ms</span
+              ><span class="v">out · in</span> <span>Bank or tab change</span><span class="v">160 ms</span
+              ><span class="v">in-out</span> <span>Meters, countdown bars</span><span class="v">frame rate</span
+              ><span class="v">engine ballistics</span> <span>prefers-reduced-motion</span
+              ><span class="v">removes enter, exit, move, meter smoothing</span><span class="v">lamps stay</span>
+            </div>
+          </section>
+
+          <section class="sec plate" data-region="forms">
+            <div class="sec-head">
+              <span class="t">Locked, doubted, absent</span
+              ><span class="d"
+                >a refused control changes form, a doubted value carries its own mark, a lost signal leaves the well
+                empty</span
+              >
+            </div>
+            <div class="forms">
+              <div>
+                <div class="l">locked · aria-disabled · the reason in the display</div>
+                <button class="key locked" data-key aria-disabled="true"><span class="cap">Talkback</span></button>
+              </div>
+              <div>
+                <div class="l">doubt · the desk has not confirmed this value</div>
+                <div class="readout well" style="border: 1px dashed var(--amber-text); color: var(--amber-text)">
+                  +2.1 dB
+                </div>
+              </div>
+              <div>
+                <div class="l">no metering · the readout prints —</div>
+                <div class="meter-empty well"><div class="ref"></div></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="sec plate" data-region="chrome">
+            <div class="sec-head">
+              <span class="t">Chrome budget</span><span class="d">density from the chrome, never from the type</span>
+            </div>
+            <div class="table">
+              <span class="h">Viewport</span><span class="h">Header · footer</span
+              ><span class="h">Cluster · plate · state display</span> <span>2560 × 1440 · studio</span
+              ><span class="v">56 · 40</span><span class="v">424 · 416 · 180</span>
+              <span>1920 × 1080 · live minimum</span><span class="v">52 · 36</span
+              ><span class="v">360 · 360 · 168</span> <span>1280 × 800 · utility</span><span class="v">48 · 32</span
+              ><span class="v">232 · drawer 360 · 140</span>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span>Tokens <b>docs/redesign/system/tokens-a-2026-09.css</b></span>
+        <span>Radii <b>4 · 8 · 12 · pill</b></span>
+        <span>Type floor <b>12 px</b></span>
+        <span>Targets <b>24 · 28 take-time · 32 studio</b></span>
+        <span>Hues <b>amber · green · red · blue</b></span>
+      </footer>
+    </div>
+    <script>
+      const params = new URLSearchParams(location.search);
+      if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+      let one = false;
+      function fit() {
+        const k = Math.min(1, innerWidth / 2560, innerHeight / 1440);
+        document.getElementById("board").style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      addEventListener("resize", fit);
+      addEventListener("keydown", (e) => {
+        if (e.key === "1") {
+          one = !one;
+          fit();
+        }
+        if (e.key === "s") document.documentElement.dataset.theme = "studio";
+        if (e.key === "g") document.documentElement.dataset.theme = "graphite";
+        if (e.key === "b") document.documentElement.dataset.theme = "bone";
+      });
+      fit();
+    </script>
+  </body>
+</html>

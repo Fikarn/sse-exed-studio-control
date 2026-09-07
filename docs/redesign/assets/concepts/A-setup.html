@@ -1,0 +1,1564 @@
+<!doctype html>
+<html lang="en" data-theme="studio" data-states="ready,degraded,setup-required">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Setup / Support · Concept A — Cockpit · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         SETUP / SUPPORT in Concept A's language (Cockpit).
+         Setup is a workspace inside the shell, not another application: the same
+         header and tabs, the same cluster. Cluster: the commissioning state display
+         (READY / DEGRADED / SETUP REQUIRED with the engine's sentence and the way
+         out), the Runner | Support switch, the five steps as keys, the three probes
+         with their results, the standing actions. Bay: the current step as a
+         backlit screen with everything that step needs. Plate: Support — the
+         workstation settings (the theme lives here), backups, diagnostics, sample
+         data, versions. Material v2.
+         ?theme=studio|graphite|bone · ?state=ready|degraded|setup-required
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      kbd {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        border: 1px solid var(--line-2);
+        border-radius: var(--r4);
+        padding: 3px 5px;
+        white-space: nowrap;
+      }
+      .muted {
+        color: var(--text-2);
+      }
+
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.on .hint,
+      .key.on kbd {
+        color: var(--amber-ink);
+        border-color: rgba(0, 0, 0, 0.35);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      .key.primary kbd {
+        color: var(--primary-ink);
+        border-color: currentColor;
+        opacity: 0.85;
+      }
+      .key.sm {
+        min-height: 32px;
+        font-size: 13px;
+        padding: 0 10px;
+      }
+      .key.danger {
+        color: var(--red-text);
+        border-color: var(--red-text);
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .wordmark .sub {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0.02em;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: 12px;
+      }
+      .tab {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r8);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab kbd {
+        padding: 2px 4px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 12px;
+      }
+
+      .body {
+        display: grid;
+        grid-template-columns: 424px 1fr 416px;
+        min-height: 0;
+      }
+      .cluster {
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .state {
+        height: 180px;
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .state.tone-ok {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state.tone-attention {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%), var(--well);
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .state .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .state-word {
+        font: 600 24px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state.tone-attention .state-word {
+        color: var(--amber-text);
+      }
+      .state-sub {
+        font: 500 14px/1.35 var(--ui);
+      }
+      .state-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        align-self: start;
+      }
+      .state-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .state-actions .key {
+        min-height: 32px;
+        font-size: 13px;
+      }
+      .seg {
+        display: flex;
+        gap: 6px;
+        padding: 4px;
+        border-radius: var(--r12);
+      }
+      .seg .key {
+        flex: 1;
+        min-height: 40px;
+        border-radius: var(--r8);
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--well-text);
+      }
+      .seg .key .cap {
+        font-size: 14px;
+      }
+      .seg .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .sec {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .sec-head .title {
+        font: 600 16px/1 var(--ui);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .sec-head .title span {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 28px 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        min-height: 56px;
+        padding: 0 12px;
+      }
+      .step .n {
+        font: 600 14px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .step .name {
+        font: 600 15px/1.2 var(--ui);
+      }
+      .step .meta {
+        grid-column: 2;
+        font: 400 12px/1.2 var(--ui);
+        color: var(--text-2);
+        margin-top: 3px;
+      }
+      .step .st {
+        grid-row: 1 / span 2;
+        grid-column: 3;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .step.current {
+        border: 2px solid var(--accent);
+      }
+      .step.current .st {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .probe {
+        display: grid;
+        grid-template-columns: 14px 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        min-height: 44px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+      }
+      .probe .name {
+        font: 600 14px/1.2 var(--ui);
+        color: var(--well-text);
+      }
+      .probe .detail {
+        grid-column: 2;
+        font: 400 12px/1.2 var(--ui);
+        color: var(--well-text-2);
+        margin-top: 2px;
+      }
+      .probe .st {
+        grid-row: 1 / span 2;
+        grid-column: 3;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--green-text);
+      }
+      .probe.attention .st {
+        color: var(--amber-text);
+      }
+      .actions {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .actions .key {
+        flex: 1;
+        min-height: 40px;
+        padding: 0 8px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      /* bay: the step screen */
+      .bay {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+      }
+      .bay-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 32px;
+      }
+      .bay-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .bay-head .d {
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .bay-head .right {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+      }
+      /* the step screen is only as tall as the step needs; the bay floor stays visible below it */
+      .screen {
+        flex: none;
+        border-radius: var(--r12);
+        padding: 40px 48px 44px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 48px;
+        align-content: start;
+        min-height: 0;
+      }
+      .screen[hidden] {
+        display: none;
+      }
+      .screen .eyebrow {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .screen h1 {
+        font: 600 44px/1.05 var(--ui);
+        letter-spacing: -0.02em;
+        margin-top: 10px;
+      }
+      .screen .lead {
+        font: 500 20px/1.4 var(--ui);
+        color: var(--well-text);
+        margin-top: 18px;
+        max-width: 760px;
+      }
+      .screen .rules {
+        margin-top: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 760px;
+      }
+      .screen .rule {
+        display: grid;
+        grid-template-columns: 14px 1fr;
+        column-gap: 12px;
+        font: 400 15px/1.45 var(--ui);
+        color: var(--well-text-2);
+      }
+      .screen .rule .lamp {
+        margin-top: 6px;
+      }
+      .screen .cards {
+        margin-top: 32px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        max-width: 760px;
+      }
+      .screen .card {
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: var(--r8);
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .screen .card .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .screen .card .v {
+        font: 600 16px/1.25 var(--mono);
+      }
+      .screen .card .s {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font: 500 13px/1 var(--ui);
+        color: var(--green-text);
+      }
+      .screen .card.attention .s {
+        color: var(--amber-text);
+      }
+      .screen .go {
+        margin-top: 36px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .screen .go .key {
+        min-height: 48px;
+        padding: 0 20px;
+        font-size: 15px;
+      }
+      .screen .go .key.primary {
+        color: var(--primary-ink);
+      }
+      .screen .go .note {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        max-width: 340px;
+      }
+      .screen .col2 {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding-top: 88px;
+      }
+      .screen .col2 .h {
+        font: 600 14px/1 var(--ui);
+      }
+      .screen .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        column-gap: 12px;
+        min-height: 40px;
+        padding: 0 12px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: var(--r8);
+        font: 500 14px/1.2 var(--ui);
+      }
+      .screen .row b {
+        font: 600 14px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .screen .row .lampword {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .screen .field {
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: var(--r8);
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .screen .field .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .screen .field .v {
+        font: 600 16px/1 var(--mono);
+      }
+      .screen .key {
+        color: var(--text);
+      }
+
+      /* inspector: support */
+      .inspector {
+        border-left: 1px solid var(--line);
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .section-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .section-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .insp-keys {
+        display: flex;
+        gap: 8px;
+      }
+      .insp-keys .key {
+        flex: 1;
+        min-height: 36px;
+        font-size: 13px;
+        padding: 0 8px;
+      }
+      .readouts {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        row-gap: 10px;
+        align-items: center;
+        font: 500 14px/1 var(--ui);
+      }
+      .readouts .v {
+        font: 600 14px/1 var(--mono);
+      }
+      .theme-seg .key .cap {
+        font-size: 13px;
+      }
+      .danger {
+        margin-top: auto;
+      }
+
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .footer .hints {
+        margin-left: auto;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+      }
+      .footer .hints span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* ---- viewports ---- */
+      .short {
+        display: none;
+      }
+      #board[data-vw="1920"] {
+        grid-template-rows: 52px 1fr 36px;
+      }
+      #board[data-vw="1920"] .body {
+        grid-template-columns: 360px 1fr 360px;
+      }
+      #board[data-vw="1920"] .shell {
+        gap: 20px;
+        padding: 0 16px;
+      }
+      #board[data-vw="1920"] .cluster {
+        padding: 12px 12px 16px;
+        gap: 12px;
+      }
+      #board[data-vw="1920"] .state {
+        height: 168px;
+        padding: 12px 14px;
+      }
+      #board[data-vw="1920"] .step {
+        min-height: 48px;
+      }
+      #board[data-vw="1920"] .step .meta {
+        display: none;
+      }
+      #board[data-vw="1920"] .probe {
+        min-height: 40px;
+      }
+      #board[data-vw="1920"] .actions .key {
+        min-height: 36px;
+        font-size: 12px;
+        padding: 0 4px;
+      }
+      #board[data-vw="1920"] .go .long {
+        display: none;
+      }
+      #board[data-vw="1920"] .go .short {
+        display: inline;
+      }
+      #board[data-vw="1920"] .bay {
+        padding: 12px;
+      }
+      #board[data-vw="1920"] .screen {
+        padding: 28px 32px 32px;
+        column-gap: 32px;
+      }
+      #board[data-vw="1920"] .screen h1 {
+        font-size: 32px;
+      }
+      #board[data-vw="1920"] .screen .lead {
+        font-size: 16px;
+      }
+      #board[data-vw="1920"] .screen .col2 {
+        padding-top: 60px;
+      }
+      #board[data-vw="1920"] .inspector {
+        padding: 14px 12px;
+        gap: 12px;
+      }
+      #board[data-vw="1920"] .footer {
+        padding: 0 16px;
+        gap: 18px;
+      }
+      #board[data-vw="1280"] {
+        grid-template-rows: 48px 1fr 32px;
+      }
+      #board[data-vw="1280"] .body {
+        grid-template-columns: 232px 1fr 0px;
+      }
+      #board[data-vw="1280"] .shell {
+        gap: 14px;
+        padding: 0 12px;
+      }
+      #board[data-vw="1280"] .shell .tabs {
+        margin-left: 4px;
+        gap: 2px;
+      }
+      #board[data-vw="1280"] .shell .tab {
+        height: 32px;
+        padding: 0 10px;
+      }
+      #board[data-vw="1280"] .shell kbd,
+      #board[data-vw="1280"] .long {
+        display: none;
+      }
+      #board[data-vw="1280"] .short {
+        display: inline;
+      }
+      #board[data-vw="1280"] .lampchip {
+        height: 28px;
+        padding: 0 8px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .clock {
+        margin-left: 4px;
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .cluster {
+        padding: 8px 8px 10px;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .state {
+        height: 140px;
+        padding: 10px 12px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .state-word {
+        font-size: 20px;
+      }
+      #board[data-vw="1280"] .state-sub {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .state-meta {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .state-actions .key {
+        min-height: 28px;
+        font-size: 12px;
+        padding: 0 8px;
+      }
+      #board[data-vw="1280"] .seg {
+        padding: 3px;
+        gap: 4px;
+      }
+      #board[data-vw="1280"] .seg .key {
+        min-height: 32px;
+      }
+      #board[data-vw="1280"] .seg .key .cap {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .sec {
+        gap: 4px;
+      }
+      #board[data-vw="1280"] .sec-head .title {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .sec-head .title span {
+        display: none;
+      }
+      #board[data-vw="1280"] .key.sm {
+        min-height: 28px;
+        font-size: 12px;
+        padding: 0 6px;
+      }
+      #board[data-vw="1280"] .step {
+        min-height: 36px;
+        padding: 0 8px;
+        column-gap: 6px;
+        grid-template-columns: 20px 1fr auto;
+      }
+      #board[data-vw="1280"] .step .name {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .step .meta {
+        display: none;
+      }
+      #board[data-vw="1280"] .step .st {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .probe {
+        min-height: 36px;
+        padding: 0 8px;
+        column-gap: 6px;
+      }
+      #board[data-vw="1280"] .probe .name {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .probe .detail {
+        display: none;
+      }
+      #board[data-vw="1280"] .probe .st {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .actions .key {
+        min-height: 34px;
+        font-size: 12px;
+        padding: 0 6px;
+      }
+      #board[data-vw="1280"] .actions .key kbd {
+        display: none;
+      }
+      #board[data-vw="1280"] .bay {
+        padding: 8px;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .bay-head {
+        height: 28px;
+      }
+      #board[data-vw="1280"] .bay-head .right {
+        display: none;
+      }
+      #board[data-vw="1280"] .screen {
+        grid-template-columns: 1fr;
+        padding: 20px 24px 24px;
+        row-gap: 16px;
+      }
+      #board[data-vw="1280"] .screen h1 {
+        font-size: 24px;
+        margin-top: 6px;
+      }
+      #board[data-vw="1280"] .screen .lead {
+        font-size: 15px;
+        margin-top: 10px;
+        max-width: none;
+      }
+      #board[data-vw="1280"] .screen .rules {
+        margin-top: 14px;
+        gap: 6px;
+        max-width: none;
+      }
+      #board[data-vw="1280"] .screen .rule {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .screen .rule .lamp {
+        margin-top: 5px;
+      }
+      #board[data-vw="1280"] .screen .cards {
+        margin-top: 14px;
+        gap: 8px;
+        max-width: none;
+      }
+      #board[data-vw="1280"] .screen .card {
+        padding: 10px 12px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .screen .card .v {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .screen .go {
+        margin-top: 16px;
+      }
+      #board[data-vw="1280"] .screen .go .key {
+        min-height: 40px;
+        padding: 0 14px;
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .screen .go .note {
+        display: none;
+      }
+      #board[data-vw="1280"] .screen .col2 {
+        padding-top: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .screen .col2 .h {
+        grid-column: 1 / -1;
+      }
+      #board[data-vw="1280"] .screen .row {
+        min-height: 34px;
+        padding: 0 10px;
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .screen .row b {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .inspector {
+        display: none;
+      }
+      #board[data-vw="1280"] .footer {
+        padding: 0 12px;
+        gap: 14px;
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .footer .hints span:nth-child(n + 3) {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="A-setup">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control<span class="sub">SSE Executive Education</span></div>
+        <nav class="tabs">
+          <button class="tab on" data-key>
+            <span class="long">Setup / Support</span><span class="short">Setup</span> <kbd>Ctrl 1</kbd>
+          </button>
+          <button class="tab" data-key>Lighting <kbd>Ctrl 2</kbd></button>
+          <button class="tab" data-key>Audio <kbd>Ctrl 3</kbd></button>
+          <button class="tab" data-key>Planning <kbd>Ctrl 4</kbd></button>
+        </nav>
+        <div class="health">
+          <button class="lampchip" id="hdrLighting" data-key>
+            <i class="lamp ok"></i><b>Lighting</b> <span>ok</span>
+          </button>
+          <button class="lampchip" id="hdrAudio" data-key><i class="lamp ok"></i><b>Audio</b> <span>ok</span></button>
+          <button class="lampchip" id="hdrSurface" data-key>
+            <i class="lamp ok"></i><b>Surface</b> <span>ok</span>
+          </button>
+          <button class="lampchip amber" data-key><i class="lamp amber"></i><b>Solo</b> 1</button>
+          <div class="clock">09:11</div>
+        </div>
+      </header>
+
+      <div class="body">
+        <aside class="cluster plate" data-region="cluster">
+          <div class="state well tone-ok" id="state" data-region="state">
+            <div class="state-top">
+              <i class="lamp ok" id="stateLamp"></i>
+              <div class="state-word" id="stateWord">READY</div>
+            </div>
+            <div class="state-sub" id="stateSub">Commissioning complete and operator mode unlocked.</div>
+            <div class="state-meta" id="stateMeta">
+              Step 5 of 5 · Publish · 3 of 3 probes passed · Backup 22 Apr 09:12
+            </div>
+            <div class="state-actions" id="stateActions"></div>
+          </div>
+
+          <div class="seg well">
+            <button class="key on" data-key data-take><span class="cap">Runner</span></button>
+            <button class="key" data-key data-take><span class="cap">Support</span></button>
+          </div>
+
+          <div class="sec" id="steps">
+            <div class="sec-head">
+              <div class="title">Steps <span>5 · done in order</span></div>
+            </div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-head">
+              <div class="title">Probes <span id="probeCount">3 of 3 passed</span></div>
+              <button class="key sm" data-key>Run all</button>
+            </div>
+            <div id="probes"></div>
+          </div>
+
+          <div class="actions">
+            <button class="key" data-key>Export backup</button>
+            <button class="key" data-key>Engine log</button>
+            <button class="key" data-key aria-label="Back to the console">Console <kbd>Ctrl 3</kbd></button>
+          </div>
+        </aside>
+
+        <main class="bay" data-region="runner">
+          <div class="bay-head">
+            <span class="t">Commissioning runner</span
+            ><span class="d" id="bayHead">step 5 of 5 · the last step commits everything above it</span>
+            <div class="right">
+              <button class="key sm" data-key>Shortcuts <kbd>?</kbd></button>
+            </div>
+          </div>
+
+          <!-- step 5 -->
+          <section class="screen well" id="screen-publish">
+            <div>
+              <div class="eyebrow">Step 5 of 5</div>
+              <h1>Publish</h1>
+              <div class="lead">
+                Publishing commits the commissioning gate, exports a fresh support backup, and returns you to the
+                console.
+              </div>
+              <div class="rules">
+                <div class="rule">
+                  <i class="lamp ok"></i
+                  ><span
+                    >Lighting, audio and control-surface probes must all be green before publish; publishing with a
+                    probe that is not green asks for an explicit override and records it.</span
+                  >
+                </div>
+                <div class="rule">
+                  <i class="lamp ok"></i
+                  ><span>The support backup export is part of publish, not a chore for afterwards.</span>
+                </div>
+                <div class="rule">
+                  <i class="lamp ok"></i
+                  ><span
+                    >Once published, the deck's Audio page, the lighting bridge and the console link are live for the
+                    next session.</span
+                  >
+                </div>
+              </div>
+              <div class="cards" id="cards">
+                <div class="card">
+                  <span class="l">Latest backup</span><span class="v">22 Apr 2026 · 09:12</span
+                  ><span class="s"><i class="lamp ok"></i>healthy</span>
+                </div>
+                <div class="card">
+                  <span class="l">Startup target</span><span class="v">dashboard</span
+                  ><span class="s"><i class="lamp ok"></i>healthy</span>
+                </div>
+                <div class="card">
+                  <span class="l">Support archives</span><span class="v">1 · native</span
+                  ><span class="s"><i class="lamp ok"></i>ready</span>
+                </div>
+              </div>
+              <div class="go">
+                <button class="key primary" id="publishKey" data-key data-take>Publish commissioning</button>
+                <button class="key" data-key>
+                  <span class="long">Back to Verify live echo</span><span class="short">Back to step 4</span>
+                </button>
+                <span class="note" id="publishNote"
+                  >Writes the gate, exports a backup, then opens the Audio console.</span
+                >
+              </div>
+            </div>
+            <div class="col2">
+              <div class="h">What publish records</div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>Hardware profile</span><b>Studio workstation</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>Lighting bridge</span><b>192.168.1.80 · universe 1</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>Audio console</span><b>UFX III · TotalMix OSC</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>Control surface</span
+                ><b>Stream Deck+ · 4 pages · 48 controls</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>Companion profile</span><b>exported · current</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>Override</span><b>none recorded</b>
+              </div>
+              <div class="h" style="margin-top: 14px">The steps above, as done</div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>1 · Import profile</span><b>Companion profile exported</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>2 · Probe hardware</span><b>3 of 3 probes passed</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>3 · Map bindings</span><b>4 pages · 48 controls mapped</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>4 · Verify live echo</span><b>every control echoed</b>
+              </div>
+              <div class="h" style="margin-top: 14px">Support archives</div>
+              <div class="row">
+                <span class="lampword"><i class="lamp ok"></i>native-backup-2026-04-22T07-12-00</span
+                ><b>22 Apr 2026 · 09:12 · native</b>
+              </div>
+            </div>
+          </section>
+
+          <!-- step 1 (setup-required) -->
+          <section class="screen well" id="screen-import" hidden>
+            <div>
+              <div class="eyebrow">Step 1 of 5</div>
+              <h1>Import profile</h1>
+              <div class="lead">
+                Export the ready-to-import Companion profile for the Stream Deck+, then load it in Companion on this
+                workstation.
+              </div>
+              <div class="rules">
+                <div class="rule">
+                  <i class="lamp"></i
+                  ><span
+                    >The profile carries the deck's four pages and 48 controls; edit bindings in step 3, not in
+                    Companion.</span
+                  >
+                </div>
+                <div class="rule">
+                  <i class="lamp"></i
+                  ><span
+                    >The server base URL is where Companion reaches this workstation; keep it on the studio
+                    network.</span
+                  >
+                </div>
+              </div>
+              <div class="cards">
+                <div class="field"><span class="l">Server base URL</span><span class="v">not set</span></div>
+                <div class="field"><span class="l">Export target</span><span class="v">not set</span></div>
+                <div class="field"><span class="l">Profile</span><span class="v">not exported yet</span></div>
+              </div>
+              <div class="go">
+                <button class="key primary" data-key>Export profile</button>
+                <button class="key" data-key>Continue to Probe hardware</button>
+                <span class="note">Continue is available once the export has been written.</span>
+              </div>
+            </div>
+            <div class="col2">
+              <div class="h">Before you start</div>
+              <div class="row">
+                <span class="lampword"><i class="lamp"></i>Companion</span><b>running on this workstation</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp"></i>Stream Deck+</span><b>connected over USB</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp"></i>TotalMix</span><b>OSC remote enabled</b>
+              </div>
+              <div class="row">
+                <span class="lampword"><i class="lamp"></i>Apollo bridge</span><b>on the studio network</b>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <aside class="inspector plate" data-region="support">
+          <div class="insp-head">
+            <h2>Support</h2>
+            <div class="sub">
+              Workstation settings, backups and diagnostics · always here, whatever step the runner is on
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">Workstation</span><span class="d">applies to every workspace</span>
+            </div>
+            <div class="readouts"><span>Theme</span><span class="v muted">dim control room</span></div>
+            <div class="seg well theme-seg">
+              <button class="key on" data-key data-take><span class="cap">Studio</span></button>
+              <button class="key" data-key data-take><span class="cap">Graphite</span></button>
+              <button class="key" data-key data-take><span class="cap">Bone</span></button>
+            </div>
+            <div class="readouts"><span>UI scale</span><span class="v muted">100 %</span></div>
+            <div class="seg well theme-seg">
+              <button class="key" data-key data-take><span class="cap">90</span></button>
+              <button class="key on" data-key data-take><span class="cap">100</span></button>
+              <button class="key" data-key data-take><span class="cap">110</span></button>
+              <button class="key" data-key data-take><span class="cap">125</span></button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Backups</span><span class="d">1 archive</span></div>
+            <div class="readouts">
+              <span>Latest</span><span class="v">22 Apr 2026 · 09:12</span> <span>Kind</span
+              ><span class="v">native archive</span>
+            </div>
+            <div class="insp-keys">
+              <button class="key" data-key>Export backup</button><button class="key" data-key>Restore…</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">Diagnostics</span><span class="d">for a support ticket</span>
+            </div>
+            <div class="insp-keys">
+              <button class="key" data-key>Export diagnostics</button><button class="key" data-key>Engine log</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Sample data</span><span class="d">asks first</span></div>
+            <div class="insp-keys"><button class="key" data-key>Load sample planning data…</button></div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">About</span><span class="d">this workstation</span></div>
+            <div class="readouts">
+              <span>Studio Control</span><span class="v">v2.2.1</span> <span>Engine</span
+              ><span class="v">0.1.0 · protocol 1</span> <span>Hardware profile</span
+              ><span class="v">Studio workstation</span>
+            </div>
+          </div>
+
+          <div class="danger insp-keys"><button class="key danger" data-key>Restart the bridge…</button></div>
+        </aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Step <b id="ftStep">5 / 5 · Publish</b></span>
+        <span class="item">Probes <b id="ftProbes">3 / 3 ok</b></span>
+        <span class="item">Commissioning <b id="ftComm">ready to publish</b></span>
+        <span class="item">App <b>v2.2.1</b></span>
+        <div class="hints">
+          <span><kbd>Ctrl K</kbd> Palette</span>
+          <span><kbd>?</kbd> Shortcuts</span>
+          <span><kbd>Ctrl 3</kbd> Back to the console</span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      const STEPS = [
+        ["Import profile", "Export the ready-to-import Companion profile."],
+        ["Probe hardware", "Run control-surface, lighting, and audio probes."],
+        ["Map bindings", "Review page, button, and dial bindings."],
+        ["Verify live echo", "Press physical controls and watch for live echo."],
+        ["Publish", "Commit setup and capture a support backup."],
+      ];
+      const STATES = {
+        ready: {
+          tone: "ok",
+          word: "READY",
+          sub: "Commissioning complete and operator mode unlocked.",
+          meta: "Step 5 of 5 · Publish · 3 of 3 probes passed · Backup 22 Apr 09:12",
+          current: 5,
+          done: 4,
+          probes: [
+            ["Lighting bridge", "Universe 1 responding.", "ok"],
+            ["Audio console", "OSC sync healthy.", "ok"],
+            ["Control surface", "Profile export current.", "ok"],
+          ],
+          hdr: ["ok", "ok", "ok"],
+          screen: "publish",
+          footer: ["5 / 5 · Publish", "3 / 3 ok", "ready to publish"],
+        },
+        degraded: {
+          tone: "attention",
+          word: "DEGRADED",
+          sub: "Operator mode is available, but lighting and control-surface support need attention.",
+          meta: "Step 5 of 5 · Publish · 1 of 3 probes passed · re-verify before publishing",
+          current: 5,
+          done: 4,
+          actions: [["Run all probes", "primary"]],
+          probes: [
+            ["Lighting bridge", "Universe changed after verification.", "attention"],
+            ["Audio console", "OSC sync healthy.", "ok"],
+            ["Control surface", "Companion export is stale.", "attention"],
+          ],
+          hdr: ["amber", "attention", "ok", "attention"],
+          screen: "publish",
+          override: true,
+          footer: ["5 / 5 · Publish", "1 / 3 ok", "needs re-verification"],
+        },
+        "setup-required": {
+          tone: "attention",
+          word: "SETUP REQUIRED",
+          sub: "Complete commissioning to unlock operator mode.",
+          meta: "Step 1 of 5 · Import profile · lighting and audio not yet verified",
+          current: 1,
+          done: 0,
+          actions: [["Start with Import profile", "primary"]],
+          probes: [
+            ["Lighting bridge", "Universe not confirmed.", "attention"],
+            ["Audio console", "Connection not verified.", "attention"],
+            ["Control surface", "Companion bridge available.", "ok"],
+          ],
+          hdr: ["amber", "not commissioned", "not commissioned", "ok"],
+          screen: "import",
+          footer: ["1 / 5 · Import profile", "1 / 3 ok", "setup required"],
+        },
+      };
+      function applyState(name) {
+        const s = STATES[name] || STATES.ready;
+        document.getElementById("board").dataset.state = name;
+        const st = document.getElementById("state");
+        st.className = "state well tone-" + s.tone;
+        document.getElementById("stateLamp").className = "lamp " + (s.tone === "ok" ? "ok" : "amber");
+        document.getElementById("stateWord").textContent = s.word;
+        document.getElementById("stateSub").textContent = s.sub;
+        document.getElementById("stateMeta").textContent = s.meta;
+        document.getElementById("stateActions").innerHTML = (s.actions || [])
+          .map(([l, c]) => `<button class="key state-key ${c}" data-key>${l}</button>`)
+          .join("");
+        const steps = document.getElementById("steps");
+        steps.querySelectorAll(".step").forEach((e) => e.remove());
+        steps.insertAdjacentHTML(
+          "beforeend",
+          STEPS.map(([n, d], i) => {
+            const k = i + 1,
+              done = k <= s.done,
+              cur = k === s.current;
+            return `<button class="key step ${cur ? "current" : ""}" data-key data-take aria-label="Step ${k} ${n}"><span class="n">${k}</span><span class="name">${n}</span><span class="meta">${d}</span><span class="st"><i class="lamp ${done ? "ok" : cur ? "amber" : ""}"></i>${done ? "done" : cur ? "current" : "pending"}</span></button>`;
+          }).join("")
+        );
+        document.getElementById("probes").innerHTML = s.probes
+          .map(
+            ([n, d, t]) =>
+              `<div class="probe well ${t}"><i class="lamp ${t === "ok" ? "ok" : "amber"}"></i><span class="name">${n}</span><span class="detail">${d}</span><span class="st">${t === "ok" ? "passed" : "attention"}</span></div>`
+          )
+          .join("");
+        document.getElementById("probeCount").textContent =
+          `${s.probes.filter((p) => p[2] === "ok").length} of 3 passed`;
+        const lamps = [
+          ["hdrLighting", 1],
+          ["hdrAudio", 2],
+          ["hdrSurface", 3],
+        ];
+        for (const [id, i] of lamps) {
+          const el = document.getElementById(id);
+          const w = s.hdr[i] || "ok";
+          const tone = w === "ok" ? "ok" : "amber";
+          el.className = "lampchip " + (tone === "ok" ? "" : "amber");
+          el.querySelector(".lamp").className = "lamp " + tone;
+          el.querySelector("span").textContent = w;
+        }
+        document.getElementById("screen-publish").hidden = s.screen !== "publish";
+        document.getElementById("screen-import").hidden = s.screen !== "import";
+        document.getElementById("bayHead").textContent =
+          s.screen === "publish"
+            ? "step 5 of 5 · the last step commits everything above it"
+            : "step 1 of 5 · the deck profile first, then the probes";
+        const pk = document.getElementById("publishKey");
+        pk.textContent = s.override ? "Publish with override…" : "Publish commissioning";
+        pk.className = "key " + (s.override ? "danger" : "primary");
+        document.getElementById("publishNote").textContent = s.override
+          ? "Two probes are not green. Publishing now asks for an explicit override and records it with a timestamp."
+          : "Writes the gate, exports a backup, then opens the Audio console.";
+        document
+          .querySelectorAll("#cards .card")
+          .forEach((c, i) => c.classList.toggle("attention", !!s.override && i === 2));
+        document.getElementById("ftStep").textContent = s.footer[0];
+        document.getElementById("ftProbes").textContent = s.footer[1];
+        document.getElementById("ftComm").textContent = s.footer[2];
+      }
+      const params = new URLSearchParams(location.search);
+      const VW = (params.get("vw") || "2560x1440").split("x").map(Number);
+      const board = document.getElementById("board");
+      board.style.width = VW[0] + "px";
+      board.style.height = VW[1] + "px";
+      board.dataset.vw = VW[0] >= 2560 ? "2560" : VW[0] >= 1920 ? "1920" : "1280";
+      if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+      applyState(params.get("state") || "ready");
+      let one = false;
+      function fit() {
+        const k = Math.min(1, innerWidth / VW[0], innerHeight / VW[1]);
+        document.getElementById("board").style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      addEventListener("resize", fit);
+      addEventListener("keydown", (e) => {
+        if (e.key === "1") {
+          one = !one;
+          fit();
+        }
+        if (e.key === "s") document.documentElement.dataset.theme = "studio";
+        if (e.key === "g") document.documentElement.dataset.theme = "graphite";
+        if (e.key === "b") document.documentElement.dataset.theme = "bone";
+      });
+      fit();
+    </script>
+  </body>
+</html>
