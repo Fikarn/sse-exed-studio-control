@@ -227,12 +227,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "packages/design-system/src/components/AppShellFrame.module.css": {
-    "colour": 0,
-    "fontSize": 4,
-    "radius": 1,
-    "shadow": 1
-  },
   "packages/design-system/src/components/Button.module.css": {
     "colour": 6,
     "fontSize": 1,

@@ -233,3 +233,43 @@ test("shortcut labels follow the host platform", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   await expect(page.locator("[data-health-bar] kbd", { hasText: monitorLabel })).toHaveCount(1);
 });
+
+// Visual overhaul A, Slice 2 (plan D1, finding C3): the header lamp mirrors
+// the worst state its workspace shows — `ACTION FAILED` is red in the header
+// too. Until the state display lands (Slice 4), the workspace's state is its
+// current band: the Console's warning band and the Lighting bridge banner.
+for (const { fixture, lamp, band, tone } of [
+  { fixture: "lighting-dmx-unreachable", lamp: "shell-lamp-lighting", band: "lighting-bridge-banner", tone: "error" },
+  { fixture: "audio-offline", lamp: "shell-lamp-audio", band: "audio-warning-band", tone: "error" },
+  { fixture: "audio-action-failed", lamp: "shell-lamp-audio", band: "audio-warning-band", tone: "error" },
+]) {
+  test(`the header lamp's tone equals the workspace's state tone on ${fixture}`, async ({ page }) => {
+    await openFixture(page, fixture);
+    const workspaceBand = page.getByTestId(band);
+    await expect(workspaceBand).toBeVisible();
+    await expect(workspaceBand).toHaveAttribute("data-tone", tone);
+    await expect(page.getByTestId(lamp)).toHaveAttribute("data-tone", tone);
+  });
+}
+
+// Visual overhaul A, Slice 2 (plan D1, finding H1): Setup / Support is a
+// workspace inside the one shell — the same header, tabs and lamps — and
+// once commissioning is published the operator can leave it from the tabs.
+test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
+  await openFixture(page, "setup-ready");
+  await expect(page.getByText("Commissioning runner")).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
+  for (const id of ["lighting", "audio", "surface"]) {
+    await expect(page.getByTestId(`shell-lamp-${id}`)).toBeVisible();
+  }
+  await expect(page.getByTestId("shell-clock")).toHaveText(/^\d\d:\d\d$/);
+  const header = page.locator('[data-region="header"]');
+  const headerBox = await header.boundingBox();
+  expect(Math.abs((headerBox?.height ?? 0) - 56), "header height within 2 px of D4").toBeLessThanOrEqual(2);
+  await nav.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
+});

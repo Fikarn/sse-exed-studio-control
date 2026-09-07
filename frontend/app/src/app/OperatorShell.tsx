@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Calendar, Mic, Sliders, Sun } from "lucide-react";
 
 import { AppShellFrame } from "@sse/design-system";
@@ -9,7 +9,8 @@ import styles from "./OperatorShell.module.css";
 import { createShellEnvironment } from "./createShellEnvironment";
 import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
 import { OPERATOR_UI_SCALES } from "./operatorLayout";
-import { buildMonitorItems, isEditableTarget } from "./shellData";
+import { asRecord, buildMonitorItems, isEditableTarget } from "./shellData";
+import { describeAudioStatus } from "./audio/audioFormatting";
 import { computeLiveSceneDrift } from "./lighting/lightingDrift";
 import { SetupSupportPilot } from "./setup/SetupSupportPilot";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
@@ -26,7 +27,6 @@ import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
 import { PlanningWorkspaceSurface } from "./planning/PlanningWorkspace";
 import { PaletteProvider, usePalette } from "./shared/paletteContext";
-import { PreReadyFrame } from "./shared/PreReadyFrame";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ShortcutOverlay } from "./shared/ShortcutOverlay";
 import { ToastProvider } from "./shared/toastContext";
@@ -101,6 +101,31 @@ function OperatorShellInner() {
     document.documentElement.toggleAttribute("data-audio-hydrated", shellState.audioSnapshot !== null);
     return () => document.documentElement.removeAttribute("data-audio-hydrated");
   }, [shellState.audioSnapshot]);
+
+  // Visual overhaul A, Slice 2: the header clock (HH:MM, the studio's local
+  // time), and the workspace states the lamps mirror (plan D1, finding C3).
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const clock = useMemo(
+    () => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(now),
+    [now]
+  );
+  const audioStatus = useMemo(() => describeAudioStatus(shellState.audioSnapshot), [shellState.audioSnapshot]);
+  const workspaceTones = useMemo(
+    () => ({
+      audio: shellState.audioSnapshot ? { tone: audioStatus.tone, word: audioStatus.label.toLowerCase() } : null,
+      lighting:
+        shellState.lightingSnapshot?.reachable === false
+          ? { tone: "error" as const, word: "unreachable" }
+          : lightingSceneDrift
+            ? { tone: "attention" as const, word: "unsaved" }
+            : null,
+    }),
+    [audioStatus, lightingSceneDrift, shellState.audioSnapshot, shellState.lightingSnapshot]
+  );
 
   const requestRestart = useLiveCallback(() => {
     setConfirmIntent("restart-engine");
@@ -262,10 +287,28 @@ function OperatorShellInner() {
   const workspaces = useMemo(
     () =>
       [
-        { id: "setup", label: "Setup / Support", meta: "pilot", icon: <Sliders size={16} /> },
-        { id: "lighting", label: "Lighting", meta: "primary", icon: <Sun size={16} /> },
-        { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} /> },
-        { id: "planning", label: "Planning", meta: "secondary", icon: <Calendar size={16} /> },
+        {
+          id: "setup",
+          label: "Setup / Support",
+          meta: "pilot",
+          icon: <Sliders size={16} />,
+          hint: formatShortcut(["mod", "1"]),
+        },
+        {
+          id: "lighting",
+          label: "Lighting",
+          meta: "primary",
+          icon: <Sun size={16} />,
+          hint: formatShortcut(["mod", "2"]),
+        },
+        { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} />, hint: formatShortcut(["mod", "3"]) },
+        {
+          id: "planning",
+          label: "Planning",
+          meta: "secondary",
+          icon: <Calendar size={16} />,
+          hint: formatShortcut(["mod", "4"]),
+        },
       ] as const,
     []
   );
@@ -392,150 +435,91 @@ function OperatorShellInner() {
       />
     ) : null;
 
+  const restartDialog =
+    confirmIntent === "restart-engine" ? (
+      shellExperience === "recovery" ? (
+        <ShellDialog
+          body="Retry startup with the current runtime paths. If the failure persists, capture diagnostics before changing persistence or protocol state."
+          confirmLabel="Retry startup"
+          onCancel={() => setConfirmIntent(null)}
+          onConfirm={() => void performRestart()}
+          title="Retry startup?"
+        />
+      ) : (
+        <ShellDialog
+          body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
+          confirmLabel="Restart bridge"
+          onCancel={() => setConfirmIntent(null)}
+          onConfirm={() => void performRestart()}
+          title="Restart engine bridge?"
+        />
+      )
+    ) : null;
+
+  // Visual overhaul A, Slice 2 (plan D1): one shell on every surface. Before
+  // the engine is ready there is nowhere to go, so every tab is locked; once
+  // ready, the operator workspaces stay locked until commissioning has
+  // published (the engine's startup target says "dashboard"), and Setup is
+  // a workspace with the same header, lamps and latches as the others.
+  const operatorModeUnlocked =
+    String(asRecord(shellState.appSnapshot?.startup)?.targetSurface ?? "commissioning") === "dashboard";
+  const tabsDisabled = shellExperience !== "ready";
+  const disabledWorkspaces = !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "planning"] : [];
+  const monitorItems = buildMonitorItems(
+    shellState.healthSnapshot,
+    { lightingSceneDrift, audioSolo },
+    shellExperience === "ready" ? workspaceTones : undefined
+  );
+
+  let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
-    return (
-      <>
-        <PreReadyFrame>
-          <SetupStartupSurface
-            appSnapshot={shellState.appSnapshot}
-            lifecycle={shellState.lifecycle}
-            onShowShortcuts={showShortcuts}
-          />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
-            confirmLabel="Restart bridge"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Restart engine bridge?"
-          />
-        ) : null}
-        {closeDialog}
-      </>
+    surface = (
+      <SetupStartupSurface
+        appSnapshot={shellState.appSnapshot}
+        lifecycle={shellState.lifecycle}
+        onShowShortcuts={showShortcuts}
+      />
     );
-  }
-
-  if (shellExperience === "startup") {
-    return (
-      <>
-        <PreReadyFrame>
-          <StartupSurface lifecycle={shellState.lifecycle} onShowShortcuts={showShortcuts} />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
-            confirmLabel="Restart bridge"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Restart engine bridge?"
-          />
-        ) : null}
-        {closeDialog}
-      </>
+  } else if (shellExperience === "startup") {
+    surface = <StartupSurface lifecycle={shellState.lifecycle} onShowShortcuts={showShortcuts} />;
+  } else if (setupModalActive && shellExperience === "ready") {
+    surface = (
+      <SetupSupportPilot
+        appSnapshot={shellState.appSnapshot}
+        commissioningSnapshot={shellState.commissioningSnapshot}
+        controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
+        healthSnapshot={shellState.healthSnapshot}
+        liveTransportRequested={environment.liveTransportRequested}
+        onRequestRestart={requestRestart}
+        onShowShortcuts={showShortcuts}
+        store={environment.store}
+        supportSnapshot={deferredSupportSnapshot}
+      />
     );
-  }
-
-  if (setupModalActive && shellExperience === "ready") {
-    return (
-      <>
-        <PreReadyFrame>
-          <SetupSupportPilot
-            appSnapshot={shellState.appSnapshot}
-            commissioningSnapshot={shellState.commissioningSnapshot}
-            controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
-            healthSnapshot={shellState.healthSnapshot}
-            liveTransportRequested={environment.liveTransportRequested}
-            onRequestRestart={requestRestart}
-            onShowShortcuts={showShortcuts}
-            store={environment.store}
-            supportSnapshot={deferredSupportSnapshot}
-          />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
-            confirmLabel="Restart bridge"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Restart engine bridge?"
-          />
-        ) : null}
-        {closeDialog}
-      </>
+  } else if (setupModalActive && shellExperience === "recovery") {
+    surface = (
+      <SetupRecoverySurface
+        appSnapshot={shellState.appSnapshot}
+        failure={shellState.startupFailure}
+        healthSnapshot={shellState.healthSnapshot}
+        liveTransportRequested={environment.liveTransportRequested}
+        onRequestRestart={requestRestart}
+        onShowShortcuts={showShortcuts}
+        store={environment.store}
+        supportSnapshot={deferredSupportSnapshot}
+      />
     );
-  }
-
-  if (setupModalActive && shellExperience === "recovery") {
-    return (
-      <>
-        <PreReadyFrame>
-          <SetupRecoverySurface
-            appSnapshot={shellState.appSnapshot}
-            failure={shellState.startupFailure}
-            healthSnapshot={shellState.healthSnapshot}
-            liveTransportRequested={environment.liveTransportRequested}
-            onRequestRestart={requestRestart}
-            onShowShortcuts={showShortcuts}
-            store={environment.store}
-            supportSnapshot={deferredSupportSnapshot}
-          />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Retry startup with the current runtime paths. If the failure persists, capture diagnostics before changing persistence or protocol state."
-            confirmLabel="Retry startup"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Retry startup?"
-          />
-        ) : null}
-        {closeDialog}
-      </>
+  } else if (shellExperience === "recovery") {
+    surface = (
+      <RecoverySurface
+        failure={shellState.startupFailure}
+        healthSnapshot={shellState.healthSnapshot}
+        onRequestRestart={requestRestart}
+        onShowShortcuts={showShortcuts}
+      />
     );
-  }
-
-  if (shellExperience === "recovery") {
-    return (
-      <>
-        <PreReadyFrame>
-          <RecoverySurface
-            failure={shellState.startupFailure}
-            healthSnapshot={shellState.healthSnapshot}
-            onRequestRestart={requestRestart}
-            onShowShortcuts={showShortcuts}
-          />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Retry startup with the current runtime paths. If the failure persists, capture diagnostics before changing persistence or protocol state."
-            confirmLabel="Retry startup"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Retry startup?"
-          />
-        ) : null}
-        {closeDialog}
-      </>
-    );
-  }
-
-  if (activeWorkspace === "setup") {
-    // Unreachable: every shellExperience (startup/ready/recovery) early-returns
-    // for the setup workspace above. The guard narrows the union so the frame
-    // below models only the three real workspaces (GLO-07 close-out).
-    return null;
-  }
-
-  const monitorItems = buildMonitorItems(shellState.healthSnapshot, { lightingSceneDrift, audioSolo });
-
-  const body =
-    activeWorkspace === "lighting" ? (
+  } else if (activeWorkspace === "lighting") {
+    surface = (
       <LightingWorkspaceSurface
         appSnapshot={shellState.appSnapshot}
         lightingFixtureCatalogSnapshot={deferredLightingFixtureCatalogSnapshot}
@@ -543,25 +527,33 @@ function OperatorShellInner() {
         lightingSnapshot={deferredLightingSnapshot}
         store={environment.store}
       />
-    ) : activeWorkspace === "audio" ? (
+    );
+  } else if (activeWorkspace === "audio") {
+    surface = (
       <AudioWorkspace
         appSnapshot={shellState.appSnapshot}
         audioSnapshot={deferredAudioSnapshot}
         store={environment.store}
       />
-    ) : (
+    );
+  } else {
+    surface = (
       <PlanningWorkspaceSurface
         appSnapshot={shellState.appSnapshot}
         planningSnapshot={deferredPlanningSnapshot}
         store={environment.store}
       />
     );
+  }
 
   return (
     <>
       <AppShellFrame
         activeWorkspace={activeWorkspace}
+        clock={clock}
+        disabledWorkspaces={disabledWorkspaces}
         monitorItems={monitorItems}
+        tabsDisabled={tabsDisabled}
         workspaces={workspaces}
         onMonitorItemClick={(item) => {
           // Health chips open Setup / Support; latched chips jump to the
@@ -574,18 +566,10 @@ function OperatorShellInner() {
           void tryNavigateWorkspace(workspaceId as ShellState["activeWorkspace"]);
         }}
       >
-        <div className={styles.workspaceStack}>{body}</div>
+        <div className={styles.workspaceStack}>{surface}</div>
       </AppShellFrame>
       {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-      {confirmIntent === "restart-engine" ? (
-        <ShellDialog
-          body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
-          confirmLabel="Restart bridge"
-          onCancel={() => setConfirmIntent(null)}
-          onConfirm={() => void performRestart()}
-          title="Restart engine bridge?"
-        />
-      ) : null}
+      {restartDialog}
       {closeDialog}
     </>
   );

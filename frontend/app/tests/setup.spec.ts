@@ -10,7 +10,16 @@ test("renders the setup/support pilot shell from fixtures", async ({ page }) => 
   await openFixture(page, "setup-required");
 
   await expect(page.getByText("Commissioning runner")).toBeVisible();
-  await expect(page.getByLabel("Workspace command rail")).toHaveCount(0);
+  // Visual overhaul A, Slice 2 (plan D1): Setup is a workspace inside the one
+  // shell (old assertion: no navigation, PreReadyFrame); before commissioning
+  // is published the operator workspaces are locked.
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  await expect(nav).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
+  await expect(nav.getByRole("button", { name: "Audio", exact: true })).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
   await expect(page.getByRole("tab", { name: /Import profile/i })).toBeVisible();
 });

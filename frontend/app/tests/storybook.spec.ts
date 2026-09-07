@@ -57,22 +57,23 @@ function liveAudioMasks(page: Page): Locator[] {
 }
 
 function shouldFreezeClock(storyId: string) {
-  // Planning stories render relative time labels ("in 5 minutes"). Freeze
+  // Planning stories render relative time labels ("in 5 minutes"), and every
+  // shell story prints the header clock (visual overhaul A, Slice 2). Freeze
   // the clock so the captures are stable.
-  return storyId.includes("planning");
+  return storyId.includes("planning") || storyId.includes("operatorshell");
 }
 
 function shouldAwaitAudioHydration(storyId: string) {
   // GLO-09: the monitor-strip solo chip derives from the audio snapshot,
   // which hydrates on its own refresh machine after bootstrap — wait for the
   // shell's hydration marker so ready-frame captures are deterministic.
-  // Pre-ready and setup-modal stories never mount the strip.
+  // Pre-ready stories never mount the strip; Setup does since visual
+  // overhaul A, Slice 2 (one shell on every surface), so it waits too.
   return (
     storyId.includes("operatorshell") &&
     !storyId.includes("bootstrap") &&
     !storyId.includes("protocol") &&
-    !storyId.includes("startup") &&
-    !storyId.includes("setup")
+    !storyId.includes("startup")
   );
 }
 

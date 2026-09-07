@@ -29,8 +29,8 @@ Rule: if a change would move product state, persistence, or device policy into R
 
 ## Hardware target (binding)
 
-- Primary operator surface: fullscreen `2560×1440` on a fixed second monitor.
-- Minimum fallback: `1920×1080`.
+- Primary operator surface: fullscreen `2560×1440` on a fixed second monitor. **Operator ruling 2026-09-07 (visual overhaul A, plan D4): `2560×1440` is the only resolution that matters.** Chrome budget: header 56, footer 40, cluster 424, plate 416, gutters 16; the Console shows 4 / 6 / 3 strips.
+- `1920×1080` and `1280×800` remain as fallback layouts, not deliverables: their guards stay (`audio-legibility`, `viewport-contract`, the six-size scroll check) but no design gate runs below `2560×1440`.
 - **No scroll during normal operation.** Dense fixed-height layouts.
 - Devices currently in play: RME Fireface UFX III (audio), Litepanels Apollo Bridge / Astra Bi-Color / Aputure Infinimat / Infinibar PB12 (lighting), Stream Deck+ + Bitfocus Companion local (control).
 

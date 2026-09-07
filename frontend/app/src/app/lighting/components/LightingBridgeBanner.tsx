@@ -24,6 +24,8 @@ export function LightingBridgeBanner({ reachable, bridgeIp, universe }: Lighting
   return (
     <StatusBand
       className={styles.banner}
+      data-testid="lighting-bridge-banner"
+      data-tone="error"
       tone="error"
       title={<span className={styles.title}>DMX bridge unreachable</span>}
       summary={

@@ -8,7 +8,8 @@ import { describe, expect, it } from "vitest";
 // Studio-only literal (#060706) that Bone inherited as a black band, and the
 // header action chips carried cream rgba() literals. Every colour in this
 // stylesheet must come from a theme token so Graphite and Bone re-theme the
-// chrome from themes.css alone.
+// chrome from themes.css alone. Visual overhaul A, Slice 2: the header is the
+// A plate (panel-top → bg) and every chrome height is a chrome token.
 describe("AppShellFrame.module.css", () => {
   const cssPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "AppShellFrame.module.css");
   const css = readFileSync(cssPath, "utf8");
@@ -23,9 +24,11 @@ describe("AppShellFrame.module.css", () => {
     expect(literals, `colour-function literals in AppShellFrame.module.css: ${literals.length}`).toEqual([]);
   });
 
-  it("themes the header gradient bottom and the action-chip glass through tokens", () => {
-    expect(css).toContain("var(--color-shell-header-bottom)");
-    expect(css).toContain("var(--color-shell-action-glass-top)");
-    expect(css).toContain("var(--color-shell-action-glass-hover-top)");
+  it("themes the header plate and the chrome heights through the A tokens", () => {
+    expect(css).toContain("var(--material-panel-top)");
+    expect(css).toContain("var(--material-bg)");
+    expect(css).toContain("var(--chrome-studio-header)");
+    expect(css).toContain("var(--chrome-studio-cluster)");
+    expect(css).toContain("var(--chrome-studio-plate)");
   });
 });

@@ -1,352 +1,144 @@
+/* Visual overhaul A, Slice 2: the shell grid (system §2, plan D4). Header 56,
+   cluster 424, plate 416, footer 40 at 2560×1440, every value a chrome
+   token scaled by the operator UI scale; the material is the A model (chassis
+   floor, plates with a top sheen, a recessed bay). Every colour here is a
+   theme token so Graphite and Bone re-theme the chrome from themes.css alone. */
+
 .shell {
   display: grid;
-  grid-template:
-    "header header header" var(--operator-shell-height, var(--size-shell-height))
-    "main main context" minmax(0, 1fr)
-    / minmax(0, 1fr) minmax(0, 1fr) minmax(280px, var(--size-context-rail-width));
+  grid-template-rows: var(--operator-shell-height, var(--chrome-studio-header)) minmax(0, 1fr) auto;
   height: var(--operator-app-height, 100vh);
   height: var(--operator-app-height-dynamic, 100dvh);
   min-height: var(--operator-app-min-height, 100vh);
   min-height: var(--operator-app-min-height-dynamic, 100dvh);
-  background:
-    radial-gradient(circle at top left, var(--color-brand-green-glow), transparent 32%),
-    linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-bg-canvas) 100%);
-  color: var(--color-brand-text-primary);
+  min-width: 0;
+  overflow: hidden;
+  background: var(--material-bg);
+  color: var(--text-text);
   font-family: var(--font-family-ui);
 }
 
-.shell[data-context-visible="false"] {
-  grid-template:
-    "header header" var(--operator-shell-height, var(--size-shell-height))
-    "main main" minmax(0, 1fr)
-    / minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.shellHeader {
-  grid-area: header;
+.header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--operator-shell-header-gap, 18px);
-  padding: 0 var(--operator-shell-header-padding-x, 24px) 0 var(--operator-shell-header-padding-left, 36px);
-  /* 2026-09 audit Slice 10: both gradient stops are theme tokens — the bottom
-     stop used to be a Studio literal that Bone inherited as a black band. */
-  background: linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-shell-header-bottom) 100%);
-  border-bottom: 1px solid var(--color-bg-stroke);
-  font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-lg, 13px);
-  color: var(--color-shell-header-text-muted);
-  position: relative;
-  overflow: hidden;
-  min-width: 0;
-}
-
-.shellHeader::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--color-brand-dark-green-soft) 30%,
-    var(--color-brand-dark-green-soft) 70%,
-    transparent
-  );
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--operator-shell-brand-gap, 22px);
-  height: 100%;
+  gap: 28px;
+  padding: 0 24px;
   min-width: 0;
   overflow: hidden;
-  flex-shrink: 1;
+  border-bottom: 1px solid var(--material-line);
+  background: linear-gradient(180deg, var(--material-panel-top), var(--material-bg));
 }
 
-.brandDivider {
-  width: 1px;
-  height: calc(42px * var(--operator-ui-scale-factor, 1));
-  background: linear-gradient(180deg, transparent 0%, var(--color-bg-border) 50%, transparent 100%);
-  margin: 0 4px;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-.productName {
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 36;
-  font-weight: 500;
-  font-size: calc(20px * var(--operator-ui-scale-factor, 1));
-  color: var(--color-brand-text-secondary);
-  letter-spacing: 0;
-  line-height: 1;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.workspaceNav {
+.wordmark {
   display: flex;
+  flex-direction: column;
   gap: 4px;
-  font-family: var(--font-family-ui);
-  margin-left: var(--operator-shell-header-gap, 18px);
-  height: 100%;
-  align-items: center;
-}
-
-.shellMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--operator-shell-meta-gap, 8px);
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.monitorAction {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  max-width: calc(204px * var(--operator-ui-scale-factor, 1));
-  height: calc(30px * var(--operator-ui-scale-factor, 1));
-  padding: 0 9px;
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-sm);
-  background:
-    linear-gradient(180deg, var(--color-shell-action-glass-top), var(--color-shell-action-glass-bottom)),
-    var(--color-bg-soft);
-  color: var(--color-brand-text-secondary);
-  font-family: var(--font-family-ui);
-  font-size: calc(11.5px * var(--operator-ui-scale-factor, 1));
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: var(--shadow-inset-hi);
-  transition:
-    background var(--motion-duration-fast) ease,
-    border-color var(--motion-duration-fast) ease,
-    color var(--motion-duration-fast) ease,
-    transform var(--motion-duration-fast) ease;
-}
-
-button.monitorAction {
-  cursor: pointer;
-}
-
-button.monitorAction:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--monitor-tone, var(--color-bg-border)) 20%, var(--color-bg-border));
-  background:
-    linear-gradient(180deg, var(--color-shell-action-glass-hover-top), var(--color-shell-action-glass-hover-bottom)),
-    var(--color-bg-raised);
-  color: var(--color-brand-text-primary);
-}
-
-button.monitorAction:active {
-  transform: translateY(0);
-}
-
-button.monitorAction:focus-visible {
-  outline: 2px solid var(--color-primary-400);
-  outline-offset: 2px;
-}
-
-.monitorDot {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--monitor-tone, var(--color-info-500));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--monitor-tone, var(--color-info-500)) 58%, transparent);
-}
-
-.monitorText {
-  display: inline-flex;
-  align-items: baseline;
-  flex: 1 1 auto;
-  gap: 5px;
-  min-width: 0;
-}
-
-.monitorLabel,
-.monitorDetail {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
   white-space: nowrap;
 }
 
-.monitorLabel {
-  flex: 0 0 auto;
-  color: var(--color-brand-text-secondary);
-}
-
-.monitorDetail {
-  flex: 1 1 auto;
-  color: var(--color-brand-text-muted);
-  font-family: var(--font-family-mono);
-  font-size: 0.9em;
-  letter-spacing: 0;
-}
-
-.monitorTarget {
-  flex: 0 0 auto;
-  margin-left: 1px;
-  padding-left: 7px;
-  border-left: 1px solid var(--color-bg-border);
-  color: var(--color-brand-green);
-  font-size: 0.86em;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0;
-}
-
-.clock {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum", "zero";
-  color: var(--color-brand-text-secondary);
-  letter-spacing: 0;
-  font-size: var(--operator-font-size-xl, 14px);
-  font-family: var(--font-family-mono);
-  white-space: nowrap;
-}
-
-.surface {
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-lg);
-  background: color-mix(in srgb, var(--color-bg-default) 94%, transparent);
-  box-shadow: var(--shadow-md);
-}
-
-.main {
-  grid-area: main;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  padding: var(--operator-shell-main-padding, var(--space-4));
-}
-
-.mainSurface {
-  composes: surface;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.mainHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--operator-shell-main-header-gap, var(--space-3));
-  min-height: var(--operator-shell-main-header-height, 72px);
-  padding: 0 var(--operator-shell-main-header-padding-x, var(--space-5));
-  border-bottom: 1px solid var(--color-bg-stroke);
-}
-
-.titleBlock {
-  display: flex;
-  flex-direction: column;
-  gap: var(--operator-shell-title-block-gap, 6px);
+.product {
+  font: 600 var(--font-size-value) / 1 var(--font-family-ui);
+  letter-spacing: -0.01em;
+  color: var(--text-text);
 }
 
 .eyebrow {
-  color: var(--color-brand-text-muted);
-  font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
-  text-transform: uppercase;
-  letter-spacing: 0;
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  letter-spacing: 0.02em;
+  color: var(--text-text2);
 }
 
-.title {
-  margin: 0;
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 64;
-  font-weight: 600;
-  font-size: var(--operator-font-size-shell-title, 30px);
-  line-height: 1;
-  color: var(--color-brand-text-primary);
-  letter-spacing: 0;
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: 12px;
+  flex: none;
 }
 
-.subtitle {
-  margin: 0;
-  color: var(--color-brand-text-secondary);
-  font: var(--font-weight-regular) var(--operator-font-size-md, var(--font-size-md)) / 1.5 var(--font-family-ui);
-}
-
-.mainBody {
-  display: grid;
+.health {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   overflow: hidden;
+}
+
+.clock {
+  margin-left: 12px;
+  font: 500 var(--font-size-value) / 1 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-text);
+  white-space: nowrap;
+  flex: none;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
-  flex: 1;
 }
 
-.contextRail {
-  grid-area: context;
+.shell[data-cluster] .body {
+  grid-template-columns: calc(var(--chrome-studio-cluster) * var(--operator-ui-scale-factor, 1)) minmax(0, 1fr);
+}
+
+.shell[data-plate] .body {
+  grid-template-columns: minmax(0, 1fr) calc(var(--chrome-studio-plate) * var(--operator-ui-scale-factor, 1));
+}
+
+.shell[data-cluster][data-plate] .body {
+  grid-template-columns:
+    calc(var(--chrome-studio-cluster) * var(--operator-ui-scale-factor, 1)) minmax(0, 1fr)
+    calc(var(--chrome-studio-plate) * var(--operator-ui-scale-factor, 1));
+}
+
+.cluster,
+.plate {
   display: flex;
   flex-direction: column;
-  gap: var(--operator-shell-main-header-gap, var(--space-3));
-  padding: var(--operator-shell-main-padding, var(--space-4));
-  border-left: 1px solid var(--color-bg-stroke);
-  background: color-mix(in srgb, var(--color-bg-soft) 84%, transparent);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--elevation-plate-fill);
+  box-shadow: var(--elevation-plate);
 }
 
-.contextSection {
-  composes: surface;
-  padding: var(--operator-shell-main-padding, var(--space-4));
+.cluster {
+  border-right: 1px solid var(--material-line);
 }
 
-.contextHeading {
-  margin: 0 0 var(--space-3);
-  font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-lg)) / 1.2 var(--font-family-ui);
-  color: var(--color-brand-text-primary);
+.plate {
+  border-left: 1px solid var(--material-line);
 }
 
-.list {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--color-brand-text-muted);
-  font-size: var(--operator-font-size-md, var(--font-size-md));
+.bay {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
+  background: var(--material-bay);
+  box-shadow: var(--elevation-bay);
 }
 
-@media (max-width: 1440px) {
-  .shellHeader {
-    padding: 0 var(--operator-shell-header-padding-x, 24px);
-    gap: var(--operator-shell-header-gap, 12px);
+/* Fallback layouts below the studio surface (not a deliverable, plan D4):
+   the header keeps its one row without scrolling. */
+@media (max-width: 1919px) {
+  .header {
+    gap: 16px;
   }
 
-  .brand {
-    gap: var(--operator-shell-brand-gap, 18px);
-  }
-
-  .workspaceNav {
-    margin-left: var(--operator-shell-header-gap, 12px);
-  }
-
-  .productName {
+  .eyebrow {
     display: none;
   }
+}
 
-  .brandDivider {
-    display: none;
-  }
-
-  .monitorAction {
-    max-width: calc(124px * var(--operator-ui-scale-factor, 1));
-    padding-inline: 8px;
-  }
-
-  .monitorTarget {
+@media (max-width: 1439px) {
+  .wordmark {
     display: none;
   }
 }

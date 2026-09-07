@@ -9,7 +9,10 @@ import { openFixture } from "./helpers/openFixture";
 test("renders startup and recovery fixture states", async ({ page }) => {
   await openFixture(page, "startup-loading");
   await expect(page.getByText("STARTING ENGINE…")).toBeVisible();
-  await expect(page.getByLabel("Workspace command rail")).toHaveCount(0);
+  // Visual overhaul A, Slice 2 (plan D1): the shell header renders on every
+  // surface; before the engine is ready every tab is locked.
+  await expect(page.getByRole("navigation", { name: "Workspace navigation" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Lighting", exact: true })).toBeDisabled();
 
   await openFixture(page, "protocol-mismatch");
   await expect(page.getByRole("heading", { name: "Protocol mismatch" })).toBeVisible({ timeout: 10000 });
@@ -68,10 +71,16 @@ test("startup-loading fixture hides every operator workspace surface", async ({ 
   await openFixture(page, "startup-loading");
   await expect(page.getByText("STARTING ENGINE…")).toBeVisible();
 
-  // While starting we should NOT show any operator workspace — the rail,
-  // the workspace tabs, none of it. Asserting absence catches the class
-  // of regression where the rail flickers in before the engine is ready.
-  await expect(page.getByLabel("Workspace command rail")).toHaveCount(0);
+  // While starting we should NOT show any operator workspace. The shell
+  // header is there (visual overhaul A, Slice 2, plan D1) with every tab
+  // locked — old assertion: no navigation at all — so the class of regression
+  // caught here is a workspace surface flickering in before the engine is
+  // ready, or a tab that could be pressed.
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  await expect(nav).toBeVisible();
+  for (const label of ["Setup / Support", "Lighting", "Audio", "Planning"]) {
+    await expect(nav.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-disabled", "true");
+  }
   await expect(page.getByTestId("audio-workspace")).toHaveCount(0);
   await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
   await expect(page.getByTestId("planning-workspace")).toHaveCount(0);

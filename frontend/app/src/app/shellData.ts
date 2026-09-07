@@ -22,6 +22,10 @@ import type {
   ShellState,
 } from "@sse/engine-client";
 import type { StatusTone } from "@sse/design-system";
+// Runtime import through the asset-free subpath: the specs that import app
+// source through Playwright cannot load the package index (it carries the
+// crest PNG), so the shared tone map is reached without it.
+import { toneForSubsystem } from "@sse/design-system/statusTone";
 
 export type StatusToneLike = "attention" | "error" | "info" | "ok";
 
@@ -633,25 +637,47 @@ export interface LatchedShellState {
   audioSolo: boolean;
 }
 
-export function buildMonitorItems(healthSnapshot: SnapshotRecord | null, latched?: LatchedShellState) {
+/** Visual overhaul A, Slice 2 (plan D1, finding C3): what each workspace
+ *  currently shows as its own state — the Console's badge, the rig's bridge
+ *  state — so the header lamp mirrors the worst of the engine's health check
+ *  and the workspace's state, with the workspace's word when it is the
+ *  worse one. */
+export interface WorkspaceStateTones {
+  audio?: { tone: StatusToneLike; word: string } | null;
+  lighting?: { tone: StatusToneLike; word: string } | null;
+}
+
+const TONE_RANK: Record<StatusToneLike, number> = { error: 3, attention: 2, info: 1, ok: 0 };
+
+export function buildMonitorItems(
+  healthSnapshot: SnapshotRecord | null,
+  latched?: LatchedShellState,
+  workspaceTones?: WorkspaceStateTones
+) {
   const checks =
     healthSnapshot && typeof healthSnapshot.checks === "object" && healthSnapshot.checks
       ? (healthSnapshot.checks as Record<string, { status?: string; summary?: string }>)
       : {};
 
+  const lamp = (
+    id: "lighting" | "audio",
+    label: string,
+    check: { status?: string } | undefined,
+    workspace: { tone: StatusToneLike; word: string } | null | undefined
+  ) => {
+    const health = asStatusTone(check?.status, "attention");
+    const tone = toneForSubsystem(health, workspace?.tone ?? null) as StatusToneLike;
+    const workspaceWorse = workspace ? TONE_RANK[workspace.tone] > TONE_RANK[health] : false;
+    return {
+      id,
+      label,
+      detail: workspaceWorse && workspace ? workspace.word : statusLabelFor(check, "pending"),
+      status: tone,
+    };
+  };
   const items = [
-    {
-      id: "lighting",
-      label: "Lighting",
-      detail: statusLabelFor(checks.lighting, "pending"),
-      status: asStatusTone(checks.lighting?.status, "attention"),
-    },
-    {
-      id: "audio",
-      label: "Audio",
-      detail: statusLabelFor(checks.audio, "pending"),
-      status: asStatusTone(checks.audio?.status, "attention"),
-    },
+    lamp("lighting", "Lighting", checks.lighting, workspaceTones?.lighting),
+    lamp("audio", "Audio", checks.audio, workspaceTones?.audio),
     {
       id: "surface",
       label: "Surface",

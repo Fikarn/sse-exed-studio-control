@@ -253,11 +253,13 @@ for (const theme of ["studio", "graphite", "bone"] as const) {
       // The header paints `linear-gradient(180deg, top, bottom)`; the tokens
       // that feed it are read back, and each label is checked against the
       // worst of the two stops (there is no way to rasterise the DOM here).
+      // Visual overhaul A, Slice 2: the header is the A plate, panel-top → bg
+      // (old stops: --color-bg-deep → --color-shell-header-bottom).
       const probe = document.createElement("span");
       header.appendChild(probe);
-      probe.style.color = "var(--color-bg-deep)";
+      probe.style.color = "var(--material-panel-top)";
       const top = parse(getComputedStyle(probe).color);
-      probe.style.color = "var(--color-shell-header-bottom)";
+      probe.style.color = "var(--material-bg)";
       const bottom = parse(getComputedStyle(probe).color);
       probe.remove();
       if (!top || !bottom) return { error: `header stops unresolved: ${String(top)} / ${String(bottom)}` };
