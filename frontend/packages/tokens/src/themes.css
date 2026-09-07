@@ -212,3 +212,167 @@
   --color-inset-hairline-border: rgba(26, 24, 20, 0.3);
   --color-inset-hairline-border-soft: rgba(26, 24, 20, 0.26);
 }
+
+/* ==========================================================================
+   Visual overhaul A, Slice 1 (2026-09): the A families per theme.
+   The generated :root block carries Studio (core.json); these blocks re-map
+   material, text, accent and the role variants for Graphite (brushed cool
+   steel) and Bone (a light workshop), exactly as docs/redesign/system/
+   tokens-a-2026-09.css proposes: fills keep the same hue with a dark ink, the
+   text variants are darkened in Bone to clear 4.5:1 on the light chassis.
+   The `audio.console.*` values are the Console's former private theme
+   blocks, moved here verbatim (Slice 4 retires them).
+   ========================================================================== */
+
+/* A · Graphite */
+:root[data-theme="graphite"] {
+  --material-bg: #13151a;
+  --material-bay: #0c0d11;
+  --material-panel: #1a1d24;
+  --material-panel-top: #20242c;
+  --material-key: #262a33;
+  --material-key-top: #31363f;
+  --material-well: #07080b;
+  --material-line: rgba(255, 255, 255, 0.1);
+  --material-line2: rgba(255, 255, 255, 0.22);
+  --material-sheen: rgba(255, 255, 255, 0.09);
+  --material-shade: rgba(0, 0, 0, 0.55);
+  --material-well-shade: rgba(0, 0, 0, 0.8);
+  --text-text: #f2f4f8;
+  --text-text2: #a9b0bc;
+  --accent: #f2f4f8;
+  --role-green-text: #46d67c;
+  --role-red-fill: #ff6b6b;
+  --role-red-text: #ff7676;
+  --role-blue-text: #8ccaff;
+  --role-primary-fill: #eef0f4;
+  --role-primary-ink: #13151a;
+  --role-cap-fill: #eceef3;
+  --role-cap-fill2: #c9cdd6;
+  --role-cap-line: #13151a;
+  --audio-console-bg: #0a0d10;
+  --audio-console-bg1: #0f1418;
+  --audio-console-bg2: #141a1f;
+  --audio-console-bg3: #1c232a;
+  --audio-console-bg-elev: #232b33;
+  --audio-console-fg: #e8edf0;
+  --audio-console-fg2: rgba(232, 237, 240, 0.66);
+  --audio-console-fg3: rgba(232, 237, 240, 0.56);
+  --audio-console-fg4: rgba(232, 237, 240, 0.2);
+  --audio-console-line: rgba(232, 237, 240, 0.07);
+  --audio-console-line2: rgba(232, 237, 240, 0.12);
+  --audio-console-accent: #5ee0e0;
+  --audio-console-accent-soft: rgba(94, 224, 224, 0.12);
+  --audio-console-accent-glow: rgba(94, 224, 224, 0.3);
+  --audio-console-danger: oklch(62% 0.2 25);
+  --audio-console-danger-soft: oklch(62% 0.2 25 / 0.25);
+  --audio-console-meter-low: oklch(86% 0.025 220);
+  --audio-console-meter-mid: oklch(86% 0.025 220);
+  --audio-console-meter-hi: oklch(55% 0.23 25);
+  --audio-console-meter-over-tone: color-mix(in oklch, var(--audio-console-meter-hi) 70%, oklch(72% 0.18 60));
+  --audio-console-meter-peak-edge: oklch(16% 0.015 220);
+  --audio-console-meter-bg: oklch(9% 0.005 220);
+  --audio-console-meter-canvas-low: oklch(76% 0.02 220);
+  --audio-console-meter-peak-hold: oklch(94% 0.02 220);
+  --audio-console-strip-bg: #0f1418;
+  --audio-console-strip-bg-hover: #141a20;
+  --audio-console-strip-bg-selected: #16222a;
+  --audio-console-housing-bg-top: oklch(7% 0.005 220);
+  --audio-console-housing-bg-bot: oklch(10% 0.005 220);
+  --audio-console-housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+/* A · Bone */
+:root[data-theme="bone"] {
+  --material-bg: #f1f0ec;
+  --material-bay: #e5e4df;
+  --material-panel: #fbfbfa;
+  --material-panel-top: #ffffff;
+  --material-key: #f6f6f4;
+  --material-key-top: #ffffff;
+  --material-well: #101012;
+  --material-line: rgba(0, 0, 0, 0.12);
+  --material-line2: rgba(0, 0, 0, 0.3);
+  --material-sheen: rgba(255, 255, 255, 0.9);
+  --material-shade: rgba(0, 0, 0, 0.14);
+  --material-well-shade: rgba(0, 0, 0, 0.8);
+  --material-strip-floor: rgba(255, 255, 255, 0.45);
+  --material-strip-floor-sel: rgba(255, 255, 255, 0.7);
+  --text-text: #1b1b1d;
+  --text-text2: #5d5e64;
+  --accent: #1b1b1d;
+  --role-amber-fill: #e9a83e;
+  --role-amber-fill-top: #f4bd5c;
+  --role-amber-ink: #1a1000;
+  --role-amber-text: #8a5a00;
+  --role-amber-bloom: rgba(233, 168, 62, 0.5);
+  --role-green-fill: #2fbf6a;
+  --role-green-fill-top: #52d287;
+  --role-green-ink: #04200f;
+  --role-green-text: #1a6b36;
+  --role-green-bloom: rgba(47, 191, 106, 0.4);
+  --role-red-fill: #c62d2a;
+  --role-red-ink: #ffffff;
+  --role-red-text: #b3261e;
+  --role-red-bloom: rgba(198, 45, 42, 0.35);
+  --role-blue-text: #0b62c2;
+  --role-blue-bloom: rgba(11, 98, 194, 0.3);
+  --role-primary-fill: #1b1b1d;
+  --role-primary-fill-top: #2c2c30;
+  --role-primary-ink: #ffffff;
+  --role-primary-sheen: rgba(255, 255, 255, 0.14);
+  --role-cap-fill: #2c2d33;
+  --role-cap-fill2: #141517;
+  --role-cap-sheen: rgba(255, 255, 255, 0.18);
+  --role-cap-line: #ffffff;
+  --audio-console-bg: #f3f0e8;
+  --audio-console-bg1: #faf8f2;
+  --audio-console-bg2: #ffffff;
+  --audio-console-bg3: #ebe7dd;
+  --audio-console-bg-elev: #ffffff;
+  --audio-console-fg: #1a1814;
+  --audio-console-fg2: rgba(26, 24, 20, 0.66);
+  --audio-console-fg3: rgba(26, 24, 20, 0.6);
+  --audio-console-fg4: rgba(26, 24, 20, 0.22);
+  --audio-console-line: rgba(26, 24, 20, 0.08);
+  --audio-console-line2: rgba(26, 24, 20, 0.14);
+  --audio-console-accent: #a64e16;
+  --audio-console-accent-soft: rgba(166, 78, 22, 0.12);
+  --audio-console-accent-glow: rgba(166, 78, 22, 0.3);
+  --audio-console-danger: oklch(50% 0.22 25);
+  --audio-console-danger-soft: oklch(50% 0.22 25 / 0.15);
+  --audio-console-meter-low: oklch(38% 0.04 75);
+  --audio-console-meter-mid: oklch(38% 0.04 75);
+  --audio-console-meter-hi: oklch(72% 0.24 27);
+  --audio-console-meter-peak-edge: oklch(95% 0.01 75);
+  --audio-console-meter-bg: oklch(94% 0.005 75);
+  --audio-console-meter-canvas-low: oklch(46% 0.04 75);
+  --audio-console-meter-peak-hold: oklch(28% 0.04 75);
+  --audio-console-strip-bg: #fdfbf5;
+  --audio-console-strip-bg-hover: #fffefa;
+  --audio-console-strip-bg-selected: #ffffff;
+  --audio-console-housing-bg-top: oklch(88% 0.005 75);
+  --audio-console-housing-bg-bot: oklch(93% 0.005 75);
+  --audio-console-housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 0 0 1px rgba(26, 24, 20, 0.08);
+}
+
+/* A · a well is a black backlit display in every theme: whatever is printed on it uses the display inks, never the chassis inks (scoping these on .well is what fixed every light-theme failure on the mocks) */
+.well,
+[data-well] {
+  --text-text: var(--display-text);
+  --text-text2: var(--display-text2);
+  --role-green-text: var(--display-green);
+  --role-amber-text: var(--display-amber);
+  --role-red-text: var(--display-red);
+  --role-blue-text: var(--display-blue);
+  --role-green-bloom: var(--display-bloom-green);
+  --role-amber-bloom: var(--display-bloom-amber);
+  --role-red-bloom: var(--display-bloom-red);
+  --role-blue-bloom: var(--display-bloom-blue);
+}
+
+/* A · Bone's muted display ink is lifted to clear 4.5:1 on the black well */
+:root[data-theme="bone"] .well,
+:root[data-theme="bone"] [data-well] {
+  --display-text2: #b3b3b8;
+}

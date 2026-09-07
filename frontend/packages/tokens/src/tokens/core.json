@@ -1,355 +1,1402 @@
 {
   "color": {
     "background": {
-      "950": { "$value": "#09110B" },
-      "900": { "$value": "#101813" },
-      "850": { "$value": "#152019" },
-      "800": { "$value": "#1C2922" },
-      "700": { "$value": "#24342B" }
-    },
-    "surface": {
-      "900": { "$value": "#111914" },
-      "800": { "$value": "#18221B" },
-      "700": { "$value": "#213028" },
-      "600": { "$value": "#2C4036" },
-      "default": { "$value": "{color.bg.default}" },
-      "soft": { "$value": "{color.bg.soft}" },
-      "raised": { "$value": "{color.bg.raised}" },
-      "border": { "$value": "{color.bg.border}" },
-      "borderStrong": { "$value": "{color.bg.borderStrong}" }
-    },
-    "text": {
-      "strong": { "$value": "{color.brand.text.primary}" },
-      "muted": { "$value": "{color.brand.text.secondary}" },
-      "subtle": { "$value": "{color.brand.text.muted}" },
-      "primary": { "$value": "{color.text.strong}" }
-    },
-    "primary": {
-      "500": { "$value": "#99BA92" },
-      "400": { "$value": "#B6D8AD" },
-      "700": { "$value": "#62835F" }
-    },
-    "danger": {
-      "500": { "$value": "#D56A65" },
-      "soft": { "$value": "rgba(213, 106, 101, 0.16)" },
-      "softStrong": { "$value": "rgba(213, 106, 101, 0.28)" },
-      "glow": { "$value": "rgba(213, 106, 101, 0.06)" },
-      "border": { "$value": "rgba(213, 106, 101, 0.5)" },
-      "borderStrong": { "$value": "rgba(213, 106, 101, 0.7)" }
-    },
-    "warning": {
-      "500": { "$value": "#D8A95A" },
-      "soft": { "$value": "color-mix(in srgb, var(--color-warning-500) 16%, transparent)" },
-      "border": { "$value": "color-mix(in srgb, var(--color-warning-500) 50%, transparent)" }
-    },
-    "info": {
-      "500": { "$value": "#69A9D1" }
-    },
-    "border": {
-      "default": { "$value": "#2A3B31" },
-      "strong": { "$value": "#406050" }
-    },
-    "accent": {
-      "green": { "$value": "{color.primary.500}" },
-      "amber": { "$value": "{color.warning.500}" },
-      "red": { "$value": "{color.danger.500}" },
-      "primary": { "$value": "{color.primary.500}" }
-    },
-    "success": {
-      "500": { "$value": "{color.primary.500}" },
-      "soft": { "$value": "{color.brand.greenSoft}" }
-    },
-    "status": {
-      "warning": { "$value": "{color.warning.500}" }
-    },
-    "brand": {
-      "green": { "$value": "{color.primary.500}" },
-      "greenHot": { "$value": "#B5D4AD" },
-      "greenSoft": { "$value": "rgba(153, 186, 146, 0.16)" },
-      "greenGlow": { "$value": "rgba(153, 186, 146, 0.10)" },
-      "greenBorder": { "$value": "rgba(153, 186, 146, 0.5)" },
-      "darkGreen": { "$value": "#1F4D38" },
-      "darkGreenMid": { "$value": "#2C6A4F" },
-      "darkGreenSoft": { "$value": "rgba(31, 77, 56, 0.5)" },
-      "darkGreenAmbient": { "$value": "rgba(31, 77, 56, 0.12)" },
-      "yellow": { "$value": "#E8D561" },
-      "yellowSoft": { "$value": "rgba(232, 213, 97, 0.14)" },
-      "yellowGlow": { "$value": "rgba(232, 213, 97, 0.06)" },
-      "yellowBorder": { "$value": "rgba(232, 213, 97, 0.5)" },
-      "burgundy": { "$value": "#6B1F1F" },
-      "burgundySoft": { "$value": "rgba(107, 31, 31, 0.16)" },
-      "coral": { "$value": "#ED7C5E" },
-      "coralSoft": { "$value": "rgba(237, 124, 94, 0.16)" },
-      "coralBorder": { "$value": "rgba(237, 124, 94, 0.5)" },
-      "coralGlow": { "$value": "rgba(237, 124, 94, 0.06)" },
-      "sky": { "$value": "#C8D4DD" },
-      "text": {
-        "primary": { "$value": "#FAF6E6" },
-        "secondary": { "$value": "#D4CDB3" },
-        "muted": { "$value": "#8A8470" },
-        "faint": { "$value": "#5A5547" }
+      "950": {
+        "$value": "#09110B"
+      },
+      "900": {
+        "$value": "#101813"
+      },
+      "850": {
+        "$value": "#152019"
+      },
+      "800": {
+        "$value": "#1C2922"
+      },
+      "700": {
+        "$value": "#24342B"
       }
     },
-    "scrim": { "$value": "rgba(0, 0, 0, 0.45)" },
-    "focusRing": { "$value": "{color.primary.400}" },
+    "surface": {
+      "900": {
+        "$value": "#111914"
+      },
+      "800": {
+        "$value": "#18221B"
+      },
+      "700": {
+        "$value": "#213028"
+      },
+      "600": {
+        "$value": "#2C4036"
+      },
+      "default": {
+        "$value": "{color.bg.default}"
+      },
+      "soft": {
+        "$value": "{color.bg.soft}"
+      },
+      "raised": {
+        "$value": "{color.bg.raised}"
+      },
+      "border": {
+        "$value": "{color.bg.border}"
+      },
+      "borderStrong": {
+        "$value": "{color.bg.borderStrong}"
+      }
+    },
+    "text": {
+      "strong": {
+        "$value": "{color.brand.text.primary}"
+      },
+      "muted": {
+        "$value": "{color.brand.text.secondary}"
+      },
+      "subtle": {
+        "$value": "{color.brand.text.muted}"
+      },
+      "primary": {
+        "$value": "{color.text.strong}"
+      }
+    },
+    "primary": {
+      "500": {
+        "$value": "#99BA92"
+      },
+      "400": {
+        "$value": "#B6D8AD"
+      },
+      "700": {
+        "$value": "#62835F"
+      }
+    },
+    "danger": {
+      "500": {
+        "$value": "#D56A65"
+      },
+      "soft": {
+        "$value": "rgba(213, 106, 101, 0.16)"
+      },
+      "softStrong": {
+        "$value": "rgba(213, 106, 101, 0.28)"
+      },
+      "glow": {
+        "$value": "rgba(213, 106, 101, 0.06)"
+      },
+      "border": {
+        "$value": "rgba(213, 106, 101, 0.5)"
+      },
+      "borderStrong": {
+        "$value": "rgba(213, 106, 101, 0.7)"
+      }
+    },
+    "warning": {
+      "500": {
+        "$value": "#D8A95A"
+      },
+      "soft": {
+        "$value": "color-mix(in srgb, var(--color-warning-500) 16%, transparent)"
+      },
+      "border": {
+        "$value": "color-mix(in srgb, var(--color-warning-500) 50%, transparent)"
+      }
+    },
+    "info": {
+      "500": {
+        "$value": "#69A9D1"
+      }
+    },
+    "border": {
+      "default": {
+        "$value": "#2A3B31"
+      },
+      "strong": {
+        "$value": "#406050"
+      }
+    },
+    "accent": {
+      "green": {
+        "$value": "{color.primary.500}"
+      },
+      "amber": {
+        "$value": "{color.warning.500}"
+      },
+      "red": {
+        "$value": "{color.danger.500}"
+      },
+      "primary": {
+        "$value": "{color.primary.500}"
+      }
+    },
+    "success": {
+      "500": {
+        "$value": "{color.primary.500}"
+      },
+      "soft": {
+        "$value": "{color.brand.greenSoft}"
+      }
+    },
+    "status": {
+      "warning": {
+        "$value": "{color.warning.500}"
+      }
+    },
+    "brand": {
+      "green": {
+        "$value": "{color.primary.500}"
+      },
+      "greenHot": {
+        "$value": "#B5D4AD"
+      },
+      "greenSoft": {
+        "$value": "rgba(153, 186, 146, 0.16)"
+      },
+      "greenGlow": {
+        "$value": "rgba(153, 186, 146, 0.10)"
+      },
+      "greenBorder": {
+        "$value": "rgba(153, 186, 146, 0.5)"
+      },
+      "darkGreen": {
+        "$value": "#1F4D38"
+      },
+      "darkGreenMid": {
+        "$value": "#2C6A4F"
+      },
+      "darkGreenSoft": {
+        "$value": "rgba(31, 77, 56, 0.5)"
+      },
+      "darkGreenAmbient": {
+        "$value": "rgba(31, 77, 56, 0.12)"
+      },
+      "yellow": {
+        "$value": "#E8D561"
+      },
+      "yellowSoft": {
+        "$value": "rgba(232, 213, 97, 0.14)"
+      },
+      "yellowGlow": {
+        "$value": "rgba(232, 213, 97, 0.06)"
+      },
+      "yellowBorder": {
+        "$value": "rgba(232, 213, 97, 0.5)"
+      },
+      "burgundy": {
+        "$value": "#6B1F1F"
+      },
+      "burgundySoft": {
+        "$value": "rgba(107, 31, 31, 0.16)"
+      },
+      "coral": {
+        "$value": "#ED7C5E"
+      },
+      "coralSoft": {
+        "$value": "rgba(237, 124, 94, 0.16)"
+      },
+      "coralBorder": {
+        "$value": "rgba(237, 124, 94, 0.5)"
+      },
+      "coralGlow": {
+        "$value": "rgba(237, 124, 94, 0.06)"
+      },
+      "sky": {
+        "$value": "#C8D4DD"
+      },
+      "text": {
+        "primary": {
+          "$value": "#FAF6E6"
+        },
+        "secondary": {
+          "$value": "#D4CDB3"
+        },
+        "muted": {
+          "$value": "#8A8470"
+        },
+        "faint": {
+          "$value": "#5A5547"
+        }
+      }
+    },
+    "scrim": {
+      "$value": "rgba(0, 0, 0, 0.45)"
+    },
+    "focusRing": {
+      "$value": "{color.primary.400}"
+    },
     "shell": {
-      "backdropGlow": { "$value": "rgba(153, 186, 146, 0.1)" },
-      "backdropTop": { "$value": "#050705" },
-      "backdropBottom": { "$value": "#070a08" },
-      "headerBottom": { "$value": "#060706" },
-      "headerTextMuted": { "$value": "{color.brand.text.muted}" },
-      "actionGlassTop": { "$value": "rgba(250, 246, 230, 0.045)" },
-      "actionGlassBottom": { "$value": "rgba(250, 246, 230, 0.012)" },
-      "actionGlassHoverTop": { "$value": "rgba(250, 246, 230, 0.065)" },
-      "actionGlassHoverBottom": { "$value": "rgba(250, 246, 230, 0.018)" }
+      "backdropGlow": {
+        "$value": "rgba(153, 186, 146, 0.1)"
+      },
+      "backdropTop": {
+        "$value": "#050705"
+      },
+      "backdropBottom": {
+        "$value": "#070a08"
+      },
+      "headerBottom": {
+        "$value": "#060706"
+      },
+      "headerTextMuted": {
+        "$value": "{color.brand.text.muted}"
+      },
+      "actionGlassTop": {
+        "$value": "rgba(250, 246, 230, 0.045)"
+      },
+      "actionGlassBottom": {
+        "$value": "rgba(250, 246, 230, 0.012)"
+      },
+      "actionGlassHoverTop": {
+        "$value": "rgba(250, 246, 230, 0.065)"
+      },
+      "actionGlassHoverBottom": {
+        "$value": "rgba(250, 246, 230, 0.018)"
+      }
     },
     "inset": {
-      "hairlineBg": { "$value": "rgba(255, 255, 255, 0.03)" },
-      "hairlineBorder": { "$value": "rgba(255, 255, 255, 0.2)" },
-      "hairlineBorderSoft": { "$value": "rgba(255, 255, 255, 0.18)" }
+      "hairlineBg": {
+        "$value": "rgba(255, 255, 255, 0.03)"
+      },
+      "hairlineBorder": {
+        "$value": "rgba(255, 255, 255, 0.2)"
+      },
+      "hairlineBorderSoft": {
+        "$value": "rgba(255, 255, 255, 0.18)"
+      }
     },
     "bg": {
-      "deep": { "$value": "#08090A" },
-      "canvas": { "$value": "#0D0F0D" },
-      "default": { "$value": "#121412" },
-      "soft": { "$value": "#0F110F" },
-      "raised": { "$value": "#161916" },
-      "strong": { "$value": "#1C201C" },
-      "elevated": { "$value": "#20251F" },
-      "stroke": { "$value": "#21251F" },
-      "hairline": { "$value": "rgba(250, 246, 230, 0.04)" },
-      "border": { "$value": "#2A2F28" },
-      "borderStrong": { "$value": "#383F35" }
+      "deep": {
+        "$value": "#08090A"
+      },
+      "canvas": {
+        "$value": "#0D0F0D"
+      },
+      "default": {
+        "$value": "#121412"
+      },
+      "soft": {
+        "$value": "#0F110F"
+      },
+      "raised": {
+        "$value": "#161916"
+      },
+      "strong": {
+        "$value": "#1C201C"
+      },
+      "elevated": {
+        "$value": "#20251F"
+      },
+      "stroke": {
+        "$value": "#21251F"
+      },
+      "hairline": {
+        "$value": "rgba(250, 246, 230, 0.04)"
+      },
+      "border": {
+        "$value": "#2A2F28"
+      },
+      "borderStrong": {
+        "$value": "#383F35"
+      }
     },
     "cct": {
-      "2700": { "$value": "#EF8E5A" },
-      "3200": { "$value": "#F3A87A" },
-      "3800": { "$value": "#F6C39A" },
-      "4400": { "$value": "#F0DFB8" },
-      "5000": { "$value": "#EBE5D2" },
-      "5600": { "$value": "#D4DDE2" },
-      "6500": { "$value": "#C8D4DD" }
+      "2700": {
+        "$value": "#EF8E5A"
+      },
+      "3200": {
+        "$value": "#F3A87A"
+      },
+      "3800": {
+        "$value": "#F6C39A"
+      },
+      "4400": {
+        "$value": "#F0DFB8"
+      },
+      "5000": {
+        "$value": "#EBE5D2"
+      },
+      "5600": {
+        "$value": "#D4DDE2"
+      },
+      "6500": {
+        "$value": "#C8D4DD"
+      }
     },
     "fixture": {
-      "shellFill": { "$value": "rgba(8, 9, 10, 0.92)" },
-      "shellStroke": { "$value": "rgba(212, 205, 179, 0.4)" },
-      "ghostStroke": { "$value": "rgba(153, 186, 146, 0.45)" }
+      "shellFill": {
+        "$value": "rgba(8, 9, 10, 0.92)"
+      },
+      "shellStroke": {
+        "$value": "rgba(212, 205, 179, 0.4)"
+      },
+      "ghostStroke": {
+        "$value": "rgba(153, 186, 146, 0.45)"
+      }
     },
     "stage": {
-      "gridMajor": { "$value": "rgba(212, 205, 179, 0.46)" },
-      "gridMinor": { "$value": "rgba(212, 205, 179, 0.28)" },
-      "gridFaint": { "$value": "rgba(212, 205, 179, 0.12)" },
-      "beamLine": { "$value": "rgba(212, 205, 179, 0.18)" },
-      "doorStroke": { "$value": "rgba(212, 205, 179, 0.32)" },
-      "vignette": { "$value": "rgba(0, 0, 0, 0.25)" },
-      "toneOverlaySoft": { "$value": "rgba(7, 12, 22, 0.28)" },
-      "toneOverlayStrong": { "$value": "rgba(7, 12, 22, 0.46)" }
+      "gridMajor": {
+        "$value": "rgba(212, 205, 179, 0.46)"
+      },
+      "gridMinor": {
+        "$value": "rgba(212, 205, 179, 0.28)"
+      },
+      "gridFaint": {
+        "$value": "rgba(212, 205, 179, 0.12)"
+      },
+      "beamLine": {
+        "$value": "rgba(212, 205, 179, 0.18)"
+      },
+      "doorStroke": {
+        "$value": "rgba(212, 205, 179, 0.32)"
+      },
+      "vignette": {
+        "$value": "rgba(0, 0, 0, 0.25)"
+      },
+      "toneOverlaySoft": {
+        "$value": "rgba(7, 12, 22, 0.28)"
+      },
+      "toneOverlayStrong": {
+        "$value": "rgba(7, 12, 22, 0.46)"
+      }
     },
     "studio": {
-      "050": { "$value": "{color.text.strong}" },
-      "100": { "$value": "{color.text.strong}" },
-      "200": { "$value": "{color.text.muted}" },
-      "300": { "$value": "{color.text.muted}" },
-      "400": { "$value": "{color.text.subtle}" },
-      "500": { "$value": "{color.border.strong}" },
-      "600": { "$value": "{color.border.default}" },
-      "wall": { "$value": "#4d5544" },
-      "wallStroke": { "$value": "#6b7560" },
-      "element": { "$value": "rgba(108, 116, 96, 0.18)" },
-      "elementStroke": { "$value": "rgba(108, 116, 96, 0.5)" },
-      "talentRing": { "$value": "rgba(232, 213, 97, 0.45)" },
-      "talentDot": { "$value": "rgba(232, 213, 97, 0.7)" },
-      "talentFill": { "$value": "rgba(232, 213, 97, 0.12)" },
-      "cameraFill": { "$value": "rgba(108, 169, 209, 0.22)" },
-      "cameraStroke": { "$value": "rgba(108, 169, 209, 0.6)" }
+      "050": {
+        "$value": "{color.text.strong}"
+      },
+      "100": {
+        "$value": "{color.text.strong}"
+      },
+      "200": {
+        "$value": "{color.text.muted}"
+      },
+      "300": {
+        "$value": "{color.text.muted}"
+      },
+      "400": {
+        "$value": "{color.text.subtle}"
+      },
+      "500": {
+        "$value": "{color.border.strong}"
+      },
+      "600": {
+        "$value": "{color.border.default}"
+      },
+      "wall": {
+        "$value": "#4d5544"
+      },
+      "wallStroke": {
+        "$value": "#6b7560"
+      },
+      "element": {
+        "$value": "rgba(108, 116, 96, 0.18)"
+      },
+      "elementStroke": {
+        "$value": "rgba(108, 116, 96, 0.5)"
+      },
+      "talentRing": {
+        "$value": "rgba(232, 213, 97, 0.45)"
+      },
+      "talentDot": {
+        "$value": "rgba(232, 213, 97, 0.7)"
+      },
+      "talentFill": {
+        "$value": "rgba(232, 213, 97, 0.12)"
+      },
+      "cameraFill": {
+        "$value": "rgba(108, 169, 209, 0.22)"
+      },
+      "cameraStroke": {
+        "$value": "rgba(108, 169, 209, 0.6)"
+      }
     },
     "glass": {
-      "bg": { "$value": "rgba(8, 10, 8, 0.78)" },
-      "bgStrong": { "$value": "rgba(8, 10, 8, 0.85)" },
-      "bgSubtle": { "$value": "rgba(8, 10, 8, 0.65)" },
-      "bgSoft": { "$value": "rgba(8, 10, 8, 0.72)" },
-      "border": { "$value": "rgba(250, 246, 230, 0.08)" }
+      "bg": {
+        "$value": "rgba(8, 10, 8, 0.78)"
+      },
+      "bgStrong": {
+        "$value": "rgba(8, 10, 8, 0.85)"
+      },
+      "bgSubtle": {
+        "$value": "rgba(8, 10, 8, 0.65)"
+      },
+      "bgSoft": {
+        "$value": "rgba(8, 10, 8, 0.72)"
+      },
+      "border": {
+        "$value": "rgba(250, 246, 230, 0.08)"
+      }
     },
     "scene": {
-      "minigraphBg": { "$value": "rgba(3, 5, 4, 0.62)" }
+      "minigraphBg": {
+        "$value": "rgba(3, 5, 4, 0.62)"
+      }
     },
     "plot": {
-      "guide": { "$value": "{color.brand.green}" },
-      "marqueeFill": { "$value": "{color.brand.greenSoft}" },
-      "marqueeFillAdditive": { "$value": "{color.brand.greenGlow}" }
+      "guide": {
+        "$value": "{color.brand.green}"
+      },
+      "marqueeFill": {
+        "$value": "{color.brand.greenSoft}"
+      },
+      "marqueeFillAdditive": {
+        "$value": "{color.brand.greenGlow}"
+      }
     }
   },
   "audio": {
     "tier": {
-      "inputs": { "$value": "#d8c483" },
-      "playback": { "$value": "#d6acce" },
-      "outputs": { "$value": "#5dc5e8" }
+      "inputs": {
+        "$value": "#d8c483"
+      },
+      "playback": {
+        "$value": "#d6acce"
+      },
+      "outputs": {
+        "$value": "#5dc5e8"
+      }
     },
     "output": {
-      "mainOut": { "$value": "#5dc5e8" },
-      "phonesA": { "$value": "#e8a341" },
-      "phonesB": { "$value": "#b388f5" }
+      "mainOut": {
+        "$value": "#5dc5e8"
+      },
+      "phonesA": {
+        "$value": "#e8a341"
+      },
+      "phonesB": {
+        "$value": "#b388f5"
+      }
     },
     "meter": {
-      "low": { "$value": "#36ce71" },
-      "lowHot": { "$value": "#6cf99d" },
-      "warn": { "$value": "#f4c443" },
-      "hot": { "$value": "#f59f2a" },
-      "peakHold": { "$value": "#ffd35a" },
-      "over": { "$value": "#ff3b30" },
-      "bg": { "$value": "#050608" }
+      "low": {
+        "$value": "#36ce71"
+      },
+      "lowHot": {
+        "$value": "#6cf99d"
+      },
+      "warn": {
+        "$value": "#f4c443"
+      },
+      "hot": {
+        "$value": "#f59f2a"
+      },
+      "peakHold": {
+        "$value": "#ffd35a"
+      },
+      "over": {
+        "$value": "#ff3b30"
+      },
+      "bg": {
+        "$value": "#050608"
+      }
     },
     "group": {
-      "talent": { "$value": "#d8c483" },
-      "line": { "$value": "#b9b29a" },
-      "bed": { "$value": "#b9d2a0" },
-      "fx": { "$value": "#d6acce" },
-      "remote": { "$value": "#8fc2d2" }
+      "talent": {
+        "$value": "#d8c483"
+      },
+      "line": {
+        "$value": "#b9b29a"
+      },
+      "bed": {
+        "$value": "#b9d2a0"
+      },
+      "fx": {
+        "$value": "#d6acce"
+      },
+      "remote": {
+        "$value": "#8fc2d2"
+      }
     },
     "warningBand": {
-      "verified": { "$value": "#22c55e" },
-      "assumed": { "$value": "#f59e0b" },
-      "notVerified": { "$value": "#f59e0b" },
-      "disabled": { "$value": "#8d8da5" },
-      "offline": { "$value": "#ef4444" },
-      "actionFailed": { "$value": "#ef4444" },
-      "simulated": { "$value": "#f59e0b" }
+      "verified": {
+        "$value": "#22c55e"
+      },
+      "assumed": {
+        "$value": "#f59e0b"
+      },
+      "notVerified": {
+        "$value": "#f59e0b"
+      },
+      "disabled": {
+        "$value": "#8d8da5"
+      },
+      "offline": {
+        "$value": "#ef4444"
+      },
+      "actionFailed": {
+        "$value": "#ef4444"
+      },
+      "simulated": {
+        "$value": "#f59e0b"
+      }
     },
     "warn": {
-      "fill": { "$value": "{color.brand.yellow}" },
-      "soft": { "$value": "{color.brand.yellowSoft}" },
-      "border": { "$value": "{color.brand.yellowBorder}" },
-      "glow": { "$value": "{color.brand.yellowGlow}" },
-      "dot": { "$value": "{color.brand.yellow}" }
+      "fill": {
+        "$value": "{color.brand.yellow}"
+      },
+      "soft": {
+        "$value": "{color.brand.yellowSoft}"
+      },
+      "border": {
+        "$value": "{color.brand.yellowBorder}"
+      },
+      "glow": {
+        "$value": "{color.brand.yellowGlow}"
+      },
+      "dot": {
+        "$value": "{color.brand.yellow}"
+      }
     },
     "engaged": {
-      "fill": { "$value": "{color.warning.500}" },
-      "soft": { "$value": "rgba(216, 169, 90, 0.16)" },
-      "border": { "$value": "rgba(216, 169, 90, 0.5)" },
-      "glow": { "$value": "rgba(216, 169, 90, 0.10)" },
-      "dot": { "$value": "{color.warning.500}" }
+      "fill": {
+        "$value": "{color.warning.500}"
+      },
+      "soft": {
+        "$value": "rgba(216, 169, 90, 0.16)"
+      },
+      "border": {
+        "$value": "rgba(216, 169, 90, 0.5)"
+      },
+      "glow": {
+        "$value": "rgba(216, 169, 90, 0.10)"
+      },
+      "dot": {
+        "$value": "{color.warning.500}"
+      }
     },
     "peakHold": {
-      "calm": { "$value": "{color.text.subtle}" }
+      "calm": {
+        "$value": "{color.text.subtle}"
+      }
+    },
+    "console": {
+      "$description": "Visual overhaul A, Slice 1: the Console's private theme values (the 2026-05-27 prototype palette), moved out of AudioWorkspace.module.css so the Console renders pixel-identically from tokens; themes.css carries Graphite and Bone. Deprecated: Slice 4 moves the Console onto the role tokens and Slice 11 removes this family.",
+      "bg": {
+        "$value": "#0c0a08"
+      },
+      "bg1": {
+        "$value": "#131110"
+      },
+      "bg2": {
+        "$value": "#1a1714"
+      },
+      "bg3": {
+        "$value": "#221e1a"
+      },
+      "bgElev": {
+        "$value": "#2a2521"
+      },
+      "fg": {
+        "$value": "#efebe1"
+      },
+      "fg2": {
+        "$value": "rgba(239, 235, 225, 0.68)"
+      },
+      "fg3": {
+        "$value": "rgba(239, 235, 225, 0.56)"
+      },
+      "fg4": {
+        "$value": "rgba(239, 235, 225, 0.22)"
+      },
+      "line": {
+        "$value": "rgba(239, 235, 225, 0.07)"
+      },
+      "line2": {
+        "$value": "rgba(239, 235, 225, 0.12)"
+      },
+      "accent": {
+        "$value": "#f5a524"
+      },
+      "accentSoft": {
+        "$value": "rgba(245, 165, 36, 0.14)"
+      },
+      "accentGlow": {
+        "$value": "rgba(245, 165, 36, 0.35)"
+      },
+      "danger": {
+        "$value": "oklch(58% 0.22 25)"
+      },
+      "dangerSoft": {
+        "$value": "oklch(58% 0.22 25 / 0.25)"
+      },
+      "meterLow": {
+        "$value": "oklch(82% 0.035 75)"
+      },
+      "meterMid": {
+        "$value": "oklch(82% 0.035 75)"
+      },
+      "meterHi": {
+        "$value": "oklch(52% 0.25 27)"
+      },
+      "meterOverTone": {
+        "$value": "color-mix(in oklch, var(--audio-console-meter-hi) 72%, var(--audio-console-accent))"
+      },
+      "meterPeakEdge": {
+        "$value": "oklch(18% 0.02 75)"
+      },
+      "meterBg": {
+        "$value": "oklch(10% 0.005 60)"
+      },
+      "meterCanvasLow": {
+        "$value": "oklch(72% 0.03 75)"
+      },
+      "meterPeakHold": {
+        "$value": "oklch(92% 0.02 75)"
+      },
+      "stripBg": {
+        "$value": "#15110e"
+      },
+      "stripBgHover": {
+        "$value": "#1b1714"
+      },
+      "stripBgSelected": {
+        "$value": "#221b15"
+      },
+      "housingBgTop": {
+        "$value": "oklch(8% 0.005 60)"
+      },
+      "housingBgBot": {
+        "$value": "oklch(11% 0.005 60)"
+      },
+      "housingShadow": {
+        "$value": "inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.4)"
+      }
+    }
+  },
+  "material": {
+    "$description": "Visual overhaul A (Slice 1, 2026-09): the material model, Studio values; themes.css re-maps Graphite and Bone. Level -1 bay, 0 bg (chassis), +1 panel (plate), +2 key; wells are black backlit displays in every theme.",
+    "bg": {
+      "$value": "#0b0b0d",
+      "$description": "chassis floor, level 0"
+    },
+    "bay": {
+      "$value": "#060607",
+      "$description": "the recessed bay the canvas sits in, level -1"
+    },
+    "panel": {
+      "$value": "#111114",
+      "$description": "plate, level +1, bottom of its gradient"
+    },
+    "panelTop": {
+      "$value": "#17171b",
+      "$description": "plate, top of its gradient"
+    },
+    "key": {
+      "$value": "#1b1c21",
+      "$description": "key, level +2, bottom of its gradient"
+    },
+    "keyTop": {
+      "$value": "#26272e",
+      "$description": "key, top of its gradient"
+    },
+    "well": {
+      "$value": "#000000",
+      "$description": "display floor, a backlit well, the same in every theme"
+    },
+    "line": {
+      "$value": "rgba(255, 255, 255, 0.09)",
+      "$description": "hairline"
+    },
+    "line2": {
+      "$value": "rgba(255, 255, 255, 0.2)",
+      "$description": "stronger hairline, unlit lamp, kbd border"
+    },
+    "sheen": {
+      "$value": "rgba(255, 255, 255, 0.08)",
+      "$description": "the 1 px top highlight of a plate or key"
+    },
+    "shade": {
+      "$value": "rgba(0, 0, 0, 0.6)",
+      "$description": "the shade under a key or a cap"
+    },
+    "wellShade": {
+      "$value": "rgba(0, 0, 0, 0.85)",
+      "$description": "the inset shade at the top of a well"
+    },
+    "stripFloor": {
+      "$value": "rgba(255, 255, 255, 0.025)",
+      "$description": "a strip's lift on the bay; a white lift in every theme, never a shade"
+    },
+    "stripFloorSel": {
+      "$value": "rgba(255, 255, 255, 0.045)",
+      "$description": "the selected strip's lift"
+    }
+  },
+  "text": {
+    "$description": "Visual overhaul A: the chassis inks (Studio); wells override them with the display inks.",
+    "text": {
+      "$value": "#f4f4f5"
+    },
+    "text2": {
+      "$value": "#a6a6ad",
+      "$description": "muted: 7.8:1 on bg, 6.9:1 on panel, 6.2:1 on key"
+    }
+  },
+  "accent": {
+    "$value": "#f4f4f5",
+    "$description": "Visual overhaul A: the selection keyline is neutral so colour stays for state."
+  },
+  "role": {
+    "$description": "Visual overhaul A: hue names the family, form names the meaning. fill = a key that is on (amber engaged, green live), lamp or keyline = attention / ok / error, text = the word. Studio values; themes.css re-maps Graphite and Bone.",
+    "amber": {
+      "fill": {
+        "$value": "#f0b35b"
+      },
+      "fillTop": {
+        "$value": "#f8c977"
+      },
+      "ink": {
+        "$value": "#1a1000"
+      },
+      "text": {
+        "$value": "#f0b35b"
+      },
+      "bloom": {
+        "$value": "rgba(240, 179, 91, 0.45)"
+      }
+    },
+    "green": {
+      "fill": {
+        "$value": "#3ddc7a"
+      },
+      "fillTop": {
+        "$value": "#66e99a"
+      },
+      "ink": {
+        "$value": "#04200f"
+      },
+      "text": {
+        "$value": "#3ddc7a"
+      },
+      "bloom": {
+        "$value": "rgba(61, 220, 122, 0.5)"
+      }
+    },
+    "red": {
+      "fill": {
+        "$value": "#ff6161"
+      },
+      "ink": {
+        "$value": "#230505"
+      },
+      "text": {
+        "$value": "#ff6b6b"
+      },
+      "bloom": {
+        "$value": "rgba(255, 97, 97, 0.5)"
+      }
+    },
+    "blue": {
+      "text": {
+        "$value": "#7cc4ff"
+      },
+      "bloom": {
+        "$value": "rgba(124, 196, 255, 0.45)"
+      }
+    },
+    "primary": {
+      "$description": "the primary command key: white in the dark themes, ink in Bone",
+      "fill": {
+        "$value": "#eeeef0"
+      },
+      "fillTop": {
+        "$value": "#ffffff"
+      },
+      "ink": {
+        "$value": "#0b0b0d"
+      },
+      "sheen": {
+        "$value": "rgba(255, 255, 255, 0.6)"
+      }
+    },
+    "cap": {
+      "$description": "a fader cap",
+      "fill": {
+        "$value": "#f4f4f7"
+      },
+      "fill2": {
+        "$value": "#d3d3d9"
+      },
+      "sheen": {
+        "$value": "rgba(255, 255, 255, 0.7)"
+      },
+      "line": {
+        "$value": "#0b0b0d"
+      }
+    }
+  },
+  "display": {
+    "$description": "Visual overhaul A: the inks printed on a well (a black backlit display) in every theme; the .well scope in themes.css re-points the text and role text tokens at these.",
+    "text": {
+      "$value": "#f4f4f5"
+    },
+    "text2": {
+      "$value": "#a6a6ad"
+    },
+    "green": {
+      "$value": "#3ddc7a"
+    },
+    "amber": {
+      "$value": "#f0b35b"
+    },
+    "red": {
+      "$value": "#ff6b6b"
+    },
+    "blue": {
+      "$value": "#7cc4ff"
+    },
+    "bloom": {
+      "amber": {
+        "$value": "rgba(240, 179, 91, 0.45)"
+      },
+      "green": {
+        "$value": "rgba(61, 220, 122, 0.5)"
+      },
+      "red": {
+        "$value": "rgba(255, 97, 97, 0.5)"
+      },
+      "blue": {
+        "$value": "rgba(124, 196, 255, 0.45)"
+      }
+    }
+  },
+  "signal": {
+    "$description": "Visual overhaul A: signal, not status - the meter ramp keeps the physical green-yellow-orange-red, the colour-temperature track is the one other gradient that is information.",
+    "meterLow": {
+      "$value": "#2ee06a"
+    },
+    "meterMid": {
+      "$value": "#ffd23f"
+    },
+    "meterHot": {
+      "$value": "#ff8a3d"
+    },
+    "meterOver": {
+      "$value": "#ff4d4d"
+    },
+    "peak": {
+      "$value": "#ffffff"
+    },
+    "peakBloom": {
+      "$value": "rgba(255, 255, 255, 0.45)"
+    },
+    "rampV": {
+      "$value": "linear-gradient(to top, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 90%, var(--signal-meter-hot) 90%, var(--signal-meter-hot) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%)",
+      "$description": "ramp stops on a 0..100 % well: green to 70 % (-18 dBFS), yellow to 90 % (-6), orange to 95 % (-3), red above"
+    },
+    "rampH": {
+      "$value": "linear-gradient(to right, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 90%, var(--signal-meter-hot) 90%, var(--signal-meter-hot) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%)"
+    },
+    "cctTrack": {
+      "$value": "linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff)"
+    }
+  },
+  "chrome": {
+    "$description": "Visual overhaul A, plan D4: the chrome budget of the one surface, 2560x1440. The 1920 and 1280 fallbacks live in the mocks and are not a deliverable.",
+    "studio": {
+      "header": {
+        "$value": "56px"
+      },
+      "footer": {
+        "$value": "40px"
+      },
+      "cluster": {
+        "$value": "424px"
+      },
+      "plate": {
+        "$value": "416px"
+      },
+      "stateDisplay": {
+        "$value": "180px"
+      },
+      "gutter": {
+        "$value": "16px"
+      },
+      "strip": {
+        "$value": "120px"
+      }
+    }
+  },
+  "elevation": {
+    "$description": "Visual overhaul A: one light from above, five levels. Rules the census enforces: no outer shadow with a negative offset; blur over 8 px only on a lit element or the level +3 float; gradients only as material (plates, keys, caps) or signal.",
+    "plate": {
+      "$value": "inset 0 1px 0 var(--material-sheen)",
+      "$description": "level +1, with plateFill"
+    },
+    "plateFill": {
+      "$value": "linear-gradient(180deg, var(--material-panel-top), var(--material-panel))"
+    },
+    "bay": {
+      "$value": "inset 0 2px 10px var(--material-well-shade)",
+      "$description": "level -1"
+    },
+    "well": {
+      "$value": "inset 0 2px 6px var(--material-well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05)",
+      "$description": "a display"
+    },
+    "key": {
+      "$value": "inset 0 1px 0 var(--material-sheen), 0 1px 2px var(--material-shade)",
+      "$description": "level +2, with keyFill"
+    },
+    "keyFill": {
+      "$value": "linear-gradient(180deg, var(--material-key-top), var(--material-key))"
+    },
+    "keyLitAmber": {
+      "$value": "inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 14px var(--role-amber-bloom)",
+      "$description": "engaged"
+    },
+    "keyLitAmberFill": {
+      "$value": "linear-gradient(180deg, var(--role-amber-fill-top), var(--role-amber-fill))"
+    },
+    "keyLitGreen": {
+      "$value": "inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 18px var(--role-green-bloom)",
+      "$description": "live"
+    },
+    "keyLitGreenFill": {
+      "$value": "linear-gradient(180deg, var(--role-green-fill-top), var(--role-green-fill))"
+    },
+    "cap": {
+      "$value": "inset 0 1px 0 var(--role-cap-sheen), 0 2px 4px var(--material-shade)",
+      "$description": "a fader cap, with capFill"
+    },
+    "capFill": {
+      "$value": "linear-gradient(180deg, var(--role-cap-fill), var(--role-cap-fill2))"
+    },
+    "lampAmber": {
+      "$value": "0 0 10px var(--role-amber-bloom)",
+      "$description": "a lit lamp; unlit lamps have none"
+    },
+    "lampGreen": {
+      "$value": "0 0 10px var(--role-green-bloom)"
+    },
+    "lampRed": {
+      "$value": "0 0 10px var(--role-red-bloom)"
+    },
+    "lampBlue": {
+      "$value": "0 0 10px var(--role-blue-bloom)"
+    },
+    "peak": {
+      "$value": "0 0 6px var(--signal-peak-bloom)"
+    },
+    "float": {
+      "$value": "0 12px 32px rgba(0, 0, 0, 0.6)",
+      "$description": "level +3: dialogs, the palette, toasts, the drawer; the only large blur"
+    },
+    "tintOk": {
+      "$value": "radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%)",
+      "$description": "the state display's tint over the well, at most 16 %"
+    },
+    "tintAttention": {
+      "$value": "radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%)"
+    },
+    "tintError": {
+      "$value": "radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%)"
+    },
+    "tintInfo": {
+      "$value": "radial-gradient(110% 90% at 0% 0%, rgba(124, 196, 255, 0.16), transparent 60%)"
+    }
+  },
+  "target": {
+    "$description": "Visual overhaul A: pointer targets",
+    "min": {
+      "$value": "24px"
+    },
+    "take": {
+      "$value": "28px",
+      "$description": "take-time controls"
+    },
+    "takeStudio": {
+      "$value": "32px",
+      "$description": "take-time controls at 2560x1440"
     }
   },
   "font": {
     "family": {
-      "sans": { "$value": "{font.family.ui}" },
-      "mono": { "$value": "\"JetBrains Mono Variable\", \"JetBrains Mono\", ui-monospace, monospace" },
-      "ui": { "$value": "\"Inter Variable\", \"Inter\", system-ui, sans-serif" },
-      "display": { "$value": "\"Fraunces Variable\", \"Fraunces\", \"Source Serif 4\", Georgia, serif" }
+      "sans": {
+        "$value": "{font.family.ui}"
+      },
+      "mono": {
+        "$value": "\"JetBrains Mono Variable\", \"JetBrains Mono\", ui-monospace, monospace"
+      },
+      "ui": {
+        "$value": "\"Inter Variable\", \"Inter\", system-ui, sans-serif"
+      },
+      "display": {
+        "$value": "\"Fraunces Variable\", \"Fraunces\", \"Source Serif 4\", Georgia, serif"
+      }
     },
     "size": {
-      "5xs": { "$value": "7px" },
-      "4xs": { "$value": "8px" },
-      "4xs-plus": { "$value": "8.5px" },
-      "3xs": { "$value": "9px" },
-      "3xs-plus": { "$value": "9.5px" },
-      "2xs": { "$value": "10px" },
-      "2xs-plus": { "$value": "10.5px" },
-      "xs": { "$value": "11px" },
-      "xs-plus": { "$value": "11.5px" },
-      "sm": { "$value": "12px" },
-      "sm-plus": { "$value": "12.5px" },
-      "md-tight": { "$value": "13px" },
-      "md": { "$value": "14px" },
-      "lg-tight": { "$value": "15px" },
-      "lg": { "$value": "16px" },
-      "xl-tight": { "$value": "18px" },
-      "xl": { "$value": "20px" },
-      "2xl": { "$value": "22px" },
-      "3xl": { "$value": "28px" }
+      "5xs": {
+        "$value": "7px"
+      },
+      "4xs": {
+        "$value": "8px"
+      },
+      "4xs-plus": {
+        "$value": "8.5px"
+      },
+      "3xs": {
+        "$value": "9px"
+      },
+      "3xs-plus": {
+        "$value": "9.5px"
+      },
+      "2xs": {
+        "$value": "10px"
+      },
+      "2xs-plus": {
+        "$value": "10.5px"
+      },
+      "xs": {
+        "$value": "11px"
+      },
+      "xs-plus": {
+        "$value": "11.5px"
+      },
+      "sm": {
+        "$value": "{font.size.tick}",
+        "$description": "deprecated alias (A S1) - use font.size.tick; removed in S11"
+      },
+      "sm-plus": {
+        "$value": "12.5px"
+      },
+      "md-tight": {
+        "$value": "{font.size.label}",
+        "$description": "deprecated alias (A S1) - use font.size.label; removed in S11"
+      },
+      "md": {
+        "$value": "{font.size.body}",
+        "$description": "deprecated alias (A S1) - use font.size.body; removed in S11"
+      },
+      "lg-tight": {
+        "$value": "{font.size.name}",
+        "$description": "deprecated alias (A S1) - use font.size.name; removed in S11"
+      },
+      "lg": {
+        "$value": "{font.size.value}",
+        "$description": "deprecated alias (A S1) - use font.size.value; removed in S11"
+      },
+      "xl-tight": {
+        "$value": "18px"
+      },
+      "xl": {
+        "$value": "{font.size.word}",
+        "$description": "deprecated alias (A S1) - use font.size.word; removed in S11"
+      },
+      "2xl": {
+        "$value": "22px"
+      },
+      "3xl": {
+        "$value": "28px"
+      },
+      "tick": {
+        "$value": "12px",
+        "$description": "the floor: scale ticks, eyebrows, secondary meta, kbd hints - never read to act"
+      },
+      "label": {
+        "$value": "13px",
+        "$description": "labels and rows read to act, hints"
+      },
+      "body": {
+        "$value": "14px",
+        "$description": "body, command keys, table rows, the engine's sentences"
+      },
+      "name": {
+        "$value": "15px",
+        "$description": "list names: snapshots, projects, steps"
+      },
+      "value": {
+        "$value": "16px",
+        "$description": "strip names, printed values, section titles, the clock"
+      },
+      "word": {
+        "$value": "20px",
+        "$description": "take-time words: caps on big keys, the strip dB"
+      },
+      "state": {
+        "$value": "24px",
+        "$description": "the state word, plate titles"
+      },
+      "heroSmall": {
+        "$value": "32px",
+        "$description": "Setup's step title"
+      },
+      "hero": {
+        "$value": "44px",
+        "$description": "the one number read from a metre away"
+      }
     },
     "weight": {
-      "regular": { "$value": "400" },
-      "medium": { "$value": "500" },
-      "semibold": { "$value": "600" }
+      "regular": {
+        "$value": "400"
+      },
+      "medium": {
+        "$value": "500"
+      },
+      "semibold": {
+        "$value": "600"
+      }
+    },
+    "lineHeight": {
+      "tight": {
+        "$value": "1"
+      },
+      "text": {
+        "$value": "1.35"
+      }
+    },
+    "tracking": {
+      "cap": {
+        "$value": "0.04em",
+        "$description": "uppercase mono key caps and state words"
+      },
+      "eyebrow": {
+        "$value": "0.06em"
+      }
     }
   },
   "space": {
-    "1": { "$value": "4px" },
-    "2": { "$value": "8px" },
-    "3": { "$value": "12px" },
-    "4": { "$value": "16px" },
-    "5": { "$value": "20px" },
-    "6": { "$value": "24px" },
-    "7": { "$value": "28px" },
-    "8": { "$value": "32px" },
-    "9": { "$value": "36px" },
-    "10": { "$value": "40px" }
+    "1": {
+      "$value": "4px"
+    },
+    "2": {
+      "$value": "8px"
+    },
+    "3": {
+      "$value": "12px"
+    },
+    "4": {
+      "$value": "16px"
+    },
+    "5": {
+      "$value": "20px"
+    },
+    "6": {
+      "$value": "24px"
+    },
+    "7": {
+      "$value": "28px"
+    },
+    "8": {
+      "$value": "32px"
+    },
+    "9": {
+      "$value": "36px"
+    },
+    "10": {
+      "$value": "40px"
+    }
   },
   "radius": {
-    "sm": { "$value": "8px" },
-    "md": { "$value": "14px" },
-    "lg": { "$value": "20px" },
-    "xl": { "$value": "24px" },
-    "surface": { "$value": "{radius.lg}" },
-    "pill": { "$value": "999px" },
+    "sm": {
+      "$value": "{radius.key}",
+      "$description": "deprecated alias (A S1) - use radius.key; removed in S11"
+    },
+    "md": {
+      "$value": "14px"
+    },
+    "lg": {
+      "$value": "20px"
+    },
+    "xl": {
+      "$value": "24px"
+    },
+    "surface": {
+      "$value": "{radius.lg}"
+    },
+    "pill": {
+      "$value": "999px"
+    },
     "tight": {
-      "xs": { "$value": "3px" },
-      "sm": { "$value": "4px" },
-      "md": { "$value": "6px" },
-      "lg": { "$value": "8px" },
-      "xl": { "$value": "12px" }
+      "xs": {
+        "$value": "3px"
+      },
+      "sm": {
+        "$value": "{radius.ctl}",
+        "$description": "deprecated alias (A S1) - use radius.ctl; removed in S11"
+      },
+      "md": {
+        "$value": "6px"
+      },
+      "lg": {
+        "$value": "{radius.key}",
+        "$description": "deprecated alias (A S1) - use radius.key; removed in S11"
+      },
+      "xl": {
+        "$value": "{radius.screen}",
+        "$description": "deprecated alias (A S1) - use radius.screen; removed in S11"
+      }
+    },
+    "ctl": {
+      "$value": "4px",
+      "$description": "A: caps, fields, kbd, small lamps' boxes"
+    },
+    "key": {
+      "$value": "8px",
+      "$description": "A: keys, wells, cards"
+    },
+    "screen": {
+      "$value": "12px",
+      "$description": "A: the state display, the bay screen, the plot, the drawer"
     }
   },
   "size": {
-    "controlHeight": { "$value": "36px" },
-    "toolbarHeight": { "$value": "44px" },
-    "monitorRailHeight": { "$value": "52px" },
-    "contextRailWidth": { "$value": "344px" },
-    "workspaceRailWidth": { "$value": "248px" },
-    "shellHeight": { "$value": "92px" },
-    "healthBarHeight": { "$value": "64px" }
+    "controlHeight": {
+      "$value": "36px"
+    },
+    "toolbarHeight": {
+      "$value": "44px"
+    },
+    "monitorRailHeight": {
+      "$value": "52px"
+    },
+    "contextRailWidth": {
+      "$value": "344px"
+    },
+    "workspaceRailWidth": {
+      "$value": "248px"
+    },
+    "shellHeight": {
+      "$value": "92px"
+    },
+    "healthBarHeight": {
+      "$value": "64px"
+    }
   },
   "shadow": {
-    "surface": { "$value": "0 14px 38px rgba(0, 0, 0, 0.28)" },
-    "insetHi": { "$value": "inset 0 1px 0 rgba(250, 246, 230, 0.05)" },
-    "insetHiStrong": { "$value": "inset 0 1px 0 rgba(250, 246, 230, 0.08)" },
-    "sm": { "$value": "0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(250, 246, 230, 0.04)" },
-    "md": { "$value": "0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(250, 246, 230, 0.05)" },
-    "lg": { "$value": "0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(250, 246, 230, 0.06)" },
-    "glass": { "$value": "0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.10)" },
+    "surface": {
+      "$value": "0 14px 38px rgba(0, 0, 0, 0.28)"
+    },
+    "insetHi": {
+      "$value": "inset 0 1px 0 rgba(250, 246, 230, 0.05)"
+    },
+    "insetHiStrong": {
+      "$value": "inset 0 1px 0 rgba(250, 246, 230, 0.08)"
+    },
+    "sm": {
+      "$value": "0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(250, 246, 230, 0.04)"
+    },
+    "md": {
+      "$value": "0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(250, 246, 230, 0.05)"
+    },
+    "lg": {
+      "$value": "0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(250, 246, 230, 0.06)"
+    },
+    "glass": {
+      "$value": "0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.10)"
+    },
     "glowGreen": {
       "$value": "0 0 0 1px {color.brand.green}, 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
     },
     "glowYellow": {
       "$value": "0 0 0 1px {color.brand.yellow}, 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
     },
-    "glowGreenSm": { "$value": "0 0 12px rgba(153, 186, 146, 0.35)" },
-    "glowGreenDot": { "$value": "0 0 5px rgba(153, 186, 146, 0.55)" },
-    "glowGreenDotSubtle": { "$value": "0 0 6px rgba(153, 186, 146, 0.55)" },
-    "glowYellowSm": { "$value": "0 0 8px rgba(232, 213, 97, 0.35)" },
-    "glowYellowDot": { "$value": "0 0 5px rgba(232, 213, 97, 0.55)" },
-    "glowYellowDotSubtle": { "$value": "0 0 6px rgba(232, 213, 97, 0.55)" },
+    "glowGreenSm": {
+      "$value": "0 0 12px rgba(153, 186, 146, 0.35)"
+    },
+    "glowGreenDot": {
+      "$value": "0 0 5px rgba(153, 186, 146, 0.55)"
+    },
+    "glowGreenDotSubtle": {
+      "$value": "0 0 6px rgba(153, 186, 146, 0.55)"
+    },
+    "glowYellowSm": {
+      "$value": "0 0 8px rgba(232, 213, 97, 0.35)"
+    },
+    "glowYellowDot": {
+      "$value": "0 0 5px rgba(232, 213, 97, 0.55)"
+    },
+    "glowYellowDotSubtle": {
+      "$value": "0 0 6px rgba(232, 213, 97, 0.55)"
+    },
     "glowAmber": {
       "$value": "0 0 0 1px {color.warning.500}, 0 12px 28px rgba(216, 169, 90, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08)"
     },
-    "glowAmberSm": { "$value": "0 0 8px rgba(216, 169, 90, 0.32)" },
-    "glowAmberDot": { "$value": "0 0 5px rgba(216, 169, 90, 0.52)" },
-    "glowAmberDotSubtle": { "$value": "0 0 6px rgba(216, 169, 90, 0.52)" },
-    "thumbRing": { "$value": "0 0 0 2px rgba(153, 186, 146, 0.18)" }
+    "glowAmberSm": {
+      "$value": "0 0 8px rgba(216, 169, 90, 0.32)"
+    },
+    "glowAmberDot": {
+      "$value": "0 0 5px rgba(216, 169, 90, 0.52)"
+    },
+    "glowAmberDotSubtle": {
+      "$value": "0 0 6px rgba(216, 169, 90, 0.52)"
+    },
+    "thumbRing": {
+      "$value": "0 0 0 2px rgba(153, 186, 146, 0.18)"
+    }
   },
   "motion": {
     "duration": {
-      "fast": { "$value": "120ms" },
-      "normal": { "$value": "180ms" },
-      "slow": { "$value": "240ms" },
-      "pulse": { "$value": "1200ms" }
+      "fast": {
+        "$value": "{motion.duration.exit}",
+        "$description": "deprecated alias (A S1) - use motion.duration.exit; removed in S11"
+      },
+      "normal": {
+        "$value": "180ms"
+      },
+      "slow": {
+        "$value": "240ms"
+      },
+      "pulse": {
+        "$value": "1200ms"
+      },
+      "lamp": {
+        "$value": "0ms",
+        "$description": "A: a lamp or a lit fill switches; it does not ramp"
+      },
+      "press": {
+        "$value": "100ms",
+        "$description": "A: key press feedback"
+      },
+      "state": {
+        "$value": "160ms",
+        "$description": "A: a state word or keyline changing"
+      },
+      "enter": {
+        "$value": "200ms",
+        "$description": "A: drawer, dialog, toast entering (8 px rise + fade)"
+      },
+      "exit": {
+        "$value": "120ms"
+      },
+      "move": {
+        "$value": "160ms",
+        "$description": "A: bank change, tab change"
+      }
     },
     "easing": {
-      "standard": { "$value": "cubic-bezier(0.22, 1, 0.36, 1)" },
-      "inOut": { "$value": "cubic-bezier(0.4, 0, 0.2, 1)" },
-      "out": { "$value": "cubic-bezier(0.16, 1, 0.3, 1)" }
+      "standard": {
+        "$value": "cubic-bezier(0.22, 1, 0.36, 1)"
+      },
+      "inOut": {
+        "$value": "cubic-bezier(0.4, 0, 0.2, 1)"
+      },
+      "out": {
+        "$value": "cubic-bezier(0.16, 1, 0.3, 1)"
+      },
+      "mech": {
+        "$value": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "$description": "A: the one mechanical curve"
+      }
     }
   },
   "z": {
-    "overlay": { "$value": "100" },
-    "toast": { "$value": "1000" },
-    "menu": { "$value": "1050" },
-    "dialog": { "$value": "1100" },
-    "palette": { "$value": "1200" },
-    "tooltip": { "$value": "1300" }
+    "overlay": {
+      "$value": "100"
+    },
+    "toast": {
+      "$value": "1000"
+    },
+    "menu": {
+      "$value": "1050"
+    },
+    "dialog": {
+      "$value": "1100"
+    },
+    "palette": {
+      "$value": "1200"
+    },
+    "tooltip": {
+      "$value": "1300"
+    }
   }
 }

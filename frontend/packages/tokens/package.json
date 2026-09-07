@@ -10,7 +10,8 @@
   },
   "scripts": {
     "build": "style-dictionary build --config ./style-dictionary.config.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit && node ./src/validate-generated.mjs"
+    "typecheck": "tsc -p tsconfig.json --noEmit && node ./src/validate-generated.mjs",
+    "test": "vitest run"
   },
   "devDependencies": {
     "style-dictionary": "^5.5.0"

@@ -14,23 +14,23 @@
 
 .audioShell {
   /* ── Console theme — Studio (default, warm amber) ───────────────────────── */
-  --bg: #0c0a08;
-  --bg-1: #131110;
-  --bg-2: #1a1714;
-  --bg-3: #221e1a;
-  --bg-elev: #2a2521;
+  --bg: var(--audio-console-bg);
+  --bg-1: var(--audio-console-bg1);
+  --bg-2: var(--audio-console-bg2);
+  --bg-3: var(--audio-console-bg3);
+  --bg-elev: var(--audio-console-bg-elev);
 
-  --fg: #efebe1;
-  --fg-2: rgba(239, 235, 225, 0.68);
+  --fg: var(--audio-console-fg);
+  --fg-2: var(--audio-console-fg2);
   /* C10 nudged muted text 0.44 → 0.50; 2026-09 audit Slice 10 raises it to
      0.56 (≈ 5:1 on the console ground) because every caption that used to
      paint --fg-4 (0.22, ≈ 1.6:1 — unreadable on the studio monitor) now paints
      --audio-caption-muted = --fg-3. --fg-4 stays for hairlines and borders. */
-  --fg-3: rgba(239, 235, 225, 0.56);
-  --fg-4: rgba(239, 235, 225, 0.22);
+  --fg-3: var(--audio-console-fg3);
+  --fg-4: var(--audio-console-fg4);
 
-  --line: rgba(239, 235, 225, 0.07);
-  --line-2: rgba(239, 235, 225, 0.12);
+  --line: var(--audio-console-line);
+  --line-2: var(--audio-console-line2);
 
   /* C20 (2026-06-02): audio-scoped font aliases onto the shared global scale.
      The redesign hardcoded "Inter Tight"/"JetBrains Mono" literals ~75× across
@@ -46,23 +46,23 @@
   --font-ui: var(--font-family-sans);
   --font-mono: var(--font-family-mono);
 
-  --accent: #f5a524;
-  --accent-soft: rgba(245, 165, 36, 0.14);
-  --accent-glow: rgba(245, 165, 36, 0.35);
+  --accent: var(--audio-console-accent);
+  --accent-soft: var(--audio-console-accent-soft);
+  --accent-glow: var(--audio-console-accent-glow);
 
-  --danger: oklch(58% 0.22 25);
-  --danger-soft: oklch(58% 0.22 25 / 0.25);
+  --danger: var(--audio-console-danger);
+  --danger-soft: var(--audio-console-danger-soft);
 
   /* Single warm meter tone + clip-only red. Anchored to the meter container,
      so the warm→red boundary lives at the same physical position on every
      meter regardless of fill height (see AudioStereoMeter.module.css). */
-  --meter-low: oklch(82% 0.035 75);
-  --meter-mid: oklch(82% 0.035 75);
+  --meter-low: var(--audio-console-meter-low);
+  --meter-mid: var(--audio-console-meter-mid);
   /* C09(a): darken the clip cap so the at/over-0 dBFS boundary clears the 3:1
      UI floor against the cream body (was oklch(64% 0.24 27) ≈ 2.15:1 → ~3.15:1).
      Mirrored per theme: Graphite a smaller drop, Bone (dark body) RAISES the
      cap instead. Do NOT darken the cream body ramp to chase this. */
-  --meter-hi: oklch(52% 0.25 27);
+  --meter-hi: var(--audio-console-meter-hi);
   /* C09(a): tunable clip-cap edge tone. Defaults to --meter-hi so the canvas
      clip cap (--audio-meter-over) and the static .meterFill top stop track the
      corrected hot tone, but can be retuned without disturbing the MonitorBar
@@ -72,11 +72,11 @@
      band — a color-mix of the clip-cap tone toward the warm accent so it reads
      distinct from BOTH the saturated clip-red AND the amber peak-warning outline
      (so: not pure amber). */
-  --meter-over-tone: color-mix(in oklch, var(--meter-hi) 72%, var(--accent));
+  --meter-over-tone: var(--audio-console-meter-over-tone);
   /* C09(c): theme-aware keyline/halo for the live peak-hold tick. Dark halo on
      the light cream meter bodies (Studio/Graphite); see Bone for the light halo. */
-  --meter-peak-edge: oklch(18% 0.02 75);
-  --meter-bg: oklch(10% 0.005 60);
+  --meter-peak-edge: var(--audio-console-meter-peak-edge);
+  --meter-bg: var(--audio-console-meter-bg);
   --meter-clip-pct: 88%;
 
   /* The LIVE meters are painted on a <canvas> by AudioMeterCanvasOverlay,
@@ -87,22 +87,22 @@
      green(bottom); setting hot/amber/green to cream and over to red leaves
      red only at the clip cap. */
   --audio-meter-bg: var(--meter-bg);
-  --audio-meter-low: oklch(72% 0.03 75);
+  --audio-meter-low: var(--audio-console-meter-canvas-low);
   --audio-meter-low-hot: var(--meter-low);
   --audio-meter-warn: var(--meter-low);
   --audio-meter-hot: var(--meter-low);
   --audio-meter-over: var(--meter-clip-edge);
-  --audio-meter-peak-hold: oklch(92% 0.02 75);
+  --audio-meter-peak-hold: var(--audio-console-meter-peak-hold);
 
-  --strip-bg: #15110e;
-  --strip-bg-hover: #1b1714;
-  --strip-bg-selected: #221b15;
+  --strip-bg: var(--audio-console-strip-bg);
+  --strip-bg-hover: var(--audio-console-strip-bg-hover);
+  --strip-bg-selected: var(--audio-console-strip-bg-selected);
 
   /* Recessed-housing material: used by the topbar cluster, monitor meter,
      monitor controls, talkback button, etc. Theme-swap-aware. */
-  --housing-bg-top: oklch(8% 0.005 60);
-  --housing-bg-bot: oklch(11% 0.005 60);
-  --housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --housing-bg-top: var(--audio-console-housing-bg-top);
+  --housing-bg-bot: var(--audio-console-housing-bg-bot);
+  --housing-shadow: var(--audio-console-housing-shadow);
 
   /* S13 (TOKENS-04): the audio motion curves were promoted to the shared
      token set in S1 (byte-equal values) — the private names stay as the
@@ -187,118 +187,13 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Alternate themes (Console prototype: Graphite + Bone) ────────────────
-   Only the base vars are overridden; the --audio-* legacy aliases + the
-   --audio-meter-* canvas family resolve through var() so they re-theme
-   automatically. Default (no attribute) = Studio = the base .audioShell. */
-
-.audioShell[data-audio-theme="graphite"] {
-  --bg: #0a0d10;
-  --bg-1: #0f1418;
-  --bg-2: #141a1f;
-  --bg-3: #1c232a;
-  --bg-elev: #232b33;
-
-  --fg: #e8edf0;
-  --fg-2: rgba(232, 237, 240, 0.66);
-  /* C10: nudge muted text up (0.42 → 0.50) for a small cross-theme legibility
-     win alongside the Bone AA fixes. */
-  --fg-3: rgba(232, 237, 240, 0.56);
-  --fg-4: rgba(232, 237, 240, 0.2);
-
-  --line: rgba(232, 237, 240, 0.07);
-  --line-2: rgba(232, 237, 240, 0.12);
-
-  --accent: #5ee0e0;
-  --accent-soft: rgba(94, 224, 224, 0.12);
-  --accent-glow: rgba(94, 224, 224, 0.3);
-
-  --danger: oklch(62% 0.2 25);
-  --danger-soft: oklch(62% 0.2 25 / 0.25);
-
-  --meter-low: oklch(86% 0.025 220);
-  --meter-mid: oklch(86% 0.025 220);
-  /* C09(a): smaller clip-cap drop than Studio (light cyan-neutral body, was
-     oklch(62% 0.22 25) ≈ 1.99:1). --meter-clip-edge / --audio-meter-over
-     inherit and recompute from this. */
-  --meter-hi: oklch(55% 0.23 25);
-  /* C09(b): keep the over-band orange-red. Graphite's --accent is cyan, so the
-     inherited mix-toward-accent would desaturate to teal-gray and lose the
-     warning read — anchor the mix to a warm orange instead. */
-  --meter-over-tone: color-mix(in oklch, var(--meter-hi) 70%, oklch(72% 0.18 60));
-  --meter-bg: oklch(9% 0.005 220);
-  --audio-meter-low: oklch(76% 0.02 220);
-  --audio-meter-peak-hold: oklch(94% 0.02 220);
-  /* C09(c): dark halo for the peak tick on Graphite's light meter body, hue-
-     matched to the cool neutral. */
-  --meter-peak-edge: oklch(16% 0.015 220);
-
-  --strip-bg: #0f1418;
-  --strip-bg-hover: #141a20;
-  --strip-bg-selected: #16222a;
-
-  --housing-bg-top: oklch(7% 0.005 220);
-  --housing-bg-bot: oklch(10% 0.005 220);
-  --housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
-}
-
-.audioShell[data-audio-theme="bone"] {
-  --bg: #f3f0e8;
-  --bg-1: #faf8f2;
-  --bg-2: #ffffff;
-  --bg-3: #ebe7dd;
-  --bg-elev: #ffffff;
-
-  --fg: #1a1814;
-  --fg-2: rgba(26, 24, 20, 0.66);
-  /* C10 (AA-blocking, light theme): rgba(…,0.44) composited to ~2.7:1 and carried
-     real text (eyebrows, output pairs, snapshot preview, resting SOLO/MUTE glyph).
-     Raise to 0.60 → ≈4:1. Luminance-only; hue unchanged. */
-  --fg-3: rgba(26, 24, 20, 0.6);
-  --fg-4: rgba(26, 24, 20, 0.22);
-  /* C10: --fg-4 (~1.6:1) is illegible for real text on the light body — promote
-     the faintest captions to --fg-3 (≈4:1) in Bone only. --fg-4 stays for
-     hairlines/dots/thumbs. */
-  --audio-caption-muted: var(--fg-3);
-
-  --line: rgba(26, 24, 20, 0.08);
-  --line-2: rgba(26, 24, 20, 0.14);
-
-  /* C10 (AA-blocking, light theme): #c25e1e failed accent-on-accent-soft (~3.68:1)
-     on the loaded-snapshot name, Outputs tier label and active tier chips, and
-     solo-active (--bg on --accent) was exactly 3.75:1. Darken to #a64e16 → ≈5.6:1
-     on panels / ≈4.8:1 on accent-soft, which also lifts solo-active to ≈4.95:1.
-     accent-soft / accent-glow re-derived from the same rgb(166, 78, 22). */
-  --accent: #a64e16;
-  --accent-soft: rgba(166, 78, 22, 0.12);
-  --accent-glow: rgba(166, 78, 22, 0.3);
-
-  --danger: oklch(50% 0.22 25);
-  --danger-soft: oklch(50% 0.22 25 / 0.15);
-
-  --meter-low: oklch(38% 0.04 75);
-  --meter-mid: oklch(38% 0.04 75);
-  /* C09(a): Bone's meter LED body is DARK (oklch 38–46%), so the clip cap is
-     RAISED rather than dropped to clear 3:1 (was oklch(56% 0.24 27) ≈ 1.99:1).
-     The candidate's "drop to ~48%" was backwards and regressed to 1.57:1.
-     --meter-clip-edge / --audio-meter-over inherit and recompute from this. */
-  --meter-hi: oklch(72% 0.24 27);
-  --meter-bg: oklch(94% 0.005 75);
-  --audio-meter-low: oklch(46% 0.04 75);
-  --audio-meter-peak-hold: oklch(28% 0.04 75);
-  /* C09(c): Bone's dark meter body + dark peak tick collapse to ~1.38:1, so the
-     keyline halo is LIGHT here (opposite of Studio/Graphite) to separate the
-     tick from the body. */
-  --meter-peak-edge: oklch(95% 0.01 75);
-
-  --strip-bg: #fdfbf5;
-  --strip-bg-hover: #fffefa;
-  --strip-bg-selected: #ffffff;
-
-  --housing-bg-top: oklch(88% 0.005 75);
-  --housing-bg-bot: oklch(93% 0.005 75);
-  --housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 0 0 1px rgba(26, 24, 20, 0.08);
-}
+/* ── Themes ───────────────────────────────────────────────────────────────
+   Visual overhaul A, Slice 1 (2026-09): the Console's Studio / Graphite / Bone
+   values moved to the `audio.console.*` tokens (core.json for Studio,
+   themes.css for the other two, driven by the global `data-theme` on <html>,
+   which `data-audio-theme` mirrors), so the private theme blocks that lived
+   here are gone and the Console renders pixel-identically from tokens. Slice 4
+   moves it onto the role tokens; Slice 11 removes the family. */
 
 /* Output-role accent overrides — kept for any consumer that still reads
    --audio-accent, but the Console design routes everything through --accent. */

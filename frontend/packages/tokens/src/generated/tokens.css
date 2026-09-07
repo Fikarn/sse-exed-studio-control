@@ -134,6 +134,128 @@
   --audio-engaged-soft: rgba(216, 169, 90, 0.16);
   --audio-engaged-border: rgba(216, 169, 90, 0.5);
   --audio-engaged-glow: rgba(216, 169, 90, 0.10);
+  --audio-console-bg: #0c0a08;
+  --audio-console-bg1: #131110;
+  --audio-console-bg2: #1a1714;
+  --audio-console-bg3: #221e1a;
+  --audio-console-bg-elev: #2a2521;
+  --audio-console-fg: #efebe1;
+  --audio-console-fg2: rgba(239, 235, 225, 0.68);
+  --audio-console-fg3: rgba(239, 235, 225, 0.56);
+  --audio-console-fg4: rgba(239, 235, 225, 0.22);
+  --audio-console-line: rgba(239, 235, 225, 0.07);
+  --audio-console-line2: rgba(239, 235, 225, 0.12);
+  --audio-console-accent: #f5a524;
+  --audio-console-accent-soft: rgba(245, 165, 36, 0.14);
+  --audio-console-accent-glow: rgba(245, 165, 36, 0.35);
+  --audio-console-danger: oklch(58% 0.22 25);
+  --audio-console-danger-soft: oklch(58% 0.22 25 / 0.25);
+  --audio-console-meter-low: oklch(82% 0.035 75);
+  --audio-console-meter-mid: oklch(82% 0.035 75);
+  --audio-console-meter-hi: oklch(52% 0.25 27);
+  --audio-console-meter-over-tone: color-mix(in oklch, var(--audio-console-meter-hi) 72%, var(--audio-console-accent));
+  --audio-console-meter-peak-edge: oklch(18% 0.02 75);
+  --audio-console-meter-bg: oklch(10% 0.005 60);
+  --audio-console-meter-canvas-low: oklch(72% 0.03 75);
+  --audio-console-meter-peak-hold: oklch(92% 0.02 75);
+  --audio-console-strip-bg: #15110e;
+  --audio-console-strip-bg-hover: #1b1714;
+  --audio-console-strip-bg-selected: #221b15;
+  --audio-console-housing-bg-top: oklch(8% 0.005 60);
+  --audio-console-housing-bg-bot: oklch(11% 0.005 60);
+  --audio-console-housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --material-bg: #0b0b0d; /** chassis floor, level 0 */
+  --material-bay: #060607; /** the recessed bay the canvas sits in, level -1 */
+  --material-panel: #111114; /** plate, level +1, bottom of its gradient */
+  --material-panel-top: #17171b; /** plate, top of its gradient */
+  --material-key: #1b1c21; /** key, level +2, bottom of its gradient */
+  --material-key-top: #26272e; /** key, top of its gradient */
+  --material-well: #000000; /** display floor, a backlit well, the same in every theme */
+  --material-line: rgba(255, 255, 255, 0.09); /** hairline */
+  --material-line2: rgba(255, 255, 255, 0.2); /** stronger hairline, unlit lamp, kbd border */
+  --material-sheen: rgba(255, 255, 255, 0.08); /** the 1 px top highlight of a plate or key */
+  --material-shade: rgba(0, 0, 0, 0.6); /** the shade under a key or a cap */
+  --material-well-shade: rgba(0, 0, 0, 0.85); /** the inset shade at the top of a well */
+  --material-strip-floor: rgba(255, 255, 255, 0.025); /** a strip's lift on the bay; a white lift in every theme, never a shade */
+  --material-strip-floor-sel: rgba(255, 255, 255, 0.045); /** the selected strip's lift */
+  --text-text: #f4f4f5;
+  --text-text2: #a6a6ad; /** muted: 7.8:1 on bg, 6.9:1 on panel, 6.2:1 on key */
+  --accent: #f4f4f5; /** Visual overhaul A: the selection keyline is neutral so colour stays for state. */
+  --role-amber-fill: #f0b35b;
+  --role-amber-fill-top: #f8c977;
+  --role-amber-ink: #1a1000;
+  --role-amber-text: #f0b35b;
+  --role-amber-bloom: rgba(240, 179, 91, 0.45);
+  --role-green-fill: #3ddc7a;
+  --role-green-fill-top: #66e99a;
+  --role-green-ink: #04200f;
+  --role-green-text: #3ddc7a;
+  --role-green-bloom: rgba(61, 220, 122, 0.5);
+  --role-red-fill: #ff6161;
+  --role-red-ink: #230505;
+  --role-red-text: #ff6b6b;
+  --role-red-bloom: rgba(255, 97, 97, 0.5);
+  --role-blue-text: #7cc4ff;
+  --role-blue-bloom: rgba(124, 196, 255, 0.45);
+  --role-primary-fill: #eeeef0;
+  --role-primary-fill-top: #ffffff;
+  --role-primary-ink: #0b0b0d;
+  --role-primary-sheen: rgba(255, 255, 255, 0.6);
+  --role-cap-fill: #f4f4f7;
+  --role-cap-fill2: #d3d3d9;
+  --role-cap-sheen: rgba(255, 255, 255, 0.7);
+  --role-cap-line: #0b0b0d;
+  --display-text: #f4f4f5;
+  --display-text2: #a6a6ad;
+  --display-green: #3ddc7a;
+  --display-amber: #f0b35b;
+  --display-red: #ff6b6b;
+  --display-blue: #7cc4ff;
+  --display-bloom-amber: rgba(240, 179, 91, 0.45);
+  --display-bloom-green: rgba(61, 220, 122, 0.5);
+  --display-bloom-red: rgba(255, 97, 97, 0.5);
+  --display-bloom-blue: rgba(124, 196, 255, 0.45);
+  --signal-meter-low: #2ee06a;
+  --signal-meter-mid: #ffd23f;
+  --signal-meter-hot: #ff8a3d;
+  --signal-meter-over: #ff4d4d;
+  --signal-peak: #ffffff;
+  --signal-peak-bloom: rgba(255, 255, 255, 0.45);
+  --signal-ramp-v: linear-gradient(to top, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 90%, var(--signal-meter-hot) 90%, var(--signal-meter-hot) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%); /** ramp stops on a 0..100 % well: green to 70 % (-18 dBFS), yellow to 90 % (-6), orange to 95 % (-3), red above */
+  --signal-ramp-h: linear-gradient(to right, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 90%, var(--signal-meter-hot) 90%, var(--signal-meter-hot) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%);
+  --signal-cct-track: linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff);
+  --chrome-studio-header: 56px;
+  --chrome-studio-footer: 40px;
+  --chrome-studio-cluster: 424px;
+  --chrome-studio-plate: 416px;
+  --chrome-studio-state-display: 180px;
+  --chrome-studio-gutter: 16px;
+  --chrome-studio-strip: 120px;
+  --elevation-plate: inset 0 1px 0 var(--material-sheen); /** level +1, with plateFill */
+  --elevation-plate-fill: linear-gradient(180deg, var(--material-panel-top), var(--material-panel));
+  --elevation-bay: inset 0 2px 10px var(--material-well-shade); /** level -1 */
+  --elevation-well: inset 0 2px 6px var(--material-well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05); /** a display */
+  --elevation-key: inset 0 1px 0 var(--material-sheen), 0 1px 2px var(--material-shade); /** level +2, with keyFill */
+  --elevation-key-fill: linear-gradient(180deg, var(--material-key-top), var(--material-key));
+  --elevation-key-lit-amber: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 14px var(--role-amber-bloom); /** engaged */
+  --elevation-key-lit-amber-fill: linear-gradient(180deg, var(--role-amber-fill-top), var(--role-amber-fill));
+  --elevation-key-lit-green: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 18px var(--role-green-bloom); /** live */
+  --elevation-key-lit-green-fill: linear-gradient(180deg, var(--role-green-fill-top), var(--role-green-fill));
+  --elevation-cap: inset 0 1px 0 var(--role-cap-sheen), 0 2px 4px var(--material-shade); /** a fader cap, with capFill */
+  --elevation-cap-fill: linear-gradient(180deg, var(--role-cap-fill), var(--role-cap-fill2));
+  --elevation-lamp-amber: 0 0 10px var(--role-amber-bloom); /** a lit lamp; unlit lamps have none */
+  --elevation-lamp-green: 0 0 10px var(--role-green-bloom);
+  --elevation-lamp-red: 0 0 10px var(--role-red-bloom);
+  --elevation-lamp-blue: 0 0 10px var(--role-blue-bloom);
+  --elevation-peak: 0 0 6px var(--signal-peak-bloom);
+  --elevation-float: 0 12px 32px rgba(0, 0, 0, 0.6); /** level +3: dialogs, the palette, toasts, the drawer; the only large blur */
+  --elevation-tint-ok: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%); /** the state display's tint over the well, at most 16 % */
+  --elevation-tint-attention: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%);
+  --elevation-tint-error: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%);
+  --elevation-tint-info: radial-gradient(110% 90% at 0% 0%, rgba(124, 196, 255, 0.16), transparent 60%);
+  --target-min: 24px;
+  --target-take: 28px; /** take-time controls */
+  --target-take-studio: 32px; /** take-time controls at 2560x1440 */
   --font-family-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --font-family-ui: "Inter Variable", "Inter", system-ui, sans-serif;
   --font-family-display: "Fraunces Variable", "Fraunces", "Source Serif 4", Georgia, serif;
@@ -146,19 +268,26 @@
   --font-size-2xs-plus: 10.5px;
   --font-size-xs: 11px;
   --font-size-xs-plus: 11.5px;
-  --font-size-sm: 12px;
   --font-size-sm-plus: 12.5px;
-  --font-size-md-tight: 13px;
-  --font-size-md: 14px;
-  --font-size-lg-tight: 15px;
-  --font-size-lg: 16px;
   --font-size-xl-tight: 18px;
-  --font-size-xl: 20px;
   --font-size-2xl: 22px;
   --font-size-3xl: 28px;
+  --font-size-tick: 12px; /** the floor: scale ticks, eyebrows, secondary meta, kbd hints - never read to act */
+  --font-size-label: 13px; /** labels and rows read to act, hints */
+  --font-size-body: 14px; /** body, command keys, table rows, the engine's sentences */
+  --font-size-name: 15px; /** list names: snapshots, projects, steps */
+  --font-size-value: 16px; /** strip names, printed values, section titles, the clock */
+  --font-size-word: 20px; /** take-time words: caps on big keys, the strip dB */
+  --font-size-state: 24px; /** the state word, plate titles */
+  --font-size-hero-small: 32px; /** Setup's step title */
+  --font-size-hero: 44px; /** the one number read from a metre away */
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
+  --font-line-height-tight: 1;
+  --font-line-height-text: 1.35;
+  --font-tracking-cap: 0.04em; /** uppercase mono key caps and state words */
+  --font-tracking-eyebrow: 0.06em;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -169,16 +298,15 @@
   --space-8: 32px;
   --space-9: 36px;
   --space-10: 40px;
-  --radius-sm: 8px;
   --radius-md: 14px;
   --radius-lg: 20px;
   --radius-xl: 24px;
   --radius-pill: 999px;
   --radius-tight-xs: 3px;
-  --radius-tight-sm: 4px;
   --radius-tight-md: 6px;
-  --radius-tight-lg: 8px;
-  --radius-tight-xl: 12px;
+  --radius-ctl: 4px; /** A: caps, fields, kbd, small lamps' boxes */
+  --radius-key: 8px; /** A: keys, wells, cards */
+  --radius-screen: 12px; /** A: the state display, the bay screen, the plot, the drawer */
   --size-control-height: 36px;
   --size-toolbar-height: 44px;
   --size-monitor-rail-height: 52px;
@@ -203,13 +331,19 @@
   --shadow-glow-amber-dot: 0 0 5px rgba(216, 169, 90, 0.52);
   --shadow-glow-amber-dot-subtle: 0 0 6px rgba(216, 169, 90, 0.52);
   --shadow-thumb-ring: 0 0 0 2px rgba(153, 186, 146, 0.18);
-  --motion-duration-fast: 120ms;
   --motion-duration-normal: 180ms;
   --motion-duration-slow: 240ms;
   --motion-duration-pulse: 1200ms;
+  --motion-duration-lamp: 0ms; /** A: a lamp or a lit fill switches; it does not ramp */
+  --motion-duration-press: 100ms; /** A: key press feedback */
+  --motion-duration-state: 160ms; /** A: a state word or keyline changing */
+  --motion-duration-enter: 200ms; /** A: drawer, dialog, toast entering (8 px rise + fade) */
+  --motion-duration-exit: 120ms;
+  --motion-duration-move: 160ms; /** A: bank change, tab change */
   --motion-easing-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-easing-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --motion-easing-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-easing-mech: cubic-bezier(0.2, 0.8, 0.2, 1); /** A: the one mechanical curve */
   --z-overlay: 100;
   --z-toast: 1000;
   --z-menu: 1050;
@@ -246,9 +380,20 @@
   --audio-engaged-fill: var(--color-warning-500);
   --audio-engaged-dot: var(--color-warning-500);
   --font-family-sans: var(--font-family-ui);
+  --font-size-sm: var(--font-size-tick); /** deprecated alias (A S1) - use font.size.tick; removed in S11 */
+  --font-size-md-tight: var(--font-size-label); /** deprecated alias (A S1) - use font.size.label; removed in S11 */
+  --font-size-md: var(--font-size-body); /** deprecated alias (A S1) - use font.size.body; removed in S11 */
+  --font-size-lg-tight: var(--font-size-name); /** deprecated alias (A S1) - use font.size.name; removed in S11 */
+  --font-size-lg: var(--font-size-value); /** deprecated alias (A S1) - use font.size.value; removed in S11 */
+  --font-size-xl: var(--font-size-word); /** deprecated alias (A S1) - use font.size.word; removed in S11 */
+  --radius-sm: var(--radius-key); /** deprecated alias (A S1) - use radius.key; removed in S11 */
   --radius-surface: var(--radius-lg);
+  --radius-tight-sm: var(--radius-ctl); /** deprecated alias (A S1) - use radius.ctl; removed in S11 */
+  --radius-tight-lg: var(--radius-key); /** deprecated alias (A S1) - use radius.key; removed in S11 */
+  --radius-tight-xl: var(--radius-screen); /** deprecated alias (A S1) - use radius.screen; removed in S11 */
   --shadow-glow-yellow: 0 0 0 1px var(--color-brand-yellow), 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08);
   --shadow-glow-amber: 0 0 0 1px var(--color-warning-500), 0 12px 28px rgba(216, 169, 90, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
+  --motion-duration-fast: var(--motion-duration-exit); /** deprecated alias (A S1) - use motion.duration.exit; removed in S11 */
   --color-text-primary: var(--color-text-strong);
   --color-studio-100: var(--color-text-strong);
   --color-studio-200: var(--color-text-muted);
