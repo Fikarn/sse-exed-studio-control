@@ -1,46 +1,54 @@
 @layer components {
+  /* A keyline enclosing a word (system §4): solid for ok / error / info, dashed
+     for attention (the doubt mark), the hairline for neutral. */
   .badge {
     align-items: center;
-    border: 1px solid transparent;
-    border-radius: var(--radius-pill);
     display: inline-flex;
-    font-family: var(--font-family-mono);
-    font-size: var(--operator-font-size-xs, var(--font-size-xs));
-    font-weight: 700;
-    letter-spacing: 0;
     min-height: 28px;
-    padding: 0 var(--space-5);
+    padding: 0 10px;
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-key);
+    color: var(--text-text2);
+    font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+    letter-spacing: var(--font-tracking-cap);
     text-transform: uppercase;
+    white-space: nowrap;
   }
 
-  /* DES-07 (8e2): the fills were raw rgba() literals (bright Tailwind green/amber/
-     red) that diverged from the muted, themed semantic text colors and did not
-     theme. Tokenized onto the same semantic tokens via color-mix so each badge's
-     fill matches its text + themes across Studio/Graphite/Bone. */
-  .healthy,
-  .ready,
-  .connected {
-    background: color-mix(in srgb, var(--color-primary-500) 12%, transparent);
-    border-color: color-mix(in srgb, var(--color-primary-500) 28%, transparent);
-    color: var(--color-accent-green);
+  .ok {
+    border-color: var(--role-green-text);
+    color: var(--role-green-text);
   }
 
-  .degraded,
-  .warning {
-    background: color-mix(in srgb, var(--color-warning-500) 12%, transparent);
-    border-color: color-mix(in srgb, var(--color-warning-500) 30%, transparent);
-    color: var(--color-accent-amber);
-  }
-
-  .idle {
-    background: color-mix(in srgb, var(--color-studio-400) 8%, transparent);
-    border-color: color-mix(in srgb, var(--color-studio-400) 24%, transparent);
-    color: var(--color-studio-400);
+  .attention {
+    border-style: dashed;
+    border-color: var(--role-amber-text);
+    color: var(--role-amber-text);
   }
 
   .error {
-    background: color-mix(in srgb, var(--color-danger-500) 12%, transparent);
-    border-color: color-mix(in srgb, var(--color-danger-500) 28%, transparent);
-    color: var(--color-accent-red);
+    border-color: var(--role-red-text);
+    color: var(--role-red-text);
+  }
+
+  .info {
+    border-color: var(--role-blue-text);
+    color: var(--role-blue-text);
+  }
+
+  .neutral {
+    border-color: var(--material-line2);
+    color: var(--text-text2);
+  }
+
+  /* Legacy tone names (aliases until Slice 11): the canonical class carries
+     the paint; these exist so `className` still names the tone a test asks for. */
+  .healthy,
+  .ready,
+  .connected,
+  .degraded,
+  .warning,
+  .idle {
+    letter-spacing: var(--font-tracking-cap);
   }
 }

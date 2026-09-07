@@ -227,12 +227,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "packages/design-system/src/components/Button.module.css": {
-    "colour": 6,
-    "fontSize": 1,
-    "radius": 0,
-    "shadow": 1
-  },
   "packages/design-system/src/components/ChipStrip.module.css": {
     "colour": 1,
     "fontSize": 2,
@@ -244,12 +238,6 @@
     "fontSize": 0,
     "radius": 2,
     "shadow": 3
-  },
-  "packages/design-system/src/components/CommandPalette.module.css": {
-    "colour": 0,
-    "fontSize": 5,
-    "radius": 0,
-    "shadow": 2
   },
   "packages/design-system/src/components/ContextMenu.module.css": {
     "colour": 0,
@@ -334,12 +322,6 @@
     "fontSize": 0,
     "radius": 0,
     "shadow": 1
-  },
-  "packages/design-system/src/components/Toast.module.css": {
-    "colour": 1,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 0
   },
   "packages/design-system/src/components/Tooltip.module.css": {
     "colour": 0,

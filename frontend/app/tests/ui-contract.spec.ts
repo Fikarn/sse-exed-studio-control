@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { FIXTURES, SURFACE, STATE_DISPLAY_X_TOLERANCE_PX, THEMES, boardName } from "./helpers/ui-contract/boards.mjs";
 import { checkRatchet, measureBoard, openBoard } from "./helpers/ui-contract/measure.mjs";
+import { TARGETS } from "./helpers/ui-contract/boards.mjs";
 
 // Visual overhaul A, Slice 0 — the UI contract lanes (system §10 as tests).
 //
@@ -71,4 +74,59 @@ test.describe("UI contract", () => {
       STATE_DISPLAY_X_TOLERANCE_PX
     );
   });
+});
+
+// Visual overhaul A, Slice 3: the primitives' Storybook pages pass the
+// system's light, target, radius, type and contrast checks outright — no
+// ratchet, since they are new. The stories live under
+// "Design System/A primitives" and are served by the Storybook static server
+// (built by `npm run frontend:storybook:build`, chained into
+// `frontend:playwright:test`); the lane skips when no build is present.
+const STORYBOOK_INDEX = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../storybook-static/index.json");
+const A_STORIES: Array<{ id: string; name: string }> = existsSync(STORYBOOK_INDEX)
+  ? Object.values(
+      (
+        JSON.parse(readFileSync(STORYBOOK_INDEX, "utf8")) as {
+          entries: Record<string, { id: string; name: string; title: string }>;
+        }
+      ).entries
+    )
+      .filter((entry) => entry.title === "Design System/A primitives")
+      .map((entry) => ({ id: entry.id, name: entry.name }))
+  : [];
+
+test.describe("UI contract — the A primitives on their Storybook pages", () => {
+  test.skip(A_STORIES.length === 0, "storybook-static is not built; run npm run frontend:storybook:build");
+  test.use({ viewport: { width: SURFACE.width, height: SURFACE.height } });
+
+  for (const story of A_STORIES) {
+    test(`${story.name} passes the light, target, radius, type and contrast checks`, async ({ page }) => {
+      await page.goto(`http://127.0.0.1:6007/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`, {
+        waitUntil: "networkidle",
+      });
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(600);
+      const { measures, contrast } = await measureBoard(page);
+      const problems: string[] = [];
+      if (measures.minFontSize !== null && measures.minFontSize < TARGETS.minFontSize)
+        problems.push(`type floor ${measures.minFontSize} < ${TARGETS.minFontSize}`);
+      if (measures.offFamilyText > 0)
+        problems.push(`${measures.offFamilyText} text nodes outside Inter / JetBrains Mono`);
+      if (measures.radiiOff > 0) problems.push(`${measures.radiiOff} elements with a radius outside {4, 8, 12, pill}`);
+      if (measures.smallTargets > 0) problems.push(`${measures.smallTargets} targets under ${TARGETS.minTarget} px`);
+      if (measures.smallTake > 0) problems.push(`${measures.smallTake} take-time targets under ${TARGETS.minTake} px`);
+      if (measures.shadowNegative > 0) problems.push(`${measures.shadowNegative} shadows with a negative offset`);
+      if (measures.blurOver8Unlit > 0) problems.push(`${measures.blurOver8Unlit} blurs over 8 px on unlit elements`);
+      if (measures.gradientsOff > 0) problems.push(`${measures.gradientsOff} gradients off policy`);
+      if (measures.contrastFails > 0)
+        problems.push(
+          `${measures.contrastFails} contrast failures: ` +
+            contrast.fails
+              .slice(0, 6)
+              .map((f) => `${f.ratio}:1 ${f.size}px "${f.text}" ${f.el} ${f.color} on ${f.bg}`)
+              .join(" · ")
+        );
+      expect(problems, `${story.name}: ${JSON.stringify(measures)}`).toEqual([]);
+    });
+  }
 });

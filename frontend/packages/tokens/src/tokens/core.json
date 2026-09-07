@@ -993,6 +993,18 @@
     },
     "tintInfo": {
       "$value": "radial-gradient(110% 90% at 0% 0%, rgba(124, 196, 255, 0.16), transparent 60%)"
+    },
+    "keyPrimary": {
+      "$value": "inset 0 1px 0 var(--role-primary-sheen), 0 1px 2px var(--material-shade)",
+      "$description": "the primary command key"
+    },
+    "keyArmed": {
+      "$value": "inset 0 2px 6px var(--material-well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 0 14px var(--display-bloom-amber)",
+      "$description": "an armed key: a well with the amber bloom"
+    },
+    "bar": {
+      "$value": "0 0 8px var(--display-bloom-amber)",
+      "$description": "the armed countdown bar's glow"
     }
   },
   "target": {
@@ -1089,39 +1101,39 @@
         "$value": "28px"
       },
       "tick": {
-        "$value": "12px",
+        "$value": "{font.base.tick}",
         "$description": "the floor: scale ticks, eyebrows, secondary meta, kbd hints - never read to act"
       },
       "label": {
-        "$value": "13px",
+        "$value": "{font.base.label}",
         "$description": "labels and rows read to act, hints"
       },
       "body": {
-        "$value": "14px",
+        "$value": "{font.base.body}",
         "$description": "body, command keys, table rows, the engine's sentences"
       },
       "name": {
-        "$value": "15px",
+        "$value": "{font.base.name}",
         "$description": "list names: snapshots, projects, steps"
       },
       "value": {
-        "$value": "16px",
+        "$value": "{font.base.value}",
         "$description": "strip names, printed values, section titles, the clock"
       },
       "word": {
-        "$value": "20px",
+        "$value": "{font.base.word}",
         "$description": "take-time words: caps on big keys, the strip dB"
       },
       "state": {
-        "$value": "24px",
+        "$value": "{font.base.state}",
         "$description": "the state word, plate titles"
       },
       "heroSmall": {
-        "$value": "32px",
+        "$value": "{font.base.heroSmall}",
         "$description": "Setup's step title"
       },
       "hero": {
-        "$value": "44px",
+        "$value": "{font.base.hero}",
         "$description": "the one number read from a metre away"
       }
     },
@@ -1151,6 +1163,36 @@
       },
       "eyebrow": {
         "$value": "0.06em"
+      }
+    },
+    "base": {
+      "$description": "Visual overhaul A: the nine steps in px. font.size.* references these at 100 %; OperatorLayoutProvider re-derives font.size.* as base × the operator UI scale factor, so the scale setting reaches every A primitive (shell.spec: operator UI scale reaches portaled overlays).",
+      "tick": {
+        "$value": "12px"
+      },
+      "label": {
+        "$value": "13px"
+      },
+      "body": {
+        "$value": "14px"
+      },
+      "name": {
+        "$value": "15px"
+      },
+      "value": {
+        "$value": "16px"
+      },
+      "word": {
+        "$value": "20px"
+      },
+      "state": {
+        "$value": "24px"
+      },
+      "heroSmall": {
+        "$value": "32px"
+      },
+      "hero": {
+        "$value": "44px"
       }
     }
   },

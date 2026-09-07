@@ -1,33 +1,30 @@
-/* Toast — single bubble. Bottom-right convention; the consumer arranges
-   stacking. Slides in from below; auto-dismiss timing is the consumer's
-   concern (errors typically stay sticky until manual dismiss). */
+/* Toast — one floating plate (level +3), bottom-right; the consumer arranges
+   stacking. Enters with the 8 px rise; auto-dismiss timing is the consumer's
+   concern (errors stay until dismissed). */
 
 .toast {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   min-width: 280px;
-  max-width: 420px;
-  padding: 10px 12px;
-  border-radius: var(--radius-tight-md);
-  border: 1px solid var(--color-bg-stroke);
-  background: var(--color-bg-soft);
-  color: var(--color-brand-text-primary);
-  font-family: var(--font-family-ui);
-  font-size: var(--operator-font-size-sm, 12px);
-  line-height: 1.4;
-  letter-spacing: 0;
-  box-shadow: var(--shadow-md);
+  max-width: 440px;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--radius-key);
+  border: 1px solid var(--material-line2);
+  background: var(--elevation-plate-fill);
+  box-shadow: var(--elevation-float);
+  color: var(--text-text);
+  font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
   pointer-events: auto;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .toast {
-    animation: sseToastInBottom 200ms var(--motion-easing-standard);
+    animation: aToastIn var(--motion-duration-enter) var(--motion-easing-out);
   }
 }
 
-@keyframes sseToastInBottom {
+@keyframes aToastIn {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -38,35 +35,20 @@
   }
 }
 
-.toast[data-tone="ok"] {
-  background: linear-gradient(180deg, var(--color-brand-green-soft), var(--color-brand-green-glow));
-  border-color: var(--color-brand-green);
+.toast[data-tone="attention"] {
+  border-color: var(--role-amber-text);
 }
 
 .toast[data-tone="error"] {
-  background: linear-gradient(180deg, var(--color-danger-soft), var(--color-danger-glow));
-  color: var(--color-danger-500);
-  border-color: var(--color-danger-500);
+  border-color: var(--role-red-text);
 }
 
-/* attention — amber advisory (blocked action / degraded-but-not-failed). Uses
-   the single sanctioned amber (--color-warning-500, themed in all three). The
-   wash + border carry the amber identity while body text stays the primary
-   token so it clears AA in Studio/Graphite/Bone (amber-on-dark text would
-   not). */
-.toast[data-tone="attention"] {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-warning-500) 18%, var(--color-bg-soft)),
-    var(--color-bg-soft)
-  );
-  color: var(--color-brand-text-primary);
-  border-color: color-mix(in srgb, var(--color-warning-500) 60%, var(--color-bg-stroke));
+.toast[data-tone="ok"] {
+  border-color: var(--role-green-text);
 }
 
-.toast[data-tone="info"] {
-  background: var(--color-bg-soft);
-  color: var(--color-brand-text-secondary);
+.lamp {
+  margin-top: 5px;
 }
 
 .body {
@@ -78,68 +60,76 @@
 }
 
 .title {
-  font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-sm, 11px);
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
+  font: 600 var(--font-size-body) / 1.35 var(--font-family-ui);
+}
+
+.toast[data-tone="attention"] .title {
+  color: var(--role-amber-text);
+}
+
+.toast[data-tone="error"] .title {
+  color: var(--role-red-text);
+}
+
+.toast[data-tone="ok"] .title {
+  color: var(--role-green-text);
+}
+
+.toast[data-tone="info"] .title {
+  color: var(--role-blue-text);
 }
 
 .message {
-  font-family: var(--font-family-ui);
-  font-size: var(--operator-font-size-sm, 12px);
-  letter-spacing: 0;
+  color: var(--text-text2);
   word-wrap: break-word;
 }
 
 .action {
   appearance: none;
-  background: transparent;
-  border: 1px solid currentColor;
-  color: inherit;
-  padding: 2px 8px;
-  border-radius: var(--radius-tight-sm);
-  font: var(--font-weight-semibold) var(--operator-font-size-xs, 10px) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-  cursor: pointer;
-  flex-shrink: 0;
   align-self: center;
-  transition: background-color 120ms var(--motion-easing-standard);
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-key);
+  border: 1px solid var(--material-line);
+  background: var(--elevation-key-fill);
+  box-shadow: var(--elevation-key);
+  color: var(--text-text);
+  font: 600 var(--font-size-label) / 1 var(--font-family-ui);
+  cursor: pointer;
 }
 
 .action:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  border-color: var(--material-line2);
 }
 
 .action:focus-visible {
-  outline: 2px solid var(--color-brand-green);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 .dismiss {
   appearance: none;
   background: transparent;
-  border: none;
-  color: inherit;
+  border: 1px solid transparent;
+  border-radius: var(--radius-ctl);
+  color: var(--text-text2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 24px;
   cursor: pointer;
-  padding: 2px;
   flex-shrink: 0;
   align-self: flex-start;
-  opacity: 0.6;
-  transition: opacity 120ms var(--motion-easing-standard);
 }
 
 .dismiss:hover {
-  opacity: 1;
+  color: var(--text-text);
+  border-color: var(--material-line);
 }
 
 .dismiss:focus-visible {
-  outline: 2px solid var(--color-brand-green);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: var(--radius-tight-xs);
-  opacity: 1;
 }

@@ -1,0 +1,165 @@
+@layer components {
+  .head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .headText {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .title {
+    margin: 0;
+    font: 600 var(--font-size-state) / 1.1 var(--font-family-mono);
+    letter-spacing: -0.01em;
+    color: var(--text-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sub {
+    margin: 0;
+    font: 500 var(--font-size-label) / 1.35 var(--font-family-ui);
+    color: var(--text-text2);
+  }
+
+  .headAction {
+    flex: none;
+  }
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .sectionHead {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .sectionTitle {
+    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+    color: var(--text-text);
+  }
+
+  .sectionDetail {
+    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+    color: var(--text-text2);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sectionActions {
+    margin-left: auto;
+    display: inline-flex;
+    gap: 8px;
+    flex: none;
+  }
+
+  .fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .readouts {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 10px;
+    column-gap: 12px;
+    align-items: center;
+    font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+  }
+
+  .readoutRow {
+    display: contents;
+  }
+
+  .readoutLabel {
+    color: var(--text-text2);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .readoutValue {
+    margin: 0;
+    font: 600 var(--font-size-value) / 1 var(--font-family-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-text);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .ok {
+    color: var(--role-green-text);
+  }
+
+  .attention {
+    color: var(--role-amber-text);
+  }
+
+  .error {
+    color: var(--role-red-text);
+  }
+
+  .info {
+    color: var(--role-blue-text);
+  }
+
+  .controlRow {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .controlLabel {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+    color: var(--text-text2);
+  }
+
+  .controlLabel b {
+    color: var(--text-text);
+    font-weight: 600;
+  }
+
+  .control {
+    display: grid;
+    grid-template-columns: 1fr 96px;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .controlValue {
+    font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-text);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .danger {
+    margin-top: auto;
+    display: flex;
+    gap: 8px;
+  }
+}

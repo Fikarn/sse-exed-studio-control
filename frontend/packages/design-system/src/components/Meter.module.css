@@ -1,0 +1,161 @@
+@layer components {
+  .meter {
+    position: relative;
+    border-radius: var(--radius-ctl);
+    overflow: hidden;
+    background: var(--material-well);
+    border: 1px solid var(--material-line);
+    box-shadow: var(--elevation-well);
+    flex: none;
+  }
+
+  .vertical {
+    width: 24px;
+    min-height: 120px;
+    height: 100%;
+  }
+
+  .vertical.stereo {
+    width: 26px;
+  }
+
+  .horizontal {
+    height: 20px;
+    width: 100%;
+  }
+
+  .bars {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    gap: 2px;
+  }
+
+  .vertical .bars {
+    top: 14px;
+    bottom: 14px;
+    left: 3px;
+    right: 3px;
+    flex-direction: row;
+  }
+
+  .horizontal .bars {
+    top: 3px;
+    bottom: 3px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+  }
+
+  .bar {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .ramp,
+  .glow {
+    position: absolute;
+  }
+
+  .vertical .ramp,
+  .vertical .glow {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--meter-level, 0) * 100%);
+    background: var(--signal-ramp-v);
+    background-size: 100% calc(100% / max(var(--meter-level, 0.0001), 0.0001));
+    background-position: bottom;
+  }
+
+  .horizontal .ramp,
+  .horizontal .glow {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(var(--meter-level, 0) * 100%);
+    background: var(--signal-ramp-h);
+    background-size: calc(100% / max(var(--meter-level, 0.0001), 0.0001)) 100%;
+    background-position: left;
+  }
+
+  .glow {
+    filter: blur(6px);
+    opacity: 0.55;
+  }
+
+  .vertical .glow {
+    left: -3px;
+    right: -3px;
+  }
+
+  .horizontal .glow {
+    top: -3px;
+    bottom: -3px;
+  }
+
+  .peak {
+    position: absolute;
+    background: var(--signal-peak);
+    box-shadow: var(--elevation-peak);
+  }
+
+  .vertical .peak {
+    left: 0;
+    right: 0;
+    height: 2px;
+    margin-bottom: -1px;
+  }
+
+  .horizontal .peak {
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+  }
+
+  .reference {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .vertical .reference {
+    left: 0;
+    right: 0;
+    bottom: calc(14px + var(--meter-reference, 0.7) * (100% - 28px));
+    border-top: 1px dashed var(--display-text2);
+  }
+
+  .horizontal .reference {
+    top: 0;
+    bottom: 0;
+    left: calc(var(--meter-reference, 0.7) * 100%);
+    border-left: 1px dashed var(--display-text2);
+  }
+
+  .clip {
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: var(--radius-pill);
+    background: var(--material-key-top);
+    border: 1px solid var(--material-line2);
+  }
+
+  .clipLit {
+    background: var(--display-red);
+    border-color: var(--display-red);
+    box-shadow: var(--elevation-lamp-red);
+  }
+
+  .stale .ramp,
+  .stale .peak {
+    opacity: 0.4;
+  }
+}

@@ -1,0 +1,146 @@
+@layer components {
+  .display {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 8px;
+    height: calc(var(--chrome-studio-state-display) * var(--operator-ui-scale-factor, 1));
+    flex: none;
+    padding: 14px 16px;
+    border-radius: var(--radius-screen);
+    border: 1px solid var(--material-line);
+    background: var(--material-well);
+    box-shadow: var(--elevation-well);
+    color: var(--display-text);
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* The state's own colour as a radial tint, at most 16 %. */
+  .ok {
+    background: var(--elevation-tint-ok), var(--material-well);
+  }
+
+  .attention {
+    background: var(--elevation-tint-attention), var(--material-well);
+  }
+
+  .error {
+    background: var(--elevation-tint-error), var(--material-well);
+  }
+
+  .info {
+    background: var(--elevation-tint-info), var(--material-well);
+  }
+
+  .top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .lamp {
+    width: 14px;
+    height: 14px;
+  }
+
+  .word {
+    font: 600 var(--font-size-state) / 1 var(--font-family-mono);
+    letter-spacing: var(--font-tracking-cap);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ok .word {
+    color: var(--display-green);
+  }
+
+  .attention .word {
+    color: var(--display-amber);
+  }
+
+  .error .word {
+    color: var(--display-red);
+  }
+
+  .info .word {
+    color: var(--display-blue);
+  }
+
+  .sentence {
+    font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
+    color: var(--display-text);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .code {
+    font: 500 var(--font-size-tick) / 1.3 var(--font-family-mono);
+    color: var(--display-text2);
+  }
+
+  .meta {
+    font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
+    color: var(--display-text2);
+    align-self: start;
+    min-width: 0;
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    align-self: end;
+  }
+
+  .armedRow {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 6px;
+    border: 1px solid var(--display-amber);
+    border-radius: var(--radius-key);
+    padding: 6px 10px;
+    align-self: start;
+  }
+
+  .armedWord {
+    font: 600 var(--font-size-body) / 1 var(--font-family-mono);
+    letter-spacing: var(--font-tracking-cap);
+    color: var(--display-amber);
+  }
+
+  .armedText {
+    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+    color: var(--display-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .armedSeconds {
+    font: 600 var(--font-size-body) / 1 var(--font-family-mono);
+    color: var(--display-amber);
+  }
+
+  .bar {
+    grid-column: 1 / -1;
+    display: block;
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--material-line2);
+    overflow: hidden;
+  }
+
+  .bar i {
+    display: block;
+    height: 100%;
+    width: calc(var(--arm-progress, 1) * 100%);
+    background: var(--display-amber);
+    box-shadow: var(--elevation-bar);
+  }
+}

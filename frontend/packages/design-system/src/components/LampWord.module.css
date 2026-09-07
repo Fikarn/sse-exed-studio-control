@@ -1,0 +1,77 @@
+@layer components {
+  .lampWord {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+    color: var(--text-text);
+    white-space: nowrap;
+  }
+
+  .cap {
+    font-family: var(--font-family-mono);
+    letter-spacing: var(--font-tracking-cap);
+    text-transform: uppercase;
+  }
+
+  .ok {
+    color: var(--role-green-text);
+  }
+
+  .attention {
+    color: var(--role-amber-text);
+  }
+
+  .error {
+    color: var(--role-red-text);
+  }
+
+  .info {
+    color: var(--role-blue-text);
+  }
+
+  .off {
+    color: var(--text-text2);
+  }
+
+  .latch {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: var(--radius-key);
+    border: 1px solid var(--role-amber-text);
+    background: color-mix(in srgb, var(--role-amber-text) 6%, transparent);
+    font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+    color: var(--text-text);
+    min-width: 0;
+  }
+
+  .latch-info {
+    border-color: var(--role-blue-text);
+    background: color-mix(in srgb, var(--role-blue-text) 6%, transparent);
+  }
+
+  .who {
+    font-weight: 600;
+    color: var(--role-amber-text);
+    white-space: nowrap;
+  }
+
+  .latch-info .who {
+    color: var(--role-blue-text);
+  }
+
+  .text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .action {
+    margin-left: auto;
+    flex: none;
+  }
+}

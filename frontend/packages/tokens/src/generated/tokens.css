@@ -253,6 +253,9 @@
   --elevation-tint-attention: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%);
   --elevation-tint-error: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%);
   --elevation-tint-info: radial-gradient(110% 90% at 0% 0%, rgba(124, 196, 255, 0.16), transparent 60%);
+  --elevation-key-primary: inset 0 1px 0 var(--role-primary-sheen), 0 1px 2px var(--material-shade); /** the primary command key */
+  --elevation-key-armed: inset 0 2px 6px var(--material-well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 0 14px var(--display-bloom-amber); /** an armed key: a well with the amber bloom */
+  --elevation-bar: 0 0 8px var(--display-bloom-amber); /** the armed countdown bar's glow */
   --target-min: 24px;
   --target-take: 28px; /** take-time controls */
   --target-take-studio: 32px; /** take-time controls at 2560x1440 */
@@ -272,15 +275,6 @@
   --font-size-xl-tight: 18px;
   --font-size-2xl: 22px;
   --font-size-3xl: 28px;
-  --font-size-tick: 12px; /** the floor: scale ticks, eyebrows, secondary meta, kbd hints - never read to act */
-  --font-size-label: 13px; /** labels and rows read to act, hints */
-  --font-size-body: 14px; /** body, command keys, table rows, the engine's sentences */
-  --font-size-name: 15px; /** list names: snapshots, projects, steps */
-  --font-size-value: 16px; /** strip names, printed values, section titles, the clock */
-  --font-size-word: 20px; /** take-time words: caps on big keys, the strip dB */
-  --font-size-state: 24px; /** the state word, plate titles */
-  --font-size-hero-small: 32px; /** Setup's step title */
-  --font-size-hero: 44px; /** the one number read from a metre away */
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
@@ -288,6 +282,15 @@
   --font-line-height-text: 1.35;
   --font-tracking-cap: 0.04em; /** uppercase mono key caps and state words */
   --font-tracking-eyebrow: 0.06em;
+  --font-base-tick: 12px;
+  --font-base-label: 13px;
+  --font-base-body: 14px;
+  --font-base-name: 15px;
+  --font-base-value: 16px;
+  --font-base-word: 20px;
+  --font-base-state: 24px;
+  --font-base-hero-small: 32px;
+  --font-base-hero: 44px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -380,12 +383,15 @@
   --audio-engaged-fill: var(--color-warning-500);
   --audio-engaged-dot: var(--color-warning-500);
   --font-family-sans: var(--font-family-ui);
-  --font-size-sm: var(--font-size-tick); /** deprecated alias (A S1) - use font.size.tick; removed in S11 */
-  --font-size-md-tight: var(--font-size-label); /** deprecated alias (A S1) - use font.size.label; removed in S11 */
-  --font-size-md: var(--font-size-body); /** deprecated alias (A S1) - use font.size.body; removed in S11 */
-  --font-size-lg-tight: var(--font-size-name); /** deprecated alias (A S1) - use font.size.name; removed in S11 */
-  --font-size-lg: var(--font-size-value); /** deprecated alias (A S1) - use font.size.value; removed in S11 */
-  --font-size-xl: var(--font-size-word); /** deprecated alias (A S1) - use font.size.word; removed in S11 */
+  --font-size-tick: var(--font-base-tick); /** the floor: scale ticks, eyebrows, secondary meta, kbd hints - never read to act */
+  --font-size-label: var(--font-base-label); /** labels and rows read to act, hints */
+  --font-size-body: var(--font-base-body); /** body, command keys, table rows, the engine's sentences */
+  --font-size-name: var(--font-base-name); /** list names: snapshots, projects, steps */
+  --font-size-value: var(--font-base-value); /** strip names, printed values, section titles, the clock */
+  --font-size-word: var(--font-base-word); /** take-time words: caps on big keys, the strip dB */
+  --font-size-state: var(--font-base-state); /** the state word, plate titles */
+  --font-size-hero-small: var(--font-base-hero-small); /** Setup's step title */
+  --font-size-hero: var(--font-base-hero); /** the one number read from a metre away */
   --radius-sm: var(--radius-key); /** deprecated alias (A S1) - use radius.key; removed in S11 */
   --radius-surface: var(--radius-lg);
   --radius-tight-sm: var(--radius-ctl); /** deprecated alias (A S1) - use radius.ctl; removed in S11 */
@@ -402,5 +408,11 @@
   --color-studio-050: var(--color-text-strong);
   --color-plot-guide: var(--color-brand-green);
   --audio-peak-hold-calm: var(--color-text-subtle);
+  --font-size-sm: var(--font-size-tick); /** deprecated alias (A S1) - use font.size.tick; removed in S11 */
+  --font-size-md-tight: var(--font-size-label); /** deprecated alias (A S1) - use font.size.label; removed in S11 */
+  --font-size-md: var(--font-size-body); /** deprecated alias (A S1) - use font.size.body; removed in S11 */
+  --font-size-lg-tight: var(--font-size-name); /** deprecated alias (A S1) - use font.size.name; removed in S11 */
+  --font-size-lg: var(--font-size-value); /** deprecated alias (A S1) - use font.size.value; removed in S11 */
+  --font-size-xl: var(--font-size-word); /** deprecated alias (A S1) - use font.size.word; removed in S11 */
   --shadow-glow-green: 0 0 0 1px var(--color-brand-green), 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
 }

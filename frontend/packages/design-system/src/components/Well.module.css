@@ -1,0 +1,110 @@
+@layer components {
+  .well {
+    background: var(--material-well);
+    border: 1px solid var(--material-line);
+    box-shadow: var(--elevation-well);
+    color: var(--display-text);
+    min-width: 0;
+  }
+
+  .key {
+    border-radius: var(--radius-key);
+  }
+
+  .screen {
+    border-radius: var(--radius-screen);
+  }
+
+  .readout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    padding: 0 10px;
+    font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .word {
+    font-size: var(--font-size-word);
+  }
+
+  .value {
+    font-size: var(--font-size-value);
+    height: 36px;
+  }
+
+  .hero {
+    height: 64px;
+    font-size: var(--font-size-hero);
+    letter-spacing: -0.02em;
+  }
+
+  .right {
+    justify-content: flex-end;
+  }
+
+  .center {
+    justify-content: center;
+  }
+
+  .doubt {
+    border: 1px dashed var(--display-amber);
+    color: var(--display-amber);
+  }
+
+  .readout[data-empty] {
+    color: var(--display-text2);
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .fieldLabel {
+    font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+    color: var(--display-text2);
+    text-transform: uppercase;
+    letter-spacing: var(--font-tracking-eyebrow);
+  }
+
+  .fieldValue {
+    font: 600 var(--font-size-value) / 1 var(--font-family-mono);
+    color: var(--display-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .screenFrame {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .screenHead {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 32px;
+    flex: none;
+  }
+
+  .screen {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .info {
+    border: 1px solid var(--display-blue);
+  }
+}

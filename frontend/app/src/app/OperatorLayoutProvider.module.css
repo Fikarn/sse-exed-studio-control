@@ -44,6 +44,16 @@
   --operator-font-size-shell-title: calc(30px * var(--operator-ui-scale-factor));
   /* Visual overhaul A, Slice 2 (plan D4): the header is the chrome token, scaled. */
   --operator-shell-height: calc(var(--chrome-studio-header) * var(--operator-ui-scale-factor));
+  /* Visual overhaul A, Slice 3: the A type scale under the operator UI scale. */
+  --font-size-tick: calc(var(--font-base-tick) * var(--operator-ui-scale-factor));
+  --font-size-label: calc(var(--font-base-label) * var(--operator-ui-scale-factor));
+  --font-size-body: calc(var(--font-base-body) * var(--operator-ui-scale-factor));
+  --font-size-name: calc(var(--font-base-name) * var(--operator-ui-scale-factor));
+  --font-size-value: calc(var(--font-base-value) * var(--operator-ui-scale-factor));
+  --font-size-word: calc(var(--font-base-word) * var(--operator-ui-scale-factor));
+  --font-size-state: calc(var(--font-base-state) * var(--operator-ui-scale-factor));
+  --font-size-hero-small: calc(var(--font-base-hero-small) * var(--operator-ui-scale-factor));
+  --font-size-hero: calc(var(--font-base-hero) * var(--operator-ui-scale-factor));
   --operator-shell-header-gap: calc(18px * var(--operator-ui-scale-factor));
   --operator-shell-header-padding-x: calc(24px * var(--operator-ui-scale-factor));
   --operator-shell-header-padding-left: calc(36px * var(--operator-ui-scale-factor));

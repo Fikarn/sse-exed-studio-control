@@ -1,9 +1,16 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { AlertTriangle, Inbox } from "lucide-react";
 
 import { Button, type ButtonVariant } from "./Button";
+import { Lamp } from "./Lamp";
 import styles from "./OperationalState.module.css";
+
+// Visual overhaul A, Slice 3 (findings H5, H6): EmptyState and DegradedState
+// are keylined plates that read as one row and stack to one column when the
+// host is narrower than 320 px (a container query, so a narrow rail never
+// wraps one word per line). LoadingState is a skeleton drawn at the host's
+// geometry, with no animation — an idle surface stays still.
 
 export interface EmptyStateAction {
   label: string;
@@ -49,18 +56,25 @@ export function EmptyState({
   ) : null;
   const showActionsBlock = Boolean(renderAction) || Boolean(actions);
   return (
-    <div className={[styles.state, styles.empty, className].filter(Boolean).join(" ")} role="status" {...props}>
-      <Icon aria-hidden="true" className={styles.icon} strokeWidth={1.7} />
-      <div className={styles.copy}>
-        <strong className={styles.title}>{title}</strong>
-        {message ? <span className={styles.message}>{message}</span> : null}
-      </div>
-      {showActionsBlock ? (
-        <div className={styles.actions}>
-          {renderAction}
-          {actions}
+    <div className={styles.host}>
+      <div
+        className={[styles.state, styles.empty, className].filter(Boolean).join(" ")}
+        data-material="plate"
+        role="status"
+        {...props}
+      >
+        <Icon aria-hidden="true" className={styles.icon} strokeWidth={1.7} />
+        <div className={styles.copy}>
+          <strong className={styles.title}>{title}</strong>
+          {message ? <span className={styles.message}>{message}</span> : null}
         </div>
-      ) : null}
+        {showActionsBlock ? (
+          <div className={styles.actions}>
+            {renderAction}
+            {actions}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -81,13 +95,62 @@ export function DegradedState({
   ...props
 }: DegradedStateProps) {
   return (
-    <div className={[styles.state, styles.degraded, className].filter(Boolean).join(" ")} role="alert" {...props}>
-      <Icon aria-hidden="true" className={styles.icon} strokeWidth={1.7} />
-      <div className={styles.copy}>
-        <strong className={styles.title}>{title}</strong>
-        <span className={styles.message}>{message}</span>
+    <div className={styles.host}>
+      <div
+        className={[styles.state, styles.degraded, className].filter(Boolean).join(" ")}
+        data-material="plate"
+        role="alert"
+        {...props}
+      >
+        <span className={styles.lampSlot}>
+          <Lamp tone="attention" />
+          <Icon aria-hidden="true" className={styles.icon} strokeWidth={1.7} />
+        </span>
+        <div className={styles.copy}>
+          <strong className={styles.title}>{title}</strong>
+          <span className={styles.message}>{message}</span>
+        </div>
+        {actions ? <div className={styles.actions}>{actions}</div> : null}
       </div>
-      {actions ? <div className={styles.actions}>{actions}</div> : null}
+    </div>
+  );
+}
+
+export interface LoadingStateProps extends HTMLAttributes<HTMLDivElement> {
+  /** What is loading, for assistive tech and the visible line
+   *  (`Loading the console…`). */
+  label: string;
+  /** Skeleton rows drawn under the label, at the host's geometry. */
+  rows?: number;
+  /** Height of each row in px (default 40). */
+  rowHeight?: number;
+  /** Fill the host's height rather than the rows' sum. */
+  fill?: boolean;
+}
+
+export function LoadingState({
+  label,
+  rows = 3,
+  rowHeight = 40,
+  fill = false,
+  className,
+  ...props
+}: LoadingStateProps) {
+  return (
+    <div
+      className={[styles.loading, fill ? styles.fill : "", className].filter(Boolean).join(" ")}
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      data-loading=""
+      {...props}
+    >
+      <span className={styles.loadingLabel}>{label}</span>
+      <div className={styles.skeleton} aria-hidden="true">
+        {Array.from({ length: rows }, (_, index) => (
+          <span key={index} className={styles.bone} style={{ "--row-height": `${rowHeight}px` } as CSSProperties} />
+        ))}
+      </div>
     </div>
   );
 }

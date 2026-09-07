@@ -111,8 +111,8 @@ describe("A themes — legibility from the token values", () => {
       it("the display inks read at 4.5:1 on the well", () => {
         const well = { ...vars, ...wellOverrides[theme] };
         for (const ink of [
-          "--text-text",
-          "--text-text2",
+          "--display-text",
+          "--display-text2",
           "--role-green-text",
           "--role-amber-text",
           "--role-red-text",

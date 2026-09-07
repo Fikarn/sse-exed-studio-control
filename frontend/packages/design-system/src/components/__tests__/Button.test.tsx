@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { Button } from "../Button";
 
 // plan PR 6 / workstream D2: Button is the most-imported design-system
@@ -69,6 +73,19 @@ describe("Button", () => {
     );
     await user.click(screen.getByRole("button", { name: "Inert" }));
     expect(onClick).not.toHaveBeenCalled();
+  });
+
+  // Visual overhaul A, Slice 3 (system §7, §9): Button aliases Key mode="command"
+  // — sentence-case labels and no hover travel. Old: the recipe set
+  // text-transform: uppercase and translated the key on hover.
+  it("prints sentence case and never travels", () => {
+    const css = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "Button.module.css"),
+      "utf8"
+    );
+    expect(css).not.toContain("text-transform: uppercase");
+    expect(css).not.toMatch(/:hover \{[^}]*transform/);
+    expect(css).toContain("var(--elevation-key)");
   });
 
   it("renders the leadingVisual slot when provided", () => {

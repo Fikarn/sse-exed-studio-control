@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 
+import { Lamp, type LampTone } from "./Lamp";
 import styles from "./Toast.module.css";
 
 export type ToastTone = "ok" | "attention" | "error" | "info";
@@ -15,22 +16,29 @@ export interface ToastProps {
   message: string;
   /** Optional one-line headline above the message. */
   title?: string;
-  /** Optional primary action — usually "Undo". Renders as a low-affordance
-   *  inline button to the right of the message. */
+  /** Optional primary action — usually "Undo". Renders as a key at the
+   *  toast's end. */
   action?: ToastAction;
   /** Dismiss button click. Always rendered. */
   onDismiss: () => void;
 }
 
 /**
- * Single toast bubble. Tones: ok (success / non-error confirmation),
- * attention (amber — a blocked-action or degraded-but-not-failed advisory),
- * info (neutral status), error (sticky failures). Stacks are rendered by
- * the consumer via a portal — this primitive is one tile.
+ * Single toast bubble — a floating plate (level +3) with a lamp and its word
+ * (visual overhaul A, Slice 3). Tones: ok, attention (amber), info, error
+ * (sticky failures, announced assertively). Stacks are rendered by the
+ * consumer via a portal — this primitive is one tile.
  */
 export function Toast({ tone, message, title, action, onDismiss }: ToastProps) {
   return (
-    <div className={styles.toast} data-tone={tone} role={tone === "error" ? "alert" : "status"}>
+    <div
+      className={styles.toast}
+      data-tone={tone}
+      data-level="float"
+      data-material="plate"
+      role={tone === "error" ? "alert" : "status"}
+    >
+      <Lamp tone={tone as LampTone} className={styles.lamp} />
       <div className={styles.body}>
         {title ? <div className={styles.title}>{title}</div> : null}
         <div className={styles.message}>{message}</div>
@@ -41,7 +49,7 @@ export function Toast({ tone, message, title, action, onDismiss }: ToastProps) {
         </button>
       ) : null}
       <button type="button" className={styles.dismiss} onClick={onDismiss} aria-label="Dismiss">
-        <X aria-hidden="true" size={12} strokeWidth={2} />
+        <X aria-hidden="true" size={14} strokeWidth={2} />
       </button>
     </div>
   );

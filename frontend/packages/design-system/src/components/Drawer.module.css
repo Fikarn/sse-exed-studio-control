@@ -1,0 +1,89 @@
+@layer components {
+  .drawer {
+    position: fixed;
+    top: calc(var(--operator-shell-height, var(--chrome-studio-header)));
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-overlay);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 16px;
+    border-left: 1px solid var(--material-line2);
+    background: var(--elevation-plate-fill);
+    box-shadow: var(--elevation-float);
+    color: var(--text-text);
+    outline: none;
+  }
+
+  .drawer:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .drawer {
+      animation: aDrawerIn var(--motion-duration-enter) var(--motion-easing-out);
+    }
+  }
+
+  @keyframes aDrawerIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .title {
+    margin: 0;
+    font: 600 var(--font-size-state) / 1.1 var(--font-family-mono);
+    letter-spacing: -0.01em;
+  }
+
+  .actions {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .close {
+    appearance: none;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: var(--radius-key);
+    border: 1px solid var(--material-line);
+    background: var(--elevation-key-fill);
+    box-shadow: var(--elevation-key);
+    color: var(--text-text);
+    font: 600 var(--font-size-label) / 1 var(--font-family-ui);
+    cursor: pointer;
+  }
+
+  .close:hover {
+    border-color: var(--material-line2);
+  }
+
+  .close:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    overflow: auto;
+  }
+}

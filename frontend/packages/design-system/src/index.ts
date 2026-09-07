@@ -1,5 +1,23 @@
 export { AppShellFrame } from "./components/AppShellFrame";
 export type { AppShellFrameProps, MonitorItem, RailItem } from "./components/AppShellFrame";
+export { Key, ArmKey, Segmented } from "./components/Key";
+export type { ArmKeyProps, KeyMode, KeyProps, SegmentedProps } from "./components/Key";
+export { useArm, ARM_DWELL_MS, ARM_TIMEOUT_MS } from "./components/useArm";
+export type { ArmedKey, UseArmOptions, UseArmResult } from "./components/useArm";
+export { StateDisplay } from "./components/StateDisplay";
+export type { StateDisplayArmed, StateDisplayProps, StateDisplayTone } from "./components/StateDisplay";
+export { LampWord, Latch } from "./components/LampWord";
+export type { LampWordProps, LatchProps } from "./components/LampWord";
+export { Well, Readout, Field, Screen } from "./components/Well";
+export type { FieldProps, ReadoutProps, ScreenProps, WellProps } from "./components/Well";
+export { Slider, Groove } from "./components/Slider";
+export type { GrooveProps, SliderBaseProps, SliderProps } from "./components/Slider";
+export { Meter } from "./components/Meter";
+export type { MeterProps } from "./components/Meter";
+export { PlateHead, Section, Fields, Readouts, ControlRow, Danger } from "./components/Plate";
+export type { ControlRowProps, PlateHeadProps, ReadoutRow, ReadoutsProps, SectionProps } from "./components/Plate";
+export { Drawer } from "./components/Drawer";
+export type { DrawerProps } from "./components/Drawer";
 export { Footer } from "./components/Footer";
 export type { FooterHint, FooterItem, FooterProps } from "./components/Footer";
 export { Lamp } from "./components/Lamp";
@@ -37,8 +55,13 @@ export { ChipStrip } from "./components/ChipStrip";
 export type { ChipStripChip, ChipStripProps } from "./components/ChipStrip";
 export { Tooltip } from "./components/Tooltip";
 export type { TooltipPlacement, TooltipProps } from "./components/Tooltip";
-export { EmptyState, DegradedState } from "./components/OperationalState";
-export type { DegradedStateProps, EmptyStateAction, EmptyStateProps } from "./components/OperationalState";
+export { EmptyState, DegradedState, LoadingState } from "./components/OperationalState";
+export type {
+  DegradedStateProps,
+  EmptyStateAction,
+  EmptyStateProps,
+  LoadingStateProps,
+} from "./components/OperationalState";
 export { HealthBar, HealthItem } from "./components/HealthBar";
 export type {
   HealthBarHint,
@@ -74,7 +97,8 @@ export type { SegmentedControlOption, SegmentedControlProps } from "./components
 export type { SharedStatusTone } from "./components/statusTone";
 export { toneForSubsystem, worstTone } from "./components/statusTone";
 export { StatusBadge } from "./components/StatusBadge";
-export type { StatusBadgeProps, StatusTone } from "./components/StatusBadge";
+export { canonicalBadgeTone } from "./components/StatusBadge";
+export type { StatusBadgeLegacyTone, StatusBadgeProps, StatusTone } from "./components/StatusBadge";
 export { StatusDot } from "./components/StatusDot";
 export type { StatusDotProps, StatusDotSize, StatusDotState } from "./components/StatusDot";
 export { StatusBand } from "./components/StatusBand";

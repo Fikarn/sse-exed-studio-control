@@ -1,108 +1,99 @@
+/* Visual overhaul A, Slice 3 (system §7, §9): Button aliases Key mode="command"
+   — the machined key recipe, sentence-case labels (no uppercase), no hover
+   travel. Variants map onto the key modes: primary → the primary command key,
+   secondary → command, ghost → an edge-only key, danger → the red keyline. */
 @layer components {
   .button {
+    appearance: none;
+    position: relative;
     align-items: center;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
-    border: 1px solid var(--color-bg-stroke);
-    border-radius: var(--radius-tight-md);
-    color: var(--color-brand-text-primary);
-    cursor: pointer;
     display: inline-flex;
-    font-family: var(--font-family-mono);
-    font-size: var(--operator-font-size-sm, 11px);
-    font-weight: 700;
-    gap: 7px;
     justify-content: center;
+    gap: 8px;
+    padding: 0 12px;
+    border-radius: var(--radius-key);
+    border: 1px solid var(--material-line);
+    background: var(--elevation-key-fill);
+    box-shadow: var(--elevation-key);
+    color: var(--text-text);
+    cursor: pointer;
+    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
     letter-spacing: 0;
-    padding: 0 14px;
-    text-transform: uppercase;
-    transition:
-      transform var(--motion-duration-fast) ease,
-      box-shadow var(--motion-duration-fast) ease,
-      border-color var(--motion-duration-fast) ease,
-      background-color var(--motion-duration-fast) ease;
     white-space: nowrap;
+    transition:
+      border-color var(--motion-duration-press) var(--motion-easing-mech),
+      color var(--motion-duration-press) var(--motion-easing-mech);
   }
 
   .button:hover {
-    border-color: var(--color-bg-border);
-    transform: translateY(-1px);
+    border-color: var(--material-line2);
   }
 
-  .button:active {
-    transform: translateY(0);
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
-  }
-
-  .button:active:not(.primary):not(.danger) {
-    background-color: var(--color-bg-soft);
+  .button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
-    transform: none;
+    background: transparent;
+    box-shadow: none;
+    border-style: dashed;
+    border-color: var(--material-line2);
   }
 
   .leading {
-    color: var(--color-brand-text-secondary);
-    font-size: 0.95em;
+    color: inherit;
     display: inline-flex;
     align-items: center;
   }
 
   .default {
-    min-height: 30px;
+    min-height: 36px;
   }
 
   .compact {
-    min-height: 28px;
-    padding-inline: 12px;
-    font-size: var(--operator-font-size-xs, 10px);
+    min-height: 32px;
+    padding-inline: 10px;
+    font-size: var(--font-size-label);
   }
 
   .primary {
-    background: linear-gradient(180deg, var(--color-brand-green-hot) 0%, var(--color-brand-green) 100%);
-    border-color: var(--color-brand-green);
-    color: var(--color-bg-deep);
-    font-weight: 700;
-    box-shadow:
-      var(--shadow-inset-hi-strong),
-      0 1px 2px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(180deg, var(--role-primary-fill-top), var(--role-primary-fill));
+    border-color: transparent;
+    color: var(--role-primary-ink);
+    box-shadow: var(--elevation-key-primary);
   }
 
   .primary:hover {
-    border-color: var(--color-brand-green-hot);
-  }
-
-  .primary .leading {
-    color: var(--color-bg-deep);
-    opacity: 0.7;
+    border-color: var(--role-primary-ink);
   }
 
   .secondary {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
-    background-color: var(--color-bg-raised);
+    background: var(--elevation-key-fill);
   }
 
   .ghost {
     background: transparent;
     border-color: transparent;
-    color: var(--color-brand-text-secondary);
+    box-shadow: none;
+    color: var(--text-text2);
   }
 
   .ghost:hover {
-    border-color: var(--color-bg-stroke);
-    background: var(--color-bg-soft);
+    border-color: var(--material-line);
+    color: var(--text-text);
   }
 
   .danger {
-    background: linear-gradient(180deg, var(--color-danger-soft-strong), var(--color-danger-soft));
-    border-color: var(--color-danger-border);
-    color: var(--color-danger-500);
+    background: var(--elevation-key-fill);
+    border-color: var(--role-red-text);
+    color: var(--role-red-text);
   }
 
   .danger:hover {
-    border-color: var(--color-danger-border-strong);
+    border-color: var(--role-red-text);
   }
 
   .spinner {
