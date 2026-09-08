@@ -1,0 +1,57 @@
+/* Visual overhaul A, Slice 4b: the strip's fader block — scale, groove, meter
+   in one row, filling the height the strip has left. */
+
+.faderBlock {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+/* The groove's wrapper carries the value the strip prints elsewhere, so here it
+   is only the column the cap rides in. */
+.faderBlock > :nth-child(2) {
+  flex: none;
+}
+
+.scale {
+  position: relative;
+  width: 22px;
+  flex: none;
+}
+
+.scaleMark {
+  position: absolute;
+  /* Clear of the groove's amber unity notch, so the mark is read against the
+     strip floor and nothing else. */
+  right: 3px;
+  transform: translateY(50%);
+  /* A little room around the numeral: at 12 px a bare glyph fills its box, and
+     a mark read on the strip floor should have floor around it. */
+  padding: 1px 3px;
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--text-text2);
+  white-space: nowrap;
+}
+
+/* Below the studio surface the block keeps all three columns — the scale, the
+   groove and the meter — in a 96 px strip: the mock's 1920 geometry. The groove
+   stays a 40 px target, well above the take-time floor. */
+:global([data-operator-layout-root][data-chrome="compact"]) .faderBlock {
+  gap: 4px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .scale {
+  width: 20px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .faderBlock [role="slider"] {
+  width: 40px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .faderBlock [data-meter] {
+  width: 20px;
+}

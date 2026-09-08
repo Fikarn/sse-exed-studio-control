@@ -945,14 +945,14 @@
       "$description": "engaged"
     },
     "keyLitAmberFill": {
-      "$value": "linear-gradient(180deg, var(--role-amber-fill-top), var(--role-amber-fill))"
+      "$value": "linear-gradient(180deg, var(--role-amber-fill-top), var(--role-amber-fill)) var(--role-amber-fill)"
     },
     "keyLitGreen": {
       "$value": "inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 18px var(--role-green-bloom)",
       "$description": "live"
     },
     "keyLitGreenFill": {
-      "$value": "linear-gradient(180deg, var(--role-green-fill-top), var(--role-green-fill))"
+      "$value": "linear-gradient(180deg, var(--role-green-fill-top), var(--role-green-fill)) var(--role-green-fill)"
     },
     "cap": {
       "$value": "inset 0 1px 0 var(--role-cap-sheen), 0 2px 4px var(--material-shade)",

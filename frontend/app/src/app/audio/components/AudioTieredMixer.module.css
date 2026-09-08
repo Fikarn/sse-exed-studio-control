@@ -1,293 +1,121 @@
-/* AudioTieredMixer module — Console redesign (2026-05-27).
+/* AudioTieredMixer module — visual overhaul A, Slice 4b (system §2, §7).
  *
- * Horizontal signal-flow layout: Inputs → Playback → Outputs sit as three
- * equal-width section cards in a single row. The previous stacked tier
- * layout is replaced; tier accent colors are unified to --accent per the
- * Console prototype's single-amber discipline.
+ * The bay carries three tiers side by side — Inputs, Playback, Outputs — each
+ * a column of strips under its own head, with a hairline between them so the
+ * eye finds the three groups. The tiers are sized by what they hold: a strip is
+ * a fixed 120 px, so a tier is as wide as its strips and the bay spends what is
+ * left on the widest one.
  */
 
 .tieredMixer {
   position: relative;
   flex: 1 1 auto;
-  display: grid;
-  /* C08: content-proportional, NOT count-based. The three columns are sized to
-     their settled content width (Inputs ~4 lanes ≈ 462px, Playback ~6 lanes ≈
-     686px, Outputs 3 × 220px lanes ≈ 680px) so Inputs no longer leaves a void
-     while Outputs — whose 220px lanes are 2× a channel strip — keeps enough
-     room to avoid a horizontal scrollbar. A naïve count-keyed 4:6:3 would
-     starve Outputs; the ~4.2:6.2:6.1 ratio tracks content instead. */
-  grid-template-columns: minmax(0, 4.2fr) minmax(0, 6.2fr) minmax(0, 6.1fr);
-  grid-template-rows: minmax(0, 1fr);
-  gap: 14px;
+  display: flex;
+  gap: 0;
   min-height: 0;
-  padding: 14px 16px 0;
+  padding: 16px;
 }
 
 .mixerTier {
   position: relative;
   z-index: 2;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   min-height: 0;
-  border-radius: var(--radius-sm);
-  background: var(--bg-1);
-  overflow: hidden;
+  min-width: 0;
+}
+
+.mixerTier + .mixerTier {
+  margin-left: 12px;
+  padding-left: 11px;
+  border-left: 1px solid var(--material-line);
 }
 
 .outputTier {
-  background: var(--bg-1);
-  box-shadow:
-    inset 0 0 0 1px var(--line-2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  flex: 1;
 }
 
 .tierLabel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  /* DP3 (POLISH PASS 3): a touch more vertical air now that the lead carries a
-     two-line title-over-meta card; the three tier headers settle at one height. */
-  padding: 9px 14px 10px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-2);
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-}
-
-.mixerTier[data-tier="hardware-inputs"] .tierLabel {
-  background: linear-gradient(180deg, color-mix(in oklch, var(--accent) 6%, var(--bg-2)) 0%, var(--bg-2) 100%);
-}
-
-.mixerTier[data-tier="hardware-inputs"] .tierTitleBlock > span:last-child::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  margin-right: 8px;
-  vertical-align: middle;
-  opacity: 0.6;
-  position: relative;
-  top: -1px;
-}
-
-.mixerTier[data-tier="software-playback"] .tierLabel {
-  background: var(--bg);
-  color: var(--audio-caption-muted);
-}
-
-.mixerTier[data-tier="software-playback"] .tierTitleBlock > span:last-child::before {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--fg-4);
-  background: transparent;
-  margin-right: 8px;
-  vertical-align: middle;
-  border-radius: 50%;
-  position: relative;
-  top: -1px;
-}
-
-.outputTier .tierLabel {
-  background: var(--accent-soft);
-  border-bottom-color: var(--accent-glow);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-/* Source-tier (Inputs / Playback) header lead: packs the title block and the
-   active mix-target echo into the `1fr` grid column so the "which bus am I
-   riding?" context sits beside the left-side faders. The mix-for echo lives
-   here rather than as a third `justify-self:end` sibling (chips + bank pill
-   already own the `auto` column). */
-.tierHeaderLead {
-  display: inline-flex;
-  /* DP3 (POLISH PASS 3): the lead becomes a two-line stack — the title block
-     claims the whole first line (flex: 0 0 100% below), routing + spec wrap
-     onto the second as a quiet, baseline-aligned meta line. */
-  flex-wrap: wrap;
+  display: flex;
   align-items: baseline;
-  column-gap: 11px;
-  row-gap: 5px;
+  gap: 10px;
   min-width: 0;
+  height: 24px;
+  padding: 0 2px;
+  cursor: pointer;
 }
 
-.tierHeaderLead .tierTitleBlock {
-  flex: 0 0 100%;
-}
-
-.tierTitleBlock {
-  display: inline-flex;
-  align-items: center;
-  /* DP3 (POLISH PASS 3): a touch more air; the tier number reads as a quiet
-     index ahead of the name rather than crowding the icon. */
-  gap: 9px;
+.tierHeaderLead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
-.tierTitleBlock > span:last-child {
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-weight: 500;
+.tierTitle {
+  font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+  color: var(--text-text);
+  flex: none;
 }
 
-.tierIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--audio-caption-muted);
-  width: 14px;
-  height: 14px;
+.tierDetail {
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.outputTier .tierIcon {
-  color: var(--accent);
+/* The lock note stands on the tier the hand is reaching for. */
+.tierLockNote {
+  font: 600 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--role-amber-text);
+  flex: none;
 }
 
-.tierNum {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
-  color: var(--audio-caption-muted);
-  letter-spacing: 0.16em;
+.tierLockNote[data-tone="error"] {
+  color: var(--role-red-text);
+}
+
+[data-mix-for-name="short"] {
+  display: none;
 }
 
 .tierChipRow {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
-  justify-self: end;
+  flex: none;
 }
 
 .tierChip {
-  appearance: none;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-3xs-plus);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: var(--radius-tight-sm);
-  background: var(--bg);
-  color: var(--fg-3);
-  border: 1px solid var(--line);
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-ctl);
+  background: transparent;
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
   cursor: pointer;
-  transition:
-    background var(--motion-duration-fast) var(--easing),
-    color var(--motion-duration-fast) var(--easing),
-    border-color var(--motion-duration-fast) var(--easing);
-}
-
-.tierChip:hover {
-  border-color: var(--line-2);
-  color: var(--fg);
 }
 
 .tierChip[data-active="true"] {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: var(--accent-glow);
+  border-color: var(--role-amber-line);
+  background: var(--role-amber-fill-top);
+  color: var(--role-amber-text);
 }
 
-/* Bank pill — kept visible (operators rely on it to see which bank is shown);
-   styled as a quiet mono caption in the tier header. */
-.tierLabel small {
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  letter-spacing: 0.08em;
-  color: var(--audio-caption-muted);
-  text-transform: uppercase;
-  justify-self: end;
-  white-space: nowrap;
-}
-
-/* DP3 (POLISH PASS 3): the bank-spec caption now rides on the lead's second
-   row — muted, left-aligned, ellipsised, set off from the routing echo by a
-   hairline left border (no glyph). UI font + near-zero tracking so the name
-   above stays the anchor and the spec reads as supporting metadata. */
-.tierHeaderLead > small {
-  flex: 0 1 auto;
-  min-width: 0;
-  justify-self: start;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-ui);
-  text-transform: none;
-  letter-spacing: 0.005em;
-  color: var(--audio-caption-muted);
-  padding-left: 11px;
-  border-left: 1px solid var(--line);
-}
-
-.tierMixFor {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  justify-self: end;
-  text-transform: none;
-  font-family: var(--font-ui);
-  letter-spacing: -0.005em;
-}
-
-/* DP3 (POLISH PASS 3): the routing lead-in stays put on the lead's second row
-   while the spec caption flexes/ellipsises beside it. */
-.tierHeaderLead .tierMixFor {
-  flex-shrink: 0;
-}
-
-.tierMixForEyebrow {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-3xs-plus);
-  letter-spacing: 0.12em;
-  color: var(--fg-3);
-  text-transform: uppercase;
-  font-weight: 500;
-}
-
-.tierMixForArrow {
-  color: var(--accent);
-  font-size: var(--font-size-sm);
-  line-height: 1;
-}
-
-.tierMixForName {
-  font-size: var(--font-size-md-tight);
-  font-weight: 600;
-  color: var(--accent);
-  letter-spacing: -0.01em;
-}
-
-/* Source-tier echo carries both the full name and the shortName; the wide
-   surface shows the full name, the narrow container query swaps to shortName.
-   (The output-tier `.tierMixForName` has no data-mix-for-name attr and always
-   shows the full name in its roomy `auto` column.) */
-.tierMixForName[data-mix-for-name="short"] {
-  display: none;
-}
-
-/* C11: Peak Hold + Reset eyebrow on the Outputs tier header. Replaces the
-   retired ~38px context-bar row; sits in the header's `auto` column at the
-   right edge alongside the (conditional) meter-simulation chip. Geometry +
-   palette mirror the old `.canvasModeSwitch` / `.meterSimulationChip` so the
-   controls read identically — just hosted in the most-metered tier instead of
-   a standalone row. */
 .tierMeterEyebrow {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  justify-self: end;
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
   cursor: default;
 }
 
@@ -344,21 +172,12 @@
   color: var(--fg);
 }
 
-.tierLaneGrid {
-  display: flex;
-  gap: 2px;
-  align-items: flex-start;
-  padding: 14px 8px;
-  min-height: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
+.tierLaneGrid,
 .outputLaneGrid {
   display: flex;
-  gap: 2px;
-  align-items: flex-start;
-  padding: 14px 8px;
+  gap: 8px;
+  align-items: stretch;
+  flex: 1;
   min-height: 0;
   overflow-x: auto;
   scrollbar-width: thin;
@@ -387,40 +206,36 @@
   text-transform: uppercase;
 }
 
-/* 2026-09 audit Slice 9: compact density (operator root narrower than 2200 px,
-   e.g. the 1920×1080 studio monitor). The view model shows 4 inputs, 4 playback
-   pairs and 3 outputs per bank; the columns share the width 1 : 1 : 1.25 so the
-   outputs column keeps room for three 176 px lanes and no tier scrolls
-   sideways (budget at 1920: ~1480 px for the three tiers → ~455 / 455 / 569). */
+/* Below the studio surface the bay spends less air and the tier detail collapses
+   to the short name, so the head stays one line at the 1920×1080 fallback. */
 [data-density="compact"] .tieredMixer {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
+  padding: 12px;
+  gap: 0;
 }
 
-/* Visual overhaul A, Slice 4a: with the cluster in the shell the outputs column
-   is ~502 px at the 1920×1080 fallback, so its gutters give back the 8 px the
-   three 160 px lanes need. */
+[data-density="compact"] .tierLaneGrid,
 [data-density="compact"] .outputLaneGrid {
-  padding: 14px 4px;
+  gap: 6px;
 }
 
-@container operator-root (max-width: 1600px) {
-  .tieredMixer {
-    gap: 8px;
-    padding: 10px 12px 0;
-  }
+[data-density="compact"] .mixerTier + .mixerTier {
+  margin-left: 8px;
+  padding-left: 7px;
+}
 
-  /* Narrow surface (e.g. 1920 fallback): collapse the source-tier mix-target
-     echo to shortName so the title row never wraps or pushes the chip/pill
-     cell into a second line. */
-  .tierHeaderLead {
-    gap: 10px;
-  }
+[data-density="compact"] [data-mix-for-name="full"] {
+  display: none;
+}
 
-  .tierMixForName[data-mix-for-name="full"] {
-    display: none;
-  }
+[data-density="compact"] [data-mix-for-name="short"] {
+  display: inline;
+}
 
-  .tierMixForName[data-mix-for-name="short"] {
-    display: inline;
-  }
+/* The outputs head carries the meter-simulation chip and the peak-hold keys.
+   Below the studio surface the chip gives way first — the footer says the same
+   thing — so the tier stays as wide as its three strips and never scrolls. */
+[data-density="compact"] .tierMeterSimChip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

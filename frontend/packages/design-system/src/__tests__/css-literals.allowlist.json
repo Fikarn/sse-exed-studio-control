@@ -95,12 +95,6 @@
     "radius": 2,
     "shadow": 5
   },
-  "app/src/app/audio/components/AudioStripPreamp.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 2,
-    "shadow": 1
-  },
   "app/src/app/audio/components/AudioTieredMixer.module.css": {
     "colour": 1,
     "fontSize": 0,

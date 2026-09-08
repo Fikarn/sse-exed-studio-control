@@ -21,7 +21,10 @@ import {
 // surface, so the old 640×213 / 426×640 preamp-bitmap aspect ratios no longer
 // apply. Kept as two named constants so the per-surface assertions still read
 // as "strip preamp" vs "inspector preamp" intent.
-export const COMPACT_PREAMP_ASPECT_RATIO = 1;
+// Visual overhaul A, Slice 4b: the strip's preamp is a gain key now, so only
+// the inspector's knob is measured by aspect. COMPACT_PREAMP_ASPECT_RATIO is
+// retired with the strip knob; its callers compare the two surfaces' gain keys
+// to each other instead.
 export const NARROW_PREAMP_ASPECT_RATIO = 1;
 
 async function readRequiredBoxBySelector(page: Page, selector: string, label: string) {

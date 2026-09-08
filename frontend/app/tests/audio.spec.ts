@@ -19,7 +19,6 @@ import {
 
 import { AUDIO_ARM_MIN_DWELL_MS } from "../src/app/audio/audioConstants";
 import {
-  COMPACT_PREAMP_ASPECT_RATIO,
   NARROW_PREAMP_ASPECT_RATIO,
   expectAudioInspectorPanelsFit,
   expectAudioLaneCardsInsideTierGrids,
@@ -399,6 +398,53 @@ test("renders unclipped dBFS scale labels beside every audio meter", async ({ pa
   await expectDbfsScaleLabelsInsideMeters(page, "native 2560 output inspector");
 });
 
+// Visual overhaul A, Slice 4b (plan Slice 4, finding C2): when the console is
+// locked, every write on the bay is outlined and says why — and the reason is
+// on the tier header the operator's hand is reaching for, not only in the
+// cluster's state display.
+test("audio-not-verified outlines every console write on the bay and prints the reason on each tier header", async ({
+  page,
+}) => {
+  await openFixture(page, "audio-not-verified");
+
+  const reason = "Console controls stay locked until the audio probe passes.";
+  for (const tier of ["hardware-inputs", "software-playback", "hardware-outputs"]) {
+    await expect(page.getByTestId(`audio-tier-lock-note-${tier}`)).toHaveText("locked · run the audio probe");
+  }
+
+  const strip = page.getByTestId("audio-strip-audio-input-9");
+  for (const testId of ["audio-lane-phantom-audio-input-9", "audio-lane-gain-audio-input-9"]) {
+    const key = strip.getByTestId(testId);
+    await expect(key).toHaveAttribute("aria-disabled", "true");
+    await expect(key).toHaveAttribute("title", reason);
+    expect(await key.evaluate((node) => getComputedStyle(node).borderStyle)).toBe("dashed");
+  }
+  const fader = strip.getByRole("slider", { name: "Host send level" });
+  await expect(fader).toHaveAttribute("aria-disabled", "true");
+  await expect(strip.getByRole("button", { name: "Mute Host" })).toBeDisabled();
+  await expect(strip.getByRole("button", { name: "Solo Host" })).toBeDisabled();
+
+  // The lock is the engine's, so it lifts the moment the probe passes.
+  await page.getByTestId("audio-state-probe").click();
+  await expect(page.getByTestId("audio-tier-lock-note-hardware-inputs")).toHaveCount(0);
+  await expect(strip.getByTestId("audio-lane-gain-audio-input-9")).not.toHaveAttribute("aria-disabled", "true");
+});
+
+// Visual overhaul A, Slice 4b (plan Slice 4): with no console there is no
+// signal, so the strips' meters are empty wells and their readouts print what
+// the desk last said rather than inventing movement.
+test("audio-offline empties the strip meters", async ({ page }) => {
+  await openFixture(page, "audio-offline");
+
+  const strip = page.getByTestId("audio-strip-audio-input-9");
+  await expect(strip).toBeVisible();
+  const meter = strip.locator("[data-meter]");
+  await expect(meter).toHaveCount(1);
+  await expect(meter).toHaveAttribute("data-empty", "");
+  await expect(meter.locator("[data-signal='meter']")).toHaveCount(0);
+  await expect(strip.getByTestId("audio-lane-readout-audio-input-9")).toBeVisible();
+});
+
 test("renders live-console meter references instead of loudness readouts", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
@@ -461,7 +507,11 @@ test("keeps the audio workspace stable during meter-only ticks", async ({ page }
   });
   await openFixture(page, "audio-populated");
 
-  const meter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]').first();
+  // Visual overhaul A, Slice 4b. Old: the strip's meter was
+  // `[data-meter-component="stereo"]`. New: `[data-meter]`. Reason: the strip
+  // composes the design system's meter; the inspector keeps the tall Console
+  // meter until Slice 4c.
+  const meter = page.getByTestId("audio-strip-audio-input-9").locator("[data-meter]").first();
   await expect(meter).toBeVisible();
   const canvas = page.getByTestId("audio-meter-canvas");
   await expect(canvas).toBeVisible();
@@ -624,7 +674,14 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Test meter simulation");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST STAGE");
 
-  const hostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
+  // Visual overhaul A, Slice 4b. Old: every strip meter assertion read
+  // `[data-meter-component="stereo"]` and its `--audio-meter-*` custom
+  // properties. New: `[data-meter]` and the design system's `--meter-level` on
+  // each bar. Reason: the strip composes the design system's meter, which fills
+  // by the same dBFS scale and still names its track, fill and peak. What is
+  // checked is unchanged: the strip meters move under simulation, a mono strip
+  // mirrors one level, and nothing about them animates or transitions.
+  const hostMeter = page.getByTestId("audio-strip-audio-input-9").locator("[data-meter]");
   await expect(hostMeter).toHaveCount(1);
   const meterCanvas = page.getByTestId("audio-meter-canvas");
   await expect(meterCanvas).toBeVisible();
@@ -635,51 +692,30 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await expect(stripFill).toBeVisible();
   expect(await stripFill.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
   expect(await stripFill.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe("0s");
-  expect(["auto", "transform"]).toContain(await stripFill.evaluate((node) => getComputedStyle(node).willChange));
-  expect(await stripFill.evaluate((node) => getComputedStyle(node).transform)).not.toBe("none");
-  const firstHostMeterVars = await hostMeter.evaluate((node) => {
-    const style = getComputedStyle(node);
-    return {
-      left: style.getPropertyValue("--audio-meter-left").trim(),
-      right: style.getPropertyValue("--audio-meter-right").trim(),
-      peakLeft: style.getPropertyValue("--audio-meter-peak-left").trim(),
-      peakRight: style.getPropertyValue("--audio-meter-peak-right").trim(),
-    };
-  });
-  expect(firstHostMeterVars.right).toBe(firstHostMeterVars.left);
-  expect(firstHostMeterVars.peakRight).toBe(firstHostMeterVars.peakLeft);
+  // Old: the fill was a transformed layer, so the guard read `transform` and
+  // `will-change`. New: the design system's fill is the bar's own height, so
+  // the guard reads that it has one. Reason: the meter is the design system's;
+  // what the guard is for — the fill moves without animating — is unchanged.
+  expect(await stripFill.evaluate((node) => getComputedStyle(node).height)).not.toBe("0px");
+  // A mono source mirrors one level: it renders one bar, not two.
+  await expect(hostMeter.locator("[data-meter-track]")).toHaveCount(1);
   const stripPeak = hostMeter.locator('[data-meter-peak="left"]').first();
   await expect(stripPeak).toBeVisible();
   expect(await stripPeak.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
   expect(await stripPeak.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe("0s");
   const stripPeakColor = await stripPeak.evaluate((node) => getComputedStyle(node).backgroundColor);
   expect(stripPeakColor).not.toBe("rgba(0, 0, 0, 0)");
-  expect(stripPeakColor).not.toContain("255, 255, 255");
-  const hostPeakVars = await hostMeter.evaluate((node) => {
-    const style = getComputedStyle(node);
-    return {
-      left: style.getPropertyValue("--audio-meter-peak-left").trim(),
-      right: style.getPropertyValue("--audio-meter-peak-right").trim(),
-    };
-  });
-  expect(hostPeakVars.left).not.toBe("");
-  expect(hostPeakVars.right).not.toBe("");
-  expect(hostPeakVars.right).toBe(hostPeakVars.left);
+  const stripPeakPosition = await stripPeak.evaluate((node) => (node as HTMLElement).style.bottom);
+  expect(stripPeakPosition).not.toBe("");
 
   const inspectorPeak = page.getByTestId("audio-inspector-metering").locator('[data-meter-peak="left"]').first();
   await expect(inspectorPeak).toBeVisible();
   expect(await inspectorPeak.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
   expect(await inspectorPeak.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe("0s");
 
-  await expect(page.getByTestId("audio-strip-audio-input-10").locator('[data-meter-component="stereo"]')).toHaveCount(
-    1
-  );
-  await expect(page.getByTestId("audio-strip-audio-input-11").locator('[data-meter-component="stereo"]')).toHaveCount(
-    1
-  );
-  await expect(page.getByTestId("audio-strip-audio-input-12").locator('[data-meter-component="stereo"]')).toHaveCount(
-    1
-  );
+  await expect(page.getByTestId("audio-strip-audio-input-10").locator("[data-meter]")).toHaveCount(1);
+  await expect(page.getByTestId("audio-strip-audio-input-11").locator("[data-meter]")).toHaveCount(1);
+  await expect(page.getByTestId("audio-strip-audio-input-12").locator("[data-meter]")).toHaveCount(1);
   const readSeededLevels = async () => {
     const levels: number[] = [];
     for (const testId of [
@@ -691,8 +727,9 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
       levels.push(
         await page
           .getByTestId(testId)
-          .locator('[data-meter-component="stereo"]')
-          .evaluate((node) => Number.parseFloat(getComputedStyle(node).getPropertyValue("--audio-meter-left")))
+          .locator("[data-meter-track]")
+          .first()
+          .evaluate((node) => Number.parseFloat(getComputedStyle(node).getPropertyValue("--meter-level")) * 100)
       );
     }
     return levels;
@@ -710,9 +747,7 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
     .poll(async () => new Set((await readSeededLevels()).map((value) => Math.round(value))).size, { timeout: 5_000 })
     .toBeGreaterThan(1);
 
-  const programPlaybackMeter = page
-    .getByTestId("audio-strip-audio-playback-1-2")
-    .locator('[data-meter-component="stereo"]');
+  const programPlaybackMeter = page.getByTestId("audio-strip-audio-playback-1-2").locator("[data-meter]");
   await expect(programPlaybackMeter).toHaveCount(1);
   // 2026-05-27 redesign: the rail's "Active mix" mini-meter (audio-active-mix-meter)
   // was removed with the rail; the monitor bar's master meter replaced it. The
@@ -731,18 +766,25 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Test meter simulation");
   await expect(page.locator("[data-simulated-meter]")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-playback-3-4").locator("[data-simulation-profile]")).toHaveCount(0);
-  const hardwareHostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
-  const hardwareMeterVars = await hardwareHostMeter.evaluate((node) => {
-    const style = getComputedStyle(node);
+  // Visual overhaul A, Slice 4b. Old: the scale was read from the labels inside
+  // the strip's meter ("0", "-6" … "-60", the dBFS marks). New: it is read from
+  // the strip's fader scale beside the groove ("+6" … "-60"). Reason: the strip
+  // now prints the scale the fader is set against, where the operator's hand
+  // is; the meter's own −18 dBFS reference stays on the meter. The level is
+  // still the desk's, on the same dBFS fill.
+  const hardwareMeterVars = await page.getByTestId("audio-strip-audio-input-9").evaluate((strip) => {
+    const track = strip.querySelector("[data-meter-track]");
     return {
-      left: Number.parseFloat(style.getPropertyValue("--audio-meter-left")),
-      scaleLabels: Array.from(node.querySelectorAll("span"))
+      left: track ? Number.parseFloat(getComputedStyle(track).getPropertyValue("--meter-level")) * 100 : Number.NaN,
+      scaleLabels: Array.from(strip.querySelectorAll("[data-fader-scale-mark]"))
         .map((entry) => entry.textContent?.trim())
         .filter(Boolean),
     };
   });
   expect(hardwareMeterVars.left).toBeCloseTo(((20 * Math.log10(0.72) + 60) / 60) * 100, 1);
-  expect(hardwareMeterVars.scaleLabels).toEqual(expect.arrayContaining(["0", "-6", "-12", "-18", "-24", "-40", "-60"]));
+  expect(hardwareMeterVars.scaleLabels).toEqual(
+    expect.arrayContaining(["+6", "0", "-6", "-12", "-20", "-30", "-40", "-60"])
+  );
 });
 
 test("holds fixture peak markers until the hold window expires", () => {
@@ -1418,7 +1460,13 @@ test("snapshot recall reports the push and lists 48V differences without touchin
   // difference gets its own armed confirm in the report band.
   await openFixture(page, "audio-populated");
   const hostStrip = page.getByTestId("audio-strip-audio-input-9");
-  await expect(hostStrip.getByText("48V", { exact: true })).toBeVisible();
+  // Visual overhaul A, Slice 4b. Old: the strip printed a read-only "48V"
+  // badge. New: 48 V is a hazard key on the strip that lights when it is on.
+  // Reason: the one control that can damage a source is on the strip, armed,
+  // where the operator can see and change it. What this test checks is
+  // unchanged: a recall lists the 48 V difference and never pushes it.
+  const hostPhantom = hostStrip.getByTestId("audio-lane-phantom-audio-input-9");
+  await expect(hostPhantom).toHaveAttribute("aria-pressed", "true");
 
   await page.keyboard.press("Shift+Digit3");
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-armed", "true");
@@ -1430,8 +1478,8 @@ test("snapshot recall reports the push and lists 48V differences without touchin
   await expect(report).toContainText("Recalled Interview block");
   await expect(report).toContainText("values pushed");
   await expect(report).toContainText("48V differs on Host (snapshot off, console on)");
-  // The 48V pill did not move: the recall listed it instead of pushing it.
-  await expect(hostStrip.getByText("48V", { exact: true })).toBeVisible();
+  // The 48 V key did not move: the recall listed it instead of pushing it.
+  await expect(hostPhantom).toHaveAttribute("aria-pressed", "true");
 
   const arm = page.getByTestId("audio-recall-arm-phantom-audio-input-9");
   await expect(arm).toHaveText(/Arm 48V off/);
@@ -1555,7 +1603,10 @@ test("audio workspace custom faders drag and accept numeric dB entry", async ({ 
   await expect(faderDialog).toBeVisible();
   await faderDialog.getByLabel("Fader level").fill("0");
   await faderDialog.getByRole("button", { name: "Set" }).click();
-  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toContainText("0.0dB");
+  // Visual overhaul A, Slice 4b. Old: "0.0dB". New: "0.0 dB". Reason: the
+  // strip's value is the design system's readout, which prints the unit the way
+  // every other printed value in the program does.
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toContainText("0.0 dB");
 
   await fxFader.focus();
   await page.keyboard.press("Enter");
@@ -1566,30 +1617,35 @@ test("audio workspace custom faders drag and accept numeric dB entry", async ({ 
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
 
   await page.keyboard.press("KeyU");
-  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toContainText("0.0dB");
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toContainText("0.0 dB");
 });
 
-test("audio preamp gain control responds to pointer drag", async ({ page }) => {
+test("audio preamp gain on the strip is a key that types and nudges", async ({ page }) => {
+  // Visual overhaul A, Slice 4b. Old: "audio preamp gain control responds to
+  // pointer drag" — the strip carried a 32 px knob and the test dragged it.
+  // New: the strip carries a key that prints the gain the desk reports, opens
+  // typed entry when pressed and nudges a whole dB with the arrows. Reason:
+  // system §7 gives the strip a gain key; riding the gain by hand stays on the
+  // plate's knob, which keeps its own drag test
+  // ("inspector preamp gain knob only reports whole-dB values") — so no way of
+  // setting gain was lost.
   await openFixture(page, "audio-populated");
 
-  const hostGain = page.getByTestId("audio-strip-audio-input-9").getByRole("slider", { name: "Host preamp gain" });
-  await expect(hostGain).toHaveAttribute("aria-orientation", "vertical");
-  const beforeGain = await hostGain.getAttribute("aria-valuenow");
-  const gainBox = await hostGain.boundingBox();
-  expect(gainBox).not.toBeNull();
-  await page.mouse.move(gainBox!.x + gainBox!.width / 2, gainBox!.y + gainBox!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(gainBox!.x + gainBox!.width / 2, gainBox!.y - 32, { steps: 8 });
-  await page.mouse.up();
-  await expect.poll(() => hostGain.getAttribute("aria-valuenow")).not.toBe(beforeGain);
+  const hostGain = page.getByTestId("audio-lane-gain-audio-input-9");
+  await expect(hostGain).toBeVisible();
+  await expect(hostGain).toContainText("dB");
+  const beforeGain = (await hostGain.textContent())?.trim();
 
   await hostGain.focus();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowUp");
+  await expect.poll(async () => (await hostGain.textContent())?.trim()).not.toBe(beforeGain);
+
+  await hostGain.click();
   const gainDialog = page.getByRole("dialog", { name: /Set Host preamp gain/i });
   await expect(gainDialog).toBeVisible();
   await gainDialog.getByLabel("Preamp gain").fill("12");
   await gainDialog.getByRole("button", { name: "Set" }).click();
-  await expect(hostGain).toHaveAttribute("aria-valuenow", "12");
+  await expect(hostGain).toContainText("12 dB");
 });
 
 test("inspector preamp gain knob only reports whole-dB values", async ({ page }) => {
@@ -1641,13 +1697,18 @@ test("renders audio scaled studio preview as the 2560 studio surface", async ({ 
 
   await page.setViewportSize({ width: 2560, height: 1440 });
   await openFixture(page, "audio-populated");
-  const nativeHostGain = page
-    .getByTestId("audio-strip-audio-input-9")
-    .getByRole("slider", { name: "Host preamp gain" });
+  // Visual overhaul A, Slice 4b. Old: the parity check measured the strip's
+  // preamp knob (`role="slider"`, 1:1). New: it measures the strip's gain key.
+  // Reason: the strip's gain is a key now; what the check is for — the scaled
+  // studio preview lays the strip out exactly as the native surface does — is
+  // unchanged, and it now compares the two surfaces to each other rather than
+  // to a constant.
+  const nativeHostGain = page.getByTestId("audio-lane-gain-audio-input-9");
   await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
   await expect(nativeHostGain).toBeVisible();
   const nativeDetails = await readAudioLayoutDetails();
-  await expectAspectRatio(nativeHostGain, COMPACT_PREAMP_ASPECT_RATIO, "native 2560 compact preamp");
+  const nativeGainBox = await nativeHostGain.boundingBox();
+  expect(nativeGainBox, "native gain key should have a box").not.toBeNull();
   await expectDbfsScaleLabelsInsideMeters(page, "native 2560 studio surface");
 
   await page.setViewportSize({ width: 1512, height: 982 });
@@ -1671,10 +1732,13 @@ test("renders audio scaled studio preview as the 2560 studio surface", async ({ 
   // keeps the load-bearing layout-geometry equivalence above.
   await expectAudioLaneCardsInsideTierGrids(page);
 
-  const previewHostGain = page
-    .getByTestId("audio-strip-audio-input-9")
-    .getByRole("slider", { name: "Host preamp gain" });
-  await expectAspectRatio(previewHostGain, COMPACT_PREAMP_ASPECT_RATIO, "studio preview compact preamp");
+  const previewHostGain = page.getByTestId("audio-lane-gain-audio-input-9");
+  const previewGainBox = await previewHostGain.boundingBox();
+  expect(previewGainBox, "preview gain key should have a box").not.toBeNull();
+  expect(
+    previewGainBox!.width / previewGainBox!.height,
+    "the preview lays the gain key out as the native surface does"
+  ).toBeCloseTo(nativeGainBox!.width / nativeGainBox!.height, 1);
 
   await page.getByTestId("audio-strip-audio-input-9").click();
   await expectAudioStudioSideRailsFilled(page);
@@ -1751,11 +1815,11 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   await expectAudioWorkspaceGeometry(page);
   await expectAudioLaneCardsInsideTierGrids(page);
   await expectDbfsScaleLabelsInsideMeters(page, "1920 fallback");
-  await expectAspectRatio(
-    page.getByTestId("audio-strip-audio-input-9").getByRole("slider", { name: "Host preamp gain" }),
-    COMPACT_PREAMP_ASPECT_RATIO,
-    "1920 fallback compact preamp"
-  );
+  // Visual overhaul A, Slice 4b: the strip's gain is a key, and at the fallback
+  // size it still fits its row (old: the knob's 1:1 aspect).
+  const fallbackGainBox = await page.getByTestId("audio-lane-gain-audio-input-9").boundingBox();
+  expect(fallbackGainBox, "1920 fallback gain key should have a box").not.toBeNull();
+  expect(fallbackGainBox!.height, "1920 fallback gain key keeps its target height").toBeGreaterThanOrEqual(24);
   await page.getByTestId("audio-strip-audio-input-9").click();
   // 2026-05-27 redesign: the rail Trust panel and rail Snapshot panel are
   // gone. The chrome at 1920 now hangs the equivalent facts on the AudioTopBar

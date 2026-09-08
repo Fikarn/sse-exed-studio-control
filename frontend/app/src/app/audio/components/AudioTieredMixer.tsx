@@ -1,37 +1,38 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { ArrowRight, Mic, Play } from "lucide-react";
 
 import styles from "./AudioTieredMixer.module.css";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
+import { audioLockNote } from "../audioFormatting";
 import { type AudioChannelGroupSelectionRequest, type AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioChannelLane, AudioOutputLane } from "./AudioMixerLane";
+import type { AudioChannelEntry } from "../../shellData";
+
+// Visual overhaul A, Slice 4b: three tiers side by side, each one a title, the
+// line that says what it holds and where it sends, and — when the console is
+// locked — the reason, right where the operator's hand is.
 
 type AudioChannelUpdate = Parameters<ShellStore["updateAudioChannel"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
-const TIER_ICONS = {
-  "hardware-inputs": Mic,
-  "software-playback": Play,
-  "hardware-outputs": ArrowRight,
-};
-
-const TIER_NUMBERS = {
-  "hardware-inputs": "01",
-  "software-playback": "02",
-  "hardware-outputs": "03",
-};
-
-function TierIcon({ tierId }: { tierId: string }) {
-  const Icon = TIER_ICONS[tierId as keyof typeof TIER_ICONS];
-  return Icon ? (
-    <span className={styles.tierIcon}>
-      <Icon size={18} strokeWidth={1.6} aria-hidden="true" />
-    </span>
-  ) : null;
+// What a playback strip prints under its format tag: where else it is going,
+// so the operator sees the cue sends without selecting the strip.
+function otherSendsFor(
+  channel: AudioChannelEntry,
+  viewModel: AudioWorkspaceViewModel
+): { id: string; name: string; level: number }[] {
+  return viewModel.hardwareOutputs.mixTargets
+    .filter((mixTarget) => mixTarget.id !== viewModel.selectedMixTargetId)
+    .slice(0, 2)
+    .map((mixTarget) => ({
+      id: mixTarget.id,
+      name: mixTarget.shortName || mixTarget.name,
+      level: channel.mixLevels[mixTarget.id] ?? 0,
+    }));
 }
 
 export function AudioTieredMixer({
+  armedActionKey,
   clearDraftValueLater,
   commitChannelContinuous,
   commitMixTargetContinuous,
@@ -44,12 +45,14 @@ export function AudioTieredMixer({
   onSelectChannelGroup,
   onSelectOutputMixTarget,
   onTogglePeakHold,
+  onTogglePhantom,
   peakHoldEnabled,
   setDraftValue,
   onUpdateChannel,
   onUpdateMixTarget,
   viewModel,
 }: {
+  armedActionKey: string | null;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
@@ -62,6 +65,7 @@ export function AudioTieredMixer({
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
   onSelectOutputMixTarget: (mixTargetId: string) => void;
   onTogglePeakHold: () => void;
+  onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
   peakHoldEnabled: boolean;
   setDraftValue: (key: string, value: number) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
@@ -78,29 +82,8 @@ export function AudioTieredMixer({
             onClick={() => onSelectChannel(null)}
           >
             <div className={styles.tierHeaderLead}>
-              <div className={styles.tierTitleBlock}>
-                <TierIcon tierId={tier.id} />
-                <span className={styles.tierNum}>{TIER_NUMBERS[tier.id as keyof typeof TIER_NUMBERS]}</span>
-                <span>{tier.label}</span>
-              </div>
-              <div className={styles.tierMixFor} data-testid={`audio-tier-mix-for-${tier.id}`}>
-                <span className={styles.tierMixForEyebrow}>Mix for</span>
-                <span className={styles.tierMixForArrow}>→</span>
-                <span className={styles.tierMixForName} data-mix-for-name="full">
-                  {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
-                </span>
-                <span className={styles.tierMixForName} data-mix-for-name="short">
-                  {viewModel.selectedMixTarget?.shortName ??
-                    viewModel.hardwareOutputs.mixTargets[0]?.shortName ??
-                    "Main"}
-                </span>
-              </div>
-              {/* DP3 (POLISH PASS 3): the bank-spec caption moves INTO the lead so
-                  the header reflows to a two-line title-over-meta card — row 1 the
-                  tier identity, row 2 the routing echo + this muted, left-aligned,
-                  ellipsised spec behind a hairline separator (the treatment the
-                  Outputs lead already carried, now shared by every tier). */}
-              <small data-testid={`audio-tier-bank-pill-${tier.id}`}>
+              <span className={styles.tierTitle}>{tier.label}</span>
+              <span className={styles.tierDetail} data-testid={`audio-tier-bank-pill-${tier.id}`}>
                 {tier.channels.length > 0
                   ? viewModel.clampedBankIndex > 0
                     ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks} · ch ${
@@ -110,7 +93,30 @@ export function AudioTieredMixer({
                       }`
                     : tier.meta
                   : "No sources in this bank"}
-              </small>
+              </span>
+              <span className={styles.tierDetail} data-testid={`audio-tier-mix-for-${tier.id}`}>
+                <span data-mix-for-name="full">
+                  sends into{" "}
+                  {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
+                </span>
+                <span data-mix-for-name="short">
+                  →{" "}
+                  {viewModel.selectedMixTarget?.shortName ??
+                    viewModel.hardwareOutputs.mixTargets[0]?.shortName ??
+                    "Main"}
+                </span>
+              </span>
+              {/* The console is locked: the reason stands on the tier the hand
+                  is reaching for, not only in the state display. */}
+              {viewModel.actionsAllowed ? null : (
+                <span
+                  className={styles.tierLockNote}
+                  data-tone={viewModel.status.tone === "error" ? "error" : "attention"}
+                  data-testid={`audio-tier-lock-note-${tier.id}`}
+                >
+                  {audioLockNote(viewModel.status.label)}
+                </span>
+              )}
             </div>
             <div className={styles.tierChipRow}>
               {tier.chips.map((chip) => (
@@ -147,21 +153,25 @@ export function AudioTieredMixer({
             }}
           >
             {tier.channels.length > 0 ? (
-              tier.channels.map((channel, index) => (
+              tier.channels.map((channel) => (
                 <AudioChannelLane
                   actionsAllowed={viewModel.actionsAllowed}
+                  armedActionKey={armedActionKey}
                   channel={channel}
                   clearDraftValueLater={clearDraftValueLater}
                   commitChannelContinuous={commitChannelContinuous}
                   draftStore={draftStore}
                   feeding={viewModel.feedingChannelIds.includes(channel.id)}
                   getDraftValue={getDraftValue}
-                  index={index}
                   key={channel.id}
+                  lockedReason={viewModel.actionsAllowed ? undefined : (viewModel.status.warningBody ?? undefined)}
+                  meterEmpty={viewModel.meterSimulationState === "gated"}
                   onClearClip={onClearClip}
                   onOpenContextMenu={onOpenChannelMenu}
                   onSelect={onSelectChannel}
+                  onTogglePhantom={onTogglePhantom}
                   onUpdateChannel={onUpdateChannel}
+                  otherSends={otherSendsFor(channel, viewModel)}
                   setDraftValue={setDraftValue}
                   selected={channel.id === viewModel.selectedChannelId}
                   selectedMixTargetId={viewModel.selectedMixTargetId}
@@ -185,24 +195,19 @@ export function AudioTieredMixer({
           onClick={() => onSelectChannel(null)}
         >
           <div className={styles.tierHeaderLead}>
-            <div className={styles.tierTitleBlock}>
-              <span className={styles.tierIcon}>
-                <ArrowRight size={18} strokeWidth={1.6} aria-hidden="true" />
+            <span className={styles.tierTitle}>{viewModel.hardwareOutputs.label}</span>
+            <span className={styles.tierDetail} data-testid="audio-tier-mix-for">
+              {viewModel.hardwareOutputs.mixTargets.length} mixes · level · one is the mix the faders send into
+            </span>
+            {viewModel.actionsAllowed ? null : (
+              <span
+                className={styles.tierLockNote}
+                data-tone={viewModel.status.tone === "error" ? "error" : "attention"}
+                data-testid="audio-tier-lock-note-hardware-outputs"
+              >
+                {audioLockNote(viewModel.status.label)}
               </span>
-              <span className={styles.tierNum}>03</span>
-              <span>{viewModel.hardwareOutputs.label}</span>
-            </div>
-            <div className={styles.tierMixFor} data-testid="audio-tier-mix-for">
-              <span className={styles.tierMixForEyebrow}>Mix for</span>
-              <span className={styles.tierMixForArrow}>→</span>
-              <span className={styles.tierMixForName}>
-                {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
-              </span>
-            </div>
-            {/* DP3 (POLISH PASS 3): Outputs already carried its spec inline in the
-                lead — now every tier matches it (muted, hairline-separated row-2
-                caption), equalizing the three tier-header heights. */}
-            <small>{viewModel.hardwareOutputs.mixTargets.length} dest · selecting one sets the active mix</small>
+            )}
           </div>
           {/* C11: the retired ~38px context bar's Peak Hold + Reset controls
               relocate here as a slim eyebrow on the Outputs header (the most
@@ -250,15 +255,16 @@ export function AudioTieredMixer({
           </div>
         </div>
         <div className={styles.outputLaneGrid} data-testid="audio-tier-lanes-hardware-outputs">
-          {viewModel.hardwareOutputs.mixTargets.map((mixTarget, index) => (
+          {viewModel.hardwareOutputs.mixTargets.map((mixTarget) => (
             <AudioOutputLane
               actionsAllowed={viewModel.actionsAllowed}
               clearDraftValueLater={clearDraftValueLater}
               commitMixTargetContinuous={commitMixTargetContinuous}
               draftStore={draftStore}
               getDraftValue={getDraftValue}
-              index={index}
               key={mixTarget.id}
+              lockedReason={viewModel.actionsAllowed ? undefined : (viewModel.status.warningBody ?? undefined)}
+              meterEmpty={viewModel.meterSimulationState === "gated"}
               mixTarget={mixTarget}
               onSelect={onSelectOutputMixTarget}
               onUpdateMixTarget={onUpdateMixTarget}

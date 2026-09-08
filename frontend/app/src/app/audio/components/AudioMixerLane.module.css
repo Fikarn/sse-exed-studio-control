@@ -1,559 +1,166 @@
-/* AudioMixerLane module — Console redesign (2026-05-27).
- *
- * Channel-strip and output-lane rhythm mirrors the Claude Design prototype
- * (Console.html). The JSX in AudioMixerLane.tsx is unchanged; only visual
- * treatment moves. Class-name surface is preserved (channelLane, laneHeader,
- * laneBody, etc.) so tests keep working.
- */
+/* Visual overhaul A, Slice 4b (system §7 "Strip"): the strip is a lifted floor
+   on the bay, not a card — a white lift in every theme, the selected one lifted
+   further and keylined in the accent. Every value is a token; the geometry is
+   the mock's (120 px wide at the studio surface, 56 px head, 40 px readout,
+   66 px preamp rows, 36 px keys, the fader block taking the rest). */
 
-.channelLane,
-.outputLane {
-  /* C08: channel lanes flex to fill their content-proportional tier column so
-     the source tiers no longer pool their strips against the left edge. The
-     110px basis is the prototype strip width; lanes grow to ~140px on the wide
-     2560 surface and shrink no further than 88px. `.outputLane` re-asserts a
-     fixed 220px non-flexing width below (its bus-panel layout needs the room). */
-  flex: 1 1 110px;
-  max-width: 140px;
-  min-width: 88px;
-  background-color: var(--strip-bg);
-  border-radius: var(--radius-tight-sm);
-  padding: 12px 8px;
+.strip {
+  width: var(--chrome-studio-strip);
+  flex: none;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  position: relative;
-  transition:
-    opacity 0.25s var(--easing),
-    background var(--motion-duration-fast) var(--easing);
-  cursor: default;
+  gap: 10px;
+  padding: 10px 8px;
+  min-height: 0;
   border: 1px solid transparent;
-  /* Stretch the card to its tier cell (matching Claude Design, which leaves
-     align-self unset = the flex default `stretch`) so the meter body can grow to
-     fill the full cell height instead of floating content-height at the top with
-     a dead band below. Was `flex-start`, which pinned the card to its content. */
-  align-self: stretch;
-  /* Belt-and-suspenders cap so the card can never exceed the tier grid (the
-     expectAudioLaneCardsInsideTierGrids guarantee). With align-self:stretch the
-     card already equals the cell height, so this is a no-op at 2560; at the
-     1920×1080 fallback the responsive .laneBody/.outputBody shrinks (min-height:0)
-     to keep the content within the cell. */
-  max-height: 100%;
-}
-
-.channelLane:hover,
-.outputLane:hover {
-  background-color: var(--strip-bg-hover);
-}
-
-.channelLane[data-selected="true"],
-.outputLane[data-selected="true"] {
-  background-color: var(--strip-bg-selected);
-  border-color: var(--line-2);
-}
-
-.channelLane[data-no-send="true"]:not([data-selected="true"]) {
-  opacity: 0.55;
-}
-
-/* Header block: index + name + badges (fixed height so meters align across
-   all three sections, like the prototype's 84px head-block). */
-.laneHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 0 2px;
-  flex-shrink: 0;
-  height: 84px;
-  min-height: 84px;
-}
-
-.laneNameBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.lanePreampRow,
-.laneIndexRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  color: var(--audio-caption-muted);
-  text-transform: uppercase;
-  min-height: 12px;
-}
-
-.lanePreampRow > span:first-child,
-.laneIndexRow > span:first-child {
-  font-weight: 500;
-}
-
-.lanePreampRow > span:last-child,
-.laneIndexRow > span:last-child {
-  color: var(--audio-caption-muted);
-  font-size: var(--audio-type-micro);
-}
-
-.laneName {
-  font-size: var(--font-size-lg-tight);
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  color: var(--fg);
-  line-height: 1.15;
-  min-height: 32px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-}
-
-.channelLane[data-selected="true"] .laneName,
-.outputLane[data-selected="true"] .laneName {
-  color: var(--accent);
-}
-
-/* Strip badges (48V / HiZ / Ø) — reserved row so meters stay aligned. */
-.laneBadges {
-  display: flex;
-  gap: 4px;
-  min-height: 14px;
-  flex-wrap: wrap;
-}
-
-.laneBadge {
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  padding: 2px 5px;
-  border-radius: var(--radius-tight-xs);
-  background: var(--bg-3);
-  color: var(--fg-2);
-  border: 1px solid var(--line);
-  line-height: 1;
-}
-
-/* +48V earns a single accent dot — phantom is the one condition worth
-   clocking at a glance from across the room. */
-.laneBadgePhantom {
-  color: var(--fg);
-  border-color: var(--line-2);
-}
-
-.laneBadgePhantom::before {
-  content: "";
-  display: inline-block;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-  margin-right: 4px;
-  vertical-align: middle;
-  box-shadow: 0 0 4px var(--accent-glow);
-}
-
-.laneHeaderBadges {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  position: absolute;
-  top: 12px;
-  right: 12px;
-}
-
-/* Clip alert (C21) — a compact labeled red pill in place of the bare 10px dot,
-   mirroring the 48V badge geometry so it sits cleanly in the header badge slot.
-   Clears the held clip on click; reuses the clip-only --danger. */
-.laneClipPill {
-  appearance: none;
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  padding: 2px 5px;
-  border-radius: var(--radius-tight-xs);
-  background: var(--danger-soft);
-  color: var(--danger);
-  border: 1px solid var(--danger);
-  line-height: 1;
+  border-radius: var(--radius-screen);
+  background: var(--material-strip-floor);
   cursor: pointer;
-  box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 45%, transparent);
-  transition: background var(--motion-duration-fast) var(--easing);
 }
 
-.laneClipPill:hover {
-  background: color-mix(in srgb, var(--danger) 30%, transparent);
-}
-
-/* ── Fader + meter region ─────────────────────────────────────────────────── */
-
-/* The meter+fader region is the card's one flexible child (header/readout/
-   controls/preamp are all flex-shrink:0). It GROWS to fill the tier cell —
-   matching Claude Design's `flex: 1 1 240px` — so on the tall 2560×1440 surface
-   the meter stretches to the bottom of the card instead of leaving a dead band
-   under the controls. `min-height: 0` still lets it SHRINK below the 240 basis
-   at the 1920×1080 fallback (cell shorter than content), keeping the card inside
-   the tier grid. The capped `flex: 0 1 280px` here was a DP1 regression. */
-.laneBody {
-  position: relative;
-  flex: 1 1 240px;
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  /* DP1 (channel-strip-refine): tighten the meter↔fader pairing so the strip
-     reads as one instrument — narrower gap + a slimmer right gutter. */
-  padding: 14px 4px 14px 0;
-  gap: 9px;
-  margin: 12px 0 6px;
-}
-
-.outputBody {
-  position: relative;
-  flex: 1 1 240px;
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  /* DP1 (channel-strip-refine): match the channel-strip meter↔fader spacing. */
-  padding: 14px 4px 14px 0;
-  gap: 9px;
-  margin: 12px 0 6px;
-  flex-direction: row;
-}
-
-/* Give the stereo meter an explicit box in the flex lane. The restored
-   (perf-compliant) AudioStereoMeter grid relies on its parent for width —
-   without this the scale column renders but the meter tracks collapse to ~0.
-   Targets the meter's data attribute (stable across the CSS-module hash). */
-.laneBody [data-meter-component="stereo"],
-.outputBody [data-meter-component="stereo"] {
-  flex: 0 0 auto;
-  align-self: stretch;
-  /* C08: widen the stereo meter wrapper (46 → 52px) now that lanes flex wider.
-     The meter is fully fluid inside its box, so a wider wrapper cleanly widens
-     the most-scanned bars. */
-  width: 52px;
-}
-
-.outputActiveMark {
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  color: var(--accent);
-  text-transform: uppercase;
-}
-
-.outputNameRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.outputNameRow .laneName {
-  font-size: var(--font-size-md-tight);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  min-height: 16px;
-  display: block;
-  -webkit-line-clamp: unset;
-  -webkit-box-orient: unset;
-  word-break: normal;
-}
-
-/* ── dB readout ───────────────────────────────────────────────────────────── */
-
-.laneReadout {
-  display: flex;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 6px 0 10px 39px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-md-tight);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  color: var(--fg);
-}
-
-.channelLane[data-selected="true"] .laneReadout {
-  color: var(--accent);
-}
-
-/* ── Mute / Solo ──────────────────────────────────────────────────────────── */
-
-.laneControls {
-  display: flex;
-  /* DP1 (channel-strip-refine): M and S each take half the strip as a balanced
-     pair (was two ~22px buttons clustered left) — like the output bus toggles. */
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 0 2px;
-}
-
-/* DP1 (channel-strip-refine): channel M/S buttons are wrapped in <Tooltip>, so
-   each direct child of .laneControls (the Tooltip wrapper span, or — on the
-   output lane — the bare M button) claims half the width. The Tooltip trigger
-   (the [aria-describedby] span; its sibling is the absolutely-positioned bubble)
-   and the button inside it then stretch to fill that half. Reaches the Tooltip
-   structurally via its stable aria attribute — no design-system class import. */
-.laneControls > * {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.laneControls > * > [aria-describedby] {
-  display: block;
-  width: 100%;
-}
-
-.laneControls .laneToggle {
-  width: 100%;
-}
-
-.laneToggle {
-  flex: 1;
-  height: 28px;
-  border-radius: 5px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs-plus);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  /* C12: resting legibility — bump glyph to --fg-2 and give a resting border
-     affordance so M/S read as buttons without hover (Bone 2.72:1 → ~5.2:1). */
-  color: var(--fg-2);
-  background: var(--bg-3);
-  border: 1px solid var(--line);
-  cursor: pointer;
-  transition:
-    background var(--motion-duration-fast) var(--easing),
-    color var(--motion-duration-fast) var(--easing);
-}
-
-.laneToggle:hover {
-  color: var(--fg);
-}
-
-.laneToggle:disabled {
-  opacity: var(--control-disabled-opacity);
-  cursor: not-allowed;
-}
-
-.laneToggle[data-control="mute"][data-active="true"] {
-  background: var(--danger);
-  color: #fff;
-  border-color: transparent;
-}
-
-.laneToggle[data-control="solo"][data-active="true"] {
-  background: var(--accent);
-  color: var(--bg);
-  border-color: transparent;
-}
-
-/* ── Output bus panel (right side of output lanes) ────────────────────────── */
-
-.outputBusPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  padding: 8px 2px;
-}
-
-.outputBusHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.outputBusHeader > span {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.outputBusHeader small {
-  font-family: var(--font-mono);
-  font-size: var(--audio-type-micro);
-  letter-spacing: 0.14em;
-  color: var(--audio-caption-muted);
-  text-transform: uppercase;
-}
-
-.outputBusHeader strong {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--fg);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
-
-.outputBusMuteButton {
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 5px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs-plus);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--fg-3);
-  background: var(--bg-3);
-  border: 0;
-  cursor: pointer;
-  transition:
-    background var(--motion-duration-fast) var(--easing),
-    color var(--motion-duration-fast) var(--easing);
-}
-
-.outputBusMuteButton:hover {
-  color: var(--fg);
-}
-
-.outputBusMuteButton[data-active="true"] {
-  background: var(--danger);
-  color: #fff;
-}
-
-.outputMetricGrid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 4px;
-  padding-top: 4px;
-  border-top: 1px solid var(--line);
-}
-
-.outputMetricGrid > span {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
-  color: var(--fg-3);
-  letter-spacing: 0.02em;
-}
-
-.outputMetricGrid small {
-  font-size: var(--audio-type-micro);
-  letter-spacing: 0.12em;
-  color: var(--audio-caption-muted);
-  text-transform: uppercase;
-}
-
-.outputMetricGrid strong {
-  font-weight: 500;
-  color: var(--fg);
-  font-variant-numeric: tabular-nums;
-}
-
-.outputMetricGrid em {
-  font-style: normal;
-  color: var(--fg-3);
-  margin-left: 6px;
-}
-
-/* ── Output-lane: wider strip with bus panel column. ─────────────────────── */
-
-.outputLane {
-  /* Output lanes are 2× a channel strip (they carry the bus panel column) and
-     stay a fixed, non-flexing 220px — overriding the shared C08 channel flex so
-     Outputs never collapses toward the 140px channel cap nor stretches. */
-  flex: 0 0 auto;
-  width: 220px;
-  max-width: none;
-  min-width: 160px;
-}
-
-/* 2026-09 audit Slice 9: compact density — output lanes fit the outputs column
-   at 1920×1080 without a horizontal scroll.
-   Visual overhaul A, Slice 4a: the Console's cluster takes 232 px off the left
-   of the shell below the studio surface, so the outputs column drops from
-   ~569 px to ~502 px. Three lanes at the 160 px floor plus the tier's gaps and
-   gutters settle at ~492 px, so the tier still never scrolls sideways. */
-[data-density="compact"] .outputLane {
-  width: 160px;
-  min-width: 160px;
-}
-
-.outputLane[data-selected="true"] {
+.strip[data-selected="true"] {
   border-color: var(--accent);
-  box-shadow:
-    inset 0 0 0 1px var(--accent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background: var(--material-strip-floor-sel);
 }
 
-.outputLane[data-selected="true"] .laneName {
-  color: var(--accent);
-}
-
-/* ── Output-lane routing footer (DP3) ─────────────────────────────────────── */
-
-/* DP3 (channel-strip-refine POLISH PASS 2 #1 + POLISH PASS 3 bridge fix):
-   output lanes carry no preamp/solo, so the ~61px the input/playback preamp
-   occupies hung empty below the lone Mute button. The footer fills that knob
-   slot (min-height 61px, box-sizing border-box) so the output meter bottoms
-   land on the same bridge line as the rest of the surface — and ends the strip
-   on a deliberate routing line (bus role over its fixed hardware destination)
-   instead of trailing off into void. (Our output lanes carry no ::after
-   knob-slot spacer, so the prototype's `:has(.outputFooter)::after{content:none}`
-   has nothing to neutralize and is intentionally omitted.) */
-.outputFooter {
-  margin-top: 0;
-  min-height: 61px;
-  box-sizing: border-box;
+.stripHead {
+  height: 56px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 3px;
+}
+
+.stripName {
+  font: 600 var(--font-size-value) / 1.15 var(--font-family-ui);
+  color: var(--text-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stripSub {
+  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--text-text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stripReadout {
+  height: 40px;
+  flex: none;
+}
+
+.stripPre {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 66px;
+  min-width: 0;
+}
+
+/* The tag names what the strip is; the active mix target says so in the amber
+   the program uses for engaged, as a keyline and a word — never amber ink on an
+   amber fill. */
+.stripTag {
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 8px 2px;
-  border-top: 1px solid var(--line);
-  flex-shrink: 0;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px dashed var(--material-line);
+  border-radius: var(--radius-key);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
 }
 
-.outputFooterRole {
-  font-family: var(--font-mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--fg-3);
-  font-size: var(--audio-type-micro);
-  font-weight: 500;
+.stripTag[data-active="true"] {
+  border-style: solid;
+  border-color: var(--role-amber-text);
+  color: var(--role-amber-text);
+  font-weight: 600;
 }
 
-.outputFooterDest {
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
-  color: var(--audio-caption-muted);
-  font-size: var(--audio-type-micro);
+.stripSends {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 2px 6px;
+  min-width: 0;
+  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  color: var(--text-text2);
 }
 
-/* Selected bus lights its routing role in the accent. */
-.outputLane[data-selected="true"] .outputFooterRole {
-  color: var(--accent);
+.stripSendRow {
+  display: contents;
 }
 
-/* DP3 (POLISH PASS 3): output lanes are ~220px wide vs ~110px for input/
-   playback, so a full-width GROUP/FORMAT chip there would dwarf the others.
-   Cap + centre it so the chip is the same physical size as every other strip's.
-   The tag strip lives in AudioLaneTagStrip.module.css; reach it from this
-   parent module via its stable testid (no hashed-class import). */
-.outputLane > [data-testid="audio-lane-tag-strip"] {
-  width: 104px;
-  align-self: center;
+.stripSendRow b {
+  font: 500 var(--font-size-tick) / 1.2 var(--font-family-mono);
+  color: var(--text-text);
+  text-align: right;
+}
+
+.stripLamps {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: start;
+  gap: 4px 8px;
+}
+
+.stripKeys {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+/* Each key sits in a tooltip wrapper, so the row shares its width with the
+   wrappers and the keys fill them. */
+.stripKeys > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.stripKeys > * > * {
+  display: block;
+  width: 100%;
+}
+
+.stripKey {
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+}
+
+.stripClip {
+  flex: none;
+  min-height: 24px;
+}
+
+/* Below the studio surface the strip narrows and spends less air; nothing is
+   dropped — the fader block simply keeps less height. */
+:global([data-operator-layout-root][data-chrome="compact"]) .strip {
+  width: 96px;
+  gap: 8px;
+  padding: 8px 4px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .stripName {
+  font-size: var(--font-size-name);
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .stripHead {
+  height: 44px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .stripReadout {
+  height: 34px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .stripPre {
+  height: 60px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .stripKey {
+  min-height: 30px;
 }

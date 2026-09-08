@@ -48,6 +48,11 @@ interface BarProps {
   side: "left" | "right";
 }
 
+// The live painter fills a bar along its own axis, so each bar says which axis
+// it runs on (`data-mini-meter-orientation`) rather than the painter assuming
+// the cluster's horizontal one. `data-meter-track` is the same marker the
+// Console's tall meters have always carried, so anything that reads a meter's
+// left or right track — the canvas sampler, the tests — reads this one too.
 function Bar({ level, peak, empty, stale, orientation, meterId, meterKind, side }: BarProps) {
   const fill = empty ? 0 : clamp01(level);
   return (
@@ -57,13 +62,16 @@ function Bar({ level, peak, empty, stale, orientation, meterId, meterKind, side 
       data-mini-meter-id={meterId}
       data-mini-meter-kind={meterId ? meterKind : undefined}
       data-mini-meter-side={meterId ? side : undefined}
+      data-mini-meter-orientation={meterId ? orientation : undefined}
+      data-meter-track={side}
     >
       {!empty && !stale ? <span className={styles.glow} data-signal="meter" /> : null}
-      {!empty ? <span className={styles.ramp} data-signal="meter" /> : null}
+      {!empty ? <span className={styles.ramp} data-signal="meter" data-meter-fill={side} /> : null}
       {!empty && peak !== undefined ? (
         <span
           className={styles.peak}
           data-lit={stale ? undefined : ""}
+          data-meter-peak={side}
           style={
             {
               [orientation === "horizontal" ? "left" : "bottom"]: `${clamp01(peak) * 100}%`,

@@ -716,6 +716,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           onSelectMixTarget={selectMixTarget}
           onSelectOutputMixTarget={selectOutputMixTarget}
           onTogglePeakHold={togglePeakHold}
+          onTogglePhantom={togglePhantom}
           onResetPeakHolds={resetPeakHolds}
           setDraftValue={setDraftValue}
           onUpdateChannel={updateChannel}

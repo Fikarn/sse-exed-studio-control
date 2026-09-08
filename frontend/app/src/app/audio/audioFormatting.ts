@@ -167,6 +167,13 @@ export function formatAudioTimestamp(value: string | number | null | undefined) 
   return formatBackupTimestamp(value);
 }
 
+// How much of a meter's well a level fills: the dBFS scale the desk reads, not
+// the raw amplitude. `formatMeterPercent` prints the same number for the CSS
+// custom properties the tall meters use.
+export function meterFill(value: number) {
+  return dbfsToMeterPercent(normalizedToDbfs(value)) / 100;
+}
+
 // A snapshot slot says when it was last recalled, and the desk reads the clock,
 // not the calendar — the tile is one line wide.
 export function formatAudioRecallTime(value: string | number | null | undefined) {
@@ -174,6 +181,25 @@ export function formatAudioRecallTime(value: string | number | null | undefined)
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value);
   return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(parsed);
+}
+
+// Visual overhaul A, Slice 4b: what a locked bay says on each tier header —
+// the short phrase, in the operator's words, that names the lock and its way
+// out. The sentence itself stays in the state display and on each refused
+// control; a tier header has room for a phrase, not a paragraph.
+export function audioLockNote(label: string): string {
+  switch (label) {
+    case "NOT VERIFIED":
+      return "locked · run the audio probe";
+    case "OFFLINE":
+      return "locked · console unreachable";
+    case "DISCONNECTED":
+      return "locked · UFX III disconnected";
+    case "DISABLED":
+      return "read-only · OSC control is off in Setup";
+    default:
+      return "locked";
+  }
 }
 
 export function meterTone(value: number, clip = false) {

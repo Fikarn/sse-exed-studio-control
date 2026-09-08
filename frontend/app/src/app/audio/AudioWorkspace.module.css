@@ -364,9 +364,13 @@
   }
 }
 
+/* Visual overhaul A, Slice 4b: the studio surface's plate is 416 px (D4's
+   `424px 1fr 416px`), which is what the bay needs to hold thirteen 120 px
+   strips in three tiers without scrolling. Slice 4c builds the plate itself at
+   this width. */
 @container operator-root (min-width: 2200px) and (min-height: 1250px) {
   .audioBody {
-    grid-template-columns: minmax(0, 1fr) 504px;
+    grid-template-columns: minmax(0, 1fr) 416px;
   }
 }
 

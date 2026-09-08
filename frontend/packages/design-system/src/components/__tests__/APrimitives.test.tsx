@@ -326,6 +326,42 @@ describe("Slider and Groove", () => {
     expect(cssOf("Slider.module.css")).toMatch(/\.groove \{[^}]*width: 44px/);
     expect(cssOf("Slider.module.css")).toMatch(/\.grooveWell \{[^}]*left: 13px;\s*right: 13px/);
   });
+
+  // Visual overhaul A, Slice 4b: the Console's faders are this groove, so the
+  // engine carries what the desk expects of a fader — the axis it runs on,
+  // typed entry, and unity by hand.
+  it("says which axis it runs on", () => {
+    render(
+      <>
+        <Slider label="Main level" value={0.5} />
+        <Groove label="Host fader" value={0.5} />
+      </>
+    );
+    expect(screen.getByRole("slider", { name: "Main level" })).toHaveAttribute("aria-orientation", "horizontal");
+    expect(screen.getByRole("slider", { name: "Host fader" })).toHaveAttribute("aria-orientation", "vertical");
+  });
+
+  it("asks the host for typed entry on Enter and on a double press", () => {
+    const onRequestTypedEntry = vi.fn();
+    render(<Groove label="Host fader" value={0.5} onRequestTypedEntry={onRequestTypedEntry} />);
+    const groove = screen.getByRole("slider", { name: "Host fader" });
+    fireEvent.keyDown(groove, { key: "Enter" });
+    expect(onRequestTypedEntry).toHaveBeenCalledTimes(1);
+    // jsdom has no PointerEvent, so the double press is dispatched as the
+    // mouse event React listens for, carrying its `detail`.
+    fireEvent(groove, new MouseEvent("pointerdown", { bubbles: true, button: 0, detail: 2 }));
+    expect(onRequestTypedEntry).toHaveBeenCalledTimes(2);
+  });
+
+  it("puts a fader back on unity: Shift jumps to it, and a value beside it settles on it", () => {
+    const onChange = vi.fn();
+    const onCommit = vi.fn();
+    render(<Groove label="Host fader" value={0.5} unity={0.8172} snapUnity onChange={onChange} onCommit={onCommit} />);
+    const groove = screen.getByRole("slider", { name: "Host fader" });
+    fireEvent(groove, new MouseEvent("pointerdown", { bubbles: true, button: 0, shiftKey: true }));
+    expect(onChange).toHaveBeenLastCalledWith(0.8172);
+    expect(onCommit).toHaveBeenLastCalledWith(0.8172);
+  });
 });
 
 describe("Meter", () => {
@@ -333,6 +369,30 @@ describe("Meter", () => {
     const { container } = render(<Meter label="Host" level={0.6} peak={0.7} />);
     expect(container.querySelectorAll('[data-signal="meter"]')).toHaveLength(2);
     expect(screen.getByRole("meter", { name: "Host" })).toHaveAttribute("aria-valuenow", "60");
+  });
+
+  // Visual overhaul A, Slice 4b: a meter that names an engine entry is painted
+  // live by the Console's canvas, which needs to know which way each bar runs
+  // and which track, fill and peak it is looking at.
+  it("names each bar's track, axis, fill and peak for the live painter", () => {
+    const { container } = render(
+      <Meter
+        label="Host"
+        level={0.6}
+        levelRight={0.5}
+        peak={0.7}
+        peakRight={0.6}
+        meterId="audio-input-9"
+        meterKind="channel"
+      />
+    );
+    const bars = container.querySelectorAll("[data-mini-meter-kind]");
+    expect(bars).toHaveLength(2);
+    expect(bars[0]).toHaveAttribute("data-mini-meter-orientation", "vertical");
+    expect(bars[0]).toHaveAttribute("data-meter-track", "left");
+    expect(bars[1]).toHaveAttribute("data-meter-track", "right");
+    expect(container.querySelector('[data-meter-fill="left"]')).not.toBeNull();
+    expect(container.querySelector('[data-meter-peak="right"]')).not.toBeNull();
   });
 
   it("empty leaves the well with the reference only; stale drops the glow and dims", () => {

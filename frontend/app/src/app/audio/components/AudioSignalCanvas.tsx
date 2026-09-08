@@ -28,6 +28,7 @@ export function AudioSignalCanvas({
   onSelectMixTarget: _onSelectMixTarget,
   onSelectOutputMixTarget,
   onTogglePeakHold,
+  onTogglePhantom,
   onResetPeakHolds,
   setDraftValue,
   onUpdateChannel,
@@ -52,6 +53,7 @@ export function AudioSignalCanvas({
   onSelectMixTarget: (mixTargetId: string) => void;
   onSelectOutputMixTarget: (mixTargetId: string) => void;
   onTogglePeakHold: () => void;
+  onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
   onResetPeakHolds: () => void;
   setDraftValue: (key: string, value: number) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
@@ -119,6 +121,7 @@ export function AudioSignalCanvas({
           state display, not a band on the bay floor. */}
 
       <AudioTieredMixer
+        armedActionKey={armedAction?.key ?? null}
         clearDraftValueLater={clearDraftValueLater}
         commitChannelContinuous={commitChannelContinuous}
         commitMixTargetContinuous={commitMixTargetContinuous}
@@ -131,6 +134,7 @@ export function AudioSignalCanvas({
         onSelectChannelGroup={onSelectChannelGroup}
         onSelectOutputMixTarget={onSelectOutputMixTarget}
         onTogglePeakHold={onTogglePeakHold}
+        onTogglePhantom={onTogglePhantom}
         peakHoldEnabled={peakHoldEnabled}
         setDraftValue={setDraftValue}
         onUpdateChannel={onUpdateChannel}

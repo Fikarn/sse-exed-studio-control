@@ -238,9 +238,9 @@
   --elevation-key: inset 0 1px 0 var(--material-sheen), 0 1px 2px var(--material-shade); /** level +2, with keyFill */
   --elevation-key-fill: linear-gradient(180deg, var(--material-key-top), var(--material-key));
   --elevation-key-lit-amber: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 14px var(--role-amber-bloom); /** engaged */
-  --elevation-key-lit-amber-fill: linear-gradient(180deg, var(--role-amber-fill-top), var(--role-amber-fill));
+  --elevation-key-lit-amber-fill: linear-gradient(180deg, var(--role-amber-fill-top), var(--role-amber-fill)) var(--role-amber-fill);
   --elevation-key-lit-green: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 18px var(--role-green-bloom); /** live */
-  --elevation-key-lit-green-fill: linear-gradient(180deg, var(--role-green-fill-top), var(--role-green-fill));
+  --elevation-key-lit-green-fill: linear-gradient(180deg, var(--role-green-fill-top), var(--role-green-fill)) var(--role-green-fill);
   --elevation-cap: inset 0 1px 0 var(--role-cap-sheen), 0 2px 4px var(--material-shade); /** a fader cap, with capFill */
   --elevation-cap-fill: linear-gradient(180deg, var(--role-cap-fill), var(--role-cap-fill2));
   --elevation-lamp-amber: 0 0 10px var(--role-amber-bloom); /** a lit lamp; unlit lamps have none */

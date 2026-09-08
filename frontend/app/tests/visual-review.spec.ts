@@ -236,11 +236,19 @@ async function assertStudioPreviewFidelity(page: Page, fixture: string, size: Vi
     // knob (role=slider, square ~1:1) rather than a "preamp-panel-compact"
     // bitmap. The fidelity check is that the scaled studio preview preserves
     // the knob's square aspect ratio.
+    // Visual overhaul A, Slice 4b: the strips carry a gain key instead of a
+    // knob, so the fidelity check measures the strip's fader groove — the tall
+    // control the scale must not distort — and the plate's knob keeps the
+    // square check where it still stands.
     const preampKnobRatios = Array.from(
       document.querySelectorAll('[data-testid="audio-workspace"] [role="slider"][aria-label*="preamp gain"]')
     ).map((node) => ratioFor(node));
+    const grooveRatios = Array.from(
+      document.querySelectorAll('[data-testid="audio-workspace"] [role="slider"][aria-label*="send level"]')
+    ).map((node) => ratioFor(node));
 
     return {
+      grooveRatios,
       preampKnobRatios,
       root: root
         ? {
@@ -264,9 +272,14 @@ async function assertStudioPreviewFidelity(page: Page, fixture: string, size: Vi
     // audio fidelity check now verifies the SVG preamp knobs render square in
     // the scaled studio preview (the scale must preserve their aspect ratio).
     expect(
-      details.preampKnobRatios.length,
-      `Audio Studio Preview must render preamp knobs @ ${size.label}`
+      details.grooveRatios.length,
+      `Audio Studio Preview must render strip faders @ ${size.label}`
     ).toBeGreaterThan(0);
+    // A 44 px column that is far taller than it is wide: the scale must keep
+    // it that way rather than squashing it.
+    details.grooveRatios.forEach((ratio, index) => {
+      expect(ratio ?? Number.NaN, `Audio Studio Preview strip fader ${index + 1} @ ${size.label}`).toBeLessThan(0.5);
+    });
     details.preampKnobRatios.forEach((ratio, index) => {
       assertRatioClose(ratio ?? Number.NaN, 1, `Audio Studio Preview preamp knob ${index + 1} @ ${size.label}`, 0.1);
     });

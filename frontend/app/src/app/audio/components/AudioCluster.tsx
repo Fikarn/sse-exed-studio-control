@@ -6,7 +6,7 @@ import styles from "./AudioCluster.module.css";
 import { AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
 import { createThrottledCommit } from "../audioContinuousControls";
-import { dbfsToMeterPercent, formatAudioDb, formatAudioTimestamp } from "../audioFormatting";
+import { dbfsToMeterPercent, formatAudioDb, formatAudioTimestamp, meterFill } from "../audioFormatting";
 import type { AudioArmedAction } from "../audioArming";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
 import { useMomentaryTalkback } from "../hooks/useMomentaryTalkback";
@@ -337,16 +337,16 @@ export function AudioCluster({
         />
         <Meter
           label={`Monitor output meter — ${selectedMixTarget?.name ?? "Main Out"}`}
-          level={selectedMixTarget?.meterLeft ?? 0}
-          levelRight={
+          level={meterFill(selectedMixTarget?.meterLeft ?? 0)}
+          levelRight={meterFill(
             selectedMixTarget
               ? selectedMixTarget.mono
                 ? selectedMixTarget.meterLeft
                 : selectedMixTarget.meterRight
               : 0
-          }
-          peak={selectedMixTarget?.peakHoldLeft ?? 0}
-          peakRight={selectedMixTarget?.peakHoldRight ?? 0}
+          )}
+          peak={meterFill(selectedMixTarget?.peakHoldLeft ?? 0)}
+          peakRight={meterFill(selectedMixTarget?.peakHoldRight ?? 0)}
           orientation="horizontal"
           empty={meterEmpty}
           stale={meterStale}
