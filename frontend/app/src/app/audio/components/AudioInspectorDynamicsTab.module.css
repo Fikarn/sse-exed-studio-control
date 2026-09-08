@@ -11,7 +11,7 @@
   display: block;
   min-height: 170px;
   overflow: hidden;
-  border-radius: 5px;
+  border-radius: var(--radius-ctl);
   background:
     linear-gradient(color-mix(in srgb, var(--line) 24%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, var(--line) 18%, transparent) 1px, transparent 1px), var(--audio-meter-bg);
@@ -90,7 +90,7 @@
   gap: 4px;
   padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: 5px;
+  border-radius: var(--radius-ctl);
   background: color-mix(in srgb, var(--bg) 90%, transparent);
 }
 
@@ -138,7 +138,7 @@
   bottom: 8px;
   left: var(--dynamics-gate-x, 100%);
   width: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-ctl);
   background: color-mix(in srgb, var(--audio-meter-warn) 74%, transparent);
   box-shadow: 0 0 10px color-mix(in srgb, var(--audio-meter-warn) 28%, transparent);
   transform: translateX(-50%);

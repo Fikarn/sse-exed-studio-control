@@ -40,13 +40,10 @@ export function AudioTieredMixer({
   getDraftValue,
   onClearClip,
   onOpenChannelMenu,
-  onResetPeakHolds,
   onSelectChannel,
   onSelectChannelGroup,
   onSelectOutputMixTarget,
-  onTogglePeakHold,
   onTogglePhantom,
-  peakHoldEnabled,
   setDraftValue,
   onUpdateChannel,
   onUpdateMixTarget,
@@ -60,13 +57,10 @@ export function AudioTieredMixer({
   getDraftValue: (key: string, fallback: number) => number;
   onClearClip: (channelId: string) => void;
   onOpenChannelMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
-  onResetPeakHolds: () => void;
   onSelectChannel: (channelId: string | null) => void;
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
   onSelectOutputMixTarget: (mixTargetId: string) => void;
-  onTogglePeakHold: () => void;
   onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
-  peakHoldEnabled: boolean;
   setDraftValue: (key: string, value: number) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
@@ -209,11 +203,10 @@ export function AudioTieredMixer({
               </span>
             )}
           </div>
-          {/* C11: the retired ~38px context bar's Peak Hold + Reset controls
-              relocate here as a slim eyebrow on the Outputs header (the most
-              metered tier). The meter-simulation chip rides along so its
-              testid + "TEST METER SIMULATION" label keep their spec coverage
-              without the standalone context-bar row. */}
+          {/* Visual overhaul A, Slice 4c: peak hold and Reset peaks moved to the
+              plate's Meter section, where the readouts they act on are. What
+              stays here is the word that says the meters are simulated, which
+              belongs beside the meters themselves. */}
           <div className={styles.tierMeterEyebrow}>
             {viewModel.meterSimulationActive ? (
               <span
@@ -224,34 +217,6 @@ export function AudioTieredMixer({
                 {viewModel.meterSimulationLabel}
               </span>
             ) : null}
-            <div className={styles.tierPeakHoldSwitch} aria-label="Meter peak hold">
-              <button
-                aria-pressed={peakHoldEnabled}
-                className={styles.tierPeakHoldOption}
-                data-active={peakHoldEnabled}
-                data-testid="audio-peak-hold-toggle"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onTogglePeakHold();
-                }}
-                title={peakHoldEnabled ? "Disable held peak marks" : "Enable held peak marks"}
-                type="button"
-              >
-                Hold
-              </button>
-              <button
-                className={styles.tierPeakHoldOption}
-                data-testid="audio-peak-hold-reset"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onResetPeakHolds();
-                }}
-                title="Reset held peak marks"
-                type="button"
-              >
-                Reset
-              </button>
-            </div>
           </div>
         </div>
         <div className={styles.outputLaneGrid} data-testid="audio-tier-lanes-hardware-outputs">

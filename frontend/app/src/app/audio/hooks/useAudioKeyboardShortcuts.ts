@@ -19,6 +19,7 @@ import { useEffect } from "react";
 import { isEditableTarget, type AudioChannelEntry } from "../../shellData";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
+import { PLATE_SECTION_KEYS, type PlateSection } from "../components/inspector/audioInspectorHelpers";
 
 type SelectableSource = { id: string; kind: "channel" | "output" };
 
@@ -27,7 +28,6 @@ interface UseAudioKeyboardShortcutsArgs {
   clearAllSolo: () => void;
   clearClips: (channelId?: string) => void;
   contextMenu: unknown;
-  inspectorTab: string;
   nextBank: () => void;
   orderedSelectableSources: SelectableSource[];
   previousBank: () => void;
@@ -37,7 +37,7 @@ interface UseAudioKeyboardShortcutsArgs {
   selectChannel: (channelId: string | null) => void;
   selectOutputMixTarget: (mixTargetId: string) => void;
   setContextMenu: (value: null) => void;
-  setInspectorTab: (tab: "channel" | "eq" | "dynamics" | "sends") => void;
+  revealPlateSection: (section: PlateSection) => void;
   updateChannel: (request: { channelId: string; mute?: boolean; solo?: boolean; phase?: boolean }) => void;
   viewModel: AudioWorkspaceViewModel | null;
   visibleSelectableChannels: AudioChannelEntry[];
@@ -48,7 +48,6 @@ export function useAudioKeyboardShortcuts({
   clearAllSolo,
   clearClips,
   contextMenu,
-  inspectorTab,
   nextBank,
   orderedSelectableSources,
   previousBank,
@@ -58,7 +57,7 @@ export function useAudioKeyboardShortcuts({
   selectChannel,
   selectOutputMixTarget,
   setContextMenu,
-  setInspectorTab,
+  revealPlateSection,
   updateChannel,
   viewModel,
   visibleSelectableChannels,
@@ -79,11 +78,8 @@ export function useAudioKeyboardShortcuts({
       return;
     }
     if (plain && event.key === "Escape") {
-      if (inspectorTab !== "channel") {
-        setInspectorTab("channel");
-        event.preventDefault();
-        return;
-      }
+      // Visual overhaul A, Slice 4c: the plate has no tabs to back out of, so
+      // Escape goes straight to letting the strip go.
       if (viewModel.selectedChannelId) {
         selectChannel(null);
         event.preventDefault();
@@ -93,21 +89,14 @@ export function useAudioKeyboardShortcuts({
 
     if (isEditableTarget(event.target)) return;
 
-    // Inspector tab accelerators. Only meaningful when a channel is selected —
-    // an output-only selection forces the strip back to the single "channel"
-    // (Output) tab via `outputSelectionOnly`, so the keys stay inert there.
-    // P/Q → Preamp, E → EQ, D → Dynamics, R → Routing. No overlap with m/s/u.
+    // Plate accelerators. Only meaningful when a channel is selected — an
+    // output-only selection shows the output's own section, so the keys stay
+    // inert there. P/Q → Preamp, E → EQ, D → Dynamics, R → Sends; the plate
+    // brings the section into view. No overlap with m/s/u.
     if (plain && viewModel.selectedChannel) {
-      const tabForKey: Partial<Record<string, "channel" | "eq" | "dynamics" | "sends">> = {
-        p: "channel",
-        q: "channel",
-        e: "eq",
-        d: "dynamics",
-        r: "sends",
-      };
-      const nextTab = tabForKey[key];
-      if (nextTab) {
-        setInspectorTab(nextTab);
+      const section = PLATE_SECTION_KEYS[key];
+      if (section) {
+        revealPlateSection(section);
         event.preventDefault();
         return;
       }

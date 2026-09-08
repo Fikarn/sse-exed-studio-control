@@ -41,7 +41,8 @@ export function AudioInspectorChannelHeader({
           </span>
         </span>
       </div>
-      <h2 className={styles.inspectorTitle}>{selectedChannel.name}</h2>
+      {/* Visual overhaul A, Slice 4c: the plate head prints the name, so this
+          is the line under it — what the strip is and where it goes. */}
       <div className={styles.inspectorSubtitle}>
         {channelRoutingSourceText(selectedChannel.role)} · {selectedChannel.stereo ? "Stereo" : "Mono"} →{" "}
         <strong>{selectedMixTarget?.name ?? "No output"}</strong>

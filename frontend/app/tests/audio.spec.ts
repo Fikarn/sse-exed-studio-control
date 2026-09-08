@@ -28,6 +28,7 @@ import {
   expectSliderValueChanges,
   expectSnapshotActionsDoNotOverlapContent,
   readSnapshotThumbHeights,
+  revealPlateSection,
   saveAudioSnapshot,
 } from "./helpers/audio";
 import {
@@ -174,14 +175,18 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-strip-audio-input-1")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-feeding", "true");
   await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
-  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Software");
+  // Visual overhaul A, Slice 4c. Old: the preamp card printed its own eyebrow
+  // ("Software" / "Mic / Line Gain"). New: the plate's section head says it.
+  // Reason: with no tabs the section head names what the section is, so the
+  // card no longer repeats it.
+  await expect(page.locator('[data-plate-section="preamp"]')).toContainText("Software");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("No playback stats from the driver");
   await expect(page.getByTestId("audio-inspector-channel")).not.toContainText("Buffer status");
   await expect(page.getByTestId("audio-inspector-channel").getByRole("button", { name: "Stereo link" })).toHaveCount(0);
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Stereo link");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Auto fade");
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Mic / Line Gain");
+  await expect(page.locator('[data-plate-section="preamp"]')).toContainText("Preamp");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("48V");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Hi-Z");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Polarity");
@@ -228,8 +233,11 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-current", "true");
   await expect(page.getByTestId("audio-toolbar-current-snapshot")).toHaveText("Recalled Interview block");
 
-  await expect(page.getByTestId("audio-inspector-channel")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Preamp" })).toHaveAttribute("aria-selected", "true");
+  // Visual overhaul A, Slice 4c. Old: the plate was a tab strip and this
+  // asserted the Preamp tab was selected and its panel visible. New: every
+  // section of the plate is present at once. Reason: the plate has no tab row —
+  // nothing about the selected strip is hidden behind one.
+  await expect(page.locator('[data-plate-section="preamp"]')).toBeVisible();
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("Level L / R");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("Peak hold");
   await expect(page.getByTestId("audio-inspector-level-readout")).toHaveAttribute("data-meter-readout-mode", "level");
@@ -240,9 +248,10 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("Nominal ref");
   // 2026-05-27 redesign: Overview mini-preview cards removed; the EQ / Dyn /
   // Routing tabs are the route into processing now.
-  await expect(page.getByRole("tab", { name: "EQ" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Dyn" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Routing" })).toBeVisible();
+  // Visual overhaul A, Slice 4c: they are sections of the plate, all present.
+  for (const section of ["eq", "dynamics", "send", "meter", "channel"] as const) {
+    await expect(page.locator(`[data-plate-section="${section}"]`)).toBeAttached();
+  }
   const contextCountsBefore = await page.evaluate(() => ({ ...window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ }));
   await page.getByTestId("audio-strip-audio-input-1").click({ button: "right", position: { x: 12, y: 12 } });
   const menu = page.getByRole("menu", { name: /actions/i });
@@ -270,15 +279,15 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
       prompt: 0,
     });
   await expect(page.getByRole("button", { name: "PFL" })).toHaveCount(0);
-  await page.getByRole("tab", { name: "EQ" }).click();
+  await revealPlateSection(page, "eq");
   await page.getByTestId("audio-inspector-eq").getByRole("button", { name: "1", exact: true }).click();
   await expect(page.getByRole("button", { name: "Enable PEQ" })).toBeEnabled();
   await page.getByRole("button", { name: "Enable PEQ" }).click();
   await expect(page.getByRole("button", { name: "Bypass PEQ" })).toHaveAttribute("data-active", "true");
-  await page.getByRole("tab", { name: "Dyn" }).click();
+  await revealPlateSection(page, "dynamics");
   await expect(page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp" })).toBeEnabled();
   await expect(page.getByTestId("audio-dynamics-range")).toContainText("Comp");
-  await page.getByRole("tab", { name: "Routing" }).click();
+  await revealPlateSection(page, "send");
   await expect(page.getByTestId("audio-inspector-sends")).toContainText("Phones 1");
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText(/Send|No send|Muted/);
   const preFader = page.getByTestId("audio-inspector-sends").getByRole("button", { name: "Pre fader" }).first();
@@ -286,22 +295,36 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await preFader.click();
   await expect(preFader).toHaveAttribute("data-active", "true");
 
-  // Inspector tab keyboard accelerators (channel is selected): E/D/R/P switch
-  // tabs without a mouse trip. aria-keyshortcuts advertises each key.
-  await expect(page.getByRole("tab", { name: "EQ" })).toHaveAttribute("aria-keyshortcuts", "E");
+  // Visual overhaul A, Slice 4c. Old: E/D/R/P switched the plate's tabs and the
+  // test read `aria-selected` / `aria-keyshortcuts`. New: the same keys bring
+  // the section into view, and the test reads where the plate is scrolled to.
+  // Reason: with every section present there is nothing to select — the keys
+  // take the operator to the part of the plate they want.
+  const plateSectionAtTop = async () => {
+    return page.evaluate(() => {
+      const plate = document.querySelector('[data-testid="audio-inspector"]');
+      if (!plate) return null;
+      const top = plate.getBoundingClientRect().top;
+      let best: { id: string; delta: number } | null = null;
+      for (const section of plate.querySelectorAll<HTMLElement>("[data-plate-section]")) {
+        const delta = Math.abs(section.getBoundingClientRect().top - top);
+        if (!best || delta < best.delta) best = { id: section.dataset.plateSection ?? "", delta };
+      }
+      return best?.id ?? null;
+    });
+  };
   await page.keyboard.press("KeyE");
-  await expect(page.getByRole("tab", { name: "EQ" })).toHaveAttribute("aria-selected", "true");
+  await expect.poll(plateSectionAtTop).toBe("eq");
   await page.keyboard.press("KeyD");
-  await expect(page.getByRole("tab", { name: "Dyn" })).toHaveAttribute("aria-selected", "true");
+  await expect.poll(plateSectionAtTop).toBe("dynamics");
   await page.keyboard.press("KeyR");
-  await expect(page.getByRole("tab", { name: "Routing" })).toHaveAttribute("aria-selected", "true");
+  await expect.poll(plateSectionAtTop).toBe("send");
   await page.keyboard.press("KeyP");
-  await expect(page.getByRole("tab", { name: "Preamp" })).toHaveAttribute("aria-selected", "true");
-  await page.keyboard.press("KeyE");
-  await expect(page.getByRole("tab", { name: "EQ" })).toHaveAttribute("aria-selected", "true");
+  await expect.poll(plateSectionAtTop).toBe("preamp");
 
+  // Escape lets the strip go (old: it first backed out of the open tab).
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("audio-inspector-channel")).toBeVisible();
+  await expect(page.locator('[data-plate-section="preamp"]')).toHaveCount(0);
 });
 
 test("audio topbar setup action opens the setup workspace", async ({ page }) => {
@@ -979,11 +1002,15 @@ test("supports audio group filtering and source/output selection flow", async ({
   await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
   await page.getByTestId("audio-output-audio-mix-phones-a").click();
   await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
-  await expect(page.getByRole("tab", { name: "Output", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tab", { name: "EQ", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Routing", exact: true })).toHaveCount(0);
-  await expect(page.getByTestId("audio-inspector-output-panel")).toContainText("Phones 1");
+  // Visual overhaul A, Slice 4c. Old: selecting an output selected the Output
+  // tab and hid the EQ / Dyn / Routing tabs. New: the plate carries the
+  // output's own section and none of the channel's. Reason: no tab row — what
+  // the plate shows is what the selection has.
+  await expect(page.locator('[data-plate-section="output"]')).toBeVisible();
+  for (const section of ["eq", "dynamics", "send", "preamp"] as const) {
+    await expect(page.locator(`[data-plate-section="${section}"]`)).toHaveCount(0);
+  }
+  await expect(page.getByTestId("audio-inspector-output")).toContainText("Phones 1");
   await expect(page.getByTestId("audio-inspector-output")).toContainText("Level L / R");
   await expect(page.getByTestId("audio-inspector-output")).toContainText("Peak hold");
   await expect(page.getByTestId("audio-inspector-output-level-readout")).toHaveAttribute(
@@ -996,7 +1023,12 @@ test("supports audio group filtering and source/output selection flow", async ({
   );
   await expect(page.getByTestId("audio-inspector-eq-mini")).toHaveCount(0);
   await expect(page.getByTestId("audio-inspector-dynamics-mini")).toHaveCount(0);
-  await expect(page.getByTestId("audio-inspector-output-panel")).toContainText("Output processing");
+  // Visual overhaul A, Slice 4c. Old: the no-channel overview card printed
+  // "Output processing". New: the output's own plate section prints the mix,
+  // its level and its metering. Reason: the overview cards were the tabbed
+  // plate's way of previewing what a tab held; with every section visible there
+  // is nothing to preview.
+  await expect(page.getByTestId("audio-inspector-output")).toContainText("Monitor level");
 
   await page.getByTestId("audio-tier-lanes-hardware-inputs").dispatchEvent("click");
   await expect(page.getByTestId("audio-inspector-output")).toContainText("Phones 1");
@@ -1018,7 +1050,8 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
   // 2026-05-27 redesign: the preamp card eyebrow is now "Mic / Line Gain"
   // (was "Hardware") and hosts an SVG rotary knob; the 48V / Hi-Z / Polarity
   // / AutoSet toggles stay.
-  await expect(inspector).toContainText("Mic / Line Gain");
+  // Visual overhaul A, Slice 4c: the words moved to the plate's section head.
+  await expect(page.locator('[data-plate-section="preamp"]')).toContainText("mic / line gain on the UFX III");
   await expect(inspector).toContainText("48V");
   await expect(inspector).toContainText("Hi-Z");
   await expect(inspector).toContainText("Polarity");
@@ -1087,12 +1120,15 @@ test("supports operator peak-hold control for live audio meters", async ({ page 
   const levelReadout = page.getByTestId("audio-inspector-level-readout");
   const peakHoldReadout = page.getByTestId("audio-inspector-peak-hold-readout");
 
-  await expect(peakHoldToggle).toHaveAttribute("data-active", "true");
+  // Visual overhaul A, Slice 4c: peak hold is a key in the plate's Meter
+  // section (old: a switch on the Outputs tier header with `data-active`), so
+  // its engaged state is `aria-pressed`.
+  await expect(peakHoldToggle).toHaveAttribute("aria-pressed", "true");
   await expect(meterCanvas).toHaveAttribute("data-meter-peak-hold-enabled", "true");
   await expect(peakHoldReadout).toHaveAttribute("data-meter-peak-hold-enabled", "true");
 
   await peakHoldToggle.click();
-  await expect(peakHoldToggle).toHaveAttribute("data-active", "false");
+  await expect(peakHoldToggle).toHaveAttribute("aria-pressed", "false");
   await expect(meterCanvas).toHaveAttribute("data-meter-peak-hold-enabled", "false");
   await expect(peakHoldReadout).toHaveAttribute("data-meter-peak-hold-enabled", "false");
   await expect
@@ -1265,7 +1301,7 @@ test("supports engine-backed audio EQ editing", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await page.getByRole("tab", { name: "EQ" }).click();
+  await revealPlateSection(page, "eq");
   await expect(page.getByTestId("audio-eq-range")).toContainText("20 Hz");
   await expect(page.getByTestId("audio-eq-range")).toContainText("20 kHz");
   await expect(page.getByTestId("audio-eq-range")).toContainText("±20 dB");
@@ -1366,7 +1402,7 @@ test("supports engine-backed audio dynamics editing", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await page.getByRole("tab", { name: "Dyn" }).click();
+  await revealPlateSection(page, "dynamics");
   await expect(page.getByTestId("audio-dynamics-range")).toContainText("Comp");
   await expect(page.getByTestId("audio-dynamics-curve")).toHaveAttribute("data-active", "false");
   const comp = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp" });
@@ -1396,7 +1432,7 @@ test("supports engine-backed audio send mode controls", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
-  await page.getByRole("tab", { name: "Routing" }).click();
+  await revealPlateSection(page, "send");
   const sends = page.getByTestId("audio-inspector-sends");
   await expect(page.getByTestId("audio-send-destination-audio-mix-main")).toContainText("Main Out");
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText("Phones 1");
@@ -1798,12 +1834,12 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
     await expectNoHorizontalOverflow(page.getByTestId(testId), `1920 ${testId}`);
   }
   // Visual overhaul A, Slice 4a. Old: "1920 inspector width should be 380 px".
-  // New: 300 px. Reason: below the studio surface the Console's cluster takes
-  // 232 px off the left of the shell, so the transitional inspector gives the
-  // same back and the outputs tier keeps its three lanes without scrolling
+  // New (Slice 4c): 360 px, the mock's plate at the 1920 fallback. Reason: the
+  // cluster takes its width off the left of the shell and the plate takes the
+  // mock's, and the bay holds its banked strips between them without scrolling
   // sideways. The 2560×1440 deliverable (D4) is unchanged.
   const inspectorBox = await readRequiredBox(page, "audio-inspector");
-  expect(Math.abs(inspectorBox.width - 300), "1920 inspector width should be 300 px").toBeLessThanOrEqual(1);
+  expect(Math.abs(inspectorBox.width - 360), "1920 plate width should be 360 px").toBeLessThanOrEqual(1);
   // The other two playback pairs are one bank away and come back with "[".
   await expect(page.getByTestId("audio-strip-audio-playback-9-10")).toHaveCount(0);
   await page.keyboard.press("BracketRight");
@@ -1837,25 +1873,32 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   // 2026-05-27 redesign: the Overview mini-preview cards (eq-mini / dynamics-mini
   // / sends-mini) were replaced by the EQ / Dyn / Routing tabs; assert those are
   // present for the selected channel at the 1920 fallback.
-  await expect(page.getByRole("tab", { name: "EQ", exact: true })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Routing", exact: true })).toBeVisible();
+  // Visual overhaul A, Slice 4c: they are sections of the plate, all present at
+  // the fallback size too — the plate scrolls, it does not hide.
+  for (const section of ["eq", "dynamics", "send", "meter", "channel"] as const) {
+    await expect(page.locator(`[data-plate-section="${section}"]`)).toBeAttached();
+  }
   await expectAudioStudioSideRailsFilled(page, 32);
   await expectAudioOverviewProcessingStack(page, "1920 fallback selected-channel", 40);
   await expectSnapshotActionsDoNotOverlapContent(page, "snapshot-show-open");
   await expectAudioInspectorPanelsFit(page);
 
   await page.getByTestId("audio-output-audio-mix-phones-a").click();
-  await expect(page.getByRole("tab", { name: "Output", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator('[data-plate-section="output"]')).toBeVisible();
   await expectDbfsScaleLabelsInsideMeters(page, "1920 fallback output inspector");
-  await expect(page.getByRole("tab", { name: "EQ", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Dyn", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "Routing", exact: true })).toHaveCount(0);
-  const outputFacts = page.locator('[data-fact-size="long"]');
-  const outputFactCount = await outputFacts.count();
-  expect(outputFactCount, "output long facts should be rendered").toBeGreaterThan(0);
-  for (let index = 0; index < outputFactCount; index += 1) {
-    await expectNoElementOverflow(outputFacts.nth(index), `1920 output fact ${index + 1}`);
+  for (const section of ["eq", "dynamics", "send", "preamp"] as const) {
+    await expect(page.locator(`[data-plate-section="${section}"]`)).toHaveCount(0);
+  }
+  // Visual overhaul A, Slice 4c. Old: the two long facts (Clock, Metering) were
+  // measured on the retired overview card. New: they are the shell footer's
+  // telemetry, measured there. Reason: those facts moved to the footer in
+  // Slice 4a and the overview cards are gone with the tab row; the guard is the
+  // same one — a long value must not overflow its box at the fallback size.
+  const footerFacts = page.getByTestId("audio-footer-telemetry").locator("span");
+  const footerFactCount = await footerFacts.count();
+  expect(footerFactCount, "footer telemetry should be rendered").toBeGreaterThan(0);
+  for (let index = 0; index < footerFactCount; index += 1) {
+    await expectNoElementOverflow(footerFacts.nth(index), `1920 footer fact ${index + 1}`);
   }
   await expectNoDocumentScroll(page);
 });

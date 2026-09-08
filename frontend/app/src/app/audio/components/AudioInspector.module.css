@@ -6,13 +6,31 @@
  * inspectorTabs, inspectorPanel, emptyInspector) preserved.
  */
 
+/* Visual overhaul A, Slice 4c (system §7): the plate — a level +1 surface at
+   the right of the shell holding every section of the selected strip at once.
+   It scrolls as one column; nothing is behind a tab. */
 .inspector {
-  border-left: 1px solid var(--line);
-  background: var(--bg-1);
+  border-left: 1px solid var(--material-line);
+  background: var(--elevation-plate-fill);
   display: flex;
   flex-direction: column;
+  gap: 16px;
   min-height: 0;
-  overflow: hidden;
+  padding: 20px 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+.plateSection {
+  flex: none;
+  min-width: 0;
+}
+
+/* Below the studio surface the plate spends less air; every section stays. */
+:global([data-operator-layout-root][data-chrome="compact"]) .inspector {
+  gap: 12px;
+  padding: 14px 12px;
 }
 
 /* ── Tab strip ────────────────────────────────────────────────────────────── */
@@ -94,7 +112,7 @@
 
 .inspectorPanel::-webkit-scrollbar-thumb {
   background: var(--line-2);
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
@@ -164,7 +182,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   padding: 2px 6px;
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
   background: var(--bg-3);
   color: var(--fg-2);
   border: 1px solid var(--line);
@@ -278,7 +296,7 @@
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: var(--bg-2);
   border: 1px solid var(--line);
   color: var(--fg-2);
@@ -356,7 +374,7 @@
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: var(--bg-3);
   border: 1px dashed var(--line-2);
   color: var(--fg-2);
@@ -534,7 +552,7 @@
   min-width: 0;
   height: 28px;
   padding: 0 8px;
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: var(--bg-3);
   border: 1px solid var(--line);
   font-family: var(--font-mono);

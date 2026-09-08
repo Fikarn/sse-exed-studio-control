@@ -19,7 +19,7 @@
   display: block;
   min-height: 170px;
   overflow: hidden;
-  border-radius: 5px;
+  border-radius: var(--radius-ctl);
   background:
     linear-gradient(color-mix(in srgb, var(--line) 24%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, var(--line) 18%, transparent) 1px, transparent 1px), var(--audio-meter-bg);
@@ -94,9 +94,12 @@
   right: 8px;
   padding: 2px 4px;
   border-radius: var(--radius-tight-sm);
-  color: color-mix(in srgb, var(--fg-3) 74%, transparent);
-  background: color-mix(in srgb, var(--audio-meter-bg) 62%, transparent);
-  font: var(--font-weight-semibold) var(--audio-type-micro) / 1 var(--font-family-mono);
+  /* Visual overhaul A, Slice 4c: the plate shows the equaliser at all times, so
+     its scale is read like every other tick — 12 px on a chip of the graph's
+     own floor, which is a well in every theme, with the well's ink on it. */
+  color: var(--text-text2);
+  background: var(--audio-meter-bg);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
   transform: translateY(-50%);
@@ -126,8 +129,11 @@
   position: absolute;
   bottom: 6px;
   left: 50%;
-  color: color-mix(in srgb, var(--fg-3) 66%, transparent);
-  font: var(--font-weight-semibold) var(--audio-type-micro) / 1 var(--font-family-mono);
+  padding: 1px 3px;
+  border-radius: var(--radius-ctl);
+  color: var(--text-text2);
+  background: var(--audio-meter-bg);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   white-space: nowrap;
   text-transform: uppercase;
@@ -303,7 +309,7 @@
   min-height: 28px;
   padding: 0 10px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: color-mix(in srgb, var(--bg-1) 72%, transparent);
   color: var(--fg-3);
   font: var(--font-weight-semibold) var(--font-size-2xs) / 1 var(--font-family-mono);
@@ -360,7 +366,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 4px 9px;
-  border-radius: 5px;
+  border-radius: var(--radius-ctl);
   cursor: pointer;
   transition:
     background var(--motion-duration-fast) var(--easing),

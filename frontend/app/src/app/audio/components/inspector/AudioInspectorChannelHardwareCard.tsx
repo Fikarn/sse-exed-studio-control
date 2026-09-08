@@ -70,9 +70,6 @@ export function AudioInspectorChannelHardwareCard({
       className={`${styles.inspectorMiniCard} ${styles.sourceCard} ${styles.inspectorStickyHardwareCard}`}
       data-testid="audio-inspector-hardware-mini"
     >
-      <span className={styles.eyebrow}>
-        {audioChannelSupportsGain(selectedChannel) ? "Mic / Line Gain" : "Software"}
-      </span>
       {audioChannelSupportsGain(selectedChannel) ? (
         <div className={styles.inspectorHardwareGrid}>
           <div className={styles.preampHero}>

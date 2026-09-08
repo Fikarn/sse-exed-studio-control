@@ -27,7 +27,7 @@ import {
 } from "./audioViewModel";
 import { AudioCluster } from "./components/AudioCluster";
 import { AudioFooter } from "./components/AudioFooter";
-import { AudioInspector, type InspectorTab } from "./components/AudioInspector";
+import { AudioInspector, type PlateSection } from "./components/AudioInspector";
 import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { AudioTextDialog } from "./components/AudioTextDialog";
@@ -115,7 +115,15 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const draftStore = draftStoreRef.current;
   const [textDialog, setTextDialog] = useState<AudioTextDialogState | null>(null);
   const [deleteSnapshotDialog, setDeleteSnapshotDialog] = useState<AudioDeleteSnapshotState | null>(null);
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("channel");
+  // Visual overhaul A, Slice 4c: the plate shows every section at once, so this
+  // is no longer which tab is open but which section an accelerator last asked
+  // to see. The token makes the same key twice move the plate twice.
+  const [revealSection, setRevealSection] = useState<PlateSection | null>(null);
+  const [revealToken, setRevealToken] = useState(0);
+  const revealPlateSection = useLiveCallback((section: PlateSection) => {
+    setRevealSection(section);
+    setRevealToken((token) => token + 1);
+  });
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
   // Slice 3c — follow the global theme rather than an audio-local state, so the
@@ -548,7 +556,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     clearAllSolo,
     clearClips,
     contextMenu,
-    inspectorTab,
     nextBank,
     orderedSelectableSources,
     previousBank,
@@ -558,7 +565,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     selectChannel,
     selectOutputMixTarget,
     setContextMenu,
-    setInspectorTab,
+    revealPlateSection,
     updateChannel,
     viewModel,
     visibleSelectableChannels,
@@ -715,13 +722,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           onSelectChannelGroup={selectChannelGroup}
           onSelectMixTarget={selectMixTarget}
           onSelectOutputMixTarget={selectOutputMixTarget}
-          onTogglePeakHold={togglePeakHold}
           onTogglePhantom={togglePhantom}
-          onResetPeakHolds={resetPeakHolds}
           setDraftValue={setDraftValue}
           onUpdateChannel={updateChannel}
           onUpdateMixTarget={updateMixTarget}
-          peakHoldEnabled={peakHoldEnabled}
           store={store}
           viewModel={viewModel}
         />
@@ -733,9 +737,15 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           commitMixTargetContinuous={commitMixTargetContinuous}
           draftStore={draftStore}
           getDraftValue={getDraftValue}
-          activeTab={inspectorTab}
-          onActiveTabChange={setInspectorTab}
+          onRenameChannel={(channelId) => {
+            const channel = viewModel.channels.find((entry) => entry.id === channelId);
+            if (channel) renameChannel(channel.id, channel.name);
+          }}
+          onResetPeakHolds={resetPeakHolds}
           onSelectMixTarget={selectMixTarget}
+          onTogglePeakHold={togglePeakHold}
+          revealSection={revealSection}
+          revealToken={revealToken}
           setDraftValue={setDraftValue}
           onUpdateChannelDynamics={updateChannelDynamics}
           onUpdateChannelEq={updateChannelEq}

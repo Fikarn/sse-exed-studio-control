@@ -93,7 +93,7 @@
 .sendModeRow button {
   min-height: 25px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: color-mix(in srgb, var(--bg-1) 78%, transparent);
   color: var(--fg-3);
   font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
@@ -119,7 +119,7 @@
 .sendTargetButton {
   min-height: 28px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: color-mix(in srgb, var(--bg-1) 76%, transparent);
   color: var(--fg-3);
   font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);

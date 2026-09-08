@@ -61,32 +61,31 @@ export async function expectAudioWorkspaceGeometry(page: Page) {
 }
 
 export async function expectAudioInspectorPanelsFit(page: Page) {
-  for (const { tab, panelId } of [
-    { tab: "Preamp", panelId: "audio-inspector-channel" },
-    { tab: "EQ", panelId: "audio-inspector-eq" },
-    { tab: "Dyn", panelId: "audio-inspector-dynamics" },
-    { tab: "Routing", panelId: "audio-inspector-sends" },
-  ]) {
-    await page.getByRole("tab", { name: tab, exact: true }).click();
-    const metrics = await page.getByTestId(panelId).evaluate((panel) => ({
-      clientHeight: panel.clientHeight,
-      scrollHeight: panel.scrollHeight,
-      overflowY: getComputedStyle(panel).overflowY,
-    }));
-    // 2026-05-27 Console redesign: the dense processing panels (EQ / Dyn
-    // all-knob grids) can exceed the inspector height at the cramped 1920×1080
-    // fallback. That is fine as long as the panel scrolls (content stays
-    // reachable) instead of clipping silently — so a scrollable panel satisfies
-    // the guard. The guard still catches a panel that overflows with hidden
-    // overflow (content cut off with no way to reach it).
-    const fits = metrics.scrollHeight <= metrics.clientHeight + 1;
-    const scrollable = metrics.overflowY === "auto" || metrics.overflowY === "scroll";
-    expect(
-      fits || scrollable,
-      `${panelId} clips content (scrollHeight ${metrics.scrollHeight} > clientHeight ${metrics.clientHeight}, overflow-y ${metrics.overflowY})`
-    ).toBe(true);
-  }
-  await page.getByRole("tab", { name: "Preamp", exact: true }).click();
+  // Visual overhaul A, Slice 4c. Old: the check clicked each tab and measured
+  // its panel. New: it measures the plate itself and every section in it.
+  // Reason: there are no tabs — the plate is one scrolling column — and what
+  // the guard is for is unchanged: nothing is cut off with no way to reach it.
+  const metrics = await page.getByTestId("audio-inspector").evaluate((plate) => ({
+    clientHeight: plate.clientHeight,
+    scrollHeight: plate.scrollHeight,
+    overflowY: getComputedStyle(plate).overflowY,
+    sections: Array.from(plate.querySelectorAll<HTMLElement>("[data-plate-section]")).map((section) => ({
+      id: section.dataset.plateSection ?? "",
+      clipped: section.scrollHeight > section.clientHeight + 1 && getComputedStyle(section).overflowY === "hidden",
+      width: section.getBoundingClientRect().width,
+    })),
+  }));
+
+  const scrollable = metrics.overflowY === "auto" || metrics.overflowY === "scroll";
+  expect(
+    metrics.scrollHeight <= metrics.clientHeight + 1 || scrollable,
+    `the plate clips content (scrollHeight ${metrics.scrollHeight} > clientHeight ${metrics.clientHeight}, overflow-y ${metrics.overflowY})`
+  ).toBe(true);
+  expect(metrics.sections.length, "the plate should render its sections").toBeGreaterThan(0);
+  expect(
+    metrics.sections.filter((section) => section.clipped).map((section) => section.id),
+    "plate sections clipping their content"
+  ).toEqual([]);
 }
 
 export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx = 24) {
@@ -123,6 +122,20 @@ export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx 
 // recall; save / rename / delete come with the preview of what they change.
 // What the check is for is unchanged — the strip must never cover the slot's
 // name, mix shape or last recall.
+// Visual overhaul A, Slice 4c: the plate has no tab row — every section is
+// visible at once — so what used to be "click the EQ tab" is "bring the EQ
+// section into view". Sections keep the ids the tabs' panels had, prefixed
+// `audio-plate-section-`.
+export async function revealPlateSection(
+  page: Page,
+  section: "preamp" | "send" | "eq" | "dynamics" | "meter" | "channel" | "output"
+) {
+  const target = page.locator(`[data-plate-section="${section}"]`);
+  await expect(target).toBeAttached();
+  await target.scrollIntoViewIfNeeded();
+  return target;
+}
+
 export async function expectSnapshotActionsDoNotOverlapContent(page: Page, snapshotId: string) {
   const tile = page.getByTestId(`audio-snapshot-${snapshotId}`);
   const actions = tile.getByTestId(`audio-snapshot-actions-${snapshotId}`);
@@ -189,45 +202,51 @@ export async function expectAudioOverviewProcessingStack(page: Page, label: stri
   // send card (source → EQ → send → meter). This helper asserts the Preamp
   // panel is present and that the preamp hero, the EQ preview, and the meter
   // card all render inside it.
-  const panel = page.getByTestId("audio-inspector-channel");
-  const meter = page.getByTestId("audio-inspector-metering");
-  const hardware = page.getByTestId("audio-inspector-hardware-mini");
-  const eqPreview = page.getByTestId("audio-inspector-eq-preview");
+  // Visual overhaul A, Slice 4c. Old: the check measured the Preamp tab's
+  // panel and the read-only EQ mini-preview card inside it. New: it measures
+  // the plate's own order — the preamp section, then the sends, then the
+  // equaliser, then the meter — because the plate shows every section at once
+  // and the mini-preview is gone (the equaliser itself is right there).
+  // Reason: no tab row, so what the check is for — the sections stack in the
+  // signal's order inside the plate and stay boxed in it — reads off the plate.
+  const plate = page.getByTestId("audio-inspector");
+  const preamp = page.locator('[data-plate-section="preamp"]');
+  const sends = page.locator('[data-plate-section="send"]');
+  const eq = page.locator('[data-plate-section="eq"]');
+  const meter = page.locator('[data-plate-section="meter"]');
 
-  await expect(panel, `${label} Preamp panel`).toBeVisible();
-  await expect(hardware, `${label} preamp card visible`).toBeVisible();
-  await expect(eqPreview, `${label} EQ preview visible`).toBeVisible();
-  await expect(meter, `${label} meter card visible`).toBeVisible();
+  await expect(plate, `${label} plate`).toBeVisible();
+  for (const [locator, name] of [
+    [preamp, "preamp section"],
+    [sends, "sends section"],
+    [eq, "equaliser section"],
+    [meter, "meter section"],
+  ] as const) {
+    await expect(locator, `${label} ${name}`).toBeAttached();
+  }
 
-  const panelBox = await readRequiredLocatorBox(panel, `${label} Preamp panel`);
-  const meterBox = await readRequiredLocatorBox(meter, `${label} meter card`);
-  const hardwareBox = await readRequiredLocatorBox(hardware, `${label} preamp card`);
-  const eqPreviewBox = await readRequiredLocatorBox(eqPreview, `${label} EQ preview`);
+  const plateBox = await readRequiredLocatorBox(plate, `${label} plate`);
+  const preampBox = await readRequiredLocatorBox(preamp, `${label} preamp section`);
+  const sendsBox = await readRequiredLocatorBox(sends, `${label} sends section`);
+  const eqBox = await readRequiredLocatorBox(eq, `${label} equaliser section`);
+  const meterBox = await readRequiredLocatorBox(meter, `${label} meter section`);
 
-  // The preamp hero + EQ preview sit at the top of the stack, always above the
-  // fold, so they stay fully boxed inside the panel.
-  expectInsideBox(hardwareBox, panelBox, `${label} preamp card inside Preamp panel`);
-  expectInsideBox(eqPreviewBox, panelBox, `${label} EQ preview inside Preamp panel`);
-  // EQ preview sits below the preamp hero and above the meter card.
-  expect(eqPreviewBox.top, `${label} EQ preview below preamp hero`).toBeGreaterThanOrEqual(hardwareBox.top - 1);
-  expect(meterBox.top, `${label} meter card below EQ preview`).toBeGreaterThanOrEqual(eqPreviewBox.top - 1);
+  // The signal's order down the plate: what the source is, where it goes, what
+  // is done to it, what is coming back.
+  expect(sendsBox.top, `${label} sends below the preamp`).toBeGreaterThanOrEqual(preampBox.top - 1);
+  expect(eqBox.top, `${label} equaliser below the sends`).toBeGreaterThanOrEqual(sendsBox.top - 1);
+  expect(meterBox.top, `${label} meter below the equaliser`).toBeGreaterThanOrEqual(eqBox.top - 1);
 
-  // The meter card is the last card in the stack. With the EQ preview added,
-  // the cramped 1920×1080 fallback can push it into the panel's scroll
-  // overflow — that is fine (the panel scrolls; the card stays reachable),
-  // exactly as expectAudioInspectorPanelsFit already allows. So we require the
-  // meter card to be horizontally boxed in the panel and to start within the
-  // panel, and only require its bottom inside the panel when the panel is not
-  // scrollable (content actually fits).
-  expect(meterBox.left, `${label} meter card left inside Preamp panel`).toBeGreaterThanOrEqual(panelBox.left - 1);
-  expect(meterBox.right, `${label} meter card right inside Preamp panel`).toBeLessThanOrEqual(panelBox.right + 1);
-  expect(meterBox.top, `${label} meter card top inside Preamp panel`).toBeGreaterThanOrEqual(panelBox.top - 1);
-
-  const panelScrolls = await panel.evaluate(
-    (node) => node.scrollHeight > node.clientHeight + 1 && getComputedStyle(node).overflowY !== "visible"
-  );
-  if (!panelScrolls) {
-    expect(meterBox.bottom, `${label} meter card bottom inside Preamp panel`).toBeLessThanOrEqual(panelBox.bottom + 1);
+  // Every section is boxed inside the plate horizontally; the plate scrolls, so
+  // a section below the fold is reachable rather than clipped.
+  for (const [box, name] of [
+    [preampBox, "preamp section"],
+    [sendsBox, "sends section"],
+    [eqBox, "equaliser section"],
+    [meterBox, "meter section"],
+  ] as const) {
+    expect(box.left, `${label} ${name} left inside the plate`).toBeGreaterThanOrEqual(plateBox.left - 1);
+    expect(box.right, `${label} ${name} right inside the plate`).toBeLessThanOrEqual(plateBox.right + 1);
   }
 }
 

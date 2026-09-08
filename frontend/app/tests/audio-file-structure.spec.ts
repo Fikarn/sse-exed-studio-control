@@ -8,18 +8,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "../../../");
 
+// Visual overhaul A, Slice 4c. Old: the list named AudioInspectorTabStrip.tsx,
+// AudioInspectorOverviewCards.tsx and AudioInspectorChannelSendActions.tsx.
+// New: they are gone. Reason: the plate has no tab row (so no strip), no tab
+// previews (so no overview cards) and no second copy of the strip's Mute /
+// Solo / Unity row (so no send-actions card) — the sends section carries the
+// send itself. The rule the list guards is unchanged: the plate stays split
+// per section rather than growing back into one file.
 const EXPECTED_INSPECTOR_FILES = [
   "frontend/app/src/app/audio/components/inspector/audioInspectorHelpers.ts",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelHardwareCard.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelHeader.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelMeterCard.tsx",
-  "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelSendActions.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorDynamicsTab.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorEqTab.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorOutputView.tsx",
-  "frontend/app/src/app/audio/components/inspector/AudioInspectorOverviewCards.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorSendsTab.tsx",
-  "frontend/app/src/app/audio/components/inspector/AudioInspectorTabStrip.tsx",
 ];
 
 const EXPECTED_HOOK_FILES = [

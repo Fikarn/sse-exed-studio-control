@@ -8,7 +8,10 @@
     border-top: 1px solid var(--material-line);
     background: linear-gradient(180deg, var(--material-bg), var(--material-panel));
     color: var(--text-text2);
-    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+    /* A line box that contains its descenders: at `/ 1` the mono values sat a
+       pixel proud of their box, which reads as a clipped value to anything
+       measuring the footer. */
+    font: 500 var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;

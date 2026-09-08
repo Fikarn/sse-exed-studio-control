@@ -27,13 +27,10 @@ export function AudioSignalCanvas({
   onSelectChannelGroup,
   onSelectMixTarget: _onSelectMixTarget,
   onSelectOutputMixTarget,
-  onTogglePeakHold,
   onTogglePhantom,
-  onResetPeakHolds,
   setDraftValue,
   onUpdateChannel,
   onUpdateMixTarget,
-  peakHoldEnabled,
   store: _store,
   viewModel,
 }: {
@@ -52,13 +49,10 @@ export function AudioSignalCanvas({
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
   onSelectMixTarget: (mixTargetId: string) => void;
   onSelectOutputMixTarget: (mixTargetId: string) => void;
-  onTogglePeakHold: () => void;
   onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
-  onResetPeakHolds: () => void;
   setDraftValue: (key: string, value: number) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
-  peakHoldEnabled: boolean;
   store: ShellStore;
   viewModel: AudioWorkspaceViewModel;
 }) {
@@ -129,13 +123,10 @@ export function AudioSignalCanvas({
         getDraftValue={getDraftValue}
         onOpenChannelMenu={onOpenChannelMenu}
         onClearClip={onClearClips}
-        onResetPeakHolds={onResetPeakHolds}
         onSelectChannel={onSelectChannel}
         onSelectChannelGroup={onSelectChannelGroup}
         onSelectOutputMixTarget={onSelectOutputMixTarget}
-        onTogglePeakHold={onTogglePeakHold}
         onTogglePhantom={onTogglePhantom}
-        peakHoldEnabled={peakHoldEnabled}
         setDraftValue={setDraftValue}
         onUpdateChannel={onUpdateChannel}
         onUpdateMixTarget={onUpdateMixTarget}

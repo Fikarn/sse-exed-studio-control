@@ -68,9 +68,12 @@ test("snapshot diff shows '+N more' when more than two channels changed", async 
 
 test("EQ Band 2 locks the band-type selector via the capability flag", async ({ page }) => {
   await openFixture(page, "audio-selected-channel");
-  const eqTab = page.getByRole("tab", { name: "EQ" });
-  await expect(eqTab).toBeVisible();
-  await eqTab.click();
+  // Visual overhaul A, Slice 4c. Old: click the EQ tab. New: the equaliser is a
+  // section of the plate, always present; bring it into view. Reason: the plate
+  // has no tab row.
+  const eqSection = page.locator('[data-plate-section="eq"]');
+  await expect(eqSection).toBeAttached();
+  await eqSection.scrollIntoViewIfNeeded();
 
   const band2 = page.getByTestId("audio-eq-point-2");
   await band2.click();
