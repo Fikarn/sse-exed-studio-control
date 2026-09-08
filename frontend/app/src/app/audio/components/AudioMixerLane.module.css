@@ -480,10 +480,14 @@
   min-width: 160px;
 }
 
-/* 2026-09 audit Slice 9: compact density — three 176 px output lanes fit the
-   ~569 px outputs column at 1920×1080 without a horizontal scroll. */
+/* 2026-09 audit Slice 9: compact density — output lanes fit the outputs column
+   at 1920×1080 without a horizontal scroll.
+   Visual overhaul A, Slice 4a: the Console's cluster takes 232 px off the left
+   of the shell below the studio surface, so the outputs column drops from
+   ~569 px to ~502 px. Three lanes at the 160 px floor plus the tier's gaps and
+   gutters settle at ~492 px, so the tier still never scrolls sideways. */
 [data-density="compact"] .outputLane {
-  width: 176px;
+  width: 160px;
   min-width: 160px;
 }
 

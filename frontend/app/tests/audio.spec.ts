@@ -108,19 +108,25 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // GS-AUD-45 (now 2026-05-27 redesign): OSC / Metering live in the
   // AudioTopBar stat cluster; Endpoint is dropped from the chrome entirely.
   // The footer keeps only the temporal facts.
-  await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("OSC");
+  // Visual overhaul A, Slice 4 (system §2): the shell's footer carries the
+  // Console's telemetry — the console link, the metering source, the last sync
+  // and the bank. Old: the top bar's stat cluster carried OSC / Metering and
+  // the footer carried Clock / Last sync.
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Console");
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Metering");
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Last sync");
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Bank");
   await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Endpoint");
-  await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Metering");
-  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Clock");
   // 2026-05-27 redesign: Endpoint is no longer surfaced on the chrome.
   // OSC / Metering live in the AudioTopBar stat cluster (no testid on the
   // cluster itself yet; assert via topbar text).
-  await expect(page.getByTestId("audio-topbar")).toContainText("OSC");
-  await expect(page.getByTestId("audio-topbar")).toContainText("Metering");
+  await expect(page.getByTestId("audio-topbar")).toHaveCount(0);
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Command palette");
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Shortcuts");
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank prev");
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank next");
+  // Old: "Bank prev" / "Bank next" as two hints; the A footer prints one
+  // `[ ] Bank` hint pair and the talkback hold (system §2).
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank");
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("hold to talk");
   await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Shift 1-8 recall");
   await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Esc clear");
   // 2026-05-27 redesign: monitor controls moved from the rail card to the
@@ -128,16 +134,19 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // `audio-monitor-master-meter`; assert visibility of the bar itself.
   await expect(page.getByTestId("audio-monitor-bar")).toBeVisible();
   await expect(page.getByTestId("audio-monitor-master-meter")).toBeVisible();
-  await expect(page.getByTestId("audio-topbar")).toContainText("Sync");
+  // The standing actions live in the cluster now (plan D8: the state display's
+  // way out duplicates them deliberately).
+  await expect(page.getByTestId("audio-topbar-sync")).toContainText("Sync from TotalMix");
   await expect(page.getByTestId("audio-topbar-setup")).toBeEnabled();
-  await expect(page.getByTestId("audio-topbar")).not.toContainText("Levels");
   await expect(page.getByTestId("audio-solo-warning-band")).toContainText("solo engaged");
+  // Visual overhaul A, Slice 4: the latch is one 40 px row in the cluster
+  // (old: a 36 px band across the bay).
   await expect
     .poll(async () => {
       const box = await page.getByTestId("audio-solo-warning-band").boundingBox();
       return Math.round(box?.height ?? 0);
     })
-    .toBeLessThanOrEqual(36);
+    .toBeLessThanOrEqual(44);
   await expect(page.getByTestId("audio-clip-warning-band")).toHaveCount(0);
   await page.getByRole("button", { name: "Clear all solo" }).click();
   await expect(page.getByTestId("audio-solo-warning-band")).toHaveCount(0);
@@ -305,8 +314,12 @@ test("audio topbar setup action opens the setup workspace", async ({ page }) => 
 
 test("renders audio degraded and loading fixture states", async ({ page }) => {
   await openFixture(page, "audio-state-assumed");
-  await expect(page.getByText("STATE ASSUMED", { exact: true })).toBeVisible();
-  await expect(page.getByText(/showing the last state the console confirmed/i)).toBeVisible();
+  // Visual overhaul A, Slice 4 (plan D1): the state word, the engine's
+  // sentence and the way out live in the cluster's state display. Old: the
+  // band's title "STATE ASSUMED" above the bay.
+  const assumedDisplay = page.getByTestId("audio-state-display");
+  await expect(assumedDisplay).toContainText("ASSUMED");
+  await expect(assumedDisplay).toContainText(/showing the last state the console confirmed/i);
 
   await openFixture(page, "audio-not-verified");
   // 2026-09 audit remediation, Slice 1: until the audio probe passes every
@@ -314,33 +327,46 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   // controls, (b) say why in a full banner, and (c) offer the probe as the
   // way out. The old assertion (Sync enabled + refusal toast after clicking
   // it) encoded the finding this slice fixes.
-  const notVerifiedBand = page.getByTestId("audio-warning-band");
+  const notVerifiedBand = page.getByTestId("audio-state-display");
   await expect(notVerifiedBand).toBeVisible();
-  await expect(notVerifiedBand).toContainText("AUDIO NOT VERIFIED");
-  await expect(page.getByTestId("audio-topbar-sync")).toHaveCount(0);
+  await expect(notVerifiedBand).toContainText("NOT VERIFIED");
+  // Visual overhaul A, Slice 4 (plan D8): Sync stands in the cluster's actions
+  // whatever the state; the probe is the way out inside the state display.
+  // Old: the top bar hid Sync while the console was not verified.
+  await expect(page.getByTestId("audio-state-probe")).toBeVisible();
   await expect(page.getByTestId("audio-topbar-probe")).toBeVisible();
   await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("button", { name: "Mute Host" })).toBeDisabled();
-  await page.getByTestId("audio-warning-band-probe").click();
+  await page.getByTestId("audio-state-probe").click();
   // The fixture probe passes, which is exactly what unlocks the console.
-  await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
+  await expect(page.getByTestId("audio-state-display")).not.toContainText("NOT VERIFIED");
   await expect(page.getByTestId("audio-topbar-sync")).toBeEnabled();
   await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).not.toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("button", { name: "Mute Host" })).toBeEnabled();
 
   await openFixture(page, "audio-osc-disabled");
-  await expect(page.getByText("OSC DISABLED", { exact: true })).toBeVisible();
+  // The state display carries the engine's word (old: the band's title
+  // "OSC DISABLED").
+  await expect(page.getByTestId("audio-state-display")).toContainText("DISABLED");
   await expect(page.getByTestId("audio-topbar-sync")).toBeDisabled();
 
   await openFixture(page, "audio-offline");
-  await expect(page.getByText("CONSOLE UNREACHABLE", { exact: true })).toBeVisible();
+  // The state display carries the engine's word and its sentence (old: the
+  // band's title "CONSOLE UNREACHABLE").
+  await expect(page.getByTestId("audio-state-display")).toContainText("OFFLINE");
   await expect(page.getByText("Console did not answer OSC ping.").first()).toBeVisible();
 
   await openFixture(page, "audio-action-failed");
-  await expect(page.getByText("SNAPSHOT RECALL FAILED", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("AUDIO_SNAPSHOT_RECALL_FAILED · Snapshot slot 3 did not match the current console layout.")
-  ).toBeVisible();
+  // Visual overhaul A, Slice 4a. Old: the sentence read
+  // "AUDIO_SNAPSHOT_RECALL_FAILED · Snapshot slot 3 did not match…". New: the
+  // sentence says what happened and the code stands in the display's own code
+  // slot. Reason: operator copy never leads with a raw fault code, and the
+  // state display is the one place that has somewhere else to put it.
+  const failedState = page.getByTestId("audio-state-display");
+  await expect(failedState).toContainText("ACTION FAILED");
+  await expect(failedState).toContainText("Snapshot slot 3 did not match the current console layout.");
+  await expect(failedState).toContainText("AUDIO_SNAPSHOT_RECALL_FAILED");
+  await expect(failedState.locator("[data-state-code]")).toHaveText("AUDIO_SNAPSHOT_RECALL_FAILED");
 
   await openFixture(page, "audio-loading");
   await expect(page.getByText("Loading audio snapshot.")).toBeVisible();
@@ -594,7 +620,8 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   // label moved to the AudioTopBar's Metering stat cell ("test simulation").
   // The rail-card "Active mix · test meters" copy is retired (no replacement
   // — the monitor bar shows only the active master meter).
-  await expect(page.getByTestId("audio-topbar")).toContainText("test simulation");
+  // The metering source is a footer item now (old: the top bar's stat cell).
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Test meter simulation");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST STAGE");
 
   const hostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
@@ -701,7 +728,7 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   // 2026-05-27 redesign: rail card with the "Active mix · live" eyebrow is
   // gone. The Metering stat cell on the AudioTopBar shows the live metering
   // label (footerTelemetry.metering) instead of the "test simulation" copy.
-  await expect(page.getByTestId("audio-topbar")).not.toContainText("test simulation");
+  await expect(page.getByTestId("audio-footer-telemetry")).not.toContainText("Test meter simulation");
   await expect(page.locator("[data-simulated-meter]")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-playback-3-4").locator("[data-simulation-profile]")).toHaveCount(0);
   const hardwareHostMeter = page.getByTestId("audio-strip-audio-input-9").locator('[data-meter-component="stereo"]');
@@ -837,21 +864,22 @@ test("fixture simulated output submix uses TotalMix fader gain curve", async () 
 test("supports audio warning-band sync and keyboard mix-target changes", async ({ page }) => {
   await openFixture(page, "audio-state-assumed");
 
-  const warningBand = page.getByTestId("audio-warning-band");
-  await expect(warningBand).not.toContainText("Esc clear");
-  await expect(warningBand.getByRole("button", { name: "Sync now" })).toBeEnabled();
-  await expect(warningBand.getByRole("button", { name: "Setup" })).toBeEnabled();
-  await warningBand.focus();
-  await page.keyboard.press("Enter");
-  await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
+  // Visual overhaul A, Slice 4 (plan D8): the way out is a key inside the
+  // state display and the same command stands in the cluster's actions. Old:
+  // "Sync now" / "Setup" buttons on the band, focused and confirmed with Enter.
+  const stateDisplay = page.getByTestId("audio-state-display");
+  await expect(stateDisplay).not.toContainText("Esc clear");
+  await expect(page.getByTestId("audio-state-sync")).toBeEnabled();
+  await expect(page.getByTestId("audio-topbar-setup")).toBeEnabled();
+  await page.getByTestId("audio-state-sync").press("Enter");
+  await expect(stateDisplay).not.toContainText("ASSUMED");
 
   await page.keyboard.press("ArrowRight");
   await expect(page.getByTestId("audio-strip-audio-playback-5-6")).toHaveAttribute("data-selected", "true");
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Master" })).toHaveCount(0);
 
   await openFixture(page, "audio-osc-disabled");
-  const disabledWarningBand = page.getByTestId("audio-warning-band");
-  await expect(disabledWarningBand.getByRole("button", { name: "Sync now" })).toBeDisabled();
+  await expect(page.getByTestId("audio-state-display")).toContainText("DISABLED");
   await expect(page.getByTestId("audio-topbar-sync")).toBeDisabled();
 });
 
@@ -984,8 +1012,11 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
 test("supports audio solo chip and clip clearing", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
+  // Visual overhaul A, Slice 4 (system §7): a latched state the operator must
+  // see from anywhere is a latch in the cluster. Old: a warning band on the
+  // bay floor with a per-channel "×" chip; the latch clears every solo at once.
   await expect(page.getByTestId("audio-solo-warning-band")).toBeVisible();
-  await page.getByTestId("audio-solo-warning-band").getByRole("button", { name: /×/ }).click();
+  await page.getByTestId("audio-solo-warning-band").getByRole("button", { name: "Clear all solo" }).click();
   await expect(page.getByTestId("audio-solo-warning-band")).toHaveCount(0);
 
   await openFixture(page, "audio-clipped");
@@ -1110,12 +1141,22 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
     })
     .not.toEqual(savedThumbBefore);
   await page.mouse.move(1, 1);
+  // Visual overhaul A, Slice 4a. Old: the save / rename / delete keys were a
+  // row under every slot and were asserted visible with the pointer away. New:
+  // they live in the slot's float with the preview, so they appear on hover or
+  // keyboard focus. Reason: the resting slot is the mock's — the name and when
+  // it was last recalled — and the deliberate actions come with the preview of
+  // what they would change.
   const snapshotActions = currentSnapshot.getByTestId("audio-snapshot-actions-snapshot-show-open");
-  await expect(snapshotActions).toBeVisible();
+  await expect(snapshotActions).toBeHidden();
   await currentSnapshot.hover();
+  await expect(snapshotActions).toBeVisible();
   await expect(currentSnapshot.getByText("18 sources saved")).toBeVisible();
   const recallSurface = currentSnapshot.locator("button").first();
-  await recallSurface.focus();
+  // Visual overhaul A, Slice 4 (system §6): one focus ring, on keyboard focus
+  // only — so the ring is asserted after a real Tab, not a programmatic focus.
+  await currentSnapshot.getByRole("button", { name: /Arm save|Apply save/ }).focus();
+  await page.keyboard.press("Shift+Tab");
   const recallBox = await recallSurface.boundingBox();
   expect(recallBox?.width ?? 0).toBeGreaterThan(40);
   expect(recallBox?.height ?? 0).toBeGreaterThan(40);
@@ -1692,8 +1733,13 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   ]) {
     await expectNoHorizontalOverflow(page.getByTestId(testId), `1920 ${testId}`);
   }
+  // Visual overhaul A, Slice 4a. Old: "1920 inspector width should be 380 px".
+  // New: 300 px. Reason: below the studio surface the Console's cluster takes
+  // 232 px off the left of the shell, so the transitional inspector gives the
+  // same back and the outputs tier keeps its three lanes without scrolling
+  // sideways. The 2560×1440 deliverable (D4) is unchanged.
   const inspectorBox = await readRequiredBox(page, "audio-inspector");
-  expect(Math.abs(inspectorBox.width - 380), "1920 inspector width should be 380 px").toBeLessThanOrEqual(1);
+  expect(Math.abs(inspectorBox.width - 300), "1920 inspector width should be 300 px").toBeLessThanOrEqual(1);
   // The other two playback pairs are one bank away and come back with "[".
   await expect(page.getByTestId("audio-strip-audio-playback-9-10")).toHaveCount(0);
   await page.keyboard.press("BracketRight");
@@ -1716,8 +1762,14 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   // (OSC / Metering stat cluster) and keeps the snapshot deck inline under
   // the mixer (no panel wrapper). Assert the new bars are visible at the
   // 1920 fallback breakpoint.
-  await expect(page.getByTestId("audio-topbar")).toBeVisible();
+  // Visual overhaul A, Slice 4a. Old: `audio-topbar` visible and
+  // `audio-monitor-bar` visible. New: the cluster (`audio-monitor-bar` on the
+  // cluster root) and the shell footer (`audio-health-bar`) are visible and no
+  // top bar exists. Reason: the Console's chrome moved into the cluster and the
+  // shared footer, so the top bar is gone at every size, not only at 2560.
+  await expect(page.getByTestId("audio-topbar")).toHaveCount(0);
   await expect(page.getByTestId("audio-monitor-bar")).toBeVisible();
+  await expect(page.getByTestId("audio-health-bar")).toBeVisible();
   // 2026-05-27 redesign: the Overview mini-preview cards (eq-mini / dynamics-mini
   // / sends-mini) were replaced by the EQ / Dyn / Routing tabs; assert those are
   // present for the selected channel at the 1920 fallback.

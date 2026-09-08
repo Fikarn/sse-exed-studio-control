@@ -32,21 +32,20 @@ test("tier bank pill renders the tier description on bank 1 and is testid-addres
   await expect(pill).toContainText(/ch/);
 });
 
-test("health bar drops OSC, Endpoint and Metering rows", async ({ page }) => {
+test("the footer carries the console link, the metering source, the last sync and the bank", async ({ page }) => {
+  // Visual overhaul A, Slice 4 (system §2): the Console's footer is the
+  // shell's, and it carries the telemetry the retired top bar's stat cluster
+  // held. Old: "health bar drops OSC, Endpoint and Metering rows" — the
+  // footer kept only Clock / Last sync and the top bar carried the rest.
   await openFixture(page, "audio-populated");
-  const healthBar = page.getByTestId("audio-health-bar");
-  await expect(healthBar).toBeVisible();
-  await expect(healthBar).not.toContainText("OSC");
-  await expect(healthBar).not.toContainText("Endpoint");
-  await expect(healthBar).not.toContainText("Metering");
-  await expect(healthBar).toContainText("Clock");
-  await expect(healthBar).toContainText("Last sync");
-  // 2026-05-27 redesign: the AudioTopBar stat cluster is now the canonical
-  // surface for OSC / Console / Metering facts. The cluster has no testid
-  // yet — assert via text inside the topbar header.
-  const topbar = page.getByTestId("audio-topbar");
-  await expect(topbar).toContainText("OSC");
-  await expect(topbar).toContainText("Metering");
+  const footer = page.getByTestId("audio-health-bar");
+  await expect(footer).toBeVisible();
+  await expect(footer).toContainText("Console");
+  await expect(footer).toContainText("Metering");
+  await expect(footer).toContainText("Last sync");
+  await expect(footer).toContainText("Bank");
+  await expect(footer).not.toContainText("Endpoint");
+  await expect(page.getByTestId("audio-topbar")).toHaveCount(0);
 });
 
 test("snapshot diff shows '+N more' when more than two channels changed", async ({ page }) => {

@@ -396,6 +396,13 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
 }
 
+/* Visual overhaul A, Slice 4a: with the cluster in the shell the outputs column
+   is ~502 px at the 1920×1080 fallback, so its gutters give back the 8 px the
+   three 160 px lanes need. */
+[data-density="compact"] .outputLaneGrid {
+  padding: 14px 4px;
+}
+
 @container operator-root (max-width: 1600px) {
   .tieredMixer {
     gap: 8px;

@@ -1,0 +1,201 @@
+.deck {
+  flex: none;
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.slotKey {
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  gap: 2px;
+  min-height: 56px;
+  padding: 8px 10px;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* The key's label span is the slot's column: name, mix shape, last recall. */
+.slotBody {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+}
+
+.slotKey :global([data-lit]) {
+  pointer-events: none;
+}
+
+.slotName {
+  font: 600 var(--font-size-name) / 1.1 var(--font-family-ui);
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.slotThumb {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  width: 100%;
+  margin: 2px 0;
+}
+
+.slotThumb i {
+  flex: 1;
+  min-width: 2px;
+  /* A radii are {ctl, key, screen, pill}; on a 2 px bar the pill is the cap. */
+  border-radius: var(--radius-pill);
+  background: var(--text-text2);
+}
+
+.slotThumb[data-has-contents="true"] i {
+  background: var(--role-amber-text);
+}
+
+/* The slot's preview: what it holds against the mix on the desk right now.
+   A level +3 plate on hover or focus, so the grid stays quiet at rest. */
+.slotPreview {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  width: max-content;
+  max-width: 240px;
+  padding: 10px 12px;
+  border-radius: var(--radius-key);
+  border: 1px solid var(--material-line2);
+  background: var(--elevation-plate-fill);
+  box-shadow: var(--elevation-float);
+  font: 500 var(--font-size-label) / 1.35 var(--font-family-ui);
+  color: var(--text-text2);
+  pointer-events: none;
+}
+
+.slotPreview strong {
+  color: var(--text-text);
+  font-weight: 600;
+}
+
+.slot:hover .slotPreview,
+.slot:focus-within .slotPreview {
+  display: flex;
+}
+
+.slotPreviewLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--font-family-mono);
+}
+
+.slotPreviewOverflow {
+  color: var(--role-amber-text);
+}
+
+.slotMeta {
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--text-text2);
+}
+
+.slot[data-current="true"] .slotKey {
+  border-color: var(--accent);
+}
+
+/* The float hangs under its slot; the right-hand column hangs the other way so
+   it stays inside the cluster instead of being clipped by it. */
+/* The hovered slot and its float sit above the slots below them. */
+.slot:hover,
+.slot:focus-within {
+  z-index: 6;
+}
+
+.slot:nth-child(even) .slotPreview {
+  left: auto;
+  right: 0;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .slotPreview {
+  max-width: 200px;
+}
+
+/* Save, rename and delete are deliberate, so they live in the slot's float
+   with the preview — the resting tile stays the mock's name and last recall. */
+.slotActions {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--material-line2);
+  /* The float itself is click-through so the pointer can reach the slots it
+     covers; its keys are the exception — they are there to be pressed. */
+  pointer-events: auto;
+}
+
+.slotAction {
+  flex: 1;
+  min-height: 28px;
+  padding: 0 6px;
+}
+
+/* At the fallback size the slot keeps the two facts the operator acts on — the
+   name and when it was last recalled. The mix-shape thumbnail is the first
+   thing to go. */
+:global([data-operator-layout-root][data-chrome="compact"]) .slotThumb {
+  display: none;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px dashed var(--material-line2);
+  border-radius: var(--radius-key);
+  color: var(--text-text2);
+}
+
+.emptySlot {
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  letter-spacing: var(--font-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.emptyWord {
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

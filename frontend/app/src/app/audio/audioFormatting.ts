@@ -167,6 +167,15 @@ export function formatAudioTimestamp(value: string | number | null | undefined) 
   return formatBackupTimestamp(value);
 }
 
+// A snapshot slot says when it was last recalled, and the desk reads the clock,
+// not the calendar — the tile is one line wide.
+export function formatAudioRecallTime(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(parsed);
+}
+
 export function meterTone(value: number, clip = false) {
   const dbfs = normalizedToDbfs(value);
   const roundedDbfs = Number.isFinite(dbfs) ? Number(dbfs.toFixed(3)) : dbfs;

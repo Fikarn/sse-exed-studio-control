@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { Crest } from "./Crest";
+import { ShellRegionsContext, type ShellRegionElements } from "./shellRegions";
 import { Footer, type FooterProps } from "./Footer";
 import { LampChip } from "./LampChip";
 import { Tab } from "./Tab";
@@ -50,11 +51,15 @@ export interface AppShellFrameProps {
   /** Specific tabs locked, e.g. the operator workspaces before commissioning
    *  is published. */
   disabledWorkspaces?: readonly string[];
-  /** The left plate: the workspace's state display, take-time keys, lists. */
-  cluster?: ReactNode;
-  /** The right plate: the selection, or Support. */
-  plate?: ReactNode;
-  footer?: FooterProps;
+  /** The left plate: the workspace's state display, take-time keys, lists.
+   *  `"slot"` renders the region empty and lets the workspace fill it with
+   *  `<ShellRegion region="cluster">`. */
+  cluster?: ReactNode | "slot";
+  /** The right plate: the selection, or Support. `"slot"` as above. */
+  plate?: ReactNode | "slot";
+  /** The footer: `FooterProps` for the shell's own, `"slot"` for the
+   *  workspace's own `<Footer>` through `<ShellRegion region="footer">`. */
+  footer?: FooterProps | "slot";
   /** The bay. */
   children: ReactNode;
   onMonitorItemClick?: (item: MonitorItem) => void;
@@ -77,86 +82,109 @@ export function AppShellFrame({
   onMonitorItemClick,
   onWorkspaceChange,
 }: AppShellFrameProps) {
+  const [clusterElement, setClusterElement] = useState<HTMLElement | null>(null);
+  const [plateElement, setPlateElement] = useState<HTMLElement | null>(null);
+  const [footerElement, setFooterElement] = useState<HTMLElement | null>(null);
+  const regions = useMemo<ShellRegionElements>(
+    () => ({ cluster: clusterElement, plate: plateElement, footer: footerElement }),
+    [clusterElement, plateElement, footerElement]
+  );
   return (
-    <div
-      className={styles.shell}
-      data-shell-frame=""
-      data-cluster={cluster ? "" : undefined}
-      data-plate={plate ? "" : undefined}
-    >
-      <header className={styles.header} data-region="header" data-material="plate">
-        <Crest variant="mark" />
-        <div className={styles.wordmark}>
-          <span className={styles.product}>{productName}</span>
-          {eyebrow ? <span className={styles.eyebrow}>{eyebrow}</span> : null}
-        </div>
-        <nav className={styles.tabs} aria-label="Workspace navigation">
-          {workspaces.map((workspace) => (
-            <Tab
-              key={workspace.id}
-              id={workspace.id}
-              label={workspace.label}
-              hint={workspace.hint}
-              active={workspace.id === activeWorkspace}
-              disabled={tabsDisabled || disabledWorkspaces.includes(workspace.id)}
-              onClick={() => onWorkspaceChange?.(workspace.id)}
-            />
-          ))}
-        </nav>
-        <div className={styles.health}>
-          {monitorItems.map((item, index) => {
-            const key = item.id ?? `${item.status}:${item.label}:${index}`;
-            const statusDetail = item.detail ?? item.status;
-            const targetDescription = item.target ?? "Setup / Support";
-            const latch = item.latch ?? item.id?.startsWith("latched:") ?? false;
-            const testId = item.id ? `shell-lamp-${item.id.replace(/[^a-z0-9]+/gi, "-")}` : undefined;
-            return (
-              <LampChip
-                key={key}
-                label={item.label}
-                word={statusDetail}
-                tone={item.status}
-                latch={latch}
-                testId={testId}
-                title={
-                  onMonitorItemClick
-                    ? `Open ${targetDescription} for ${item.label}: ${statusDetail}`
-                    : `${item.label}: ${statusDetail}`
-                }
-                ariaLabel={
-                  onMonitorItemClick
-                    ? `Open ${targetDescription} for ${item.label}. Current status: ${statusDetail}.`
-                    : undefined
-                }
-                onClick={onMonitorItemClick ? () => onMonitorItemClick(item) : undefined}
+    <ShellRegionsContext.Provider value={regions}>
+      <div
+        className={styles.shell}
+        data-shell-frame=""
+        data-cluster={cluster ? "" : undefined}
+        data-plate={plate ? "" : undefined}
+      >
+        <header className={styles.header} data-region="header" data-material="plate">
+          <Crest variant="mark" />
+          <div className={styles.wordmark}>
+            <span className={styles.product}>{productName}</span>
+            {eyebrow ? <span className={styles.eyebrow}>{eyebrow}</span> : null}
+          </div>
+          <nav className={styles.tabs} aria-label="Workspace navigation">
+            {workspaces.map((workspace) => (
+              <Tab
+                key={workspace.id}
+                id={workspace.id}
+                label={workspace.label}
+                hint={workspace.hint}
+                active={workspace.id === activeWorkspace}
+                disabled={tabsDisabled || disabledWorkspaces.includes(workspace.id)}
+                onClick={() => onWorkspaceChange?.(workspace.id)}
               />
-            );
-          })}
-          {clock ? (
-            <span className={styles.clock} data-testid="shell-clock">
-              {clock}
-            </span>
+            ))}
+          </nav>
+          <div className={styles.health}>
+            {monitorItems.map((item, index) => {
+              const key = item.id ?? `${item.status}:${item.label}:${index}`;
+              const statusDetail = item.detail ?? item.status;
+              const targetDescription = item.target ?? "Setup / Support";
+              const latch = item.latch ?? item.id?.startsWith("latched:") ?? false;
+              const testId = item.id ? `shell-lamp-${item.id.replace(/[^a-z0-9]+/gi, "-")}` : undefined;
+              return (
+                <LampChip
+                  key={key}
+                  label={item.label}
+                  word={statusDetail}
+                  tone={item.status}
+                  latch={latch}
+                  testId={testId}
+                  title={
+                    onMonitorItemClick
+                      ? `Open ${targetDescription} for ${item.label}: ${statusDetail}`
+                      : `${item.label}: ${statusDetail}`
+                  }
+                  ariaLabel={
+                    onMonitorItemClick
+                      ? `Open ${targetDescription} for ${item.label}. Current status: ${statusDetail}.`
+                      : undefined
+                  }
+                  onClick={onMonitorItemClick ? () => onMonitorItemClick(item) : undefined}
+                />
+              );
+            })}
+            {clock ? (
+              <span className={styles.clock} data-testid="shell-clock">
+                {clock}
+              </span>
+            ) : null}
+          </div>
+        </header>
+
+        <div className={styles.body}>
+          {cluster ? (
+            <aside
+              className={styles.cluster}
+              data-region="cluster"
+              data-material="plate"
+              ref={cluster === "slot" ? setClusterElement : undefined}
+            >
+              {cluster === "slot" ? null : cluster}
+            </aside>
+          ) : null}
+          <main className={styles.bay} data-region="bay">
+            {children}
+          </main>
+          {plate ? (
+            <aside
+              className={styles.plate}
+              data-region="plate"
+              data-material="plate"
+              ref={plate === "slot" ? setPlateElement : undefined}
+            >
+              {plate === "slot" ? null : plate}
+            </aside>
           ) : null}
         </div>
-      </header>
 
-      <div className={styles.body}>
-        {cluster ? (
-          <aside className={styles.cluster} data-region="cluster" data-material="plate">
-            {cluster}
-          </aside>
-        ) : null}
-        <main className={styles.bay} data-region="bay">
-          {children}
-        </main>
-        {plate ? (
-          <aside className={styles.plate} data-region="plate" data-material="plate">
-            {plate}
-          </aside>
+        {footer === "slot" ? (
+          <div className={styles.footerSlot} ref={setFooterElement} />
+        ) : footer ? (
+          <Footer {...footer} />
         ) : null}
       </div>
-
-      {footer ? <Footer {...footer} /> : null}
-    </div>
+    </ShellRegionsContext.Provider>
   );
 }

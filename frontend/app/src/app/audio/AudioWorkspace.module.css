@@ -387,3 +387,12 @@
    container rule above, so the 1920×1080 studio monitor (studioFull from
    1920 up) got a 504 px inspector and its tiers scrolled sideways. The 504 px
    inspector now lives only under the ≥ 2200 px container query. */
+
+/* Visual overhaul A, Slice 4a: below the studio surface the Console's cluster
+   takes 232 px off the left of the shell, so the transitional inspector gives
+   the same back. 2560×1440 (D4) is untouched — this only keeps the 1920×1080
+   fallback free of sideways scroll until Slice 4c retires the inspector into
+   the plate. */
+:global([data-operator-layout-root][data-chrome="compact"]) .audioBody {
+  grid-template-columns: minmax(0, 1fr) 300px;
+}

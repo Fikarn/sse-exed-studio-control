@@ -26,7 +26,11 @@ export interface FooterProps {
 }
 
 export const Footer = ({ items, hints = [], action, testId, itemsTestId, hintsTestId }: FooterProps) => (
-  <footer className={styles.footer} data-region="footer" data-material="plate" data-testid={testId}>
+  // data-health-bar: the same inert presence marker the retired HealthBar
+  // carried. The app's toast stack keys its bottom offset on
+  // `html:not(:has([data-health-bar]))`, so a workspace that swaps its health
+  // bar for this footer keeps its toasts clear of the footer.
+  <footer className={styles.footer} data-health-bar="" data-region="footer" data-material="plate" data-testid={testId}>
     <div className={styles.items} data-testid={itemsTestId}>
       {items.map((item, index) => (
         <span key={item.id ?? `${item.label}:${index}`} className={styles.item}>

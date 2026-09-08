@@ -143,4 +143,27 @@
     background: var(--display-amber);
     box-shadow: var(--elevation-bar);
   }
+
+  /* The armed row's own countdown: the bar runs the window down, so the
+     display needs no ticking state and an idle surface stays still. */
+  .barCountdown {
+    width: 100%;
+    transform-origin: left;
+    animation: aStateArmCountdown var(--arm-duration, 4500ms) linear forwards;
+  }
+
+  @keyframes aStateArmCountdown {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .barCountdown {
+      animation: none;
+    }
+  }
 }

@@ -101,6 +101,15 @@ describe("Footer", () => {
     expect(footer.querySelectorAll("kbd")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Sync" })).toBeInTheDocument();
   });
+
+  // Visual overhaul A, Slice 4a: a workspace that swaps its health bar for this
+  // footer must keep its toasts clear of it. The toast stack keys its bottom
+  // offset on `html:not(:has([data-health-bar]))`, so the marker moves with the
+  // footer — the same assertion HealthBar carries.
+  it("carries the inert data-health-bar marker the toast stack keys on", () => {
+    render(<Footer items={[{ label: "Console", value: "confirmed" }]} testId="marked-footer" />);
+    expect(screen.getByTestId("marked-footer")).toHaveAttribute("data-health-bar");
+  });
 });
 
 describe("AppShellFrame", () => {

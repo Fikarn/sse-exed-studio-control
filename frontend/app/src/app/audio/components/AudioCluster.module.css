@@ -1,0 +1,130 @@
+/* Visual overhaul A, Slice 4: the Console's cluster. Every value is a token;
+   the geometry is the mock's (the state display first and fixed, the take-time
+   keys under it, the snapshots and the standing actions at the bottom). */
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* Fill the region so the standing actions can sit at the foot of the cluster
+     the way the mock pins them, with the free space above them. */
+  height: 100%;
+  min-height: 0;
+  padding: 16px 16px 20px;
+  overflow: hidden;
+}
+
+/* The mock's monitor block: the talk key across the cluster, Dim and Mono
+   side by side under it. */
+.monitorRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex: none;
+}
+
+.monitorRow > :first-child {
+  grid-column: 1 / -1;
+}
+
+.monitorToggles {
+  display: contents;
+}
+
+/* Talkback refused: the key carries the red keyline and says why. */
+.refused {
+  border-color: var(--role-red-text);
+}
+
+.refused .hint {
+  color: var(--role-red-text);
+}
+
+.mainLevel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+
+.mainLevelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mainLevelLabel {
+  font: 600 var(--font-size-value) / 1 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.mainLevelHint {
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.masterMeter {
+  height: 24px;
+  flex: none;
+}
+
+.mixTargetCaption {
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  flex: none;
+}
+
+/* The dBFS marks under the monitor meter. Each mark is placed at its own
+   percentage of the bar, so the number sits over the level it names. */
+.masterMeterScale {
+  position: relative;
+  height: 12px;
+  flex: none;
+}
+
+.masterMeterScale span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--text-text2);
+}
+
+.masterMeterScale span:first-child {
+  transform: none;
+}
+
+.masterMeterScale span:last-child {
+  transform: translateX(-100%);
+}
+
+.actions {
+  margin-top: auto;
+  flex: none;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Visual overhaul A, Slice 4a: the 1920×1080 fallback is 360 px shorter than
+   the studio surface, so the cluster spends less air between its blocks and
+   the eight snapshot keys still land inside it. 2560×1440 (D4) keeps the
+   mock's 16 px rhythm untouched. */
+:global([data-operator-layout-root][data-chrome="compact"]) .cluster {
+  gap: 12px;
+  padding: 12px 12px 12px;
+  /* Below the studio surface the cluster carries the same blocks in 360 px less
+     height. It spends less air, drops the caption the segmented keys already
+     say, and scrolls rather than clipping when a state sentence runs long. */
+  overflow-y: auto;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .mixTargetCaption {
+  display: none;
+}

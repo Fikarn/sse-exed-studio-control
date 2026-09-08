@@ -20,7 +20,7 @@
   }
 
   .horizontal {
-    height: 20px;
+    height: var(--master-meter-height, 20px);
     width: 100%;
   }
 

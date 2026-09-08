@@ -239,10 +239,15 @@ test("shortcut labels follow the host platform", async ({ page }) => {
 // the worst state its workspace shows — `ACTION FAILED` is red in the header
 // too. Until the state display lands (Slice 4), the workspace's state is its
 // current band: the Console's warning band and the Lighting bridge banner.
+// Visual overhaul A, Slice 4a. Old: both audio cases read
+// `audio-warning-band`. New: they read `audio-state-display`. Reason: the
+// Console's state, its sentence and its way out are the cluster's state
+// display now, so the band the header lamp mirrored no longer exists. Lighting
+// keeps its banner until Slice 5.
 for (const { fixture, lamp, band, tone } of [
   { fixture: "lighting-dmx-unreachable", lamp: "shell-lamp-lighting", band: "lighting-bridge-banner", tone: "error" },
-  { fixture: "audio-offline", lamp: "shell-lamp-audio", band: "audio-warning-band", tone: "error" },
-  { fixture: "audio-action-failed", lamp: "shell-lamp-audio", band: "audio-warning-band", tone: "error" },
+  { fixture: "audio-offline", lamp: "shell-lamp-audio", band: "audio-state-display", tone: "error" },
+  { fixture: "audio-action-failed", lamp: "shell-lamp-audio", band: "audio-state-display", tone: "error" },
 ]) {
   test(`the header lamp's tone equals the workspace's state tone on ${fixture}`, async ({ page }) => {
     await openFixture(page, fixture);

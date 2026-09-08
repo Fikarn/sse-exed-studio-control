@@ -558,7 +558,12 @@ export function AudioMeterCanvasOverlay({
   useEffect(() => {
     const canvas = canvasRef.current;
     const root = canvas?.closest<HTMLElement>('[data-testid="audio-workspace"]');
-    if (!canvas || !root) return;
+    // Visual overhaul A, Slice 4: the cluster's meters live in the shell's own
+    // region, outside the workspace element, so the canvas covers the shell
+    // frame and the observers watch it. The workspace element stays the source
+    // of the palette and the metering gate.
+    const paintRoot = canvas?.closest<HTMLElement>("[data-shell-frame]") ?? root ?? null;
+    if (!canvas || !root || !paintRoot) return;
 
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
@@ -587,10 +592,10 @@ export function AudioMeterCanvasOverlay({
     });
 
     const resizeObserver = new ResizeObserver(requestMeasure);
-    resizeObserver.observe(root);
+    resizeObserver.observe(paintRoot);
 
     const mutationObserver = new MutationObserver(requestMeasure);
-    mutationObserver.observe(root, {
+    mutationObserver.observe(paintRoot, {
       attributeFilter: ["data-density", "data-view-mode", "data-selected"],
       attributes: true,
       childList: true,
@@ -599,7 +604,7 @@ export function AudioMeterCanvasOverlay({
 
     const paint = () => {
       if (needsMeasure) {
-        const measured = measureGeometry(canvas, root);
+        const measured = measureGeometry(canvas, paintRoot);
         colors = measured.colors;
         dpr = measured.dpr;
         geometry = measured.geometry;

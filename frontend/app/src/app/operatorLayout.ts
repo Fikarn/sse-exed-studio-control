@@ -17,6 +17,12 @@ export const OPERATOR_LAYOUT_MINIMUMS: Record<Exclude<OperatorLayoutMode, "const
 
 export const OPERATOR_UI_SCALES: readonly OperatorUiScale[] = [90, 100, 110, 125];
 
+// Visual overhaul A, Slice 4: below this logical width the shell's plates take
+// their fallback widths — the same line the Console banks its strips at
+// (`AUDIO_COMPACT_DENSITY_MAX_WIDTH`), read from the operator surface so
+// Scaled Studio Preview keeps the studio geometry.
+export const OPERATOR_COMPACT_CHROME_MAX_WIDTH = 2200;
+
 export const OPERATOR_REVIEW_SURFACES: readonly OperatorReviewSurface[] = ["native", "studioPreview"];
 
 export const OPERATOR_STUDIO_PREVIEW_SIZE: OperatorLayoutSize = { width: 2560, height: 1440 };

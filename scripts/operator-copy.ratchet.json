@@ -1,4 +1,4 @@
 {
-  "maxHits": 42,
-  "seeded": "2026-09-07 (A S0): snapshot outside the Console, engine, transport"
+  "maxHits": 37,
+  "seeded": "2026-09-07 (A S4a): tightened from 42 — the Console's chrome moved into the cluster and the shared footer"
 }

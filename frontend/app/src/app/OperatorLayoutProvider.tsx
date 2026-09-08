@@ -15,6 +15,7 @@ import {
   deriveOperatorLayoutMode,
   isOperatorReviewSurface,
   isOperatorUiScale,
+  OPERATOR_COMPACT_CHROME_MAX_WIDTH,
   OPERATOR_STUDIO_PREVIEW_SIZE,
   type OperatorLayoutMode,
   type OperatorReviewSurface,
@@ -257,6 +258,7 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
           className={styles.root}
           style={rootStyle}
           data-operator-layout-root
+          data-chrome={size.width < OPERATOR_COMPACT_CHROME_MAX_WIDTH ? "compact" : "studio"}
           data-layout-mode={layoutMode}
           data-ui-scale={uiScale}
           data-review-surface={reviewSurface}

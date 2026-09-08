@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import type { AudioSnapshot, ShellStore } from "@sse/engine-client";
-import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "@sse/design-system";
+import { ConfirmDialog, ContextMenu, ShellRegion, type ContextMenuItem } from "@sse/design-system";
 import { Pencil, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import styles from "./AudioWorkspace.module.css";
@@ -25,13 +25,12 @@ import {
   type AudioChannelGroupSelectionRequest,
   type AudioChannelGroupSelections,
 } from "./audioViewModel";
-import { AudioHealthBar } from "./components/AudioHealthBar";
+import { AudioCluster } from "./components/AudioCluster";
+import { AudioFooter } from "./components/AudioFooter";
 import { AudioInspector, type InspectorTab } from "./components/AudioInspector";
 import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
-import { AudioMonitorBar } from "./components/AudioMonitorBar";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { AudioTextDialog } from "./components/AudioTextDialog";
-import { AudioTopBar } from "./components/AudioTopBar";
 import { useOperatorLayout } from "../OperatorLayoutProvider";
 import { type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
@@ -122,14 +121,13 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   // Slice 3c — follow the global theme rather than an audio-local state, so the
   // mixer re-themes in lockstep with the chrome (seam closed). The switcher in
   // AudioTopBar drives the same global setter.
-  const { bodyWidth, theme: audioTheme, setTheme: setAudioTheme } = useOperatorLayout();
+  const { bodyWidth, theme: audioTheme } = useOperatorLayout();
   // 2026-09 audit Slice 9 (operator decision 6): below 2200 px of operator
   // root the Console runs at compact density — 4 inputs, 4 playback pairs, 3
   // outputs per bank, 380 px inspector — so the 1920×1080 studio monitor never
   // scrolls a tier sideways. The Scaled Studio Preview measures its 2560
   // logical root and stays desktop; the layout mode (studioFull) is untouched.
   const density: AudioDensityMode = bodyWidth < AUDIO_COMPACT_DENSITY_MAX_WIDTH ? "compact" : "desktop";
-  const warningBandRef = useRef<HTMLDivElement | null>(null);
   const recallPulseTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -294,11 +292,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
   const dismissRecallReport = useLiveCallback(() => {
     setRecallReport(null);
-  });
-
-  const recallCurrentSnapshot = useLiveCallback(() => {
-    if (!viewModel?.selectedSnapshot) return;
-    recallSnapshot(viewModel.selectedSnapshot.id);
   });
 
   const captureSnapshot = useLiveCallback(() => {
@@ -485,10 +478,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   });
 
-  const clearSolo = useLiveCallback((channelId: string) => {
-    updateChannel({ channelId, solo: false });
-  });
-
   const clearClips = useLiveCallback((channelId?: string) => {
     void performAction(channelId ? `audio-clear-clip-${channelId}` : "audio-clear-clips", async () => {
       await store.clearAudioClips(channelId ? { channelId } : {});
@@ -570,11 +559,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     selectOutputMixTarget,
     setContextMenu,
     setInspectorTab,
-    syncAudio,
     updateChannel,
     viewModel,
     visibleSelectableChannels,
-    warningBandRef,
   });
 
   useAudioPaletteRegistration({
@@ -680,54 +667,60 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         </div>
       ) : null}
 
-      <AudioTopBar
-        audioTheme={audioTheme}
-        onClearAllSolo={clearAllSolo}
-        onOpenSetup={openSetup}
-        onRecallCurrentSnapshot={recallCurrentSnapshot}
-        onRunAudioProbe={runAudioProbe}
-        onSelectTheme={setAudioTheme}
-        onSync={syncAudio}
-        store={store}
-        viewModel={viewModel}
-      />
+      <ShellRegion region="cluster">
+        <AudioCluster
+          armedAction={armedAction}
+          busyAction={busyAction}
+          clearDraftValueLater={clearDraftValueLater}
+          commitMixTargetContinuous={commitMixTargetContinuous}
+          draftStore={draftStore}
+          getDraftValue={getDraftValue}
+          onCaptureSnapshot={captureSnapshot}
+          onClearAllSolo={clearAllSolo}
+          onClearClips={clearClips}
+          onDeleteSnapshot={deleteSnapshot}
+          onHoldTalkback={holdTalkback}
+          onOpenSetup={openSetup}
+          onRecallSnapshot={recallSnapshot}
+          onRenameSnapshot={renameSnapshot}
+          onRunAudioProbe={runAudioProbe}
+          onSaveSnapshot={saveSnapshot}
+          onSelectMixTarget={selectMixTarget}
+          onSync={syncAudio}
+          onUpdateMixTarget={updateMixTarget}
+          recentlyRecalledSnapshotId={recentlyRecalledSnapshotId}
+          setDraftValue={setDraftValue}
+          viewModel={viewModel}
+        />
+      </ShellRegion>
+
+      <ShellRegion region="footer">
+        <AudioFooter viewModel={viewModel} />
+      </ShellRegion>
 
       <div className={styles.audioBody}>
         <AudioSignalCanvas
           armedAction={armedAction}
-          busyAction={busyAction}
           clearDraftValueLater={clearDraftValueLater}
           commitChannelContinuous={commitChannelContinuous}
           commitMixTargetContinuous={commitMixTargetContinuous}
           draftStore={draftStore}
           getDraftValue={getDraftValue}
-          onOpenChannelMenu={openChannelContextMenu}
-          onClearAllSolo={clearAllSolo}
           onClearClips={clearClips}
-          onClearSolo={clearSolo}
-          onCaptureSnapshot={captureSnapshot}
-          onDeleteSnapshot={deleteSnapshot}
-          onOpenSetup={openSetup}
-          onRecallSnapshot={recallSnapshot}
-          onRenameSnapshot={renameSnapshot}
-          onRunAudioProbe={runAudioProbe}
+          onOpenChannelMenu={openChannelContextMenu}
           recallReport={recallReport}
           onDismissRecallReport={dismissRecallReport}
           onArmPhantomFromRecall={armPhantomFromRecall}
-          onSaveSnapshot={saveSnapshot}
           onSelectChannel={selectChannel}
           onSelectChannelGroup={selectChannelGroup}
           onSelectMixTarget={selectMixTarget}
           onSelectOutputMixTarget={selectOutputMixTarget}
-          onSync={syncAudio}
           onTogglePeakHold={togglePeakHold}
           onResetPeakHolds={resetPeakHolds}
           setDraftValue={setDraftValue}
           onUpdateChannel={updateChannel}
           onUpdateMixTarget={updateMixTarget}
           peakHoldEnabled={peakHoldEnabled}
-          recentlyRecalledSnapshotId={recentlyRecalledSnapshotId}
-          statusWarningRef={warningBandRef}
           store={store}
           viewModel={viewModel}
         />
@@ -755,8 +748,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           viewModel={viewModel}
         />
       </div>
-
-      <AudioMonitorBar onHoldTalkback={holdTalkback} onUpdateMixTarget={updateMixTarget} viewModel={viewModel} />
 
       <AudioMeterCanvasOverlay
         peakHoldEnabled={peakHoldEnabled}
@@ -797,8 +788,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           title="Delete Audio Snapshot"
         />
       ) : null}
-
-      <AudioHealthBar viewModel={viewModel} />
     </div>
   );
 }

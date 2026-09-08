@@ -8,6 +8,10 @@ import styles from "./Meter.module.css";
 // −18 dBFS reference is a dashed line at 70 %, the peak a white line with its
 // bloom, the clip a lamp. `empty` leaves the well with the reference only
 // (no metering); `stale` shows the last frame dimmed with no glow.
+//
+// Slice 4: a meter can name the engine's meter entry (`meterId` / `meterKind`),
+// which stamps the `data-mini-meter-*` attributes the Console's canvas overlay
+// paints into — so a meter tracks the desk live without a React render.
 export interface MeterProps {
   /** 0..1 of the well (0 = floor, 0.7 = −18 dBFS, 1 = 0 dBFS). */
   level: number;
@@ -23,23 +27,37 @@ export interface MeterProps {
   /** Where the reference line sits, 0..1 (default 0.7 = −18 dBFS). */
   reference?: number;
   label: string;
+  /** The engine's meter entry this well shows, for the live painter. */
+  meterId?: string;
+  meterKind?: "channel" | "mixTarget";
   testId?: string;
   className?: string;
+  style?: CSSProperties;
 }
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0));
 
-function Bar({
-  level,
-  peak,
-  empty,
-  stale,
-  orientation,
-}: Pick<MeterProps, "level" | "peak" | "empty" | "stale" | "orientation">) {
+interface BarProps {
+  level: number;
+  peak?: number;
+  empty?: boolean;
+  stale?: boolean;
+  orientation: "vertical" | "horizontal";
+  meterId?: string;
+  meterKind?: "channel" | "mixTarget";
+  side: "left" | "right";
+}
+
+function Bar({ level, peak, empty, stale, orientation, meterId, meterKind, side }: BarProps) {
   const fill = empty ? 0 : clamp01(level);
-  const style = { "--meter-level": String(fill) } as CSSProperties;
   return (
-    <span className={styles.bar} style={style}>
+    <span
+      className={styles.bar}
+      style={{ "--meter-level": String(fill) } as CSSProperties}
+      data-mini-meter-id={meterId}
+      data-mini-meter-kind={meterId ? meterKind : undefined}
+      data-mini-meter-side={meterId ? side : undefined}
+    >
       {!empty && !stale ? <span className={styles.glow} data-signal="meter" /> : null}
       {!empty ? <span className={styles.ramp} data-signal="meter" /> : null}
       {!empty && peak !== undefined ? (
@@ -68,8 +86,11 @@ export function Meter({
   orientation = "vertical",
   reference = 0.7,
   label,
+  meterId,
+  meterKind,
   testId,
   className,
+  style,
 }: MeterProps) {
   const stereo = levelRight !== undefined;
   return (
@@ -95,12 +116,30 @@ export function Meter({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={empty ? undefined : Math.round(clamp01(level) * 100)}
-      style={{ "--meter-reference": String(clamp01(reference)) } as CSSProperties}
+      style={{ ...style, "--meter-reference": String(clamp01(reference)) } as CSSProperties}
     >
       <span className={styles.bars} aria-hidden="true">
-        <Bar level={level} peak={peak} empty={empty} stale={stale} orientation={orientation} />
+        <Bar
+          level={level}
+          peak={peak}
+          empty={empty}
+          stale={stale}
+          orientation={orientation}
+          meterId={meterId}
+          meterKind={meterKind}
+          side="left"
+        />
         {stereo ? (
-          <Bar level={levelRight} peak={peakRight} empty={empty} stale={stale} orientation={orientation} />
+          <Bar
+            level={levelRight}
+            peak={peakRight}
+            empty={empty}
+            stale={stale}
+            orientation={orientation}
+            meterId={meterId}
+            meterKind={meterKind}
+            side="right"
+          />
         ) : null}
       </span>
       <span className={styles.reference} aria-hidden="true" />

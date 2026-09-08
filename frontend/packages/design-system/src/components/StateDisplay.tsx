@@ -17,8 +17,10 @@ export interface StateDisplayArmed {
   text: ReactNode;
   /** Seconds left, printed mono (`3.9 s`). */
   secondsLeft?: number;
-  /** 0..1 of the window left, drawn as the bar. */
-  progress: number;
+  /** 0..1 of the window left, drawn as the bar (a still bar). */
+  progress?: number;
+  /** The arm window: the bar runs its own countdown, so no ticking state. */
+  timeoutMs?: number;
 }
 
 export interface StateDisplayProps {
@@ -67,7 +69,14 @@ export function StateDisplay({
       {sentence || code ? (
         <div className={styles.sentence}>
           {sentence}
-          {code ? <span className={styles.code}>{code}</span> : null}
+          {/* data-state-code: the one place a raw fault code is allowed to
+              stand on its own — it is the code slot, never the first thing the
+              sentence says. The operator-copy census keys on this marker. */}
+          {code ? (
+            <span className={styles.code} data-state-code="">
+              {code}
+            </span>
+          ) : null}
         </div>
       ) : null}
       {armed ? (
@@ -80,7 +89,15 @@ export function StateDisplay({
             <span />
           )}
           <span className={styles.bar} aria-hidden="true">
-            <i style={{ "--arm-progress": String(Math.max(0, Math.min(1, armed.progress))) } as CSSProperties} />
+            <i
+              className={armed.timeoutMs ? styles.barCountdown : undefined}
+              style={
+                {
+                  "--arm-progress": String(Math.max(0, Math.min(1, armed.progress ?? 1))),
+                  "--arm-duration": armed.timeoutMs ? `${armed.timeoutMs}ms` : undefined,
+                } as CSSProperties
+              }
+            />
           </span>
         </div>
       ) : meta ? (

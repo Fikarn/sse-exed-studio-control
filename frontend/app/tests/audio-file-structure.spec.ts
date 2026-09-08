@@ -30,13 +30,20 @@ const EXPECTED_HOOK_FILES = [
   "frontend/app/src/app/audio/hooks/useAudioPaletteRegistration.ts",
 ];
 
+// Visual overhaul A, Slice 4a. Old: the list named AudioHealthBar.module.css
+// and AudioSnapshotDeck.module.css. New: it names AudioCluster.module.css and
+// AudioSnapshotKeys.module.css. Reason: the health bar's telemetry moved onto
+// the shell's footer (the design-system Footer, which carries its own module)
+// and the snapshot deck became the cluster's snapshot keys. The rule the list
+// guards is unchanged — every Console component keeps its own stylesheet, so
+// the workspace shell module cannot grow back.
 const EXPECTED_PER_COMPONENT_CSS_MODULES = [
-  "frontend/app/src/app/audio/components/AudioHealthBar.module.css",
+  "frontend/app/src/app/audio/components/AudioCluster.module.css",
   "frontend/app/src/app/audio/components/AudioInspector.module.css",
   "frontend/app/src/app/audio/components/AudioMixerLane.module.css",
   "frontend/app/src/app/audio/components/AudioRail.module.css",
   "frontend/app/src/app/audio/components/AudioSignalCanvas.module.css",
-  "frontend/app/src/app/audio/components/AudioSnapshotDeck.module.css",
+  "frontend/app/src/app/audio/components/AudioSnapshotKeys.module.css",
   "frontend/app/src/app/audio/components/AudioToolbar.module.css",
 ];
 

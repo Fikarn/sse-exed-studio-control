@@ -114,6 +114,10 @@
   border-left: 1px solid var(--material-line);
 }
 
+.footerSlot {
+  display: contents;
+}
+
 .bay {
   display: flex;
   flex-direction: column;
@@ -125,8 +129,28 @@
   box-shadow: var(--elevation-bay);
 }
 
-/* Fallback layouts below the studio surface (not a deliverable, plan D4):
-   the header keeps its one row without scrolling. */
+/* Fallback layouts below the studio surface (not a deliverable, plan D4): the
+   plates narrow so the bay still fits. Keyed off the operator surface's own
+   density line (the 2200 px the Console banks its strips at), never the host
+   window, so Scaled Studio Preview keeps the studio geometry (AGENTS.md
+   §Hardware target). */
+/* The mock's fallback gutter (12 px at 1920, 16 at the studio surface). */
+:global([data-operator-layout-root][data-chrome="compact"]) .bay {
+  padding: calc(12px * var(--operator-ui-scale-factor, 1));
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .shell[data-cluster] .body {
+  grid-template-columns: 232px minmax(0, 1fr);
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .shell[data-plate] .body {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .shell[data-cluster][data-plate] .body {
+  grid-template-columns: 232px minmax(0, 1fr) 360px;
+}
+
 @media (max-width: 1919px) {
   .header {
     gap: 16px;

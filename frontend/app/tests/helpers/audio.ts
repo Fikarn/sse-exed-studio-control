@@ -24,6 +24,12 @@ import {
 export const COMPACT_PREAMP_ASPECT_RATIO = 1;
 export const NARROW_PREAMP_ASPECT_RATIO = 1;
 
+async function readRequiredBoxBySelector(page: Page, selector: string, label: string) {
+  const box = await page.locator(selector).first().boundingBox();
+  expect(box, `${label} should have a box`).not.toBeNull();
+  return { ...box!, bottom: box!.y + box!.height, left: box!.x, right: box!.x + box!.width, top: box!.y };
+}
+
 export async function expectAudioWorkspaceGeometry(page: Page) {
   await expectNoDocumentScroll(page);
 
@@ -31,17 +37,24 @@ export async function expectAudioWorkspaceGeometry(page: Page) {
   const canvas = await readRequiredBox(page, "audio-signal-canvas");
   const mixer = await readRequiredBox(page, "audio-tiered-mixer");
   const outputTier = await readRequiredBox(page, "audio-hardware-outputs-tier");
+  // Visual overhaul A, Slice 4 (plan D1): the snapshot keys live in the shell's
+  // cluster and the telemetry on the shell's footer, so neither sits inside the
+  // workspace any more. Old: both were measured inside the canvas / workspace.
+  const cluster = await readRequiredBoxBySelector(page, '[data-region="cluster"]', "cluster");
   const snapshotDeck = await readRequiredBox(page, "audio-snapshot-deck");
-  const healthBar = await readRequiredBox(page, "audio-health-bar");
+  const stateDisplay = await readRequiredBox(page, "audio-state-display");
+  const footer = await readRequiredBox(page, "audio-health-bar");
 
   expectInsideBox(canvas, workspace, "canvas inside workspace");
   expectInsideBox(mixer, canvas, "tiered mixer inside canvas");
   expectInsideBox(outputTier, mixer, "output tier inside tiered mixer");
   expectInsideBox(outputTier, canvas, "output tier inside canvas");
-  expectInsideBox(snapshotDeck, canvas, "snapshot deck inside canvas");
-  expect(outputTier.bottom, "output tier should end before snapshot deck").toBeLessThanOrEqual(snapshotDeck.top + 1);
-  expect(healthBar.top, "health bar should be below canvas").toBeGreaterThanOrEqual(canvas.bottom - 1);
-  expectInsideBox(healthBar, workspace, "health bar inside workspace");
+  expectInsideBox(stateDisplay, cluster, "state display inside the cluster");
+  expectInsideBox(snapshotDeck, cluster, "snapshot keys inside the cluster");
+  expect(stateDisplay.top, "the state display is the cluster's first element").toBeLessThanOrEqual(
+    snapshotDeck.top + 1
+  );
+  expect(footer.top, "footer should be below the bay").toBeGreaterThanOrEqual(workspace.bottom - 1);
 }
 
 export async function expectAudioInspectorPanelsFit(page: Page) {
@@ -74,39 +87,61 @@ export async function expectAudioInspectorPanelsFit(page: Page) {
 }
 
 export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx = 24) {
-  // 2026-05-27 Console redesign: the left studio rail (Trust / Snapshot
-  // panels) was replaced by the top bar + bottom monitor bar. This helper now
-  // asserts that chrome is present + filled instead of the removed rail.
-  await expect(page.getByTestId("audio-topbar"), "studio top bar present").toBeVisible();
-  await expect(page.getByTestId("audio-monitor-bar"), "studio monitor bar present").toBeVisible();
+  // Visual overhaul A, Slice 4 (plan D1): the top bar and the monitor bar are
+  // gone; the Console's take-time controls are the cluster, whose first
+  // element is the state display and whose master meter is filled. Old: the
+  // top bar and the monitor bar each spanned the surface.
+  await expect(page.getByTestId("audio-monitor-bar"), "console cluster present").toBeVisible();
+  await expect(page.getByTestId("audio-state-display"), "state display present").toBeVisible();
+  await expect(page.getByTestId("audio-topbar"), "the top bar is retired").toHaveCount(0);
   const metrics = await page.evaluate(() => {
-    const topbar = document.querySelector<HTMLElement>('[data-testid="audio-topbar"]');
-    const monitor = document.querySelector<HTMLElement>('[data-testid="audio-monitor-bar"]');
+    const cluster = document.querySelector<HTMLElement>('[data-testid="audio-monitor-bar"]');
+    const state = document.querySelector<HTMLElement>('[data-testid="audio-state-display"]');
     const monitorMeter = document.querySelector<HTMLElement>('[data-testid="audio-monitor-master-meter"]');
     const rect = (el: HTMLElement | null) => (el ? el.getBoundingClientRect().width : 0);
-    return { monitorMeter: rect(monitorMeter), monitorWidth: rect(monitor), topbarWidth: rect(topbar) };
+    return {
+      clusterWidth: rect(cluster),
+      monitorMeter: rect(monitorMeter),
+      shellWidth: rect(document.querySelector<HTMLElement>("[data-shell-frame]")),
+      stateWidth: rect(state),
+    };
   });
-  expect(metrics.topbarWidth, "top bar spans the surface").toBeGreaterThan(400);
-  expect(metrics.monitorWidth, "monitor bar spans the surface").toBeGreaterThan(400);
-  expect(metrics.monitorMeter, "monitor master meter is filled").toBeGreaterThan(120);
+  // A share, not a pixel count: the Scaled Studio Preview renders the 2560
+  // canvas at ~59 %, so the cluster measures ~250 px there and ~424 px native.
+  expect(metrics.clusterWidth / metrics.shellWidth, "cluster fills its column").toBeGreaterThan(0.12);
+  expect(metrics.stateWidth / metrics.clusterWidth, "state display fills the cluster").toBeGreaterThan(0.8);
+  expect(metrics.monitorMeter / metrics.clusterWidth, "monitor master meter is filled").toBeGreaterThan(0.8);
 }
 
+// Visual overhaul A, Slice 4a. Old: the action strip was a row under every
+// slot, asserted visible at rest and inside the tile's own box. New: it is in
+// the slot's float, so the check hovers the slot first and asserts the strip is
+// inside that float. Reason: the resting slot is the mock's name and last
+// recall; save / rename / delete come with the preview of what they change.
+// What the check is for is unchanged — the strip must never cover the slot's
+// name, mix shape or last recall.
 export async function expectSnapshotActionsDoNotOverlapContent(page: Page, snapshotId: string) {
   const tile = page.getByTestId(`audio-snapshot-${snapshotId}`);
   const actions = tile.getByTestId(`audio-snapshot-actions-${snapshotId}`);
+  await expect(actions, `${snapshotId} action strip should rest hidden`).toBeHidden();
+  await tile.hover();
   await expect(actions, `${snapshotId} action strip should be visible`).toBeVisible();
 
-  const tileBox = await readRequiredLocatorBox(tile, `${snapshotId} tile`);
+  const floatBox = await readRequiredLocatorBox(tile.locator('[data-level="float"]'), `${snapshotId} slot float`);
   const actionBox = await readRequiredLocatorBox(actions, `${snapshotId} action strip`);
-  expectInsideBox(actionBox, tileBox, `${snapshotId} action strip inside tile`);
+  expectInsideBox(actionBox, floatBox, `${snapshotId} action strip inside the slot float`);
 
   for (const [locator, label] of [
     [tile.getByTestId(`audio-snapshot-name-${snapshotId}`), "name"],
+    // The mix-shape thumbnail is the one part the slot drops below the studio
+    // surface, so it is measured only where it is drawn.
     [tile.getByTestId(`audio-snapshot-thumb-${snapshotId}`), "thumbnail"],
     [tile.getByTestId(`audio-snapshot-meta-${snapshotId}`), "status"],
   ] as const) {
-    const contentBox = await readRequiredLocatorBox(locator, `${snapshotId} ${label}`);
-    expect(boxesIntersect(actionBox, contentBox), `${snapshotId} action strip overlaps ${label}`).toBe(false);
+    const contentBox = await locator.boundingBox();
+    if (label === "thumbnail" && contentBox === null) continue;
+    expect(contentBox, `${snapshotId} ${label} should render a measurable box`).not.toBeNull();
+    expect(boxesIntersect(actionBox, contentBox!), `${snapshotId} action strip overlaps ${label}`).toBe(false);
   }
 }
 

@@ -66,7 +66,7 @@ export function OperatorShell() {
 function OperatorShellInner() {
   const environment = useMemo(() => createShellEnvironment(), []);
   const palette = usePalette();
-  const { reviewSurface, setReviewSurface, setUiScale } = useOperatorLayout();
+  const { reviewSurface, setReviewSurface, setTheme, setUiScale } = useOperatorLayout();
   const shellState = useShellSnapshot(environment.store);
   useTauriShellTestBridge(shellState, environment.store);
   const activeWorkspace = shellState.activeWorkspace;
@@ -235,6 +235,16 @@ function OperatorShellInner() {
         shortcut: formatShortcut(["mod", "shift", "R"]),
         action: () => setConfirmIntent("restart-engine"),
       },
+      // Visual overhaul A, Slice 4 (plan D5, D12): the Console's private theme
+      // switch is gone; the theme is the program's, set from the palette and
+      // from Support › Workstation.
+      ...(["studio", "graphite", "bone"] as const).map((themeId) => ({
+        id: `system:theme:${themeId}`,
+        label: `Switch to the ${themeId[0]!.toUpperCase()}${themeId.slice(1)} theme`,
+        group: "System",
+        keywords: ["theme", "studio", "graphite", "bone", "light", "dark", themeId],
+        action: () => setTheme(themeId),
+      })),
       {
         id: "system:show-shortcuts",
         label: "Show keyboard shortcuts",
@@ -282,7 +292,7 @@ function OperatorShellInner() {
       },
       ...uiScaleActions,
     ]);
-  }, [palette, reviewSurface, setReviewSurface, setUiScale, tryNavigateWorkspace]);
+  }, [palette, reviewSurface, setReviewSurface, setTheme, setUiScale, tryNavigateWorkspace]);
 
   const workspaces = useMemo(
     () =>
@@ -471,6 +481,11 @@ function OperatorShellInner() {
     shellExperience === "ready" ? workspaceTones : undefined
   );
 
+  // Visual overhaul A: a workspace fills the shell's cluster, plate and
+  // footer regions once it has moved onto the cluster rule. The Console did in
+  // Slice 4; Lighting, Planning and Setup follow in Slices 5–7.
+  const consoleRegions = shellExperience === "ready" && activeWorkspace === "audio" ? ("slot" as const) : undefined;
+
   let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
     surface = (
@@ -551,6 +566,8 @@ function OperatorShellInner() {
       <AppShellFrame
         activeWorkspace={activeWorkspace}
         clock={clock}
+        cluster={consoleRegions}
+        footer={consoleRegions}
         disabledWorkspaces={disabledWorkspaces}
         monitorItems={monitorItems}
         tabsDisabled={tabsDisabled}

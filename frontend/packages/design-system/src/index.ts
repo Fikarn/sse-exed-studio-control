@@ -18,6 +18,8 @@ export { PlateHead, Section, Fields, Readouts, ControlRow, Danger } from "./comp
 export type { ControlRowProps, PlateHeadProps, ReadoutRow, ReadoutsProps, SectionProps } from "./components/Plate";
 export { Drawer } from "./components/Drawer";
 export type { DrawerProps } from "./components/Drawer";
+export { ShellRegion, useShellRegion } from "./components/shellRegions";
+export type { ShellRegionElements, ShellRegionName, ShellRegionProps } from "./components/shellRegions";
 export { Footer } from "./components/Footer";
 export type { FooterHint, FooterItem, FooterProps } from "./components/Footer";
 export { Lamp } from "./components/Lamp";

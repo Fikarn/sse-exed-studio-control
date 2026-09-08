@@ -71,12 +71,6 @@
     "radius": 3,
     "shadow": 3
   },
-  "app/src/app/audio/components/AudioMonitorBar.module.css": {
-    "colour": 10,
-    "fontSize": 0,
-    "radius": 4,
-    "shadow": 6
-  },
   "app/src/app/audio/components/AudioRail.module.css": {
     "colour": 3,
     "fontSize": 4,
@@ -94,12 +88,6 @@
     "fontSize": 0,
     "radius": 7,
     "shadow": 9
-  },
-  "app/src/app/audio/components/AudioSnapshotDeck.module.css": {
-    "colour": 1,
-    "fontSize": 0,
-    "radius": 2,
-    "shadow": 3
   },
   "app/src/app/audio/components/AudioStereoMeter.module.css": {
     "colour": 5,
@@ -124,12 +112,6 @@
     "fontSize": 0,
     "radius": 5,
     "shadow": 0
-  },
-  "app/src/app/audio/components/AudioTopBar.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 5,
-    "shadow": 6
   },
   "app/src/app/lighting/LightingWorkspace.module.css": {
     "colour": 2,

@@ -14,7 +14,7 @@
  * on signature width. Slice 5C closes the drift by biting the wide
  * signature and documenting the dependency count here.
  */
-import { useEffect, type RefObject } from "react";
+import { useEffect } from "react";
 
 import { isEditableTarget, type AudioChannelEntry } from "../../shellData";
 import { useLiveCallback } from "../../shared/useLiveCallback";
@@ -38,11 +38,9 @@ interface UseAudioKeyboardShortcutsArgs {
   selectOutputMixTarget: (mixTargetId: string) => void;
   setContextMenu: (value: null) => void;
   setInspectorTab: (tab: "channel" | "eq" | "dynamics" | "sends") => void;
-  syncAudio: () => void;
   updateChannel: (request: { channelId: string; mute?: boolean; solo?: boolean; phase?: boolean }) => void;
   viewModel: AudioWorkspaceViewModel | null;
   visibleSelectableChannels: AudioChannelEntry[];
-  warningBandRef: RefObject<HTMLDivElement | null>;
 }
 
 export function useAudioKeyboardShortcuts({
@@ -61,11 +59,9 @@ export function useAudioKeyboardShortcuts({
   selectOutputMixTarget,
   setContextMenu,
   setInspectorTab,
-  syncAudio,
   updateChannel,
   viewModel,
   visibleSelectableChannels,
-  warningBandRef,
 }: UseAudioKeyboardShortcutsArgs) {
   const handleKeyDown = useLiveCallback((event: KeyboardEvent) => {
     if (!viewModel || event.defaultPrevented) return;
@@ -200,16 +196,9 @@ export function useAudioKeyboardShortcuts({
       }
       return;
     }
-    if (
-      plain &&
-      event.key === "Enter" &&
-      warningBandRef.current &&
-      document.activeElement === warningBandRef.current &&
-      viewModel.capabilities.canSync
-    ) {
-      syncAudio();
-      event.preventDefault();
-    }
+    // Visual overhaul A, Slice 4: the state display's way-out key is a real
+    // key, so Enter on it syncs natively; the focused-warning-band shortcut
+    // this replaced had no target once the band went.
   });
 
   useEffect(() => {

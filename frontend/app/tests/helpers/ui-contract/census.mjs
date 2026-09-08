@@ -73,6 +73,10 @@ export function censusInPage() {
       return n === 0 || n === 4 || n === 8 || n === 12 || n >= 999;
     });
   };
+  // The Console's audio scene primitive is called a snapshot at the desk, so
+  // the copy scan exempts that word inside the audio workspace and inside the
+  // cluster the workspace portals into the shell.
+  const audioRoots = [...root.querySelectorAll('[data-testid="audio-workspace"], [data-audio-cluster]')];
   const FORBIDDEN = [
     { name: "engine", re: /\bengine\b/i, exempt: /\bengine log\b/i },
     { name: "backend", re: /\bbackend\b/i },
@@ -80,7 +84,6 @@ export function censusInPage() {
     { name: "IPC", re: /\bIPC\b/ },
     { name: "OSC ping", re: /\bOSC ping\b/i },
   ];
-  const audioRoot = root.querySelector('[data-testid="audio-workspace"]');
 
   const texts = [];
   const sizes = new Map();
@@ -145,9 +148,13 @@ export function censusInPage() {
       if (f.re.test(txt) && !(f.exempt && f.exempt.test(txt)))
         copy.push({ word: f.name, el: ident(el), text: txt.slice(0, 60) });
     }
-    if (/\bsnapshots?\b/i.test(txt) && !(audioRoot && audioRoot.contains(el)))
+    if (/\bsnapshots?\b/i.test(txt) && !audioRoots.some((audioRoot) => audioRoot.contains(el)))
       copy.push({ word: "snapshot", el: ident(el), text: txt.slice(0, 60) });
-    if (/^AUDIO_[A-Z_]+/.test(txt)) copy.push({ word: "AUDIO_* first", el: ident(el), text: txt.slice(0, 60) });
+    // The state display's code slot (`data-state-code`) is the one place a raw
+    // fault code stands alone by design — it is never the first thing the
+    // sentence beside it says.
+    if (/^AUDIO_[A-Z_]+/.test(txt) && !el.hasAttribute("data-state-code"))
+      copy.push({ word: "AUDIO_* first", el: ident(el), text: txt.slice(0, 60) });
     // SVG text paints with `fill`, not `color`; read the colour the eye sees.
     const color = el.namespaceURI === "http://www.w3.org/2000/svg" ? cs.fill : cs.color;
     if (!alpha(color)) continue;
