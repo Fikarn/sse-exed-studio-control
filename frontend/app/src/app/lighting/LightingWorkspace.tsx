@@ -32,17 +32,15 @@ import {
 import { ColumnResizer } from "./components/ColumnResizer";
 import { CreateFixtureDialog } from "./components/CreateFixtureDialog";
 import { DMXMonitorDialog } from "./components/DMXMonitorDialog";
-import { LightingBridgeBanner } from "./components/LightingBridgeBanner";
-import { LightingHealthBar } from "./components/LightingHealthBar";
 import { LightingInspector, deriveInspectorTab, type LightingUiMode } from "./components/LightingInspector";
 import type { InspectorTab } from "./components/LightingInspectorTabs";
-import { LightingRail } from "./components/LightingRail";
-import { LightingToolbar } from "./components/LightingToolbar";
+import { ShellRegion } from "@sse/design-system";
 import { DMXCompactStrip } from "./components/DMXCompactStrip";
+import { LightingCluster } from "./components/LightingCluster";
+import { LightingFooter } from "./components/LightingFooter";
 import { fixtureHasCctControl, fixtureStatesEqual, sceneMatchesFixtures } from "./lightingDrift";
 import type { StagePlotRenderMode } from "./fixtureVisuals";
 import { lightingFixtureChannelCount } from "./lightingPatch";
-import { PreviewBanner } from "./components/PreviewBanner";
 import { RenameDialog } from "./components/RenameDialog";
 import { SelectionChipStrip } from "./components/SelectionChipStrip";
 import { StagePlot } from "./components/StagePlot";
@@ -2653,52 +2651,105 @@ export function LightingWorkspaceSurface({
 
   return (
     <div className={styles.shell} data-testid="lighting-workspace" data-layout-mode={operatorLayout.layoutMode}>
-      <LightingToolbar
-        bridgeUniverse={bridgeUniverse}
-        bridgeIp={bridgeIp}
-        bridgeReachable={bridgeReachable}
-        fixtureCount={fixtures.length}
-        fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}
-        groupCount={groups.length}
-        sceneCount={scenes.length}
-        recallFadeMs={recallFadeMs}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        recentScenes={recentToolbarScenes}
-        onRecallRecentScene={(sceneId) => void handleRecallScene(sceneId)}
-        onRecallFadeMsChange={setRecallFadeMs}
-        patchMode={uiMode === "patch"}
-        onTogglePatch={handleTogglePatch}
-        previewMode={previewMode}
-        previewDirty={previewDirty}
-        onTogglePreview={() => void handleTogglePreview()}
-        onAddFixture={requestAddFixture}
-        hasSelection={selectedFixtureIds.size > 0}
-        highlightActive={highlightActive}
-        soloActive={soloActive}
-        onToggleHighlight={() => void handleToggleHighlight()}
-        onToggleSolo={() => void handleToggleSolo()}
-        onIdentifyFind={() => void handleIdentifyFind()}
-        onOpenInspector={() => setInspectorDrawerOpen(true)}
-        inspectorDrawerOpen={inspectorDrawerOpen}
-      />
-
-      <LightingBridgeBanner reachable={bridgeReachable} bridgeIp={bridgeIp} universe={bridgeUniverse} />
-
-      <div className={`${styles.modeStripWrapper} ${previewMode ? styles.modeStripWrapperOpen : ""}`}>
-        {previewMode ? (
-          <PreviewBanner
-            dirty={previewDirty}
-            targetSceneName={activeScene?.name ?? null}
-            busy={
-              busyActions.has("preview-mode") || busyActions.has("preview-discard") || busyActions.has("scene-resave")
-            }
-            onSave={() => void handleResaveScene()}
-            onDiscard={() => void handleDiscardPreview()}
-            onExit={requestExitPreview}
-          />
-        ) : null}
-      </div>
+      {/* Visual overhaul A, Slice 5: the toolbar, the bridge banner and the
+          preview banner are gone. What they carried is the cluster's — the
+          rig's state and its way out at the top, the keys and the rig's
+          sections under it — and the cluster is the shell's region, so it is in
+          the same place in every workspace. */}
+      <ShellRegion region="cluster">
+        <LightingCluster
+          bridgeIp={bridgeIp}
+          bridgeReachable={bridgeReachable}
+          bridgeUniverse={bridgeUniverse}
+          channelCount={lightingDmxMonitorSnapshot?.channels.length ?? 0}
+          fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}
+          fixtureTotal={fixtures.length}
+          grandMaster={grandMasterDraft}
+          groups={railGroupEntries}
+          hasSelection={selectedFixtureIds.size > 0}
+          highlightActive={highlightActive}
+          lastRecalledLabel={lastSavedLabel ?? null}
+          patchMode={uiMode === "patch"}
+          previewBusy={
+            busyActions.has("preview-mode") || busyActions.has("preview-discard") || busyActions.has("scene-resave")
+          }
+          previewDirty={previewDirty}
+          previewMode={previewMode}
+          recallFadeMs={recallFadeMs}
+          sceneModified={effectiveSceneModified}
+          sceneName={activeScene?.name ?? null}
+          scenes={scenes}
+          recentScenes={recentToolbarScenes}
+          searchQuery={searchQuery}
+          soloActive={soloActive}
+          onRecallRecentScene={(sceneId) => void handleRecallScene(sceneId)}
+          onAddFixture={requestAddFixture}
+          onDiscardPreview={() => void handleDiscardPreview()}
+          onEmergencyCut={requestEmergencyCut}
+          onGrandMasterChange={handleGrandMasterChange}
+          onIdentifyFind={() => void handleIdentifyFind()}
+          onOpenDmxMonitor={() => setDmxMonitorOpen(true)}
+          onOpenInspector={operatorLayout.isNarrow ? () => setInspectorDrawerOpen(true) : undefined}
+          onOpenSetup={() => void store.setWorkspace("setup")}
+          onRecallFadeMsChange={setRecallFadeMs}
+          onResaveScene={() => void handleResaveScene()}
+          onRevertScene={activeSceneId ? () => void handleRecallScene(activeSceneId) : undefined}
+          onSaveScene={handleSaveScene}
+          onSearchChange={setSearchQuery}
+          onToggleAllPower={(on) => void handleToggleAllPower(on)}
+          onTogglePatch={handleTogglePatch}
+          onTogglePreview={() => void handleTogglePreview()}
+          onToggleHighlight={() => void handleToggleHighlight()}
+          onToggleSolo={() => void handleToggleSolo()}
+          sceneRailProps={{
+            activeSceneId: liveActiveSceneId,
+            selectedSceneId: stagePlotActiveScene?.id ?? activeSceneId,
+            modifiedSceneId,
+            previewSceneId: previewMode ? previewTargetSceneId : null,
+            previewMode,
+            sceneThumbs: displayedSceneThumbs,
+            searchQuery,
+            onRecall: handleRecallScene,
+            onAddScene: uiMode === "patch" ? undefined : handleSaveScene,
+            onClearSearch: () => setSearchQuery(""),
+            onReorderScene: uiMode === "patch" ? undefined : handleReorderScene,
+            onPinScene: uiMode === "patch" ? undefined : handlePinScene,
+            onRenameScene: uiMode === "patch" ? undefined : handleRenameScene,
+            renamingSceneIds,
+            onRequestDeleteScene:
+              uiMode === "patch" ? undefined : (id: string, name: string) => setConfirmDeleteScene({ id, name }),
+            onSetSceneColor:
+              uiMode === "patch"
+                ? undefined
+                : (sceneId: string, colorIndex: number | null) => void handleSetSceneColor(sceneId, colorIndex),
+            onHoverPreview: uiMode === "patch" ? undefined : handleHoverPreview,
+            onHoverPreviewClear: uiMode === "patch" ? undefined : handleHoverPreviewClear,
+          }}
+          groupRailProps={{
+            onTogglePower: handleToggleGroupPower,
+            searchQuery,
+            onClearSearch: () => setSearchQuery(""),
+            onInspectGroup: uiMode === "patch" ? undefined : handleInspectGroup,
+            onCreateGroup: uiMode === "patch" ? undefined : () => setCreateGroupOpen(true),
+            onRequestRenameGroup:
+              uiMode === "patch"
+                ? undefined
+                : (groupId: string) => {
+                    handleInspectGroup(groupId);
+                    requestInlineRename("group", groupId);
+                  },
+            onRequestDeleteGroup:
+              uiMode === "patch"
+                ? undefined
+                : (groupId: string, groupName: string) => setConfirmDeleteGroup({ id: groupId, name: groupName }),
+            onReorderGroup: uiMode === "patch" ? undefined : handleReorderGroup,
+            onSetGroupColor:
+              uiMode === "patch"
+                ? undefined
+                : (groupId: string, colorIndex: number | null) => void handleSetGroupColor(groupId, colorIndex),
+          }}
+        />
+      </ShellRegion>
 
       <div
         className={`${styles.body} ${columns.isResizing ? styles.bodyResizing : ""}`}
@@ -2709,54 +2760,23 @@ export function LightingWorkspaceSurface({
           ["--lighting-inspector-width" as string]: `${columns.inspectorWidth}px`,
         }}
       >
-        <LightingRail
-          grandMaster={grandMasterDraft}
-          masterEnabled={bridgeReachable}
-          bridgeReachable={bridgeReachable}
-          fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}
-          fixtureTotal={fixtures.length}
-          onGrandMasterChange={handleGrandMasterChange}
-          onEmergencyCut={requestEmergencyCut}
-          onToggleAllPower={handleToggleAllPower}
-          scenes={scenes}
-          activeSceneId={liveActiveSceneId}
-          selectedSceneId={stagePlotActiveScene?.id ?? activeSceneId}
-          modifiedSceneId={modifiedSceneId}
-          previewSceneId={previewMode ? previewTargetSceneId : null}
-          previewMode={previewMode}
-          sceneThumbs={displayedSceneThumbs}
-          onRecallScene={handleRecallScene}
-          onSaveScene={handleSaveScene}
-          onReorderScene={handleReorderScene}
-          onPinScene={handlePinScene}
-          onRenameScene={handleRenameScene}
-          renamingSceneIds={renamingSceneIds}
-          onRequestDeleteScene={(id, name) => setConfirmDeleteScene({ id, name })}
-          onSetSceneColor={(sceneId, colorIndex) => void handleSetSceneColor(sceneId, colorIndex)}
-          onHoverPreviewScene={handleHoverPreview}
-          onHoverPreviewSceneClear={handleHoverPreviewClear}
-          groups={railGroupEntries}
-          onToggleGroupPower={handleToggleGroupPower}
-          onReorderGroup={handleReorderGroup}
-          onSetGroupColor={(groupId, colorIndex) => void handleSetGroupColor(groupId, colorIndex)}
-          searchQuery={searchQuery}
-          patchMode={uiMode === "patch"}
-          isSceneModified={!previewMode && isSceneModified}
-          onResaveScene={handleResaveScene}
-          onRevertScene={activeSceneId ? () => void handleRecallScene(activeSceneId) : undefined}
-          onClearSearch={() => setSearchQuery("")}
-          onCreateGroup={() => setCreateGroupOpen(true)}
-          onInspectGroup={handleInspectGroup}
-          onRequestRenameGroup={(groupId) => {
-            handleInspectGroup(groupId);
-            requestInlineRename("group", groupId);
-          }}
-          onRequestDeleteGroup={(groupId, groupName) => setConfirmDeleteGroup({ id: groupId, name: groupName })}
-        />
-
-        <ColumnResizer ariaLabel="Resize scene rail" onPointerDown={columns.startResize("rail")} />
-
-        <main className={styles.stage} data-testid="lighting-stage">
+        {/* Visual overhaul A, Slice 5 (system §7): the plot is the bay's screen —
+            a backlit picture of the room at real scale, with the blue keyline
+            while the operator is editing offline and the lock note on its head
+            when the bridge is not answering. */}
+        <main
+          className={styles.stage}
+          data-region="plot"
+          data-material="screen"
+          data-preview={previewMode ? "" : undefined}
+          data-locked={bridgeReachable ? undefined : ""}
+          data-testid="lighting-stage"
+        >
+          {bridgeReachable ? null : (
+            <div className={styles.stageLockNote} data-testid="lighting-stage-lock-note">
+              locked · bridge unreachable
+            </div>
+          )}
           <StagePlot
             fixtures={stagePlotFixtures}
             catalog={lightingFixtureCatalogSnapshot}
@@ -2897,19 +2917,21 @@ export function LightingWorkspaceSurface({
         </div>
       </div>
 
-      <LightingHealthBar
-        lightingSnapshot={lightingSnapshot}
-        lightingDmxMonitorSnapshot={lightingDmxMonitorSnapshot}
-        fixturesPatched={fixturesPatched}
-        fixturesTotal={liveFixtureEntries.length}
-        driftDetected={effectiveSceneModified}
-        previewMode={previewMode}
-        lastSavedLabel={lastSavedLabel}
-        dmxStripOn={dmxStripOn}
-        onToggleDmxStrip={() => setDmxStripOn((current) => !current)}
-        bridgeReachable={bridgeReachable}
-        bridgeUniverse={bridgeUniverse}
-      />
+      <ShellRegion region="footer">
+        <LightingFooter
+          bridgeReachable={bridgeReachable}
+          bridgeUniverse={bridgeUniverse}
+          dmxStripOn={dmxStripOn}
+          driftDetected={effectiveSceneModified}
+          fixturesPatched={fixturesPatched}
+          fixturesTotal={liveFixtureEntries.length}
+          lastSavedLabel={lastSavedLabel}
+          lightingDmxMonitorSnapshot={lightingDmxMonitorSnapshot}
+          lightingSnapshot={lightingSnapshot}
+          previewMode={previewMode}
+          onToggleDmxStrip={() => setDmxStripOn((current) => !current)}
+        />
+      </ShellRegion>
 
       {dmxMonitorOpen ? (
         <DMXMonitorDialog

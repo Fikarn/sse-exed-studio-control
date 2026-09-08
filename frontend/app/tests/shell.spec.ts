@@ -243,9 +243,10 @@ test("shortcut labels follow the host platform", async ({ page }) => {
 // `audio-warning-band`. New: they read `audio-state-display`. Reason: the
 // Console's state, its sentence and its way out are the cluster's state
 // display now, so the band the header lamp mirrored no longer exists. Lighting
-// keeps its banner until Slice 5.
+// Visual overhaul A, Slice 5: Lighting's case moved the same way — the bridge
+// banner became the rig's state display.
 for (const { fixture, lamp, band, tone } of [
-  { fixture: "lighting-dmx-unreachable", lamp: "shell-lamp-lighting", band: "lighting-bridge-banner", tone: "error" },
+  { fixture: "lighting-dmx-unreachable", lamp: "shell-lamp-lighting", band: "lighting-state-display", tone: "error" },
   { fixture: "audio-offline", lamp: "shell-lamp-audio", band: "audio-state-display", tone: "error" },
   { fixture: "audio-action-failed", lamp: "shell-lamp-audio", band: "audio-state-display", tone: "error" },
 ]) {

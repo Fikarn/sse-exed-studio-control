@@ -69,15 +69,15 @@
   }
 }
 
+/* Visual overhaul A, Slice 5: the rail is the shell's cluster now, so the body
+   is the bay and the plate — the plot takes what the plate leaves. */
 .body {
   flex: 1 1 0;
   display: grid;
   grid-template-columns:
-    var(--lighting-rail-width, 280px)
-    6px
     minmax(0, 1fr)
     6px
-    var(--lighting-inspector-width, 360px);
+    var(--lighting-inspector-width, 416px);
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -85,19 +85,14 @@
 
 .body[data-layout-mode="desktopCompact"] {
   grid-template-columns:
-    minmax(220px, var(--lighting-rail-width, 260px))
-    6px
     minmax(var(--operator-stage-min-width, 560px), 1fr)
     6px
-    minmax(280px, var(--lighting-inspector-width, 320px));
+    minmax(280px, var(--lighting-inspector-width, 360px));
 }
 
 .body[data-layout-mode="narrowUtility"],
 .body[data-layout-mode="constrained"] {
-  grid-template-columns:
-    minmax(240px, var(--lighting-rail-width, 300px))
-    6px
-    minmax(var(--operator-stage-min-width, 520px), 1fr);
+  grid-template-columns: minmax(var(--operator-stage-min-width, 520px), 1fr);
 }
 
 .bodyResizing {
@@ -105,13 +100,37 @@
   user-select: none;
 }
 
+/* Visual overhaul A, Slice 5: the plot is the bay's screen — the room, backlit,
+   at the size it is rendered. The blue keyline says the operator is editing
+   offline; the lock note says the bridge is not answering. */
 .stage {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
   min-height: var(--operator-stage-min-height, 480px);
-  background: var(--color-bg-canvas);
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-screen);
+  background: var(--material-well);
+  box-shadow: var(--elevation-well);
+  overflow: hidden;
+}
+
+.stage[data-preview] {
+  border-color: var(--role-blue-text);
+}
+
+.stageLockNote {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 4;
+  padding: 2px 8px;
+  border-radius: var(--radius-ctl);
+  background: var(--material-panel-top);
+  color: var(--role-red-text);
+  font: 600 var(--font-size-label) / 1.4 var(--font-family-ui);
 }
 
 .inspectorDrawerBackdrop {

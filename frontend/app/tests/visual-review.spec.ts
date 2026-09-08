@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
 
 // Visual review baselines for the operator shell across the hardware-profile
 // fallback ladder plus the Scaled Studio Preview surface. Replaces the
@@ -173,19 +174,22 @@ async function assertLightingResponsive(page: Page, size: Viewport) {
 
   expect(details.layoutMode, `lighting layout mode @ ${size.label}`).toBe(expectedMode);
 
+  // Visual overhaul A, Slice 5. Old: seven toolbar primaries, "overflow" among
+  // them, each measured where it stood. New: the same ids on their new homes in
+  // the cluster, minus "overflow" — nothing folds into an overflow menu now.
+  // The cluster is one scrolling column, so a primary below the fold is
+  // reachable rather than clipped, and the clipping check is the helper's,
+  // which brings each one into view first.
   const primaryIds = details.primaryControls.map((entry) => entry.id).sort();
-  expect(primaryIds, `lighting toolbar primary controls @ ${size.label}`).toEqual([
+  expect(primaryIds, `lighting primary controls @ ${size.label}`).toEqual([
     "add",
-    "overflow",
     "patch",
     "preview",
     "search",
     "status",
     "title",
   ]);
-
-  const clipped = details.primaryControls.filter((entry) => !entry.fits).map((entry) => entry.id);
-  expect(clipped, `lighting toolbar primary controls clipped @ ${size.label}`).toEqual([]);
+  await expectToolbarPrimaryControlsFit(page);
 
   const stageMinWidth = expectedMode === "narrowUtility" ? 520 : 560;
   const stageMinHeight = expectedMode === "narrowUtility" ? 400 : 440;
@@ -193,16 +197,15 @@ async function assertLightingResponsive(page: Page, size: Viewport) {
   expect(details.stage!.width, `lighting stage width @ ${size.label}`).toBeGreaterThanOrEqual(stageMinWidth);
   expect(details.stage!.height, `lighting stage height @ ${size.label}`).toBeGreaterThanOrEqual(stageMinHeight);
 
-  if (expectedMode !== "studioFull") {
-    await page.locator('[data-testid="lighting-toolbar-overflow"]').click();
-    const menuLabels = await page.locator('[role="menuitem"]').allTextContents();
-    for (const label of ["Highlight selection", "Solo selection", "Find selected fixtures"]) {
-      expect(
-        menuLabels.some((entry) => entry.includes(label)),
-        `lighting overflow missing '${label}' @ ${size.label}`
-      ).toBe(true);
-    }
-    await page.keyboard.press("Escape");
+  // Visual overhaul A, Slice 5. Old: below the studio surface the selection's
+  // tools folded into a toolbar overflow menu, and this checked the menu held
+  // them. New: Highlight, Solo and Find are keys on the cluster at every size.
+  // Reason: there is no overflow menu — the cluster is the same at every size.
+  for (const testId of ["lighting-highlight-toggle", "lighting-solo-toggle", "lighting-identify-find"]) {
+    expect(
+      await page.locator(`[data-testid="${testId}"]`).count(),
+      `lighting cluster missing '${testId}' @ ${size.label}`
+    ).toBe(1);
   }
 
   if (expectedMode === "narrowUtility") {

@@ -1,0 +1,73 @@
+/* Visual overhaul A, Slice 5: Lighting's cluster. Every value is a token; the
+   geometry is the mock's — the state display first and fixed, the two take-time
+   keys under it, the grand master, the scenes, the groups, and the standing
+   actions at the foot. */
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px 16px 20px;
+  overflow-y: auto;
+}
+
+.keyRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex: none;
+}
+
+.master {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+
+.masterHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.masterLabel {
+  font: 600 var(--font-size-value) / 1 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.masterHint {
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.section {
+  flex: none;
+  min-width: 0;
+}
+
+.sectionKeys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions {
+  margin-top: auto;
+  flex: none;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Below the studio surface the cluster spends less air; nothing is dropped. */
+:global([data-operator-layout-root][data-chrome="compact"]) .cluster {
+  gap: 12px;
+  padding: 12px;
+}

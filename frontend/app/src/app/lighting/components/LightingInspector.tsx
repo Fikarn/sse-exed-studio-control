@@ -268,7 +268,13 @@ export function LightingInspector({
   const fixtureGroup = selectedFixture ? (groups.find((group) => group.id === selectedFixture.groupId) ?? null) : null;
 
   return (
-    <aside className={styles.inspector} aria-label={`Lighting inspector — ${TAB_TITLE[activeTab]}`}>
+    <aside
+      className={styles.inspector}
+      aria-label={`Lighting inspector — ${TAB_TITLE[activeTab]}`}
+      data-material="plate"
+      data-region="plate"
+      data-testid="lighting-plate"
+    >
       <LightingInspectorTabs active={activeTab} onChange={onTabChange} visibleTabs={visibleTabs} />
       {previewMode && activeTab !== "patch" ? (
         <div className={styles.previewSource}>

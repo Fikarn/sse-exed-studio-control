@@ -483,8 +483,11 @@ function OperatorShellInner() {
 
   // Visual overhaul A: a workspace fills the shell's cluster, plate and
   // footer regions once it has moved onto the cluster rule. The Console did in
-  // Slice 4; Lighting, Planning and Setup follow in Slices 5–7.
-  const consoleRegions = shellExperience === "ready" && activeWorkspace === "audio" ? ("slot" as const) : undefined;
+  // Slice 4 and Lighting in Slice 5; Planning and Setup follow in Slices 6–7.
+  const workspaceRegions =
+    shellExperience === "ready" && (activeWorkspace === "audio" || activeWorkspace === "lighting")
+      ? ("slot" as const)
+      : undefined;
 
   let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
@@ -566,8 +569,8 @@ function OperatorShellInner() {
       <AppShellFrame
         activeWorkspace={activeWorkspace}
         clock={clock}
-        cluster={consoleRegions}
-        footer={consoleRegions}
+        cluster={workspaceRegions}
+        footer={workspaceRegions}
         disabledWorkspaces={disabledWorkspaces}
         monitorItems={monitorItems}
         tabsDisabled={tabsDisabled}

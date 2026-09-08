@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
 import { Lamp } from "./Lamp";
 import styles from "./StateDisplay.module.css";
@@ -23,7 +23,7 @@ export interface StateDisplayArmed {
   timeoutMs?: number;
 }
 
-export interface StateDisplayProps {
+export interface StateDisplayProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   tone: StateDisplayTone;
   /** The engine's word: VERIFIED, NOT VERIFIED, OFFLINE, REACHABLE, READY … */
   word: string;
@@ -51,6 +51,7 @@ export function StateDisplay({
   armed,
   testId,
   className,
+  ...rest
 }: StateDisplayProps) {
   return (
     <section
@@ -61,6 +62,7 @@ export function StateDisplay({
       data-tone={tone}
       data-testid={testId}
       aria-live="polite"
+      {...rest}
     >
       <div className={styles.top}>
         <Lamp tone={tone} className={styles.lamp} />
