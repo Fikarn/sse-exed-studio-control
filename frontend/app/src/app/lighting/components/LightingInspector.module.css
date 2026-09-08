@@ -160,11 +160,19 @@
   color: var(--color-brand-text-secondary);
 }
 
+/* Visual overhaul A, Slice 5b: the two pools stand side by side on the plate,
+   so the palettes are a section rather than a second page of it. */
 .palettePane {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
   min-width: 0;
+}
+
+.palettePane > .paletteStatus,
+.palettePane > .paletteNotice {
+  grid-column: 1 / -1;
 }
 
 .paletteStatus {
@@ -204,6 +212,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+/* The pool's "create" key is a real target too. */
+.palettePoolHeader button {
+  min-width: 24px;
+  min-height: 24px;
 }
 
 .palettePoolHeader h3 {
@@ -260,11 +274,18 @@
   color: var(--color-brand-text-secondary);
 }
 
+/* Visual overhaul A, Slice 5b: the palettes are on the plate at all times now,
+   so their row keys are real targets — 24 px minimum, the system's floor. */
 .paletteTileActions {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 8px;
+}
+
+.paletteTileActions button {
+  min-width: 24px;
+  min-height: 24px;
 }
 
 .paletteForm {

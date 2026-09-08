@@ -687,10 +687,13 @@ export function LightingWorkspaceSurface({
           selectedGroupId,
         }));
 
-  // Reset tab override when uiMode flips so patch ↔ recall behaves naturally.
+  // Visual overhaul A, Slice 5b: with no tab row the plate shows what was last
+  // asked for. Inspecting a group asks for the group, so the override survives
+  // that selection; picking a fixture on the plot, or flipping patch mode,
+  // hands the plate back to the fixture (or the patch) it belongs to.
   useEffect(() => {
     setActiveTabOverride(null);
-  }, [uiMode, persistedSelectedFixtureId, selectedGroupId]);
+  }, [uiMode, persistedSelectedFixtureId]);
 
   useEffect(() => {
     if (!operatorLayout.isNarrow) {

@@ -97,10 +97,14 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await page.getByRole("button", { name: "Turn off" }).click();
   await expect(page.getByRole("button", { name: /^Fixture Warm wash, off,/ })).toHaveAttribute("aria-pressed", "true");
 
+  // Visual overhaul A, Slice 5b. Old: inspect the group, then click the Group
+  // tab. New: the plate shows what is selected, so inspecting the group is
+  // enough. Reason: the plate has no tab row.
   await page.getByRole("button", { name: "Inspect Front group" }).click();
-  await page.getByRole("tab", { name: "Group" }).click();
   await expect(page.getByRole("heading", { name: "Group" })).toBeVisible();
-  await expect(workspace.getByText("Front", { exact: true }).last()).toBeVisible();
+  // Visual overhaul A, Slice 5b: the group's own section is the plate's, which
+  // sits beside the plot rather than inside it.
+  await expect(page.getByTestId("lighting-plate").getByText("Front", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Turn group off" }).click();
   await expect(page.getByRole("button", { name: /Front, 2 fixtures.*off\. Toggle on\./i })).toBeVisible();
 });
@@ -275,6 +279,37 @@ test("preview: the plot carries the blue keyline and the state display offers sa
   await expect(page.getByTestId("lighting-stage")).toHaveAttribute("data-preview", "");
 });
 
+// Visual overhaul A, Slice 5b (plan Slice 5, the plate): the selected fixture's
+// whole story at once — what it is, Identify and on / off, its levels, where it
+// stands, what it answers on, what the saved scene holds for it, and the
+// palettes — with no tab row to hide half of it behind.
+test("the plate shows the selected fixture's sections at once, with no tab row", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const plate = page.getByTestId("lighting-plate");
+  await expect(plate).toBeVisible();
+  await expect(plate.getByRole("tab")).toHaveCount(0);
+
+  await expect(plate.getByRole("button", { name: "Identify" })).toBeVisible();
+  await expect(plate.getByRole("button", { name: /Turn off|Turn on/ })).toBeVisible();
+  await expect(plate.getByLabel("Fixture intensity")).toBeVisible();
+  await expect(plate.getByLabel("Fixture CCT")).toBeVisible();
+  await expect(plate.getByLabel("Fixture rotation in degrees")).toBeVisible();
+
+  const patchFacts = page.getByTestId("lighting-plate-patch-facts");
+  await expect(patchFacts).toContainText("DMX start");
+  await expect(patchFacts).toContainText("Universe");
+
+  // What the saved scene holds for this fixture, beside what the rig is doing.
+  const sceneValues = page.getByTestId("lighting-plate-scene-values");
+  await expect(sceneValues).toContainText("In scene Warm wash");
+  await expect(sceneValues).toContainText("Saved intensity");
+  await expect(sceneValues).toContainText("On the rig now");
+
+  await expect(page.getByTestId("lighting-plate-palettes")).toBeAttached();
+  await expect(plate.getByRole("button", { name: "Delete fixture" })).toBeVisible();
+});
+
 test("renders scaled studio preview inside the current MacBook-sized viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1512, height: 982 });
   const response = await page.goto("/?fixture=lighting-populated&transport=fixture&operatorReview=studio");
@@ -362,8 +397,12 @@ test("supports lighting preview mode without driving live scene state", async ({
 test("supports lighting palette pools from the inspector and quick picker", async ({ page }) => {
   await openFixture(page, "lighting-palettes-selected");
 
-  const inspector = page.getByLabel(/Lighting inspector.*Palettes/);
-  await expect(page.getByRole("tab", { name: "Palettes" })).toHaveAttribute("aria-selected", "true");
+  // Visual overhaul A, Slice 5b. Old: the Palettes tab was selected and the
+  // panel was scoped by the plate's label. New: the palettes are a section of
+  // the plate, under whatever is selected. Reason: they are a tool for the
+  // selection, not a place to go.
+  const inspector = page.getByTestId("lighting-plate-palettes");
+  await expect(inspector).toBeVisible();
   await expect(inspector.getByRole("heading", { name: "Intensity" })).toBeVisible();
   await expect(inspector.getByRole("heading", { name: "CCT" })).toBeVisible();
   await expect(inspector.getByText("1 selected")).toBeVisible();
@@ -453,7 +492,9 @@ test("supports lighting toolbar search, patch mode, and empty-state fixture crea
   await expect(page.getByLabel("Fixture patch start channel")).toBeVisible();
   await expect(page.getByTestId("lighting-beam-fixture-key")).toHaveCount(0);
   await page.getByLabel("Fixture patch start channel").fill("3");
-  await page.getByRole("button", { name: "Apply" }).click();
+  // The palettes' own "Apply <name>" keys share the plate with the patch
+  // panel's Apply, so the patch one is matched exactly.
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(page.getByText("003", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Identify" }).click();
   await expect(page.getByRole("button", { name: /Bursting/ })).toHaveAttribute("aria-pressed", "true");

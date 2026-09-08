@@ -18,12 +18,9 @@ import { InspectorGroup } from "./InspectorGroup";
 import { InspectorPalettes } from "./InspectorPalettes";
 import { InspectorPatch } from "./InspectorPatch";
 import { InspectorScene } from "./InspectorScene";
-import {
-  LIGHTING_TAB_BUTTON_ID,
-  LIGHTING_TAB_PANEL_ID,
-  LightingInspectorTabs,
-  type InspectorTab,
-} from "./LightingInspectorTabs";
+import { Section } from "@sse/design-system";
+import { type InspectorTab } from "./LightingInspectorTabs";
+import { LightingPlatePatchFacts, LightingPlateSceneValues } from "./LightingPlateSceneValues";
 
 import styles from "./LightingInspector.module.css";
 
@@ -152,22 +149,6 @@ export function deriveInspectorTab(opts: {
   return "scene";
 }
 
-function buildVisibleTabs(opts: {
-  uiMode: LightingUiMode;
-  selectedGroupId: string | null;
-  activeTab: InspectorTab;
-}): readonly InspectorTab[] {
-  if (opts.uiMode === "patch") return ["patch", "palettes"];
-  // Group tab is only present when there's a group to inspect — the empty
-  // "Select a group from the rail" state is unreachable from any UI path
-  // (group chips toggle power, not select for inspection in this build),
-  // so hiding the tab when no group is selected avoids a dead-end.
-  const groupVisible = opts.selectedGroupId !== null || opts.activeTab === "group";
-  return groupVisible
-    ? (["scene", "fixture", "group", "palettes"] as const)
-    : (["scene", "fixture", "palettes"] as const);
-}
-
 const TAB_TITLE: Record<InspectorTab, string> = {
   scene: "Scene",
   fixture: "Fixture",
@@ -263,8 +244,6 @@ export function LightingInspector({
         ? [selectedFixture.id]
         : [];
 
-  const visibleTabs = buildVisibleTabs({ uiMode, selectedGroupId, activeTab });
-
   const fixtureGroup = selectedFixture ? (groups.find((group) => group.id === selectedFixture.groupId) ?? null) : null;
 
   return (
@@ -275,7 +254,6 @@ export function LightingInspector({
       data-region="plate"
       data-testid="lighting-plate"
     >
-      <LightingInspectorTabs active={activeTab} onChange={onTabChange} visibleTabs={visibleTabs} />
       {previewMode && activeTab !== "patch" ? (
         <div className={styles.previewSource}>
           <span className={styles.previewSourceEyebrow}>Preview values</span>
@@ -283,12 +261,11 @@ export function LightingInspector({
         </div>
       ) : null}
 
-      <section
-        role="tabpanel"
-        id={LIGHTING_TAB_PANEL_ID[activeTab]}
-        aria-labelledby={LIGHTING_TAB_BUTTON_ID[activeTab]}
-        className={styles.tabPanel}
-      >
+      {/* Visual overhaul A, Slice 5b: no tab row. The plate shows what is
+          selected — the fixture, the group, the scene, or the patch while
+          addressing — with every one of its sections at once, and the palettes
+          under it because they apply to whatever is selected. */}
+      <section className={styles.tabPanel} data-plate-view={activeTab}>
         {activeTab === "scene" ? (
           <InspectorScene
             scene={inspectorScene}
@@ -362,6 +339,23 @@ export function LightingInspector({
           />
         ) : null}
 
+        {/* What the saved scene holds for this fixture, beside what the rig is
+            doing now — the plate's own answer to "has it drifted?". */}
+        {activeTab === "fixture" && selectedFixture && (!selectedFixtures || selectedFixtures.length <= 1) ? (
+          <>
+            <LightingPlatePatchFacts
+              channelCount={
+                catalog?.definitions
+                  .find((definition) => definition.id === selectedFixture.definitionId)
+                  ?.modes.find((mode) => mode.id === selectedFixture.modeId)?.channelCount ?? null
+              }
+              fixture={selectedFixture}
+              overlapNote={patchOverlap ? "overlaps another fixture on this universe" : null}
+            />
+            <LightingPlateSceneValues fixture={selectedFixture} scene={inspectorScene} />
+          </>
+        ) : null}
+
         {activeTab === "fixture" && !selectedFixture ? (
           <p className={styles.empty}>
             Choose a fixture on the stage plot to see its controls. Or use the toolbar search to find one by name.
@@ -397,18 +391,29 @@ export function LightingInspector({
           <p className={styles.empty}>Choose a group from the rail (chevron icon) to see its members.</p>
         ) : null}
 
-        {activeTab === "palettes" ? (
-          <InspectorPalettes
-            palettes={palettes}
-            selectedFixtureIds={paletteFixtureIds}
-            patchMode={uiMode === "patch"}
-            previewMode={previewMode}
-            busyActions={busyActions}
-            onApplyPalette={(paletteId) => onApplyPalette?.(paletteId, paletteFixtureIds)}
-            onCreatePalette={onCreatePalette ?? (() => undefined)}
-            onUpdatePalette={onUpdatePalette ?? (() => undefined)}
-            onDeletePalette={onDeletePalette ?? (() => undefined)}
-          />
+        {/* The palettes are a tool for whatever is selected, so they sit under
+            it rather than behind a tab of their own — except while addressing
+            fixtures, where they are refused anyway and the patch tools are what
+            the operator is using. */}
+        {activeTab === "scene" || activeTab === "fixture" || activeTab === "palettes" ? (
+          <Section
+            title="Palettes"
+            detail="levels and colours you can apply to the selection"
+            data-plate-section="palettes"
+            testId="lighting-plate-palettes"
+          >
+            <InspectorPalettes
+              palettes={palettes}
+              selectedFixtureIds={paletteFixtureIds}
+              patchMode={uiMode === "patch"}
+              previewMode={previewMode}
+              busyActions={busyActions}
+              onApplyPalette={(paletteId) => onApplyPalette?.(paletteId, paletteFixtureIds)}
+              onCreatePalette={onCreatePalette ?? (() => undefined)}
+              onUpdatePalette={onUpdatePalette ?? (() => undefined)}
+              onDeletePalette={onDeletePalette ?? (() => undefined)}
+            />
+          </Section>
         ) : null}
 
         {activeTab === "patch" ? (
