@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { Button, StatusBadge, Surface } from "@sse/design-system";
+import { Button, Key, StatusBadge } from "@sse/design-system";
 import type { JsonValue, ShellStore, StartupFailure } from "@sse/engine-client";
 
 import {
@@ -14,6 +14,8 @@ import {
 } from "../shellData";
 import { exportShellDiagnostics, openShellPath } from "../shellCommands";
 import { useLiveCallback } from "../shared/useLiveCallback";
+import { PreReadyState } from "../startup/PreReadyState";
+import recoveryStyles from "../startup/RecoveryBands.module.css";
 import styles from "../OperatorShell.module.css";
 import {
   type ActionFeedback,
@@ -150,7 +152,33 @@ export function SetupRecoverySurface({
   };
 
   return (
-    <div className={styles.setupRecoveryShell}>
+    // Visual overhaul A, Slice 7: the incident on the same skeleton as every
+    // workspace — the word, the engine's sentence, its code in the display's
+    // own slot, and the ways out as keys on the display.
+    <PreReadyState
+      tone="error"
+      word={getFailureTitle(failure).toUpperCase()}
+      sentence={summary}
+      code={failure?.code ?? "ENGINE_STARTUP_FAILED"}
+      meta={`${formatFailureCode(failure)} · failed at ${failure?.stage ?? "runtime"} · recover from Setup / Support`}
+      actions={
+        <>
+          <Key size="small" mode="primary" testId="setup-recovery-retry" onClick={onRequestRestart}>
+            Retry startup
+          </Key>
+          <Key
+            size="small"
+            disabled={!canReturnToConsole}
+            testId="setup-recovery-console"
+            onClick={() => void store.setWorkspace("planning")}
+          >
+            Back to Console
+          </Key>
+          <Key size="small" cap="Shortcuts" hint="?" testId="setup-recovery-shortcuts" onClick={onShowShortcuts} />
+        </>
+      }
+      testId="setup-recovery-surface"
+    >
       {feedback ? (
         <div aria-live="polite" className={styles.setupFeedbackBanner} data-tone={feedback.tone} role="status">
           <StatusBadge
@@ -161,46 +189,9 @@ export function SetupRecoverySurface({
         </div>
       ) : null}
 
-      <div className={styles.setupUtilityRow}>
-        <div className={styles.setupUtilityActions}>
-          <Button
-            disabled={!canReturnToConsole}
-            onClick={() => {
-              void store.setWorkspace("planning");
-            }}
-            variant="ghost"
-          >
-            Back to Console
-          </Button>
-        </div>
-        <div className={styles.setupUtilityMeta}>
-          <div className={styles.setupUtilityEyebrow}>Setup / Support</div>
-          <div className={styles.setupUtilityTitle}>Incident recovery</div>
-        </div>
-        <div className={styles.setupUtilityActions}>
-          <Button disabled size="compact" variant="secondary">
-            Runner
-          </Button>
-          <Button size="compact" variant="primary">
-            Support
-          </Button>
-          <Button onClick={onShowShortcuts} size="compact" variant="ghost">
-            Shortcuts
-          </Button>
-        </div>
-      </div>
-
       <div className={styles.setupIncidentGrid}>
-        <Surface className={styles.setupIncidentHero} padding="lg" tone="raised">
+        <div className={`${styles.setupIncidentHero} ${recoveryStyles.card}`} data-material="plate">
           <div className={styles.setupIncidentPrompt}>What went wrong?</div>
-          <div className={styles.setupIncidentHeader}>
-            <div>
-              <div className={styles.setupIncidentEyebrow}>Restore</div>
-              <h1 className={styles.setupIncidentTitle}>{getFailureTitle(failure)}</h1>
-              <p className={styles.setupIncidentBody}>{summary}</p>
-            </div>
-            <StatusBadge label={formatFailureCode(failure)} tone="error" />
-          </div>
 
           {failure?.code === "PROTOCOL_MISMATCH" ? (
             <div className={styles.setupIncidentMetaGrid}>
@@ -364,9 +355,9 @@ export function SetupRecoverySurface({
               </button>
             </div>
           </div>
-        </Surface>
+        </div>
 
-        <Surface className={styles.setupIncidentCard} padding="lg" tone="raised">
+        <div className={`${styles.setupIncidentCard} ${recoveryStyles.card}`} data-material="plate">
           <div className={styles.setupIncidentSectionLabel}>Diagnostics</div>
           <div className={styles.setupIncidentCheckGrid}>
             {diagnosticsChecks.map((check) => (
@@ -440,9 +431,9 @@ export function SetupRecoverySurface({
               )}
             </ul>
           </div>
-        </Surface>
+        </div>
 
-        <Surface className={styles.setupIncidentCard} padding="lg" tone="raised">
+        <div className={`${styles.setupIncidentCard} ${recoveryStyles.card}`} data-material="plate">
           <div className={styles.setupIncidentSectionLabel}>Install & Update</div>
           <div className={styles.setupIncidentInfoList}>
             <div>
@@ -464,8 +455,8 @@ export function SetupRecoverySurface({
               </span>
             </div>
           </div>
-        </Surface>
+        </div>
       </div>
-    </div>
+    </PreReadyState>
   );
 }

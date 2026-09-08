@@ -483,10 +483,14 @@ function OperatorShellInner() {
 
   // Visual overhaul A: a workspace fills the shell's cluster, plate and
   // footer regions once it has moved onto the cluster rule. The Console did in
-  // Slice 4, Lighting in Slice 5 and Planning in Slice 6; Setup follows in 7.
+  // Slice 4, Lighting in Slice 5, Planning in Slice 6 and Setup in Slice 7.
+  // The pre-ready surfaces render their own frame (they are not workspaces).
   const workspaceRegions =
     shellExperience === "ready" &&
-    (activeWorkspace === "audio" || activeWorkspace === "lighting" || activeWorkspace === "planning")
+    (activeWorkspace === "audio" ||
+      activeWorkspace === "lighting" ||
+      activeWorkspace === "planning" ||
+      activeWorkspace === "setup")
       ? ("slot" as const)
       : undefined;
 

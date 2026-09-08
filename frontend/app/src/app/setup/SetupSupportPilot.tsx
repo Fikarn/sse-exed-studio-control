@@ -1,15 +1,6 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  Button,
-  ConfirmDialog,
-  HealthBar,
-  type HealthBarItemData,
-  MetricCard,
-  StatusBadge,
-  StatusPill,
-  Surface,
-} from "@sse/design-system";
+import { Button, ConfirmDialog, Key, ShellRegion, StatusPill, Surface } from "@sse/design-system";
 import type { JsonValue, ShellStore } from "@sse/engine-client";
 
 import { exportShellDiagnostics, openShellPath } from "../shellCommands";
@@ -21,13 +12,20 @@ import {
   getCommissioningChecks,
   getSupportBackups,
   isEditableTarget,
-  mapStatusBadgeTone,
   statusToneLabel,
   type SnapshotRecord,
   type StatusToneLike,
 } from "../shellData";
+import { useOperatorLayout } from "../OperatorLayoutProvider";
+import { SetupCluster, type SetupClusterStep } from "./components/SetupCluster";
+import { SetupFooter } from "./components/SetupFooter";
+import { SetupFactCard, SetupRecordHeading, SetupRecordRow, SetupStepScreen } from "./components/SetupStepScreen";
+import { SupportPlate } from "./components/SupportPlate";
 import { findEchoControlId, parseControlSurfaceLastEvent } from "./setupControlEcho";
+import { deriveSetupState } from "./setupState";
 import styles from "./SetupSupportPilot.module.css";
+
+const APP_VERSION = `v${__APP_VERSION__}`;
 
 type SetupMode = "runner" | "support";
 type RunnerStepId = "import" | "probe" | "map" | "verify" | "publish";
@@ -249,6 +247,7 @@ export function SetupSupportPilot({
     [commissioningSnapshot, pages]
   );
 
+  const { setTheme, setUiScale, theme, uiScale } = useOperatorLayout();
   const [mode, setMode] = useState<SetupMode>(persistedMode);
   const [activeStepId, setActiveStepId] = useState<RunnerStepId>(recommendedStepId);
   const [pendingStepId, setPendingStepId] = useState<RunnerStepId | null>(null);
@@ -371,17 +370,13 @@ export function SetupSupportPilot({
   const runtime = asRecord(appSnapshot?.runtime);
   const runtimePaths = asRecord(runtime?.paths);
   const controlSurface = asRecord(runtime?.controlSurface);
-  const shell = asRecord(appSnapshot?.shell);
   const startup = asRecord(appSnapshot?.startup);
-  const healthChecks = asRecord(healthSnapshot?.checks);
   // SET-01: the banner fires on ANY non-ok health tone, so derive its title
   // from that tone instead of the hardcoded alarming "Degraded startup posture"
   // (an `attention` posture is not "degraded").
   const healthTone = healthSnapshot ? asStatusTone(healthSnapshot.status, "info") : "ok";
   const degradedSummary =
     healthTone !== "ok" ? String(healthSnapshot?.summary ?? "Hardware or bridge attention required.") : null;
-  const degradedTitle =
-    healthTone === "error" ? "Startup blocked" : healthTone === "attention" ? "Attention required" : "Startup notice";
   const isReady = commissioningSnapshot?.hasCompletedSetup === true;
   const lastBackup = backups[0];
   const stepIndex = runnerStepOrder.indexOf(activeStepId);
@@ -629,40 +624,6 @@ export function SetupSupportPilot({
     return isReady ? "Open planning" : "Publish setup";
   }, [activeStepId, isReady]);
 
-  // Slice 5 (CHROME-02): the commissioning runner footer is unified onto the
-  // shared DS HealthBar (full variant) — a few setup status items derived from
-  // already-present snapshot data on the left, the Back / primary nav in the
-  // bar's actions slot. Presentation-only: no new engine/OSC data.
-  const setupFooterItems = useMemo<HealthBarItemData[]>(() => {
-    const activeStepLabel = runnerSteps.find((step) => step.id === activeStepId)?.label ?? "";
-    const checkEntries = Object.entries(healthChecks ?? {});
-    const checksTotal = checkEntries.length;
-    const checksPassed = checkEntries.filter(
-      ([, value]) => asStatusTone(asRecord(value)?.status, "info") === "ok"
-    ).length;
-
-    const items: HealthBarItemData[] = [
-      {
-        label: "Step",
-        value: `${stepIndex + 1} / ${runnerStepOrder.length}`,
-        suffix: activeStepLabel ? `· ${activeStepLabel}` : undefined,
-      },
-    ];
-    if (checksTotal > 0) {
-      items.push({
-        label: "Checks",
-        dot: checksPassed === checksTotal ? "ok" : "attn",
-        value: `${checksPassed} / ${checksTotal} ok`,
-      });
-    }
-    items.push({
-      label: "Commissioning",
-      dot: isReady ? "ok" : "attn",
-      value: isReady ? "Ready to publish" : "In progress",
-    });
-    return items;
-  }, [activeStepId, healthChecks, isReady, runnerSteps, stepIndex]);
-
   const invokePrimaryAction = useLiveCallback(() => {
     if (activeStepId === "import") {
       void performAction("export-companion", () => saveImportProfile(true));
@@ -684,6 +645,17 @@ export function SetupSupportPilot({
       return;
     }
 
+    // 2026-09 audit Slice 8: a probe that is not green needs the operator's
+    // explicit decision before publish; the dialog names each one. Visual
+    // overhaul A, Slice 7: this is asked before the published check, so a
+    // desk whose probes have gone off can be re-published with the override
+    // recorded rather than only offering the way back to the console.
+    const notPassed = probeChecks(checks).filter((check) => check.status !== "ok");
+    if (notPassed.length > 0) {
+      setPublishOverridePrompt(notPassed.map((check) => `${check.label} — ${check.detail}`));
+      return;
+    }
+
     if (isReady) {
       void performAction("open-planning", async () => {
         await store.setWorkspace("planning");
@@ -695,13 +667,6 @@ export function SetupSupportPilot({
       return;
     }
 
-    // 2026-09 audit Slice 8: a probe that is not green needs the operator's
-    // explicit decision before publish; the dialog names each one.
-    const notPassed = probeChecks(checks).filter((check) => check.status !== "ok");
-    if (notPassed.length > 0) {
-      setPublishOverridePrompt(notPassed.map((check) => `${check.label} — ${check.detail}`));
-      return;
-    }
     void performAction("publish-setup", () => publishSetup());
   });
 
@@ -792,741 +757,814 @@ export function SetupSupportPilot({
     persistMode,
   ]);
 
+  // Visual overhaul A, Slice 7: the runner's steps as the cluster prints them —
+  // done, current or pending, with a probe failure showing on the step that
+  // runs the probes.
+  const clusterSteps: SetupClusterStep[] = runnerSteps.map((step, index) => ({
+    hint: step.hint,
+    id: step.id,
+    label: step.label,
+    standing:
+      step.id === "probe" && probeHasError
+        ? "failed"
+        : step.id === activeStepId
+          ? "current"
+          : index < stepIndex || (step.id === "publish" && isReady)
+            ? "done"
+            : "pending",
+  }));
+
+  const setupState = deriveSetupState({
+    checks: probeChecks(checks),
+    commissioningSummary: typeof commissioningSnapshot?.summary === "string" ? commissioningSnapshot.summary : null,
+    healthSummary: degradedSummary,
+    healthTone: healthTone === "error" ? "error" : healthTone === "attention" ? "attention" : "ok",
+    lastBackupLabel: lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : null,
+    published: isReady,
+    stepLabel: runnerSteps[stepIndex]?.label ?? "Import profile",
+    stepNumber: stepIndex + 1,
+    stepTotal: runnerStepOrder.length,
+  });
+
+  const engineLogPath = String(runtimePaths?.logFilePath ?? "");
+  const openEngineLog = () => {
+    void performAction("open-engine-log", () => openReferencePath("Engine log", engineLogPath));
+  };
+
+  const primaryKey = (
+    <Key
+      mode="primary"
+      take
+      disabled={busyAction !== null}
+      testId="setup-step-primary"
+      onClick={() => invokePrimaryAction()}
+    >
+      {busyAction ? "Working…" : primaryActionLabel}
+    </Key>
+  );
+
+  const backKey =
+    stepIndex > 0 ? (
+      <Key take testId="setup-step-back" onClick={() => moveStepSelection(-1)}>
+        Back to {runnerSteps[stepIndex - 1]?.label ?? "the previous step"}
+      </Key>
+    ) : null;
+
+  const bayHead = (
+    <>
+      <span className={styles.bayTitle}>{mode === "runner" ? "Commissioning runner" : "Support dashboard"}</span>
+      <span className={styles.bayDetail}>
+        {mode === "runner"
+          ? `step ${stepIndex + 1} of ${runnerStepOrder.length} · ${
+              activeStepId === "publish"
+                ? "the last step commits everything above it"
+                : "each step is finished before the next one opens"
+            }`
+          : "what to do when something is wrong, and the archives to do it from"}
+      </span>
+      <Key size="small" className={styles.bayShortcuts} cap="Shortcuts" hint="?" onClick={onShowShortcuts} />
+    </>
+  );
+
+  const publishOverrideRecorded =
+    typeof commissioningSnapshot?.publishOverrideAt === "string" && commissioningSnapshot.publishOverrideAt
+      ? formatBackupTimestamp(commissioningSnapshot.publishOverrideAt)
+      : null;
+  const notPassedProbes = probeChecks(checks).filter((check) => check.status !== "ok");
+
   return (
-    <div className={styles.workspaceStack}>
-      {degradedSummary ? (
-        <div className={styles.degradedBanner} role="status">
-          <div>
-            <div className={styles.bannerTitle}>{degradedTitle}</div>
-            <div className={styles.bannerBody}>{degradedSummary}</div>
-          </div>
-          <div className={styles.bannerActions}>
-            <Button variant="secondary" onClick={() => persistMode("support")}>
-              Open support
-            </Button>
-            <Button variant="ghost" onClick={onRequestRestart}>
-              Restart bridge
-            </Button>
-          </div>
-        </div>
-      ) : null}
+    <div className={styles.workspaceStack} data-testid="setup-workspace">
+      <ShellRegion region="cluster">
+        <SetupCluster
+          busy={busyAction !== null}
+          canReturnToConsole={canReturnToConsole}
+          checks={probeChecks(checks)}
+          mode={mode}
+          state={setupState}
+          steps={clusterSteps}
+          onExportBackup={() => void performAction("support-export", exportSupportBackup)}
+          onOpenEngineLog={openEngineLog}
+          onReturnToConsole={() => void store.setWorkspace("planning")}
+          onRunAllProbes={() => {
+            persistMode("runner");
+            void activateStep("probe");
+            void performAction("run-all-probes", () => runAllProbes(true));
+          }}
+          onSelectMode={persistMode}
+          onSelectStep={(stepId) => requestStepSelection(stepId as RunnerStepId)}
+          onStartRunner={() => {
+            persistMode("runner");
+            void activateStep("import");
+          }}
+        />
+      </ShellRegion>
 
-      {feedback ? (
-        <div className={styles.feedbackBanner} data-tone={feedback.tone} role="status">
-          <StatusPill
-            label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
-            tone={feedbackStatus(feedback) ?? "info"}
-          />
-          <span>{feedback.message}</span>
-        </div>
-      ) : null}
-
-      <div className={styles.utilityRow}>
-        <div className={styles.utilityActions}>
-          <Button
-            disabled={!canReturnToConsole}
-            onClick={() => {
-              void store.setWorkspace("planning");
-            }}
-            variant="ghost"
-          >
-            Back to Console
-          </Button>
-        </div>
-        <div className={styles.utilityMeta}>
-          <div className={styles.modeEyebrow}>Setup / Support</div>
-          <div className={styles.modeHeadline}>{mode === "runner" ? "Commissioning runner" : "Support dashboard"}</div>
-        </div>
-        <div className={styles.utilityActions}>
-          <Button
-            variant={mode === "runner" ? "primary" : "secondary"}
-            onClick={() => persistMode("runner")}
-            size="compact"
-          >
-            Runner
-          </Button>
-          <Button
-            variant={mode === "support" ? "primary" : "secondary"}
-            onClick={() => persistMode("support")}
-            size="compact"
-          >
-            Support
-          </Button>
-          <Button variant="ghost" onClick={onShowShortcuts} size="compact">
-            Shortcuts
-          </Button>
-        </div>
-      </div>
-
-      {mode === "runner" ? (
-        <div className={styles.runnerLayout}>
-          <div className={styles.stepRail} role="tablist" aria-label="Commissioning runner">
-            {runnerSteps.map((step, index) => (
-              <button
-                key={step.id}
-                aria-selected={step.id === activeStepId}
-                className={styles.stepButton}
-                data-active={step.id === activeStepId}
-                data-status={step.tone}
-                onClick={() => requestStepSelection(step.id)}
-                role="tab"
-                type="button"
-              >
-                <span className={styles.stepNumber}>{index + 1}</span>
-                <span className={styles.stepLabel}>{step.label}</span>
-                <span className={styles.stepHint}>{step.hint}</span>
-                <StatusPill
-                  label={
-                    step.tone === "ok"
-                      ? "Complete"
-                      : step.tone === "error"
-                        ? "Failed"
-                        : step.id === activeStepId
-                          ? "Current"
-                          : "Up next"
-                  }
-                  tone={step.tone}
-                />
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.runnerBody}>
-            <div className={styles.runnerMain}>
+      <div className={styles.body}>
+        <main className={styles.bay} data-region={mode === "runner" ? "runner" : "support"}>
+          {mode === "runner" ? (
+            <>
               {activeStepId === "import" ? (
-                <Surface className={styles.heroSurface} padding="lg" tone="raised">
-                  <div className={styles.cardHeader}>
-                    <div>
-                      <div className={styles.sectionEyebrow}>Step 1</div>
-                      <h2 className={styles.sectionTitle}>Import the Companion profile</h2>
-                      <p className={styles.sectionBody}>
-                        Export the ready-to-import control-surface profile before manual edits. The runner stays
-                        anchored to the engine-owned local bridge URL and current control-surface snapshot.
-                      </p>
-                    </div>
-                    <StatusBadge
-                      label={statusToneLabel(asStatusTone(controlSurface?.status, "info"))}
-                      tone={mapStatusBadgeTone(asStatusTone(controlSurface?.status, "info"))}
-                    />
-                  </div>
-                  <div className={styles.fieldGrid}>
-                    <label className={styles.field}>
-                      <span>Server base URL</span>
-                      <input
-                        className={styles.textField}
-                        onChange={(event) => setExportBaseUrl(event.target.value)}
-                        placeholder="http://127.0.0.1:38201"
-                        value={exportBaseUrl}
+                <SetupStepScreen
+                  head={bayHead}
+                  eyebrow={`Step 1 of ${runnerStepOrder.length}`}
+                  title="Import the Companion profile"
+                  lead="Export the ready-to-import control-surface profile, then load it in Companion on this workstation."
+                  rules={[
+                    {
+                      id: "bindings",
+                      text: "The profile carries the deck pages and their controls; edit bindings in Map bindings, not in Companion.",
+                      tone: "off",
+                    },
+                    {
+                      id: "url",
+                      text: "The server base URL is where Companion reaches this workstation; keep it on the studio network.",
+                      tone: "off",
+                    },
+                  ]}
+                  facts={
+                    <>
+                      <label className={styles.field}>
+                        <span>Server base URL</span>
+                        <input
+                          className={styles.textField}
+                          onChange={(event) => setExportBaseUrl(event.target.value)}
+                          placeholder="http://127.0.0.1:38201"
+                          value={exportBaseUrl}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>Export target</span>
+                        <input
+                          className={styles.textField}
+                          disabled
+                          value={String(runtimePaths?.appDataDir ?? "Native runtime path unavailable")}
+                        />
+                      </label>
+                    </>
+                  }
+                  actions={
+                    <>
+                      {primaryKey}
+                      <Key
+                        take
+                        testId="setup-download-companion"
+                        onClick={() => void performAction("export-companion-inline", () => saveImportProfile(false))}
+                      >
+                        Download Companion profile
+                      </Key>
+                    </>
+                  }
+                  note="Continue is available once the export has been written."
+                  record={
+                    <>
+                      <SetupRecordHeading>Before you start</SetupRecordHeading>
+                      <SetupRecordRow
+                        label="Control-surface bridge"
+                        value={String(controlSurface?.summary ?? "Pending")}
+                        tone={asStatusTone(controlSurface?.status, "info") === "ok" ? "ok" : "attention"}
                       />
-                    </label>
-                    <label className={styles.field}>
-                      <span>Export target</span>
-                      <input
-                        className={styles.textField}
-                        disabled
-                        value={String(runtimePaths?.appDataDir ?? "Native runtime path unavailable")}
+                      <SetupRecordRow
+                        label="Deck pages"
+                        value={String(pages.length)}
+                        tone={pages.length > 0 ? "ok" : "off"}
                       />
-                    </label>
-                  </div>
-                  <div className={styles.metricRow}>
-                    <MetricCard
-                      caption="Bridge status"
-                      tone={asStatusTone(controlSurface?.status, "info") === "ok" ? "healthy" : "warning"}
-                      value={String(controlSurface?.summary ?? "Pending")}
-                    />
-                    <MetricCard
-                      caption="Deck pages"
-                      tone={pages.length > 0 ? "connected" : "idle"}
-                      value={String(pages.length)}
-                    />
-                    <MetricCard
-                      caption="Mapped controls"
-                      tone={totalControlCount > 0 ? "connected" : "idle"}
-                      value={String(totalControlCount)}
-                    />
-                  </div>
-                  <div className={styles.inlineActions}>
-                    <Button
-                      onClick={() => {
-                        void performAction("export-companion-inline", () => saveImportProfile(false));
-                      }}
-                      variant="secondary"
-                    >
-                      Download Companion profile
-                    </Button>
-                    <Button onClick={() => setSeedPlanningPrompt(true)} variant="ghost">
-                      Load sample planning
-                    </Button>
-                  </div>
-                </Surface>
+                      <SetupRecordRow
+                        label="Mapped controls"
+                        value={String(totalControlCount)}
+                        tone={totalControlCount > 0 ? "ok" : "off"}
+                      />
+                      <SetupRecordRow
+                        label="Hardware profile"
+                        value={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
+                        tone="off"
+                      />
+                    </>
+                  }
+                  testId="setup-screen-import"
+                />
               ) : null}
 
               {activeStepId === "probe" ? (
-                <Surface className={styles.heroSurface} padding="lg" tone="raised">
-                  <div className={styles.cardHeader}>
-                    <div>
-                      <div className={styles.sectionEyebrow}>Step 2</div>
-                      <h2 className={styles.sectionTitle}>Probe hardware</h2>
-                      <p className={styles.sectionBody}>
-                        Run the control-surface, DMX, and OSC probes in one pass. Probe failures stay visible here and
-                        in Support so recovery does not fork into a second model.
-                      </p>
-                    </div>
-                    <StatusBadge
-                      label={`${checks.filter((check) => check.status === "ok").length}/${checks.length} passing`}
-                      tone={checks.length > 0 && checks.every((check) => check.status === "ok") ? "healthy" : "warning"}
-                    />
-                  </div>
-                  <div className={styles.fieldGrid}>
-                    <label className={styles.field}>
-                      <span>Lighting bridge IP</span>
-                      <input
-                        className={styles.textField}
-                        onChange={(event) => setLightingBridgeIp(event.target.value)}
-                        placeholder="192.168.1.80"
-                        value={lightingBridgeIp}
-                      />
-                    </label>
-                    <label className={styles.field}>
-                      <span>Lighting universe</span>
-                      <input
-                        className={styles.textField}
-                        onChange={(event) => setLightingUniverse(event.target.value)}
-                        value={lightingUniverse}
-                      />
-                    </label>
-                    <label className={styles.field}>
-                      <span>Audio send host</span>
-                      <input
-                        className={styles.textField}
-                        onChange={(event) => setAudioSendHost(event.target.value)}
-                        value={audioSendHost}
-                      />
-                    </label>
-                    <label className={styles.field}>
-                      <span>Audio send port</span>
-                      <input
-                        className={styles.textField}
-                        onChange={(event) => setAudioSendPort(event.target.value)}
-                        value={audioSendPort}
-                      />
-                    </label>
-                    <label className={styles.field}>
-                      <span>Audio receive port</span>
-                      <input
-                        className={styles.textField}
-                        onChange={(event) => setAudioReceivePort(event.target.value)}
-                        value={audioReceivePort}
-                      />
-                    </label>
-                  </div>
-                  <div className={styles.checkGrid}>
-                    {checks.map((check) => (
-                      <div key={check.id} className={styles.checkCard}>
-                        <div className={styles.checkHeader}>
-                          <div>
-                            <div className={styles.checkTitle}>{check.label}</div>
-                            <div className={styles.checkDetail}>{check.detail}</div>
+                <SetupStepScreen
+                  head={bayHead}
+                  eyebrow={`Step 2 of ${runnerStepOrder.length}`}
+                  title="Probe hardware"
+                  lead="Run the control-surface, lighting and audio probes in one pass. What each one reports stays on the cluster and in Support, so recovery does not fork into a second model."
+                  rules={[
+                    {
+                      id: "green",
+                      text: "Every probe must be green before publish; a probe that is not green asks for an explicit override and records it.",
+                      tone: probeHasError
+                        ? "error"
+                        : setupState.passedProbeCount === setupState.probeCount
+                          ? "ok"
+                          : "attention",
+                    },
+                  ]}
+                  facts={
+                    <>
+                      <label className={styles.field}>
+                        <span>Lighting bridge IP</span>
+                        <input
+                          className={styles.textField}
+                          onChange={(event) => setLightingBridgeIp(event.target.value)}
+                          placeholder="192.168.1.80"
+                          value={lightingBridgeIp}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>Lighting universe</span>
+                        <input
+                          className={styles.textField}
+                          onChange={(event) => setLightingUniverse(event.target.value)}
+                          value={lightingUniverse}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>Audio send host</span>
+                        <input
+                          className={styles.textField}
+                          onChange={(event) => setAudioSendHost(event.target.value)}
+                          value={audioSendHost}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>Audio send port</span>
+                        <input
+                          className={styles.textField}
+                          onChange={(event) => setAudioSendPort(event.target.value)}
+                          value={audioSendPort}
+                        />
+                      </label>
+                      <label className={styles.field}>
+                        <span>Audio receive port</span>
+                        <input
+                          className={styles.textField}
+                          onChange={(event) => setAudioReceivePort(event.target.value)}
+                          value={audioReceivePort}
+                        />
+                      </label>
+                    </>
+                  }
+                  actions={
+                    <>
+                      {primaryKey}
+                      {backKey}
+                    </>
+                  }
+                  note={`${setupState.passedProbeCount} of ${setupState.probeCount} probes passed. A probe that fails never advances the runner on its own.`}
+                  record={
+                    <>
+                      <SetupRecordHeading>What each probe reports</SetupRecordHeading>
+                      {probeChecks(checks).map((check) => (
+                        <div key={check.id} className={styles.probeRecord}>
+                          <SetupRecordRow
+                            label={check.label}
+                            value={statusToneLabel(check.status)}
+                            tone={check.status === "ok" ? "ok" : check.status === "error" ? "error" : "attention"}
+                            testId={`setup-probe-record-${check.id}`}
+                          />
+                          <div className={styles.checkDetail}>{check.detail}</div>
+                          <div className={styles.inlineActions}>
+                            <Key
+                              size="small"
+                              disabled={busyAction !== null}
+                              onClick={() =>
+                                void performAction(`probe-${check.id}`, () =>
+                                  runSingleProbe(check.id as "control-surface" | "lighting" | "audio")
+                                )
+                              }
+                            >
+                              Run probe
+                            </Key>
+                            {check.checkedAt ? (
+                              <span className={styles.metaCopy}>Last run {formatBackupTimestamp(check.checkedAt)}</span>
+                            ) : null}
                           </div>
-                          <StatusPill label={statusToneLabel(check.status)} tone={check.status} />
                         </div>
-                        <div className={styles.inlineActions}>
-                          <Button
-                            onClick={() => {
-                              void performAction(`probe-${check.id}`, () =>
-                                runSingleProbe(check.id as "control-surface" | "lighting" | "audio")
-                              );
-                            }}
-                            size="compact"
-                            variant="secondary"
-                          >
-                            Run probe
-                          </Button>
-                          {check.checkedAt ? (
-                            <span className={styles.metaCopy}>Last run {formatBackupTimestamp(check.checkedAt)}</span>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Surface>
+                      ))}
+                    </>
+                  }
+                  testId="setup-screen-probe"
+                />
               ) : null}
 
               {activeStepId === "map" || activeStepId === "verify" ? (
-                <Surface className={styles.heroSurface} padding="lg" tone="raised">
-                  <div className={styles.cardHeader}>
-                    <div>
-                      <div className={styles.sectionEyebrow}>Step {activeStepId === "map" ? "3" : "4"}</div>
-                      <h2 className={styles.sectionTitle}>
-                        {activeStepId === "map" ? "Map bindings" : "Verify live echo"}
-                      </h2>
-                      <p className={styles.sectionBody}>
-                        {activeStepId === "map"
-                          ? "Review the engine-owned Stream Deck+ page map, then use the binding detail pane to confirm slot labels before live verification."
-                          : "Waiting for press… physical button and dial activity should pulse the matching cell when the control-surface snapshot changes."}
-                      </p>
-                    </div>
-                    <StatusBadge
-                      label={
-                        activeStepId === "map"
-                          ? `${pages.length} pages`
-                          : liveTransportRequested
-                            ? "live transport"
-                            : "fixture transport"
-                      }
-                      tone={
-                        activeStepId === "map"
-                          ? pages.length > 0
-                            ? "healthy"
-                            : "idle"
-                          : liveTransportRequested
-                            ? "ready"
-                            : "idle"
-                      }
-                    />
-                  </div>
-                  {activeStepId === "verify" ? (
-                    <div className={styles.verifyLead}>
-                      <StatusPill
-                        label={echoControlId ? "Pulse detected" : "Waiting for press"}
-                        tone={echoControlId ? "ok" : "info"}
+                <SetupStepScreen
+                  head={bayHead}
+                  eyebrow={`Step ${activeStepId === "map" ? 3 : 4} of ${runnerStepOrder.length}`}
+                  title={activeStepId === "map" ? "Map bindings" : "Verify live echo"}
+                  lead={
+                    activeStepId === "map"
+                      ? "Review the deck page map the engine owns, then confirm each slot label against the hardware before live verification."
+                      : "Press a physical button or dial. The matching cell pulses when the desk reports the press back."
+                  }
+                  rules={
+                    activeStepId === "verify"
+                      ? [
+                          {
+                            id: "echo",
+                            text: echoControlId
+                              ? "The pulse is driven by what the control surface reports, not by this screen."
+                              : "Nothing has been pressed yet. The cell pulses as soon as the desk answers.",
+                            tone: echoControlId ? "ok" : "off",
+                          },
+                          {
+                            id: "transport",
+                            text: liveTransportRequested
+                              ? "This workstation is on the live transport, so a press reaches the engine."
+                              : "This workstation is on the fixture transport; presses are simulated.",
+                            tone: liveTransportRequested ? "ok" : "off",
+                          },
+                        ]
+                      : [
+                          {
+                            id: "pages",
+                            text: "Bindings are edited here, not in Companion: the profile is regenerated from what the engine holds.",
+                            tone: "off",
+                          },
+                        ]
+                  }
+                  facts={
+                    selectedPage ? (
+                      <div className={styles.deckPreview}>
+                        <div className={styles.pageTabs}>
+                          {pages.map((page, index) => (
+                            <button
+                              key={page.id}
+                              className={styles.pageTab}
+                              data-active={page.id === selectedPage?.id}
+                              onClick={() => {
+                                setSelectedPageId(page.id);
+                                setSelectedControlId(page.buttons[0]?.id ?? page.dials[0]?.id ?? null);
+                              }}
+                              type="button"
+                            >
+                              {page.label}
+                              {activeStepId === "map" ? <small>{index + 1}</small> : null}
+                            </button>
+                          ))}
+                        </div>
+                        <div className={styles.buttonMatrix}>
+                          {selectedPage.buttons.map((control) => (
+                            <button
+                              key={control.id}
+                              className={styles.deckButton}
+                              data-echo={activeStepId === "verify" && control.id === echoControlId}
+                              data-selected={control.id === selectedControl?.id}
+                              onClick={() => setSelectedControlId(control.id)}
+                              type="button"
+                            >
+                              <span>{control.label}</span>
+                              <small>{control.type}</small>
+                            </button>
+                          ))}
+                        </div>
+                        <div className={styles.dialRow}>
+                          {selectedPage.dials.map((control) => (
+                            <button
+                              key={control.id}
+                              className={styles.dialChip}
+                              data-echo={activeStepId === "verify" && control.id === echoControlId}
+                              data-selected={control.id === selectedControl?.id}
+                              onClick={() => setSelectedControlId(control.id)}
+                              type="button"
+                            >
+                              {control.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles.emptyState}>Control-surface snapshot unavailable.</div>
+                    )
+                  }
+                  actions={
+                    <>
+                      {primaryKey}
+                      {backKey}
+                    </>
+                  }
+                  note={
+                    activeStepId === "verify" && !echoControlId
+                      ? "Waiting for a press. Continue when every control you rely on has echoed."
+                      : undefined
+                  }
+                  record={
+                    <>
+                      <SetupRecordHeading>
+                        {activeStepId === "map" ? "Binding detail" : "Echo detail"}
+                      </SetupRecordHeading>
+                      <SetupRecordRow
+                        label={selectedControl?.label ?? "Choose a control"}
+                        value={selectedControl?.type ?? "—"}
+                        tone={
+                          activeStepId === "verify" && selectedControl?.id === echoControlId
+                            ? "ok"
+                            : selectedControl
+                              ? "off"
+                              : "attention"
+                        }
                       />
-                      <span className={styles.metaCopy}>
-                        {echoControlId
-                          ? "The grid pulse is driven by control-surface snapshot deltas."
-                          : "Press a physical button or encoder to confirm live echo."}
-                      </span>
-                    </div>
-                  ) : null}
-                  <div className={styles.pageTabs}>
-                    {pages.map((page, index) => (
-                      <button
-                        key={page.id}
-                        className={styles.pageTab}
-                        data-active={page.id === selectedPage?.id}
-                        onClick={() => {
-                          setSelectedPageId(page.id);
-                          setSelectedControlId(page.buttons[0]?.id ?? page.dials[0]?.id ?? null);
-                        }}
-                        type="button"
-                      >
-                        {page.label}
-                        {activeStepId === "map" ? <small>{index + 1}</small> : null}
-                      </button>
-                    ))}
-                  </div>
-                  {selectedPage ? (
-                    <div className={styles.deckPreview}>
-                      <div className={styles.buttonMatrix}>
-                        {selectedPage.buttons.map((control) => (
-                          <button
-                            key={control.id}
-                            className={styles.deckButton}
-                            data-echo={activeStepId === "verify" && control.id === echoControlId}
-                            data-selected={control.id === selectedControl?.id}
-                            onClick={() => setSelectedControlId(control.id)}
-                            type="button"
-                          >
-                            <span>{control.label}</span>
-                            <small>{control.type}</small>
-                          </button>
-                        ))}
+                      <div className={styles.checkDetail}>
+                        {selectedControl?.description ??
+                          "Review the current page and make sure the binding description matches the hardware label."}
                       </div>
-                      <div className={styles.dialRow}>
-                        {selectedPage.dials.map((control) => (
-                          <button
-                            key={control.id}
-                            className={styles.dialChip}
-                            data-echo={activeStepId === "verify" && control.id === echoControlId}
-                            data-selected={control.id === selectedControl?.id}
-                            onClick={() => setSelectedControlId(control.id)}
-                            type="button"
-                          >
-                            {control.label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className={styles.selectionCard}>
-                        <div className={styles.selectionLabel}>
-                          {activeStepId === "map" ? "Binding detail" : "Echo detail"}
-                        </div>
-                        <div className={styles.selectionTitle}>{selectedControl?.label ?? "Choose a control"}</div>
-                        <div className={styles.checkDetail}>
-                          {selectedControl?.description ??
-                            "Review the current page and make sure the binding description matches the hardware label."}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className={styles.emptyState}>Control-surface snapshot unavailable.</div>
-                  )}
-                </Surface>
+                      <SetupRecordHeading>The deck as the engine holds it</SetupRecordHeading>
+                      <SetupRecordRow
+                        label="Pages"
+                        value={String(pages.length)}
+                        tone={pages.length > 0 ? "ok" : "attention"}
+                      />
+                      <SetupRecordRow
+                        label="Controls"
+                        value={String(totalControlCount)}
+                        tone={totalControlCount > 0 ? "ok" : "attention"}
+                      />
+                      <SetupRecordRow
+                        label="Transport"
+                        value={liveTransportRequested ? "live" : "fixture"}
+                        tone={liveTransportRequested ? "ok" : "off"}
+                      />
+                    </>
+                  }
+                  testId={`setup-screen-${activeStepId}`}
+                />
               ) : null}
 
               {activeStepId === "publish" ? (
-                <Surface className={styles.heroSurface} padding="lg" tone="raised">
-                  <div className={styles.cardHeader}>
-                    <div>
-                      <div className={styles.sectionEyebrow}>Step 5</div>
-                      <h2 className={styles.sectionTitle}>Publish</h2>
-                      <p className={styles.sectionBody}>
-                        Publishing commits the commissioning gate, exports a fresh support backup, and returns routing
-                        to Planning.
-                      </p>
-                    </div>
-                    <StatusBadge label={isReady ? "Ready" : "Pending publish"} tone={isReady ? "healthy" : "warning"} />
-                  </div>
-                  <div className={styles.metricRow}>
-                    <MetricCard
-                      caption="Latest backup"
-                      tone={lastBackup ? "healthy" : "warning"}
-                      value={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "None"}
-                    />
-                    <MetricCard
-                      caption="Startup target"
-                      tone={isReady ? "ready" : "warning"}
-                      value={String(startup?.targetSurface ?? "commissioning")}
-                    />
-                    <MetricCard
-                      caption="Support archives"
-                      tone={backups.length > 0 ? "healthy" : "idle"}
-                      value={String(backups.length)}
-                    />
-                  </div>
-                  <div className={styles.readinessList}>
-                    <div>
-                      Lighting, audio, and control-surface probes must all be green before publish; publishing with a
-                      probe that is not green asks for an explicit override and records it.
-                    </div>
-                    {typeof commissioningSnapshot?.publishOverrideAt === "string" &&
-                    commissioningSnapshot.publishOverrideAt ? (
-                      <div data-testid="setup-publish-override-note">
-                        Published with a probe override at{" "}
-                        {formatBackupTimestamp(commissioningSnapshot.publishOverrideAt)}.
-                      </div>
-                    ) : null}
-                    <div>Support backup export is part of publish, not a post-commissioning chore.</div>
-                    <div>The shell asks for the routing change, then reloads from engine snapshots.</div>
-                  </div>
-                </Surface>
-              ) : null}
-            </div>
-
-            <aside className={styles.runnerSide}>
-              <Surface className={styles.sideCard} padding="lg">
-                <div className={styles.selectionLabel}>Health posture</div>
-                <div className={styles.sideList}>
-                  {Object.entries(healthChecks ?? {}).map(([key, value]) => {
-                    const record = asRecord(value);
-                    return (
-                      <div key={key} className={styles.sideRow}>
-                        <span className={styles.sideLabel}>{key}</span>
-                        <StatusPill
-                          label={String(record?.summary ?? "Pending")}
-                          tone={asStatusTone(record?.status, "info")}
+                <SetupStepScreen
+                  head={bayHead}
+                  eyebrow={`Step ${runnerStepOrder.length} of ${runnerStepOrder.length}`}
+                  title="Publish"
+                  lead="Publishing commits the commissioning gate, exports a fresh support backup, and returns you to the console."
+                  rules={[
+                    {
+                      id: "probes",
+                      text: "Lighting, audio and control-surface probes must all be green before publish; publishing with a probe that is not green asks for an explicit override and records it.",
+                      tone: notPassedProbes.length > 0 ? "attention" : "ok",
+                    },
+                    {
+                      id: "backup",
+                      text: "The support backup export is part of publish, not a chore for afterwards.",
+                      tone: "ok",
+                    },
+                    {
+                      id: "live",
+                      text: "Once published, the deck pages, the lighting bridge and the console link are live for the next session.",
+                      tone: "ok",
+                    },
+                  ]}
+                  facts={
+                    <>
+                      <SetupFactCard
+                        label="Latest backup"
+                        value={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "None"}
+                        standing={lastBackup ? "healthy" : "none yet"}
+                        tone={lastBackup ? "ok" : "attention"}
+                      />
+                      <SetupFactCard
+                        label="Startup target"
+                        value={String(startup?.targetSurface ?? "commissioning")}
+                        standing={isReady ? "healthy" : "pending publish"}
+                        tone={isReady ? "ok" : "attention"}
+                      />
+                      <SetupFactCard
+                        label="Support archives"
+                        value={`${backups.length} · native`}
+                        standing={backups.length > 0 ? "ready" : "none yet"}
+                        tone={backups.length > 0 ? "ok" : "attention"}
+                      />
+                    </>
+                  }
+                  actions={
+                    <>
+                      <Key
+                        mode={notPassedProbes.length > 0 ? "danger" : "primary"}
+                        take
+                        disabled={busyAction !== null}
+                        testId="setup-step-primary"
+                        onClick={() => invokePrimaryAction()}
+                      >
+                        {busyAction
+                          ? "Working…"
+                          : notPassedProbes.length > 0
+                            ? "Publish with override…"
+                            : isReady
+                              ? "Open planning"
+                              : "Publish setup"}
+                      </Key>
+                      {backKey}
+                    </>
+                  }
+                  note={
+                    notPassedProbes.length > 0
+                      ? `${notPassedProbes.length} of ${setupState.probeCount} probes are not green. Publishing now asks for an explicit override and records it with a timestamp.`
+                      : "Writes the gate, exports a backup, then opens the console."
+                  }
+                  record={
+                    <>
+                      {/* What publish commits, as the engine holds it: the
+                          addresses and the counts, not a repeat of the probe
+                          sentences the cluster already prints. */}
+                      <SetupRecordHeading>What publish records</SetupRecordHeading>
+                      <SetupRecordRow
+                        label="Hardware profile"
+                        value={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
+                      />
+                      <SetupRecordRow
+                        label="Lighting bridge"
+                        value={
+                          lightingBridgeIp
+                            ? `${lightingBridgeIp} · universe ${lightingUniverse}`
+                            : "no address recorded"
+                        }
+                        tone={lightingBridgeIp ? "ok" : "attention"}
+                      />
+                      <SetupRecordRow
+                        label="Audio console"
+                        value={`${audioSendHost}:${audioSendPort} · receive ${audioReceivePort}`}
+                      />
+                      <SetupRecordRow
+                        label="Control surface"
+                        value={`${pages.length} pages · ${totalControlCount} controls`}
+                        tone={pages.length > 0 ? "ok" : "attention"}
+                      />
+                      <SetupRecordRow
+                        label="Companion profile"
+                        value={String(controlSurface?.summary ?? "not exported yet")}
+                        tone={asStatusTone(controlSurface?.status, "info") === "ok" ? "ok" : "attention"}
+                      />
+                      <SetupRecordRow
+                        label="Override"
+                        value={publishOverrideRecorded ?? "none recorded"}
+                        tone={publishOverrideRecorded ? "attention" : "ok"}
+                        testId={publishOverrideRecorded ? "setup-publish-override-note" : undefined}
+                      />
+                      <SetupRecordHeading>The steps above, as done</SetupRecordHeading>
+                      {clusterSteps.slice(0, -1).map((step, index) => (
+                        <SetupRecordRow
+                          key={step.id}
+                          label={`${index + 1} · ${step.label}`}
+                          value={
+                            step.id === "probe"
+                              ? `${setupState.passedProbeCount} of ${setupState.probeCount} probes passed`
+                              : step.id === "import"
+                                ? String(controlSurface?.summary ?? "not exported yet")
+                                : step.id === "map"
+                                  ? `${pages.length} pages · ${totalControlCount} controls mapped`
+                                  : echoControlId
+                                    ? "a control echoed"
+                                    : "not confirmed this session"
+                          }
+                          tone={step.standing === "done" ? "ok" : step.standing === "failed" ? "error" : "attention"}
                         />
-                      </div>
-                    );
-                  })}
-                </div>
-              </Surface>
-
-              <Surface className={styles.sideCard} padding="lg">
-                <div className={styles.selectionLabel}>Setup context</div>
-                <div className={styles.sideList}>
-                  <div className={styles.sideRow}>
-                    <span className={styles.sideLabel}>Workspace</span>
-                    <span className={styles.metaCopy}>{String(shell?.workspace ?? "setup")}</span>
-                  </div>
-                  <div className={styles.sideRow}>
-                    <span className={styles.sideLabel}>Hardware profile</span>
-                    <span className={styles.metaCopy}>
-                      {String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
-                    </span>
-                  </div>
-                  <div className={styles.sideRow}>
-                    <span className={styles.sideLabel}>Support archive</span>
-                    <span className={styles.metaCopy}>
-                      {lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No backups yet"}
-                    </span>
-                  </div>
-                  <div className={styles.inlineActions}>
-                    <Button
-                      onClick={() => {
-                        void performAction("support-export", exportSupportBackup);
-                      }}
-                      size="compact"
-                      variant="secondary"
-                    >
-                      Export backup
-                    </Button>
-                    <Button onClick={() => persistMode("support")} size="compact" variant="ghost">
-                      Support dashboard
-                    </Button>
-                  </div>
-                </div>
-              </Surface>
-            </aside>
-          </div>
-
-          <HealthBar
-            className={styles.setupFooter}
-            items={setupFooterItems}
-            actions={
-              <>
-                <Button disabled={stepIndex <= 0} onClick={() => moveStepSelection(-1)} variant="ghost">
-                  Back
-                </Button>
-                <Button onClick={invokePrimaryAction} variant="primary" disabled={busyAction !== null}>
-                  {busyAction ? "Working…" : primaryActionLabel}
-                </Button>
-              </>
-            }
-          />
-        </div>
-      ) : (
-        <div className={styles.supportGrid}>
-          <Surface className={styles.supportHero} padding="lg" tone="raised">
-            <div className={styles.supportPrompt}>What went wrong?</div>
-            <div className={styles.cardHeader}>
-              <div>
-                <div className={styles.sectionEyebrow}>Restore</div>
-                <h2 className={styles.sectionTitle}>Backup and recovery</h2>
-                <p className={styles.sectionBody}>
-                  Restore from a native support archive or a legacy db.json export, then re-probe the affected adapters
-                  before resuming operator work.
-                </p>
-              </div>
-              <StatusBadge
-                label={backups.length > 0 ? `${backups.length} archives` : "empty backup history"}
-                tone={backups.length > 0 ? "healthy" : "warning"}
-              />
-            </div>
-            <div className={styles.restoreSummary}>
-              <div className={styles.restoreHighlight}>
-                <span className={styles.selectionLabel}>Latest backup</span>
-                <strong>{lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No backup exported yet"}</strong>
-                <span className={styles.checkDetail}>
-                  {String(
+                      ))}
+                      <SetupRecordHeading>Support archives</SetupRecordHeading>
+                      {backups.length > 0 ? (
+                        backups
+                          .slice(0, 3)
+                          .map((backup) => (
+                            <SetupRecordRow
+                              key={backup.path}
+                              label={backup.name}
+                              value={formatBackupTimestamp(backup.modifiedAt)}
+                            />
+                          ))
+                      ) : (
+                        <SetupRecordRow label="No archives yet" value="export one with publish" tone="attention" />
+                      )}
+                    </>
+                  }
+                  testId="setup-screen-publish"
+                />
+              ) : null}
+            </>
+          ) : (
+            <SetupStepScreen
+              head={bayHead}
+              eyebrow="Support"
+              title="Backup and recovery"
+              lead="What went wrong? Restore from a native support archive or a legacy db.json export, then re-probe the affected adapters before resuming operator work."
+              rules={[
+                {
+                  id: "restore",
+                  text: String(
                     supportSnapshot?.restoreSummary ??
                       "Restore from a native support archive or a legacy db.json export."
-                  )}
-                </span>
-              </div>
-              <div className={styles.restoreField}>
-                <label className={styles.field}>
-                  <span>Restore from path</span>
-                  <input
-                    className={styles.textField}
-                    onChange={(event) => setRestorePath(event.target.value)}
-                    placeholder={String(runtimePaths?.backupDir ?? "/path/to/backup.json")}
-                    value={restorePath}
+                  ),
+                  tone: backups.length > 0 ? "ok" : "attention",
+                },
+                {
+                  id: "install",
+                  text: "Keep the workstation on the packaged installer and update-repository path rather than ad hoc local binaries. On macOS, right-click the app and choose Open to clear Gatekeeper once; on Windows, choose More info then Run anyway if SmartScreen intervenes.",
+                  tone: "off",
+                },
+              ]}
+              facts={
+                <>
+                  <SetupFactCard
+                    label="Latest backup"
+                    value={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No backup exported yet"}
+                    standing={backups.length > 0 ? `${backups.length} archives` : "empty backup history"}
+                    tone={backups.length > 0 ? "ok" : "attention"}
                   />
-                </label>
-              </div>
-            </div>
-            <div className={styles.inlineActions}>
-              <Button
-                onClick={() => {
-                  void performAction(
-                    backups.length > 0 ? "support-export-main" : "support-export-first",
-                    exportSupportBackup
-                  );
-                }}
-                variant="primary"
-              >
-                {backups.length > 0 ? "Export backup" : "Export first backup"}
-              </Button>
-              <Button
-                disabled={!lastBackup}
-                onClick={() => {
-                  if (!lastBackup) {
-                    return;
-                  }
-                  void performAction("restore-latest", () => restoreBackup(lastBackup.path));
-                }}
-                variant="secondary"
-              >
-                Restore latest
-              </Button>
-              <Button
-                disabled={!restorePath.trim()}
-                onClick={() => {
-                  void performAction("restore-path", () => restoreBackup(restorePath.trim()));
-                }}
-                variant="ghost"
-              >
-                Restore path
-              </Button>
-            </div>
-            <div className={styles.backupList}>
-              {backups.length > 0 ? (
-                backups.map((backup) => (
-                  <button
-                    key={backup.path}
-                    className={styles.backupRow}
-                    onClick={() => setRestorePath(backup.path)}
-                    type="button"
+                  <label className={styles.field}>
+                    <span>Restore from path</span>
+                    <input
+                      className={styles.textField}
+                      onChange={(event) => setRestorePath(event.target.value)}
+                      placeholder={String(runtimePaths?.backupDir ?? "/path/to/backup.json")}
+                      value={restorePath}
+                    />
+                  </label>
+                </>
+              }
+              actions={
+                <>
+                  <Key
+                    mode="primary"
+                    take
+                    disabled={busyAction !== null}
+                    testId="support-export-first"
+                    onClick={() =>
+                      void performAction(
+                        backups.length > 0 ? "support-export-main" : "support-export-first",
+                        exportSupportBackup
+                      )
+                    }
                   >
-                    <span>
-                      <strong>{backup.name}</strong>
-                      <small>{backup.path}</small>
-                    </span>
-                    <span className={styles.metaCopy}>
-                      {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <div className={styles.emptyState}>
-                  No backups yet. Export first backup before any destructive support work.
-                </div>
-              )}
-            </div>
-          </Surface>
-
-          <Surface className={styles.supportCard} padding="lg">
-            <div className={styles.selectionLabel}>Diagnostics</div>
-            <div className={styles.checkGrid}>
-              {checks.map((check) => (
-                <div key={check.id} className={styles.checkCard}>
-                  <div className={styles.checkHeader}>
-                    <div>
-                      <div className={styles.checkTitle}>{check.label}</div>
-                      <div className={styles.checkDetail}>{check.detail}</div>
-                    </div>
-                    <StatusPill label={statusToneLabel(check.status)} tone={check.status} />
+                    {backups.length > 0 ? "Export a backup now" : "Export first backup"}
+                  </Key>
+                  <Key
+                    take
+                    disabled={!restorePath.trim() || busyAction !== null}
+                    testId="support-restore-path"
+                    onClick={() => void performAction("restore-path", () => restoreBackup(restorePath.trim()))}
+                  >
+                    Restore path
+                  </Key>
+                </>
+              }
+              note="Restoring replaces the workstation database. Export a backup first."
+              record={
+                <>
+                  <SetupRecordHeading>Archives</SetupRecordHeading>
+                  <div className={styles.backupList}>
+                    {backups.length > 0 ? (
+                      backups.map((backup) => (
+                        <button
+                          key={backup.path}
+                          className={styles.backupRow}
+                          onClick={() => setRestorePath(backup.path)}
+                          type="button"
+                        >
+                          <span>
+                            <strong>{backup.name}</strong>
+                            <small>{backup.path}</small>
+                          </span>
+                          <span className={styles.metaCopy}>
+                            {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className={styles.emptyState}>
+                        No backups yet. Export first backup before any destructive support work.
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    onClick={() => {
-                      void performAction(`support-probe-${check.id}`, () =>
-                        runSingleProbe(check.id as "control-surface" | "lighting" | "audio")
-                      );
-                    }}
-                    size="compact"
-                    variant="secondary"
-                  >
-                    Probe
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <div className={styles.inlineActions}>
-              <Button
-                onClick={() => {
-                  void performAction("export-shell-diagnostics", exportDiagnostics);
-                }}
-                size="compact"
-                variant="secondary"
-              >
-                Export diagnostics
-              </Button>
-              <Button
-                disabled={!String(runtimePaths?.logFilePath ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-engine-log", () =>
-                    openReferencePath("Engine log", String(runtimePaths?.logFilePath ?? ""))
-                  );
-                }}
-                size="compact"
-                variant="secondary"
-              >
-                Engine log
-              </Button>
-              <Button onClick={onRequestRestart} size="compact" variant="ghost">
-                Restart bridge
-              </Button>
-            </div>
-          </Surface>
+                  <SetupRecordHeading>Where things are</SetupRecordHeading>
+                  <div className={styles.supportRailButtons}>
+                    <button
+                      className={styles.railButton}
+                      onClick={() =>
+                        void performAction("open-archive-path", () =>
+                          openReferencePath(
+                            "Archive",
+                            String(supportSnapshot?.backupDir ?? runtimePaths?.backupDir ?? "")
+                          )
+                        )
+                      }
+                      type="button"
+                    >
+                      Archive
+                    </button>
+                    <button
+                      className={styles.railButton}
+                      disabled={!String(runtimePaths?.updateRepositoryPath ?? "").trim()}
+                      onClick={() =>
+                        void performAction("open-update-repo", () =>
+                          openReferencePath("Update repo", String(runtimePaths?.updateRepositoryPath ?? ""))
+                        )
+                      }
+                      type="button"
+                    >
+                      Update repo
+                    </button>
+                    <button
+                      className={styles.railButton}
+                      disabled={!String(runtimePaths?.appDataDir ?? "").trim()}
+                      onClick={() =>
+                        void performAction("open-app-data", () =>
+                          openReferencePath("App data", String(runtimePaths?.appDataDir ?? ""))
+                        )
+                      }
+                      type="button"
+                    >
+                      App data
+                    </button>
+                    <button
+                      className={styles.railButton}
+                      disabled={!String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? "").trim()}
+                      onClick={() =>
+                        void performAction("open-diagnostics-dir", () =>
+                          openReferencePath(
+                            "Diagnostics",
+                            String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? "")
+                          )
+                        )
+                      }
+                      type="button"
+                    >
+                      Diagnostics
+                    </button>
+                    <button
+                      className={styles.railButton}
+                      disabled={!String(runtimePaths?.logsDir ?? "").trim()}
+                      onClick={() =>
+                        void performAction("open-logs", () =>
+                          openReferencePath("Logs", String(runtimePaths?.logsDir ?? ""))
+                        )
+                      }
+                      type="button"
+                    >
+                      Logs
+                    </button>
+                  </div>
+                </>
+              }
+              testId="setup-screen-support"
+            />
+          )}
 
-          <Surface className={styles.supportCard} padding="lg">
-            <div className={styles.selectionLabel}>Install & Update</div>
-            <div className={styles.supportInfoList}>
-              <div>
-                <strong>macOS</strong>
-                <span>
-                  If the app is blocked, right-click the app, choose Open, then confirm once to clear Gatekeeper for
-                  future launches.
-                </span>
-              </div>
-              <div>
-                <strong>Windows</strong>
-                <span>If SmartScreen intervenes, choose More info, then Run anyway.</span>
-              </div>
-              <div>
-                <strong>Update posture</strong>
-                <span>
-                  Keep the workstation on the packaged installer/update-repository path rather than ad hoc local
-                  binaries.
-                </span>
-              </div>
+          {feedback ? (
+            <div className={styles.feedbackBanner} data-testid="setup-feedback" data-tone={feedback.tone} role="status">
+              <StatusPill
+                label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
+                tone={feedbackStatus(feedback) ?? "info"}
+              />
+              <span>{feedback.message}</span>
             </div>
-          </Surface>
+          ) : null}
+        </main>
 
-          <Surface className={styles.supportRail} padding="lg">
-            <div className={styles.selectionLabel}>Reference paths</div>
-            <div className={styles.supportRailButtons}>
-              <button
-                className={styles.railButton}
-                onClick={() => {
-                  void performAction("open-archive-path", () =>
-                    openReferencePath("Archive", String(supportSnapshot?.backupDir ?? runtimePaths?.backupDir ?? ""))
-                  );
-                }}
-                type="button"
-              >
-                Archive
-              </button>
-              <button
-                className={styles.railButton}
-                disabled={!String(runtimePaths?.updateRepositoryPath ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-update-repo", () =>
-                    openReferencePath("Update repo", String(runtimePaths?.updateRepositoryPath ?? ""))
-                  );
-                }}
-                type="button"
-              >
-                Update repo
-              </button>
-              <button
-                className={styles.railButton}
-                disabled={!String(runtimePaths?.appDataDir ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-app-data", () =>
-                    openReferencePath("App data", String(runtimePaths?.appDataDir ?? ""))
-                  );
-                }}
-                type="button"
-              >
-                App data
-              </button>
-              <button
-                className={styles.railButton}
-                disabled={!String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-diagnostics-dir", () =>
-                    openReferencePath("Diagnostics", String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? ""))
-                  );
-                }}
-                type="button"
-              >
-                Diagnostics
-              </button>
-              <button
-                className={styles.railButton}
-                disabled={!String(runtimePaths?.logsDir ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-logs", () => openReferencePath("Logs", String(runtimePaths?.logsDir ?? "")));
-                }}
-                type="button"
-              >
-                Logs
-              </button>
-            </div>
-          </Surface>
-        </div>
-      )}
+        <aside className={styles.plateColumn} data-material="plate" data-region="support">
+          <SupportPlate
+            appVersion={APP_VERSION}
+            archiveCount={backups.length}
+            backupKind={lastBackup ? "native archive" : "none yet"}
+            busy={busyAction !== null}
+            canOpenEngineLog={engineLogPath.trim().length > 0}
+            engineVersion={String(runtime?.engineVersion ?? "—")}
+            hardwareProfile={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
+            lastBackupLabel={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "no backup exported yet"}
+            protocolVersion={String(runtime?.protocol ?? runtime?.protocolVersion ?? "1")}
+            restoreDisabled={!lastBackup}
+            theme={theme}
+            uiScale={uiScale}
+            onExportBackup={() => void performAction("support-export-main", exportSupportBackup)}
+            onExportDiagnostics={() => void performAction("export-shell-diagnostics", exportDiagnostics)}
+            onLoadSamplePlanning={() => setSeedPlanningPrompt(true)}
+            onOpenEngineLog={openEngineLog}
+            onRestartBridge={onRequestRestart}
+            onRestoreLatest={() => {
+              if (!lastBackup) return;
+              void performAction("restore-latest", () => restoreBackup(lastBackup.path));
+            }}
+            onSelectTheme={setTheme}
+            onSelectUiScale={setUiScale}
+          />
+        </aside>
+      </div>
+
+      <ShellRegion region="footer">
+        <SetupFooter
+          appVersion={APP_VERSION}
+          commissioningWord={
+            setupState.word === "READY"
+              ? "ready to publish"
+              : setupState.word === "DEGRADED"
+                ? "needs re-verification"
+                : "setup required"
+          }
+          passedProbeCount={setupState.passedProbeCount}
+          probeCount={setupState.probeCount}
+          stepLabel={runnerSteps[stepIndex]?.label ?? ""}
+          stepNumber={stepIndex + 1}
+          stepTotal={runnerStepOrder.length}
+        />
+      </ShellRegion>
 
       {seedPlanningPrompt ? (
         <ConfirmDialog

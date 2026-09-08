@@ -308,7 +308,9 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentPrompt {
-  color: var(--color-text-subtle);
+  /* Visual overhaul A, Slice 7: the chassis ink, which clears 4.5:1 on the
+     plate in every theme (the retired subtle ink did not). */
+  color: var(--text-text2);
   font: var(--font-weight-medium) var(--operator-font-size-md, var(--font-size-md)) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
@@ -324,7 +326,7 @@ button.lightingDmxDrawerCell {
 .setupIncidentEyebrow,
 .setupIncidentSectionLabel,
 .setupIncidentMetaLabel {
-  color: var(--color-text-subtle);
+  color: var(--text-text2);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;

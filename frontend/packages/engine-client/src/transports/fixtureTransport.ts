@@ -3264,9 +3264,18 @@ function synchronizeFixtureState(state: MutableFixtureState) {
 
   state.healthSnapshot.status = hasCompletedSetup && allChecksPassed ? "ok" : "attention";
   state.healthSnapshot.startupPhase = hasCompletedSetup ? "ready" : "waiting-for-app-snapshot";
-  state.healthSnapshot.summary = hasCompletedSetup
-    ? "System healthy and ready."
-    : "Storage healthy. Operator mode locked pending setup.";
+  // Visual overhaul A, Slice 7: a published desk whose probes have gone off is
+  // not "healthy and ready" — the summary the state display prints has to say
+  // which of them needs attention, as the engine's own would.
+  const unsettledCheckLabels = checks
+    .filter((check) => asString(check.status) !== "passed" && asString(check.status) !== "ok")
+    .map((check) => asString(check.label))
+    .filter(Boolean);
+  state.healthSnapshot.summary = !hasCompletedSetup
+    ? "Storage healthy. Operator mode locked pending setup."
+    : allChecksPassed
+      ? "System healthy and ready."
+      : `Operator mode is available, but ${unsettledCheckLabels.join(" and ")} need attention.`;
   state.healthSnapshot.checks = {
     lighting: {
       status:
@@ -3568,6 +3577,9 @@ function updateFixtureCheck(
     check.label = labelMap[target];
     check.status = status;
     check.message = message;
+    // A fresh probe result replaces the last one: a scenario that seeded its
+    // own `detail` must not keep printing it after the probe has run.
+    check.detail = message;
     check.checkedAt = checkedAt;
   }
 

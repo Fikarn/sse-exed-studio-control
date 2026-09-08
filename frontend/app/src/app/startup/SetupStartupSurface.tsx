@@ -1,9 +1,14 @@
-import { Button, StatusBadge } from "@sse/design-system";
+import { Key, Lamp } from "@sse/design-system";
 import type { ShellState } from "@sse/engine-client";
 
-import { asRecord, type SnapshotRecord } from "../shellData";
-import styles from "../OperatorShell.module.css";
+import { asRecord, formatLifecycleLabel, type SnapshotRecord } from "../shellData";
+import { PreReadyState } from "./PreReadyState";
+import stepStyles from "./StartupSteps.module.css";
 import { buildStartupSteps, stepStatusLabel } from "./startupHelpers";
+
+// Visual overhaul A, Slice 7: the cold boot on the Setup tab. The state display
+// says the engine is starting and how far the handshake has got; the runner
+// itself opens as soon as the engine answers.
 
 export function SetupStartupSurface({
   appSnapshot,
@@ -16,53 +21,31 @@ export function SetupStartupSurface({
 }) {
   const shell = asRecord(appSnapshot?.shell);
   const setup = asRecord(shell?.setup);
-  const startup = asRecord(appSnapshot?.startup);
-  const canReturnToConsole = String(startup?.targetSurface ?? "commissioning") === "dashboard";
   const activeSection = setup?.activeSection === "support" ? "support" : "commissioning";
+  const steps = buildStartupSteps(lifecycle);
+  const done = steps.filter((step) => step.tone !== "idle").length;
 
   return (
-    <div className={styles.setupLoadingShell}>
-      <div className={styles.setupUtilityRow}>
-        <div className={styles.setupUtilityActions}>
-          <Button disabled={!canReturnToConsole} variant="ghost">
-            Back to Console
-          </Button>
-        </div>
-        <div className={styles.setupUtilityMeta}>
-          <div className={styles.setupUtilityEyebrow}>Setup / Support</div>
-          <div className={styles.setupUtilityTitle}>Commissioning runner</div>
-        </div>
-        <div className={styles.setupUtilityActions}>
-          <Button disabled size="compact" variant={activeSection === "commissioning" ? "primary" : "secondary"}>
-            Runner
-          </Button>
-          <Button disabled size="compact" variant={activeSection === "support" ? "primary" : "secondary"}>
-            Support
-          </Button>
-          <Button onClick={onShowShortcuts} size="compact" variant="ghost">
-            Shortcuts
-          </Button>
-        </div>
-      </div>
-      <div aria-live="polite" className={styles.setupLoadingState} role="status">
-        <div className={styles.setupLoadingLabel}>STARTING ENGINE…</div>
-        <div aria-hidden="true" className={styles.setupLoadingPulse} />
-        {/* STA-05: surface the engine-handshake progress on the primary cold-boot
-            screen (was just the label + pulse), reusing the shared startup steps. */}
-        <div className={styles.setupLoadingSteps}>
-          <div className={styles.stepList}>
-            {buildStartupSteps(lifecycle).map((step) => (
-              <div key={step.label} className={styles.stepItem}>
-                <div>
-                  <div className={styles.stepLabel}>{step.label}</div>
-                  <div className={styles.stepDetail}>{step.description}</div>
-                </div>
-                <StatusBadge label={stepStatusLabel(step.tone)} tone={step.tone} />
-              </div>
-            ))}
+    <PreReadyState
+      tone="info"
+      word="STARTING ENGINE…"
+      sentence="The commissioning runner opens as soon as the workstation is ready."
+      meta={`${formatLifecycleLabel(lifecycle)} · ${done} of ${steps.length} startup steps done · ${
+        activeSection === "support" ? "Support" : "Runner"
+      } is where you were`}
+      actions={<Key size="small" cap="Shortcuts" hint="?" testId="setup-startup-shortcuts" onClick={onShowShortcuts} />}
+      testId="setup-startup-surface"
+    >
+      <div className={stepStyles.steps} data-testid="startup-steps">
+        {steps.map((step) => (
+          <div key={step.label} className={stepStyles.step} data-material="key">
+            <Lamp tone={step.tone === "idle" ? "off" : step.tone === "healthy" ? "ok" : "info"} />
+            <span className={stepStyles.stepLabel}>{step.label}</span>
+            <span className={stepStyles.stepDetail}>{step.description}</span>
+            <span className={stepStyles.stepStanding}>{stepStatusLabel(step.tone)}</span>
           </div>
-        </div>
+        ))}
       </div>
-    </div>
+    </PreReadyState>
   );
 }

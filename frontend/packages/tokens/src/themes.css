@@ -245,6 +245,10 @@
   --role-red-fill: #ff6b6b;
   --role-red-text: #ff7676;
   --role-blue-text: #8ccaff;
+  --chassis-green-text: var(--role-green-text);
+  --chassis-amber-text: var(--role-amber-text);
+  --chassis-red-text: var(--role-red-text);
+  --chassis-blue-text: var(--role-blue-text);
   --role-primary-fill: #eef0f4;
   --role-primary-ink: #13151a;
   --role-cap-fill: #eceef3;
@@ -316,6 +320,10 @@
   --role-red-text: #b3261e;
   --role-red-bloom: rgba(198, 45, 42, 0.35);
   --role-blue-text: #0b62c2;
+  --chassis-green-text: var(--role-green-text);
+  --chassis-amber-text: var(--role-amber-text);
+  --chassis-red-text: var(--role-red-text);
+  --chassis-blue-text: var(--role-blue-text);
   --role-blue-bloom: rgba(11, 98, 194, 0.3);
   --role-primary-fill: #1b1b1d;
   --role-primary-fill-top: #2c2c30;
@@ -356,6 +364,16 @@
   --audio-console-housing-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 0 0 1px rgba(26, 24, 20, 0.08);
 }
 
+/* A · the chassis role inks for the base theme, captured before the well scope
+   shadows them, so a key that sits on a well can put them back (Slice 7). Each
+   themed block carries its own copy beside its role inks. */
+:root {
+  --chassis-green-text: var(--role-green-text);
+  --chassis-amber-text: var(--role-amber-text);
+  --chassis-red-text: var(--role-red-text);
+  --chassis-blue-text: var(--role-blue-text);
+}
+
 /* A · a well is a black backlit display in every theme: the role inks printed on it are the display's own (scoping these on .well is what fixed every light-theme failure on the mocks). Text on a well reads --display-text / --display-text2 explicitly, so a key sitting on a well keeps the chassis inks (Slice 3). */
 .well,
 [data-well] {
@@ -373,4 +391,17 @@
 :root[data-theme="bone"] .well,
 :root[data-theme="bone"] [data-well] {
   --display-text2: #b3b3b8;
+}
+
+/* A · a key sitting on a well keeps the chassis inks (Slice 3's note, made
+   true in Slice 7): the well scope maps the role inks onto the display's,
+   which is right for text printed on the well and wrong for a key that
+   carries its own material — a danger key on a screen was printing the
+   display's bright red on Bone's light key face. */
+.well [data-material="key"],
+[data-well] [data-material="key"] {
+  --role-green-text: var(--chassis-green-text);
+  --role-amber-text: var(--chassis-amber-text);
+  --role-red-text: var(--chassis-red-text);
+  --role-blue-text: var(--chassis-blue-text);
 }

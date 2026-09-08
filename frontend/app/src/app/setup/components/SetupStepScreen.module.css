@@ -1,0 +1,270 @@
+/* Visual overhaul A, Slice 7: the commissioning step as a screen. Two columns
+   at the studio surface, one below it; the screen is the height its step needs,
+   so the bay's floor stays visible under it and nothing scrolls to be reached. */
+
+.frame {
+  flex: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 48px;
+  align-content: start;
+  min-height: 0;
+  padding: 32px 40px 36px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.eyebrow {
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--display-text2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 10px 0 0;
+  font: 600 var(--font-size-hero) / 1.05 var(--font-family-ui);
+  letter-spacing: -0.02em;
+  color: var(--display-text);
+}
+
+.lead {
+  max-width: 760px;
+  margin-top: 16px;
+  font: 500 var(--font-size-lg) / 1.4 var(--font-family-ui);
+  color: var(--display-text);
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  margin-top: 24px;
+}
+
+.rule {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+  font: 400 var(--font-size-body) / 1.45 var(--font-family-ui);
+  color: var(--display-text2);
+}
+
+.rule > span:first-child {
+  margin-top: 7px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  max-width: 760px;
+  margin-top: 28px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--display-text) 20%, transparent);
+  border-radius: var(--radius-key);
+}
+
+.cardLabel {
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--display-text2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cardValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 600 var(--font-size-name) / 1.25 var(--font-family-mono);
+  color: var(--display-text);
+}
+
+.cardStanding {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--role-green-text);
+}
+
+.card[data-tone="attention"] .cardStanding {
+  color: var(--role-amber-text);
+}
+
+.card[data-tone="error"] .cardStanding {
+  color: var(--role-red-text);
+}
+
+.card[data-tone="off"] .cardStanding {
+  color: var(--display-text2);
+}
+
+.go {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 30px;
+}
+
+.go > button {
+  min-height: 48px;
+  padding: 0 20px;
+}
+
+.note {
+  max-width: 340px;
+  font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
+  color: var(--display-text2);
+}
+
+/* ---- the right column: what the step records ---------------------------- */
+
+.record {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 72px;
+}
+
+.recordHeading {
+  margin-top: 6px;
+  font: 600 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--display-text);
+}
+
+.recordHeading:first-child {
+  margin-top: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--display-text) 16%, transparent);
+  border-radius: var(--radius-key);
+  font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--display-text2);
+}
+
+.rowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowValue {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+  color: var(--display-text);
+}
+
+/* Below the studio surface the step is one column and spends less air: the
+   record rows stand two across, the note gives way, and the step still needs
+   no scroll (A-setup.html's 1280 board). */
+:global([data-operator-layout-root][data-chrome="compact"]) .step {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 12px;
+  padding: 16px 20px 20px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .title {
+  margin-top: 6px;
+  font-size: var(--font-size-2xl);
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .lead {
+  max-width: none;
+  margin-top: 10px;
+  font-size: var(--font-size-body);
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .rules {
+  max-width: none;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .rule {
+  font-size: var(--font-size-label);
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .rule > span:first-child {
+  margin-top: 5px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .facts {
+  max-width: none;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .card {
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .cardValue {
+  font-size: var(--font-size-label);
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .go {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .go > button {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .note {
+  display: none;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .record {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding-top: 0;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .recordHeading {
+  grid-column: 1 / -1;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .row {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: var(--font-size-label);
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .rowValue {
+  font-size: var(--font-size-label);
+}

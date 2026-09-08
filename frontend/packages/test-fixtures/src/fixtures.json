@@ -56,16 +56,19 @@
       "summary": "Complete commissioning to unlock operator mode.",
       "checks": [
         {
+          "id": "lighting",
           "label": "Lighting bridge",
           "status": "attention",
           "detail": "Universe not confirmed."
         },
         {
+          "id": "audio",
           "label": "Audio console",
           "status": "attention",
           "detail": "Connection not verified."
         },
         {
+          "id": "control-surface",
           "label": "Control surface",
           "status": "ok",
           "detail": "Companion bridge available."
@@ -139,16 +142,19 @@
       "summary": "Commissioning complete and operator mode unlocked.",
       "checks": [
         {
+          "id": "lighting",
           "label": "Lighting bridge",
           "status": "ok",
           "detail": "Universe 1 responding."
         },
         {
+          "id": "audio",
           "label": "Audio console",
           "status": "ok",
           "detail": "OSC sync healthy."
         },
         {
+          "id": "control-surface",
           "label": "Control surface",
           "status": "ok",
           "detail": "Profile export current."
@@ -237,16 +243,19 @@
       "summary": "Commissioning complete and operator mode unlocked.",
       "checks": [
         {
+          "id": "lighting",
           "label": "Lighting bridge",
           "status": "attention",
           "detail": "Universe changed after verification."
         },
         {
+          "id": "audio",
           "label": "Audio console",
           "status": "ok",
           "detail": "OSC sync healthy."
         },
         {
+          "id": "control-surface",
           "label": "Control surface",
           "status": "attention",
           "detail": "Companion export is stale."

@@ -1,9 +1,13 @@
-import { Button, MetricCard, StatusBadge, Surface } from "@sse/design-system";
+import { Key, Lamp } from "@sse/design-system";
 import type { ShellState } from "@sse/engine-client";
 
 import { formatLifecycleLabel } from "../shellData";
-import styles from "../OperatorShell.module.css";
+import { PreReadyState } from "./PreReadyState";
+import stepStyles from "./StartupSteps.module.css";
 import { buildStartupSteps, stepStatusLabel } from "./startupHelpers";
+
+// Visual overhaul A, Slice 7: the cold boot on the same skeleton as every
+// workspace — the state first, the engine's handshake under it, one key.
 
 export function StartupSurface({
   lifecycle,
@@ -13,47 +17,27 @@ export function StartupSurface({
   onShowShortcuts: () => void;
 }) {
   const steps = buildStartupSteps(lifecycle);
+  const done = steps.filter((step) => step.tone !== "idle").length;
 
   return (
-    <div className={styles.stateShell}>
-      <Surface className={styles.stateSurface} padding="lg" tone="raised">
-        <div className={styles.stateHeader}>
-          <div>
-            <div className={styles.stateEyebrow}>Startup</div>
-            <h1 className={styles.stateTitle}>Starting operator shell</h1>
-            <p className={styles.stateSubtitle}>
-              Connecting to the studio engine. The console opens once the engine confirms it is ready.
-            </p>
+    <PreReadyState
+      tone={lifecycle === "ready" ? "ok" : "info"}
+      word={lifecycle === "ready" ? "READY" : "STARTING"}
+      sentence="Connecting to the studio engine. The console opens once the engine confirms it is ready."
+      meta={`${formatLifecycleLabel(lifecycle)} · ${done} of ${steps.length} startup steps done · native webview shell`}
+      actions={<Key size="small" cap="Shortcuts" hint="?" testId="startup-shortcuts" onClick={onShowShortcuts} />}
+      testId="startup-surface"
+    >
+      <div className={stepStyles.steps} data-testid="startup-steps">
+        {steps.map((step) => (
+          <div key={step.label} className={stepStyles.step} data-material="key">
+            <Lamp tone={step.tone === "idle" ? "off" : step.tone === "healthy" ? "ok" : "info"} />
+            <span className={stepStyles.stepLabel}>{step.label}</span>
+            <span className={stepStyles.stepDetail}>{step.description}</span>
+            <span className={stepStyles.stepStanding}>{stepStatusLabel(step.tone)}</span>
           </div>
-          <StatusBadge label={formatLifecycleLabel(lifecycle)} tone={lifecycle === "ready" ? "healthy" : "idle"} />
-        </div>
-        <div className={styles.metricGrid}>
-          <MetricCard
-            caption="Lifecycle"
-            label={lifecycle === "ready" ? "Ready" : "Loading"}
-            tone={lifecycle === "ready" ? "healthy" : "idle"}
-            value={formatLifecycleLabel(lifecycle)}
-          />
-          <MetricCard caption="Target surface" label="Pending" tone="idle" value="Setup / Support" />
-          <MetricCard caption="Render mode" label="Active" tone="ready" value="Native webview shell" />
-        </div>
-        <div className={styles.stepList}>
-          {steps.map((step) => (
-            <div key={step.label} className={styles.stepItem}>
-              <div>
-                <div className={styles.stepLabel}>{step.label}</div>
-                <div className={styles.stepDetail}>{step.description}</div>
-              </div>
-              <StatusBadge label={stepStatusLabel(step.tone)} tone={step.tone} />
-            </div>
-          ))}
-        </div>
-        <div className={styles.actionRow}>
-          <Button variant="ghost" onClick={onShowShortcuts}>
-            Keyboard shortcuts
-          </Button>
-        </div>
-      </Surface>
-    </div>
+        ))}
+      </div>
+    </PreReadyState>
   );
 }

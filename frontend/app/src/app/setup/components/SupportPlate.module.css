@@ -1,0 +1,36 @@
+/* Visual overhaul A, Slice 7: the Support plate. Every section on screen at
+   once, the red command at the bottom, nothing behind a tab. */
+
+.plate {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.segmented {
+  margin-top: 6px;
+}
+
+.segmented > * {
+  flex: 1;
+}
+
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.keys > * {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.danger {
+  margin-top: auto;
+  flex: none;
+}
