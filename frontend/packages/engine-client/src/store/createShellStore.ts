@@ -1151,6 +1151,12 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async togglePlanningTaskComplete(taskId: string) {
       return performRequest("planning.task.toggleComplete", { taskId });
     },
+    async setPlanningTaskTimer(taskId: string, action: "start" | "stop" | "toggle") {
+      return performRequest("planning.task.timer", { action, taskId });
+    },
+    async deletePlanningTask(taskId: string) {
+      return performRequest("planning.task.delete", { taskId });
+    },
     async exportSupportBackup() {
       return performRequest("support.backup.export");
     },

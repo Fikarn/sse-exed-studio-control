@@ -44,13 +44,13 @@
   "app/src/app/audio/components/AudioInspectorDynamicsTab.module.css": {
     "colour": 1,
     "fontSize": 0,
-    "radius": 3,
+    "radius": 0,
     "shadow": 2
   },
   "app/src/app/audio/components/AudioInspectorEqTab.module.css": {
     "colour": 7,
     "fontSize": 0,
-    "radius": 3,
+    "radius": 1,
     "shadow": 4
   },
   "app/src/app/audio/components/AudioKnob.module.css": {
@@ -64,12 +64,6 @@
     "fontSize": 0,
     "radius": 0,
     "shadow": 1
-  },
-  "app/src/app/audio/components/AudioMixerLane.module.css": {
-    "colour": 3,
-    "fontSize": 0,
-    "radius": 3,
-    "shadow": 3
   },
   "app/src/app/audio/components/AudioRail.module.css": {
     "colour": 3,
@@ -96,10 +90,10 @@
     "shadow": 5
   },
   "app/src/app/audio/components/AudioTieredMixer.module.css": {
-    "colour": 1,
+    "colour": 0,
     "fontSize": 0,
-    "radius": 3,
-    "shadow": 1
+    "radius": 1,
+    "shadow": 0
   },
   "app/src/app/audio/components/AudioToolbar.module.css": {
     "colour": 0,
@@ -189,7 +183,7 @@
     "colour": 0,
     "fontSize": 0,
     "radius": 0,
-    "shadow": 14
+    "shadow": 11
   },
   "app/src/app/setup/SetupSupportPilot.module.css": {
     "colour": 0,

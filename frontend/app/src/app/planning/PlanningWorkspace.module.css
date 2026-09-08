@@ -1,194 +1,537 @@
+/* Visual overhaul A, Slice 6 (system §2, §5, §7; A-planning.html): Planning on
+   the cluster rule. The cluster and the footer are the shell's; what is left
+   here is the bay — the timeline as a backlit screen with one lane per project
+   — the unscheduled tray, and the plate column that carries the selected task.
+   Every value is a token. */
+
 .planningWorkspace {
   display: grid;
-  /* PLA-03/DENSITY-03: header (toolbar + optional feedback notice) over a 1fr shell that
-     FILLS the remaining height. Was `auto auto minmax(0,1fr)` with the shell as the 2nd of
-     two children when the notice was absent (the common case) — so the shell sized to content
-     in the auto row and the 1fr row sat empty: the "vast dead band". The notice now lives in
-     the header stack, so the shell is always the 1fr row and the lane band grows to fill. */
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--space-4);
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
-  padding: var(--space-4);
-  /* PLA-10/DENSITY-02: a query container so the toolbar can densify on its own width
-     (independent of the viewport) — keeps it from wrapping into the timeline band at
-     narrow widths. inline-size only constrains the inline axis, so height:100% holds. */
-  container: planning-workspace / inline-size;
 }
 
-/* PLA-03: toolbar + optional feedback notice share one grid row so the shell below always
-   occupies the 1fr track (see .planningWorkspace). */
-.planningWorkspaceHeader {
+.planningBody {
   display: grid;
-  gap: var(--space-4);
-  align-content: start;
+  grid-template-columns: minmax(0, 1fr) var(--planning-plate-width, 416px);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.planningToolbar {
+/* The bay: the screen, the tray, and whatever the day has to say. */
+.planningBay {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  min-width: 0;
+  padding: 12px;
+  background: var(--material-bay);
+  box-shadow: inset 0 2px 10px var(--material-well-shade);
+}
+
+.planningPlateColumn {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-left: 1px solid var(--material-line);
+  background: linear-gradient(180deg, var(--material-panel-top), var(--material-panel));
+}
+
+/* ---- the screen's header ------------------------------------------------ */
+
+.planningScreenTitle {
+  flex: none;
+  font: 600 var(--font-size-value) / 1 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.planningScreenDetail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+/* The filters ride the 32 px screen header, so their well is the mock's
+   compact one (3 px of padding around 26 px keys) rather than the cluster's
+   take-time segmented. They narrow a view; they never touch the rig. */
+.planningFilters {
+  flex: none;
+  gap: 4px;
+  padding: 3px;
+}
+
+.planningFilters[data-well] > button {
+  min-height: 26px;
+  padding: 0 10px;
+}
+
+.planningScreenSearch {
+  flex: none;
+  width: 280px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: var(--material-well);
+  color: var(--display-text);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.planningScreenSearch::placeholder {
+  color: var(--display-text2);
+}
+
+/* ---- the picture: the axis over the lanes ------------------------------- */
+
+.planningShell {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 32px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.planningAxis {
+  position: relative;
+  margin-left: var(--planning-label-col, 176px);
+  min-width: 0;
+}
+
+.planningAxisTick {
+  position: absolute;
+  top: 8px;
+  transform: translateX(6px);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--display-text2);
+  white-space: nowrap;
+}
+
+/* Below 90 px per hour only every other hour is labelled, so labels never
+   touch; the unlabelled hours keep their rule. */
+.planningAxisTick[data-labelled="false"] {
+  color: transparent;
+}
+
+.planningAxisTick[data-last="true"] {
+  transform: translateX(-100%) translateX(-6px);
+}
+
+.planningTimeline {
+  position: relative;
+  display: grid;
+  align-content: start;
+  grid-auto-rows: var(--planning-lane-height, 96px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- the lanes ---------------------------------------------------------- */
+
+.planningLane {
+  display: grid;
+  grid-template-columns: var(--planning-label-col, 176px) minmax(0, 1fr);
+  border-top: 1px solid var(--material-line2);
+  /* A second row that does not fit is clipped at the lane, never drawn over
+     the lane below it. */
+  overflow: hidden;
+}
+
+.planningLane:first-child {
+  border-top: 0;
+}
+
+.planningLane[data-filter-dimmed="true"] {
+  opacity: 0.32;
+}
+
+.planningLaneHead {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 16px 0;
+}
+
+.planningLaneTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--font-size-value) / 1.1 var(--font-family-ui);
+  color: var(--display-text);
+}
+
+.planningLaneMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  color: var(--display-text2);
+}
+
+.planningLaneBody {
+  position: relative;
+  min-width: 0;
+  /* The hour rules, drawn from the same counts the axis is labelled from. */
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--display-text2) 22%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--display-text2) 11%, transparent) 1px, transparent 1px);
+  background-size:
+    calc(100% / var(--planning-hour-count, 13)) 100%,
+    calc(100% / var(--planning-half-hour-count, 26)) 100%;
+}
+
+.planningLaneDropZone {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.planningLaneDropZone[data-drop-allowed="true"] {
+  cursor: move;
+}
+
+.planningLaneDropZone[data-drop-active="true"] {
+  background: color-mix(in srgb, var(--role-amber-text) 12%, transparent);
+}
+
+/* ---- a task: a card at its start, a bar for its duration ---------------- */
+
+.planningTaskGroup {
+  display: contents;
+}
+
+/* The bar is drawn over the card, as the mock draws it: the card can hang to
+   the left of its start, the bar always begins at the start time. */
+.planningBar {
+  position: absolute;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--display-text) 55%, transparent);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.planningBar[data-running="true"] {
+  background: var(--role-green-text);
+}
+
+.planningBar[data-blocked="true"] {
+  background: var(--role-red-text);
+}
+
+.planningBar[data-done="true"] {
+  background: var(--role-green-text);
+  opacity: 0.6;
+}
+
+/* A card is drawn on the backlit screen, so it is display material in every
+   theme (A-planning.html fills `.screen .card` the same dark in Studio,
+   Graphite and Bone) and everything printed on it uses the display inks. */
+.planningBlock {
+  position: absolute;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  width: var(--planning-card-width, 268px);
+  height: var(--planning-card-height, 78px);
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--display-text) 28%, transparent);
+  border-radius: var(--radius-key);
+  background: color-mix(in srgb, var(--display-text) 8%, var(--material-well));
+  color: var(--display-text);
+  cursor: grab;
+  text-align: left;
+  z-index: 2;
+}
+
+.planningBlock[data-dragging="true"] {
+  opacity: 0.42;
+  cursor: grabbing;
+}
+
+.planningBlock[data-completed="true"] {
+  border-color: color-mix(in srgb, var(--display-text) 16%, transparent);
+  background: color-mix(in srgb, var(--display-text) 4%, var(--material-well));
+}
+
+.planningBlock[data-status="blocked"] {
+  border-color: var(--role-red-text);
+}
+
+.planningBlock[data-overlap="true"] {
+  border-color: var(--role-amber-text);
+}
+
+.planningBlock[data-overlap-pulse="true"] {
+  animation: planningOverlapPulse 900ms ease-out;
+}
+
+.planningBlock[data-selected="true"] {
+  border-color: var(--display-text);
+  box-shadow: inset 0 0 0 1px var(--display-text);
+}
+
+.planningBlockTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--display-text);
+}
+
+.planningBlock[data-completed="true"] .planningBlockTitle {
+  color: var(--display-text2);
+}
+
+.planningBlockMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--font-size-tick) / 1.2 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--display-text2);
+}
+
+/* The meta line and the timer share one row, so neither can print over the
+   other however narrow the card is: the meta gives way first. */
+.planningBlockRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.planningBlockRun,
+.planningBlockDone {
+  flex: none;
+  font: 600 var(--font-size-tick) / 1.2 var(--font-family-mono);
+  color: var(--role-green-text);
+  white-space: nowrap;
+}
+
+.planningDropGhost {
+  position: absolute;
+  top: var(--planning-card-top, 22px);
+  height: var(--planning-card-height, 78px);
+  min-width: 24px;
+  border: 1px dashed var(--role-amber-text);
+  border-radius: var(--radius-key);
+  background: var(--role-amber-fill-top);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---- the now marker ----------------------------------------------------- */
+
+.planningNowPlayhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--role-amber-text);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.planningNowLabel {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  font: 600 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--role-amber-text);
+  white-space: nowrap;
+}
+
+@keyframes planningOverlapPulse {
+  from {
+    box-shadow: inset 0 0 0 2px var(--role-amber-text);
+  }
+  to {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+}
+
+/* ---- the unscheduled tray ----------------------------------------------- */
+
+.planningUnscheduledTray {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+  padding: 10px 16px;
+  border-radius: var(--radius-screen);
+  transition:
+    max-height var(--motion-duration-normal) var(--motion-easing-standard),
+    padding var(--motion-duration-normal) var(--motion-easing-standard);
+}
+
+.planningUnscheduledHead {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  min-height: 44px;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--display-text2);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
+
+/* A-planning.html keeps the tray open: its cards and the line that says what
+   to do with them are always readable. Collapsing caps it at one row rather
+   than hiding it, so no text is printed where it cannot be read. */
+.planningUnscheduledBody {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-height: 48px;
+  overflow: hidden;
+}
+
+.planningUnscheduledTray[data-expanded="true"] .planningUnscheduledBody,
+.planningUnscheduledTray[data-all-unscheduled="true"] .planningUnscheduledBody {
+  max-height: 240px;
+}
+
+/* The tray is a well too, so its cards are display material like the screen's. */
+.planningUnscheduledChip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px dashed color-mix(in srgb, var(--display-text) 28%, transparent);
+  border-radius: var(--radius-key);
+  background: color-mix(in srgb, var(--display-text) 8%, var(--material-well));
+  color: var(--display-text);
+  cursor: grab;
+  text-align: left;
+}
+
+.planningUnscheduledChip:active {
+  cursor: grabbing;
+}
+
+.planningUnscheduledChip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.planningUnscheduledTitle {
+  font: 600 var(--font-size-label) / 1.2 var(--font-family-ui);
+}
+
+.planningUnscheduledMeta {
+  font: 500 var(--font-size-tick) / 1.2 var(--font-family-mono);
+  color: var(--display-text2);
+}
+
+.planningUnscheduledHint {
+  font: 500 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  color: var(--display-text2);
+}
+
+/* ---- what the day has to say -------------------------------------------- */
+
+.planningEmptyState {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+}
+
+.planningFilterBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: var(--material-panel);
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1.4 var(--font-family-ui);
+}
+
+.planningFilterClear {
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-ctl);
+  background: linear-gradient(180deg, var(--material-key-top), var(--material-key));
+  color: var(--text-text);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  cursor: pointer;
+}
+
+.planningToolbarNotice {
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: var(--material-panel);
+  color: var(--text-text);
+  font: 500 var(--font-size-label) / 1.4 var(--font-family-ui);
+}
+
+.planningToolbarNotice[data-tone="ok"] {
+  border-color: var(--role-green-text);
+  color: var(--role-green-text);
+}
+
+.planningToolbarNotice[data-tone="info"] {
+  border-color: var(--material-line2);
+}
+
+.planningToolbarNotice[data-tone="error"] {
+  border-color: var(--role-red-text);
+  color: var(--role-red-text);
+}
+
+/* Below the studio surface the bay spends less air and the plate narrows;
+   nothing is dropped. */
+:global([data-operator-layout-root][data-chrome="compact"]) .planningBody {
+  grid-template-columns: minmax(0, 1fr) var(--planning-plate-width, 360px);
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .planningBay {
+  gap: 8px;
+  padding: 8px;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .planningScreenSearch {
+  width: 200px;
+}
+
+/* ---- kept from before Slice 6: the board columns, the loading skeleton,
+   the timeline's loading scale, and the Time report overlay. ---- */
 
 .planningEyebrow {
   color: var(--color-text-subtle);
   font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
-}
-
-.planningToolbarActions {
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-start;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  flex: 1 1 auto;
-}
-
-.planningToolbarButton {
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 88%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  padding: 10px 16px;
-  text-transform: uppercase;
-}
-
-.planningToolbarButton[data-active="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 44%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 18%, var(--color-surface-700));
-}
-
-.planningToolbarButton[data-primary="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 82%, transparent);
-  background: color-mix(in srgb, var(--color-primary-500) 90%, white 10%);
-  color: var(--color-background-950);
-}
-
-.planningToolbarButton:disabled {
-  cursor: default;
-  opacity: 0.56;
-}
-
-.planningToolbarButtonContent {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.planningToolbarButtonContent svg {
-  width: 16px;
-  height: 16px;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.planningProjectComposer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.planningProjectInput {
-  min-width: 220px;
-  padding: 10px 14px;
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
-  color: var(--color-text-primary);
-  font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-ui);
-  letter-spacing: 0;
-}
-
-.planningSearchInput {
-  min-width: 220px;
-  padding: 10px 14px;
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
-  color: var(--color-text-primary);
-  font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-ui);
-  letter-spacing: 0;
-}
-
-.planningSearchInput::placeholder {
-  color: var(--color-text-subtle);
-}
-
-.planningSearchInput:focus {
-  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);
-  outline-offset: 2px;
-}
-
-/* PLA-10/DENSITY-02: when the workspace narrows (e.g. 1280-wide tier), densify the toolbar —
-   tighter gaps, smaller input min-widths, slimmer button padding — so it stays compact and
-   reclaims timeline-band height instead of wrapping a second row into it. Container-width
-   driven (not viewport), so it tracks the actual space the toolbar has. No-scroll re-verified
-   at 2560/1920 (rule does not fire there) and at the 1280 tier (rule fires). */
-@container planning-workspace (max-width: 1300px) {
-  .planningToolbar {
-    gap: var(--space-3);
-  }
-
-  .planningToolbarActions {
-    gap: var(--space-2);
-  }
-
-  .planningSearchInput,
-  .planningProjectInput {
-    min-width: 150px;
-  }
-
-  .planningToolbarButton {
-    padding: 8px 12px;
-  }
-}
-
-/* PLA-04: one keyboard focus ring for every interactive Planning control,
-   mirroring the Audio/Lighting per-surface house pattern + the search-input
-   recipe. (CONTROLS-03/Slice 8b made planningBoardCard keyboard-focusable, so
-   it now joins the recipe.) */
-.planningToolbarButton:focus-visible,
-.planningNudgeButton:focus-visible,
-.planningTodayButton:focus-visible,
-.planningBoardDetailButton:focus-visible,
-.planningBoardCard:focus-visible,
-.planningBlock:focus-visible,
-.planningUnscheduledChip:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);
-  outline-offset: 2px;
-}
-
-.planningToolbarNotice {
-  padding: 12px 14px;
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
-  color: var(--color-text-primary);
-  font: var(--font-weight-medium) var(--font-size-sm) / 1.4 var(--font-family-ui);
-}
-
-.planningToolbarNotice[data-tone="ok"] {
-  border-color: color-mix(in srgb, var(--color-success-500) 38%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-success-500) 12%, var(--color-surface-800));
-}
-
-.planningToolbarNotice[data-tone="info"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 38%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 12%, var(--color-surface-800));
-}
-
-.planningToolbarNotice[data-tone="error"] {
-  border-color: color-mix(in srgb, var(--color-danger-500) 38%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-danger-500) 12%, var(--color-surface-800));
 }
 
 .planningTimeReportDialog {
@@ -311,509 +654,6 @@
   background: var(--color-success-500);
 }
 
-.planningProjectDetailDialog {
-  width: min(860px, 100%);
-  max-height: min(840px, calc(100vh - 48px));
-  overflow: auto;
-}
-
-.planningProjectDetailHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.planningProjectDetailTitleBlock {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.planningProjectDetailDescription {
-  margin: 0;
-  color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
-}
-
-.planningProjectDetailBadgeRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.planningProjectDetailSummaryRow {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.planningProjectDetailSummaryChip {
-  display: grid;
-  gap: 6px;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
-}
-
-.planningProjectDetailSummaryChip span {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.planningProjectDetailSummaryChip strong {
-  color: var(--color-text-primary);
-  font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.3 var(--font-family-mono);
-  letter-spacing: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.planningProjectDetailProgress {
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-700) 92%, transparent);
-  overflow: hidden;
-}
-
-.planningProjectDetailProgressFill {
-  height: 100%;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--color-success-500) 82%, white 12%);
-}
-
-.planningProjectDetailSections {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.9fr);
-  gap: var(--space-4);
-}
-
-.planningProjectDetailSection {
-  display: grid;
-  align-content: start;
-  gap: var(--space-3);
-  min-height: 0;
-}
-
-.planningProjectDetailSectionHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.planningProjectDetailSectionHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.planningProjectDetailSectionTitle {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.planningProjectDetailSectionMeta {
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1.3 var(--font-family-ui);
-}
-
-.planningProjectDetailTaskList,
-.planningProjectDetailActivityList {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.planningProjectDetailTaskComposer {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
-}
-
-.planningProjectDetailTaskComposerInput {
-  width: 100%;
-  min-height: 40px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-950) 82%, transparent);
-  color: var(--color-text-primary);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.4 var(--font-family-ui);
-}
-
-.planningProjectDetailTaskComposerInput::placeholder {
-  color: var(--color-text-muted);
-}
-
-.planningProjectDetailTaskComposerInput:focus {
-  border-color: color-mix(in srgb, var(--color-primary-500) 54%, var(--color-border-default));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
-}
-
-/* CONTROLS-04: restore a real keyboard focus ring (the input previously set
-   outline:none on :focus, defeating it). */
-.planningProjectDetailTaskComposerInput:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);
-  outline-offset: 2px;
-}
-
-.planningProjectDetailTaskComposerActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-.planningProjectDetailTaskComposerError {
-  color: var(--color-danger-500);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1.4 var(--font-family-ui);
-}
-
-.planningProjectDetailTaskCard,
-.planningProjectDetailActivityItem {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
-}
-
-.planningProjectDetailTaskCard[data-selected="true"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 10%, var(--color-surface-800));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 16%, transparent);
-}
-
-.planningProjectDetailTaskCardButton {
-  width: 100%;
-  display: grid;
-  gap: var(--space-2);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.planningProjectDetailTaskHeader,
-.planningProjectDetailActivityHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.planningProjectDetailTaskTitleRow,
-.planningProjectDetailTaskBadgeRow,
-.planningProjectDetailTaskMeta,
-.planningProjectDetailTaskLabels {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.planningProjectDetailTaskTitle {
-  color: var(--color-text-primary);
-  font: var(--font-weight-semibold) var(--font-size-sm) / 1.3 var(--font-family-ui);
-}
-
-.planningProjectDetailTaskToggle {
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 88%, transparent);
-  border-radius: var(--radius-tight-sm);
-  background: transparent;
-  color: var(--color-background-950);
-  cursor: pointer;
-  font: var(--font-weight-bold) 11px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-}
-
-.planningProjectDetailTaskToggle[data-completed="true"] {
-  border-color: var(--color-success-500);
-  background: color-mix(in srgb, var(--color-success-500) 90%, white 10%);
-}
-
-.planningProjectDetailTaskTitle[data-completed="true"] {
-  color: var(--color-text-muted);
-  text-decoration: line-through;
-}
-
-.planningProjectDetailRunningDot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--color-success-500);
-}
-
-.planningProjectDetailTaskMeta {
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1.3 var(--font-family-ui);
-}
-
-.planningProjectDetailTaskMeta span[data-tone="error"] {
-  color: var(--color-danger-500);
-}
-
-.planningProjectDetailTaskMeta span[data-tone="warning"] {
-  color: var(--color-warning-500);
-}
-
-.planningProjectDetailChecklistList {
-  display: grid;
-  gap: 6px;
-}
-
-.planningProjectDetailChecklistItem {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.planningProjectDetailChecklistToggle {
-  width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 88%, transparent);
-  border-radius: var(--radius-tight-sm);
-  background: transparent;
-  color: var(--color-background-950);
-  font: var(--font-weight-bold) 10px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-}
-
-.planningProjectDetailChecklistItem[data-done="true"] .planningProjectDetailChecklistToggle {
-  border-color: var(--color-success-500);
-  background: color-mix(in srgb, var(--color-success-500) 90%, white 10%);
-}
-
-.planningProjectDetailChecklistText {
-  color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-xs) / 1.4 var(--font-family-ui);
-}
-
-.planningProjectDetailChecklistText[data-done="true"] {
-  color: var(--color-text-subtle);
-  text-decoration: line-through;
-}
-
-.planningProjectDetailChecklistComposer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.planningProjectDetailChecklistComposerInput {
-  flex: 1 1 auto;
-  min-height: 34px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-950) 82%, transparent);
-  color: var(--color-text-primary);
-  font: var(--font-weight-regular) var(--font-size-xs) / 1.4 var(--font-family-ui);
-}
-
-.planningProjectDetailChecklistComposerInput::placeholder {
-  color: var(--color-text-muted);
-}
-
-.planningProjectDetailChecklistComposerInput:focus {
-  border-color: color-mix(in srgb, var(--color-primary-500) 54%, var(--color-border-default));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
-}
-
-/* CONTROLS-04: restore the keyboard focus ring defeated by outline:none. */
-.planningProjectDetailChecklistComposerInput:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary-500) 52%, transparent);
-  outline-offset: 2px;
-}
-
-.planningProjectDetailChecklistError {
-  color: var(--color-danger-500);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1.4 var(--font-family-ui);
-}
-
-.planningProjectDetailTaskDescription,
-.planningProjectDetailActivityBody,
-.planningProjectDetailEmpty {
-  color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
-}
-
-.planningProjectDetailTaskLabel {
-  padding: 6px 10px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-900) 90%, transparent);
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
-}
-
-.planningProjectDetailActivityHeader span:last-child {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1.2 var(--font-family-ui);
-}
-
-/* PLA-06 (Slice 10d-1): the mode + filter tablists are now DS SegmentedControl
-   (role=radiogroup, neutral selected wash — matches Lighting's StagePlotControls and
-   the shared-primitive look). This span just places the control in the toolbar flow;
-   the control brings its own shell, sizing, focus, and keyboard model. */
-.planningSegmentGroup {
-  display: inline-flex;
-  align-items: center;
-}
-
-.planningNowCard,
-.planningDayCard,
-.planningStatChip {
-  display: grid;
-  gap: 6px;
-  padding: 12px 14px;
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
-}
-
-/* PLA-05: severity-encode the at-a-glance metric chips so a non-zero Slipped
-   (amber attention) / Blocked (danger) chip is chromatically distinct from the
-   neutral On-time/Lanes chips. data-tone is only set when the count > 0. */
-.planningStatChip[data-tone="warn"] {
-  border-color: color-mix(in srgb, var(--color-warning-500) 38%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-warning-500) 12%, var(--color-surface-800));
-}
-
-.planningStatChip[data-tone="danger"] {
-  border-color: color-mix(in srgb, var(--color-danger-500) 38%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-danger-500) 12%, var(--color-surface-800));
-}
-
-/* PLA-06 (Slice 10d-2): the stat chips render via DS MetricCard (showBadge=false). These hooks
-   theme MetricCard's caption/value to Planning's text tokens + tabular-nums (the chip's PLA-05
-   severity tint stays on the wrapper above); the --metric-* fallbacks keep every other
-   MetricCard consumer byte-identical. */
-.planningStatChip {
-  --metric-caption-color: var(--color-text-subtle);
-  --metric-value-color: var(--color-text-strong);
-  --metric-value-numeric: tabular-nums;
-}
-
-.planningNowLabel {
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.planningNowValue {
-  font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-lg)) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.planningNowHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.planningNudgeRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.planningNudgeButton,
-.planningTodayButton {
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 88%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
-  padding: 8px 12px;
-}
-
-.planningTodayButton {
-  justify-self: start;
-  font-family: var(--font-family-mono);
-}
-
-.planningStatRow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(96px, 1fr));
-  gap: var(--space-3);
-}
-
-/* .planningFilterClear is the banner's "Clear filter" button (the filter row itself is now
-   a DS SegmentedControl — see .planningSegmentGroup). */
-.planningFilterClear {
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 88%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  padding: 9px 14px;
-  text-transform: uppercase;
-}
-
-.planningTipChip {
-  padding: 10px 14px;
-  border: 1px dashed color-mix(in srgb, var(--color-primary-500) 42%, var(--color-border-default));
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-primary-500) 12%, var(--color-surface-800));
-  color: var(--color-text-primary);
-  font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-}
-
-.planningShell,
-.planningBoardShell {
-  min-height: 0;
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-xl);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-surface-800) 94%, transparent),
-      color-mix(in srgb, var(--color-surface-900) 98%, black 2%)
-    ),
-    /* PLA-01/CHROME-05: neutral surface lift (was an accent-green --color-primary-500
-       wash) so the field reads near-neutral like the Audio/Lighting canvas and the
-       AppShellFrame ambient — green stays only on active/selected/running affordances. */
-    radial-gradient(circle at top right, color-mix(in srgb, var(--color-surface-700) 55%, transparent), transparent 48%);
-  overflow: hidden;
-}
-
-.planningShell {
-  display: grid;
-  grid-template-rows: 36px minmax(0, 1fr) auto;
-}
-
 .planningScale {
   display: grid;
   grid-template-columns: var(--planning-label-col) minmax(0, 1fr);
@@ -855,205 +695,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.planningTimeline {
-  position: relative;
-  min-height: 0;
-  display: grid;
-  align-content: start;
-  grid-auto-rows: var(--planning-lane-height, 84px);
-  overflow: hidden;
-}
-
-.planningFilterBanner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: 10px var(--space-4);
-  border-bottom: 1px solid var(--color-border-default);
-  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) var(--font-size-sm) / 1.4 var(--font-family-ui);
-}
-
-.planningNowPlayhead {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 60px;
-  transform: translateX(-30px);
-  background: color-mix(in srgb, var(--color-primary-500) 14%, transparent);
-  pointer-events: none;
-  z-index: 2;
-}
-
-.planningNowPlayhead::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 4px;
-  transform: translateX(-50%);
-  background: color-mix(in srgb, var(--color-primary-500) 88%, transparent);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--color-primary-500) 24%, transparent);
-}
-
-.planningLane {
-  display: grid;
-  grid-template-columns: var(--planning-label-col) minmax(0, 1fr);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 82%, transparent);
-}
-
-.planningLane:last-child {
-  border-bottom: 0;
-}
-
-/* PLA-11: subtle even-row banding strengthens row hierarchy on dense boards (ledger read).
-   .planningTimeline's first child is the absolutely-positioned playhead, so :nth-child(even)
-   resolves to alternating lanes; the neutral wash shows through the transparent lane-body
-   grid + the lane head. Themed via --color-surface-700; no height added (no-scroll-safe). */
-.planningLane:nth-child(even) {
-  background-color: color-mix(in srgb, var(--color-surface-700) 22%, transparent);
-}
-
-.planningLane[data-filter-dimmed="true"] {
-  opacity: 0.32;
-}
-
-.planningLaneHead {
-  display: grid;
-  gap: 8px;
-  padding: 14px var(--space-4);
-  border-right: 1px solid color-mix(in srgb, var(--color-border-default) 88%, transparent);
-}
-
-.planningLaneTitle {
-  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.1 var(--font-family-display);
-  letter-spacing: 0;
-}
-
-.planningLaneMeta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--font-size-sm) / 1.4 var(--font-family-ui);
-}
-
-.planningLaneBody {
-  position: relative;
-  min-width: 0;
-  /* PLA-11: raise the hour/half-hour time-grid alpha (was 18%/8%, near-invisible) so the
-     advertised grid reads on the dark Studio + Graphite fields. Structural alpha bump on the
-     themed --color-border-default (mirrors S9c LGS-05); Bone grid COLOR tuning stays for S14. */
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--color-border-default) 30%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--color-border-default) 15%, transparent) 1px, transparent 1px);
-  background-size:
-    calc(100% / var(--planning-hour-count, 13)) 100%,
-    calc(100% / var(--planning-half-hour-count, 26)) 100%;
-}
-
-.planningLaneDropZone {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-.planningLaneDropZone[data-drop-active="true"] {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--color-primary-500) 12%, transparent) 1px, transparent 1px),
-    color-mix(in srgb, var(--color-primary-500) 6%, transparent);
-  background-size:
-    calc(100% / 52) 100%,
-    auto;
-}
-
-.planningLaneDropZone[data-drop-allowed="true"] {
-  cursor: move;
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--color-primary-500) 10%, transparent) 1px, transparent 1px),
-    transparent;
-  background-size:
-    calc(100% / 52) 100%,
-    auto;
-}
-
-.planningDropGhost {
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  min-width: 120px;
-  border: 1px dashed color-mix(in srgb, var(--color-primary-500) 58%, var(--color-border-default));
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-primary-500) 16%, var(--color-surface-700));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.planningBlock {
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  min-width: 120px;
-  display: grid;
-  align-content: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
-  color: var(--color-text-primary);
-  cursor: grab;
-  text-align: left;
-  z-index: 1;
-}
-
-.planningBlock[data-dragging="true"] {
-  opacity: 0.42;
-  cursor: grabbing;
-}
-
-.planningBlock[data-status="in-progress"] {
-  border-color: color-mix(in srgb, var(--color-primary-500) 36%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-primary-500) 18%, var(--color-surface-700));
-}
-
-.planningBlock[data-status="blocked"] {
-  border-color: color-mix(in srgb, var(--color-danger-500) 44%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-danger-500) 14%, var(--color-surface-700));
-}
-
-.planningBlock[data-status="done"] {
-  opacity: 0.72;
-}
-
-.planningBlock[data-running="true"] {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-primary-500) 28%, transparent),
-    0 0 18px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
-}
-
-.planningBlock[data-overlap="true"] {
-  border-color: color-mix(in srgb, var(--color-warning-500) 52%, var(--color-border-default));
-  background: color-mix(in srgb, var(--color-warning-500) 14%, var(--color-surface-700));
-}
-
-.planningBlock[data-overlap-pulse="true"] {
-  animation: planningOverlapPulse 900ms ease-out;
-}
-
-/* PLA-12: selection is a NEUTRAL high-contrast keyline so it doesn't collide
-   with the green in-progress fill / running glow stacked underneath (those three
-   states previously all read as primary-green). --color-text-strong themes per
-   data-theme (near-white in Studio/Graphite, dark in Bone). */
-.planningBlock[data-selected="true"] {
-  border-color: var(--color-text-strong);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-text-strong) 35%, transparent);
-}
-
 @keyframes planningOverlapPulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-warning-500) 44%, transparent);
@@ -1062,95 +703,6 @@
   100% {
     box-shadow: 0 0 0 16px color-mix(in srgb, var(--color-warning-500) 0%, transparent);
   }
-}
-
-.planningBlockTitle {
-  font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-mono);
-  letter-spacing: 0;
-}
-
-.planningBlockMeta {
-  color: var(--color-text-muted);
-  font: var(--font-weight-medium) 12px / 1.2 var(--font-family-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-}
-
-.planningUnscheduledTray {
-  display: grid;
-  gap: var(--space-3);
-  padding: 0 var(--space-4);
-  border-top: 1px solid var(--color-border-default);
-  background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
-  min-height: 28px;
-  transition:
-    min-height 160ms ease,
-    padding 160ms ease,
-    background-color 160ms ease;
-}
-
-.planningUnscheduledTray[data-expanded="true"] {
-  min-height: 120px;
-  padding: var(--space-3) var(--space-4);
-}
-
-.planningUnscheduledTray[data-all-unscheduled="true"] {
-  min-height: 240px;
-  padding: var(--space-3) var(--space-4);
-}
-
-.planningUnscheduledHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  color: var(--color-text-subtle);
-  font: var(--font-weight-medium) 11px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.planningUnscheduledBody {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  max-height: 0;
-  overflow: hidden;
-}
-
-.planningUnscheduledTray[data-expanded="true"] .planningUnscheduledBody,
-.planningUnscheduledTray[data-all-unscheduled="true"] .planningUnscheduledBody {
-  max-height: 400px;
-}
-
-.planningUnscheduledChip {
-  border: 1px dashed color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  cursor: grab;
-  padding: 10px 12px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
-  color: var(--color-text-primary);
-  font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-}
-
-.planningUnscheduledChip:active {
-  cursor: grabbing;
-}
-
-.planningEmptyState {
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 10px;
-  min-height: 420px;
-  padding: var(--space-6);
-  text-align: center;
 }
 
 /* .planningBoardEmpty styles the per-column inline "No X tasks." / "No projects in this column."
@@ -1413,27 +965,4 @@
   100% {
     background-position: -100% 0;
   }
-}
-
-@media (max-width: 1440px) {
-  .planningProjectDetailSummaryRow,
-  .planningProjectDetailSections {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* S14 — Bone per-surface overrides. The primary/success-mix-white fills are
-   DARK on Bone (the bone primary/success are ink-greens), so the dark-theme
-   label token --color-background-950 (#dcd7c9 on bone) read only 3.43:1 on
-   them; the lightest surface clears 5.37:1. Bone-only — Studio/Graphite keep
-   the shipped pairing. */
-:global([data-theme="bone"]) .planningToolbarButton[data-primary="true"] {
-  color: var(--color-bg-elevated);
-}
-
-:global([data-theme="bone"]) .planningProjectDetailTaskToggle[data-completed="true"],
-:global([data-theme="bone"])
-  .planningProjectDetailChecklistItem[data-done="true"]
-  .planningProjectDetailChecklistToggle {
-  color: var(--color-bg-elevated);
 }

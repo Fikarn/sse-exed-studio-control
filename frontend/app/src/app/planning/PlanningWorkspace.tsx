@@ -8,13 +8,12 @@ import {
   useState,
 } from "react";
 
-import { EmptyState, MetricCard, SegmentedControl, StatusBadge } from "@sse/design-system";
+import { EmptyState, Key, Screen, Segmented, ShellRegion, StatusBadge, Well } from "@sse/design-system";
 import type { PlanningSnapshot, ShellStore } from "@sse/engine-client";
 
 import {
   asRecord,
   getPlanningActivityLog,
-  getPlanningCounts,
   getPlanningProjects,
   getPlanningSettings,
   getPlanningTasks,
@@ -26,9 +25,12 @@ import {
 import planningStyles from "./PlanningWorkspace.module.css";
 import { type ActionFeedback } from "../startup/startupHelpers";
 import { useLiveCallback } from "../shared/useLiveCallback";
-import { PlanningClockIcon } from "./icons";
-import { PlanningProjectDetailOverlay } from "./PlanningProjectDetailOverlay";
+import { PlanningCluster } from "./components/PlanningCluster";
+import { PlanningFooter } from "./components/PlanningFooter";
+import { PlanningPlate } from "./components/PlanningPlate";
 import { PlanningTimeReportOverlay } from "./PlanningTimeReportOverlay";
+import { derivePlanningDayFacts, formatPlanningElapsed } from "./planningState";
+import { layoutPlanningLane, planningLabelledHours, planningLaneRowCapacity } from "./planningTimelineLayout";
 import {
   PLANNING_OVERLAP_PULSE_MS,
   type PlanningBoardStatus,
@@ -53,6 +55,19 @@ import {
   planningWidthPercent,
 } from "./planningHelpers";
 
+// Visual overhaul A, Slice 6 (A-planning.html): the screen's geometry. The
+// label column and the card box are fixed px — a card is a box pinned to a
+// start time, not a bar whose width is its duration — and they step down with
+// the axis exactly as the mock's three viewports do.
+const PLANNING_LABEL_WIDTH = 176;
+const PLANNING_CARD_TOP = 22;
+
+function planningCardSize(axisWidth: number) {
+  if (axisWidth >= 1200) return { height: 78, width: 268 };
+  if (axisWidth >= 900) return { height: 64, width: 210 };
+  return { height: 52, width: 180 };
+}
+
 export function PlanningWorkspaceSurface({
   appSnapshot,
   planningSnapshot,
@@ -65,7 +80,6 @@ export function PlanningWorkspaceSurface({
   const projects = useMemo(() => getPlanningProjects(planningSnapshot), [planningSnapshot]);
   const tasks = useMemo(() => getPlanningTasks(planningSnapshot), [planningSnapshot]);
   const activityLog = useMemo(() => getPlanningActivityLog(planningSnapshot), [planningSnapshot]);
-  const counts = useMemo(() => getPlanningCounts(planningSnapshot), [planningSnapshot]);
   const settings = useMemo(() => getPlanningSettings(planningSnapshot), [planningSnapshot]);
   const loadingModeSection = (() => {
     const planning = asRecord(appSnapshot?.planning);
@@ -84,9 +98,6 @@ export function PlanningWorkspaceSurface({
   const [planningTimeReportLoading, setPlanningTimeReportLoading] = useState(false);
   const [planningTimeReportError, setPlanningTimeReportError] = useState<string | null>(null);
   const [planningTimeReport, setPlanningTimeReport] = useState<PlanningTimeReportData | null>(null);
-  const [planningProjectDetailOpen, setPlanningProjectDetailOpen] = useState(false);
-  const [planningProjectDetailProjectId, setPlanningProjectDetailProjectId] = useState<string | null>(null);
-  const [planningProjectDetailTaskId, setPlanningProjectDetailTaskId] = useState<string | null>(null);
   const [planningOverlapPulseTaskId, setPlanningOverlapPulseTaskId] = useState<string | null>(null);
   const [trayExpanded, setTrayExpanded] = useState(false);
   const [draggingScheduledTaskId, setDraggingScheduledTaskId] = useState<string | null>(null);
@@ -101,11 +112,13 @@ export function PlanningWorkspaceSurface({
     status: PlanningBoardStatus;
   } | null>(null);
   const [planningTimelineViewportHeight, setPlanningTimelineViewportHeight] = useState<number | null>(null);
+  // Visual overhaul A, Slice 6: the cards are fixed-width boxes pinned to a
+  // start time, so the screen has to be measured before they can be placed.
+  const [planningTimelineViewportWidth, setPlanningTimelineViewportWidth] = useState<number | null>(null);
   const newProjectTitleRef = useRef<HTMLInputElement | null>(null);
   const planningSearchInputRef = useRef<HTMLInputElement | null>(null);
   const planningOverlapPulseTimerRef = useRef<number | null>(null);
   const planningTimeReportOpenRef = useRef(false);
-  const planningProjectDetailOpenRef = useRef(false);
   const planningTimelineRef = useRef<HTMLDivElement | null>(null);
   const selectedTimelineTaskRef = useRef<PlanningTaskEntry | null>(null);
 
@@ -129,10 +142,6 @@ export function PlanningWorkspaceSurface({
   useEffect(() => {
     planningTimeReportOpenRef.current = planningTimeReportOpen;
   }, [planningTimeReportOpen]);
-
-  useEffect(() => {
-    planningProjectDetailOpenRef.current = planningProjectDetailOpen;
-  }, [planningProjectDetailOpen]);
 
   useEffect(
     () => () => {
@@ -189,6 +198,7 @@ export function PlanningWorkspaceSurface({
   useEffect(() => {
     if (settings.modeSection !== "timeline") {
       setPlanningTimelineViewportHeight(null);
+      setPlanningTimelineViewportWidth(null);
       return;
     }
 
@@ -198,7 +208,9 @@ export function PlanningWorkspaceSurface({
     }
 
     const updateViewportHeight = () => {
-      setPlanningTimelineViewportHeight(timelineElement.getBoundingClientRect().height);
+      const rect = timelineElement.getBoundingClientRect();
+      setPlanningTimelineViewportHeight(rect.height);
+      setPlanningTimelineViewportWidth(rect.width);
     };
 
     updateViewportHeight();
@@ -249,84 +261,53 @@ export function PlanningWorkspaceSurface({
     () => buildPlanningLaneOverlapMap(visibleScheduledTasks),
     [visibleScheduledTasks]
   );
-  const planningProjectDetailProject =
-    (planningProjectDetailProjectId
-      ? projects.find((project) => project.id === planningProjectDetailProjectId)
-      : null) ?? null;
-  const planningProjectDetailTasks = useMemo(
-    () =>
-      planningProjectDetailProject
-        ? tasks
-            .filter((task) => task.projectId === planningProjectDetailProject.id)
-            .sort((left, right) => left.order - right.order)
-        : [],
-    [planningProjectDetailProject, tasks]
-  );
-  const planningProjectDetailSelectedTask =
-    (planningProjectDetailTaskId
-      ? planningProjectDetailTasks.find((task) => task.id === planningProjectDetailTaskId)
-      : null) ??
-    (settings.selectedTaskId ? planningProjectDetailTasks.find((task) => task.id === settings.selectedTaskId) : null) ??
-    planningProjectDetailTasks[0] ??
+  // Visual overhaul A, Slice 6 (plan D1): the plate is always on screen, so
+  // what the retired project-detail dialog derived is derived here instead —
+  // the project in front of the operator, its tasks, and the day's activity on
+  // any of them.
+  const plateProject =
+    (settings.selectedProjectId ? projects.find((project) => project.id === settings.selectedProjectId) : null) ??
+    (selectedTask ? projects.find((project) => project.id === selectedTask.projectId) : null) ??
+    filteredProjects[0] ??
+    projects[0] ??
     null;
-  const planningProjectDetailTaskIds = useMemo(
-    () => new Set(planningProjectDetailTasks.map((task) => task.id)),
-    [planningProjectDetailTasks]
-  );
-  const planningProjectDetailActivity = useMemo(
+  const plateTasks = useMemo(
     () =>
-      planningProjectDetailProject
-        ? activityLog.filter(
-            (entry) =>
-              entry.entityId === planningProjectDetailProject.id || planningProjectDetailTaskIds.has(entry.entityId)
-          )
+      plateProject
+        ? tasks.filter((task) => task.projectId === plateProject.id).sort((left, right) => left.order - right.order)
         : [],
-    [activityLog, planningProjectDetailProject, planningProjectDetailTaskIds]
+    [plateProject, tasks]
   );
-  const planningProjectDetailCompletedTaskCount = planningProjectDetailTasks.filter((task) => task.completed).length;
-  const planningProjectDetailTotalSeconds = planningProjectDetailTasks.reduce(
-    (total, task) => total + task.totalSeconds,
-    0
+  const plateTaskIds = useMemo(() => new Set(plateTasks.map((task) => task.id)), [plateTasks]);
+  const plateSelectedTask = settings.selectedTaskId
+    ? (plateTasks.find((task) => task.id === settings.selectedTaskId) ?? null)
+    : null;
+  const plateActivity = useMemo(
+    () =>
+      plateProject
+        ? activityLog.filter((entry) => entry.entityId === plateProject.id || plateTaskIds.has(entry.entityId))
+        : [],
+    [activityLog, plateProject, plateTaskIds]
   );
-  const planningProjectDetailChecklistTotals = planningProjectDetailTasks.reduce(
-    (totals, task) => ({
-      done: totals.done + task.checklist.filter((item) => item.done).length,
-      total: totals.total + task.checklist.length,
-    }),
-    { done: 0, total: 0 }
+
+  // Visual overhaul A, Slice 6: one derivation of the day, printed in the
+  // state display, the footer and the "Tracked today" list — the numbers the
+  // toolbar's four chips used to carry, counted from the same snapshot.
+  const dayFacts = useMemo(
+    () => derivePlanningDayFacts({ day: timelineDay, now, projects, tasks }),
+    [now, projects, tasks, timelineDay]
   );
-  const planningProjectDetailProgressValue =
-    planningProjectDetailTasks.length > 0
-      ? planningProjectDetailCompletedTaskCount / planningProjectDetailTasks.length
-      : 0;
-
-  useEffect(() => {
-    if (!planningProjectDetailOpen) {
-      return;
+  const projectTaskCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const task of tasks) {
+      counts.set(task.projectId, (counts.get(task.projectId) ?? 0) + 1);
     }
-
-    if (planningProjectDetailProject) {
-      return;
-    }
-
-    setPlanningProjectDetailOpen(false);
-    setPlanningProjectDetailProjectId(null);
-    setPlanningProjectDetailTaskId(null);
-  }, [planningProjectDetailOpen, planningProjectDetailProject]);
-
-  const blockedCount = projects.filter((project) => project.status === "blocked").length;
-  const slippedCount = visibleScheduledTasks.filter((task) => {
-    if (task.completed) {
-      return false;
-    }
-    const scheduledStart = task.scheduledStart ? new Date(task.scheduledStart) : null;
-    if (!scheduledStart || Number.isNaN(scheduledStart.getTime())) {
-      return false;
-    }
-    const taskEndMinute = planningMinutesForDate(scheduledStart) + (task.scheduledDurationSeconds ?? 0) / 60;
-    return taskEndMinute < currentMinute;
-  }).length;
-  const onTimeCount = Math.max(0, visibleScheduledTasks.length - slippedCount - blockedCount);
+    return counts;
+  }, [tasks]);
+  const projectTitles = useMemo(
+    () => new Map(projects.map((project) => [project.id, project.title] as const)),
+    [projects]
+  );
   const timelineTicks = Array.from(
     { length: Math.ceil(timelineRangeMinutes / 60) + 1 },
     (_, index) => Math.floor(timelineStartMinute / 60) + index
@@ -335,30 +316,38 @@ export function PlanningWorkspaceSurface({
     { length: Math.max(0, Math.floor(timelineRangeMinutes / 30) - 1) },
     (_, index) => timelineStartMinute + (index + 1) * 30
   ).filter((minute) => minute % 60 !== 0);
+  const planningMeasuredAxisWidth = Math.max(0, (planningTimelineViewportWidth ?? 0) - PLANNING_LABEL_WIDTH);
+  const { height: planningCardHeight, width: planningCardWidth } = planningCardSize(planningMeasuredAxisWidth);
   const timelineLaneHeight = (() => {
-    // PLA-03/DENSITY-03: distribute the measured timeline band across the lanes instead of
-    // pinning every board to a fixed 84px cap (which parked few-lane boards at the top over a
-    // large dead band). Lanes now fill up to a 150px ceiling (so a lone task bar doesn't float
-    // in a vast empty lane); dense boards still floor at 48px and overflow:hidden clips beyond,
-    // so no-scroll holds at every viewport. Operator-chosen "measured cap-raise" over a
-    // 1fr-stretch (which would defeat the 48px floor on dense boards).
-    const minimumLaneHeight = 48;
-    const maximumLaneHeight = 150;
+    // PLA-03/DENSITY-03 kept, with A's rule on top (A-planning.html): the band
+    // divides evenly between the lanes, as the mock's `laneH = (H - axis) /
+    // lanes` does, so a card and its second row have room. The old 150 px
+    // ceiling is gone — it left a dead band under five lanes on the studio
+    // monitor. Dense boards still floor at the card's own height.
     const fallbackLaneHeight = 96;
     if (!planningTimelineViewportHeight || filteredProjects.length === 0) {
       return fallbackLaneHeight;
     }
 
     const filledLaneHeight = Math.floor(planningTimelineViewportHeight / filteredProjects.length);
-    return Math.max(minimumLaneHeight, Math.min(maximumLaneHeight, filledLaneHeight));
+    return Math.max(PLANNING_CARD_TOP + planningCardHeight + 8, filledLaneHeight);
   })();
+  const planningLaneRows = planningLaneRowCapacity(timelineLaneHeight, planningCardHeight, PLANNING_CARD_TOP, 8);
+  const planningHourWidth = planningMeasuredAxisWidth / Math.max(1, timelineRangeMinutes / 60);
+  // A card is placed from a measurement, so it waits for one: drawing before
+  // the screen has been measured would pile every card on the axis start.
+  const planningScreenMeasured = planningMeasuredAxisWidth > 0;
   const planningTimelineVariables = {
+    "--planning-card-height": `${planningCardHeight}px`,
+    "--planning-card-top": `${PLANNING_CARD_TOP}px`,
+    "--planning-card-width": `${planningCardWidth}px`,
     "--planning-half-hour-count": String(Math.max(1, Math.round(timelineRangeMinutes / 30))),
     "--planning-hour-count": String(Math.max(1, Math.round(timelineRangeMinutes / 60))),
     "--planning-lane-height": `${timelineLaneHeight}px`,
-    // PLA-09: single source for the 280px label column shared by the scale header, lane
+    // PLA-09: single source for the label column shared by the scale header, lane
     // bodies, loading skeleton, and the playhead calc() below — keeps them grid-aligned.
-    "--planning-label-col": "280px",
+    // Visual overhaul A, Slice 6: 176 px, the mock's label column at 2560.
+    "--planning-label-col": `${PLANNING_LABEL_WIDTH}px`,
   } as CSSProperties;
   const hasPlanningSearch = deferredPlanningSearchQuery.length > 0;
   const showSearchZeroResult = hasPlanningSearch && filteredProjects.length === 0;
@@ -384,33 +373,68 @@ export function PlanningWorkspaceSurface({
     });
   });
 
-  const closePlanningProjectDetail = useLiveCallback(() => {
-    planningProjectDetailOpenRef.current = false;
-    setPlanningProjectDetailOpen(false);
-  });
-
-  const openPlanningProjectDetail = useLiveCallback((projectId: string, taskId?: string | null) => {
+  // Visual overhaul A, Slice 6: what used to open the project-detail dialog now
+  // puts the project on the plate — the plate is always there, so there is
+  // nothing to open and nothing to close.
+  const showPlanningProject = useLiveCallback((projectId: string, taskId?: string | null) => {
     const projectTasks = tasks
       .filter((task) => task.projectId === projectId)
       .sort((left, right) => left.order - right.order);
     const nextTaskId = taskId ?? projectTasks[0]?.id ?? null;
 
-    setPlanningProjectDetailProjectId(projectId);
-    setPlanningProjectDetailTaskId(nextTaskId);
-    planningProjectDetailOpenRef.current = true;
-    setPlanningProjectDetailOpen(true);
     void store.updatePlanningSettings({
       selectedProjectId: projectId,
       selectedTaskId: nextTaskId,
     });
   });
 
-  const selectPlanningProjectDetailTask = useLiveCallback((taskId: string, projectId: string) => {
-    setPlanningProjectDetailProjectId(projectId);
-    setPlanningProjectDetailTaskId(taskId);
-    void store.updatePlanningSettings({
-      selectedProjectId: projectId,
-      selectedTaskId: taskId,
+  const clearPlanningTaskSelection = useLiveCallback(() => {
+    selectedTimelineTaskRef.current = null;
+    void store.updatePlanningSettings({ selectedTaskId: null });
+  });
+
+  const togglePlanningTaskTimer = useLiveCallback(async (taskId: string, running: boolean) => {
+    const task = tasks.find((entry) => entry.id === taskId) ?? null;
+    setPlanningBusyAction(`timer-${taskId}`);
+    try {
+      await store.setPlanningTaskTimer(taskId, running ? "stop" : "start");
+      setPlanningFeedback({
+        message: running
+          ? `Stopped the timer on '${task?.title ?? "the task"}'.`
+          : `Started the timer on '${task?.title ?? "the task"}'.`,
+        tone: "ok",
+      });
+    } catch (error) {
+      setPlanningFeedback({
+        message: error instanceof Error ? error.message : "The timer could not be changed.",
+        tone: "error",
+      });
+    } finally {
+      setPlanningBusyAction(null);
+    }
+  });
+
+  const deletePlanningTaskById = useLiveCallback(async (taskId: string) => {
+    const task = tasks.find((entry) => entry.id === taskId) ?? null;
+    setPlanningBusyAction(`task-delete-${taskId}`);
+    try {
+      await store.deletePlanningTask(taskId);
+      setPlanningFeedback({ message: `Deleted '${task?.title ?? "the task"}'.`, tone: "info" });
+    } catch (error) {
+      setPlanningFeedback({
+        message: error instanceof Error ? error.message : "The task could not be deleted.",
+        tone: "error",
+      });
+    } finally {
+      setPlanningBusyAction(null);
+    }
+  });
+
+  const stepPlanningDay = useLiveCallback((direction: -1 | 1) => {
+    setTimelineDay((current) => {
+      const next = new Date(current);
+      next.setDate(next.getDate() + direction);
+      return planningDateOnly(next);
     });
   });
 
@@ -750,14 +774,6 @@ export function PlanningWorkspaceSurface({
         return;
       }
 
-      if (planningProjectDetailOpenRef.current) {
-        if (event.key === "Escape") {
-          closePlanningProjectDetail();
-          event.preventDefault();
-        }
-        return;
-      }
-
       if (planningTimeReportOpenRef.current) {
         if (event.key === "Escape") {
           closePlanningTimeReport();
@@ -775,6 +791,14 @@ export function PlanningWorkspaceSurface({
       }
 
       if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      // Visual overhaul A, Slice 6: the plate is always on screen, so Escape
+      // does not close it — it takes the task off it.
+      if (event.key === "Escape" && selectedTimelineTaskRef.current) {
+        clearPlanningTaskSelection();
+        event.preventDefault();
         return;
       }
 
@@ -848,7 +872,7 @@ export function PlanningWorkspaceSurface({
       }
 
       if (event.key === "Enter" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        openPlanningProjectDetail(keyboardSelectedTimelineTask.projectId, keyboardSelectedTimelineTask.id);
+        showPlanningProject(keyboardSelectedTimelineTask.projectId, keyboardSelectedTimelineTask.id);
         event.preventDefault();
         return;
       }
@@ -880,13 +904,13 @@ export function PlanningWorkspaceSurface({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
-    closePlanningProjectDetail,
+    clearPlanningTaskSelection,
     closePlanningTimeReport,
     currentMinute,
     focusPlanningSearch,
     filteredProjects,
     movePlanningTaskToAdjacentLane,
-    openPlanningProjectDetail,
+    showPlanningProject,
     pulsePlanningOverlap,
     reschedulePlanningTask,
     selectedTimelineTask?.id,
@@ -973,6 +997,86 @@ export function PlanningWorkspaceSurface({
     );
   }
 
+  const planningFilters = [
+    { label: "All", value: "all" },
+    { label: "To do", value: "todo" },
+    { label: "In progress", value: "in-progress" },
+    { label: "Blocked", value: "blocked" },
+    { label: "Done", value: "done" },
+  ] as const;
+
+  const planningCluster = (
+    <PlanningCluster
+      busy={planningBusyAction !== null}
+      composerOpen={projectComposerOpen}
+      composerTitle={newProjectTitle}
+      facts={dayFacts}
+      modeSection={settings.modeSection}
+      projects={projects}
+      projectTaskCounts={projectTaskCounts}
+      projectTitles={projectTitles}
+      selectedProjectId={plateProject?.id ?? null}
+      timeReportOpen={planningTimeReportOpen}
+      viewDayLabel={viewDayLabel}
+      viewIsToday={viewIsToday}
+      onComposerCancel={closeProjectComposer}
+      onComposerSubmit={() => void createPlanningProject()}
+      onComposerTitleChange={setNewProjectTitle}
+      onExportBackup={() => void exportPlanningBackup()}
+      onNextDay={() => stepPlanningDay(1)}
+      onOpenComposer={openProjectComposer}
+      onOpenTimeReport={togglePlanningTimeReport}
+      onPreviousDay={() => stepPlanningDay(-1)}
+      onSelectMode={togglePlanningMode}
+      onSelectProject={(projectId) => showPlanningProject(projectId)}
+      onSnapToToday={snapTimelineToNow}
+      onStopTimer={(taskId) => void togglePlanningTaskTimer(taskId, true)}
+    />
+  );
+
+  // The screen's own header: what the picture is, then the filters and the
+  // search that narrow it — the toolbar's two controls, on the thing they act on.
+  const planningScreenHead = (
+    <>
+      <span className={planningStyles.planningScreenTitle}>
+        {settings.modeSection === "board" ? "Board" : "Timeline"}
+      </span>
+      <span className={planningStyles.planningScreenDetail}>
+        {settings.modeSection === "board"
+          ? "one card per project · drag a card to move it between columns"
+          : `${formatPlanningHourLabel(Math.floor(timelineStartMinute / 60))} – ${formatPlanningHourLabel(
+              Math.floor(timelineEndMinute / 60)
+            )} · one lane per project · a card sits at its start, the bar is its duration`}
+      </span>
+      <Segmented label="Planning filter" className={planningStyles.planningFilters} testId="planning-filter-switch">
+        {planningFilters.map((filter) => (
+          <Key
+            key={filter.value}
+            mode="segmented"
+            size="small"
+            cap={filter.label}
+            engaged={settings.viewFilter === filter.value}
+            role="radio"
+            aria-checked={settings.viewFilter === filter.value}
+            testId={`planning-filter-${filter.value}`}
+            onClick={() => updatePlanningViewFilter(filter.value)}
+          />
+        ))}
+      </Segmented>
+      <input
+        aria-label="Search planning tasks"
+        className={planningStyles.planningScreenSearch}
+        data-toolbar-primary="search"
+        data-well=""
+        onChange={(event) => setPlanningSearchQuery(event.currentTarget.value)}
+        placeholder="Search tasks and projects"
+        ref={planningSearchInputRef}
+        type="search"
+        value={planningSearchQuery}
+      />
+    </>
+  );
+
   return (
     <div
       aria-label="Planning workspace"
@@ -980,681 +1084,552 @@ export function PlanningWorkspaceSurface({
       data-testid="planning-workspace"
       role="region"
     >
-      <div className={planningStyles.planningWorkspaceHeader}>
-        <div className={planningStyles.planningToolbar} data-testid="planning-toolbar">
-          <div className={planningStyles.planningToolbarActions}>
-            <span className={planningStyles.planningSegmentGroup}>
-              <SegmentedControl
-                label="Planning mode"
-                size="compact"
-                value={settings.modeSection}
-                onChange={(value) => togglePlanningMode(value as "timeline" | "board")}
-                options={[
-                  { label: "Timeline", value: "timeline" },
-                  { label: "Board", value: "board" },
-                ]}
-              />
-            </span>
-            <div className={planningStyles.planningNowCard}>
-              <div className={planningStyles.planningNowHeader}>
-                <span className={planningStyles.planningNowLabel}>Now</span>
-                <span className={planningStyles.planningNowValue}>{nowLabel}</span>
-              </div>
-              <div className={planningStyles.planningNudgeRow}>
-                <button
-                  aria-label="View one hour earlier"
-                  className={planningStyles.planningNudgeButton}
-                  onClick={() => setTimelineOffsetMinutes((current) => current - 60)}
-                  type="button"
-                >
-                  [
-                </button>
-                <button
-                  aria-label="Snap to now"
-                  className={planningStyles.planningNudgeButton}
-                  onClick={() => snapTimelineToNow()}
-                  type="button"
-                >
-                  ●
-                </button>
-                <button
-                  aria-label="View one hour later"
-                  className={planningStyles.planningNudgeButton}
-                  onClick={() => setTimelineOffsetMinutes((current) => current + 60)}
-                  type="button"
-                >
-                  ]
-                </button>
-              </div>
-            </div>
-            <div className={planningStyles.planningDayCard}>
-              <span className={planningStyles.planningNowLabel}>Day</span>
-              <span className={planningStyles.planningNowValue}>{viewDayLabel}</span>
-              {!viewIsToday ? (
-                <button
-                  className={planningStyles.planningTodayButton}
-                  onClick={() => snapTimelineToNow()}
-                  type="button"
-                >
-                  Today
-                </button>
-              ) : null}
-            </div>
-            <div className={planningStyles.planningStatRow}>
-              <div className={planningStyles.planningStatChip}>
-                <MetricCard caption="Lanes" value={String(counts.projectCount)} showBadge={false} />
-              </div>
-              <div className={planningStyles.planningStatChip}>
-                <MetricCard caption="On-time" value={String(onTimeCount)} showBadge={false} />
-              </div>
-              <div className={planningStyles.planningStatChip} data-tone={slippedCount > 0 ? "warn" : undefined}>
-                <MetricCard caption="Slipped" value={String(slippedCount)} showBadge={false} />
-              </div>
-              <div className={planningStyles.planningStatChip} data-tone={blockedCount > 0 ? "danger" : undefined}>
-                <MetricCard caption="Blocked" value={String(blockedCount)} showBadge={false} />
-              </div>
-            </div>
-            <span className={planningStyles.planningSegmentGroup}>
-              <SegmentedControl
-                label="Planning filter"
-                size="compact"
-                value={settings.viewFilter}
-                onChange={(value) =>
-                  updatePlanningViewFilter(value as "all" | "todo" | "in-progress" | "blocked" | "done")
-                }
-                options={[
-                  { label: "All", value: "all" },
-                  { label: "Todo", value: "todo" },
-                  { label: "In progress", value: "in-progress" },
-                  { label: "Blocked", value: "blocked" },
-                  { label: "Done", value: "done" },
-                ]}
-              />
-            </span>
-            {settings.modeSection === "timeline" && allTasksUnscheduled ? (
-              <div className={planningStyles.planningTipChip}>Drag into a lane to schedule.</div>
-            ) : null}
-            <input
-              aria-label="Search planning tasks"
-              className={planningStyles.planningSearchInput}
-              onChange={(event) => setPlanningSearchQuery(event.currentTarget.value)}
-              placeholder="Search tasks..."
-              ref={planningSearchInputRef}
-              type="text"
-              value={planningSearchQuery}
-            />
-            <button
-              aria-pressed={planningTimeReportOpen}
-              className={planningStyles.planningToolbarButton}
-              data-active={planningTimeReportOpen}
-              onClick={() => togglePlanningTimeReport()}
-              type="button"
-            >
-              <span className={planningStyles.planningToolbarButtonContent}>
-                <PlanningClockIcon />
-                <span>Time report</span>
-              </span>
-            </button>
-            <button
-              className={planningStyles.planningToolbarButton}
-              disabled={planningBusyAction !== null}
-              onClick={() => void exportPlanningBackup()}
-              type="button"
-            >
-              Backup
-            </button>
-            {projectComposerOpen ? (
-              <div className={planningStyles.planningProjectComposer}>
-                <input
-                  aria-label="New project title"
-                  className={planningStyles.planningProjectInput}
-                  disabled={planningBusyAction !== null}
-                  onChange={(event) => setNewProjectTitle(event.currentTarget.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void createPlanningProject();
-                    }
-                    if (event.key === "Escape") {
-                      event.preventDefault();
-                      closeProjectComposer();
-                    }
-                  }}
-                  placeholder="New project title"
-                  ref={newProjectTitleRef}
-                  type="text"
-                  value={newProjectTitle}
-                />
-                <button
-                  className={planningStyles.planningToolbarButton}
-                  data-primary="true"
-                  disabled={newProjectTitle.trim().length === 0 || planningBusyAction !== null}
-                  onClick={() => void createPlanningProject()}
-                  type="button"
-                >
-                  Add project
-                </button>
-                <button
-                  className={planningStyles.planningToolbarButton}
-                  disabled={planningBusyAction !== null}
-                  onClick={() => closeProjectComposer()}
-                  type="button"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                className={planningStyles.planningToolbarButton}
-                data-primary="true"
-                disabled={planningBusyAction !== null}
-                onClick={() => openProjectComposer()}
-                type="button"
-              >
-                New project
-              </button>
-            )}
-          </div>
-        </div>
-        {planningFeedback ? (
-          <div className={planningStyles.planningToolbarNotice} data-tone={planningFeedback.tone} role="status">
-            {planningFeedback.message}
-          </div>
-        ) : null}
-      </div>
+      <ShellRegion region="cluster">{planningCluster}</ShellRegion>
 
-      {settings.modeSection === "board" ? (
-        <div className={planningStyles.planningBoardShell}>
-          {boardColumns.map((column) => {
-            const columnProjects = filteredProjects.filter((project) => project.status === column.id);
-            const filteredOut = settings.viewFilter !== "all" && settings.viewFilter !== column.id;
-            return (
-              <section
-                key={column.id}
-                className={planningStyles.planningBoardColumn}
-                data-filter-dimmed={filteredOut}
-                data-testid={`planning-board-column-${column.id}`}
-              >
-                <div className={planningStyles.planningBoardColumnHead}>
-                  <span>{column.label}</span>
-                  <span>{columnProjects.length}</span>
-                </div>
-                <div
-                  className={planningStyles.planningBoardColumnBody}
-                  data-drop-active={planningBoardDropTarget?.status === column.id}
-                  data-testid={`planning-board-column-body-${column.id}`}
-                  onDragOver={(event) => {
-                    const draggedProjectId =
-                      event.dataTransfer.getData("text/planning-project-id") || draggingBoardProjectId;
-                    if (!draggedProjectId) {
-                      return;
-                    }
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                    setPlanningBoardDropTarget({
-                      index: resolvePlanningBoardDropIndex(column.id, columnProjects, columnProjects.length),
-                      status: column.id,
-                    });
-                  }}
-                  onDragLeave={(event) => {
-                    if (planningBoardDropTarget?.status !== column.id) {
-                      return;
-                    }
-                    const relatedTarget = event.relatedTarget;
-                    if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
-                      return;
-                    }
-                    setPlanningBoardDropTarget((current) => (current?.status === column.id ? null : current));
-                  }}
-                  onDrop={(event) => {
-                    const draggedProjectId =
-                      event.dataTransfer.getData("text/planning-project-id") || draggingBoardProjectId;
-                    if (!draggedProjectId) {
-                      clearPlanningBoardDragState();
-                      return;
-                    }
-                    event.preventDefault();
-                    const dropIndex = resolvePlanningBoardDropIndex(column.id, columnProjects, columnProjects.length);
-                    void reorderPlanningProject(draggedProjectId, column.id, dropIndex);
-                    clearPlanningBoardDragState();
-                  }}
-                >
-                  {settings.viewFilter !== "all" && settings.viewFilter === column.id && columnProjects.length === 0 ? (
-                    <div
-                      className={planningStyles.planningBoardEmpty}
-                      data-testid={`planning-board-empty-${column.id}`}
-                      data-zero-filter="true"
+      <div className={planningStyles.planningBody}>
+        <main className={planningStyles.planningBay} data-region="timeline">
+          <Screen head={planningScreenHead} testId="planning-screen">
+            {settings.modeSection === "board" ? (
+              <div className={planningStyles.planningBoardShell}>
+                {boardColumns.map((column) => {
+                  const columnProjects = filteredProjects.filter((project) => project.status === column.id);
+                  const filteredOut = settings.viewFilter !== "all" && settings.viewFilter !== column.id;
+                  return (
+                    <section
+                      key={column.id}
+                      className={planningStyles.planningBoardColumn}
+                      data-filter-dimmed={filteredOut}
+                      data-testid={`planning-board-column-${column.id}`}
                     >
-                      No {column.label.toLowerCase()} tasks.
-                    </div>
-                  ) : columnProjects.length > 0 ? (
-                    columnProjects.map((project, projectIndex) => {
-                      const projectTasks = tasks.filter((task) => task.projectId === project.id);
-                      const completedTaskCount = projectTasks.filter((task) => task.completed).length;
-                      const runningTask = projectTasks.find((task) => task.isRunning) ?? null;
-                      const allLabels = Array.from(
-                        new Set(projectTasks.flatMap((task) => task.labels.map((label) => label.toLowerCase())))
-                      );
-                      const visibleLabels = allLabels.slice(0, 2);
-                      const extraLabelCount = allLabels.length - visibleLabels.length;
-                      return (
-                        <article
-                          key={project.id}
-                          className={planningStyles.planningBoardCard}
-                          data-blocked={project.status === "blocked"}
-                          data-dragging={draggingBoardProjectId === project.id}
-                          data-drop-target={
-                            planningBoardDropTarget?.status === column.id &&
-                            planningBoardDropTarget.index === projectIndex
-                          }
-                          data-running={runningTask !== null}
-                          data-selected={settings.selectedProjectId === project.id}
-                          draggable
-                          data-testid={`planning-board-card-${project.id}`}
-                          role="group"
-                          tabIndex={0}
-                          aria-roledescription="Draggable kanban card"
-                          aria-label={`${project.title}, ${column.label} column, position ${projectIndex + 1} of ${columnProjects.length}. Use arrow keys to move.`}
-                          onClick={() =>
-                            void store.updatePlanningSettings({
-                              selectedProjectId: project.id,
-                              selectedTaskId: projectTasks[0]?.id ?? null,
-                            })
-                          }
-                          onKeyDown={(event) => {
-                            // CONTROLS-03: keyboard parity for the pointer-drag
-                            // verb. Reuses reorderPlanningProject (the drag path)
-                            // — presentation-only, no new engine data. Modifier
-                            // chords early-return so app/OS shortcuts are untouched.
-                            if (event.metaKey || event.ctrlKey || event.altKey) {
-                              return;
-                            }
-                            if (event.key === "Enter" || event.key === " ") {
-                              // Only the card itself selects; the nested detail
-                              // button keeps its own Enter/Space activation.
-                              if (event.target !== event.currentTarget) {
-                                return;
-                              }
-                              event.preventDefault();
-                              void store.updatePlanningSettings({
-                                selectedProjectId: project.id,
-                                selectedTaskId: projectTasks[0]?.id ?? null,
-                              });
-                              return;
-                            }
-                            if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-                              // Reorder within the current status column.
-                              const targetIndex = projectIndex + (event.key === "ArrowUp" ? -1 : 1);
-                              if (targetIndex < 0 || targetIndex >= columnProjects.length) {
-                                return;
-                              }
-                              event.preventDefault();
-                              void reorderPlanningProject(project.id, column.id, targetIndex);
-                              return;
-                            }
-                            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-                              // Move to the adjacent status column (append to its end,
-                              // matching the column-body pointer drop).
-                              const columnIndex = boardColumns.findIndex((entry) => entry.id === column.id);
-                              const targetColumnIndex = columnIndex + (event.key === "ArrowLeft" ? -1 : 1);
-                              if (targetColumnIndex < 0 || targetColumnIndex >= boardColumns.length) {
-                                return;
-                              }
-                              event.preventDefault();
-                              const targetStatus = boardColumns[targetColumnIndex].id;
-                              const targetCount = filteredProjects.filter(
-                                (entry) => entry.status === targetStatus
-                              ).length;
-                              void reorderPlanningProject(project.id, targetStatus, targetCount);
-                            }
-                          }}
-                          onDragEnd={() => clearPlanningBoardDragState()}
-                          onDragStart={(event) => {
-                            setDraggingBoardProjectId(project.id);
-                            event.dataTransfer.effectAllowed = "move";
-                            event.dataTransfer.setData("text/planning-project-id", project.id);
-                          }}
-                          onDragOver={(event) => {
-                            const draggedProjectId =
-                              event.dataTransfer.getData("text/planning-project-id") || draggingBoardProjectId;
-                            if (!draggedProjectId || draggedProjectId === project.id) {
-                              return;
-                            }
-                            event.preventDefault();
-                            event.dataTransfer.dropEffect = "move";
-                            const rect = event.currentTarget.getBoundingClientRect();
-                            const dropAfter = event.clientY > rect.top + rect.height / 2;
-                            const rawIndex = projectIndex + (dropAfter ? 1 : 0);
-                            setPlanningBoardDropTarget({
-                              index: resolvePlanningBoardDropIndex(column.id, columnProjects, rawIndex),
-                              status: column.id,
-                            });
-                          }}
-                          onDrop={(event) => {
-                            const draggedProjectId =
-                              event.dataTransfer.getData("text/planning-project-id") || draggingBoardProjectId;
-                            if (!draggedProjectId) {
-                              clearPlanningBoardDragState();
-                              return;
-                            }
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const rect = event.currentTarget.getBoundingClientRect();
-                            const dropAfter = event.clientY > rect.top + rect.height / 2;
-                            const rawIndex = projectIndex + (dropAfter ? 1 : 0);
-                            const dropIndex = resolvePlanningBoardDropIndex(column.id, columnProjects, rawIndex);
-                            void reorderPlanningProject(draggedProjectId, column.id, dropIndex);
-                            clearPlanningBoardDragState();
-                          }}
-                        >
-                          <div className={planningStyles.planningBoardCardHeader}>
-                            <button
-                              aria-label={`Open project detail for ${project.title}`}
-                              className={planningStyles.planningBoardDetailButton}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openPlanningProjectDetail(project.id, projectTasks[0]?.id ?? null);
-                              }}
-                              type="button"
-                            >
-                              <span className={planningStyles.planningBoardCardTitle}>{project.title}</span>
-                            </button>
-                            <div className={planningStyles.planningBoardPriority}>{project.priority.toUpperCase()}</div>
-                          </div>
-                          <div className={planningStyles.planningBoardStatusRow}>
-                            <StatusBadge
-                              label={project.status.replace("-", " ")}
-                              tone={planningStatusTone(project.status)}
-                            />
-                            {runningTask ? (
-                              <div className={planningStyles.planningBoardRunning}>
-                                <span className={planningStyles.planningBoardRunningDot} />
-                                <span>{runningTask.title} running</span>
-                              </div>
-                            ) : (
-                              <div className={planningStyles.planningBoardCardMeta}>
-                                {completedTaskCount}/{projectTasks.length} tasks
-                              </div>
-                            )}
-                          </div>
-                          {project.description ? (
-                            <div className={planningStyles.planningBoardDescription}>{project.description}</div>
-                          ) : null}
-                          <div className={planningStyles.planningBoardProgress}>
-                            <div
-                              className={planningStyles.planningBoardProgressFill}
-                              style={{
-                                width: `${projectTasks.length > 0 ? Math.round((completedTaskCount / projectTasks.length) * 100) : 0}%`,
-                              }}
-                            />
-                          </div>
-                          <div className={planningStyles.planningBoardCardMeta}>
-                            {completedTaskCount}/{projectTasks.length} tasks · {project.priority.toUpperCase()}
-                          </div>
-                          {visibleLabels.length > 0 ? (
-                            <div className={planningStyles.planningBoardTags}>
-                              {visibleLabels.map((label) => (
-                                <span key={label} className={planningStyles.planningBoardTag}>
-                                  {label}
-                                </span>
-                              ))}
-                              {extraLabelCount > 0 ? (
-                                <span className={planningStyles.planningBoardTag}>+{extraLabelCount}</span>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </article>
-                      );
-                    })
-                  ) : (
-                    <div className={planningStyles.planningBoardEmpty}>No projects in this column.</div>
-                  )}
-                </div>
-              </section>
-            );
-          })}
-          {projects.length === 0 ? (
-            <div className={planningStyles.planningBoardEmptyState}>
-              <EmptyState
-                title="No projects yet. Press N to start one."
-                message="The board stays visible, but there is no run-of-show data on the current day."
-              />
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <div className={planningStyles.planningShell} style={planningTimelineVariables}>
-          <div className={planningStyles.planningScale}>
-            <div className={planningStyles.planningScaleHead}>
-              <span>Project</span>
-              <span>
-                {formatPlanningHourLabel(Math.floor(timelineStartMinute / 60))} →{" "}
-                {formatPlanningHourLabel(Math.floor(timelineEndMinute / 60))}
-              </span>
-            </div>
-            <div className={planningStyles.planningScaleTicks}>
-              {timelineMinorTicks.map((minute) => (
-                <div
-                  key={`planning-half-hour-${minute}`}
-                  className={planningStyles.planningScaleMinorTick}
-                  style={{
-                    left: planningPercentForMinute(minute, timelineStartMinute, timelineRangeMinutes),
-                  }}
-                />
-              ))}
-              {timelineTicks.map((hour) => (
-                <div
-                  key={`planning-hour-${hour}`}
-                  className={planningStyles.planningScaleTick}
-                  style={{
-                    left: planningPercentForMinute(hour * 60, timelineStartMinute, timelineRangeMinutes),
-                  }}
-                >
-                  {formatPlanningHourLabel(hour)}
-                </div>
-              ))}
-            </div>
-          </div>
-          {showFilterBanner || showSearchZeroResult ? (
-            <div className={planningStyles.planningFilterBanner} role="status">
-              <span>
-                {hasPlanningSearch ? `Search: "${planningSearchQuery.trim()}"` : `Filter: ${settings.viewFilter}`} ·{" "}
-                {filteredProjects.length} of {projects.length}
-              </span>
-              <button
-                className={planningStyles.planningFilterClear}
-                onClick={() => clearPlanningFilters()}
-                type="button"
-              >
-                Clear
-              </button>
-            </div>
-          ) : null}
-
-          {projects.length === 0 ? (
-            <div className={planningStyles.planningEmptyState}>
-              <EmptyState
-                title="No projects yet. Press N to start one."
-                message="The timeline stays visible, but there is no run-of-show data on the current day."
-              />
-            </div>
-          ) : (
-            <div className={planningStyles.planningTimeline} ref={planningTimelineRef}>
-              <div
-                className={planningStyles.planningNowPlayhead}
-                data-testid="planning-now-playhead"
-                style={{
-                  left: `calc(var(--planning-label-col) + (100% - var(--planning-label-col)) * ${planningFractionForMinute(
-                    clampedNowMinute,
-                    timelineStartMinute,
-                    timelineRangeMinutes
-                  )})`,
-                }}
-              />
-              {filteredProjects.map((project) => {
-                const laneTasks = tasksByProjectId.get(project.id) ?? [];
-                const runningTask = laneTasks.find((task) => task.isRunning);
-                const subtitle = runningTask
-                  ? `${runningTask.title} · running`
-                  : `${tasks.filter((task) => task.projectId === project.id).length} tasks`;
-                const laneFilteredOut = settings.viewFilter !== "all" && project.status !== settings.viewFilter;
-
-                return (
-                  <div
-                    key={project.id}
-                    className={planningStyles.planningLane}
-                    data-filter-dimmed={laneFilteredOut}
-                    data-testid={`planning-lane-${project.id}`}
-                  >
-                    <div className={planningStyles.planningLaneHead}>
-                      <div className={planningStyles.planningLaneTitle}>{project.title}</div>
-                      <div className={planningStyles.planningLaneMeta}>
-                        <StatusBadge
-                          label={project.status.replace("-", " ")}
-                          tone={planningStatusTone(project.status)}
-                        />
-                        <span>{subtitle}</span>
+                      <div className={planningStyles.planningBoardColumnHead}>
+                        <span>{column.label}</span>
+                        <span>{columnProjects.length}</span>
                       </div>
-                    </div>
-                    <div className={planningStyles.planningLaneBody}>
                       <div
-                        className={planningStyles.planningLaneDropZone}
-                        data-drop-active={planningDropTarget?.projectId === project.id}
-                        data-drop-allowed={
-                          draggingScheduledTask !== null || draggingUnscheduledTask?.projectId === project.id
-                        }
-                        data-testid={`planning-lane-body-${project.id}`}
+                        className={planningStyles.planningBoardColumnBody}
+                        data-drop-active={planningBoardDropTarget?.status === column.id}
+                        data-testid={`planning-board-column-body-${column.id}`}
+                        onDragOver={(event) => {
+                          const draggedProjectId =
+                            event.dataTransfer.getData("text/planning-project-id") || draggingBoardProjectId;
+                          if (!draggedProjectId) {
+                            return;
+                          }
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          setPlanningBoardDropTarget({
+                            index: resolvePlanningBoardDropIndex(column.id, columnProjects, columnProjects.length),
+                            status: column.id,
+                          });
+                        }}
                         onDragLeave={(event) => {
-                          if (planningDropTarget?.projectId !== project.id) {
+                          if (planningBoardDropTarget?.status !== column.id) {
                             return;
                           }
                           const relatedTarget = event.relatedTarget;
                           if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
                             return;
                           }
-                          setPlanningDropTarget(null);
-                        }}
-                        onDragOver={(event) => {
-                          const accepted = updatePlanningDropTarget(event, project.id);
-                          if (!accepted) {
-                            return;
-                          }
-                          event.preventDefault();
-                          event.dataTransfer.dropEffect = "move";
+                          setPlanningBoardDropTarget((current) => (current?.status === column.id ? null : current));
                         }}
                         onDrop={(event) => {
-                          const taskId =
-                            event.dataTransfer.getData("text/planning-scheduled-task-id") ||
-                            draggingScheduledTaskId ||
-                            event.dataTransfer.getData("text/planning-task-id") ||
-                            draggingUnscheduledTaskId;
-                          if (!taskId) {
+                          const draggedProjectId =
+                            event.dataTransfer.getData("text/planning-project-id") || draggingBoardProjectId;
+                          if (!draggedProjectId) {
+                            clearPlanningBoardDragState();
                             return;
                           }
-
-                          const accepted = updatePlanningDropTarget(event, project.id);
-                          if (!accepted) {
-                            return;
-                          }
-
                           event.preventDefault();
-                          const dropMinute = minuteForLaneDrop(event);
-                          if (
-                            event.dataTransfer.getData("text/planning-scheduled-task-id") ||
-                            draggingScheduledTaskId
-                          ) {
-                            void rescheduleScheduledTaskByDrop(taskId, project.id, dropMinute);
-                          } else {
-                            void scheduleUnscheduledTask(taskId, project.id, dropMinute);
-                          }
-                          setDraggingScheduledTaskId(null);
-                          setDraggingUnscheduledTaskId(null);
-                          setPlanningDropTarget(null);
+                          const dropIndex = resolvePlanningBoardDropIndex(
+                            column.id,
+                            columnProjects,
+                            columnProjects.length
+                          );
+                          void reorderPlanningProject(draggedProjectId, column.id, dropIndex);
+                          clearPlanningBoardDragState();
                         }}
-                      />
-                      {planningDropTarget?.projectId === project.id ? (
-                        <div
-                          className={planningStyles.planningDropGhost}
-                          style={{
-                            left: planningPercentForMinute(
-                              planningDropTarget.minute,
-                              timelineStartMinute,
-                              timelineRangeMinutes
-                            ),
-                            width: planningWidthPercent(
-                              Math.max(15, Math.round(planningScheduledDurationSeconds(draggingTimelineTask) / 60)),
-                              timelineRangeMinutes
-                            ),
-                          }}
-                        />
-                      ) : null}
-                      {laneTasks.map((task) => {
-                        const scheduledStart = task.scheduledStart ? new Date(task.scheduledStart) : null;
-                        if (!scheduledStart || Number.isNaN(scheduledStart.getTime())) {
-                          return null;
+                      >
+                        {settings.viewFilter !== "all" &&
+                        settings.viewFilter === column.id &&
+                        columnProjects.length === 0 ? (
+                          <div
+                            className={planningStyles.planningBoardEmpty}
+                            data-testid={`planning-board-empty-${column.id}`}
+                            data-zero-filter="true"
+                          >
+                            No {column.label.toLowerCase()} tasks.
+                          </div>
+                        ) : columnProjects.length > 0 ? (
+                          columnProjects.map((project, projectIndex) => {
+                            const projectTasks = tasks.filter((task) => task.projectId === project.id);
+                            const completedTaskCount = projectTasks.filter((task) => task.completed).length;
+                            const runningTask = projectTasks.find((task) => task.isRunning) ?? null;
+                            const allLabels = Array.from(
+                              new Set(projectTasks.flatMap((task) => task.labels.map((label) => label.toLowerCase())))
+                            );
+                            const visibleLabels = allLabels.slice(0, 2);
+                            const extraLabelCount = allLabels.length - visibleLabels.length;
+                            return (
+                              <article
+                                key={project.id}
+                                className={planningStyles.planningBoardCard}
+                                data-blocked={project.status === "blocked"}
+                                data-dragging={draggingBoardProjectId === project.id}
+                                data-drop-target={
+                                  planningBoardDropTarget?.status === column.id &&
+                                  planningBoardDropTarget.index === projectIndex
+                                }
+                                data-running={runningTask !== null}
+                                data-selected={settings.selectedProjectId === project.id}
+                                draggable
+                                data-testid={`planning-board-card-${project.id}`}
+                                role="group"
+                                tabIndex={0}
+                                aria-roledescription="Draggable kanban card"
+                                aria-label={`${project.title}, ${column.label} column, position ${projectIndex + 1} of ${columnProjects.length}. Use arrow keys to move.`}
+                                onClick={() =>
+                                  void store.updatePlanningSettings({
+                                    selectedProjectId: project.id,
+                                    selectedTaskId: projectTasks[0]?.id ?? null,
+                                  })
+                                }
+                                onKeyDown={(event) => {
+                                  // CONTROLS-03: keyboard parity for the pointer-drag
+                                  // verb. Reuses reorderPlanningProject (the drag path)
+                                  // — presentation-only, no new engine data. Modifier
+                                  // chords early-return so app/OS shortcuts are untouched.
+                                  if (event.metaKey || event.ctrlKey || event.altKey) {
+                                    return;
+                                  }
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    // Only the card itself selects; the nested detail
+                                    // button keeps its own Enter/Space activation.
+                                    if (event.target !== event.currentTarget) {
+                                      return;
+                                    }
+                                    event.preventDefault();
+                                    void store.updatePlanningSettings({
+                                      selectedProjectId: project.id,
+                                      selectedTaskId: projectTasks[0]?.id ?? null,
+                                    });
+                                    return;
+                                  }
+                                  if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+                                    // Reorder within the current status column.
+                                    const targetIndex = projectIndex + (event.key === "ArrowUp" ? -1 : 1);
+                                    if (targetIndex < 0 || targetIndex >= columnProjects.length) {
+                                      return;
+                                    }
+                                    event.preventDefault();
+                                    void reorderPlanningProject(project.id, column.id, targetIndex);
+                                    return;
+                                  }
+                                  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                                    // Move to the adjacent status column (append to its end,
+                                    // matching the column-body pointer drop).
+                                    const columnIndex = boardColumns.findIndex((entry) => entry.id === column.id);
+                                    const targetColumnIndex = columnIndex + (event.key === "ArrowLeft" ? -1 : 1);
+                                    if (targetColumnIndex < 0 || targetColumnIndex >= boardColumns.length) {
+                                      return;
+                                    }
+                                    event.preventDefault();
+                                    const targetStatus = boardColumns[targetColumnIndex].id;
+                                    const targetCount = filteredProjects.filter(
+                                      (entry) => entry.status === targetStatus
+                                    ).length;
+                                    void reorderPlanningProject(project.id, targetStatus, targetCount);
+                                  }
+                                }}
+                                onDragEnd={() => clearPlanningBoardDragState()}
+                                onDragStart={(event) => {
+                                  setDraggingBoardProjectId(project.id);
+                                  event.dataTransfer.effectAllowed = "move";
+                                  event.dataTransfer.setData("text/planning-project-id", project.id);
+                                }}
+                                onDragOver={(event) => {
+                                  const draggedProjectId =
+                                    event.dataTransfer.getData("text/planning-project-id") || draggingBoardProjectId;
+                                  if (!draggedProjectId || draggedProjectId === project.id) {
+                                    return;
+                                  }
+                                  event.preventDefault();
+                                  event.dataTransfer.dropEffect = "move";
+                                  const rect = event.currentTarget.getBoundingClientRect();
+                                  const dropAfter = event.clientY > rect.top + rect.height / 2;
+                                  const rawIndex = projectIndex + (dropAfter ? 1 : 0);
+                                  setPlanningBoardDropTarget({
+                                    index: resolvePlanningBoardDropIndex(column.id, columnProjects, rawIndex),
+                                    status: column.id,
+                                  });
+                                }}
+                                onDrop={(event) => {
+                                  const draggedProjectId =
+                                    event.dataTransfer.getData("text/planning-project-id") || draggingBoardProjectId;
+                                  if (!draggedProjectId) {
+                                    clearPlanningBoardDragState();
+                                    return;
+                                  }
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  const rect = event.currentTarget.getBoundingClientRect();
+                                  const dropAfter = event.clientY > rect.top + rect.height / 2;
+                                  const rawIndex = projectIndex + (dropAfter ? 1 : 0);
+                                  const dropIndex = resolvePlanningBoardDropIndex(column.id, columnProjects, rawIndex);
+                                  void reorderPlanningProject(draggedProjectId, column.id, dropIndex);
+                                  clearPlanningBoardDragState();
+                                }}
+                              >
+                                <div className={planningStyles.planningBoardCardHeader}>
+                                  <button
+                                    aria-label={`Open project detail for ${project.title}`}
+                                    className={planningStyles.planningBoardDetailButton}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      showPlanningProject(project.id, projectTasks[0]?.id ?? null);
+                                    }}
+                                    type="button"
+                                  >
+                                    <span className={planningStyles.planningBoardCardTitle}>{project.title}</span>
+                                  </button>
+                                  <div className={planningStyles.planningBoardPriority}>
+                                    {project.priority.toUpperCase()}
+                                  </div>
+                                </div>
+                                <div className={planningStyles.planningBoardStatusRow}>
+                                  <StatusBadge
+                                    label={project.status.replace("-", " ")}
+                                    tone={planningStatusTone(project.status)}
+                                  />
+                                  {runningTask ? (
+                                    <div className={planningStyles.planningBoardRunning}>
+                                      <span className={planningStyles.planningBoardRunningDot} />
+                                      <span>{runningTask.title} running</span>
+                                    </div>
+                                  ) : (
+                                    <div className={planningStyles.planningBoardCardMeta}>
+                                      {completedTaskCount}/{projectTasks.length} tasks
+                                    </div>
+                                  )}
+                                </div>
+                                {project.description ? (
+                                  <div className={planningStyles.planningBoardDescription}>{project.description}</div>
+                                ) : null}
+                                <div className={planningStyles.planningBoardProgress}>
+                                  <div
+                                    className={planningStyles.planningBoardProgressFill}
+                                    style={{
+                                      width: `${projectTasks.length > 0 ? Math.round((completedTaskCount / projectTasks.length) * 100) : 0}%`,
+                                    }}
+                                  />
+                                </div>
+                                <div className={planningStyles.planningBoardCardMeta}>
+                                  {completedTaskCount}/{projectTasks.length} tasks · {project.priority.toUpperCase()}
+                                </div>
+                                {visibleLabels.length > 0 ? (
+                                  <div className={planningStyles.planningBoardTags}>
+                                    {visibleLabels.map((label) => (
+                                      <span key={label} className={planningStyles.planningBoardTag}>
+                                        {label}
+                                      </span>
+                                    ))}
+                                    {extraLabelCount > 0 ? (
+                                      <span className={planningStyles.planningBoardTag}>+{extraLabelCount}</span>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                              </article>
+                            );
+                          })
+                        ) : (
+                          <div className={planningStyles.planningBoardEmpty}>No projects in this column.</div>
+                        )}
+                      </div>
+                    </section>
+                  );
+                })}
+                {projects.length === 0 ? (
+                  <div className={planningStyles.planningBoardEmptyState}>
+                    <EmptyState
+                      title="No projects yet. Press N to start one."
+                      message="The board stays visible, but there is no run-of-show data on the current day."
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : projects.length === 0 ? (
+              <div className={planningStyles.planningEmptyState}>
+                <EmptyState
+                  title="No projects yet. Press N to start one."
+                  message="The timeline stays visible, but there is no run-of-show data on the current day."
+                />
+              </div>
+            ) : (
+              <div className={planningStyles.planningShell} style={planningTimelineVariables}>
+                <div className={planningStyles.planningAxis}>
+                  {timelineTicks.map((hour) => (
+                    <div
+                      key={`planning-hour-${hour}`}
+                      className={planningStyles.planningAxisTick}
+                      data-labelled={planningLabelledHours(timelineTicks, planningHourWidth).has(hour)}
+                      data-last={hour === timelineTicks[timelineTicks.length - 1]}
+                      style={{
+                        left: planningPercentForMinute(hour * 60, timelineStartMinute, timelineRangeMinutes),
+                      }}
+                    >
+                      {formatPlanningHourLabel(hour)}
+                    </div>
+                  ))}
+                </div>
+                <div className={planningStyles.planningTimeline} ref={planningTimelineRef}>
+                  <div
+                    className={planningStyles.planningNowPlayhead}
+                    data-testid="planning-now-playhead"
+                    style={{
+                      left: `calc(var(--planning-label-col) + (100% - var(--planning-label-col)) * ${planningFractionForMinute(
+                        clampedNowMinute,
+                        timelineStartMinute,
+                        timelineRangeMinutes
+                      )})`,
+                    }}
+                  >
+                    <span className={planningStyles.planningNowLabel}>{nowLabel} now</span>
+                  </div>
+                  {filteredProjects.map((project) => {
+                    const laneTasks = tasksByProjectId.get(project.id) ?? [];
+                    const runningTask = laneTasks.find((task) => task.isRunning);
+                    const subtitle = runningTask
+                      ? `${runningTask.title} · running`
+                      : `${projectTaskCounts.get(project.id) ?? 0} tasks · ${project.status.replace("-", " ")}`;
+                    const laneFilteredOut = settings.viewFilter !== "all" && project.status !== settings.viewFilter;
+                    // A card is a box at its start time, not a bar: work out
+                    // where each one lands before drawing the lane.
+                    const laneLayout = new Map(
+                      layoutPlanningLane(
+                        laneTasks
+                          .map((task) => {
+                            const scheduledStart = task.scheduledStart ? new Date(task.scheduledStart) : null;
+                            if (!scheduledStart || Number.isNaN(scheduledStart.getTime())) {
+                              return null;
+                            }
+                            return {
+                              durationMinutes: Math.max(1, Math.round(planningScheduledDurationSeconds(task) / 60)),
+                              id: task.id,
+                              startMinute: planningMinutesForDate(scheduledStart),
+                            };
+                          })
+                          .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
+                        {
+                          cardHeight: planningCardHeight,
+                          cardWidth: planningCardWidth,
+                          gap: 8,
+                          rangeMinutes: timelineRangeMinutes,
+                          rowCapacity: planningLaneRows,
+                          startMinute: timelineStartMinute,
+                          width: planningMeasuredAxisWidth,
                         }
-                        const taskStartMinute = planningMinutesForDate(scheduledStart);
-                        const taskDurationMinutes = Math.max(
-                          15,
-                          Math.round((task.scheduledDurationSeconds ?? 900) / 60)
-                        );
-                        const overlapTitle = planningOverlapTitlesByTaskId.get(task.id) ?? null;
-                        return (
-                          <button
-                            key={task.id}
-                            className={planningStyles.planningBlock}
-                            data-dragging={draggingScheduledTaskId === task.id}
-                            data-overlap={overlapTitle !== null}
-                            data-overlap-pulse={planningOverlapPulseTaskId === task.id}
-                            data-project-id={task.projectId}
-                            data-selected={selectedTimelineTask?.id === task.id}
-                            data-running={task.isRunning}
-                            data-scheduled-start={task.scheduledStart ?? ""}
-                            data-time-label={formatPlanningClockLabel(scheduledStart)}
-                            data-status={project.status}
-                            draggable
-                            onClick={() => selectPlanningTask(task.id, task.projectId)}
-                            onDragEnd={() => {
-                              setDraggingScheduledTaskId(null);
+                      ).map((entry) => [entry.id, entry] as const)
+                    );
+
+                    return (
+                      <div
+                        key={project.id}
+                        className={planningStyles.planningLane}
+                        data-filter-dimmed={laneFilteredOut}
+                        data-testid={`planning-lane-${project.id}`}
+                      >
+                        <div className={planningStyles.planningLaneHead}>
+                          <div className={planningStyles.planningLaneTitle}>{project.title}</div>
+                          <div className={planningStyles.planningLaneMeta}>{subtitle}</div>
+                        </div>
+                        <div className={planningStyles.planningLaneBody} data-material="well">
+                          <div
+                            className={planningStyles.planningLaneDropZone}
+                            data-drop-active={planningDropTarget?.projectId === project.id}
+                            data-drop-allowed={
+                              draggingScheduledTask !== null || draggingUnscheduledTask?.projectId === project.id
+                            }
+                            data-testid={`planning-lane-body-${project.id}`}
+                            onDragLeave={(event) => {
+                              if (planningDropTarget?.projectId !== project.id) {
+                                return;
+                              }
+                              const relatedTarget = event.relatedTarget;
+                              if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) {
+                                return;
+                              }
                               setPlanningDropTarget(null);
                             }}
-                            onDragStart={(event) => {
-                              setDraggingScheduledTaskId(task.id);
-                              event.dataTransfer.effectAllowed = "move";
-                              event.dataTransfer.setData("text/planning-scheduled-task-id", task.id);
-                              selectPlanningTask(task.id, task.projectId);
+                            onDragOver={(event) => {
+                              const accepted = updatePlanningDropTarget(event, project.id);
+                              if (!accepted) {
+                                return;
+                              }
+                              event.preventDefault();
+                              event.dataTransfer.dropEffect = "move";
                             }}
-                            style={{
-                              left: planningPercentForMinute(
-                                taskStartMinute,
-                                timelineStartMinute,
-                                timelineRangeMinutes
-                              ),
-                              width: planningWidthPercent(taskDurationMinutes, timelineRangeMinutes),
-                            }}
-                            title={
-                              overlapTitle
-                                ? `${task.title} · ${taskDurationMinutes} min · Overlaps '${overlapTitle}'.`
-                                : `${task.title} · ${taskDurationMinutes} min`
-                            }
-                            type="button"
-                          >
-                            <span className={planningStyles.planningBlockTitle}>{task.title}</span>
-                            <span className={planningStyles.planningBlockMeta}>
-                              {taskDurationMinutes} min · {task.priority.toUpperCase()}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                            onDrop={(event) => {
+                              const taskId =
+                                event.dataTransfer.getData("text/planning-scheduled-task-id") ||
+                                draggingScheduledTaskId ||
+                                event.dataTransfer.getData("text/planning-task-id") ||
+                                draggingUnscheduledTaskId;
+                              if (!taskId) {
+                                return;
+                              }
 
-          {visibleUnscheduledTasks.length > 0 ? (
-            <div
+                              const accepted = updatePlanningDropTarget(event, project.id);
+                              if (!accepted) {
+                                return;
+                              }
+
+                              event.preventDefault();
+                              const dropMinute = minuteForLaneDrop(event);
+                              if (
+                                event.dataTransfer.getData("text/planning-scheduled-task-id") ||
+                                draggingScheduledTaskId
+                              ) {
+                                void rescheduleScheduledTaskByDrop(taskId, project.id, dropMinute);
+                              } else {
+                                void scheduleUnscheduledTask(taskId, project.id, dropMinute);
+                              }
+                              setDraggingScheduledTaskId(null);
+                              setDraggingUnscheduledTaskId(null);
+                              setPlanningDropTarget(null);
+                            }}
+                          />
+                          {planningDropTarget?.projectId === project.id ? (
+                            <div
+                              className={planningStyles.planningDropGhost}
+                              style={{
+                                left: planningPercentForMinute(
+                                  planningDropTarget.minute,
+                                  timelineStartMinute,
+                                  timelineRangeMinutes
+                                ),
+                                width: planningWidthPercent(
+                                  Math.max(15, Math.round(planningScheduledDurationSeconds(draggingTimelineTask) / 60)),
+                                  timelineRangeMinutes
+                                ),
+                              }}
+                            />
+                          ) : null}
+                          {(planningScreenMeasured ? laneTasks : []).map((task) => {
+                            const scheduledStart = task.scheduledStart ? new Date(task.scheduledStart) : null;
+                            if (!scheduledStart || Number.isNaN(scheduledStart.getTime())) {
+                              return null;
+                            }
+                            const placement = laneLayout.get(task.id);
+                            if (!placement) {
+                              return null;
+                            }
+                            const taskDurationMinutes = Math.max(
+                              1,
+                              Math.round(planningScheduledDurationSeconds(task) / 60)
+                            );
+                            const overlapTitle = planningOverlapTitlesByTaskId.get(task.id) ?? null;
+                            const startLabel = formatPlanningClockLabel(scheduledStart);
+                            return (
+                              <div key={task.id} className={planningStyles.planningTaskGroup}>
+                                {/* The duration, drawn from the start time and
+                                    clipped at the axis end — the card can hang
+                                    left of it, the bar never moves. */}
+                                <span
+                                  aria-hidden="true"
+                                  className={planningStyles.planningBar}
+                                  data-blocked={project.status === "blocked"}
+                                  data-done={task.completed}
+                                  data-running={task.isRunning}
+                                  data-testid={`planning-bar-${task.id}`}
+                                  style={{
+                                    left: `${placement.barLeft}px`,
+                                    top: `${PLANNING_CARD_TOP + placement.row * (planningCardHeight + 8)}px`,
+                                    width: `${placement.barWidth}px`,
+                                  }}
+                                />
+                                <button
+                                  className={planningStyles.planningBlock}
+                                  data-material="well"
+                                  data-dragging={draggingScheduledTaskId === task.id}
+                                  data-hangs-left={placement.hangsLeft}
+                                  data-overlap={overlapTitle !== null}
+                                  data-overlap-pulse={planningOverlapPulseTaskId === task.id}
+                                  data-project-id={task.projectId}
+                                  data-row={placement.row}
+                                  data-selected={selectedTimelineTask?.id === task.id}
+                                  data-running={task.isRunning}
+                                  data-completed={task.completed}
+                                  data-scheduled-start={task.scheduledStart ?? ""}
+                                  data-time-label={startLabel}
+                                  data-status={project.status}
+                                  draggable
+                                  onClick={() => selectPlanningTask(task.id, task.projectId)}
+                                  onDragEnd={() => {
+                                    setDraggingScheduledTaskId(null);
+                                    setPlanningDropTarget(null);
+                                  }}
+                                  onDragStart={(event) => {
+                                    setDraggingScheduledTaskId(task.id);
+                                    event.dataTransfer.effectAllowed = "move";
+                                    event.dataTransfer.setData("text/planning-scheduled-task-id", task.id);
+                                    selectPlanningTask(task.id, task.projectId);
+                                  }}
+                                  style={{
+                                    left: `${placement.x}px`,
+                                    top: `${PLANNING_CARD_TOP + placement.row * (planningCardHeight + 8)}px`,
+                                  }}
+                                  title={
+                                    overlapTitle
+                                      ? `${task.title} · ${taskDurationMinutes} min · Overlaps '${overlapTitle}'.`
+                                      : `${task.title} · ${taskDurationMinutes} min`
+                                  }
+                                  type="button"
+                                >
+                                  <span className={planningStyles.planningBlockTitle}>{task.title}</span>
+                                  <span className={planningStyles.planningBlockRow}>
+                                    {/* A narrow card keeps the start and the
+                                        duration; the priority and the blocked
+                                        word drop in that order, as the mock
+                                        drops them (A-planning.html). */}
+                                    <span className={planningStyles.planningBlockMeta}>
+                                      {[
+                                        startLabel,
+                                        planningCardWidth < 200
+                                          ? `${taskDurationMinutes}m`
+                                          : `${taskDurationMinutes} min`,
+                                        (task.isRunning || task.completed) && planningCardWidth < 260
+                                          ? null
+                                          : task.priority.toUpperCase(),
+                                        project.status === "blocked" && planningCardWidth >= 200 ? "blocked" : null,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" · ")}
+                                    </span>
+                                    {task.isRunning ? (
+                                      <span className={planningStyles.planningBlockRun}>
+                                        ● {formatPlanningElapsed(task.totalSeconds)}
+                                      </span>
+                                    ) : task.completed ? (
+                                      <span className={planningStyles.planningBlockDone}>
+                                        ✓ {formatPlanningElapsed(task.totalSeconds)}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </Screen>
+
+          {visibleUnscheduledTasks.length > 0 && settings.modeSection === "timeline" ? (
+            <Well
+              radius="screen"
               className={planningStyles.planningUnscheduledTray}
               data-all-unscheduled={allTasksUnscheduled}
               data-expanded={unscheduledTrayExpanded}
@@ -1689,7 +1664,9 @@ export function PlanningWorkspaceSurface({
                     key={task.id}
                     aria-label={`Unscheduled task ${task.title}`}
                     className={planningStyles.planningUnscheduledChip}
+                    data-material="well"
                     draggable
+                    onClick={() => selectPlanningTask(task.id, task.projectId)}
                     onDragEnd={() => {
                       setDraggingUnscheduledTaskId(null);
                       setPlanningDropTarget(null);
@@ -1702,39 +1679,71 @@ export function PlanningWorkspaceSurface({
                     }}
                     type="button"
                   >
-                    {task.title}
+                    <span className={planningStyles.planningUnscheduledTitle}>{task.title}</span>
+                    <span className={planningStyles.planningUnscheduledMeta}>
+                      {projectTitles.get(task.projectId) ?? task.projectId} · {task.priority.toUpperCase()}
+                    </span>
                   </button>
                 ))}
+                <span className={planningStyles.planningUnscheduledHint}>
+                  Drag a card onto a lane to put it on the day.
+                </span>
               </div>
+            </Well>
+          ) : null}
+
+          {showFilterBanner || showSearchZeroResult ? (
+            <div className={planningStyles.planningFilterBanner} role="status">
+              <span>
+                {hasPlanningSearch ? `Search: "${planningSearchQuery.trim()}"` : `Filter: ${settings.viewFilter}`} ·{" "}
+                {filteredProjects.length} of {projects.length}
+              </span>
+              <button
+                className={planningStyles.planningFilterClear}
+                data-material="key"
+                onClick={() => clearPlanningFilters()}
+                type="button"
+              >
+                Clear
+              </button>
             </div>
           ) : null}
-        </div>
-      )}
+
+          {planningFeedback ? (
+            <div className={planningStyles.planningToolbarNotice} data-tone={planningFeedback.tone} role="status">
+              {planningFeedback.message}
+            </div>
+          ) : null}
+        </main>
+
+        <aside className={planningStyles.planningPlateColumn} data-material="plate" data-region="inspector">
+          <PlanningPlate
+            activity={plateActivity}
+            busy={planningBusyAction !== null}
+            project={plateProject}
+            projectTasks={plateTasks}
+            selectedTask={plateSelectedTask}
+            onAddChecklistItem={createPlanningProjectDetailChecklistItem}
+            onCreateTask={createPlanningProjectDetailTask}
+            onDeleteTask={(taskId) => void deletePlanningTaskById(taskId)}
+            onSelectTask={selectPlanningTask}
+            onToggleChecklistItem={togglePlanningProjectDetailChecklistItem}
+            onToggleTaskComplete={togglePlanningProjectDetailTaskComplete}
+            onToggleTimer={(taskId, running) => void togglePlanningTaskTimer(taskId, running)}
+          />
+        </aside>
+      </div>
+
+      <ShellRegion region="footer">
+        <PlanningFooter facts={dayFacts} viewDayLabel={viewDayLabel} />
+      </ShellRegion>
+
       {planningTimeReportOpen ? (
         <PlanningTimeReportOverlay
           loading={planningTimeReportLoading}
           error={planningTimeReportError}
           report={planningTimeReport}
           onClose={closePlanningTimeReport}
-        />
-      ) : null}
-      {planningProjectDetailOpen && planningProjectDetailProject ? (
-        <PlanningProjectDetailOverlay
-          activity={planningProjectDetailActivity}
-          checklistTotals={planningProjectDetailChecklistTotals}
-          onClose={closePlanningProjectDetail}
-          onCreateTask={createPlanningProjectDetailTask}
-          onAddChecklistItem={createPlanningProjectDetailChecklistItem}
-          onToggleChecklistItem={togglePlanningProjectDetailChecklistItem}
-          onSelectTask={selectPlanningProjectDetailTask}
-          onToggleTaskComplete={togglePlanningProjectDetailTaskComplete}
-          progressValue={planningProjectDetailProgressValue}
-          project={planningProjectDetailProject}
-          selectedTaskId={planningProjectDetailSelectedTask?.id ?? null}
-          tasks={planningProjectDetailTasks}
-          totalProjectSeconds={planningProjectDetailTotalSeconds}
-          totalTaskCount={planningProjectDetailTasks.length}
-          completedTaskCount={planningProjectDetailCompletedTaskCount}
         />
       ) : null}
     </div>

@@ -453,6 +453,10 @@ export interface ShellStore {
   updatePlanningSettings(request: PlanningSettingsUpdateRequest): Promise<JsonValue>;
   reschedulePlanningTask(request: PlanningTaskRescheduleRequest): Promise<JsonValue>;
   togglePlanningTaskComplete(taskId: string): Promise<JsonValue>;
+  /** Visual overhaul A, Slice 6: the running-timer keys on the cluster and the
+   *  plate drive `planning.task.timer`, which the engine has always answered. */
+  setPlanningTaskTimer(taskId: string, action: "start" | "stop" | "toggle"): Promise<JsonValue>;
+  deletePlanningTask(taskId: string): Promise<JsonValue>;
   exportSupportBackup(): Promise<JsonValue>;
   restoreSupportBackup(path: string): Promise<JsonValue>;
   exportCompanionConfig(baseUrl?: string): Promise<JsonValue>;

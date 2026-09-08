@@ -3,30 +3,46 @@ import { expect, test } from "@playwright/test";
 import { openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: planning workspace specs split out of
-// operator-shell.spec.ts. Covers timeline, board, project detail overlay,
-// reschedule + drag flows, toolbar actions, empty/loading postures.
+// operator-shell.spec.ts. Covers timeline, board, the plate, reschedule + drag
+// flows, cluster actions, empty/loading postures.
+//
+// Visual overhaul A, Slice 6 (plan D1): Planning moved onto the cluster rule.
+// The mode switch, the day keys, the projects, the running timers and the
+// standing actions are portalled into the SHELL's cluster region, so they are
+// no longer inside `planning-workspace` — assertions on them scope to
+// `planning-cluster` instead. The project-detail dialog became the always-on
+// plate (`planning-project-detail`), which lives inside the workspace, so
+// timeline-card lookups scope to their lane to stay unambiguous.
 
 test("renders the planning timeline from an engine-backed snapshot and toggles board mode", async ({ page }) => {
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
+  const cluster = page.getByTestId("planning-cluster");
   await expect(page.getByRole("heading", { name: "Planning timeline" })).toHaveCount(0);
-  // PLA-06 (Slice 10d-1): the mode + filter toggles are now DS SegmentedControl —
-  // role="radio"/aria-checked (a radiogroup), not the old role="tab"/data-active tablist.
-  await expect(workspace.getByRole("radio", { name: "Timeline" })).toHaveAttribute("aria-checked", "true");
+  // PLA-06 (Slice 10d-1): the mode + filter toggles are role="radio"/aria-checked,
+  // not the old role="tab"/data-active tablist. Slice 6: the mode switch is a
+  // segmented well on the shell's cluster; the filters ride the screen header.
+  await expect(cluster.getByRole("radio", { name: "Timeline" })).toHaveAttribute("aria-checked", "true");
   await expect(workspace.getByText("evening_service")).toBeVisible();
-  await expect(workspace.getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i })).toBeVisible();
+  await expect(
+    workspace.getByTestId("planning-lane-proj-booth-2").getByRole("button", {
+      name: /Commission Stream Deck\+ · Booth 2/i,
+    })
+  ).toBeVisible();
   await expect(workspace.getByText("Archive Q3 cue library")).toBeVisible();
   await expect(page.getByTestId("planning-now-playhead")).toBeVisible();
-  // PLA-03/DENSITY-03 (Slice 10c): lanes now fill the measured timeline band up to a 150px
-  // ceiling instead of being pinned at the old fixed 84px cap (which left a vast dead band).
-  // At 2560x1440 with 5 projects the band ÷ 5 exceeds the ceiling, so lanes sit at 150px.
+  // PLA-03/DENSITY-03 (Slice 10c) as re-cut by Slice 6: the band divides evenly
+  // between the lanes (A-planning.html's `laneH = (H - axis) / lanes`), so five
+  // lanes on the studio monitor are taller than the retired 150px ceiling and
+  // still leave room for a card's second row.
   const boothLaneBounds = await workspace.getByTestId("planning-lane-proj-booth-2").boundingBox();
-  expect(boothLaneBounds?.height ?? 0).toBeGreaterThan(120);
-  expect(boothLaneBounds?.height ?? 0).toBeLessThan(151);
+  expect(boothLaneBounds?.height ?? 0).toBeGreaterThan(150);
+  const timelineBounds = await workspace.getByTestId("planning-lane-proj-ops").boundingBox();
+  expect(Math.abs((timelineBounds?.height ?? 0) - (boothLaneBounds?.height ?? 0))).toBeLessThanOrEqual(1);
 
   await page.keyboard.press("Shift+KeyB");
-  await expect(workspace.getByRole("radio", { name: "Board" })).toHaveAttribute("aria-checked", "true");
+  await expect(cluster.getByRole("radio", { name: "Board" })).toHaveAttribute("aria-checked", "true");
   const boardCard = workspace.getByTestId("planning-board-card-proj-booth-2");
   await expect(boardCard).toBeVisible();
   await expect(boardCard).toHaveAttribute("data-running", "true");
@@ -36,17 +52,19 @@ test("renders the planning timeline from an engine-backed snapshot and toggles b
   await expect(boardCard).toContainText("audio");
   await expect(boardCard).toContainText("control-surface");
   await expect(workspace.getByText("No projects in this column.")).toHaveCount(1);
-  await expect(workspace.getByText("booth_2")).toBeVisible();
+  await expect(boardCard.getByText("booth_2")).toBeVisible();
   await page.keyboard.press("Digit4");
   await expect(workspace.getByRole("radio", { name: "Done" })).toHaveAttribute("aria-checked", "true");
   await expect(workspace.getByTestId("planning-board-empty-done")).toHaveAttribute("data-zero-filter", "true");
   await expect(workspace.getByText("No done tasks.")).toBeVisible();
 
   await page.keyboard.press("Shift+KeyT");
-  await expect(workspace.getByRole("radio", { name: "Timeline" })).toHaveAttribute("aria-checked", "true");
+  await expect(cluster.getByRole("radio", { name: "Timeline" })).toHaveAttribute("aria-checked", "true");
   await expect(workspace.getByText("Filter: done · 0 of 5")).toBeVisible();
   await workspace.getByRole("button", { name: "Clear" }).click();
-  await expect(workspace.getByRole("button", { name: /Level-match overflow/i })).toBeVisible();
+  await expect(
+    workspace.getByTestId("planning-lane-proj-audio").getByRole("button", { name: /Level-match overflow/i })
+  ).toBeVisible();
 });
 
 test("supports retained planning board drag reorder and status moves", async ({ page }) => {
@@ -136,7 +154,12 @@ test("supports planning timeline selection, keyboard reschedule, and local day n
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
-  const selectedTask = workspace.getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i });
+  const cluster = page.getByTestId("planning-cluster");
+  const plate = page.getByTestId("planning-project-detail");
+  const dayKey = cluster.getByTestId("planning-day-today");
+  const selectedTask = workspace
+    .getByTestId("planning-lane-proj-booth-2")
+    .getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i });
 
   await selectedTask.click();
   await expect(selectedTask).toHaveAttribute("data-selected", "true");
@@ -147,28 +170,24 @@ test("supports planning timeline selection, keyboard reschedule, and local day n
 
   await page.keyboard.press("ArrowDown");
   await expect(workspace.getByText("Commission Stream Deck+ · Booth 2 · running")).toBeVisible();
+  // Slice 6: Enter used to open the project-detail dialog; the plate is always
+  // on screen, so it puts the task's project on the plate instead.
   await page.keyboard.press("Enter");
-  const audioDetailDialog = page.getByRole("dialog", { name: "audio" });
-  await expect(audioDetailDialog).toBeVisible();
-  await audioDetailDialog.getByRole("button", { name: "Close" }).click();
-  await expect(audioDetailDialog).toHaveCount(0);
+  await expect(plate).toHaveAttribute("aria-label", "audio");
 
   await page.keyboard.press("ArrowUp");
   await expect(workspace.getByText("Commission Stream Deck+ · Booth 2 · running")).toHaveCount(1);
   await page.keyboard.press("Enter");
-  const boothDetailDialog = page.getByRole("dialog", { name: "booth_2" });
-  await expect(boothDetailDialog).toBeVisible();
-  await boothDetailDialog.getByRole("button", { name: "Close" }).click();
-  await expect(boothDetailDialog).toHaveCount(0);
+  await expect(plate).toHaveAttribute("aria-label", "booth_2");
 
   await page.keyboard.press("BracketRight");
-  await expect(workspace.getByText("10:00 → 23:00")).toBeVisible();
+  await expect(workspace.getByText(/10:00 – 23:00/)).toBeVisible();
 
   await page.keyboard.press("Shift+BracketRight");
-  await expect(workspace.getByRole("button", { name: "Today" })).toBeVisible();
+  await expect(dayKey).toHaveAttribute("aria-label", /^Go to today/);
 
   await page.keyboard.press("0");
-  await expect(workspace.getByRole("button", { name: "Today" })).toHaveCount(0);
+  await expect(dayKey).toHaveAttribute("aria-label", /^Today ·/);
   await expect(selectedTask).toBeVisible();
 });
 
@@ -177,30 +196,43 @@ test("reschedules a planning timeline block by drag into another lane", async ({
 
   const workspace = page.getByTestId("planning-workspace");
   const audioLane = workspace.getByTestId("planning-lane-body-proj-audio");
-  const taskBlock = workspace.getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i });
+  const taskBlock = workspace
+    .getByTestId("planning-lane-proj-booth-2")
+    .getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i });
 
   await taskBlock.dragTo(audioLane, {
     targetPosition: { x: 420, y: 42 },
   });
 
-  await expect(workspace.getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i })).toHaveCount(1);
+  await expect(
+    workspace.locator('[data-testid^="planning-lane-proj-"] button[data-row]', {
+      hasText: /Commission Stream Deck\+ · Booth 2/,
+    })
+  ).toHaveCount(1);
   await expect(workspace.getByText("Commission Stream Deck+ · Booth 2 · running")).toBeVisible();
 });
 
-test("opens the retained planning project detail overlay from timeline selection and board detail targets", async ({
+test("keeps the retained project detail on the plate, from timeline selection and board detail targets", async ({
   page,
 }) => {
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
-  await workspace.getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i }).click();
+  await workspace
+    .getByTestId("planning-lane-proj-booth-2")
+    .getByRole("button", { name: /Commission Stream Deck\+ · Booth 2/i })
+    .click();
   await page.keyboard.press("Enter");
 
-  const detailDialog = page.getByRole("dialog", { name: "booth_2" });
+  // Slice 6 (plan D1): the same controls, on the plate rather than in a dialog.
+  const detailDialog = page.getByTestId("planning-project-detail");
   await expect(detailDialog).toBeVisible();
+  await expect(detailDialog).toHaveAttribute("aria-label", "booth_2");
   await expect(detailDialog.getByText("1/2 complete")).toBeVisible();
   await expect(detailDialog.getByText("Verify OSC bindings")).toBeVisible();
-  await expect(detailDialog.getByText("Commission Stream Deck+ · Booth 2")).toBeVisible();
+  // The plate names the selected task in its head and again in the project's
+  // task list; the head is the one that says what is in front of the operator.
+  await expect(detailDialog.getByRole("heading", { name: "Commission Stream Deck+ · Booth 2" })).toBeVisible();
   await expect(detailDialog.getByText("Stream Deck+ booth commissioning resumed.")).toBeVisible();
   const checklistToggle = detailDialog.getByRole("button", {
     name: "Toggle checklist item Verify companion trigger handoff for Commission Stream Deck+ · Booth 2",
@@ -210,15 +242,10 @@ test("opens the retained planning project detail overlay from timeline selection
   await checklistToggle.click();
   await expect(checklistToggle).toHaveAttribute("data-done", "true");
   await expect(detailDialog.getByText("Checklist item checked")).toBeVisible();
-  await detailDialog
-    .getByRole("button", {
-      name: "Toggle completion for Commission Stream Deck+ · Booth 2",
-      exact: true,
-    })
-    .click();
+  await detailDialog.getByTestId("planning-plate-complete").click();
   await expect(detailDialog.getByText("2/2 complete")).toBeVisible();
   await expect(detailDialog.getByText('Task "Commission Stream Deck+ · Booth 2" marked as completed')).toBeVisible();
-  await detailDialog.getByRole("button", { name: "+ Add Task" }).click();
+  await detailDialog.getByTestId("planning-plate-add-task").click();
   await detailDialog.getByLabel("New task for booth_2").fill("Run booth handoff");
   await detailDialog.getByRole("button", { name: "Add Task", exact: true }).click();
   await expect(detailDialog.getByText("2/3 complete")).toBeVisible();
@@ -243,19 +270,20 @@ test("opens the retained planning project detail overlay from timeline selection
     })
   ).toBeVisible();
   await expect(detailDialog.getByText('Checklist item "Pack backup SD image" added')).toBeVisible();
-  await detailDialog.getByRole("button", { name: "Close" }).click();
-  await expect(detailDialog).toHaveCount(0);
-
   await page.keyboard.press("Shift+KeyB");
+  await workspace.getByRole("button", { name: "Open project detail for ops" }).click();
+  await expect(detailDialog).toHaveAttribute("aria-label", "ops");
   await workspace.getByRole("button", { name: "Open project detail for booth_2" }).click();
-  await expect(page.getByRole("dialog", { name: "booth_2" })).toBeVisible();
+  await expect(detailDialog).toHaveAttribute("aria-label", "booth_2");
 });
 
 test("surfaces planning lane overlap after a reschedule write", async ({ page }) => {
   await openFixture(page, "planning-overlap");
 
   const workspace = page.getByTestId("planning-workspace");
-  const selectedTask = workspace.getByRole("button", { name: /Program note runthrough/i });
+  const selectedTask = workspace
+    .getByTestId("planning-lane-proj-overlap")
+    .getByRole("button", { name: /Program note runthrough/i });
 
   await selectedTask.click();
   await expect(selectedTask).toHaveAttribute("data-selected", "true");
@@ -273,48 +301,53 @@ test("supports planning all-unscheduled tray expansion and schedules a task into
   const lane = workspace.getByTestId("planning-lane-body-proj-ops");
   const taskChip = workspace.getByRole("button", { name: "Unscheduled task Archive Q3 cue library" });
 
-  await expect(workspace.getByText("Drag into a lane to schedule.")).toBeVisible();
+  await expect(workspace.getByText("Drag a card onto a lane to put it on the day.")).toBeVisible();
   await expect(tray).toHaveAttribute("data-expanded", "true");
   await expect(tray).toHaveAttribute("data-all-unscheduled", "true");
 
   await taskChip.dragTo(lane);
 
-  await expect(workspace.getByText("Archive Q3 cue library")).toBeVisible();
-  await expect(workspace.getByText("15 min · P3")).toBeVisible();
+  const scheduledCard = workspace
+    .getByTestId("planning-lane-proj-ops")
+    .getByRole("button", { name: /Archive Q3 cue library/i });
+  await expect(scheduledCard).toBeVisible();
+  await expect(scheduledCard).toContainText("15 min · P3");
   await expect(workspace.getByRole("button", { name: "Unscheduled task Archive Q3 cue library" })).toHaveCount(0);
 });
 
-test("supports planning toolbar project creation and backup export", async ({ page }) => {
+test("supports planning cluster project creation and backup export", async ({ page }) => {
   await openFixture(page, "planning-empty");
 
   const workspace = page.getByTestId("planning-workspace");
+  const cluster = page.getByTestId("planning-cluster");
   await expect(workspace.getByText("No projects yet. Press N to start one.")).toBeVisible();
 
   await page.keyboard.press("KeyN");
-  const projectTitle = workspace.getByLabel("New project title");
+  const projectTitle = cluster.getByLabel("New project title");
   await expect(projectTitle).toBeFocused();
   await projectTitle.fill("studio_patch");
-  await workspace.getByRole("button", { name: "Add project" }).click();
+  await cluster.getByTestId("planning-add-project").click();
   await expect(workspace.getByText("Created project 'studio_patch'.")).toBeVisible();
-  await expect(workspace.getByText("studio_patch", { exact: true })).toBeVisible();
+  await expect(cluster.getByText("studio_patch", { exact: true })).toBeVisible();
 
-  await workspace.getByRole("button", { name: "Backup" }).click();
+  await cluster.getByTestId("planning-backup").click();
   await expect(workspace.getByText(/Exported support backup to/)).toBeVisible();
 });
 
-test("supports planning toolbar search focus and engine-backed time report", async ({ page }) => {
+test("supports planning screen search focus and engine-backed time report", async ({ page }) => {
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
-  const timelineTab = workspace.getByRole("radio", { name: "Timeline" });
+  const cluster = page.getByTestId("planning-cluster");
+  const timelineTab = cluster.getByRole("radio", { name: "Timeline" });
   const search = workspace.getByLabel("Search planning tasks");
 
   await timelineTab.click();
   await page.keyboard.press("/");
   await expect(search).toBeFocused();
   await search.fill("stream deck");
-  await expect(workspace.getByText("booth_2")).toBeVisible();
-  await expect(workspace.getByText("audio")).toHaveCount(0);
+  await expect(workspace.getByTestId("planning-lane-proj-booth-2")).toBeVisible();
+  await expect(workspace.getByTestId("planning-lane-proj-audio")).toHaveCount(0);
 
   await timelineTab.click();
   await page.keyboard.press("KeyS");
@@ -339,7 +372,10 @@ test("shows the centered empty-state card in planning board mode with no project
   await expect(workspace.getByText("No projects yet. Press N to start one.")).toBeVisible();
 
   await page.keyboard.press("Shift+KeyB");
-  await expect(workspace.getByRole("radio", { name: "Board" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByTestId("planning-cluster").getByRole("radio", { name: "Board" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
   await expect(workspace.getByText("No projects yet. Press N to start one.")).toBeVisible();
   await expect(workspace.getByTestId("planning-board-column-todo")).toBeVisible();
   await expect(workspace.getByTestId("planning-board-column-in-progress")).toBeVisible();
@@ -356,4 +392,147 @@ test("renders the planning board loading posture from app snapshot mode settings
   await expect(workspace.getByTestId("planning-board-column-blocked")).toBeVisible();
   await expect(workspace.getByTestId("planning-board-column-done")).toBeVisible();
   await expect(workspace.getByText("Run-of-show loading…")).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------
+// Visual overhaul A, Slice 6 (plan Slice 6): the cluster rule on Planning.
+// ---------------------------------------------------------------------------
+
+test("the cluster and the screen header never wrap", async ({ page }) => {
+  await openFixture(page, "planning-populated");
+
+  const cluster = page.getByTestId("planning-cluster");
+  await expect(cluster).toBeVisible();
+
+  // H11: nothing in the cluster reaches past its own column, and nothing on the
+  // screen header falls onto a second line.
+  const clusterBox = await cluster.boundingBox();
+  const overflowing = await cluster.evaluate((root) => {
+    const bounds = root.getBoundingClientRect();
+    return [...root.querySelectorAll("*")]
+      .filter((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.right > bounds.right + 1;
+      })
+      .map((node) => (node as HTMLElement).dataset.testid ?? node.className)
+      .slice(0, 5);
+  });
+  expect(overflowing, "no cluster element runs past the cluster").toEqual([]);
+  expect(clusterBox?.width ?? 0).toBeGreaterThan(300);
+
+  const head = await page.getByTestId("planning-screen").evaluate((frame) => {
+    const row = frame.firstElementChild as HTMLElement | null;
+    if (!row) return null;
+    const bounds = row.getBoundingClientRect();
+    return {
+      height: Math.round(bounds.height),
+      centres: [...row.children].map((child) => {
+        const rect = child.getBoundingClientRect();
+        return Math.round(rect.top + rect.height / 2);
+      }),
+      overflowing: [...row.querySelectorAll("*")].some((node) => {
+        const el = node as HTMLElement;
+        return el.scrollWidth > el.clientWidth + 1 && el.tagName !== "INPUT";
+      }),
+    };
+  });
+  // One row of a fixed height, every child on the same centreline, and nothing
+  // inside it clipped: the header cannot have wrapped.
+  expect(head!.height, "the screen header stays one row tall").toBeLessThanOrEqual(34);
+  expect(new Set(head!.centres).size, "the screen header stays on one row").toBe(1);
+  expect(head!.overflowing, "nothing on the screen header is clipped").toBe(false);
+});
+
+test("planning-overlap renders overlapping cards in a second row with no clipped title", async ({ page }) => {
+  await openFixture(page, "planning-overlap");
+
+  const lane = page.getByTestId("planning-workspace").getByTestId("planning-lane-proj-overlap");
+  const first = lane.getByRole("button", { name: /Program note runthrough/i });
+  const second = lane.getByRole("button", { name: /Projector handoff/i });
+
+  // The mock's rule: a card whose box would cover another card in the lane
+  // drops to the next row instead of sitting on top of it.
+  await expect(first).toHaveAttribute("data-row", "0");
+  await expect(second).toHaveAttribute("data-row", "1");
+
+  const firstBox = await first.boundingBox();
+  const secondBox = await second.boundingBox();
+  expect(secondBox!.y).toBeGreaterThan(firstBox!.y + firstBox!.height - 1);
+
+  // Both titles are printed in full: the card is wide enough for them.
+  for (const card of [first, second]) {
+    const clipped = await card.locator('[class*="planningBlockTitle"]').evaluate((node) => {
+      const el = node as HTMLElement;
+      return el.scrollWidth > el.clientWidth + 1;
+    });
+    expect(clipped).toBe(false);
+  }
+});
+
+test("a card past the axis end hangs to the left of its start and its bar is clipped", async ({ page }) => {
+  await openFixture(page, "planning-populated");
+
+  const workspace = page.getByTestId("planning-workspace");
+  const lane = workspace.getByTestId("planning-lane-proj-evening-service");
+  // 20:30 + 120 min runs past the 22:00 axis end on the 09:00–22:00 day.
+  const lateCard = lane.getByRole("button", { name: /Draft run-of-show · Tue/i });
+  await expect(lateCard).toHaveAttribute("data-hangs-left", "true");
+
+  const laneBodyBox = await lane.locator('[class*="planningLaneBody"]').boundingBox();
+  const cardBox = await lateCard.boundingBox();
+  const barBox = await workspace.getByTestId("planning-bar-task-draft-run-of-show").boundingBox();
+
+  // The card sits to the left of where the bar starts, and neither leaves the axis.
+  expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(barBox!.x + 1);
+  expect(barBox!.x + barBox!.width).toBeLessThanOrEqual(laneBodyBox!.x + laneBodyBox!.width + 1);
+});
+
+test("selecting a task populates the plate; Escape clears it", async ({ page }) => {
+  await openFixture(page, "planning-populated");
+
+  const workspace = page.getByTestId("planning-workspace");
+  const plate = page.getByTestId("planning-project-detail");
+  const card = workspace
+    .getByTestId("planning-lane-proj-evening-service")
+    .getByRole("button", { name: /Draft run-of-show · Tue/i });
+
+  await card.click();
+  await expect(plate.getByRole("heading", { name: "Draft run-of-show · Tue" })).toBeVisible();
+  await expect(plate.getByTestId("planning-plate-schedule")).toContainText("20:30");
+  await expect(plate.getByTestId("planning-plate-schedule")).toContainText("120 min");
+
+  await page.keyboard.press("Escape");
+  // The plate stays — it is the shell's right column, not a dialog — but the
+  // task comes off it and the project it belongs to is what is left.
+  await expect(plate.getByRole("heading", { name: "Draft run-of-show · Tue" })).toHaveCount(0);
+  await expect(plate).toHaveAttribute("aria-label", "evening_service");
+  await expect(card).toHaveAttribute("data-selected", "false");
+});
+
+test("a running timer renders the live key on the plate and the row in the cluster", async ({ page }) => {
+  await openFixture(page, "planning-populated");
+
+  const cluster = page.getByTestId("planning-cluster");
+  const plate = page.getByTestId("planning-project-detail");
+
+  // The cluster names both running timers, with what the engine reports about
+  // them: the project, when they started, and how long they have run.
+  const timerRow = cluster.getByTestId("planning-running-timer-task-commission-streamdeck");
+  await expect(timerRow).toContainText("booth_2");
+  await expect(timerRow).toContainText("started 18:24");
+  await expect(timerRow).toContainText("1h 18m");
+  await expect(cluster.getByTestId("planning-running-timer-task-level-match")).toContainText("42m");
+
+  // The selected task is the running one, so the plate's key is lit and says
+  // what pressing it does.
+  const timerKey = plate.getByTestId("planning-plate-timer");
+  await expect(timerKey).toHaveAttribute("aria-pressed", "true");
+  await expect(timerKey).toContainText("Running");
+  await expect(timerKey).toContainText("1h 18m · stop");
+
+  // Stopping it from the cluster takes the row away and unlights the key.
+  await cluster.getByTestId("planning-stop-timer-task-commission-streamdeck").click();
+  await expect(timerRow).toHaveCount(0);
+  await expect(timerKey).toHaveAttribute("aria-pressed", "false");
+  await expect(cluster.getByTestId("planning-running-section")).toContainText("1 timer");
 });

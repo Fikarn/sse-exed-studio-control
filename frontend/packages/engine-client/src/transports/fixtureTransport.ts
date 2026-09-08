@@ -6398,6 +6398,94 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           task: cloneJson(updatedTask),
         };
       }
+      case "planning.task.timer": {
+        // Visual overhaul A, Slice 6: the cluster's Stop keys and the plate's
+        // live key. The fixture keeps the engine's shape — a running task holds
+        // `lastStarted`, and stopping banks the elapsed seconds on the total.
+        const taskId = asString(params.taskId).trim();
+        if (!taskId) {
+          throw new Error("taskId is required");
+        }
+        const action = asString(params.action).trim() || "toggle";
+        if (!["start", "stop", "toggle"].includes(action)) {
+          throw new Error("action must be one of: start, stop, toggle");
+        }
+
+        const planningSnapshot = asRecord(state.planningSnapshot) ?? buildDefaultPlanningSnapshot();
+        const tasks = asArray(planningSnapshot.tasks)
+          .map((task) => asRecord(task))
+          .filter((task): task is JsonObject => task !== null);
+        const targetTask = tasks.find((task) => asString(task.id) === taskId);
+        if (!targetTask) {
+          throw new Error(`Planning task '${taskId}' was not found.`);
+        }
+
+        const wasRunning = asBoolean(targetTask.isRunning, false);
+        const running = action === "toggle" ? !wasRunning : action === "start";
+        const startedAt = asString(targetTask.lastStarted);
+        const startedMs = startedAt ? Date.parse(startedAt) : Number.NaN;
+        const bankedSeconds =
+          wasRunning && !running && Number.isFinite(startedMs)
+            ? Math.max(0, Math.round((Date.now() - startedMs) / 1000))
+            : 0;
+        const updatedTask = {
+          ...targetTask,
+          isRunning: running,
+          lastStarted: running ? new Date().toISOString() : targetTask.lastStarted,
+          totalSeconds: asNumber(targetTask.totalSeconds, 0) + bankedSeconds,
+        };
+
+        planningSnapshot.tasks = tasks.map((task) => (asString(task.id) === taskId ? updatedTask : task));
+        const timerActivityLog = asArray(planningSnapshot.activityLog);
+        timerActivityLog.unshift({
+          id: `planning-timer-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          entityType: "task",
+          entityId: taskId,
+          action: running ? "timer-started" : "timer-stopped",
+          detail: `Timer ${running ? "started" : "stopped"} on "${asString(targetTask.title)}"`,
+        });
+        planningSnapshot.activityLog = timerActivityLog.slice(0, 40);
+        state.planningSnapshot = planningSnapshot;
+        synchronizeFixtureState(state);
+        emit("planning.changed", { reason: running ? "timer-started" : "timer-stopped" });
+        return { task: cloneJson(updatedTask) };
+      }
+      case "planning.task.delete": {
+        const taskId = asString(params.taskId).trim();
+        if (!taskId) {
+          throw new Error("taskId is required");
+        }
+
+        const planningSnapshot = asRecord(state.planningSnapshot) ?? buildDefaultPlanningSnapshot();
+        const tasks = asArray(planningSnapshot.tasks)
+          .map((task) => asRecord(task))
+          .filter((task): task is JsonObject => task !== null);
+        const targetTask = tasks.find((task) => asString(task.id) === taskId);
+        if (!targetTask) {
+          throw new Error(`Planning task '${taskId}' was not found.`);
+        }
+
+        planningSnapshot.tasks = tasks.filter((task) => asString(task.id) !== taskId);
+        const deleteActivityLog = asArray(planningSnapshot.activityLog);
+        deleteActivityLog.unshift({
+          id: `planning-task-delete-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          entityType: "task",
+          entityId: taskId,
+          action: "deleted",
+          detail: `Task "${asString(targetTask.title)}" deleted`,
+        });
+        planningSnapshot.activityLog = deleteActivityLog.slice(0, 40);
+        const planningSettings = asRecord(planningSnapshot.settings);
+        if (planningSettings && asString(planningSettings.selectedTaskId) === taskId) {
+          planningSettings.selectedTaskId = null;
+        }
+        state.planningSnapshot = planningSnapshot;
+        synchronizeFixtureState(state);
+        emit("planning.changed", { reason: "task-deleted" });
+        return { taskId };
+      }
       case "planning.task.toggleComplete": {
         const taskId = asString(params.taskId).trim();
         if (!taskId) {

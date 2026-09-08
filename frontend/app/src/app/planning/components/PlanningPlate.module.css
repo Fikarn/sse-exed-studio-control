@@ -1,0 +1,235 @@
+/* Visual overhaul A, Slice 6: Planning's plate — the selected task, its
+   schedule, its checklist and its notes, then the project's other tasks, the
+   activity and the one red command. Every section is on screen at once. */
+
+.plate {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.liveKeys {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex: none;
+}
+
+.notes {
+  min-height: 56px;
+  padding: 10px;
+  border-radius: var(--radius-key);
+  font: 500 var(--font-size-label) / 1.5 var(--font-family-ui);
+  color: var(--display-text2);
+}
+
+/* ---- checklists --------------------------------------------------------- */
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 26px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-ctl);
+  background: transparent;
+  color: var(--text-text);
+  font: 500 var(--font-size-label) / 1.3 var(--font-family-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.check:hover {
+  border-color: var(--material-line);
+}
+
+.checkBox {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-ctl);
+  font-size: var(--font-size-tick);
+  line-height: 1;
+}
+
+.check[data-done="true"] .checkBox {
+  border-color: var(--role-green-text);
+  background: var(--role-green-fill-top);
+  color: var(--role-green-ink);
+}
+
+.checkText[data-done="true"] {
+  color: var(--text-text2);
+  text-decoration: line-through;
+}
+
+.checkComposer,
+.taskComposer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.checkInput {
+  flex: 1 1 140px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-ctl);
+  background: var(--material-well);
+  color: var(--display-text);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.checkInput::placeholder {
+  color: var(--display-text2);
+}
+
+/* ---- the project's tasks ------------------------------------------------ */
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task {
+  padding: 6px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+}
+
+.task[data-selected="true"] {
+  border-color: var(--material-line2);
+  background: var(--material-key);
+}
+
+.taskRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.taskToggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-ctl);
+  background: var(--material-key);
+  color: var(--text-text);
+  font-size: var(--font-size-label);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.taskToggle[data-completed="true"] {
+  border-color: var(--role-green-text);
+  background: var(--role-green-fill-top);
+  color: var(--role-green-ink);
+}
+
+.taskButton {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.taskTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.taskTitle[data-completed="true"] {
+  color: var(--text-text2);
+  text-decoration: line-through;
+}
+
+.taskMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--font-size-tick) / 1.2 var(--font-family-mono);
+  color: var(--text-text2);
+}
+
+.taskRunning {
+  flex: none;
+  font: 600 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--role-green-text);
+}
+
+.taskChecklist {
+  margin-top: 4px;
+  padding-left: 32px;
+}
+
+/* ---- activity, errors, the red command ---------------------------------- */
+
+.activity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+}
+
+.activityRow {
+  display: contents;
+}
+
+.activityTime {
+  font: 500 var(--font-size-tick) / 1.4 var(--font-family-mono);
+  color: var(--text-text2);
+}
+
+.activityRow > span:last-child {
+  font: 500 var(--font-size-label) / 1.4 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.activityDetail {
+  color: var(--text-text2);
+}
+
+.empty {
+  padding: 8px 0;
+  font: 500 var(--font-size-label) / 1.4 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.error {
+  flex: 1 1 100%;
+  font: 500 var(--font-size-tick) / 1.4 var(--font-family-ui);
+  color: var(--role-red-text);
+}
+
+.danger {
+  margin-top: auto;
+  flex: none;
+}
