@@ -1,5 +1,7 @@
 # Visual overhaul — session handoff (2026-09-05)
 
+> **Historical (2026-09-05).** This briefed the session that produced the concepts and the system; that work is finished and Concept A shipped. Current truth is [system-a-2026-09.md](system-a-2026-09.md) and [../plans/visual-overhaul-a-2026-09.md](../plans/visual-overhaul-a-2026-09.md). Kept for the mandate and the reasoning it records.
+
 Read this first in the new session. It says what the operator wants, what already exists and how far it can be trusted, where the tooling is, and what the first deliverable is. Everything it points to is in the repo on branch `ui-gold-standard-2026-09` or in the evidence folder next to the repo.
 
 ## Mandate (operator, 2026-09-05)

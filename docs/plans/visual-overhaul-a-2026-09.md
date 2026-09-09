@@ -1,6 +1,6 @@
 # Visual overhaul A — sliced plan
 
-Status: approved 2026-09-07 (D1–D14) on branch `ui-gold-standard-2026-09`. No slice has started; no source, token or test has been edited. Implementation runs in a new session from `visual-overhaul-a-2026-09-session-prompt.md`. It supersedes `docs/plans/gold-standard-2026-09.md` (the v1.1 plan), whose discipline it keeps and whose slices it re-scopes to Concept A.
+Status: **complete.** Approved 2026-09-07 (D1–D14) on branch `ui-gold-standard-2026-09`; all thirteen slices landed 2026-09-07 → 2026-09-09, each as its own commit with its baselines beside it, plus two follow-ups (`A S8 follow-up`, `A S11 follow-up`). Every measure in system §10 is met on all 81 boards. The per-slice `Status:` lines below are the authoritative record of what landed; `docs/HANDOFF.md` carries the slice-to-commit table and what is still open (the unsigned operator checklist in Appendix B, and the `linux` / `darwin` baselines). It supersedes `docs/plans/gold-standard-2026-09.md` (the v1.1 plan), whose discipline it keeps and whose slices it re-scoped to Concept A.
 
 Tracking: the per-slice `Status:` lines are the authoritative execution record. Each slice lands as its own commit `A S<N>: <what landed>` (baseline refreshes as `A S<N> (baselines): …`); any divergence from a slice's written scope gets a bold `*Rescoped:*` note in its status line before the commit, per the rescope protocol in `AGENTS.md`.
 

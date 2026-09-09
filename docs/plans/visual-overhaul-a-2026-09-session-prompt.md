@@ -1,5 +1,7 @@
 # Session prompt — implement Visual overhaul A (written 2026-09-07 for the implementing session)
 
+> **Historical (2026-09-07).** The prompt that started the implementing session. All thirteen slices have landed; see [visual-overhaul-a-2026-09.md](visual-overhaul-a-2026-09.md). Kept as the record of the constraints the implementation was held to.
+
 Paste everything below the line into the new session. The operator may edit the bracketed lines first.
 
 ---
