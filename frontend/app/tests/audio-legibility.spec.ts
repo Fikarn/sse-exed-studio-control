@@ -10,7 +10,11 @@ import { openFixture } from "./helpers/openFixture";
 // reaches a baseline review.
 
 const MICROTYPE_FLOOR_PX = 9.5;
-const BODY_CONTRAST_MIN = 3;
+// Visual overhaul A, Slice 10: the system's own number. This spec was
+// seeded at 3:1 when the Console's captions were the worst thing on the
+// screen; the pixel-sampled gate now reads 0 failures at 4.5:1 in all three
+// themes, so this reads the same line from the live DOM.
+const BODY_CONTRAST_MIN = 4.5;
 const NAV_CONTRAST_MIN = 4.5;
 
 interface TextRun {
@@ -184,7 +188,9 @@ const SURFACES = [
 ];
 
 for (const { width, height, theme } of SURFACES) {
-  test(`Console text at ${width}x${height} (${theme}) meets the 9.5 px floor and 3:1 contrast`, async ({ page }) => {
+  test(`Console text at ${width}x${height} (${theme}) meets the 9.5 px floor and ${BODY_CONTRAST_MIN}:1 contrast`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height });
     await openFixture(page, "audio-populated", theme === "bone" ? { theme } : undefined);
     await settleTheme(page, theme);

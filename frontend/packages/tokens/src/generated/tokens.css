@@ -48,8 +48,8 @@
   --color-brand-sky: #C8D4DD;
   --color-brand-text-primary: #FAF6E6;
   --color-brand-text-secondary: #D4CDB3;
-  --color-brand-text-muted: #8A8470;
-  --color-brand-text-faint: #5A5547;
+  --color-brand-text-muted: #948E7B;
+  --color-brand-text-faint: #8C846E;
   --color-scrim: rgba(0, 0, 0, 0.45);
   --color-shell-backdrop-glow: rgba(153, 186, 146, 0.1);
   --color-shell-backdrop-top: #050705;
@@ -141,7 +141,7 @@
   --audio-console-bg-elev: #2a2521;
   --audio-console-fg: #efebe1;
   --audio-console-fg2: rgba(239, 235, 225, 0.68);
-  --audio-console-fg3: rgba(239, 235, 225, 0.56);
+  --audio-console-fg3: rgba(239, 235, 225, 0.68);
   --audio-console-fg4: rgba(239, 235, 225, 0.22);
   --audio-console-line: rgba(239, 235, 225, 0.07);
   --audio-console-line2: rgba(239, 235, 225, 0.12);

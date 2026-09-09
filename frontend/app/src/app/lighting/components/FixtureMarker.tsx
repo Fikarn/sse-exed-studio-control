@@ -91,8 +91,17 @@ const SELECTED_STROKE = "var(--color-brand-green)";
 const HIGHLIGHT_OVERLAY_STROKE = "var(--color-warning-500)";
 const GHOST_STROKE = "var(--color-fixture-ghost-stroke)";
 
-const LABEL_NAME_FILL = "var(--color-brand-text-secondary)";
-const LABEL_META_FILL = "var(--color-brand-text-muted)";
+// Visual overhaul A, Slice 10 (system §5, §10): the plot is a well — black and
+// backlit in every theme — so its labels take the display inks, not the theme's
+// plate inks (Bone's muted ink read 1.7:1 on the plot floor). A label also
+// falls across whatever the rig is making, and a beam pool is any colour at
+// all, so each label sits on a chip of the plot's own floor. That is the same
+// answer the Console's equaliser scale uses, and it is what makes a fixture
+// name readable over a lit pool instead of readable only over the floor.
+const LABEL_NAME_FILL = "var(--display-text)";
+const LABEL_META_FILL = "var(--display-text2)";
+// JetBrains Mono advances 0.6 em, so a chip's width follows from the string.
+const labelChipWidth = (text: string, fontSize: number) => text.length * fontSize * 0.6 + 10;
 
 const MOUNTING_SHORT_LABEL: Record<FixtureMounting, string> = {
   bar: "bar",
@@ -717,6 +726,16 @@ export function FixtureMarker({
         ) : null}
         {labelVisible ? (
           <>
+            <rect
+              x={renderX - labelChipWidth(displayName, 10) / 2}
+              y={renderY + nameOffsetY - 9}
+              width={labelChipWidth(displayName, 10)}
+              height={13}
+              rx={4}
+              fill="var(--material-well)"
+              fillOpacity={0.86}
+              pointerEvents="none"
+            />
             <text
               x={renderX}
               y={renderY + nameOffsetY}
@@ -729,6 +748,16 @@ export function FixtureMarker({
             >
               {displayName}
             </text>
+            <rect
+              x={renderX - labelChipWidth(metaLabel, 9) / 2}
+              y={renderY + metaOffsetY - 8}
+              width={labelChipWidth(metaLabel, 9)}
+              height={12}
+              rx={4}
+              fill="var(--material-well)"
+              fillOpacity={0.86}
+              pointerEvents="none"
+            />
             <text
               x={renderX}
               y={renderY + metaOffsetY}

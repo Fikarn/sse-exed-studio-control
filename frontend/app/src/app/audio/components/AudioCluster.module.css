@@ -89,6 +89,13 @@
   position: absolute;
   top: 0;
   transform: translateX(-50%);
+  /* Visual overhaul A, Slice 10: a bare 12 px numeral fills its own box, so
+     the only thing around the glyph is its own antialiased fringe — the gate
+     samples that fringe as the background and reads 4.4:1 where the eye reads
+     the meter's floor. A little floor around the mark is both the honest
+     reading and the measurable one (the same padding the strip fader's scale
+     marks already carry). */
+  padding: 1px 3px;
   font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
   color: var(--text-text2);
 }

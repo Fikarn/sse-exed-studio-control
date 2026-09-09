@@ -58,8 +58,8 @@
      via core.json, so it cascades from here — Slice 3b namespace collapse) */
   --color-brand-text-primary: #e6f4f3;
   --color-brand-text-secondary: #bcccce;
-  --color-brand-text-muted: #7e8a8c;
-  --color-brand-text-faint: #525c5e;
+  --color-brand-text-muted: #949e9f;
+  --color-brand-text-faint: #78878a;
 
   /* primary / brand accent — green shifts to teal (Audio graphite cyan) */
   --color-primary-500: #6fd6ce;
@@ -125,8 +125,8 @@
      core.json — Slice 3b namespace collapse) */
   --color-brand-text-primary: #262017;
   --color-brand-text-secondary: #4a4636;
-  --color-brand-text-muted: #6e6a5a;
-  --color-brand-text-faint: #7d7a6c;
+  --color-brand-text-muted: #514e42;
+  --color-brand-text-faint: #545249;
 
   /* primary / brand accent — green darkened to clear AA on the light body.
      S14 re-derivation: the Slice 3 values carried StatusBadge TEXT over the
@@ -261,7 +261,7 @@
   --audio-console-bg-elev: #232b33;
   --audio-console-fg: #e8edf0;
   --audio-console-fg2: rgba(232, 237, 240, 0.66);
-  --audio-console-fg3: rgba(232, 237, 240, 0.56);
+  --audio-console-fg3: rgba(232, 237, 240, 0.68);
   --audio-console-fg4: rgba(232, 237, 240, 0.2);
   --audio-console-line: rgba(232, 237, 240, 0.07);
   --audio-console-line2: rgba(232, 237, 240, 0.12);
@@ -308,7 +308,7 @@
   --role-amber-fill: #e9a83e;
   --role-amber-fill-top: #f4bd5c;
   --role-amber-ink: #1a1000;
-  --role-amber-text: #8a5a00;
+  --role-amber-text: #875800;
   --role-amber-bloom: rgba(233, 168, 62, 0.5);
   --role-green-fill: #2fbf6a;
   --role-green-fill-top: #52d287;
@@ -340,11 +340,11 @@
   --audio-console-bg-elev: #ffffff;
   --audio-console-fg: #1a1814;
   --audio-console-fg2: rgba(26, 24, 20, 0.66);
-  --audio-console-fg3: rgba(26, 24, 20, 0.6);
+  --audio-console-fg3: rgba(26, 24, 20, 0.68);
   --audio-console-fg4: rgba(26, 24, 20, 0.22);
   --audio-console-line: rgba(26, 24, 20, 0.08);
   --audio-console-line2: rgba(26, 24, 20, 0.14);
-  --audio-console-accent: #a64e16;
+  --audio-console-accent: #894012;
   --audio-console-accent-soft: rgba(166, 78, 22, 0.12);
   --audio-console-accent-glow: rgba(166, 78, 22, 0.3);
   --audio-console-danger: oklch(50% 0.22 25);
