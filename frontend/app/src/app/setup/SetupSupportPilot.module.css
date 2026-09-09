@@ -241,8 +241,11 @@
         color-mix(in srgb, var(--color-primary-500) 5%, transparent)
       ),
       var(--color-surface-raised);
-    transform: translateY(-1px);
-    box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+    /* Slice 9 (system §5, §6): the active step is marked by its edge; it
+       does not lift and it does not float. */
+    box-shadow:
+      var(--elevation-key),
+      0 0 0 1px color-mix(in srgb, var(--color-primary-500) 34%, transparent);
   }
 
   /* S14 — Bone: the 42% primary border over the active wash computed 1.70:1
@@ -478,9 +481,10 @@
 
   .deckButton[data-selected="true"] {
     border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
+    /* Slice 9 (system §5): a selected key is marked by its edge. */
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color-primary-500) 22%, transparent),
-      0 16px 36px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+      var(--elevation-key),
+      0 0 0 1px color-mix(in srgb, var(--color-primary-500) 34%, transparent);
   }
 
   .deckButton[data-echo="true"],
@@ -537,8 +541,8 @@
   .backupRow:hover {
     /* SET-12: the transition above declared border/transform but no :hover
        existed — adopt the recovery surface's recipe. */
-    border-color: color-mix(in srgb, var(--color-primary-500) 30%, var(--color-border-default));
-    transform: translateY(-1px);
+    /* Slice 9 (system §6): hover changes an edge, never a position. */
+    border-color: color-mix(in srgb, var(--color-primary-500) 46%, var(--color-border-default));
   }
 
   .supportGrid {
@@ -582,9 +586,9 @@
   .railButton:hover {
     /* SET-12: converged on the recovery surface's hover recipe
        (.setupIncidentRailButton:hover) — primary-over-border mix + lift. */
-    border-color: color-mix(in srgb, var(--color-primary-500) 30%, var(--color-border-default));
+    /* Slice 9 (system §6): hover changes an edge, never a position. */
+    border-color: color-mix(in srgb, var(--color-primary-500) 46%, var(--color-border-default));
     color: var(--color-text-strong);
-    transform: translateY(-1px);
   }
 
   .railButton:disabled {

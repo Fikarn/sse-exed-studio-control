@@ -15,9 +15,11 @@ export interface PlotPillProps {
 
 export const PlotPill = ({ state = "default", children, className }: PlotPillProps) => {
   const classes = [styles.pill, styles[state], className].filter(Boolean).join(" ");
+  // Visual overhaul A, Slice 9 (system §5): the pill floats over the plot, so
+  // it is a plate at the drawer's level, not glass — and its dot is a lit lamp.
   return (
-    <div className={classes}>
-      <span className={styles.dot} aria-hidden="true" />
+    <div className={classes} data-material="plate" data-level="float">
+      <span className={styles.dot} data-lit="" aria-hidden="true" />
       <span className={styles.body}>{children}</span>
     </div>
   );

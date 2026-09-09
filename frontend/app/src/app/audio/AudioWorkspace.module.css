@@ -235,7 +235,8 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--bg-1);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.42);
+  /* Slice 9 (system §5): the drawer's recipe is the one large blur. */
+  box-shadow: var(--elevation-plate), var(--elevation-float);
 }
 
 .loadingPanel {
@@ -322,9 +323,8 @@
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
-  box-shadow:
-    0 0 0 1px var(--accent-soft),
-    0 0 18px var(--accent-soft);
+  /* Slice 9 (system §5): an armed key blooms at 14 px, from the token. */
+  box-shadow: var(--elevation-key-armed);
 }
 
 .audioShell :is(button, [role="button"], [role="slider"], input):focus-visible {

@@ -12,8 +12,11 @@ export const Surface = forwardRef<HTMLElement, SurfaceProps>(function Surface(
   ref
 ) {
   return (
+    // Slice 9 (system §5): Surface is the drawer level — dialogs and overlays.
     <section
       className={[styles.surface, styles[padding], styles[tone], className].filter(Boolean).join(" ")}
+      data-material="plate"
+      data-level="float"
       ref={ref}
       {...props}
     >

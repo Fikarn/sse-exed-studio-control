@@ -1,13 +1,14 @@
 @layer components {
+  /* Visual overhaul A, Slice 9 (system §5): Surface is what a dialog and an
+     overlay sit on, so it takes the drawer's recipe — a plate lit from above
+     with the one large blur the system allows. The 18 px backdrop blur and
+     the 40 px drop shadow it carried are not in the system. */
   .surface {
-    backdrop-filter: blur(18px);
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.008)), var(--color-surface-default);
     border: 1px solid var(--color-surface-border);
     border-radius: var(--radius-surface);
-    box-shadow:
-      0 20px 40px rgba(0, 0, 0, 0.25),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    box-shadow: var(--elevation-plate), var(--elevation-float);
   }
 
   .default {

@@ -862,7 +862,8 @@
 }
 
 .slider:hover::-webkit-slider-thumb {
-  transform: scale(1.15);
+  /* Slice 9 (system §6): hover changes an edge, never a position. */
+  border-color: var(--color-brand-green);
   box-shadow: var(--shadow-thumb-ring);
 }
 
@@ -871,12 +872,12 @@
 }
 
 .slider:focus-visible::-webkit-slider-thumb {
-  transform: scale(1.15);
   box-shadow:
     var(--shadow-thumb-ring),
     0 0 0 2px var(--color-brand-green);
 }
 
+/* A press may move — §6 gives a key press 100 ms — but only a press. */
 .slider:active::-webkit-slider-thumb {
   transform: scale(1.05);
 }
@@ -894,7 +895,8 @@
 
 .slider:hover::-moz-range-thumb,
 .slider:focus-visible::-moz-range-thumb {
-  transform: scale(1.15);
+  /* Slice 9 (system §6): hover changes an edge, never a position. */
+  border-color: var(--color-brand-green);
   box-shadow: var(--shadow-thumb-ring);
 }
 

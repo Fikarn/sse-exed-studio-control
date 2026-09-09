@@ -3,7 +3,14 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { FIXTURES, SURFACE, STATE_DISPLAY_X_TOLERANCE_PX, THEMES, boardName } from "./helpers/ui-contract/boards.mjs";
+import {
+  FIXTURES,
+  SURFACE,
+  STATE_DISPLAY_X_TOLERANCE_PX,
+  THEMES,
+  boardName,
+  isLoading,
+} from "./helpers/ui-contract/boards.mjs";
 import { checkRatchet, measureBoard, openBoard } from "./helpers/ui-contract/measure.mjs";
 import { TARGETS } from "./helpers/ui-contract/boards.mjs";
 
@@ -56,6 +63,46 @@ test.describe("UI contract", () => {
       });
     }
   }
+
+  // Visual overhaul A, Slice 9 (system §6): "Nothing on an idle surface
+  // animates." The ratchet lets a count fall; this says the floor for a ready
+  // board is zero, so a new pulse cannot be seeded in. A loading board is not
+  // idle — its skeleton sweep is what says the app has not finished — so the
+  // loading families are excluded by name, not by ratchet.
+  for (const fixture of FIXTURES.filter((name) => !isLoading(name))) {
+    test(`${fixture} animates nothing at rest`, async ({ page }) => {
+      await openBoard(page, fixture, "studio");
+      const running = await page.evaluate(() =>
+        document
+          .getAnimations()
+          .filter((animation) => animation.playState === "running")
+          .map((animation) => {
+            const target = animation.effect && "target" in animation.effect ? animation.effect.target : null;
+            const name =
+              ("animationName" in animation ? (animation as { animationName?: string }).animationName : null) ??
+              ("transitionProperty" in animation
+                ? `transition:${(animation as { transitionProperty?: string }).transitionProperty}`
+                : "animation");
+            const el = target instanceof Element ? `${target.tagName.toLowerCase()}.${target.className}` : "?";
+            return `${el} ${name}`;
+          })
+      );
+      expect(running, `${fixture} is still moving at rest`).toEqual([]);
+    });
+  }
+
+  // Slice 9 (system §6): "prefers-reduced-motion removes enter, exit and move."
+  // The loading skeleton is the one thing the app animates on purpose, so it is
+  // the honest board to prove the setting on: with reduced motion asked for,
+  // even it stops.
+  test("prefers-reduced-motion stops everything, the loading skeleton included", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openBoard(page, "planning-loading-board", "studio");
+    const running = await page.evaluate(
+      () => document.getAnimations().filter((animation) => animation.playState === "running").length
+    );
+    expect(running, "reduced motion left something running").toBe(0);
+  });
 
   // The state display sits at the same x-band on every workspace (system §2);
   // measured once the regions are declared (Slice 2).

@@ -85,7 +85,8 @@
   height: 1px;
   content: "";
   background: color-mix(in srgb, var(--fg) 32%, transparent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 10%, transparent);
+  /* Slice 9 (system §5): blur over 8 px is for lit elements and the drawer. */
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .eqGraphDbLabel {
@@ -96,8 +97,10 @@
   border-radius: var(--radius-tight-sm);
   /* Visual overhaul A, Slice 4c: the plate shows the equaliser at all times, so
      its scale is read like every other tick — 12 px on a chip of the graph's
-     own floor, which is a well in every theme, with the well's ink on it. */
-  color: var(--text-text2);
+     own floor, which is a well in every theme, with the well's ink on it.
+     Slice 9: the primary ink, because the secondary measured 4.49:1 on
+     Bone's meter floor once the marker glow came inside the 8 px ceiling. */
+  color: var(--text-text);
   background: var(--audio-meter-bg);
   font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
@@ -181,7 +184,8 @@
   border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--line));
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--bg-3) 88%, black 12%);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  /* Slice 9 (system §5): the badge floats over the graph. */
+  box-shadow: var(--elevation-float);
 }
 
 .eqValueBadge strong {
@@ -233,9 +237,10 @@
 
 .eqPoint[data-selected="true"] {
   border-color: var(--accent);
+  /* Slice 9 (system §5): a lit control blooms at 14 px (amber). */
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.66),
-    0 0 18px color-mix(in srgb, var(--accent) 46%, transparent);
+    0 0 14px var(--role-amber-bloom);
 }
 
 /* G24: ghosted handle treatment when the EQ section is bypassed or the

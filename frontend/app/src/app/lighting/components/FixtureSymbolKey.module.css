@@ -7,10 +7,12 @@
   gap: 4px;
   max-width: 430px;
   padding: 6px;
-  border: 1px solid var(--color-bg-stroke);
+  border: 1px solid var(--material-line);
   border-radius: var(--radius-tight-md);
-  background: var(--color-glass-bg-soft);
-  backdrop-filter: blur(6px);
+  /* Visual overhaul A, Slice 9 (system §5): the legend floats over the plot,
+     so it is a plate at the drawer's level rather than glass. */
+  background: var(--elevation-plate-fill);
+  box-shadow: var(--elevation-plate), var(--elevation-float);
   pointer-events: none;
 }
 
@@ -53,10 +55,12 @@
   white-space: nowrap;
 }
 
+/* Slice 9: the legend is an opaque plate now, and the muted ink measured
+   under 4.5:1 at 10 px on it. */
 .meta,
 .confidence {
   overflow: hidden;
-  color: var(--color-brand-text-muted);
+  color: var(--color-brand-text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -140,7 +140,8 @@
   width: 2px;
   border-radius: var(--radius-ctl);
   background: color-mix(in srgb, var(--audio-meter-warn) 74%, transparent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--audio-meter-warn) 28%, transparent);
+  /* Slice 9 (system §5): blur over 8 px is for lit elements and the drawer. */
+  box-shadow: 0 0 8px color-mix(in srgb, var(--audio-meter-warn) 28%, transparent);
   transform: translateX(-50%);
 }
 

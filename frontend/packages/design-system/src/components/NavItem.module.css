@@ -71,6 +71,7 @@
     height: 3px;
     background: var(--color-brand-green);
     border-radius: 1.5px 1.5px 0 0;
-    box-shadow: 0 0 12px var(--color-brand-green);
+    /* Slice 9 (system §5): a lamp blooms at 10 px, and only at 10 px. */
+    box-shadow: var(--elevation-lamp-green);
   }
 }

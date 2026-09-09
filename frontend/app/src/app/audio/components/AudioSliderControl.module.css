@@ -186,9 +186,15 @@
   right: 5px;
   border-radius: 1px;
   background: color-mix(in srgb, var(--fg) 58%, transparent);
+  /* Slice 9 (system §5): the grip's two neighbour lines were drawn as
+     shadows offset above and below, which is a light from below. They are
+     lines, so they are drawn as lines. */
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  background-clip: padding-box;
   box-shadow:
-    0 -3px 0 color-mix(in srgb, var(--fg) 16%, transparent),
-    0 3px 0 color-mix(in srgb, var(--fg) 16%, transparent);
+    inset 0 3px 0 color-mix(in srgb, var(--fg) 16%, transparent),
+    inset 0 -3px 0 color-mix(in srgb, var(--fg) 16%, transparent);
 }
 
 .sliderControl[data-orientation="horizontal"] .sliderCap {
@@ -204,8 +210,8 @@
 [data-selected="true"] .sliderCap::after {
   background: var(--accent);
   box-shadow:
-    0 -3px 0 color-mix(in srgb, var(--accent) 32%, transparent),
-    0 3px 0 color-mix(in srgb, var(--accent) 32%, transparent);
+    inset 0 3px 0 color-mix(in srgb, var(--accent) 32%, transparent),
+    inset 0 -3px 0 color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .sliderControl:hover .sliderCap {
@@ -226,9 +232,10 @@
    a faint accent glow. */
 [data-selected="true"] .sliderControl[data-orientation="vertical"] .sliderCap {
   border-color: color-mix(in srgb, var(--accent) 40%, var(--line-2));
+  /* Slice 9 (system §5): a lit cap blooms at 14 px (amber). */
   box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.5),
-    0 0 10px color-mix(in srgb, var(--accent-glow) 60%, transparent),
+    0 2px 4px var(--material-shade),
+    0 0 14px var(--role-amber-bloom),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 

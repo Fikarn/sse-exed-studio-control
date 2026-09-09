@@ -665,7 +665,7 @@ export function StagePlot({
       />
 
       {fixtures.length === 0 ? (
-        <div className={styles.plotEmpty}>
+        <div className={styles.plotEmpty} data-material="plate" data-level="float">
           <EmptyState
             icon={Sun}
             title="No fixtures on the rig yet"

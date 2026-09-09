@@ -100,8 +100,9 @@
 .plotEmpty > * {
   pointer-events: auto;
   max-width: 320px;
-  background: var(--color-glass-bg-strong);
-  backdrop-filter: blur(6px);
+  /* Slice 9 (system §5): a plate at the drawer's level, not glass. */
+  background: var(--elevation-plate-fill);
+  box-shadow: var(--elevation-plate), var(--elevation-float);
   border-radius: var(--radius-tight-md);
 }
 

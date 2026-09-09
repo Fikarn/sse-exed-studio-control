@@ -656,7 +656,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   if (!viewModel) {
     return (
       <div className={styles.audioShell} data-testid="audio-workspace">
-        <section className={styles.loadingPanel}>
+        <section className={styles.loadingPanel} data-material="plate" data-level="float">
           <span className={styles.eyebrow}>Audio</span>
           <h1>Loading the console…</h1>
           <div className={styles.loadingGrid}>

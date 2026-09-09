@@ -1,13 +1,15 @@
 @layer components {
+  /* Visual overhaul A, Slice 9 (system §5): the pill floats over the stage
+     plot, so it takes the drawer's recipe — a plate lit from above with the one
+     large blur the system allows — instead of the retired glass (a 14 px
+     backdrop blur and a 24 px drop shadow, neither of which is in the system). */
   .pill {
     display: inline-flex;
     align-items: center;
     gap: 14px;
     padding: 10px 20px;
-    background: var(--color-glass-bg);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid var(--color-glass-border);
+    background: var(--elevation-plate-fill);
+    border: 1px solid var(--material-line);
     border-radius: var(--radius-pill);
     font-family: var(--font-family-mono);
     font-size: var(--operator-font-size-sm, 11px);
@@ -15,7 +17,7 @@
     letter-spacing: 0;
     text-transform: uppercase;
     color: var(--color-brand-text-primary);
-    box-shadow: var(--shadow-glass);
+    box-shadow: var(--elevation-plate), var(--elevation-float);
   }
 
   .body {
@@ -24,36 +26,36 @@
     gap: 10px;
   }
 
+  /* A lamp, at the one bloom size §5 gives a lamp. */
   .dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
-    background: var(--color-brand-green);
-    box-shadow: 0 0 14px var(--color-brand-green);
+    background: var(--role-green-text);
+    box-shadow: var(--elevation-lamp-green);
   }
 
   .default .dot {
-    background: var(--color-brand-green);
-    box-shadow: 0 0 14px var(--color-brand-green);
+    background: var(--role-green-text);
+    box-shadow: var(--elevation-lamp-green);
   }
 
   .modified {
-    border-color: var(--color-brand-yellow-border);
+    border-color: var(--role-amber-text);
   }
 
   .modified .dot {
-    background: var(--color-brand-yellow);
-    box-shadow: 0 0 14px var(--color-brand-yellow);
+    background: var(--role-amber-text);
+    box-shadow: var(--elevation-lamp-amber);
   }
 
   .preview {
-    border-color: var(--color-warning-border);
-    background: var(--color-glass-bg);
+    border-color: var(--role-amber-text);
   }
 
   .preview .dot {
-    background: var(--color-warning-500);
-    box-shadow: 0 0 14px var(--color-warning-500);
+    background: var(--role-amber-text);
+    box-shadow: var(--elevation-lamp-amber);
   }
 }

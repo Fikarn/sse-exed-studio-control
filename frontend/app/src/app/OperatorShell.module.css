@@ -95,7 +95,8 @@ button.lightingDmxCell {
   width: min(1080px, 100%);
   display: grid;
   gap: var(--space-4);
-  box-shadow: 0 24px 72px color-mix(in srgb, black 48%, transparent);
+  /* Slice 9 (system §5): the drawer's recipe is the one large blur. */
+  box-shadow: var(--elevation-plate), var(--elevation-float);
 }
 
 .dmxOverlayHeader {
@@ -245,9 +246,10 @@ button.lightingDmxDrawerCell {
   background:
     linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-warning-500) 88%, white 12%), transparent),
     color-mix(in srgb, var(--color-surface-700) 92%, transparent);
+  /* Slice 9 (system §5): one bloom size for a lit thing. */
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--color-warning-500) 18%, transparent),
-    0 0 36px color-mix(in srgb, var(--color-warning-500) 18%, transparent);
+    0 0 8px color-mix(in srgb, var(--color-warning-500) 18%, transparent);
   animation: setupStartupPulse var(--motion-duration-pulse) ease-in-out infinite;
 }
 
@@ -454,8 +456,8 @@ button.lightingDmxDrawerCell {
 
 .setupIncidentBackupRow:hover,
 .setupIncidentRailButton:hover {
-  border-color: color-mix(in srgb, var(--color-primary-500) 30%, var(--color-border-default));
-  transform: translateY(-1px);
+  /* Slice 9 (system §6): hover changes an edge, never a position. */
+  border-color: color-mix(in srgb, var(--color-primary-500) 46%, var(--color-border-default));
 }
 
 .setupIncidentRailButton:disabled {
@@ -560,7 +562,8 @@ button.lightingDmxDrawerCell {
   margin: auto;
   display: grid;
   gap: var(--space-4);
-  box-shadow: 0 24px 80px color-mix(in srgb, black 50%, transparent);
+  /* Slice 9 (system §5): the drawer's recipe is the one large blur. */
+  box-shadow: var(--elevation-plate), var(--elevation-float);
 }
 
 .stateHeader {
@@ -701,7 +704,8 @@ button.lightingDmxDrawerCell {
   width: min(560px, 100%);
   display: grid;
   gap: var(--space-4);
-  box-shadow: 0 20px 64px color-mix(in srgb, black 45%, transparent);
+  /* Slice 9 (system §5): the drawer's recipe is the one large blur. */
+  box-shadow: var(--elevation-plate), var(--elevation-float);
 }
 
 .dialogTitle {

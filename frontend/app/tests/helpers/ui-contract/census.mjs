@@ -44,7 +44,7 @@ export function censusInPage() {
         .split(/\s+/)
         .map(parseFloat)
         .filter((n) => !Number.isNaN(n));
-      return { inset, x: nums[0] || 0, y: nums[1] || 0, blur: nums[2] || 0 };
+      return { inset, x: nums[0] || 0, y: nums[1] || 0, blur: nums[2] || 0, raw: p };
     });
   };
   const root = document.body;
@@ -105,6 +105,13 @@ export function censusInPage() {
   let bigBlurUnlit = 0;
   let radiiOff = 0;
   const gradEls = [];
+  // Visual overhaul A, Slice 9: the light counts alone say a board is off
+  // policy but not what to fix, so each offender names itself. Diagnostic
+  // only — no measure reads these.
+  const gradOffEls = [];
+  const negOffsetEls = [];
+  const bigBlurUnlitEls = [];
+  const backdropEls = [];
   const copy = [];
   for (const el of root.querySelectorAll("*")) {
     const r = el.getBoundingClientRect();
@@ -122,19 +129,31 @@ export function censusInPage() {
       for (const s of splitShadows(cs.boxShadow)) {
         const k = (s.inset ? "inset " : "") + s.x + "," + s.y + "," + s.blur;
         shadowKinds.set(k, (shadowKinds.get(k) || 0) + 1);
-        if (!s.inset && (s.x < 0 || s.y < 0)) badLight++;
+        if (!s.inset && (s.x < 0 || s.y < 0)) {
+          badLight++;
+          if (negOffsetEls.length < 12) negOffsetEls.push(`${ident(el)} ${s.raw}`);
+        }
         if (!s.inset && s.blur > 8) {
           bigBlur++;
-          if (!lit) bigBlurUnlit++;
+          if (!lit) {
+            bigBlurUnlit++;
+            if (bigBlurUnlitEls.length < 12) bigBlurUnlitEls.push(`${ident(el)} ${s.raw}`);
+          }
         }
       }
     }
     if (cs.backgroundImage && /gradient/.test(cs.backgroundImage)) {
       gradN++;
-      if (!el.closest("[data-material], [data-signal]")) gradOff++;
+      if (!el.closest("[data-material], [data-signal]")) {
+        gradOff++;
+        if (gradOffEls.length < 12) gradOffEls.push(ident(el));
+      }
       if (gradEls.length < 6) gradEls.push(ident(el));
     }
-    if (cs.backdropFilter && cs.backdropFilter !== "none") blurN++;
+    if (cs.backdropFilter && cs.backdropFilter !== "none") {
+      blurN++;
+      if (backdropEls.length < 12) backdropEls.push(`${ident(el)} ${cs.backdropFilter}`);
+    }
     if (cs.animationName && cs.animationName !== "none") animN++;
     if (cs.transitionDuration && cs.transitionDuration.split(",").some((d) => parseFloat(d) > 0)) transN++;
     let txt = "";
@@ -224,7 +243,14 @@ export function censusInPage() {
       h: Math.round(r.height),
     };
   });
-  const running = document.getAnimations().filter((a) => a.playState === "running").length;
+  const runningAnims = document.getAnimations().filter((a) => a.playState === "running");
+  const running = runningAnims.length;
+  // Slice 9: name what is still moving on a board at rest.
+  const runningEls = runningAnims.slice(0, 12).map((a) => {
+    const target = a.effect && a.effect.target ? ident(a.effect.target) : "?";
+    const name = a.animationName || (a.transitionProperty ? `transition:${a.transitionProperty}` : "animation");
+    return `${target} ${name}`;
+  });
   const sortMap = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
   return {
     vw,
@@ -247,14 +273,18 @@ export function censusInPage() {
       shadows: shadowN,
       shadowKinds: sortMap(shadowKinds).slice(0, 12),
       outerNegativeOffset: badLight,
+      outerNegativeOffsetEls: negOffsetEls,
       outerBlurOver8: bigBlur,
       outerBlurOver8Unlit: bigBlurUnlit,
+      outerBlurOver8UnlitEls: bigBlurUnlitEls,
       gradients: gradN,
       gradientsOffPolicy: gradOff,
       gradientEls: gradEls,
+      gradientsOffEls: gradOffEls,
       backdropBlur: blurN,
+      backdropBlurEls: backdropEls,
     },
-    motion: { runningAnimations: running, cssAnimated: animN, transitions: transN },
+    motion: { runningAnimations: running, runningEls, cssAnimated: animN, transitions: transN },
     offViewport,
     scroll: { docW: document.documentElement.scrollWidth, docH: document.documentElement.scrollHeight },
   };

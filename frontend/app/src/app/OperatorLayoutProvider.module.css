@@ -108,9 +108,10 @@
   position: absolute;
   top: 50%;
   left: 50%;
+  /* Slice 9 (system §5): the preview frame floats — the drawer's recipe. */
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--color-primary-500) 28%, transparent),
-    0 28px 88px rgba(0, 0, 0, 0.48);
+    var(--elevation-float);
   transform: translate(-50%, -50%) scale(var(--operator-review-scale, 1));
   transform-origin: center center;
 }
@@ -208,9 +209,8 @@
   border: 1px solid color-mix(in srgb, var(--color-brand-green) 72%, var(--color-bg-border));
   border-radius: var(--radius-tight-sm);
   background: color-mix(in srgb, var(--color-bg-raised) 96%, var(--color-brand-green-soft));
-  box-shadow:
-    var(--shadow-md),
-    0 0 18px color-mix(in srgb, var(--color-primary-500) 18%, transparent);
+  /* Slice 9 (system §5): a badge is not a lamp, so it does not bloom. */
+  box-shadow: var(--elevation-float);
   color: var(--color-brand-text-primary);
   font-family: var(--font-family-mono);
   font-size: 11px;

@@ -63,7 +63,7 @@ export function AudioSignalCanvas({
   });
 
   return (
-    <section className={styles.signalCanvas} data-testid="audio-signal-canvas">
+    <section className={styles.signalCanvas} data-testid="audio-signal-canvas" data-signal="canvas">
       {/* Visual overhaul A, Slice 4: the state, its sentence and its way out
           live in the cluster's state display, so the bay carries no band. */}
       {/* 2026-09 audit remediation, Slice 4: a recall pushes the snapshot to

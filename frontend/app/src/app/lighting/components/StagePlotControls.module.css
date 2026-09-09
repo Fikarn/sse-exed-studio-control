@@ -7,10 +7,11 @@
   align-items: stretch;
   gap: 1px;
   padding: var(--operator-stage-control-padding, 2px);
-  background: var(--color-glass-bg);
-  border: 1px solid var(--color-bg-stroke);
+  /* Slice 9 (system §5): a plate at the drawer's level, not glass. */
+  background: var(--elevation-plate-fill);
+  border: 1px solid var(--material-line);
   border-radius: var(--radius-tight-md);
-  backdrop-filter: blur(6px);
+  box-shadow: var(--elevation-plate), var(--elevation-float);
   font-family: var(--font-family-mono);
 }
 
@@ -138,7 +139,8 @@
   white-space: nowrap;
   font-size: var(--operator-font-size-xs, 10px);
   letter-spacing: 0;
-  color: var(--color-brand-text-muted);
+  /* Slice 9: readable on the opaque plate at 10 px. */
+  color: var(--color-brand-text-secondary);
   font-feature-settings: "tnum", "zero";
 }
 
@@ -159,7 +161,8 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-tight-sm);
-  color: var(--color-brand-text-muted);
+  /* Slice 9: readable on the opaque plate at 10 px. */
+  color: var(--color-brand-text-secondary);
   cursor: pointer;
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";

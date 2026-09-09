@@ -117,6 +117,7 @@ export function AudioChannelLane({
       data-group={group}
       data-no-send={!feeding && !channel.mute}
       data-role={channel.role}
+      data-lit={selected ? "" : undefined}
       data-selected={selected}
       data-testid={`audio-strip-${channel.id}`}
       onClick={() => onSelect(channel.id)}
@@ -325,6 +326,7 @@ export function AudioOutputLane({
       className={styles.strip}
       data-audio-output-id={mixTarget.id}
       data-role={mixTarget.role}
+      data-lit={selected ? "" : undefined}
       data-selected={selected}
       data-testid={`audio-output-${mixTarget.id}`}
       onClick={() => onSelect(mixTarget.id)}

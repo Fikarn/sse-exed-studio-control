@@ -35,13 +35,14 @@
     padding: 0;
     width: 18px;
     transition:
-      transform 80ms ease,
       box-shadow 80ms ease,
       border-color 80ms ease;
   }
 
   .swatch:hover {
-    transform: scale(1.08);
+    /* Slice 9 (system §6): hover changes an edge, never a position — the
+       swatch brightens its own border rather than growing. */
+    border-color: var(--color-accent-primary);
   }
 
   .swatchFocused {

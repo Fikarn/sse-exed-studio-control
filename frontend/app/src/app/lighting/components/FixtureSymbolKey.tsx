@@ -40,7 +40,13 @@ export function FixtureSymbolKey({ catalog = null, fixtures, renderMode }: Fixtu
   if (rows.length === 0) return null;
 
   return (
-    <aside className={styles.key} aria-label="Fixture symbol key" data-testid="fixture-symbol-key">
+    <aside
+      className={styles.key}
+      aria-label="Fixture symbol key"
+      data-testid="fixture-symbol-key"
+      data-material="plate"
+      data-level="float"
+    >
       {rows.map(({ count, fixture, visual }) => (
         <div
           className={styles.row}

@@ -136,7 +136,7 @@ export function AudioInspectorEqTab({
           ) : null}
           <path d={eqGraphPath} />
         </svg>
-        <div className={tabStyles.eqValueBadge} data-testid="audio-eq-value-badge">
+        <div className={tabStyles.eqValueBadge} data-testid="audio-eq-value-badge" data-level="float">
           <strong>{activeEqLabel}</strong>
           <span>{activeEqValue}</span>
         </div>
@@ -145,6 +145,7 @@ export function AudioInspectorEqTab({
             aria-label={`${selectedChannel.name} Low Cut EQ point`}
             className={`${tabStyles.eqPoint} ${tabStyles.eqLowCutPoint}`}
             data-active={selectedChannel.eq.lowCut.enabled}
+            data-lit={activeEqHandleId === LOW_CUT_HANDLE_ID ? "" : undefined}
             data-selected={activeEqHandleId === LOW_CUT_HANDLE_ID}
             data-testid="audio-eq-point-low-cut"
             disabled={!viewModel.capabilities.canEditProcessing}
@@ -194,6 +195,7 @@ export function AudioInspectorEqTab({
               // effect (gain ≈ 0). Operator sees "armed but inactive" at a
               // glance instead of guessing whether each handle is doing work.
               data-ghost={!selectedChannel.eq.enabled || Math.abs(band.gainDb) < 0.05}
+              data-lit={band.id === activeEqHandleId ? "" : undefined}
               data-selected={band.id === activeEqHandleId}
               data-testid={`audio-eq-point-${band.id}`}
               disabled={!viewModel.capabilities.canEditProcessing}

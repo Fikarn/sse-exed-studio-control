@@ -1,19 +1,22 @@
 @layer components {
+  /* Visual overhaul A, Slice 9 (system §5): the chip floats over the stage
+     plot, so it is a plate at the drawer's level. The retired glass recipe (a
+     14 px backdrop blur and a 24 px drop shadow) is not in the system. */
   .meta {
     display: inline-flex;
     align-items: center;
     gap: 12px;
     padding: 7px 13px;
-    background: var(--color-glass-bg);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid var(--color-glass-border);
+    background: var(--elevation-plate-fill);
+    border: 1px solid var(--material-line);
     border-radius: var(--radius-tight-sm);
     font-family: var(--font-family-mono);
     font-size: 11px;
-    color: var(--color-brand-text-muted);
+    /* Slice 9: on the new opaque plate the muted ink measured under 4.5:1
+       at 10 px, so the label reads in the secondary ink. */
+    color: var(--color-brand-text-secondary);
     letter-spacing: 0;
-    box-shadow: var(--shadow-glass);
+    box-shadow: var(--elevation-plate), var(--elevation-float);
     font-feature-settings: "tnum", "zero";
   }
 
@@ -23,7 +26,7 @@
   }
 
   .selected {
-    border-color: var(--color-brand-green-border);
+    border-color: var(--role-green-text);
   }
 
   .selected .value {

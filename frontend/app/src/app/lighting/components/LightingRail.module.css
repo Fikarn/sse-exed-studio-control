@@ -304,7 +304,8 @@
 }
 
 .masterSlider:hover::-webkit-slider-thumb {
-  transform: scale(1.15);
+  /* Slice 9 (system §6): hover changes an edge, never a position. */
+  border-color: var(--color-brand-green);
   box-shadow: var(--shadow-thumb-ring);
 }
 
@@ -313,7 +314,6 @@
 }
 
 .masterSlider:focus-visible::-webkit-slider-thumb {
-  transform: scale(1.15);
   box-shadow:
     var(--shadow-thumb-ring),
     0 0 0 2px var(--color-brand-green);
@@ -336,7 +336,8 @@
 
 .masterSlider:hover::-moz-range-thumb,
 .masterSlider:focus-visible::-moz-range-thumb {
-  transform: scale(1.15);
+  /* Slice 9 (system §6): hover changes an edge, never a position. */
+  border-color: var(--color-brand-green);
   box-shadow: var(--shadow-thumb-ring);
 }
 
@@ -497,12 +498,14 @@
   background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, var(--color-brand-green-glow) 100%);
 }
 
+/* Visual overhaul A, Slice 9 (system §5): a recalled scene tile is a lit
+   key, and a lit green key blooms at 18 px — one size, from the token. */
 .tileSelected {
   border-color: var(--color-brand-green);
   box-shadow:
     inset 0 0 0 1px var(--color-brand-green),
     0 0 0 1px rgba(153, 186, 146, 0.2),
-    var(--shadow-glow-green-sm);
+    0 0 18px var(--role-green-bloom);
 }
 
 .tileSelected .sceneVisual {
@@ -592,34 +595,11 @@
   box-shadow: var(--shadow-glow-amber);
 }
 
-@keyframes ssePulseGreenDot {
-  0%,
-  100% {
-    box-shadow: var(--shadow-glow-green-dot);
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(153, 186, 146, 0.85);
-  }
-}
-
-@keyframes ssePulseYellowDot {
-  0%,
-  100% {
-    box-shadow: var(--shadow-glow-yellow-dot);
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(232, 213, 97, 0.85);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .tileActive .tileBadgeDot {
-    animation: ssePulseGreenDot 1.6s ease-in-out infinite;
-  }
-  .tileModified .tileBadgeDot {
-    animation: ssePulseYellowDot 1.6s ease-in-out infinite;
-  }
-}
+/* Visual overhaul A, Slice 9 (system §6): nothing on an idle surface animates.
+   The active and modified scene dots pulsed for ever — the only thing still
+   moving on a Lighting board at rest. A lamp is lit or it is not; the dot's
+   colour and its one bloom already say which, so the pulse is gone and the
+   keyframes with it. */
 
 .tileSub {
   font-family: var(--font-family-mono);

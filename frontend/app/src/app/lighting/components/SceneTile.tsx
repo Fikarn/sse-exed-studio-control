@@ -228,6 +228,7 @@ export function SceneTile({
     <div
       ref={setNodeRef}
       className={stateClass}
+      data-lit={isSelected ? "" : undefined}
       style={tileStyle}
       onClick={() => {
         // Click cancels any pending hover preview (the timer is owned by the

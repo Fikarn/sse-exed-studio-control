@@ -88,7 +88,13 @@ export function StagePlotControls({
     : [];
 
   return (
-    <div className={styles.controls} role="toolbar" aria-label="Stage plot view">
+    <div
+      className={styles.controls}
+      role="toolbar"
+      aria-label="Stage plot view"
+      data-material="plate"
+      data-level="float"
+    >
       <span className={styles.renderModeGroup}>
         <SegmentedControl
           label="Stage plot render mode"

@@ -19,6 +19,14 @@ export function isPreReady(fixture) {
   return fixture.startsWith("protocol-") || fixture.startsWith("bootstrap-") || fixture.startsWith("startup");
 }
 
+// Visual overhaul A, Slice 9 (system §6): "nothing on an idle surface
+// animates" is a rule about a surface at rest. A board that is still loading is
+// not at rest — its skeleton sweep is the only thing telling the operator the
+// app has not finished — so the idle-animation gate reads the ready boards.
+export function isLoading(fixture) {
+  return fixture.includes("loading") || fixture.startsWith("startup");
+}
+
 export function boardName(fixture, theme) {
   return `${fixture}__${theme}`;
 }
