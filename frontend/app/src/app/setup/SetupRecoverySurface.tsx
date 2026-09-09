@@ -70,18 +70,24 @@ export function SetupRecoverySurface({
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const lastBackup = backups[0] ?? null;
-  const summary = failure?.message ?? String(healthSnapshot?.summary ?? "The shell needs operator recovery.");
+  const summary =
+    failure?.message ??
+    String(
+      healthSnapshot?.summary ?? "Studio Control needs operator recovery. Retry startup, or restore the latest backup."
+    );
   const detailEntries = Object.entries(asRecord(healthSnapshot?.details) ?? {});
   const pathEntries = Object.entries(runtimePaths);
   const engineRequestsAvailable = failure?.code !== "PROTOCOL_MISMATCH";
+  // Slice 8 (system §9): name the hardware. "Control surface", "DMX" and "OSC"
+  // are the wires; the operator knows the deck, the bridge and the desk.
   const diagnosticsChecks = [
-    { key: "controlSurface", label: "Control surface" },
-    { key: "lighting", label: "DMX" },
-    { key: "audio", label: "OSC" },
+    { key: "controlSurface", label: "The deck" },
+    { key: "lighting", label: "The bridge" },
+    { key: "audio", label: "The desk" },
   ].map(({ key, label }) => {
     const check = asRecord(asRecord(healthSnapshot?.checks)?.[key]);
     return {
-      detail: String(check?.summary ?? "No startup snapshot from this adapter was published."),
+      detail: String(check?.summary ?? `${label} reported nothing at startup.`),
       label,
       tone: asStatusTone(check?.status, failure ? "attention" : "info"),
     };
@@ -159,7 +165,7 @@ export function SetupRecoverySurface({
       tone="error"
       word={getFailureTitle(failure).toUpperCase()}
       sentence={summary}
-      code={failure?.code ?? "ENGINE_STARTUP_FAILED"}
+      code={failure?.code ?? undefined}
       meta={`${formatFailureCode(failure)} · failed at ${failure?.stage ?? "runtime"} · recover from Setup / Support`}
       actions={
         <>
@@ -215,7 +221,7 @@ export function SetupRecoverySurface({
                   supportSnapshot?.restoreSummary ??
                     (engineRequestsAvailable
                       ? "Restore from a native support archive or a legacy db.json export."
-                      : "Protocol recovery is read-only until the shell and engine agree on the contract.")
+                      : "Nothing can be restored until the app and the hardware link are the same version.")
                 )}
               </span>
             </div>
@@ -312,12 +318,12 @@ export function SetupRecoverySurface({
                 disabled={!String(runtimePaths.updateRepositoryPath ?? "").trim()}
                 onClick={() => {
                   void performAction("open-update-repo", () =>
-                    openReferencePath("Update repo", String(runtimePaths.updateRepositoryPath ?? ""))
+                    openReferencePath("Update folder", String(runtimePaths.updateRepositoryPath ?? ""))
                   );
                 }}
                 type="button"
               >
-                Update repo
+                Update folder
               </button>
               <button
                 className={styles.setupIncidentRailButton}
@@ -384,7 +390,7 @@ export function SetupRecoverySurface({
               </ul>
             ) : (
               <div className={styles.setupIncidentHint}>
-                Startup failed before the engine could publish detailed incident evidence.
+                Startup failed before Studio Control could write detailed incident evidence.
               </div>
             )}
           </div>
@@ -413,7 +419,7 @@ export function SetupRecoverySurface({
           </div>
 
           <div className={styles.setupIncidentSubsection}>
-            <div className={styles.setupIncidentMetaLabel}>Runtime paths</div>
+            <div className={styles.setupIncidentMetaLabel}>File paths</div>
             <ul className={styles.setupIncidentDetailList}>
               {pathEntries.length > 0 ? (
                 pathEntries.map(([key, value]) => (
@@ -424,9 +430,7 @@ export function SetupRecoverySurface({
                 ))
               ) : (
                 <li>
-                  <span className={styles.setupIncidentHint}>
-                    No runtime paths were attached to this startup failure.
-                  </span>
+                  <span className={styles.setupIncidentHint}>No file paths were attached to this startup failure.</span>
                 </li>
               )}
             </ul>

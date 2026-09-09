@@ -108,7 +108,9 @@ export function PlanningCluster({
           {runningTasks.map((task) => {
             const started = task.lastStarted ? new Date(task.lastStarted) : null;
             const startedLabel =
-              started && !Number.isNaN(started.getTime()) ? `started ${formatPlanningClockLabel(started)}` : "started";
+              started && !Number.isNaN(started.getTime())
+                ? `started ${formatPlanningClockLabel(started)}`
+                : "start time unknown";
             return (
               <Well key={task.id} className={styles.timer} data-testid={`planning-running-timer-${task.id}`}>
                 <div className={styles.timerName}>
@@ -159,7 +161,13 @@ export function PlanningCluster({
       </Segmented>
 
       <div className={styles.day} role="group" aria-label="Day">
-        <Key size="small" take aria-label="Previous day" testId="planning-day-previous" onClick={onPreviousDay}>
+        <Key
+          size="small"
+          take
+          aria-label="Show the previous day"
+          testId="planning-day-previous"
+          onClick={onPreviousDay}
+        >
           ‹
         </Key>
         {/* The day, long enough to read on the studio monitor and short
@@ -174,7 +182,7 @@ export function PlanningCluster({
           <span className={styles.dayLong}>{viewIsToday ? `Today · ${facts.dayLabel}` : viewDayLabel}</span>
           <span className={styles.dayShort}>{viewIsToday ? `Today · ${facts.dayShortLabel}` : viewDayLabel}</span>
         </Key>
-        <Key size="small" take aria-label="Next day" testId="planning-day-next" onClick={onNextDay}>
+        <Key size="small" take aria-label="Show the next day" testId="planning-day-next" onClick={onNextDay}>
           ›
         </Key>
       </div>
@@ -182,7 +190,7 @@ export function PlanningCluster({
       <Section
         className={styles.section}
         title="Projects"
-        detail={`${projects.length} · one lane each`}
+        detail={`${projects.length} projects · one lane each`}
         testId="planning-projects-section"
         actions={
           composerOpen ? null : (
@@ -252,7 +260,8 @@ export function PlanningCluster({
               <Lamp tone={projectLampTone(project.status)} />
               <span className={styles.projectName}>{project.title}</span>
               <span className={styles.projectMeta}>
-                {projectTaskCounts.get(project.id) ?? 0} tasks · {project.priority.toUpperCase()}
+                {projectTaskCounts.get(project.id) ?? 0}{" "}
+                {(projectTaskCounts.get(project.id) ?? 0) === 1 ? "task" : "tasks"} · {project.priority.toUpperCase()}
                 {project.description ? ` · ${project.description}` : ""}
               </span>
               <span className={styles.projectStatus} data-status={project.status}>
@@ -307,12 +316,12 @@ export function PlanningCluster({
             mode="toggle"
             engaged={modeSection === "board"}
             cap="Board view"
-            hint="Shift B"
+            hint="Shift B · Shift T"
             testId="planning-board-view"
             onClick={() => onSelectMode(modeSection === "board" ? "timeline" : "board")}
           />
           <Key size="small" disabled={busy} testId="planning-backup" onClick={onExportBackup}>
-            Backup
+            Export backup
           </Key>
         </div>
       </Section>

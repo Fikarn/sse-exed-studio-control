@@ -77,7 +77,11 @@ export function IdentifyBurstButton({
   );
 
   if (!bridgeReachable) {
-    return <Tooltip content="Identify needs the DMX bridge — bridge unreachable">{button}</Tooltip>;
+    return (
+      <Tooltip content="The bridge is not answering, so Identify cannot reach the rig. Open Setup to check it.">
+        {button}
+      </Tooltip>
+    );
   }
   return button;
 }

@@ -117,6 +117,13 @@ export interface AudioWorkspaceViewModel {
   viewMode: "submix" | "master";
 }
 
+// Slice 8 (system §9): the footer names the hardware the meters come
+// from. Only the one id the program knows is translated; anything else is
+// printed exactly as the engine reported it.
+function meteringSourceLabel(source: unknown) {
+  return String(source ?? "unknown").toLowerCase() === "rme-totalmix-osc" ? "TotalMix" : String(source ?? "unknown");
+}
+
 export function buildAudioPaletteRegistrationSignature(
   viewModel: AudioWorkspaceViewModel,
   selectableChannels: readonly AudioChannelEntry[]
@@ -522,7 +529,7 @@ export function buildAudioViewModel({
       lastSync: audioSnapshot.lastConsoleSyncAt ?? "not yet",
       metering: meterSimulationActive
         ? meterSimulationDetail
-        : `${String(audioSnapshot.meteringSource ?? "unknown")} · ${String(audioSnapshot.meteringState ?? "unknown")}`,
+        : `${meteringSourceLabel(audioSnapshot.meteringSource)} · ${String(audioSnapshot.meteringState ?? "unknown")}`,
       osc: audioSnapshot.oscEnabled ? "enabled" : "disabled",
     },
     hardwareInputs,

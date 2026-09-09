@@ -261,7 +261,7 @@ export function statusToneLabel(status: StatusToneLike): string {
     case "ok":
       return "Ready";
     case "attention":
-      return "Attention";
+      return "Needs attention";
     case "error":
       return "Failed";
     default:
@@ -272,15 +272,15 @@ export function statusToneLabel(status: StatusToneLike): string {
 export function formatLifecycleLabel(lifecycle: ShellState["lifecycle"]) {
   switch (lifecycle) {
     case "launching-process":
-      return "Launching process";
+      return "Starting up";
     case "waiting-for-ready-event":
-      return "Awaiting ready event";
+      return "Waiting for Studio Control to answer";
     case "waiting-for-health-snapshot":
-      return "Loading health snapshot";
+      return "Loading the health checks";
     case "waiting-for-app-snapshot":
-      return "Loading app snapshot";
+      return "Loading workspaces";
     case "ready":
-      return "Shell ready";
+      return "Ready";
     case "failed":
       return "Startup failed";
     default:
@@ -615,9 +615,11 @@ function statusLabelFor(check: { status?: string } | undefined, fallback: string
     case "passed":
       return "ready";
     case "failed":
-      return "attention";
+      return "failed";
     case "ok":
-      return "ok";
+      // Slice 8 (system §9): one word per state — "passed" and "ok" are the
+      // same healthy subsystem, and the header said them two different ways.
+      return "ready";
     case "info":
     case "idle":
     case "attention":
@@ -680,7 +682,7 @@ export function buildMonitorItems(
     lamp("audio", "Audio", checks.audio, workspaceTones?.audio),
     {
       id: "surface",
-      label: "Surface",
+      label: "Deck",
       detail: statusLabelFor(checks.controlSurface, "pending"),
       // Why: previously fell back to "info" (blue) while sibling subsystems
       // (lighting, audio) fell back to "attention" — that asymmetry rendered

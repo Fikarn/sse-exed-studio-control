@@ -132,7 +132,7 @@ export function AudioInspector({
     : (selectedMixTarget?.meterRight ?? 0);
   const nextPhantomState = selectedChannel ? !selectedChannel.phantom : false;
   const phantomArmed = selectedChannel ? armedActionKey === `phantom:${selectedChannel.id}:${nextPhantomState}` : false;
-  const phantomLabel = phantomArmed ? (nextPhantomState ? "Confirm 48V" : "Confirm Off") : "48V";
+  const phantomLabel = phantomArmed ? (nextPhantomState ? "Confirm 48 V on" : "Confirm 48 V off") : "48 V";
   const supportsGain = selectedChannel ? audioChannelSupportsGain(selectedChannel) : false;
   const eqOn = selectedChannel ? selectedChannel.eq.enabled : false;
 
@@ -328,7 +328,7 @@ export function AudioInspector({
         </Section>
       ) : (
         <AudioEmptyInspector
-          description="Use 1-8, click a strip, or the command palette to select a source. Output selection stays active."
+          description="Press 1–8, click a strip, or use the command palette to select a source. Output selection stays active."
           title="No channel selected"
         />
       )}

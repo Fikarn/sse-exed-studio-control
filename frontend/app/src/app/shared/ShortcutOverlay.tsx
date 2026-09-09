@@ -21,7 +21,7 @@ interface ShortcutSection {
 // search field substring-matches across every entry's description + keys.
 const SHORTCUTS: readonly ShortcutSection[] = [
   {
-    heading: "Shell",
+    heading: "Studio Control",
     entries: [
       { keys: ["mod", "K"], description: "Open command palette" },
       { keys: ["?"], description: "Toggle this shortcuts overlay" },
@@ -29,7 +29,7 @@ const SHORTCUTS: readonly ShortcutSection[] = [
       { keys: ["mod", "1–4"], description: "Switch workspaces (Setup, Lighting, Audio, Planning)" },
       { keys: ["shift", "S"], description: "Open Setup / Support" },
       { keys: ["A"], description: "Open Audio workspace" },
-      { keys: ["mod", "shift", "R"], description: "Restart the engine bridge" },
+      { keys: ["mod", "shift", "R"], description: "Restart the hardware link" },
     ],
   },
   {
@@ -37,9 +37,12 @@ const SHORTCUTS: readonly ShortcutSection[] = [
     entries: [
       {
         keys: ["S"],
-        description: "Smart save — save changes if active scene is drifted, else create a new scene",
+        description: "Smart save — save changes if the active scene has drifted, otherwise create a new scene",
       },
-      { keys: ["mod", "S"], description: "Save changes to the active scene (no-op if no drift)" },
+      {
+        keys: ["mod", "S"],
+        description: "Save changes to the active scene (does nothing if the scene has not drifted)",
+      },
       { keys: ["mod", "shift", "S"], description: "Save as new scene (opens a name dialog)" },
       { keys: ["1–9"], description: "Recall scene 1–9 (numbered slots)" },
       { keys: ["T"], description: "Cycle scene recall fade time" },
@@ -83,9 +86,9 @@ const SHORTCUTS: readonly ShortcutSection[] = [
   {
     heading: "Lighting · sliders",
     entries: [
-      { keys: ["shift", "Drag"], description: "Fine adjust (×0.1) on intensity / CCT / scrub-labels" },
-      { keys: ["mod", "Drag"], description: "Coarse adjust (×10) on intensity / CCT / scrub-labels" },
-      { keys: ["Double-click"], description: "Reset slider to its default value" },
+      { keys: ["shift", "Drag"], description: "Fine adjust (×0.1) on intensity / CCT / draggable value labels" },
+      { keys: ["mod", "Drag"], description: "Coarse adjust (×10) on intensity / CCT / draggable value labels" },
+      { keys: ["DOUBLE-CLICK"], description: "Reset slider to its default value" },
     ],
   },
   {
@@ -126,7 +129,7 @@ const SHORTCUTS: readonly ShortcutSection[] = [
     entries: [
       { keys: ["Tab"], description: "Move forward through runner steps" },
       { keys: ["shift", "Tab"], description: "Move back through runner steps" },
-      { keys: ["Enter"], description: "Invoke the runner footer primary action" },
+      { keys: ["Enter"], description: "Run the main action in the runner footer" },
       { keys: ["J", "K"], description: "Move through binding details in Map and Verify" },
       { keys: ["1–4"], description: "Jump to a page in the Setup Map" },
     ],
@@ -229,7 +232,7 @@ export function ShortcutOverlay({ onClose }: ShortcutOverlayProps) {
 
         <div className={styles.body}>
           {totalEntries === 0 ? (
-            <div className={styles.empty}>No shortcuts match “{query}”.</div>
+            <div className={styles.empty}>No shortcuts match “{query}”. Clear the box, or press Esc to close.</div>
           ) : (
             filtered.map((section) => (
               <section key={section.heading} className={styles.section}>

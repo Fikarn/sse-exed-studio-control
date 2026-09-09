@@ -183,7 +183,7 @@ describe("ArmKey", () => {
       </ArmKey>
     );
     expect(screen.getByRole("button")).toHaveAttribute("data-armed", "true");
-    expect(screen.getByText("ARMED · press again · 3.9 s")).toBeInTheDocument();
+    expect(screen.getByText("ARMED · press again · Esc cancels · 3.9 s")).toBeInTheDocument();
     const bar = screen.getByTestId("audio-arm-countdown");
     expect(bar.getAttribute("style")).toContain("--arm-duration: 4500ms");
   });

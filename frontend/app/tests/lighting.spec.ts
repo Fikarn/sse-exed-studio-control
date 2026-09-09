@@ -39,10 +39,11 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   // above it. Reason: Lighting follows the cluster rule — the state first and
   // fixed, then the keys, in the same place as every other workspace.
   await expect(page.getByTestId("lighting-cluster")).toBeVisible();
-  // Visual overhaul A, Slice 5. Old: the health bar printed "192.168.1.80 · U1".
-  // New: the shell footer prints "192.168.1.80 · universe 1". Reason: the
-  // footer is the shell's and says the universe in words.
-  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("192.168.1.80 · universe 1");
+  // Visual overhaul A, Slice 5 said "192.168.1.80 · universe 1" — the footer in
+  // words. Slice 8 takes it back to "192.168.1.80 · U1": system §9 fixes the
+  // universe's form as U1, the plate and Setup both print it that way, and one
+  // fact should not have two forms on one screen.
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("192.168.1.80 · U1");
   await expect(workspace.getByText("Warm wash").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toHaveAttribute(
     "data-selected",
@@ -245,7 +246,9 @@ test("unreachable: the state display carries the bridge sentence, the rig is out
   }
 
   await expect(page.getByTestId("lighting-stage")).toHaveAttribute("data-locked", "");
-  await expect(page.getByTestId("lighting-stage-lock-note")).toHaveText("locked · bridge unreachable");
+  await expect(page.getByTestId("lighting-stage-lock-note")).toHaveText(
+    "locked · the bridge is not answering · Open Setup"
+  );
 });
 
 // Visual overhaul A, Slice 5: the rig has drifted from the scene it was
@@ -337,18 +340,18 @@ test("enters and exits scaled studio preview from the command palette", async ({
 
   await page.keyboard.press("Meta+K");
   await page.locator("input[placeholder*=command]").fill("studio preview");
-  await expect(page.getByRole("option", { name: "Studio Preview: Enter 2560x1440 Review" })).toBeVisible();
-  await page.getByRole("option", { name: "Studio Preview: Enter 2560x1440 Review" }).click();
+  await expect(page.getByRole("option", { name: "Enter Studio Preview at 2560 × 1440" })).toBeVisible();
+  await page.getByRole("option", { name: "Enter Studio Preview at 2560 × 1440" }).click();
 
   const root = page.locator("[data-operator-layout-root]");
   await expect(root).toHaveAttribute("data-review-surface", "studioPreview");
   await expect(root).toHaveAttribute("data-layout-mode", "studioFull");
-  await expect(page.getByText(/Studio Preview - 2560x1440 @/)).toBeVisible();
+  await expect(page.getByText(/Studio Preview — 2560 × 1440 at/)).toBeVisible();
 
   await page.keyboard.press("Meta+K");
   await page.locator("input[placeholder*=command]").fill("studio preview");
-  await expect(page.getByRole("option", { name: "Studio Preview: Exit Review" })).toBeVisible();
-  await page.getByRole("option", { name: "Studio Preview: Exit Review" }).click();
+  await expect(page.getByRole("option", { name: "Exit Studio Preview" })).toBeVisible();
+  await page.getByRole("option", { name: "Exit Studio Preview" }).click();
 
   await expect(root).toHaveAttribute("data-review-surface", "native");
 });
@@ -415,9 +418,9 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
   const quickPicker = page.getByRole("dialog", { name: "Lighting palettes" });
   await expect(quickPicker).toBeVisible();
   await expect(quickPicker.getByLabel("Search palettes")).toBeFocused();
-  await expect(quickPicker.getByRole("button", { name: "Apply palette Low 10%" }).first()).toBeVisible();
+  await expect(quickPicker.getByRole("button", { name: "Apply palette Low 10 %" }).first()).toBeVisible();
   await quickPicker.getByLabel("Search palettes").fill("studio");
-  await quickPicker.getByRole("button", { name: "Apply palette Studio 4000K" }).click();
+  await quickPicker.getByRole("button", { name: "Apply palette Studio 4000 K" }).click();
   await expect(page.getByRole("button", { name: /^Fixture Key, 10 percent, 4000 kelvin/i })).toHaveAttribute(
     "aria-pressed",
     "true"
@@ -436,7 +439,7 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
   await page.keyboard.press(modifierShortcut("Shift+KeyP"));
   await expect(page.getByText("Select fixtures to apply.")).toBeVisible();
   await expect(
-    page.getByRole("dialog", { name: "Lighting palettes" }).getByRole("button", { name: "Apply palette Low 10%" })
+    page.getByRole("dialog", { name: "Lighting palettes" }).getByRole("button", { name: "Apply palette Low 10 %" })
   ).toBeDisabled();
   await page.keyboard.press("Escape");
 
@@ -558,7 +561,7 @@ test("supports lighting drag-lasso multi-select and group save", async ({ page }
   await page.keyboard.up("Shift");
 
   await expect(page.getByLabel("Selected fixtures", { exact: true }).getByText("2 fixtures selected")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Clear all selection" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Clear the selection" })).toBeVisible();
 
   await page.getByRole("button", { name: "Create a new lighting group" }).click();
   const createGroupDialog = page.getByRole("dialog", { name: "New lighting group" });
@@ -660,9 +663,9 @@ test("opens typed numeric entry on the lighting grand master and commits", async
 test("drags the selected fixture to a new plot position", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   // Slice 9e: studioFull now rests on the content frame (fitContent). This test's
-  // fixed pixel-delta drag assumes the un-zoomed Fill Desk plot, so select it and
+  // fixed pixel-delta drag assumes the un-zoomed Fill screen plot, so select it and
   // wait for the inner transform to settle to identity before driving the pointer.
-  await page.getByRole("button", { name: "Fill Desk", exact: true }).click();
+  await page.getByRole("button", { name: "Fill screen", exact: true }).click();
   await expect(page.locator('[data-inner-content="true"]')).toHaveAttribute("transform", "translate(0 0) scale(1)");
 
   const fixture = page.getByRole("button", { name: /^Fixture Key,/ });
@@ -718,9 +721,9 @@ test("mirrors fixture intensity slider drafts on the stage plot before commit", 
 test("rotates the selected fixture from the plot and inspector", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   // Slice 9e: studioFull now rests on the content frame (fitContent), whose uniform
-  // "meet" scaling changes the screen->plot angle vs. Fill Desk's non-uniform stretch.
-  // This test's pixel-based rotate-handle drag assumes Fill Desk, so select it first.
-  await page.getByRole("button", { name: "Fill Desk", exact: true }).click();
+  // "meet" scaling changes the screen->plot angle vs. Fill screen's non-uniform stretch.
+  // This test's pixel-based rotate-handle drag assumes Fill screen, so select it first.
+  await page.getByRole("button", { name: "Fill screen", exact: true }).click();
   await expect(page.locator('[data-inner-content="true"]')).toHaveAttribute("transform", "translate(0 0) scale(1)");
 
   const rotationInput = page.getByLabel("Fixture rotation in degrees");
@@ -838,7 +841,7 @@ test("frames the populated rig via the stage-plot Frame mode (DENSITY-04)", asyn
 
   const inner = page.locator('[data-inner-content="true"]');
   const frame = page.getByRole("button", { name: "Frame", exact: true });
-  const fitRoom = page.getByRole("button", { name: "Fit Room", exact: true });
+  const fitRoom = page.getByRole("button", { name: "Fit room", exact: true });
   const IDENTITY = "translate(0 0) scale(1)";
 
   // studioFull (2560x1440) now rests on the content frame by default — the rig is

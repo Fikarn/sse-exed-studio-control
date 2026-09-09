@@ -45,7 +45,7 @@ describe("Toast", () => {
     render(<Toast tone="ok" message="Done." action={{ label: "Undo", onClick: onAction }} onDismiss={onDismiss} />);
     screen.getByRole("button", { name: "Undo" }).click();
     expect(onAction).toHaveBeenCalledOnce();
-    screen.getByRole("button", { name: "Dismiss" }).click();
+    screen.getByRole("button", { name: "Dismiss message" }).click();
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 });

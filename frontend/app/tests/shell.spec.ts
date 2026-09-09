@@ -40,9 +40,9 @@ test("supports shell keyboard overlays and workspace switching", async ({ page }
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
 
   await page.keyboard.press(modifierShortcut("Shift+KeyR"));
-  await expect(page.getByRole("dialog", { name: "Restart engine bridge?" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Restart engine bridge?" })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeHidden();
 
   await page.keyboard.press(modifierShortcut("Digit2"));
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
@@ -198,7 +198,7 @@ test("lighting scene drift latches a monitor-strip chip", async ({ page }) => {
   // Toggle the Front group off — the rig now diverges from the recalled
   // Warm wash scene, which must latch the drift chip; restoring the group
   // clears it.
-  await page.getByRole("button", { name: /^Front, 2 fixtures at 67%, on/ }).click();
+  await page.getByRole("button", { name: /^Front, 2 fixtures at 67 %, on/ }).click();
   await expect(driftChip).toBeVisible();
   await page.getByRole("button", { name: /^Front, 2 fixtures/ }).click();
   await expect(driftChip).toHaveCount(0);

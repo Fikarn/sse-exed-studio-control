@@ -406,7 +406,10 @@ export function PlanningWorkspaceSurface({
       });
     } catch (error) {
       setPlanningFeedback({
-        message: error instanceof Error ? error.message : "The timer could not be changed.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The timer could not be changed. Press the timer key on the plate again.",
         tone: "error",
       });
     } finally {
@@ -422,7 +425,10 @@ export function PlanningWorkspaceSurface({
       setPlanningFeedback({ message: `Deleted '${task?.title ?? "the task"}'.`, tone: "info" });
     } catch (error) {
       setPlanningFeedback({
-        message: error instanceof Error ? error.message : "The task could not be deleted.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The task could not be deleted. Press Delete task… on the plate again.",
         tone: "error",
       });
     } finally {
@@ -676,7 +682,7 @@ export function PlanningWorkspaceSurface({
       setNewProjectTitle("");
     } catch (error) {
       setPlanningFeedback({
-        message: error instanceof Error ? error.message : "The project could not be created.",
+        message: error instanceof Error ? error.message : "The project could not be created. Press Add project again.",
         tone: "error",
       });
     } finally {
@@ -695,7 +701,10 @@ export function PlanningWorkspaceSurface({
       });
     } catch (error) {
       setPlanningFeedback({
-        message: error instanceof Error ? error.message : "The support backup could not be exported.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The support backup could not be exported. Press Export backup again.",
         tone: "error",
       });
     } finally {
@@ -723,7 +732,9 @@ export function PlanningWorkspaceSurface({
       setPlanningTimeReport(parsePlanningTimeReport(result));
     } catch (error) {
       setPlanningTimeReportError(
-        error instanceof Error ? error.message : "The planning time report could not be loaded."
+        error instanceof Error
+          ? error.message
+          : "The time report could not be loaded. Press Close, then Time report to try again."
       );
     } finally {
       setPlanningTimeReportLoading(false);
@@ -969,7 +980,7 @@ export function PlanningWorkspaceSurface({
             <div className={planningStyles.planningScale}>
               <div className={planningStyles.planningScaleHead}>
                 <span>Project</span>
-                <span>Run-of-show loading…</span>
+                <span>Loading planning…</span>
               </div>
               <div className={planningStyles.planningScaleTicks}>
                 {timelineMinorTicks.map((minute) => (
@@ -1064,7 +1075,7 @@ export function PlanningWorkspaceSurface({
         ))}
       </Segmented>
       <input
-        aria-label="Search planning tasks"
+        aria-label="Search tasks and projects"
         className={planningStyles.planningScreenSearch}
         data-toolbar-primary="search"
         data-well=""
@@ -1157,7 +1168,7 @@ export function PlanningWorkspaceSurface({
                             data-testid={`planning-board-empty-${column.id}`}
                             data-zero-filter="true"
                           >
-                            No {column.label.toLowerCase()} tasks.
+                            No {column.label.toLowerCase()} projects. Press All to see the rest.
                           </div>
                         ) : columnProjects.length > 0 ? (
                           columnProjects.map((project, projectIndex) => {
@@ -1281,7 +1292,7 @@ export function PlanningWorkspaceSurface({
                               >
                                 <div className={planningStyles.planningBoardCardHeader}>
                                   <button
-                                    aria-label={`Open project detail for ${project.title}`}
+                                    aria-label={`Show ${project.title} on the plate`}
                                     className={planningStyles.planningBoardDetailButton}
                                     onClick={(event) => {
                                       event.stopPropagation();
@@ -1341,7 +1352,9 @@ export function PlanningWorkspaceSurface({
                             );
                           })
                         ) : (
-                          <div className={planningStyles.planningBoardEmpty}>No projects in this column.</div>
+                          <div className={planningStyles.planningBoardEmpty}>
+                            No projects in this column. Drag a card here to move one in.
+                          </div>
                         )}
                       </div>
                     </section>
@@ -1351,7 +1364,7 @@ export function PlanningWorkspaceSurface({
                   <div className={planningStyles.planningBoardEmptyState}>
                     <EmptyState
                       title="No projects yet. Press N to start one."
-                      message="The board stays visible, but there is no run-of-show data on the current day."
+                      message="The board stays on screen, but with no projects there is nothing scheduled on this day."
                     />
                   </div>
                 ) : null}
@@ -1360,7 +1373,7 @@ export function PlanningWorkspaceSurface({
               <div className={planningStyles.planningEmptyState}>
                 <EmptyState
                   title="No projects yet. Press N to start one."
-                  message="The timeline stays visible, but there is no run-of-show data on the current day."
+                  message="The timeline stays on screen, but with no projects there is nothing scheduled on this day."
                 />
               </div>
             ) : (
@@ -1399,7 +1412,9 @@ export function PlanningWorkspaceSurface({
                     const runningTask = laneTasks.find((task) => task.isRunning);
                     const subtitle = runningTask
                       ? `${runningTask.title} · running`
-                      : `${projectTaskCounts.get(project.id) ?? 0} tasks · ${project.status.replace("-", " ")}`;
+                      : `${projectTaskCounts.get(project.id) ?? 0} ${
+                          (projectTaskCounts.get(project.id) ?? 0) === 1 ? "task" : "tasks"
+                        } · ${project.status.replace("-", " ")}`;
                     const laneFilteredOut = settings.viewFilter !== "all" && project.status !== settings.viewFilter;
                     // A card is a box at its start time, not a bar: work out
                     // where each one lands before drawing the lane.
@@ -1579,7 +1594,7 @@ export function PlanningWorkspaceSurface({
                                   }}
                                   title={
                                     overlapTitle
-                                      ? `${task.title} · ${taskDurationMinutes} min · Overlaps '${overlapTitle}'.`
+                                      ? `${task.title} · ${taskDurationMinutes} min · Overlaps '${overlapTitle}'. Drag the card, or press ← or → to move it 15 min.`
                                       : `${task.title} · ${taskDurationMinutes} min`
                                   }
                                   type="button"
@@ -1655,14 +1670,17 @@ export function PlanningWorkspaceSurface({
                 onClick={() => setTrayExpanded((current) => !current)}
                 type="button"
               >
-                <span>Unscheduled ({visibleUnscheduledTasks.length})</span>
-                <span>{unscheduledTrayExpanded ? "Collapse" : "Expand"}</span>
+                <span>
+                  Unscheduled · {visibleUnscheduledTasks.length}{" "}
+                  {visibleUnscheduledTasks.length === 1 ? "task" : "tasks"}
+                </span>
+                <span>{unscheduledTrayExpanded ? "Collapse the tray" : "Expand the tray"}</span>
               </button>
               <div className={planningStyles.planningUnscheduledBody}>
                 {visibleUnscheduledTasks.map((task) => (
                   <button
                     key={task.id}
-                    aria-label={`Unscheduled task ${task.title}`}
+                    aria-label={`Select ${task.title}, unscheduled`}
                     className={planningStyles.planningUnscheduledChip}
                     data-material="well"
                     draggable
@@ -1695,8 +1713,10 @@ export function PlanningWorkspaceSurface({
           {showFilterBanner || showSearchZeroResult ? (
             <div className={planningStyles.planningFilterBanner} role="status">
               <span>
-                {hasPlanningSearch ? `Search: "${planningSearchQuery.trim()}"` : `Filter: ${settings.viewFilter}`} ·{" "}
-                {filteredProjects.length} of {projects.length}
+                {hasPlanningSearch
+                  ? `Search: "${planningSearchQuery.trim()}"`
+                  : `Filter: ${planningFilters.find((filter) => filter.value === settings.viewFilter)?.label ?? settings.viewFilter}`}{" "}
+                · {filteredProjects.length} of {projects.length} projects
               </span>
               <button
                 className={planningStyles.planningFilterClear}

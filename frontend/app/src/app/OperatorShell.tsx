@@ -46,7 +46,7 @@ declare global {
 }
 
 const CLOSE_DIALOG_BODY =
-  "Closing ends the console link. TotalMix keeps its current state, sACN output stops and fixtures hold their last levels, and the Stream Deck goes idle.";
+  "Closing ends Studio Control's link to the desk, the rig and the deck. TotalMix keeps its current state, sACN output stops and fixtures hold their last levels, and the Stream Deck goes idle.";
 
 export function OperatorShell() {
   // Toast portal hosts cross-workspace bottom-right notifications + the ⌘K
@@ -119,7 +119,7 @@ function OperatorShellInner() {
       audio: shellState.audioSnapshot ? { tone: audioStatus.tone, word: audioStatus.label.toLowerCase() } : null,
       lighting:
         shellState.lightingSnapshot?.reachable === false
-          ? { tone: "error" as const, word: "unreachable" }
+          ? { tone: "error" as const, word: "no bridge" }
           : lightingSceneDrift
             ? { tone: "attention" as const, word: "unsaved" }
             : null,
@@ -188,7 +188,7 @@ function OperatorShellInner() {
   useEffect(() => {
     const uiScaleActions = OPERATOR_UI_SCALES.map((scale) => ({
       id: `system:ui-scale:${scale}`,
-      label: `Set UI scale to ${scale}%`,
+      label: `Set UI scale to ${scale} %`,
       group: "System",
       keywords: ["ui", "scale", "density", "compact", String(scale)],
       action: () => setUiScale(scale),
@@ -208,7 +208,7 @@ function OperatorShellInner() {
         label: "Switch to Lighting",
         group: "Workspace",
         keywords: ["lighting", "lights", "rig"],
-        shortcut: formatShortcut(["mod", "1"]),
+        shortcut: formatShortcut(["mod", "2"]),
         action: () => void tryNavigateWorkspace("lighting"),
       },
       {
@@ -229,7 +229,7 @@ function OperatorShellInner() {
       },
       {
         id: "system:restart-engine",
-        label: "Restart engine bridge",
+        label: "Restart the hardware link",
         group: "System",
         keywords: ["restart", "reset", "bridge", "recover"],
         shortcut: formatShortcut(["mod", "shift", "R"]),
@@ -255,28 +255,28 @@ function OperatorShellInner() {
       },
       {
         id: "system:enter-studio-fullscreen",
-        label: "Enter Studio Fullscreen",
+        label: "Enter studio fullscreen",
         group: "Window",
         keywords: ["studio", "fullscreen", "monitor", "window"],
         action: () => void enterStudioFullscreen(),
       },
       {
         id: "system:use-windowed-layout",
-        label: "Use Windowed Layout",
+        label: "Use the windowed layout",
         group: "Window",
         keywords: ["windowed", "layout", "resize", "monitor"],
         action: () => void switchToWindowedLayout(),
       },
       {
         id: "system:reset-window-layout",
-        label: "Reset Window Layout",
+        label: "Reset the window layout",
         group: "Window",
         keywords: ["reset", "window", "layout", "monitor"],
         action: () => void resetWindowLayout(),
       },
       {
         id: "system:enter-studio-preview",
-        label: "Studio Preview: Enter 2560x1440 Review",
+        label: "Enter Studio Preview at 2560 × 1440",
         group: "Window",
         keywords: ["studio", "preview", "scaled", "review", "2560", "1440", "layout"],
         when: () => reviewSurface !== "studioPreview",
@@ -284,7 +284,7 @@ function OperatorShellInner() {
       },
       {
         id: "system:exit-studio-preview",
-        label: "Studio Preview: Exit Review",
+        label: "Exit Studio Preview",
         group: "Window",
         keywords: ["studio", "preview", "scaled", "review", "native", "layout"],
         when: () => reviewSurface === "studioPreview",
@@ -449,7 +449,7 @@ function OperatorShellInner() {
     confirmIntent === "restart-engine" ? (
       shellExperience === "recovery" ? (
         <ShellDialog
-          body="Retry startup with the current runtime paths. If the failure persists, capture diagnostics before changing persistence or protocol state."
+          body="Retry startup with the paths Studio Control is set to use. If it fails again, export diagnostics before you change any saved data or connection settings."
           confirmLabel="Retry startup"
           onCancel={() => setConfirmIntent(null)}
           onConfirm={() => void performRestart()}
@@ -457,11 +457,11 @@ function OperatorShellInner() {
         />
       ) : (
         <ShellDialog
-          body="Restarting reconnects the app to its engine. The console link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
-          confirmLabel="Restart bridge"
+          body="Restarting reconnects Studio Control to the desk, the rig and the deck. The desk link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
+          confirmLabel="Restart the link"
           onCancel={() => setConfirmIntent(null)}
           onConfirm={() => void performRestart()}
-          title="Restart engine bridge?"
+          title="Restart the hardware link?"
         />
       )
     ) : null;

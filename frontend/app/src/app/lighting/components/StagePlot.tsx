@@ -669,7 +669,7 @@ export function StagePlot({
           <EmptyState
             icon={Sun}
             title="No fixtures on the rig yet"
-            message="Add your first fixture with the Add fixture button in the toolbar to start patching DMX addresses and saving scenes."
+            message="Add your first fixture with Add fixture in the cluster to start patching DMX addresses and saving scenes."
             action={onAddFixture ? { label: "Add fixture", onClick: onAddFixture, icon: Plus } : undefined}
           />
         </div>

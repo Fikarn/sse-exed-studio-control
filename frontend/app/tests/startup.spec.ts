@@ -14,7 +14,7 @@ import { openFixture } from "./helpers/openFixture";
 
 test("renders startup and recovery fixture states", async ({ page }) => {
   await openFixture(page, "startup-loading");
-  await expect(page.getByText("STARTING ENGINE…")).toBeVisible();
+  await expect(page.getByText("STARTING UP…")).toBeVisible();
   // Visual overhaul A, Slice 2 (plan D1): the shell header renders on every
   // surface; before the engine is ready every tab is locked.
   await expect(page.getByRole("navigation", { name: "Workspace navigation" })).toBeVisible();
@@ -27,17 +27,17 @@ test("renders startup and recovery fixture states", async ({ page }) => {
   await expect(page.getByText("What went wrong?")).toBeVisible();
   await expect(page.getByText("Reference paths")).toBeVisible();
   await expect(page.getByText("Requested protocol")).toBeVisible();
-  await page.getByRole("button", { name: "Update repo" }).click();
-  await expect(page.getByText(/Update repo opened at/)).toBeVisible();
+  await page.getByRole("button", { name: "Update folder" }).click();
+  await expect(page.getByText(/Update folder opened at/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Logs" })).toBeVisible();
 
   await openFixture(page, "bootstrap-failed");
-  await expect(page.getByTestId("setup-recovery-surface-state-display")).toContainText("ENGINE BOOTSTRAP FAILED", {
+  await expect(page.getByTestId("setup-recovery-surface-state-display")).toContainText("STARTUP FAILED", {
     timeout: 10000,
   });
   await expect(page.getByText("What went wrong?")).toBeVisible();
   await expect(page.getByText("Install & Update")).toBeVisible();
-  await expect(page.getByText("Runtime paths")).toBeVisible();
+  await expect(page.getByText("File paths")).toBeVisible();
   await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
 });
 
@@ -65,7 +65,7 @@ test("protocol-mismatch fixture exposes the documented diagnostic fields", async
 
 test("bootstrap-failed fixture surfaces archive + recovery affordances", async ({ page }) => {
   await openFixture(page, "bootstrap-failed");
-  await expect(page.getByTestId("setup-recovery-surface-state-display")).toContainText("ENGINE BOOTSTRAP FAILED", {
+  await expect(page.getByTestId("setup-recovery-surface-state-display")).toContainText("STARTUP FAILED", {
     timeout: 10000,
   });
 
@@ -73,13 +73,13 @@ test("bootstrap-failed fixture surfaces archive + recovery affordances", async (
   // operator needs an archive button to capture the runtime state for
   // hand-off + the runtime paths block to know where to look.
   await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
-  await expect(page.getByText("Runtime paths")).toBeVisible();
+  await expect(page.getByText("File paths")).toBeVisible();
   await expect(page.getByText("Install & Update")).toBeVisible();
 });
 
 test("startup-loading fixture hides every operator workspace surface", async ({ page }) => {
   await openFixture(page, "startup-loading");
-  await expect(page.getByText("STARTING ENGINE…")).toBeVisible();
+  await expect(page.getByText("STARTING UP…")).toBeVisible();
 
   // While starting we should NOT show any operator workspace. The shell
   // header is there (visual overhaul A, Slice 2, plan D1) with every tab
@@ -133,14 +133,14 @@ test("every recovery band names a next step", async ({ page }) => {
   await openFixture(page, "bootstrap-failed");
 
   const display = page.getByTestId("setup-recovery-surface-state-display");
-  await expect(display).toContainText("ENGINE BOOTSTRAP FAILED");
+  await expect(display).toContainText("STARTUP FAILED");
   // The way out is a key on the display itself.
   await expect(page.getByTestId("setup-recovery-retry")).toBeVisible();
 
   // Each band the surface shows carries an action or a named next step.
   await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Logs" })).toBeVisible();
-  await expect(page.getByText("Runtime paths")).toBeVisible();
+  await expect(page.getByText("File paths")).toBeVisible();
   await expect(page.getByText("Install & Update")).toBeVisible();
   await expect(page.getByRole("button", { name: /Export diagnostics/ }).first()).toBeVisible();
 });

@@ -44,7 +44,7 @@ export function LightingFooter({
   const sceneState = previewMode
     ? driftDetected
       ? "offline edits"
-      : "clean buffer"
+      : "no offline edits"
     : driftDetected
       ? "unsaved changes"
       : lastSavedLabel
@@ -58,8 +58,8 @@ export function LightingFooter({
           id: "bridge",
           label: "Bridge",
           value: bridgeIp
-            ? `${bridgeIp} · universe ${universe}${bridgeReachable ? "" : " · unreachable"}`
-            : `universe ${universe} · no address`,
+            ? `${bridgeIp} · U${universe}${bridgeReachable ? "" : " · unreachable"}`
+            : `U${universe} · no address`,
         },
         {
           id: "universe",

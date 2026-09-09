@@ -40,7 +40,9 @@ test("the footer carries the console link, the metering source, the last sync an
   await openFixture(page, "audio-populated");
   const footer = page.getByTestId("audio-health-bar");
   await expect(footer).toBeVisible();
-  await expect(footer).toContainText("Console");
+  // Slice 8 (system §9): the footer names what the row reports (OSC control),
+  // not this surface. "Console" is the workspace, the desk is the hardware.
+  await expect(footer).toContainText("OSC control");
   await expect(footer).toContainText("Metering");
   await expect(footer).toContainText("Last sync");
   await expect(footer).toContainText("Bank");

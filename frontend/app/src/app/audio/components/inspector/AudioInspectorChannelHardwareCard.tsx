@@ -105,7 +105,7 @@ export function AudioInspectorChannelHardwareCard({
           </div>
           <div className={styles.unsupportedToggleRow}>
             <button
-              aria-label={`${selectedChannel.phantom ? "Disable" : "Enable"} 48V on ${selectedChannel.name}`}
+              aria-label={`${selectedChannel.phantom ? "Disable" : "Enable"} 48 V on ${selectedChannel.name}`}
               aria-pressed={selectedChannel.phantom}
               data-armed={phantomArmed}
               data-active={selectedChannel.phantom}

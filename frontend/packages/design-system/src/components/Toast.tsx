@@ -48,7 +48,7 @@ export function Toast({ tone, message, title, action, onDismiss }: ToastProps) {
           {action.label}
         </button>
       ) : null}
-      <button type="button" className={styles.dismiss} onClick={onDismiss} aria-label="Dismiss">
+      <button type="button" className={styles.dismiss} onClick={onDismiss} aria-label="Dismiss message">
         <X aria-hidden="true" size={14} strokeWidth={2} />
       </button>
     </div>

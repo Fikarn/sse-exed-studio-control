@@ -50,7 +50,9 @@ export function AudioInspectorChannelMeterCard({
         showScale
       />
       <div className={styles.bigMeterInfo}>
-        {viewModel.meterSimulationActive ? <span className={styles.meterSimulationBadge}>TEST STAGE</span> : null}
+        {viewModel.meterSimulationActive ? (
+          <span className={styles.meterSimulationBadge}>{viewModel.meterSimulationLabel}</span>
+        ) : null}
         <div className={styles.bigMeterRow}>
           <span>
             <small>Level L / R</small>

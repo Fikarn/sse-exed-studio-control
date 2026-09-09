@@ -1,5 +1,7 @@
 import { Key, Lamp, Section, Segmented, StateDisplay, Well } from "@sse/design-system";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
+
 import type { CommissioningCheck } from "../../shellData";
 import type { SetupState } from "../setupState";
 import styles from "./SetupCluster.module.css";
@@ -163,7 +165,7 @@ export function SetupCluster({
         testId="setup-probes-section"
         actions={
           <Key size="small" disabled={busy} testId="setup-run-all-probes" onClick={onRunAllProbes}>
-            Run all
+            Run all probes
           </Key>
         }
       >
@@ -192,7 +194,7 @@ export function SetupCluster({
           <Key
             size="small"
             cap="Console"
-            hint="Ctrl 3"
+            hint={formatShortcut(["mod", "3"])}
             disabled={!canReturnToConsole}
             aria-label="Back to the console"
             testId="setup-back-to-console"

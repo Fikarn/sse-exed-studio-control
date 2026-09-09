@@ -16,7 +16,7 @@ export function AudioFooter({ viewModel }: { viewModel: AudioWorkspaceViewModel 
       : `all ${viewModel.visibleStripCount} strips`;
 
   const items: FooterItem[] = [
-    { id: "console", label: "Console", value: viewModel.footerTelemetry.osc },
+    { id: "console", label: "OSC control", value: viewModel.footerTelemetry.osc },
     { id: "metering", label: "Metering", value: viewModel.footerTelemetry.metering },
     { id: "last-sync", label: "Last sync", value: formatAudioTimestamp(snapshot.lastConsoleSyncAt) },
     { id: "bank", label: "Bank", value: bank },
@@ -26,7 +26,7 @@ export function AudioFooter({ viewModel }: { viewModel: AudioWorkspaceViewModel 
     { kbd: formatShortcut(["mod", "K"]), label: "Command palette" },
     { kbd: "?", label: "Shortcuts" },
     { kbd: ["[", "]"], label: "Bank" },
-    { kbd: "T", label: "hold to talk" },
+    { kbd: "T", label: "Hold to talk" },
   ];
 
   return (

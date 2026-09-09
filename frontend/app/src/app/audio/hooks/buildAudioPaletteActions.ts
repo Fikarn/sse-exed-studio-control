@@ -99,7 +99,7 @@ export function buildAudioPaletteActions(args: BuildAudioPaletteActionsArgs): Pa
   const actionActions: PaletteAction[] = [
     {
       id: "audio:sync",
-      label: "Sync console",
+      label: "Sync from TotalMix",
       group: "Actions",
       keywords: ["audio", "osc", "sync", "console"],
       action: syncAudio,
@@ -122,7 +122,7 @@ export function buildAudioPaletteActions(args: BuildAudioPaletteActionsArgs): Pa
     },
     {
       id: "audio:clear-selected-channel",
-      label: "Clear selected channel",
+      label: "Clear the channel selection",
       group: "Actions",
       keywords: ["audio", "selection", "clear", "esc"],
       shortcut: "Esc",
@@ -198,7 +198,7 @@ export function buildAudioPaletteActions(args: BuildAudioPaletteActionsArgs): Pa
     },
     {
       id: "audio:toggle-selected-polarity",
-      label: "Toggle selected polarity",
+      label: "Toggle polarity on the selected channel",
       group: "Actions",
       keywords: [
         "audio",

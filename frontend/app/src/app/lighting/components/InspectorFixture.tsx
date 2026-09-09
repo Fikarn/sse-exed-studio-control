@@ -301,7 +301,7 @@ export function InspectorFixture({
             </div>
             <div className={styles.fixtureSubline}>
               <StatusDot tone={fixture.on ? "ok" : "info"} size="sm" />
-              {fixture.on ? "Live" : "Standby"} · {MOUNTING_LABEL[deriveMounting(fixture, catalog)]}
+              {fixture.on ? "On" : "Off"} · {MOUNTING_LABEL[deriveMounting(fixture, catalog)]}
             </div>
           </div>
           <div className={styles.fixtureHeaderActions}>
@@ -329,7 +329,9 @@ export function InspectorFixture({
           </div>
           <div className={styles.fact}>
             <dt className={styles.factLabel}>Mode</dt>
-            <dd className={styles.factValue}>{mode ? `${mode.channelCount} ch` : fixture.modeId}</dd>
+            <dd className={styles.factValue}>
+              {mode ? `${mode.channelCount} ch` : `not in the catalog (${fixture.modeId})`}
+            </dd>
           </div>
         </dl>
         {onAssignFixtureGroup ? (
@@ -383,7 +385,7 @@ export function InspectorFixture({
                       <span className={styles.levelLabel}>{control.label}</span>
                       <span className={styles.levelValue}>
                         {Math.round(value)}
-                        {control.unit ?? ""}
+                        {control.unit ? ` ${control.unit}` : ""}
                       </span>
                     </div>
                     <ScrubSlider
@@ -406,7 +408,7 @@ export function InspectorFixture({
                         return null;
                       }}
                       disabled={!fixture.on && control.id !== "fan"}
-                      formatValue={(next) => `${Math.round(next)}${control.unit ?? ""}`}
+                      formatValue={(next) => `${Math.round(next)}${control.unit ? ` ${control.unit}` : ""}`}
                     />
                   </div>
                 );
@@ -420,7 +422,7 @@ export function InspectorFixture({
           <div className={styles.levelBlock}>
             <div className={styles.levelHeader}>
               <span className={styles.levelLabel}>Intensity</span>
-              <span className={styles.levelValue}>{Math.round(intensityDraft)}%</span>
+              <span className={styles.levelValue}>{Math.round(intensityDraft)} %</span>
             </div>
             <ScrubSlider
               ariaLabel="Fixture intensity"
@@ -439,13 +441,13 @@ export function InspectorFixture({
               // idempotent, so a busy-flag disable would just flicker the slider
               // chrome on every release without preventing anything real.
               disabled={!fixture.on}
-              formatValue={(v) => `${Math.round(v)}%`}
+              formatValue={(v) => `${Math.round(v)} %`}
             />
           </div>
           <div className={styles.levelBlock}>
             <div className={styles.levelHeader}>
               <span className={styles.levelLabel}>Colour temperature</span>
-              <span className={styles.levelValue}>{Math.round(cctDraft)}K</span>
+              <span className={styles.levelValue}>{Math.round(cctDraft)} K</span>
             </div>
             <ScrubSlider
               ariaLabel="Fixture CCT"
@@ -460,11 +462,11 @@ export function InspectorFixture({
                 setNumberDialog({ kind: "cct" });
                 return null;
               }}
-              formatValue={(v) => `${Math.round(v)}K`}
+              formatValue={(v) => `${Math.round(v)} K`}
             />
             <div className={styles.cctScale}>
-              <span>{cctRange.min}K · warm</span>
-              <span>{cctRange.max}K · cool</span>
+              <span>{cctRange.min} K · warm</span>
+              <span>{cctRange.max} K · cool</span>
             </div>
           </div>
         </div>
@@ -651,7 +653,7 @@ export function InspectorFixture({
           body={
             <>
               This permanently removes <strong>{fixture.name}</strong> from the rig and frees its DMX address (
-              {fixture.dmxStartAddress > 0 ? fixture.dmxStartAddress : "unpatched"}).
+              {fixture.dmxStartAddress > 0 ? `U${fixture.universe} ${fixture.dmxStartAddress}` : "unpatched"}).
             </>
           }
           confirmLabel="Delete fixture"
@@ -666,7 +668,7 @@ export function InspectorFixture({
       ) : null}
       {numberDialog?.kind === "intensity" ? (
         <NumberEntryDialog
-          title="Set Fixture intensity"
+          title="Set fixture intensity"
           fieldLabel="Intensity"
           initialValue={Math.round(intensityDraft)}
           min={0}
@@ -683,7 +685,7 @@ export function InspectorFixture({
       ) : null}
       {numberDialog?.kind === "cct" ? (
         <NumberEntryDialog
-          title="Set Fixture CCT"
+          title="Set fixture CCT"
           fieldLabel="Colour temperature"
           initialValue={Math.round(cctDraft)}
           min={cctRange.min}

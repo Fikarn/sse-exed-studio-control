@@ -122,7 +122,7 @@ export function InspectorFixtureBulk({
                 <li key={fixture.id} className={styles.sceneFixtureChip}>
                   <span className={styles.sceneFixtureName}>{fixture.name}</span>
                   <span className={styles.sceneFixtureLevel}>
-                    {fixture.on ? `${Math.round(fixture.intensity)}%` : "off"}
+                    {fixture.on ? `${Math.round(fixture.intensity)} %` : "off"}
                   </span>
                 </li>
               );
@@ -137,7 +137,7 @@ export function InspectorFixtureBulk({
                 >
                   <span className={styles.sceneFixtureName}>{fixture.name}</span>
                   <span className={styles.sceneFixtureLevel}>
-                    {fixture.on ? `${Math.round(fixture.intensity)}%` : "off"}
+                    {fixture.on ? `${Math.round(fixture.intensity)} %` : "off"}
                   </span>
                 </button>
               </li>
@@ -180,8 +180,7 @@ export function InspectorFixtureBulk({
           unit="K"
         />
         <div className={styles.helpText}>
-          Range narrowed to {cctRange.min}–{cctRange.max}K — the intersection of every selected fixture's supported
-          range.
+          Range narrowed to {cctRange.min}–{cctRange.max} K — the narrowest range every selected fixture supports.
         </div>
       </InspectorSection>
 

@@ -22,9 +22,9 @@ export function StartupSurface({
   return (
     <PreReadyState
       tone={lifecycle === "ready" ? "ok" : "info"}
-      word={lifecycle === "ready" ? "READY" : "STARTING"}
-      sentence="Connecting to the studio engine. The console opens once the engine confirms it is ready."
-      meta={`${formatLifecycleLabel(lifecycle)} · ${done} of ${steps.length} startup steps done · native webview shell`}
+      word={lifecycle === "ready" ? "READY" : "STARTING UP…"}
+      sentence="Connecting to the desk, the rig and the deck. The Console opens once Studio Control is ready."
+      meta={`${formatLifecycleLabel(lifecycle)} · ${done} of ${steps.length} startup steps done`}
       actions={<Key size="small" cap="Shortcuts" hint="?" testId="startup-shortcuts" onClick={onShowShortcuts} />}
       testId="startup-surface"
     >

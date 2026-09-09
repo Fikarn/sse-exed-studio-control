@@ -97,7 +97,9 @@ export function PlanningPlate({
       setNewTaskTitle("");
       setTaskComposerOpen(false);
     } catch (error) {
-      setTaskCreateError(error instanceof Error ? error.message : "The task could not be created.");
+      setTaskCreateError(
+        error instanceof Error ? error.message : "The task could not be created. Press Add task again."
+      );
     } finally {
       setTaskCreateBusy(false);
     }
@@ -123,7 +125,8 @@ export function PlanningPlate({
     } catch (error) {
       setChecklistErrors((current) => ({
         ...current,
-        [taskId]: error instanceof Error ? error.message : "The checklist item could not be added.",
+        [taskId]:
+          error instanceof Error ? error.message : "The checklist item could not be added. Press Add item again.",
       }));
     } finally {
       setChecklistBusyTaskId((current) => (current === taskId ? null : current));
@@ -135,7 +138,7 @@ export function PlanningPlate({
       {task.checklist.map((item) => (
         <button
           key={item.id}
-          aria-label={`Toggle checklist item ${item.text} for ${task.title}`}
+          aria-label={`Mark '${item.text}' ${item.done ? "not done" : "done"} on ${task.title}`}
           className={styles.check}
           data-done={item.done}
           onClick={(event) => {
@@ -359,7 +362,7 @@ export function PlanningPlate({
               type="submit"
               disabled={taskCreateBusy || newTaskTitle.trim().length === 0}
             >
-              {taskCreateBusy ? "Adding…" : "Add Task"}
+              {taskCreateBusy ? "Adding…" : "Add task"}
             </Key>
             {taskCreateError ? <div className={styles.error}>{taskCreateError}</div> : null}
           </form>
@@ -379,7 +382,7 @@ export function PlanningPlate({
                 >
                   <div className={styles.taskRow}>
                     <button
-                      aria-label={`Toggle completion for ${task.title}`}
+                      aria-label={`Mark ${task.title} ${task.completed ? "not done" : "done"}`}
                       className={styles.taskToggle}
                       data-completed={task.completed}
                       onClick={(event) => {
@@ -421,13 +424,13 @@ export function PlanningPlate({
             })}
           </div>
         ) : (
-          <div className={styles.empty}>No tasks yet.</div>
+          <div className={styles.empty}>No tasks yet. Press Add task to make one.</div>
         )}
       </Section>
 
       <Section
         title="Activity"
-        detail={activity.length > 0 ? `${activity.length} events` : "No events"}
+        detail={activity.length > 0 ? `${activity.length} ${activity.length === 1 ? "event" : "events"}` : "No events"}
         testId="planning-plate-activity"
       >
         {activity.length > 0 ? (

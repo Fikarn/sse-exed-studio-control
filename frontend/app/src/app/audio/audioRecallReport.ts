@@ -58,10 +58,10 @@ export function parseAudioRecallReport(result: unknown): AudioRecallReport | nul
 
   const parts: string[] = [];
   if (pushed === 0) {
-    parts.push("nothing pushed to the console");
+    parts.push("nothing pushed to the desk");
   } else {
     parts.push(`${pushed} values pushed, ${confirmed} confirmed`);
-    if (adjusted > 0) parts.push(`${adjusted} adjusted by the console`);
+    if (adjusted > 0) parts.push(`${adjusted} adjusted by the desk`);
     if (unconfirmed > 0) parts.push(`${unconfirmed} unconfirmed`);
   }
   let summaryLine = `${parts.join(", ")}.`;
@@ -69,10 +69,10 @@ export function parseAudioRecallReport(result: unknown): AudioRecallReport | nul
     const names = phantomDifferences
       .map(
         (entry) =>
-          `${entry.channelName} (snapshot ${entry.target ? "on" : "off"}, console ${entry.current ? "on" : "off"})`
+          `${entry.channelName} (snapshot ${entry.target ? "on" : "off"}, desk ${entry.current ? "on" : "off"})`
       )
       .join(", ");
-    summaryLine += ` 48V differs on ${names}.`;
+    summaryLine += ` 48 V differs on ${names}.`;
   }
 
   return {

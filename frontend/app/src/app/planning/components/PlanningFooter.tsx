@@ -12,14 +12,20 @@ export interface PlanningFooterProps {
   viewDayLabel: string;
 }
 
+// Slice 8 (system §9): every number carries its unit, and one task is
+// never "1 tasks".
+function taskCount(count: number) {
+  return `${count} ${count === 1 ? "task" : "tasks"}`;
+}
+
 export function PlanningFooter({ facts, viewDayLabel }: PlanningFooterProps) {
   return (
     <Footer
       items={[
         { id: "day", label: "Day", value: viewDayLabel },
-        { id: "scheduled", label: "Scheduled", value: String(facts.scheduledCount) },
-        { id: "unscheduled", label: "Unscheduled", value: String(facts.unscheduledCount) },
-        { id: "done", label: "Done", value: String(facts.doneCount) },
+        { id: "scheduled", label: "Scheduled", value: taskCount(facts.scheduledCount) },
+        { id: "unscheduled", label: "Unscheduled", value: taskCount(facts.unscheduledCount) },
+        { id: "done", label: "Done", value: taskCount(facts.doneCount) },
         { id: "tracked", label: "Tracked today", value: formatPlanningElapsed(facts.trackedTotalSeconds) },
       ]}
       hints={[
@@ -27,7 +33,7 @@ export function PlanningFooter({ facts, viewDayLabel }: PlanningFooterProps) {
         { kbd: "?", label: "Shortcuts" },
         { kbd: "N", label: "New project" },
         { kbd: ["[", "]"], label: "Hour" },
-        { kbd: formatShortcut(["shift", "["]), label: "Day" },
+        { kbd: [formatShortcut(["shift", "["]), formatShortcut(["shift", "]"])], label: "Day" },
       ]}
       testId="planning-health-bar"
       itemsTestId="planning-footer-telemetry"

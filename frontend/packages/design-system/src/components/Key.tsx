@@ -106,7 +106,7 @@ export interface ArmKeyProps extends Omit<KeyProps, "mode"> {
   timeoutMs: number;
   /** Seconds left, printed on the tag when given (`3.9 s`). */
   secondsLeft?: number;
-  /** The tag's words; default `ARMED · press again`. */
+  /** The tag's words; default `ARMED · press again · Esc cancels`. */
   armedWord?: string;
   /** Test id of the countdown bar; the Console's is `audio-arm-countdown`. */
   countdownTestId?: string;
@@ -119,7 +119,7 @@ export function ArmKey({
   armed,
   timeoutMs,
   secondsLeft,
-  armedWord = "ARMED · press again",
+  armedWord = "ARMED · press again · Esc cancels",
   countdownTestId = "audio-arm-countdown",
   cap,
   children,

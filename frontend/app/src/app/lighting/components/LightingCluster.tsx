@@ -135,7 +135,7 @@ export function LightingCluster(props: LightingClusterProps) {
   const lockedReason = state.locked
     ? state.sentence
     : patchMode
-      ? "Patch mode is on: the rig's levels are paused while you address fixtures."
+      ? "Patch mode is on: the rig's levels are paused while you address fixtures. Press P to leave it."
       : undefined;
 
   // The way out of the state the rig is in, as keys on the display itself.

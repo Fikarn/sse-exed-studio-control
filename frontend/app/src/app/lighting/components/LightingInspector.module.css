@@ -269,6 +269,10 @@
 }
 
 .paletteTileMain span {
+  /* Visual overhaul A, Slice 8 (system §9): the number and its unit are one
+     reading — "100 %" never breaks across two lines, which used to push the
+     last tile's keys past the bottom of the plate. */
+  white-space: nowrap;
   font-family: var(--font-family-mono);
   font-size: 11px;
   color: var(--color-brand-text-secondary);

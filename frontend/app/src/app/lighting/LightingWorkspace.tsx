@@ -116,13 +116,13 @@ function toShellTalentMarks(marks: readonly StudioTalentMark[]): readonly ShellT
 }
 
 function formatRecallFade(ms: number): string {
-  if (ms <= 0) return "snap";
+  if (ms <= 0) return "0 s";
   const seconds = ms / 1000;
   return `${Number.isInteger(seconds) ? seconds.toFixed(0) : seconds.toFixed(1)} s`;
 }
 
 function formatLightingPaletteQuickValue(palette: LightingPaletteSnapshot): string {
-  return palette.kind === "intensity" ? `${Math.round(palette.value)}%` : `${Math.round(palette.value)}K`;
+  return palette.kind === "intensity" ? `${Math.round(palette.value)} %` : `${Math.round(palette.value)} K`;
 }
 
 function lightingPaletteMatchesQuery(palette: LightingPaletteSnapshot, query: string): boolean {
@@ -852,7 +852,7 @@ export function LightingWorkspaceSurface({
       try {
         await store.updateLightingSettings({ selectedFixtureId: fixtureId });
       } catch (error) {
-        reportError(error, "Lighting selection update failed.");
+        reportError(error, "Could not change the selection. Click the fixture again.");
       } finally {
         finishBusy("fixture-select");
       }
@@ -1380,7 +1380,7 @@ export function LightingWorkspaceSurface({
         tone: "ok",
       });
     } catch (error) {
-      reportError(error, "Lighting master toggle failed.");
+      reportError(error, "Could not switch the rig on or off. Press Lighting again.");
     } finally {
       finishBusy("lighting-master-toggle");
     }
@@ -1599,7 +1599,7 @@ export function LightingWorkspaceSurface({
   const handleRecallScene = useLiveCallback(async (sceneId: string) => {
     if (uiMode === "patch") {
       toast.push({
-        message: "Patch mode is active. Exit patch mode before recalling a scene.",
+        message: "Patch mode is on. Press P to leave it, then recall the scene.",
         tone: "attention",
       });
       return;
@@ -1626,7 +1626,8 @@ export function LightingWorkspaceSurface({
       // would just reject it. Surface a single non-error toast so the
       // operator knows recall is preview-only and not a failed action.
       toast.push({
-        message: "Bridge unreachable — showing scene contents only.",
+        message:
+          "The bridge is not answering, so this only shows what the scene holds. Open Setup to check the bridge.",
         tone: "attention",
       });
       return;
@@ -1697,7 +1698,7 @@ export function LightingWorkspaceSurface({
       },
       {
         id: "lighting:toggle-preview",
-        label: previewMode ? (previewDirty ? "Exit preview mode..." : "Exit preview mode") : "Enter preview mode",
+        label: previewMode ? (previewDirty ? "Exit preview mode…" : "Exit preview mode") : "Enter preview mode",
         group: "Lighting",
         keywords: ["preview", "blind", "offline", "edit"],
         shortcut: "B",
@@ -1889,7 +1890,7 @@ export function LightingWorkspaceSurface({
           setExtraSelectedFixtureIds(new Set());
           toast.push({ message: `Patched. Now patching ‘${next.name}’.`, tone: "ok" });
         } catch (error) {
-          reportError(error, "Auto-advance to next fixture failed.");
+          reportError(error, "Patched. Could not move on to the next fixture — pick one on the plot.");
         }
       } else {
         setUiMode("recall");
@@ -2075,14 +2076,14 @@ export function LightingWorkspaceSurface({
       try {
         await store.highlightLightingFixtures([], "off");
       } catch (error) {
-        reportError(error, "Failed to clear overlay.");
+        reportError(error, "Could not clear Highlight and Solo. Press Esc to try again.");
       }
     }
     if (hadTimers) {
       try {
         await store.clearLightingIdentifyBursts();
       } catch (error) {
-        reportError(error, "Failed to clear identify bursts.");
+        reportError(error, "Could not stop the Find sequence. Press Esc to try again.");
       }
     }
   });
@@ -2171,7 +2172,7 @@ export function LightingWorkspaceSurface({
     try {
       await Promise.all(fixtureIds.map((fixtureId) => store.updateLightingFixture({ fixtureId, on })));
       toast.push({
-        message: `Set ${fixtureIds.length} fixtures ${on ? "on" : "off"}.`,
+        message: `Set ${fixtureIds.length} fixture${fixtureIds.length === 1 ? "" : "s"} ${on ? "on" : "off"}.`,
         tone: "ok",
       });
     } catch (error) {
@@ -2233,7 +2234,7 @@ export function LightingWorkspaceSurface({
       try {
         await store.updateLightingFixture({ fixtureId, ...nextPartial });
       } catch (error) {
-        reportError(error, "Fixture spatial update failed.");
+        reportError(error, "Could not move the fixture on the plot. Try the drag again.");
       } finally {
         finishBusy(busyKey);
       }
@@ -2362,7 +2363,7 @@ export function LightingWorkspaceSurface({
         const slot = event.code === "Digit1" ? 0 : event.code === "Digit2" ? 1 : event.code === "Digit3" ? 2 : null;
         if (slot !== null) {
           stagePlotViewport.saveViewBookmark(slot as ViewBookmarkSlot);
-          toast.push({ message: `Saved view ${slot + 1}.`, tone: "ok" });
+          toast.push({ message: `Saved view ${slot + 1}. Shift+${slot + 1} recalls it.`, tone: "ok" });
           event.preventDefault();
           return;
         }
@@ -2418,7 +2419,7 @@ export function LightingWorkspaceSurface({
           void handleResaveScene();
         } else {
           toast.push({
-            message: activeScene ? "Already saved." : "No active scene to save changes to.",
+            message: activeScene ? "Already saved." : "No scene is active. Press ⇧S to save the rig as a new scene.",
             tone: "info",
           });
         }
@@ -2579,9 +2580,9 @@ export function LightingWorkspaceSurface({
     return (
       <div className={styles.shell}>
         <div className={styles.connectingState} role="status" aria-live="polite">
-          <p className={styles.connectingTitle}>Connecting to lighting engine…</p>
+          <p className={styles.connectingTitle}>Loading the rig…</p>
           <p className={styles.connectingHint}>
-            Loading the rust engine snapshot. This usually takes a fraction of a second.
+            Reading what the bridge and the fixtures report. This usually takes a fraction of a second.
           </p>
         </div>
       </div>
@@ -2777,7 +2778,7 @@ export function LightingWorkspaceSurface({
         >
           {bridgeReachable ? null : (
             <div className={styles.stageLockNote} data-testid="lighting-stage-lock-note">
-              locked · bridge unreachable
+              locked · the bridge is not answering · Open Setup
             </div>
           )}
           <StagePlot
@@ -2986,11 +2987,11 @@ export function LightingWorkspaceSurface({
           body={
             activeScene ? (
               <>
-                Preview scene <strong>{activeScene.name}</strong> has edits that are not committed. Save writes the
-                preview buffer to the scene and leaves live output unchanged.
+                Preview scene <strong>{activeScene.name}</strong> has edits that are not saved. Save writes the preview
+                into the scene and leaves the live rig unchanged.
               </>
             ) : (
-              <>The preview buffer has edits that are not committed. Save as new or discard before exiting preview.</>
+              <>The preview has edits that are not saved. Save as new or discard before exiting preview.</>
             )
           }
           onClose={() => setShowPreviewExitPrompt(false)}
@@ -3062,7 +3063,7 @@ export function LightingWorkspaceSurface({
           body={
             <>
               This removes <strong>{confirmDeleteScene.name}</strong>. Other scenes are unaffected, the live rig state
-              stays as it is, and the next toast can undo the deletion.
+              stays as it is, and you can undo it from the mhe deletion.
             </>
           }
           confirmLabel="Delete scene"

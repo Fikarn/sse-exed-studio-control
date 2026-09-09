@@ -394,7 +394,7 @@ function normalizeStartupFailure(error: unknown): StartupFailure {
     const pathsRecord = asRecord(error.paths);
     return {
       code: String(error.code),
-      message: String(error.message ?? "Engine startup failed."),
+      message: String(error.message ?? "Studio Control could not start."),
       paths: pathsRecord
         ? Object.fromEntries(
             Object.entries(pathsRecord).flatMap(([key, value]) => (typeof value === "string" ? [[key, value]] : []))
@@ -433,7 +433,7 @@ function normalizeStartupFailure(error: unknown): StartupFailure {
 
   return {
     code: "ENGINE_STARTUP_FAILED",
-    message: "Engine startup failed.",
+    message: "Studio Control could not start.",
     stage: "frontend-bootstrap",
   };
 }
@@ -595,7 +595,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         reject(
           normalizeStartupFailure({
             code: "ENGINE_READY_TIMEOUT",
-            message: "Timed out waiting for the engine ready event.",
+            message: "Studio Control did not answer within ten seconds of starting.",
             stage: "ready-event",
           })
         );
@@ -794,7 +794,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       if (reportedProtocol !== PROTOCOL_VERSION) {
         throw normalizeStartupFailure({
           code: "PROTOCOL_MISMATCH",
-          message: `Shell expected protocol ${PROTOCOL_VERSION} but engine reported ${reportedProtocol}.`,
+          message: `Studio Control expected version ${PROTOCOL_VERSION} from its hardware link but got ${reportedProtocol}.`,
           requestedProtocol: PROTOCOL_VERSION,
           stage: "protocol-negotiation",
           supportedProtocol: reportedProtocol,

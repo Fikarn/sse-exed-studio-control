@@ -162,7 +162,7 @@ export function SupportPlate({
         <Readouts
           rows={[
             { id: "app", label: "Studio Control", value: appVersion },
-            { id: "engine", label: "Engine", value: `${engineVersion} · protocol ${protocolVersion}` },
+            { id: "engine", label: "Hardware link", value: `${engineVersion} · protocol ${protocolVersion}` },
             { id: "hardware", label: "Hardware profile", value: hardwareProfile },
           ]}
         />
@@ -170,7 +170,7 @@ export function SupportPlate({
 
       <Danger className={styles.danger}>
         <Key mode="danger" size="small" testId="support-restart-bridge" onClick={onRestartBridge}>
-          Restart the bridge…
+          Restart the hardware link…
         </Key>
       </Danger>
     </div>

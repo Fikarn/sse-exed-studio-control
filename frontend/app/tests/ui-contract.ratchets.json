@@ -553,7 +553,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 5,
+    "copyHits": 0,
     "regionsPresent": 2,
     "scrolls": false
   },
@@ -571,7 +571,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 5,
+    "copyHits": 0,
     "regionsPresent": 2,
     "scrolls": false
   },
@@ -589,7 +589,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 5,
+    "copyHits": 0,
     "regionsPresent": 2,
     "scrolls": false
   },
@@ -1201,7 +1201,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 6,
+    "copyHits": 1,
     "regionsPresent": 2,
     "scrolls": false
   },
@@ -1219,7 +1219,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 6,
+    "copyHits": 1,
     "regionsPresent": 2,
     "scrolls": false
   },
@@ -1237,7 +1237,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 6,
+    "copyHits": 1,
     "regionsPresent": 2,
     "scrolls": false
   },
@@ -1255,7 +1255,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1273,7 +1273,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1291,7 +1291,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1309,7 +1309,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1327,7 +1327,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1345,7 +1345,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1363,7 +1363,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1381,7 +1381,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1399,7 +1399,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 2,
+    "copyHits": 0,
     "regionsPresent": 4,
     "scrolls": false
   },
@@ -1417,7 +1417,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 6,
+    "copyHits": 0,
     "regionsPresent": 2,
     "scrolls": false
   },
@@ -1435,7 +1435,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 6,
+    "copyHits": 0,
     "regionsPresent": 2,
     "scrolls": false
   },
@@ -1453,7 +1453,7 @@
     "backdropBlur": 0,
     "runningAnimations": 0,
     "offViewport": 0,
-    "copyHits": 6,
+    "copyHits": 0,
     "regionsPresent": 2,
     "scrolls": false
   }

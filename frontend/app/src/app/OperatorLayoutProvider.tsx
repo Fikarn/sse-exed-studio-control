@@ -277,7 +277,7 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
         </div>
         {reviewEnabled ? (
           <div className={styles.reviewBadge} role="status">
-            Studio Preview - {OPERATOR_STUDIO_PREVIEW_SIZE.width}x{OPERATOR_STUDIO_PREVIEW_SIZE.height} @{" "}
+            Studio Preview — {OPERATOR_STUDIO_PREVIEW_SIZE.width} × {OPERATOR_STUDIO_PREVIEW_SIZE.height} at{" "}
             {Math.round(boundedReviewScale * 100)}%
           </div>
         ) : null}

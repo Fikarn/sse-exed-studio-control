@@ -68,7 +68,7 @@ export function DMXMonitorDialog({ universe, snapshot, reachable, onClose }: DMX
       body={
         reachable
           ? `${assignedCount} of ${TOTAL_CHANNELS} channels are patched to fixtures. Hover any cell for the fixture name and channel label.`
-          : `Bridge unreachable. Showing the last-known state of ${assignedCount} patched channels.`
+          : `The bridge is not answering. This is the last state it reported for ${assignedCount} patched channels — open Setup to check it.`
       }
       onClose={onClose}
       actions={

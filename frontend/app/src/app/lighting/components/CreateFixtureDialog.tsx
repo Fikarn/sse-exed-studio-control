@@ -208,7 +208,7 @@ export function CreateFixtureDialog({
           >
             {(selectedDefinition?.modes ?? []).map((mode) => (
               <option key={mode.id} value={mode.id}>
-                {mode.displayName} · {mode.channelCount} ch · {mode.capabilities.join(", ") || "metadata"}
+                {mode.displayName} · {mode.channelCount} ch · {mode.capabilities.join(", ") || "no controls"}
               </option>
             ))}
           </select>
@@ -243,7 +243,7 @@ export function CreateFixtureDialog({
         <p className={styles.hint}>
           {selectedMode?.displayName ?? "No mode"} · {channelCount} channels ·{" "}
           {dmxValid && channelCount > 0 ? `U${universeValue} ${dmxValue}-${dmxValue + channelCount - 1}` : "unpatched"}.
-          Suggested next slot: {suggestedDmx}. {largeFootprint ? "Large footprint." : ""}
+          Next free address: {suggestedDmx}. {largeFootprint ? "This mode takes a large share of the universe." : ""}
         </p>
       </form>
     </Dialog>

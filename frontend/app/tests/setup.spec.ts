@@ -40,7 +40,7 @@ test("walks the fixture-backed commissioning runner and support actions", async 
 
   await page.getByRole("tab", { name: /Probe hardware/i }).click();
   await page.getByLabel("Lighting bridge IP").fill("192.168.1.80");
-  await page.getByRole("button", { name: "Run all probes" }).click();
+  await page.getByTestId("setup-run-all-probes").click();
   await expect(page.getByText("All 3 commissioning probes passed.")).toBeVisible();
 
   await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
@@ -69,7 +69,7 @@ test("publish refuses failing probes until the operator overrides explicitly", a
 
   await page.getByRole("tab", { name: /Probe hardware/i }).click();
   await page.getByLabel("Lighting bridge IP").fill("0.0.0.0");
-  await page.getByRole("button", { name: "Run all probes" }).click();
+  await page.getByTestId("setup-run-all-probes").click();
   // Slice 7: the step's own note prints the same count, so the result the probe
   // run reported is read off the notice it wrote.
   const feedback = page.getByTestId("setup-feedback");
@@ -118,8 +118,8 @@ test("opens support mode and exercises backup workflows", async ({ page }) => {
   await plate.getByRole("button", { name: "Export backup" }).click();
   await expect(page.getByText(/Exported support backup to/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Update repo" }).click();
-  await expect(page.getByText(/Update repo opened at/)).toBeVisible();
+  await page.getByRole("button", { name: "Update folder" }).click();
+  await expect(page.getByText(/Update folder opened at/)).toBeVisible();
 
   await plate.getByRole("button", { name: "Restore latest" }).click();
   await expect(page.getByText(/Restored native-support-backup/)).toBeVisible();

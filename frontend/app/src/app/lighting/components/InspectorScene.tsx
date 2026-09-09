@@ -199,7 +199,7 @@ export function InspectorScene({
       </div>
       <p className={styles.sceneSub}>
         {stats.onCount > 0
-          ? `${stats.onCount} of ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} on at ${stats.avgIntensity}% / ${stats.avgCct} K average.`
+          ? `${stats.onCount} of ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} on at ${stats.avgIntensity} % / ${stats.avgCct} K average.`
           : `All ${stats.totalCount} fixture${stats.totalCount === 1 ? "" : "s"} dark in this scene.`}
       </p>
 
@@ -258,7 +258,7 @@ export function InspectorScene({
                 <>
                   <span className={styles.sceneFixtureSwatch} style={{ background: swatch }} aria-hidden="true" />
                   <span className={styles.sceneFixtureName}>{fixture.name}</span>
-                  <span className={styles.sceneFixtureLevel}>{state.intensity}%</span>
+                  <span className={styles.sceneFixtureLevel}>{state.intensity} %</span>
                 </>
               );
 

@@ -116,27 +116,27 @@ export function StagePlotControls({
             onClick={onFitRoom}
             aria-pressed={zoomMode === "fitRoom"}
           >
-            Fit Room
+            Fit room
           </button>
         </Tooltip>
-        <Tooltip content="Fill the desk surface using the current operator-familiar plot stretch" placement="top">
+        <Tooltip content="Fill the pane, stretching the room to fit it" placement="top">
           <button
             type="button"
             className={`${styles.modeButton} ${zoomMode === "fillDesk" ? styles.modeButtonActive : ""}`}
             onClick={onFillDesk}
             aria-pressed={zoomMode === "fillDesk"}
           >
-            Fill Desk
+            Fill screen
           </button>
         </Tooltip>
-        <Tooltip content="Reset pan and content zoom to 100%" placement="top">
+        <Tooltip content="Show the plot at 100 %" placement="top">
           <button
             type="button"
             className={`${styles.modeButton} ${zoomMode === "actual" ? styles.modeButtonActive : ""}`}
             onClick={onActualSize}
             aria-pressed={zoomMode === "actual"}
           >
-            100%
+            100 %
           </button>
         </Tooltip>
       </span>
@@ -146,7 +146,7 @@ export function StagePlotControls({
         </button>
       </Tooltip>
       <span className={styles.zoomLabel} aria-live="polite">
-        {Math.round(zoom * 100)}%
+        {Math.round(zoom * 100)} %
       </span>
       <Tooltip content="Zoom in · scroll wheel works too" placement="top">
         <button type="button" className={styles.button} onClick={onZoomIn} aria-label="Zoom in">

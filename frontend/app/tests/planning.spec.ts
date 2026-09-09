@@ -56,11 +56,11 @@ test("renders the planning timeline from an engine-backed snapshot and toggles b
   await page.keyboard.press("Digit4");
   await expect(workspace.getByRole("radio", { name: "Done" })).toHaveAttribute("aria-checked", "true");
   await expect(workspace.getByTestId("planning-board-empty-done")).toHaveAttribute("data-zero-filter", "true");
-  await expect(workspace.getByText("No done tasks.")).toBeVisible();
+  await expect(workspace.getByText("No done projects. Press All to see the rest.")).toBeVisible();
 
   await page.keyboard.press("Shift+KeyT");
   await expect(cluster.getByRole("radio", { name: "Timeline" })).toHaveAttribute("aria-checked", "true");
-  await expect(workspace.getByText("Filter: done · 0 of 5")).toBeVisible();
+  await expect(workspace.getByText("Filter: Done · 0 of 5 projects")).toBeVisible();
   await workspace.getByRole("button", { name: "Clear" }).click();
   await expect(
     workspace.getByTestId("planning-lane-proj-audio").getByRole("button", { name: /Level-match overflow/i })
@@ -234,24 +234,33 @@ test("keeps the retained project detail on the plate, from timeline selection an
   // task list; the head is the one that says what is in front of the operator.
   await expect(detailDialog.getByRole("heading", { name: "Commission Stream Deck+ · Booth 2" })).toBeVisible();
   await expect(detailDialog.getByText("Stream Deck+ booth commissioning resumed.")).toBeVisible();
+  // Slice 8 (system §9): the box is labelled with the press it makes, so the
+  // label itself flips — one locator before the click, one after.
   const checklistToggle = detailDialog.getByRole("button", {
-    name: "Toggle checklist item Verify companion trigger handoff for Commission Stream Deck+ · Booth 2",
+    name: "Mark 'Verify companion trigger handoff' done on Commission Stream Deck+ · Booth 2",
     exact: true,
   });
   await expect(checklistToggle).toHaveAttribute("data-done", "false");
   await checklistToggle.click();
-  await expect(checklistToggle).toHaveAttribute("data-done", "true");
+  await expect(
+    detailDialog.getByRole("button", {
+      name: "Mark 'Verify companion trigger handoff' not done on Commission Stream Deck+ · Booth 2",
+      exact: true,
+    })
+  ).toHaveAttribute("data-done", "true");
   await expect(detailDialog.getByText("Checklist item checked")).toBeVisible();
   await detailDialog.getByTestId("planning-plate-complete").click();
   await expect(detailDialog.getByText("2/2 complete")).toBeVisible();
   await expect(detailDialog.getByText('Task "Commission Stream Deck+ · Booth 2" marked as completed')).toBeVisible();
   await detailDialog.getByTestId("planning-plate-add-task").click();
   await detailDialog.getByLabel("New task for booth_2").fill("Run booth handoff");
-  await detailDialog.getByRole("button", { name: "Add Task", exact: true }).click();
+  await detailDialog.getByRole("button", { name: "Add task", exact: true }).click();
   await expect(detailDialog.getByText("2/3 complete")).toBeVisible();
+  // Slice 8: the row's box and the plate's take key now say the same thing —
+  // they do the same thing — so this looks for the row's.
   await expect(
-    detailDialog.getByRole("button", {
-      name: "Toggle completion for Run booth handoff",
+    detailDialog.locator('[data-testid^="planning-plate-task-"]').getByRole("button", {
+      name: "Mark Run booth handoff done",
       exact: true,
     })
   ).toBeVisible();
@@ -265,15 +274,15 @@ test("keeps the retained project detail on the plate, from timeline selection an
     .click();
   await expect(
     detailDialog.getByRole("button", {
-      name: "Toggle checklist item Pack backup SD image for Run booth handoff",
+      name: "Mark 'Pack backup SD image' done on Run booth handoff",
       exact: true,
     })
   ).toBeVisible();
   await expect(detailDialog.getByText('Checklist item "Pack backup SD image" added')).toBeVisible();
   await page.keyboard.press("Shift+KeyB");
-  await workspace.getByRole("button", { name: "Open project detail for ops" }).click();
+  await workspace.getByRole("button", { name: "Show ops on the plate" }).click();
   await expect(detailDialog).toHaveAttribute("aria-label", "ops");
-  await workspace.getByRole("button", { name: "Open project detail for booth_2" }).click();
+  await workspace.getByRole("button", { name: "Show booth_2 on the plate" }).click();
   await expect(detailDialog).toHaveAttribute("aria-label", "booth_2");
 });
 
@@ -299,7 +308,7 @@ test("supports planning all-unscheduled tray expansion and schedules a task into
   const workspace = page.getByTestId("planning-workspace");
   const tray = workspace.getByTestId("planning-unscheduled-tray");
   const lane = workspace.getByTestId("planning-lane-body-proj-ops");
-  const taskChip = workspace.getByRole("button", { name: "Unscheduled task Archive Q3 cue library" });
+  const taskChip = workspace.getByRole("button", { name: "Select Archive Q3 cue library, unscheduled" });
 
   await expect(workspace.getByText("Drag a card onto a lane to put it on the day.")).toBeVisible();
   await expect(tray).toHaveAttribute("data-expanded", "true");
@@ -312,7 +321,7 @@ test("supports planning all-unscheduled tray expansion and schedules a task into
     .getByRole("button", { name: /Archive Q3 cue library/i });
   await expect(scheduledCard).toBeVisible();
   await expect(scheduledCard).toContainText("15 min · P3");
-  await expect(workspace.getByRole("button", { name: "Unscheduled task Archive Q3 cue library" })).toHaveCount(0);
+  await expect(workspace.getByRole("button", { name: "Select Archive Q3 cue library, unscheduled" })).toHaveCount(0);
 });
 
 test("supports planning cluster project creation and backup export", async ({ page }) => {
@@ -340,7 +349,7 @@ test("supports planning screen search focus and engine-backed time report", asyn
   const workspace = page.getByTestId("planning-workspace");
   const cluster = page.getByTestId("planning-cluster");
   const timelineTab = cluster.getByRole("radio", { name: "Timeline" });
-  const search = workspace.getByLabel("Search planning tasks");
+  const search = workspace.getByLabel("Search tasks and projects");
 
   await timelineTab.click();
   await page.keyboard.press("/");
@@ -391,7 +400,7 @@ test("renders the planning board loading posture from app snapshot mode settings
   await expect(workspace.getByTestId("planning-board-column-in-progress")).toBeVisible();
   await expect(workspace.getByTestId("planning-board-column-blocked")).toBeVisible();
   await expect(workspace.getByTestId("planning-board-column-done")).toBeVisible();
-  await expect(workspace.getByText("Run-of-show loading…")).toHaveCount(0);
+  await expect(workspace.getByText("Loading planning…")).toHaveCount(0);
 });
 
 // ---------------------------------------------------------------------------

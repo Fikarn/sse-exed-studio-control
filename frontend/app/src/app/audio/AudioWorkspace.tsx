@@ -96,6 +96,10 @@ const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
 // anywhere carries the mixer along — the dark-chrome/light-mixer seam is closed.
 export type AudioTheme = "studio" | "graphite" | "bone";
 
+// Slice 8 (system §9): a write the desk did not take has one way out, and
+// every message that reports one names it.
+const SYNC_HINT = "Press Sync from TotalMix to pull the current state.";
+
 export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
   const { register } = usePalette();
   const [activeChannelGroups, setActiveChannelGroups] =
@@ -210,7 +214,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       await runner();
     } catch (error) {
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio action could not be completed.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The action could not be completed. Try it again, or press Sync from TotalMix to see the desk's current state.",
         tone: "error",
       });
     } finally {
@@ -245,7 +252,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     void store.updateAudioSettings(request).catch((error) => {
       clearOptimistic();
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio setting could not be updated.",
+        message:
+          error instanceof Error ? error.message : "The selection could not be saved. Click the strip or output again.",
         tone: "error",
       });
     });
@@ -307,7 +315,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     const usedSlots = new Set(viewModel.snapshots.map((snapshot) => snapshot.oscIndex));
     const slotIndex = Array.from({ length: 8 }, (_, index) => index).find((index) => !usedSlots.has(index));
     if (slotIndex === undefined) {
-      setFeedback({ message: "All audio snapshot slots are populated.", tone: "info" });
+      setFeedback({
+        message: "All eight snapshot slots are full. Save over a slot or delete one first.",
+        tone: "info",
+      });
       return;
     }
     void performAction("audio-snapshot-capture", async () => {
@@ -419,7 +430,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       armOrApplyAction(
         {
           key: `phantom:${channelId}:${phantom}`,
-          label: `${phantom ? "Enable" : "Disable"} 48V on ${channelName}`,
+          label: `${phantom ? "Enable" : "Disable"} 48 V on ${channelName}`,
           targetId: channelId,
           targetKind: "phantom",
           timeoutMs: AUDIO_ARM_TIMEOUT_MS,
@@ -444,7 +455,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const commitChannelEqContinuous = useLiveCallback((request: AudioEqUpdate) => {
     void store.updateAudioChannelEq(request).catch((error) => {
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio EQ control could not be updated.",
+        message: error instanceof Error ? error.message : `The EQ control could not be changed. ${SYNC_HINT}`,
         tone: "error",
       });
     });
@@ -474,7 +485,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const holdTalkback = useLiveCallback((request: AudioTalkbackHold) => {
     void store.holdAudioTalkback(request).catch((error) => {
       setFeedback({
-        message: error instanceof Error ? error.message : "Talkback could not be changed.",
+        message:
+          error instanceof Error ? error.message : "Talkback could not be changed. Release T and press it again.",
         tone: "error",
       });
     });
@@ -504,7 +516,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const commitChannelContinuous = useLiveCallback((request: AudioChannelUpdate) => {
     void store.updateAudioChannel(request).catch((error) => {
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio control could not be updated.",
+        message: error instanceof Error ? error.message : `The control could not be changed. ${SYNC_HINT}`,
         tone: "error",
       });
     });
@@ -513,7 +525,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const commitMixTargetContinuous = useLiveCallback((request: AudioMixTargetUpdate) => {
     void store.updateAudioMixTarget(request).catch((error) => {
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio output could not be updated.",
+        message: error instanceof Error ? error.message : `The output could not be changed. ${SYNC_HINT}`,
         tone: "error",
       });
     });
@@ -613,7 +625,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         disabled: !canMutate,
         icon: Pencil,
         id: "rename",
-        label: "Rename",
+        label: "Rename channel",
         onSelect: () => renameChannel(contextMenuChannel.id, contextMenuChannel.name),
       },
     ];
@@ -646,7 +658,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       <div className={styles.audioShell} data-testid="audio-workspace">
         <section className={styles.loadingPanel}>
           <span className={styles.eyebrow}>Audio</span>
-          <h1>Loading audio snapshot.</h1>
+          <h1>Loading the console…</h1>
           <div className={styles.loadingGrid}>
             {Array.from({ length: 16 }, (_, index) => (
               <span key={`audio-loading-${index}`} />
@@ -784,19 +796,19 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           initialValue={textDialog.currentName}
           onCancel={() => setTextDialog(null)}
           onConfirm={confirmTextDialog}
-          title={textDialog.kind === "snapshot" ? "Rename Audio Snapshot" : "Rename Audio Channel"}
+          title={textDialog.kind === "snapshot" ? "Rename snapshot" : "Rename channel"}
         />
       ) : null}
 
       {deleteSnapshotDialog ? (
         <ConfirmDialog
-          body={`Delete "${deleteSnapshotDialog.name}" from the audio snapshot list.`}
+          body={`Delete "${deleteSnapshotDialog.name}" from the snapshot slots.`}
           busy={busyAction === `audio-snapshot-delete-${deleteSnapshotDialog.id}`}
           confirmLabel="Delete"
           danger
           onCancel={() => setDeleteSnapshotDialog(null)}
           onConfirm={confirmDeleteSnapshot}
-          title="Delete Audio Snapshot"
+          title="Delete snapshot"
         />
       ) : null}
     </div>

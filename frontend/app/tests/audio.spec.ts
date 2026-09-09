@@ -117,7 +117,8 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // Console's telemetry — the console link, the metering source, the last sync
   // and the bank. Old: the top bar's stat cluster carried OSC / Metering and
   // the footer carried Clock / Last sync.
-  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Console");
+  // Slice 8 (system §9): the OSC row is named for what it reports.
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("OSC control");
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Metering");
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Last sync");
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Bank");
@@ -131,7 +132,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // Old: "Bank prev" / "Bank next" as two hints; the A footer prints one
   // `[ ] Bank` hint pair and the talkback hold (system §2).
   await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank");
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("hold to talk");
+  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Hold to talk");
   await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Shift 1-8 recall");
   await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Esc clear");
   // 2026-05-27 redesign: monitor controls moved from the rail card to the
@@ -167,7 +168,9 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-snapshot-capture")).toBeEnabled();
   await page.getByTestId("audio-snapshot-snapshot-open-rehearsal").hover();
   await expect(
-    page.getByTestId("audio-snapshot-snapshot-open-rehearsal").getByText("Console slot recall")
+    // Slice 8 (system §9): an empty slot recalls the desk's own OSC slot, so
+    // the preview names TotalMix rather than this workspace.
+    page.getByTestId("audio-snapshot-snapshot-open-rehearsal").getByText("TotalMix slot recall")
   ).toBeVisible();
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Master" })).toHaveCount(0);
   await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
@@ -192,7 +195,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Auto fade");
   await page.getByTestId("audio-strip-audio-input-9").click();
   await expect(page.locator('[data-plate-section="preamp"]')).toContainText("Preamp");
-  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("48V");
+  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("48 V");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Hi-Z");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Polarity");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("AutoSet");
@@ -276,7 +279,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await page.getByTestId("audio-strip-audio-input-1").click({ button: "right", position: { x: 12, y: 12 } });
   await expect(page.getByRole("menuitem", { name: "Rename" })).toBeEnabled();
   await page.getByRole("menuitem", { name: "Rename" }).click();
-  const renameDialog = page.getByRole("dialog", { name: "Rename Audio Channel" });
+  const renameDialog = page.getByRole("dialog", { name: "Rename channel" });
   await expect(renameDialog).toBeVisible();
   await renameDialog.getByLabel("Channel name").fill("Renamed line 1");
   await renameDialog.getByRole("button", { name: "Rename" }).click();
@@ -350,7 +353,10 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   // band's title "STATE ASSUMED" above the bay.
   const assumedDisplay = page.getByTestId("audio-state-display");
   await expect(assumedDisplay).toContainText("ASSUMED");
-  await expect(assumedDisplay).toContainText(/showing the last state the console confirmed/i);
+  // Slice 8 (system §9): the hardware is the desk; "the console" is this
+  // workspace. The sentence also names the key that gets the operator out.
+  await expect(assumedDisplay).toContainText(/showing the last state the desk confirmed/i);
+  await expect(assumedDisplay).toContainText(/press sync from totalmix/i);
 
   await openFixture(page, "audio-not-verified");
   // 2026-09 audit remediation, Slice 1: until the audio probe passes every
@@ -400,7 +406,7 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   await expect(failedState.locator("[data-state-code]")).toHaveText("AUDIO_SNAPSHOT_RECALL_FAILED");
 
   await openFixture(page, "audio-loading");
-  await expect(page.getByText("Loading audio snapshot.")).toBeVisible();
+  await expect(page.getByText("Loading the console…")).toBeVisible();
 });
 
 test("renders unclipped dBFS scale labels beside every audio meter", async ({ page }) => {
@@ -704,7 +710,9 @@ test("marks simulated audio metering as test-stage movement", async ({ page }) =
   // — the monitor bar shows only the active master meter).
   // The metering source is a footer item now (old: the top bar's stat cell).
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("Test meter simulation");
-  await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST STAGE");
+  // Slice 8 (system §9): one state, one word — the mixer chip and the plate
+  // both call meter simulation by the same name.
+  await expect(page.getByTestId("audio-inspector-metering")).toContainText("TEST METER SIMULATION");
 
   // Visual overhaul A, Slice 4b. Old: every strip meter assertion read
   // `[data-meter-component="stereo"]` and its `--audio-meter-*` custom
@@ -1061,21 +1069,22 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
   // / AutoSet toggles stay.
   // Visual overhaul A, Slice 4c: the words moved to the plate's section head.
   await expect(page.locator('[data-plate-section="preamp"]')).toContainText("mic / line gain on the UFX III");
-  await expect(inspector).toContainText("48V");
+  // Slice 8 (system §9): numbers carry their unit with a space.
+  await expect(inspector).toContainText("48 V");
   await expect(inspector).toContainText("Hi-Z");
   await expect(inspector).toContainText("Polarity");
   await expect(inspector).toContainText("AutoSet");
   await expect(inspector).not.toContainText("Pad");
 
-  const phantom = inspector.getByRole("button", { name: /48V/ });
+  const phantom = inspector.getByRole("button", { name: /48 V/ });
   const phantomBefore = await phantom.getAttribute("data-active");
   await phantom.click();
   await expect(phantom).toHaveAttribute("data-armed", "true");
-  await expect(phantom).toHaveText(/Confirm 48V|Confirm Off/);
+  await expect(phantom).toHaveText(/Confirm 48 V (on|off)/);
   await expect(phantom).toHaveAttribute("data-active", phantomBefore ?? "");
   await page.keyboard.press("Escape");
   await expect(phantom).not.toHaveAttribute("data-armed", "true");
-  await expect(phantom).toHaveText("48V");
+  await expect(phantom).toHaveText("48 V");
   await phantom.click();
   await expect(phantom).toHaveAttribute("data-armed", "true");
   // 2026-09 audit Slice 7: a second click inside the dwell is a double-click,
@@ -1208,7 +1217,7 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
   const capturedSlot = page.locator('[data-snapshot-slot="6"][data-slot-state="populated"]');
   await expect(capturedSlot).toContainText("Snapshot 6");
   await capturedSlot.hover();
-  await expect(capturedSlot.getByText("No diff from current mix")).toBeVisible();
+  await expect(capturedSlot.getByText("No change from the current mix")).toBeVisible();
 
   await page.getByRole("slider", { name: "FX 3/4 send level" }).focus();
   await page.keyboard.press("Enter");
@@ -1256,7 +1265,7 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
 
   await capturedSlot.hover();
   await capturedSlot.getByRole("button", { name: /Rename/ }).click();
-  const renameSnapshotDialog = page.getByRole("dialog", { name: "Rename Audio Snapshot" });
+  const renameSnapshotDialog = page.getByRole("dialog", { name: "Rename snapshot" });
   await expect(renameSnapshotDialog).toBeVisible();
   await renameSnapshotDialog.getByLabel("Snapshot name").fill("Renamed snapshot");
   await renameSnapshotDialog.getByRole("button", { name: "Rename" }).click();
@@ -1264,7 +1273,7 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
 
   await capturedSlot.hover();
   await capturedSlot.getByRole("button", { name: /Delete/ }).click();
-  const deleteSnapshotDialog = page.getByRole("dialog", { name: "Delete Audio Snapshot" });
+  const deleteSnapshotDialog = page.getByRole("dialog", { name: "Delete snapshot" });
   await expect(deleteSnapshotDialog).toBeVisible();
   await deleteSnapshotDialog.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByTestId("audio-snapshot-empty-6")).toContainText("Empty");
@@ -1482,7 +1491,7 @@ test("supports audio command palette and shortcut overlay parity", async ({ page
   await commandInput.fill("rename selected audio");
   await expect(page.getByText("Rename selected channel")).toBeVisible();
   await commandInput.fill("toggle selected polarity");
-  await expect(page.getByText("Toggle selected polarity")).toBeVisible();
+  await expect(page.getByText("Toggle polarity on the selected channel")).toBeVisible();
   await commandInput.fill("clear selected channel clip");
   await expect(page.getByText("Clear selected channel clip")).toBeVisible();
   await commandInput.fill("toggle master submix");
@@ -1522,15 +1531,15 @@ test("snapshot recall reports the push and lists 48V differences without touchin
   await expect(report).toBeVisible();
   await expect(report).toContainText("Recalled Interview block");
   await expect(report).toContainText("values pushed");
-  await expect(report).toContainText("48V differs on Host (snapshot off, console on)");
+  await expect(report).toContainText("48 V differs on Host (snapshot off, desk on)");
   // The 48 V key did not move: the recall listed it instead of pushing it.
   await expect(hostPhantom).toHaveAttribute("aria-pressed", "true");
 
   const arm = page.getByTestId("audio-recall-arm-phantom-audio-input-9");
-  await expect(arm).toHaveText(/Arm 48V off/);
+  await expect(arm).toHaveText(/Arm 48 V off/);
   await arm.click();
   await expect(arm).toHaveAttribute("data-armed", "true");
-  await expect(arm).toHaveText(/Confirm 48V off/);
+  await expect(arm).toHaveText(/Confirm 48 V off/);
   await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
   await arm.click();
   await expect(hostStrip.getByText("48V", { exact: true })).toHaveCount(0);

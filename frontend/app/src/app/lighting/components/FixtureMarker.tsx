@@ -193,7 +193,7 @@ export function FixtureMarker({
   // with the fixture body. Uppercase styling lives in CSS so the aria-label
   // can reuse the original mixed-case name for screen readers (closes #35).
   const displayName = name.length > 18 ? `${name.slice(0, 17)}…` : name;
-  const intensityLabel = on ? `${Math.round(intensity)}%` : "OFF";
+  const intensityLabel = on ? `${Math.round(intensity)} %` : "OFF";
   const metaLabel = `${intensityLabel} · ${Math.round(cct)} K · ${MOUNTING_SHORT_LABEL[mounting]}`;
 
   const nameOffsetY = -Math.max(16, visual.body.height / 2 + 14);

@@ -28,8 +28,8 @@ export function SetupStartupSurface({
   return (
     <PreReadyState
       tone="info"
-      word="STARTING ENGINE…"
-      sentence="The commissioning runner opens as soon as the workstation is ready."
+      word="STARTING UP…"
+      sentence="The commissioning runner opens as soon as Studio Control is ready."
       meta={`${formatLifecycleLabel(lifecycle)} · ${done} of ${steps.length} startup steps done · ${
         activeSection === "support" ? "Support" : "Runner"
       } is where you were`}

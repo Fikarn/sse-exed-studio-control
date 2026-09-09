@@ -43,14 +43,42 @@ test("keeps 'Engine log' and the Console's own snapshots", () => {
 });
 
 test("a raw AUDIO_* code as the first thing read is a hit", () => {
+  // Slice 8: a lone code counts where it is RENDERED. `const t = "AUDIO_..."`
+  // on its own used to count too, which made every comparison against an
+  // engine code a copy hit; the rule is about what the operator reads.
   const hits = scanSource(
-    `const t = "AUDIO_SYNC_FAILED"; const u = "Failed with AUDIO_SYNC_FAILED";`,
-    "frontend/app/src/a.ts"
+    `export const A = () => <p>AUDIO_SYNC_FAILED · the desk refused the sync</p>;
+     export const B = () => <p title="AUDIO_SYNC_FAILED">ok</p>;
+     const u = "Failed with AUDIO_SYNC_FAILED";`,
+    "frontend/app/src/a.tsx"
   );
   assert.deepEqual(
     hits.map((h) => h.word),
-    ["AUDIO_* first"]
+    ["AUDIO_* first", "AUDIO_* first"]
   );
+});
+
+test("a lone AUDIO_* code compared against is a value, not copy", () => {
+  assert.deepEqual(
+    scanSource(
+      `const refused = String(snapshot.lastActionCode) === "AUDIO_TALKBACK_REFUSED";
+       switch (code) { case "AUDIO_SYNC_FAILED": return 1; }
+       const CODES = new Set(["AUDIO_SYNC_FAILED"]);`,
+      "frontend/app/src/app/audio/x.tsx"
+    ),
+    []
+  );
+});
+
+test("the Console's snapshots are named as such outside app/audio", () => {
+  // The shortcut overlay and the command palette describe the Console's scene
+  // primitive from outside `app/audio/`; a string that names audio or the
+  // Console is talking about that primitive, and anything else is a hit.
+  assert.deepEqual(
+    scanSource(`const t = "Arm or apply audio snapshot recall";`, "frontend/app/src/app/shared/S.tsx"),
+    []
+  );
+  assert.equal(scanSource(`const t = "Loading app snapshot";`, "frontend/app/src/app/shared/S.tsx").length, 1);
 });
 
 test("the program's operator-copy hits do not exceed the ratchet", () => {

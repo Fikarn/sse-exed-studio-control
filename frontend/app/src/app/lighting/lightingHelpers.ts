@@ -191,7 +191,7 @@ export function formatLightingRelativeTime(iso: string | null | undefined): stri
 // ---------------------------------------------------------------------------
 
 export function formatLightingValueRange(min: number, max: number, suffix: string) {
-  return min === max ? `${min}${suffix}` : `${min}-${max}${suffix}`;
+  return min === max ? `${min} ${suffix}` : `${min}–${max} ${suffix}`;
 }
 
 // 2026-09 audit remediation, Slice 12: DMX values read as decimal 0–255,

@@ -64,7 +64,7 @@ export function CommandPalette({
   actions,
   recentActionIds,
   placeholder = "Type a command — try: recall, save, patch, identify",
-  emptyMessage = "No matching commands.",
+  emptyMessage = "No command matches. Clear the search to see every command · Esc closes.",
 }: CommandPaletteProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);

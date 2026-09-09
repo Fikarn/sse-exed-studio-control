@@ -163,17 +163,12 @@ export function AudioCluster({
     [commitMixTargetContinuous]
   );
 
-  const lockedReason = actionsAllowed ? undefined : (status.warningBody ?? `The console is ${status.label}.`);
-  // The state display carries the fault code in its own slot, so the sentence
-  // says what happened in words first. `warningBody` still leads with the code
-  // for the places that have nowhere else to put it (tooltips, the monitor
-  // strip's detail), so strip the prefix only here.
-  const failureCode = status.label === "ACTION FAILED" ? (snapshot.lastActionCode ?? undefined) : undefined;
-  const codePrefix = typeof failureCode === "string" ? `${failureCode} · ` : null;
-  const stateSentence =
-    codePrefix && status.warningBody?.startsWith(codePrefix)
-      ? status.warningBody.slice(codePrefix.length)
-      : (status.warningBody ?? viewModel.appSummary);
+  const lockedReason = actionsAllowed ? undefined : (status.warningBody ?? `The desk is ${status.label}.`);
+  // Slice 8 (system §9): the desk's fault code is its own field, so nothing
+  // leads a sentence with it. The state display puts it in its small slot; the
+  // locked reasons and tooltips read the sentence alone.
+  const failureCode = status.warningCode ?? undefined;
+  const stateSentence = status.warningBody ?? viewModel.appSummary;
   const meterEmpty = viewModel.meterSimulationState === "gated";
   const meterStale = String(snapshot.meteringState ?? "").toLowerCase() === "stale";
 
@@ -235,7 +230,7 @@ export function AudioCluster({
         <Key
           mode="momentary"
           cap="Talkback"
-          hint={talkbackRefused ? "refused · no talkback channel in TotalMix" : "Hold · T"}
+          hint={talkbackRefused ? "refused · set a talkback channel in TotalMix" : "Hold · T"}
           layout="stack"
           size="tall"
           live={selectedMixTarget?.talkback ?? false}
@@ -255,7 +250,7 @@ export function AudioCluster({
           <Key
             mode="toggle"
             cap="Dim"
-            hint="−20"
+            hint="-20 dB"
             engaged={selectedMixTarget?.dim ?? false}
             locked={!actionsAllowed}
             reason={lockedReason}
@@ -369,6 +364,7 @@ export function AudioCluster({
 
       <AudioSnapshotKeys
         actionsAllowed={viewModel.capabilities.canCaptureSnapshot}
+        lockedReason={lockedReason}
         channels={viewModel.channels}
         mixTargets={viewModel.mixTargets}
         selectedMixTargetId={viewModel.selectedMixTargetId}

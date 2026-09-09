@@ -34,8 +34,12 @@ export function LightingPlatePatchFacts({
       <Readouts
         rows={[
           { id: "start", label: "DMX start", value: span },
-          { id: "mode", label: "Mode", value: channelCount ? `${channelCount} ch` : fixture.modeId },
-          { id: "universe", label: "Universe", value: String(fixture.universe) },
+          {
+            id: "mode",
+            label: "Mode",
+            value: channelCount ? `${channelCount} ch` : `not in the catalog (${fixture.modeId})`,
+          },
+          { id: "universe", label: "Universe", value: `U${fixture.universe}` },
         ]}
       />
     </Section>

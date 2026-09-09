@@ -90,10 +90,10 @@ export function AudioSignalCanvas({
                   onClick={() =>
                     onArmPhantomFromRecall(difference.channelId, difference.channelName, difference.target)
                   }
-                  title={`${difference.target ? "Enable" : "Disable"} 48V on ${difference.channelName} — arm, then press again to apply`}
+                  title={`${difference.target ? "Enable" : "Disable"} 48 V on ${difference.channelName} — arm, then press again to apply`}
                   type="button"
                 >
-                  {armedAction?.key === armKey ? "Confirm" : "Arm"} 48V {difference.target ? "on" : "off"} ·{" "}
+                  {armedAction?.key === armKey ? "Confirm" : "Arm"} 48 V {difference.target ? "on" : "off"} ·{" "}
                   {difference.channelName}
                 </button>
               );

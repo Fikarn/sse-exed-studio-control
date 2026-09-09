@@ -257,7 +257,7 @@ export function LightingInspector({
       {previewMode && activeTab !== "patch" ? (
         <div className={styles.previewSource}>
           <span className={styles.previewSourceEyebrow}>Preview values</span>
-          <span>{previewDirty ? "Offline edits are pending." : "Editing buffer is clean."}</span>
+          <span>{previewDirty ? "Offline edits are pending." : "No offline edits yet."}</span>
         </div>
       ) : null}
 
@@ -350,7 +350,7 @@ export function LightingInspector({
                   ?.modes.find((mode) => mode.id === selectedFixture.modeId)?.channelCount ?? null
               }
               fixture={selectedFixture}
-              overlapNote={patchOverlap ? "overlaps another fixture on this universe" : null}
+              overlapNote={patchOverlap ? `overlaps another fixture on U${selectedFixture.universe}` : null}
             />
             <LightingPlateSceneValues fixture={selectedFixture} scene={inspectorScene} />
           </>
@@ -358,7 +358,7 @@ export function LightingInspector({
 
         {activeTab === "fixture" && !selectedFixture ? (
           <p className={styles.empty}>
-            Choose a fixture on the stage plot to see its controls. Or use the toolbar search to find one by name.
+            Choose a fixture on the stage plot to see its controls. Or search for one by name in the cluster.
           </p>
         ) : null}
 

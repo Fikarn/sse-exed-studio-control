@@ -14,7 +14,7 @@ import styles from "./PreReadyState.module.css";
 
 export interface PreReadyStateProps {
   tone: StateDisplayTone;
-  /** `STARTING`, `PROTOCOL MISMATCH`, `ENGINE BOOTSTRAP FAILED`. */
+  /** `STARTING UP…`, `PROTOCOL MISMATCH`, `STARTUP FAILED`. */
   word: string;
   /** The engine's sentence, verbatim. */
   sentence: ReactNode;

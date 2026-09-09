@@ -45,7 +45,7 @@ export function SelectionChipStrip({
       // Accent dot: CCT-tinted color when on, neutral when off.
       accentColor: lightingFixtureColorHex(fixture.cct, fixture.on),
       leadingBadge: index + 1,
-      ariaLabel: `${fixture.name}${fixture.on ? `, ${fixture.intensity}%, ${fixture.cct}K` : ", off"}. Click to remove from selection.`,
+      ariaLabel: `${fixture.name}${fixture.on ? `, ${fixture.intensity} %, ${fixture.cct} K` : ", off"}. Click to remove from selection.`,
       trailing: (
         <button
           type="button"
@@ -88,7 +88,7 @@ export function SelectionChipStrip({
             onChipClick={onRemoveFromSelection}
             onChipHover={onChipHover}
           />
-          <button type="button" className={styles.clearAll} onClick={onClearAll} aria-label="Clear all selection">
+          <button type="button" className={styles.clearAll} onClick={onClearAll} aria-label="Clear the selection">
             Clear
           </button>
         </div>

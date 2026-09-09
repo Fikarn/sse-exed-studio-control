@@ -15,6 +15,11 @@ import type { AudioChannelEntry, AudioMixTargetEntry, AudioSnapshotEntry } from 
 
 export interface AudioSnapshotKeysProps {
   actionsAllowed: boolean;
+  /**
+   * Why the slots are locked, in the desk's own words. Slice 8 (system §9):
+   * the keys used to name the audio probe whatever the real cause was.
+   */
+  lockedReason?: string;
   armedActionKey: string | null;
   busyAction: string | null;
   channels: readonly AudioChannelEntry[];
@@ -31,6 +36,7 @@ export interface AudioSnapshotKeysProps {
 
 export function AudioSnapshotKeys({
   actionsAllowed,
+  lockedReason,
   armedActionKey,
   busyAction,
   channels,
@@ -57,10 +63,14 @@ export function AudioSnapshotKeys({
         <Key
           size="small"
           testId="audio-snapshot-capture"
-          aria-label="New snapshot"
+          aria-label="Capture new snapshot"
           disabled={!actionsAllowed || busyAction === "audio-snapshot-capture"}
           onClick={onCaptureSnapshot}
-          title={actionsAllowed ? "Capture the current mix into the first empty slot" : "Snapshot capture unavailable"}
+          title={
+            actionsAllowed
+              ? "Capture the current mix into the first empty slot"
+              : (lockedReason ?? "Snapshot capture is locked.")
+          }
         >
           <Plus size={13} strokeWidth={2} aria-hidden="true" />
           Capture
@@ -109,7 +119,7 @@ export function AudioSnapshotKeys({
                 cap={String(index + 1)}
                 className={styles.slotKey}
                 locked={!actionsAllowed}
-                reason={actionsAllowed ? undefined : "Console controls stay locked until the audio probe passes."}
+                reason={actionsAllowed ? undefined : (lockedReason ?? "The snapshot slots are locked.")}
                 take
                 testId={`audio-snapshot-recall-${snapshot.id}`}
                 aria-label={`${recallArmed ? "Apply recall" : "Arm recall"} ${snapshot.name}`}
@@ -154,14 +164,14 @@ export function AudioSnapshotKeys({
                   <small>
                     {hasContents
                       ? `${snapshot.preview.changedChannels.length + snapshot.preview.changedMixTargets.length} changes`
-                      : "Console slot recall"}
+                      : "TotalMix slot recall"}
                   </small>
                 )}
                 <small>
                   {hasContents
                     ? `${snapshot.preview.channelCount} sources saved`
                     : snapshot.lastRecalled
-                      ? "Console slot only"
+                      ? "TotalMix slot only"
                       : "No captured contents"}
                 </small>
                 {hasContents ? (
@@ -185,7 +195,7 @@ export function AudioSnapshotKeys({
                       ) : null}
                     </>
                   ) : (
-                    <small>No diff from current mix</small>
+                    <small>No change from the current mix</small>
                   )
                 ) : null}
                 <span className={styles.slotActions} data-testid={`audio-snapshot-actions-${snapshot.id}`}>

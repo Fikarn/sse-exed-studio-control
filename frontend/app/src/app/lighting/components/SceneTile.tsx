@@ -284,7 +284,7 @@ export function SceneTile({
           ) : null}
         </span>
         <span className={styles.tileSub}>{subLine}</span>
-        {lastRecalledLabel ? <span className={styles.tileSub}>last {lastRecalledLabel}</span> : null}
+        {lastRecalledLabel ? <span className={styles.tileSub}>recalled {lastRecalledLabel}</span> : null}
       </span>
       {onPin ? (
         <span

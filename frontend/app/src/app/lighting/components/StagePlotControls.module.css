@@ -133,6 +133,9 @@
   justify-content: center;
   min-width: var(--operator-stage-control-zoom-width, 44px);
   padding: 0 calc(6px * var(--operator-ui-scale-factor, 1));
+  /* Visual overhaul A, Slice 8 (system §9): "135 %" is one reading, so the
+     number never leaves its unit on the line below. */
+  white-space: nowrap;
   font-size: var(--operator-font-size-xs, 10px);
   letter-spacing: 0;
   color: var(--color-brand-text-muted);

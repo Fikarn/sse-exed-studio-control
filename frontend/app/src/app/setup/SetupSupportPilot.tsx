@@ -111,7 +111,7 @@ function parseControlSurfacePages(snapshot: SnapshotRecord | null): ControlSurfa
                   value: typeof body.value === "string" ? body.value : undefined,
                 }
               : null,
-            description: String(controlRecord.description ?? "Bridge-mapped control."),
+            description: String(controlRecord.description ?? "Control mapped on the deck."),
             id: String(controlRecord.id ?? controlRecord.label ?? "control"),
             label: String(controlRecord.label ?? "Control"),
             position: typeof controlRecord.position === "number" ? controlRecord.position : 0,
@@ -376,7 +376,9 @@ export function SetupSupportPilot({
   // (an `attention` posture is not "degraded").
   const healthTone = healthSnapshot ? asStatusTone(healthSnapshot.status, "info") : "ok";
   const degradedSummary =
-    healthTone !== "ok" ? String(healthSnapshot?.summary ?? "Hardware or bridge attention required.") : null;
+    healthTone !== "ok"
+      ? String(healthSnapshot?.summary ?? "The desk or the bridge needs attention. Run all probes to see which.")
+      : null;
   const isReady = commissioningSnapshot?.hasCompletedSetup === true;
   const lastBackup = backups[0];
   const stepIndex = runnerStepOrder.indexOf(activeStepId);
@@ -398,9 +400,9 @@ export function SetupSupportPilot({
 
         const hintMap: Record<RunnerStepId, string> = {
           import: "Export the ready-to-import Companion profile.",
-          probe: "Run control-surface, lighting, and audio probes.",
-          map: "Review page, button, and dial bindings.",
-          publish: "Commit setup and capture a support snapshot.",
+          probe: "Run the deck, bridge and desk probes.",
+          map: "Review the deck's pages, buttons and dials.",
+          publish: "Commit commissioning and export a support backup.",
           verify: "Press physical controls and watch for live echo.",
         };
 
@@ -434,7 +436,10 @@ export function SetupSupportPilot({
         }
       } catch (error) {
         setFeedback({
-          message: error instanceof Error ? error.message : "The setup workflow action failed.",
+          message:
+            error instanceof Error
+              ? error.message
+              : "That setup step did not finish. Try it again, or export diagnostics for the support ticket.",
           tone: "error",
         });
       } finally {
@@ -496,8 +501,8 @@ export function SetupSupportPilot({
         target === "lighting"
           ? "Lighting bridge probe passed."
           : target === "audio"
-            ? "Audio OSC probe passed."
-            : "Control-surface probe passed.",
+            ? "The desk probe passed."
+            : "The deck probe passed.",
       tone: "ok" as const,
     };
   };
@@ -529,7 +534,7 @@ export function SetupSupportPilot({
       return {
         message: `${results.length - notPassed.length} of ${results.length} probes passed — ${notPassed
           .map((check) => `${check.label}: ${check.detail}`)
-          .join("; ")}`,
+          .join("; ")}. Fix the field it names, then press Run all probes again.`,
         tone: "error" as const,
       };
     }
@@ -603,7 +608,7 @@ export function SetupSupportPilot({
       typeof runtimePaths?.logsDir === "string" ? runtimePaths.logsDir : undefined
     );
     return {
-      message: `Shell diagnostics exported to ${path}.`,
+      message: `Diagnostics exported to ${path}. Attach it to the support ticket.`,
       tone: "ok" as const,
     };
   };
@@ -660,7 +665,7 @@ export function SetupSupportPilot({
       void performAction("open-planning", async () => {
         await store.setWorkspace("planning");
         return {
-          message: "Routing returned to the planning workbench.",
+          message: "Opened the Planning workspace.",
           tone: "info" as const,
         };
       });
@@ -868,7 +873,7 @@ export function SetupSupportPilot({
                   head={bayHead}
                   eyebrow={`Step 1 of ${runnerStepOrder.length}`}
                   title="Import the Companion profile"
-                  lead="Export the ready-to-import control-surface profile, then load it in Companion on this workstation."
+                  lead="Export the ready-to-import deck profile, then load it in Companion on this workstation."
                   rules={[
                     {
                       id: "bindings",
@@ -914,12 +919,12 @@ export function SetupSupportPilot({
                       </Key>
                     </>
                   }
-                  note="Continue is available once the export has been written."
+                  note="Download profile writes the export, then opens Probe hardware."
                   record={
                     <>
                       <SetupRecordHeading>Before you start</SetupRecordHeading>
                       <SetupRecordRow
-                        label="Control-surface bridge"
+                        label="Companion link"
                         value={String(controlSurface?.summary ?? "Pending")}
                         tone={asStatusTone(controlSurface?.status, "info") === "ok" ? "ok" : "attention"}
                       />
@@ -949,7 +954,7 @@ export function SetupSupportPilot({
                   head={bayHead}
                   eyebrow={`Step 2 of ${runnerStepOrder.length}`}
                   title="Probe hardware"
-                  lead="Run the control-surface, lighting and audio probes in one pass. What each one reports stays on the cluster and in Support, so recovery does not fork into a second model."
+                  lead="Run the deck, bridge and desk probes in one pass. What each one reports also shows under Probes and in Support, so recovery starts from the same place."
                   rules={[
                     {
                       id: "green",
@@ -981,7 +986,7 @@ export function SetupSupportPilot({
                         />
                       </label>
                       <label className={styles.field}>
-                        <span>Audio send host</span>
+                        <span>TotalMix send host</span>
                         <input
                           className={styles.textField}
                           onChange={(event) => setAudioSendHost(event.target.value)}
@@ -989,7 +994,7 @@ export function SetupSupportPilot({
                         />
                       </label>
                       <label className={styles.field}>
-                        <span>Audio send port</span>
+                        <span>TotalMix send port</span>
                         <input
                           className={styles.textField}
                           onChange={(event) => setAudioSendPort(event.target.value)}
@@ -997,7 +1002,7 @@ export function SetupSupportPilot({
                         />
                       </label>
                       <label className={styles.field}>
-                        <span>Audio receive port</span>
+                        <span>TotalMix receive port</span>
                         <input
                           className={styles.textField}
                           onChange={(event) => setAudioReceivePort(event.target.value)}
@@ -1056,8 +1061,8 @@ export function SetupSupportPilot({
                   title={activeStepId === "map" ? "Map bindings" : "Verify live echo"}
                   lead={
                     activeStepId === "map"
-                      ? "Review the deck page map the engine owns, then confirm each slot label against the hardware before live verification."
-                      : "Press a physical button or dial. The matching cell pulses when the desk reports the press back."
+                      ? "Review the deck page map Studio Control holds, then confirm each slot label against the hardware before live verification."
+                      : "Press a button or dial on the deck. The matching cell pulses when the deck reports the press back."
                   }
                   rules={
                     activeStepId === "verify"
@@ -1065,22 +1070,22 @@ export function SetupSupportPilot({
                           {
                             id: "echo",
                             text: echoControlId
-                              ? "The pulse is driven by what the control surface reports, not by this screen."
-                              : "Nothing has been pressed yet. The cell pulses as soon as the desk answers.",
+                              ? "The pulse is driven by what the deck reports, not by this screen."
+                              : "Nothing has been pressed yet. The cell pulses as soon as the deck answers.",
                             tone: echoControlId ? "ok" : "off",
                           },
                           {
                             id: "transport",
                             text: liveTransportRequested
-                              ? "This workstation is on the live transport, so a press reaches the engine."
-                              : "This workstation is on the fixture transport; presses are simulated.",
+                              ? "This workstation is wired to the hardware, so a press is real."
+                              : "This workstation is running on sample data; presses are simulated.",
                             tone: liveTransportRequested ? "ok" : "off",
                           },
                         ]
                       : [
                           {
                             id: "pages",
-                            text: "Bindings are edited here, not in Companion: the profile is regenerated from what the engine holds.",
+                            text: "Bindings are edited here, not in Companion: the profile is regenerated from what Studio Control holds.",
                             tone: "off",
                           },
                         ]
@@ -1136,7 +1141,9 @@ export function SetupSupportPilot({
                         </div>
                       </div>
                     ) : (
-                      <div className={styles.emptyState}>Control-surface snapshot unavailable.</div>
+                      <div className={styles.emptyState}>
+                        The deck has not reported its pages yet. Run all probes to check the deck.
+                      </div>
                     )
                   }
                   actions={
@@ -1170,7 +1177,7 @@ export function SetupSupportPilot({
                         {selectedControl?.description ??
                           "Review the current page and make sure the binding description matches the hardware label."}
                       </div>
-                      <SetupRecordHeading>The deck as the engine holds it</SetupRecordHeading>
+                      <SetupRecordHeading>The deck as Studio Control holds it</SetupRecordHeading>
                       <SetupRecordRow
                         label="Pages"
                         value={String(pages.length)}
@@ -1182,8 +1189,8 @@ export function SetupSupportPilot({
                         tone={totalControlCount > 0 ? "ok" : "attention"}
                       />
                       <SetupRecordRow
-                        label="Transport"
-                        value={liveTransportRequested ? "live" : "fixture"}
+                        label="Hardware link"
+                        value={liveTransportRequested ? "live" : "sample data"}
                         tone={liveTransportRequested ? "ok" : "off"}
                       />
                     </>
@@ -1197,11 +1204,11 @@ export function SetupSupportPilot({
                   head={bayHead}
                   eyebrow={`Step ${runnerStepOrder.length} of ${runnerStepOrder.length}`}
                   title="Publish"
-                  lead="Publishing commits the commissioning gate, exports a fresh support backup, and returns you to the console."
+                  lead="Publishing unlocks the operator workspaces, exports a fresh support backup, and returns you to the console."
                   rules={[
                     {
                       id: "probes",
-                      text: "Lighting, audio and control-surface probes must all be green before publish; publishing with a probe that is not green asks for an explicit override and records it.",
+                      text: "The deck, bridge and desk probes must all be green before publish; publishing with a probe that is not green asks for an explicit override and records it.",
                       tone: notPassedProbes.length > 0 ? "attention" : "ok",
                     },
                     {
@@ -1211,7 +1218,7 @@ export function SetupSupportPilot({
                     },
                     {
                       id: "live",
-                      text: "Once published, the deck pages, the lighting bridge and the console link are live for the next session.",
+                      text: "Once published, the deck pages, the bridge and the desk link are live for the next session.",
                       tone: "ok",
                     },
                   ]}
@@ -1225,7 +1232,11 @@ export function SetupSupportPilot({
                       />
                       <SetupFactCard
                         label="Startup target"
-                        value={String(startup?.targetSurface ?? "commissioning")}
+                        value={
+                          String(startup?.targetSurface ?? "commissioning") === "dashboard"
+                            ? "Console"
+                            : "Setup / Support"
+                        }
                         standing={isReady ? "healthy" : "pending publish"}
                         tone={isReady ? "ok" : "attention"}
                       />
@@ -1274,19 +1285,15 @@ export function SetupSupportPilot({
                       />
                       <SetupRecordRow
                         label="Lighting bridge"
-                        value={
-                          lightingBridgeIp
-                            ? `${lightingBridgeIp} · universe ${lightingUniverse}`
-                            : "no address recorded"
-                        }
+                        value={lightingBridgeIp ? `${lightingBridgeIp} · U${lightingUniverse}` : "no address recorded"}
                         tone={lightingBridgeIp ? "ok" : "attention"}
                       />
                       <SetupRecordRow
-                        label="Audio console"
+                        label="TotalMix"
                         value={`${audioSendHost}:${audioSendPort} · receive ${audioReceivePort}`}
                       />
                       <SetupRecordRow
-                        label="Control surface"
+                        label="Deck"
                         value={`${pages.length} pages · ${totalControlCount} controls`}
                         tone={pages.length > 0 ? "ok" : "attention"}
                       />
@@ -1345,7 +1352,7 @@ export function SetupSupportPilot({
               head={bayHead}
               eyebrow="Support"
               title="Backup and recovery"
-              lead="What went wrong? Restore from a native support archive or a legacy db.json export, then re-probe the affected adapters before resuming operator work."
+              lead="What went wrong? Restore from a native support archive or a legacy db.json export, then run the deck, bridge and desk probes again before resuming operator work."
               rules={[
                 {
                   id: "restore",
@@ -1455,12 +1462,12 @@ export function SetupSupportPilot({
                       disabled={!String(runtimePaths?.updateRepositoryPath ?? "").trim()}
                       onClick={() =>
                         void performAction("open-update-repo", () =>
-                          openReferencePath("Update repo", String(runtimePaths?.updateRepositoryPath ?? ""))
+                          openReferencePath("Update folder", String(runtimePaths?.updateRepositoryPath ?? ""))
                         )
                       }
                       type="button"
                     >
-                      Update repo
+                      Update folder
                     </button>
                     <button
                       className={styles.railButton}
@@ -1553,7 +1560,7 @@ export function SetupSupportPilot({
           appVersion={APP_VERSION}
           commissioningWord={
             setupState.word === "READY"
-              ? "ready to publish"
+              ? "published"
               : setupState.word === "DEGRADED"
                 ? "needs re-verification"
                 : "setup required"
@@ -1597,7 +1604,7 @@ export function SetupSupportPilot({
               </ul>
               <p>
                 Publishing anyway unlocks operator mode with unverified hardware. The override is recorded in the setup
-                summary and the engine log.
+                summary and the Engine log.
               </p>
             </>
           }

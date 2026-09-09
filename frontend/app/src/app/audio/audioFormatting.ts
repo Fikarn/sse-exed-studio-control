@@ -23,14 +23,23 @@ export interface AudioStatusDescriptor {
   label: string;
   tone: StatusToneLike;
   warningBody: string | null;
+  /**
+   * The desk's raw fault code, when it reported one. Slice 8 (system §9): the
+   * code is a field of its own so nothing has to lead a sentence with it — the
+   * state display prints it in its own small slot, and every tooltip and
+   * locked reason reads `warningBody` alone.
+   */
+  warningCode: string | null;
   warningTitle: string | null;
   /**
    * Whether this status warrants a full-width warning banner. False means
    * the status is real but not critical enough to consume banner real
    * estate (e.g. OSC has never been sync'd because the operator hasn't
    * pressed Sync yet — that's a "pre-flight reminder", not a fault).
-   * AudioSignalCanvas renders the banner only when `true`; AudioToolbar
-   * renders a small attention dot next to the Sync button otherwise.
+   * AudioSignalCanvas renders the banner only when `true`. The small
+   * attention dot that used to render next to the Sync button otherwise went
+   * away with AudioToolbar / AudioRail on 2026-09-09 (GS-AUD-44 posture
+   * closed); no live host draws that dot today.
    *
    * Slice 7 of the Phase 3 polish — prevents stacking two yellow banners
    * (OSC + SOLO) simultaneously when the OSC state isn't actually
@@ -192,7 +201,7 @@ export function audioLockNote(label: string): string {
     case "NOT VERIFIED":
       return "locked · run the audio probe";
     case "OFFLINE":
-      return "locked · console unreachable";
+      return "locked · desk unreachable";
     case "DISCONNECTED":
       return "locked · UFX III disconnected";
     case "DISABLED":
@@ -238,6 +247,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       label: "DISABLED",
       tone: "attention" satisfies StatusToneLike,
       warningBody: "OSC control is switched off in Setup. The Console is read-only until it is switched back on.",
+      warningCode: null,
       warningTitle: "OSC DISABLED",
     };
   }
@@ -251,6 +261,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       label: "DISCONNECTED",
       tone: "error" satisfies StatusToneLike,
       warningBody: "TotalMix reports the UFX III is disconnected. Check the interface's USB link and power.",
+      warningCode: null,
       warningTitle: "CONSOLE DISCONNECTED",
     };
   }
@@ -263,7 +274,8 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       warningBody:
         typeof snapshot?.lastActionMessage === "string" && snapshot.lastActionMessage.trim().length > 0
           ? snapshot.lastActionMessage
-          : "Audio may still pass, but the app cannot see or change the console right now.",
+          : "Audio may still pass, but the app cannot see or change the desk right now. Run the audio probe to check the link.",
+      warningCode: null,
       warningTitle: "CONSOLE UNREACHABLE",
     };
   }
@@ -279,6 +291,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       label: "NOT VERIFIED",
       tone: "attention" satisfies StatusToneLike,
       warningBody: "Console controls stay locked until the audio probe passes.",
+      warningCode: null,
       warningTitle: "AUDIO NOT VERIFIED",
     };
   }
@@ -288,7 +301,8 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       bannerEligible: true,
       label: "STALE",
       tone: "attention" satisfies StatusToneLike,
-      warningBody: "No meter data has arrived from TotalMix for a few seconds.",
+      warningBody: "No meter data has arrived from TotalMix for a few seconds. Run the audio probe to check the link.",
+      warningCode: null,
       warningTitle: "RME METERING STALE",
     };
   }
@@ -300,6 +314,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       tone: "error" satisfies StatusToneLike,
       warningBody:
         "TotalMix is not sending meter data. In TotalMix Options › Settings › OSC, turn on Send Peak Level Data, then run the audio probe again.",
+      warningCode: null,
       warningTitle: "RME METERING OFFLINE",
     };
   }
@@ -310,7 +325,8 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       label: "ASSUMED",
       tone: "attention" satisfies StatusToneLike,
       warningBody:
-        "Showing the last state the console confirmed. Press Sync to pull the current state from TotalMix before trusting faders or recall.",
+        "Showing the last state the desk confirmed. Press Sync from TotalMix to pull the current state before trusting faders or recall.",
+      warningCode: null,
       warningTitle: "STATE ASSUMED",
     };
   }
@@ -322,12 +338,15 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
         ? snapshot.lastActionCode
         : null;
     const actionMessage =
-      String(snapshot?.lastActionMessage ?? "The last audio action failed.") || "The last audio action failed.";
+      String(
+        snapshot?.lastActionMessage ?? "The last action failed. Press Sync from TotalMix to pull the current state."
+      ) || "The last action failed. Press Sync from TotalMix to pull the current state.";
     return {
       bannerEligible: true,
       label: "ACTION FAILED",
       tone: "error" satisfies StatusToneLike,
-      warningBody: actionCode ? `${actionCode} · ${actionMessage}` : actionMessage,
+      warningBody: actionMessage,
+      warningCode: actionCode,
       warningTitle,
     };
   }
@@ -338,6 +357,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       label: "SIMULATED",
       tone: "attention" satisfies StatusToneLike,
       warningBody: null,
+      warningCode: null,
       warningTitle: null,
     };
   }
@@ -347,6 +367,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     label: "VERIFIED",
     tone: "ok" satisfies StatusToneLike,
     warningBody: null,
+    warningCode: null,
     warningTitle: null,
   };
 }

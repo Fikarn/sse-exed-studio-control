@@ -47,23 +47,23 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
 
   return [
     {
-      description: "Start the isolated Rust engine process.",
-      label: "Launch engine",
+      description: "Start the part of Studio Control that talks to the desk, the rig and the deck.",
+      label: "Start up",
       tone: currentIndex >= 0 ? reachedTone : "idle",
     },
     {
-      description: "Wait for the engine to confirm protocol compatibility.",
-      label: "Ready event",
+      description: "Wait for Studio Control to confirm both halves of this install are the same version.",
+      label: "Handshake",
       tone: currentIndex >= 1 ? reachedTone : "idle",
     },
     {
-      description: "Load health, diagnostics, and degraded-state posture.",
-      label: "Health snapshot",
+      description: "Load what the desk, the rig and the deck report about themselves.",
+      label: "Health",
       tone: currentIndex >= 2 ? reachedTone : "idle",
     },
     {
-      description: "Load shell routing and commissioning state.",
-      label: "App snapshot",
+      description: "Load where you were and whether commissioning has published.",
+      label: "Workspaces",
       tone: currentIndex >= 3 ? reachedTone : "idle",
     },
   ];
@@ -86,10 +86,36 @@ export function formatFailureCode(failure: StartupFailure | null): string {
   if (code === "PROTOCOL_MISMATCH") {
     return "Protocol mismatch";
   }
+  // Slice 8 (system §9): the two codes Studio Control raises about itself
+  // humanize to "Engine …", a word operator copy does not use.
+  if (code === "ENGINE_STARTUP_FAILED") {
+    return "Startup failed";
+  }
+  if (code === "ENGINE_READY_TIMEOUT") {
+    return "Startup timed out";
+  }
   return code
     .replace(/[_-]+/g, " ")
     .toLowerCase()
     .replace(/^./, (character) => character.toUpperCase());
+}
+
+// Visual overhaul A, Slice 8 (system §9): the stage the engine reports is a
+// token ("frontend-bootstrap", "ready-event", "protocol-negotiation"); the
+// recovery display names the step in the operator's words and never invents
+// one the engine did not report.
+export function formatFailureStage(stage: string): string {
+  switch (stage) {
+    case "bootstrap":
+    case "frontend-bootstrap":
+      return "start-up";
+    case "ready-event":
+      return "ready";
+    case "protocol-negotiation":
+      return "version check";
+    default:
+      return stage.replace(/[_-]+/g, " ");
+  }
 }
 
 export function getFailureTitle(startupFailure: StartupFailure | null) {
@@ -98,15 +124,15 @@ export function getFailureTitle(startupFailure: StartupFailure | null) {
   }
 
   if (startupFailure?.stage === "bootstrap") {
-    return "Engine bootstrap failed";
+    return "Startup failed";
   }
 
-  return "Startup recovery required";
+  return "Startup failed";
 }
 
 export function formatFileSize(sizeBytes: number) {
   if (sizeBytes <= 0) {
-    return "fixture";
+    return "size not reported";
   }
 
   if (sizeBytes < 1024) {
@@ -133,9 +159,12 @@ export function formatPathLabel(key: string) {
     case "logsDir":
       return "Logs";
     case "updateRepositoryPath":
-      return "Update repo";
+      return "Update folder";
     default:
-      return key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase());
+      return key
+        .replace(/([A-Z])/g, " $1")
+        .toLowerCase()
+        .replace(/^./, (value) => value.toUpperCase());
   }
 }
 
