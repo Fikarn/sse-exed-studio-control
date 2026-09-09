@@ -123,10 +123,9 @@ export function getFailureTitle(startupFailure: StartupFailure | null) {
     return "Protocol mismatch";
   }
 
-  if (startupFailure?.stage === "bootstrap") {
-    return "Startup failed";
-  }
-
+  // Slice 8 gave every non-protocol failure the same word, so the stage no
+  // longer branches: what failed is the start-up, whichever step it stopped
+  // at, and the display's meta line names the step.
   return "Startup failed";
 }
 

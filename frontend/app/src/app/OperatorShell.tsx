@@ -457,8 +457,8 @@ function OperatorShellInner() {
         />
       ) : (
         <ShellDialog
-          body="Restarting reconnects Studio Control to the desk, the rig and the deck. The desk link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
-          confirmLabel="Restart the link"
+          body="Restarting reconnects Studio Control to the desk, the rig and the deck. The hardware link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
+          confirmLabel="Restart the hardware link"
           onCancel={() => setConfirmIntent(null)}
           onConfirm={() => void performRestart()}
           title="Restart the hardware link?"

@@ -1218,7 +1218,7 @@ export function SetupSupportPilot({
                     },
                     {
                       id: "live",
-                      text: "Once published, the deck pages, the bridge and the desk link are live for the next session.",
+                      text: "Once published, the deck's pages, the bridge and the desk are live for the next session.",
                       tone: "ok",
                     },
                   ]}
