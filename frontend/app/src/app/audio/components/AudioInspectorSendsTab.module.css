@@ -6,7 +6,7 @@
  * surfaces. */
 
 /* C19: flat card surface matching the EQ tab's .eqBandCard (flat --bg-2 /
-   --line / --radius-sm, --accent-soft + --accent-glow when active) so the
+   --line / --radius-key, --accent-soft + --accent-glow when active) so the
    inspector speaks one card vocabulary instead of the legacy accent-tinted
    gradient. Shared by both Sends AND Dynamics cards. Resting padding/gap are
    unchanged (8px radius vs the old 7px is height-neutral) so the no-scroll

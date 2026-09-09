@@ -28,7 +28,7 @@
   padding: 6px;
   background: var(--color-bg-soft);
   border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
 }
 
 .tabPanel {
@@ -49,7 +49,7 @@
   gap: 3px;
   padding: 9px 11px;
   border: 1px solid var(--color-warning-border);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: linear-gradient(
     180deg,
     var(--color-warning-soft) 0%,
@@ -1001,7 +1001,7 @@
   opacity: 0;
   transition: opacity var(--motion-duration-exit) var(--motion-easing-standard);
   background: var(--color-bg-soft);
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
   padding: 1px;
   pointer-events: none;
 }

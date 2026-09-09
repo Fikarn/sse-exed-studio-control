@@ -103,7 +103,7 @@
   /* Slice 9 (system §5): a plate at the drawer's level, not glass. */
   background: var(--elevation-plate-fill);
   box-shadow: var(--elevation-plate), var(--elevation-float);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
 }
 
 /* Slot positioning for the design-system PlotPill primitive (top-left). */

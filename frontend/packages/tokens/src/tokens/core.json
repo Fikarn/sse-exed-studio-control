@@ -1205,32 +1205,9 @@
     }
   },
   "radius": {
-    "md": {
-      "$value": "{radius.screen}",
-      "$description": "Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 14px."
-    },
-    "lg": {
-      "$value": "{radius.screen}",
-      "$description": "Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 20px."
-    },
-    "xl": {
-      "$value": "24px"
-    },
-    "surface": {
-      "$value": "{radius.lg}"
-    },
     "pill": {
-      "$value": "999px"
-    },
-    "tight": {
-      "xs": {
-        "$value": "{radius.ctl}",
-        "$description": "Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 3px."
-      },
-      "md": {
-        "$value": "{radius.key}",
-        "$description": "Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 6px."
-      }
+      "$value": "999px",
+      "$description": "A: chips, lamps, the grand master's cap"
     },
     "ctl": {
       "$value": "4px",
@@ -1242,7 +1219,7 @@
     },
     "screen": {
       "$value": "12px",
-      "$description": "A: the state display, the bay screen, the plot, the drawer"
+      "$description": "A: the state display, the bay screen, the plot, the drawer, plates and dialogs"
     }
   },
   "size": {

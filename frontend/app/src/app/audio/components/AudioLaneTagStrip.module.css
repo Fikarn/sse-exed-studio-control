@@ -14,7 +14,7 @@
   padding: 4px 0;
   min-height: 30px;
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: color-mix(in srgb, var(--bg) 90%, transparent);
 }
 

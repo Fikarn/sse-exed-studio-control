@@ -170,7 +170,7 @@
      the band to 37px, 1px over the 36px cap the audio.spec.ts geometry check pins.
      Trim vertical padding 6→4 to keep both the solo and clip bands under the cap. */
   padding: 4px 12px;
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   border: 1px solid var(--accent-glow);
   background: var(--accent-soft);
   color: var(--fg-2);

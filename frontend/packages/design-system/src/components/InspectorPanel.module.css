@@ -2,7 +2,7 @@
   .panel {
     background: var(--color-surface-default);
     border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-surface);
+    border-radius: var(--radius-screen);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     min-height: 0;

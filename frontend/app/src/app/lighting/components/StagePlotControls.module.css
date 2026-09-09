@@ -10,7 +10,7 @@
   /* Slice 9 (system §5): a plate at the drawer's level, not glass. */
   background: var(--elevation-plate-fill);
   border: 1px solid var(--material-line);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   box-shadow: var(--elevation-plate), var(--elevation-float);
   font-family: var(--font-family-mono);
 }

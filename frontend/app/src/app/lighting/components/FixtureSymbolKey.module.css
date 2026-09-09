@@ -8,7 +8,7 @@
   max-width: 430px;
   padding: 6px;
   border: 1px solid var(--material-line);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   /* Visual overhaul A, Slice 9 (system §5): the legend floats over the plot,
      so it is a plate at the drawer's level rather than glass. */
   background: var(--elevation-plate-fill);

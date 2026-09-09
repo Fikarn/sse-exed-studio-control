@@ -22,7 +22,7 @@
   min-height: 34px;
   padding: 0 10px;
   border: 1px solid var(--color-surface-border-strong);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   background: var(--color-bg-soft);
   color: var(--color-text-strong);
   font: var(--font-weight-semibold) var(--font-size-body) / 1 var(--font-family-ui);

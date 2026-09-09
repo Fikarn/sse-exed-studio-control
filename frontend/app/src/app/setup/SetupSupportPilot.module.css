@@ -114,7 +114,7 @@
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-screen);
     background:
       linear-gradient(
         135deg,
@@ -212,7 +212,7 @@
   .dialChip,
   .railButton {
     border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-screen);
     background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
     color: inherit;
     font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-tick)) / 1.2 var(--font-family-mono);
@@ -529,7 +529,7 @@
     gap: 6px;
     padding: var(--space-3);
     border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-screen);
     background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
   }
 
@@ -576,7 +576,7 @@
   .emptyState {
     padding: var(--space-4);
     border: 1px dashed var(--color-border-default);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-screen);
     text-align: center;
   }
 

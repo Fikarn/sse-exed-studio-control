@@ -33,7 +33,7 @@
   max-height: 80vh;
   background: var(--color-bg-canvas);
   border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
@@ -82,7 +82,7 @@
   align-items: center;
   justify-content: center;
   padding: 4px;
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
 }
 
 .closeButton:hover {
@@ -176,7 +176,7 @@
   background: var(--color-bg-soft);
   border: 1px solid var(--color-bg-stroke);
   border-bottom-width: 2px;
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
   padding: 2px 6px;
   color: var(--color-brand-text-secondary);
 }

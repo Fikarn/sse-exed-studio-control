@@ -716,7 +716,7 @@
 .planningBoardEmpty {
   padding: 16px;
   border: 1px dashed color-mix(in srgb, var(--color-border-default) 82%, transparent);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-screen);
   background: color-mix(in srgb, var(--color-surface-900) 68%, transparent);
 }
 
@@ -741,7 +741,7 @@
   min-height: 132px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-screen);
   background: color-mix(in srgb, var(--color-surface-700) 92%, transparent);
 }
 
@@ -763,7 +763,7 @@
   content: "";
   position: absolute;
   inset: 12px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-screen);
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--color-surface-700) 70%, transparent),
@@ -786,7 +786,7 @@
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   border: 1px solid color-mix(in srgb, var(--color-border-default) 88%, transparent);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-screen);
   background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
   overflow: hidden;
 }
@@ -837,7 +837,7 @@
   gap: 10px;
   padding: 14px;
   border: 1px solid color-mix(in srgb, var(--color-border-default) 80%, transparent);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-screen);
   background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
   /* Slice 9 (system §5): a card resting in a column is a plate, not a
      floating thing — it takes the plate's sheen, not a 28 px drop. */

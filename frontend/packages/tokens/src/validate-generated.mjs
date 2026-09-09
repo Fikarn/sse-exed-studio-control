@@ -67,6 +67,16 @@ for (const gone of [
   "--radius-tight-sm:",
   "--radius-tight-lg:",
   "--radius-tight-xl:",
+  // Slice 11 follow-up: these five were re-pointed onto a canonical step
+  // rather than removed, which left the value right and the name a second
+  // one. They are renamed at their call sites now, and `--radius-xl` — 24 px,
+  // a fifth radius §5 does not allow — went with them, unread by anything.
+  "--radius-md:",
+  "--radius-lg:",
+  "--radius-xl:",
+  "--radius-surface:",
+  "--radius-tight-xs:",
+  "--radius-tight-md:",
   "--motion-duration-fast:",
 ]) {
   if (css.includes(gone)) {

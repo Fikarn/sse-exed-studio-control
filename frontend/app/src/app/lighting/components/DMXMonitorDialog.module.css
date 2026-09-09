@@ -22,7 +22,7 @@
 .legendSwatch {
   width: 10px;
   height: 10px;
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
   border: 1px solid var(--color-bg-stroke);
 }
 
@@ -58,7 +58,7 @@
   padding: 4px 5px 5px;
   background: var(--color-bg-soft);
   border: 1px solid transparent;
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
   font-feature-settings: "tnum", "zero";
   cursor: default;
 }

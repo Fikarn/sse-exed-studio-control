@@ -7,7 +7,7 @@
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.008)), var(--color-surface-default);
     border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-surface);
+    border-radius: var(--radius-screen);
     box-shadow: var(--elevation-plate), var(--elevation-float);
   }
 

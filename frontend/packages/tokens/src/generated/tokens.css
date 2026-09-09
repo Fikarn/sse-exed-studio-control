@@ -301,11 +301,10 @@
   --space-8: 32px;
   --space-9: 36px;
   --space-10: 40px;
-  --radius-xl: 24px;
-  --radius-pill: 999px;
+  --radius-pill: 999px; /** A: chips, lamps, the grand master's cap */
   --radius-ctl: 4px; /** A: caps, fields, kbd, small lamps' boxes */
   --radius-key: 8px; /** A: keys, wells, cards */
-  --radius-screen: 12px; /** A: the state display, the bay screen, the plot, the drawer */
+  --radius-screen: 12px; /** A: the state display, the bay screen, the plot, the drawer, plates and dialogs */
   --size-control-height: 36px;
   --size-compact-control-height: 24px;
   --size-toolbar-height: 44px;
@@ -389,10 +388,6 @@
   --font-size-state: var(--font-base-state); /** the state word, plate titles */
   --font-size-hero-small: var(--font-base-hero-small); /** Setup's step title */
   --font-size-hero: var(--font-base-hero); /** the one number read from a metre away */
-  --radius-md: var(--radius-screen); /** Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 14px. */
-  --radius-lg: var(--radius-screen); /** Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 20px. */
-  --radius-tight-xs: var(--radius-ctl); /** Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 3px. */
-  --radius-tight-md: var(--radius-key); /** Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 6px. */
   --shadow-glow-yellow: 0 0 0 1px var(--color-brand-yellow), 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08);
   --shadow-glow-amber: 0 0 0 1px var(--color-warning-500), 0 12px 28px rgba(216, 169, 90, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
   --color-text-primary: var(--color-text-strong);
@@ -403,6 +398,5 @@
   --color-studio-050: var(--color-text-strong);
   --color-plot-guide: var(--color-brand-green);
   --audio-peak-hold-calm: var(--color-text-subtle);
-  --radius-surface: var(--radius-lg);
   --shadow-glow-green: 0 0 0 1px var(--color-brand-green), 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
 }
