@@ -42,13 +42,28 @@ Authoritative source: `docs/HARDWARE_PROFILE.md`.
 
 ## Design system
 
+Every operator surface is built to one written visual system — **Concept A**,
+specified in `docs/redesign/system-a-2026-09.md` and implemented across thirteen
+slices recorded in `docs/plans/visual-overhaul-a-2026-09.md` (landed 2026-09-09).
+Read §10 of the system doc before changing anything the operator sees: it is the
+list of things that are measured on every board, and it is enforced, not advisory.
+
+The short version: every surface is header · cluster · bay · plate · footer; the
+type scale has nine steps and a 12 px floor; there are four radii (4 · 8 · 12 ·
+pill) and five elevation levels; every enabled pointer target is at least 24 px;
+every text node reads at 4.5:1 or better in Studio, Graphite and Bone; nothing
+animates on a surface at rest; and the front-end never displays a state the engine
+does not report.
+
 Use the frontend token and component packages as the shared UI foundation:
 
 - `frontend/packages/tokens/` — generated design tokens and docs
 - `frontend/packages/design-system/` — shared shell primitives and layout components
 - `frontend/app/src/` — selected operator surfaces
 
-Extend tokens and shared components additively. Do not bypass the frontend design system with one-off styling unless the change is explicitly scoped and documented.
+Extend tokens and shared components additively. Do not bypass the frontend design system with one-off styling unless the change is explicitly scoped and documented. Do not introduce a second name for a size, radius, duration or state word the A scale already names — `frontend/packages/tokens/src/validate-generated.mjs` fails the build if a retired alias comes back.
+
+The workflow, the gate commands and the traps are in `docs/DEVELOPMENT.md §2c`.
 
 ## Runtime environment
 
@@ -82,6 +97,8 @@ Frontend and selected shell:
 
 - `npm run frontend:tokens:build` — regenerate design token outputs.
 - `npm run frontend:foundation` — protocol generation, tokens build, typecheck, Storybook build, fixture check, Playwright.
+- `node scripts/ui-census.mjs` (from `frontend/app`) — measure all 81 UI-contract boards; `--write-ratchets` re-seeds `frontend/app/tests/ui-contract.ratchets.json`. Takes ~4 minutes. See `docs/DEVELOPMENT.md §2c`.
+- `node scripts/check-operator-copy.mjs` (from the repo root) — the operator-copy gate. Holds at 0.
 - `npm run tauri:dev` — run the selected Tauri dev shell.
 - `npm run tauri:build` — build the selected Tauri shell.
 - `npm run tauri:foundation` — protocol generation, engine build, Tauri build, Tauri smoke.
@@ -122,6 +139,7 @@ When the selected Tauri shell is open for user inspection, that exact running sh
 - Engine tests: `cargo test` under `native/rust-engine/`. `#[ignore]`-marked tests are hardware-bound and skipped by default; run them via `npm run native:test:hardware` on the operator workstation.
 - Frontend unit/component tests: `npm run frontend:test` (Vitest + `@testing-library/react`). Specs colocated as `*.test.ts` / `*.test.tsx` under each workspace.
 - Frontend Playwright + visual baselines: `npm run frontend:playwright:test`. `visual-review.spec.ts` commits `toHaveScreenshot` baselines under `frontend/app/tests/__visual__/visual-review.spec.ts-snapshots/` (per-platform `*-darwin.png` / `*-linux.png` / `*-win32.png` files; win32 is the studio workstation's local gate, linux is CI, darwin is refreshed on the macOS release host); the CI `frontend-e2e` job re-runs them and uploads diffs + the Playwright report as artifacts. `storybook.spec.ts` does the same for the Storybook static build. Both the behaviour specs and the visual lanes run against the built app (Playwright's `webServer` is `vite preview` over `frontend/app/dist`, reused when already running; the Storybook lane reads `storybook-static`), so after any frontend source edit run `npm run build --workspace frontend/app` (and `npm run frontend:storybook:build` for the Storybook lane) before `npx playwright test …`, or the specs exercise the previous build.
+- UI contract: `frontend/app/tests/ui-contract.spec.ts` measures 81 boards (27 fixtures × 3 themes at 2560×1440) plus the Storybook primitive pages against system §10, ratcheted per board in `frontend/app/tests/ui-contract.ratchets.json` — a measure may fall, never rise. Three sibling gates run outside it: `scripts/check-operator-copy.mjs`, the design system's `css-literals.test.ts` allowlist, and the tokens package's `themes.contrast.test.ts`. `docs/DEVELOPMENT.md §2c` has the commands, the re-seed flow and the traps.
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
 - Target-host lanes: macOS and Windows native verification are both blocking release gates. Treat a Windows target-host failure the same as a macOS failure.
 
@@ -185,14 +203,15 @@ When working through a sliced plan and a slice's premise turns out to be wrong o
 
 ## Where to look
 
-| For…                                    | Go to…                                           |
-| --------------------------------------- | ------------------------------------------------ |
-| Runtime boundaries, shell/engine rules  | `docs/ARCHITECTURE.md`                           |
-| Workstation dimensions, device list     | `docs/HARDWARE_PROFILE.md`                       |
-| Operator task flows, keyboard shortcuts | `docs/OPERATIONS.md`                             |
-| Cold-start developer onboarding         | `docs/DEVELOPER_QUICKSTART.md`                   |
-| Daily build/test/package commands       | `docs/DEVELOPMENT.md`                            |
-| Release steps, acceptance checklist     | `docs/RELEASE.md`, `docs/PRODUCTIZATION_PLAN.md` |
-| Current engineering truth / open items  | `docs/HANDOFF.md`                                |
+| For…                                    | Go to…                                                         |
+| --------------------------------------- | -------------------------------------------------------------- |
+| Runtime boundaries, shell/engine rules  | `docs/ARCHITECTURE.md`                                         |
+| Workstation dimensions, device list     | `docs/HARDWARE_PROFILE.md`                                     |
+| Operator task flows, keyboard shortcuts | `docs/OPERATIONS.md`                                           |
+| Cold-start developer onboarding         | `docs/DEVELOPER_QUICKSTART.md`                                 |
+| Daily build/test/package commands       | `docs/DEVELOPMENT.md`                                          |
+| Release steps, acceptance checklist     | `docs/RELEASE.md`, `docs/PRODUCTIZATION_PLAN.md`               |
+| Current engineering truth / open items  | `docs/HANDOFF.md`                                              |
+| The visual system and its gates         | `docs/redesign/system-a-2026-09.md`, `docs/DEVELOPMENT.md §2c` |
 
 If this file disagrees with any of the above, those docs win — this file is a pointer, not a spec.

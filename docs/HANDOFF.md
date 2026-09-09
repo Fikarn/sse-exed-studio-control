@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the top-level engineering handoff for the repository as of `2026-09-04`.
+This is the top-level engineering handoff for the repository as of `2026-09-09`.
 
 Read this first before resuming product, release, or cleanup work. Use it as the entry point into the more detailed documents linked below.
 
@@ -26,6 +26,8 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - **Audio "Console" UX polish (2026-06-02, branch `claude/audio-ux-polish` — merged 2026-06-05 via PR #121).** A 21-finding front-end-only refinement pass over the Console surface, driven by an adversarially-verified UX audit committed at `docs/archive/audio-ux-audit-2026-06-02.md`. It closed two shipped defects (the inspector send/fader/action controls left unstyled by five undefined CSS classes; the "Listen" button that silently drove the −20 dB Dim), drove status severity into the chrome (`--danger` dot + warning band on faults), and added a persistent SOLO indicator + `⌥S`, typed knob entry, inspector-tab keyboard accelerators, per-theme meter contrast + Bone-theme AA, a `--control-disabled-opacity` token, ~44 px of reclaimed vertical budget, and a token/scale normalization (the legacy `--audio-*` fork migrated onto the canonical `--bg/--fg/--accent` set; ~75 font literals moved onto the loaded Inter/JetBrains faces, so sans text no longer falls back to system-ui). Five batch commits plus one visual-evidence commit on the branch; `npm run dev:check` and the audio Playwright behavior specs are green; the `darwin` audio visual baselines were regenerated (`linux` siblings refresh on the first CI run) and `FULL_RENDER_MAX_DIFF_PX` was raised 400→800 to absorb the enlarged meter-sim + Inter-AA jitter. The native `2560×1440` operator sign-off and the `linux` baseline refresh were both done at merge time. On top of the audit, #121 also reconciled the operator's Claude Design prototype on the same branch — carved/molded faders + unity detents, meters ported into the live 30 Hz canvas (fixed cream→amber→red dBFS zones, cylindrical glass, mono single-bar), tier-header title-over-meta cards, output-lane routing footers, an inspector EQ mini-preview, the input `MIC/MONO` identity chip, and restored channel-strip fill heights (`flex:1 1 240px` + `align-self:stretch`) — with the `darwin` + `linux` audio visual baselines regenerated (linux bootstrapped from CI's first-run artifact) and the full `dev:check` + Playwright matrix green. Native review also reversed C15: the master monitor meter is now a view-only live meter (the #111-dropped live mini-meter wiring restored so it tracks Main Out), not a draggable level control.
 
 - **2026-09 audit remediation (branch `audit-remediation-2026-09`, 13 slices, landed 2026-09-04, not yet pushed).** The 2026-09-02 program audit found the audio console lying about the RME desk. The remediation makes it truthful: the engine reads TotalMix back over Global OSC remote 4 and confirms every send (`aligned` is written only after a complete pull or a fully confirmed push), Sync is a real pull, Recall pushes everything except 48V (listed per channel), fader dB follows RME's published curve (unity at step 836 of 1023), talkback is momentary on every surface with a 2 s engine watchdog, console writes are refused until the audio probe passes, Publish needs every probe green or an explicit override, arm-then-apply has a 350 ms dwell, the 1920×1080 monitor gets a compact density that never scrolls, the Bone header and the Console's 9.5 px type floor are legible and measured, closing the window asks first and stops the engine gracefully, shortcut labels follow the host OS, DMX reads decimal, and sample planning asks before seeding. The ledger `docs/plans/audit-remediation-2026-09.md` is the authoritative record (per-slice gate honesty, tests added / changed, validation, baselines) and its Appendix B is the operator hardware checklist that is still unsigned.
+
+- **Visual overhaul A (branch `ui-gold-standard-2026-09`, thirteen slices, landed 2026-09-09, pushed but not merged).** Every operator surface is now built to one written visual system — Concept A, chosen from five Console concepts on 2026-09-06 and approved as plan decisions D1–D14 on 2026-09-07 (`D4: 2560×1440 is the only resolution that matters`; D9 withdrawn). The system is specified in [docs/redesign/system-a-2026-09.md](redesign/system-a-2026-09.md) and the implementation record is [docs/plans/visual-overhaul-a-2026-09.md](plans/visual-overhaul-a-2026-09.md), whose thirteen Status lines are authoritative for what landed, what moved and what was deliberately left. Every surface reads as one instrument: header · cluster · bay · plate · footer. The Console's top bar, monitor bar, health bar, snapshot deck and warning bands are gone, replaced by a fixed cluster on the left; Lighting, Planning and Setup follow the same rule; the plate shows the whole selected thing at once with no tab row; and the four workspaces share one footer. The system is **measured, not reviewed**: `frontend/app/tests/ui-contract.spec.ts` renders 81 boards (27 fixtures × 3 themes at 2560×1440) plus the Storybook primitive pages and ratchets 20 measures per board in `frontend/app/tests/ui-contract.ratchets.json` — type floor 12 px and at most 8 sizes, pixel-sampled text contrast ≥ 4.5:1, every enabled target ≥ 24 px, radii ⊆ {4, 8, 12, pill}, no negative shadow offsets, no blur over 8 px off a lit element, 0 animations at idle, 0 forbidden words, no page scroll, nothing off the viewport. **Every one of those measures is met on every one of the 81 boards.** The commands, the re-seed flow and the traps are in [docs/DEVELOPMENT.md §2c](DEVELOPMENT.md).
 
 ## Start Here
 
@@ -84,8 +86,24 @@ The highest-value unresolved work is:
    Fixture definitions, DMX footprints, DMX labels/encoders, universe-aware overlap validation, scene serialization, and persisted compatibility live in `native/rust-engine/src/lighting/`. Frontend code may mirror catalog metadata for fixture transport tests and render controls/shapes from snapshots, but it must not own device policy. Do not add GDTF import, Sidus Bluetooth discovery, firmware update, or vendor auto-configuration without a new scoped plan.
 8. Preserve stage-plot smoothness.
    Fixture drag, rotation, scene recall, and value slider edits now rely on short-lived render previews so the marker, output beam, active scene pill, and scene rail selection stay visually continuous while engine IPC catches up. Future changes should keep that preview layer render-only and clear it when authoritative snapshots match.
-9. Close out the 2026-09 audit remediation.
-   Sign the operator hardware checklist (`docs/plans/audit-remediation-2026-09.md` Appendix B — TotalMix talkback channel assignment first, then B1-B8), push `audit-remediation-2026-09` (it sits on the unpushed `studio-bringup-sacn-globalosc` Stream Deck work) so CI refreshes the linux visual baselines from the `playwright-test-results` artifact, and record the darwin baselines on the next macOS host visit. Until then `frontend-e2e` is expected red on linux for the 25 + 42 + … baselines moved by Slices 5-12.
+9. Land the 2026-09 program work. **This is the top of the queue.**
+
+   Three bodies of work sit stacked on `origin/main`, each containing the one below it, all pushed to GitHub and **none merged**:
+
+   | Branch                          | Commits ahead of `main` | What it is                                                                   |
+   | ------------------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+   | `studio-bringup-sacn-globalosc` | 11                      | sACN DMX output, TotalMix Global OSC, the Stream Deck+ audio surface (S1–S6) |
+   | `audit-remediation-2026-09`     | 26                      | the above + the 13-slice 2026-09-02 audit remediation                        |
+   | `ui-gold-standard-2026-09`      | 60                      | the above + visual overhaul A (13 slices + 2 follow-ups)                     |
+
+   `ui-gold-standard-2026-09` is therefore the whole program. Merging it merges all three.
+
+   Four things stand between here and `main`:
+
+   1. **CI has never run on any of these 60 commits.** `dev-checks.yml` triggers on `pull_request` and on `push` **to `main` only** — pushing a feature branch runs nothing. Every gate reported in the two plan ledgers was run locally on the studio workstation (win32). Opening the PR is the first time Linux sees this work.
+   2. **The `linux` and `darwin` visual baselines are 60 commits stale**, and 18 Storybook stories added by the overhaul have no `linux` or `darwin` baseline at all. Both platforms were last refreshed at `35a4c2a`, which is `origin/main`. `frontend-e2e` will therefore fail on the first PR run: 75 `linux` baselines are stale and 18 have never existed. It is **advisory, not a merge blocker** — the four required checks on `main` are `format-protocol`, `lint`, `frontend-typecheck` and `rust` — and failing it is the _documented_ way to refresh the baselines: open the PR, let `frontend-e2e` fail, download the `playwright-test-results` artifact from the run, copy each `*-actual.png` over its `*-linux.png` baseline, commit, push. `darwin` is refreshed by running the visual lanes on the macOS release host; there is no macOS runner in CI.
+   3. **Two operator checklists are unsigned**, and both are walked on the studio hardware, not in CI: `docs/plans/audit-remediation-2026-09.md` Appendix B (TotalMix talkback channel assignment first, then B1–B8) and `docs/plans/visual-overhaul-a-2026-09.md` Appendix B (nine items on the 2560×1440 monitor; item 7 — Bone and Graphite from the chair — is the one the gates can least stand in for).
+   4. **Decide how it lands.** One PR of 60 commits, or three stacked PRs merged bottom-up. The repo is squash-merge-only, which would collapse either into one or three commits on `main` and lose the per-slice `git log` that both ledgers reference by subject line. That is a deliberate decision for the maintainer, not a default.
 
 ## Execution Queue
 
@@ -104,6 +122,36 @@ Completed rollout record:
 - [Issue #5: Checkpoint D: plan Qt fallback retirement](https://github.com/Fikarn/sse-exed-studio-control/issues/5), executed through [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](./archive/QT_FALLBACK_RETIREMENT_AUDIT.md)
 
 ## Recent Session Record
+
+### Visual overhaul A (Slices 0-11, 2026-09-07 → 2026-09-09)
+
+Branch `ui-gold-standard-2026-09`, one commit per slice (`A S<N>: …`) with the refreshed captures as their own `A S<N> (baselines): …` commit beside it. Ledger: [docs/plans/visual-overhaul-a-2026-09.md](plans/visual-overhaul-a-2026-09.md). System: [docs/redesign/system-a-2026-09.md](redesign/system-a-2026-09.md). The mocks the system was drawn from are `docs/redesign/assets/concepts/A-*.html` — open them in a browser; they are self-contained.
+
+What each slice did, in one line, because the commit subjects are the index into the ledger:
+
+| Slice    | Commit                        | What landed                                                                            |
+| -------- | ----------------------------- | -------------------------------------------------------------------------------------- |
+| S0       | `fa6b53d`                     | the UI contract lanes — type, contrast, targets, radii, chrome, light, motion, copy    |
+| S1       | `8df6ba1`                     | the A token set (material, roles, display inks, signal, type, radii, chrome, motion)   |
+| S2       | `b45a1c3`                     | the shell skeleton — header, footer, cluster grid, drawer, tone map — on every surface |
+| S3       | `d9bf957`                     | the primitives: StateDisplay, the Key family, Lamp, the Well family, Plate, Drawer     |
+| S4a/b/c  | `f9538a7` `ec84272` `5644541` | the Console: cluster + footer, the bay's thirteen strips, the plate                    |
+| S5 / S5b | `05aa84d` `d85aba7`           | Lighting on the cluster rule, then its plate                                           |
+| S6       | `7e3ace4`                     | Planning on the cluster rule; the timeline is a screen                                 |
+| S7       | `0c03064`                     | Setup / Support and the pre-ready surfaces                                             |
+| S8       | `4638f6a` (+ `9446dba`)       | the operator copy pass and the copy gate                                               |
+| S9       | `3853de4`                     | one light, calm surfaces, the motion policy — the frosted glass is gone                |
+| S10      | `76f075f`                     | Graphite and Bone pass the legibility gate; the Console stops hiding the Phones levels |
+| S11      | `107dcf6` (+ `b6b38c1`)       | close-out: one vocabulary, one type scale, no target under 24 px                       |
+
+Facts worth knowing before touching this surface:
+
+- **The front-end never displays a state the engine does not report.** Every state word on screen comes from a snapshot; there are no locally-invented states. This was the rule the whole overhaul was written against.
+- **The ratchets are the test.** No slice added a spec for "does it look right"; each one moved numbers in `ui-contract.ratchets.json` and the gate holds them there. If you are about to write a visual assertion by hand, check whether the census already measures it.
+- **Baselines are per-platform and only `win32` is current.** See Current Blockers item 9.
+- Three named layout fixes are load-bearing and easy to undo by accident: the Console's tier heads are laid out at zero width and filled to the tier (S10 — otherwise a head with a lock note steals 170 px from the Outputs strips and the canvas clips the Phones levels); the Lighting palette tile puts its keys on a second row (S11 — otherwise the name column collapses to 20 px and no palette shows its name); and the sends row folds to 2 × 2 when its card is narrow (S11 — otherwise `PRE FADER` loses its R at 1920).
+- The eight Lighting components the cluster replaced were deleted in S11, but `LightingRail.module.css` **stays** — six live components still compose from it. The same trap caught the Console's `AudioRail.module.css` before it.
+- `docs/redesign/` holds the whole design pass: the brief, the review, the five Console concepts, the three-viewport study, the polish pass and the system sheet. It is the record of _why_, and it is not source material for new work — the system doc and the plan are.
 
 ### 2026-09 audit remediation (Slices 0-13)
 

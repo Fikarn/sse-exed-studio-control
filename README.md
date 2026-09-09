@@ -61,6 +61,16 @@ Operator support details live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## Product Surface
 
+Every workspace reads as one instrument. The shell is the same on all four —
+header, a fixed cluster down the left that says what the subsystem is and carries
+the take-time keys, the bay in the middle, the plate on the right showing the
+whole selected thing at once, and one footer along the bottom. Nothing scrolls
+during normal operation, and the front-end never shows a state the engine has not
+reported. The visual system is specified in
+[docs/redesign/system-a-2026-09.md](docs/redesign/system-a-2026-09.md) and
+measured on every board by the UI contract — see
+[docs/DEVELOPMENT.md §2c](docs/DEVELOPMENT.md).
+
 ### Planning
 
 - dense Kanban workspace for always-visible production tracking
@@ -69,9 +79,9 @@ Operator support details live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ### Lighting
 
-- fixture control for the current studio lighting rig
-- compact grid/list operator views plus a polished 2D studio plot
-- DMX status visibility, scenes, grouping, and live spatial editing
+- fixture control for the current studio lighting rig over sACN
+- a backlit 2D studio plot as the bay, with the rig's state and the take-time keys in the cluster beside it
+- DMX status visibility, scenes, groups, palettes, and live spatial editing
 
 ### Audio
 
@@ -108,6 +118,9 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/RELEASE.md](docs/RELEASE.md): versioning, tagging, installers, and release flow
 - [docs/OPERATOR_WORKSTATION_ROLLOUT.md](docs/OPERATOR_WORKSTATION_ROLLOUT.md): final published-installer verification on the intended studio workstation
 - [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
+- [docs/redesign/system-a-2026-09.md](docs/redesign/system-a-2026-09.md): the visual system every operator surface is built to, and the measures that enforce it
+- [docs/plans/visual-overhaul-a-2026-09.md](docs/plans/visual-overhaul-a-2026-09.md): the thirteen-slice record of how it was implemented
+- [docs/plans/audit-remediation-2026-09.md](docs/plans/audit-remediation-2026-09.md): the thirteen-slice record of the 2026-09 truthfulness remediation
 - [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
 - [docs/archive/FRONTEND_CUTOVER_PLAN.md](docs/archive/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
 - [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md): completed Checkpoint D impact audit and safe Qt fallback retirement sequence

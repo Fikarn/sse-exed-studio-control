@@ -202,6 +202,109 @@ Reference docs:
 - Apple high-resolution rendering model: <https://developer.apple.com/library/archive/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Explained/Explained.html>
 - BetterDisplay flexible scaling and virtual-screen workflow: <https://github.com/waydabber/BetterDisplay/wiki/Fully-scalable-HiDPI-desktop>
 
+### 2c. The UI contract (visual overhaul A)
+
+Every operator surface is built to one written visual system, and that system is
+measured rather than reviewed by eye. If you change anything the operator sees,
+this is the lane that tells you whether you broke it.
+
+**The system** is `docs/redesign/system-a-2026-09.md` — the cluster rule (header ·
+cluster · bay · plate · footer), five elevation levels, four role hues, a 9-step
+type scale with a 12 px floor, four radii, the motion policy, and §10's measures.
+`docs/plans/visual-overhaul-a-2026-09.md` is the implementation record: thirteen
+slices, each with a Status line saying what landed, what moved, and what was
+deliberately left. Read the slice status before changing a surface it names — it
+usually explains why something is the way it is.
+
+**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 81 boards —
+27 fixtures × 3 themes at 2560×1440 — plus the Storybook primitive pages, and
+measures each one: type floor and distinct sizes, font families, pixel-sampled
+text contrast, pointer-target size, radii, shadows and blur, gradients, running
+animations at idle, chrome heights, page scroll, targets off the viewport, and a
+forbidden-word scan of the rendered copy. Each board's numbers are ratcheted in
+`frontend/app/tests/ui-contract.ratchets.json`: a measure may fall, never rise.
+
+```bash
+# from frontend/app — measures every board and writes the report + artifacts
+node scripts/ui-census.mjs
+
+# same, and re-seeds the ratchets from what it measured
+node scripts/ui-census.mjs --write-ratchets
+```
+
+The census takes about four minutes. It writes per-board JSON to
+`artifacts/ui-census/*.json` (untracked) with the offenders named, not just
+counted — `outerBlurOver8UnlitEls`, `gradientsOffEls`, `backdropBlurEls`,
+`runningEls` — plus `artifacts/ui-census/census.md` and `contrast.md`. Read those
+lists when a measure is non-zero; the counts alone will not tell you which
+element is wrong.
+
+Re-seed the ratchets only after you have looked at the diff. `git diff` on
+`ui-contract.ratchets.json` is the "numbers that moved" report, and the rule is
+that nothing rises. To check that mechanically:
+
+```bash
+git diff --stat frontend/app/tests/ui-contract.ratchets.json
+```
+
+**Three sibling gates** run outside the census:
+
+```bash
+node scripts/check-operator-copy.mjs                 # repo root — forbidden words in operator copy
+npm run test --workspace @sse/design-system          # incl. the CSS-literal allowlist test
+```
+
+- `scripts/check-operator-copy.mjs` (repo root, **not** `frontend/app/scripts/`)
+  scans source for words that must never reach the operator — "engine",
+  "backend", "transport", "IPC", "snapshot" outside the Console's scene
+  primitive, and a raw `AUDIO_*` code leading a sentence. It holds at 0.
+- `src/__tests__/css-literals.test.ts` in `frontend/packages/design-system`
+  counts raw literals per stylesheet against an allowlist that may only shrink.
+  A `box-shadow` whose value does not start with `var(` counts as a literal even
+  when its colour is a token, and so does a raw `999px` radius — use
+  `var(--radius-pill)`. Re-seed with
+  `UPDATE_CSS_LITERALS=1 npx vitest run src/__tests__/css-literals.test.ts`.
+- `themes.contrast.test.ts` in `frontend/packages/tokens` checks the role and
+  display inks at the token layer, in all three themes, before anything renders.
+
+**Traps that have cost real time here:**
+
+- Playwright serves `frontend/app/dist`. Run `npm run build --workspace @sse/frontend-app`
+  before any Playwright command or you will test the previous build. The
+  Storybook lanes read `storybook-static` the same way.
+- Never run `npm run frontend:storybook:build` while a Playwright run is in
+  flight — the Storybook contract boards 404 mid-run and seven `ui-contract`
+  tests fail for no reason.
+- Raising a type size breaks layouts written for the old one, and only
+  measurement finds it. Slice 11's 9.5 → 12 px raise silently pushed all 38 dBFS
+  meter marks off the meters and clipped `PRE FADER` on the 1920 fallback. After
+  a type change, re-run the workspace spec and sweep every leaf text node for
+  `range.width > content width` on each fixture at 2560 and at 1920.
+- To give a control a 24 px pointer target without moving the layout, grow the
+  element and pay it back with a matching negative margin, painting the visible
+  part on `::before`. `ScrubSlider` and `ScrubLabel` are the worked examples.
+- Style Dictionary emits kebab-case. A stylesheet asking for
+  `--size-compactControlHeight` silently gets nothing; the name is
+  `--size-compact-control-height`.
+- `tests/audio-render-budget.spec.ts`, `shell.spec.ts:95` and
+  `audio.spec.ts:1054` are timing-sensitive and flake under full-suite parallel
+  load. They pass in isolation — re-run before treating one as a real failure.
+
+**Fixtures.** Every board is a fixture id from
+`frontend/packages/test-fixtures/src/fixtures.json`, and any of them opens in the
+browser at `/?fixture=<id>&transport=fixture` (add `&theme=graphite|bone` and
+`&operatorReview=studio`). That URL against a preview server is the fastest way to
+look at a state by hand — no engine, no Tauri shell:
+
+```bash
+npm run build --workspace @sse/frontend-app
+npm run preview --workspace @sse/frontend-app -- --host 127.0.0.1 --port 4180 --strictPort
+# then http://127.0.0.1:4180/?fixture=lighting-populated&transport=fixture
+```
+
+Use a port other than `4173`: Playwright binds that one with `--strictPort` and
+will fail to start if you are holding it.
+
 ### 3. Implement in small batches
 
 Prefer scoped, reviewable changes over sweeping rewrites. For larger work, break it into: analysis + plan, first implementation slice, validation, follow-up polish.
