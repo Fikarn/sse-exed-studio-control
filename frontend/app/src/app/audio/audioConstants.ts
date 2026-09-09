@@ -36,7 +36,10 @@ export const AUDIO_COMPACT_DENSITY_MAX_WIDTH = 2200;
 // Why: rail prototype monitor level used as fallback when no draft/value is
 // present for the selected mix target's volume. Expressed in dBFS, converted
 // via `faderDbToNormalized` at the call site.
-// Source: previously inline at AudioRail.tsx:21.
+// Source: previously inline at AudioRail.tsx:21 — that file was deleted on
+// 2026-09-09 with the GS-AUD-44 dead-code posture, and it was this constant's
+// only production consumer. Kept because audio-constants.spec.ts pins the
+// value; drop both together if no Console surface reclaims it.
 export const PROTOTYPE_MONITOR_LEVEL_DB = -12;
 
 // Why: snapshot thumbnail mini-meter visualisation density. 12 vertical bars

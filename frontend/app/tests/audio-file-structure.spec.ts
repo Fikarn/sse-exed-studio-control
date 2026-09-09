@@ -41,14 +41,22 @@ const EXPECTED_HOOK_FILES = [
 // and the snapshot deck became the cluster's snapshot keys. The rule the list
 // guards is unchanged — every Console component keeps its own stylesheet, so
 // the workspace shell module cannot grow back.
+//
+// 2026-09-09. Old: the list also named AudioRail.module.css and
+// AudioToolbar.module.css. New: both are gone. Reason: those two sheets belonged
+// to the unmounted AudioRail / AudioToolbar hosts kept under the Phase-2
+// GS-AUD-44 dead-code posture. That posture was closed and the hosts deleted —
+// the surface they were preserved to revert to (AudioTopBar + AudioMonitorBar)
+// was itself removed in Slice 4a, so there was nothing left to re-mount. The
+// one class AudioLiveMeterReadout borrowed from the rail sheet (.masterHalo, a
+// passthrough compose) moved into AudioLiveMeterReadout.module.css. The rule
+// the list guards is unchanged; it just no longer guards dead sheets.
 const EXPECTED_PER_COMPONENT_CSS_MODULES = [
   "frontend/app/src/app/audio/components/AudioCluster.module.css",
   "frontend/app/src/app/audio/components/AudioInspector.module.css",
   "frontend/app/src/app/audio/components/AudioMixerLane.module.css",
-  "frontend/app/src/app/audio/components/AudioRail.module.css",
   "frontend/app/src/app/audio/components/AudioSignalCanvas.module.css",
   "frontend/app/src/app/audio/components/AudioSnapshotKeys.module.css",
-  "frontend/app/src/app/audio/components/AudioToolbar.module.css",
 ];
 
 const EXPECTED_AUDIO_SHARED_MODULES = [

@@ -82,10 +82,12 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
     page.locator('[data-testid="audio-tier-lanes-software-playback"] [data-testid^="audio-strip-"]')
   ).toHaveCount(6);
   // 2026-05-27 redesign: a single amber accent (#f5a524) replaces the
-  // per-output cyan (#5dc5e8). --audio-accent now resolves to --accent for
-  // every output role.
+  // per-output cyan (#5dc5e8). Read via the canonical --accent since
+  // 2026-09-09: --audio-accent was a plain `var(--accent)` alias kept for the
+  // dead AudioRail / AudioToolbar hosts, and went when they did. Same value,
+  // same guarded fact, now read from the source of truth.
   await expect
-    .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--audio-accent").trim()))
+    .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim()))
     .toBe("#f5a524");
   await expect(workspace.getByText("Main Out").first()).toBeVisible();
   await expect(page.getByTestId("audio-signal-canvas")).toBeVisible();
@@ -101,8 +103,11 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-health-bar")).toBeVisible();
   await expectAudioWorkspaceGeometry(page);
   // 2026-05-27 redesign: the decorative master-halo glow lived on the rail
-  // monitor card (AudioRail.tsx), now dead code — the top bar + monitor bar
-  // replaced the rail, so the halo no longer renders.
+  // monitor card (AudioRail.tsx), which the top bar + monitor bar replaced, so
+  // the halo stopped rendering. AudioRail.tsx itself was deleted on 2026-09-09
+  // when the GS-AUD-44 dead-code posture closed; its sole importer gone, the
+  // AudioLiveMasterHalo component in AudioLiveMeterReadout.tsx is now unused,
+  // so this count stays 0 for a second reason.
   await expect(page.getByTestId("audio-master-halo")).toHaveCount(0);
   await expect(page.getByTestId("audio-routing-overlay")).toHaveCount(0);
   // GS-AUD-45 (now 2026-05-27 redesign): OSC / Metering live in the
@@ -201,9 +206,13 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
   await expect(workspace).toHaveAttribute("data-output-role", "phones-a");
   // 2026-05-27 redesign: per-output accents collapsed to the single amber
-  // accent; phones-a no longer recolours --audio-accent to #e8a341.
+  // accent; phones-a no longer recolours the accent to #e8a341. Asserted on
+  // --accent since 2026-09-09 (see the note at the first check); the
+  // [data-output-role] rule that re-declared --audio-accent for phones-a/-b
+  // was deleted with the dead hosts, so this is the guard that keeps the
+  // "one accent for every output role" decision honest.
   await expect
-    .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--audio-accent").trim()))
+    .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim()))
     .toBe("#f5a524");
   await expect(page.getByTestId("audio-hardware-outputs-tier")).toContainText("Phones 1");
   await page.getByTestId("audio-output-audio-mix-main").click();

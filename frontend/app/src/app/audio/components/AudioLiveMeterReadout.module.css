@@ -54,3 +54,13 @@
   font-style: normal;
   text-align: center;
 }
+
+/* AudioLiveMasterHalo's glow ring. The geometry stays defined once on the
+   shell (it reads .audioShell's --accent / --master-glow), so this is a
+   passthrough compose. It previously reached the shell through
+   AudioRail.module.css; that sheet was deleted with its host when the
+   GS-AUD-44 dead-code posture closed, so the compose points at the shell
+   directly. */
+.masterHalo {
+  composes: masterHalo from "../AudioWorkspace.module.css";
+}

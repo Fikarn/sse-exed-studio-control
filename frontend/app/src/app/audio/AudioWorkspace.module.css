@@ -5,9 +5,13 @@
    Design prototype the operator wants implemented). The canonical set
    (--bg/--fg/--accent/--line + families) is the single source of truth; C07
    (2026-06-02) migrated every live module CSS onto it and pruned the legacy
-   --audio-* and --color-* fork down to the handful of aliases still read by the
-   dead AudioRail/AudioToolbar hosts and the canvas meter overlay — see the
-   alias block below. The Phase 3 "locked" broadcast palette (talkback green,
+   --audio-* and --color-* fork. The last twelve pure aliases were read only by
+   the dead AudioRail/AudioToolbar hosts and died with them on 2026-09-09; what
+   survives is three real tokens (--audio-clip for the canvas meter overlay,
+   --audio-caption-muted, --audio-type-micro) — see the block below. The former
+   --audio-accent output-role override went too: it existed only for those
+   hosts, since the Console routes every accent through --accent.
+   The Phase 3 "locked" broadcast palette (talkback green,
    group ochres, warn yellow) is intentionally retired per the 2026-05-27
    redesign decision.
 */
@@ -118,25 +122,21 @@
      Graphite / Bone — no per-theme override needed. */
   --control-disabled-opacity: 0.7;
 
-  /* ── Legacy --audio-* / --color-* aliases ──────────────────────────────────
-     C07 (2026-06-02): the redesign's canonical set (--bg/--fg/--accent/--line
-     + families) is now the single source of truth. Every LIVE module CSS reads
-     the canonical tokens directly; the bridge below is the residue kept for two
-     reasons: (a) the two intentionally-dead, unmounted hosts — AudioRail and
-     AudioToolbar (preserved per the Phase-2 GS-AUD-44 dead-code posture) — still
-     read several of these names, and (b) --audio-clip is read by NAME at runtime
-     by AudioMeterCanvasOverlay (getComputedStyle) to paint the canvas clip cap,
-     so it must keep resolving even though the static CSS now reads --danger.
-     When either dead host is ever re-mounted, migrate its tokens to the
-     canonical names and delete the matching alias here.
+  /* ── Surviving --audio-* semantic tokens ───────────────────────────────────
+     C07 (2026-06-02) pruned the legacy --audio-* / --color-* fork down to the
+     names that still had a consumer. Two of the three reasons it cited are now
+     gone: the intentionally-dead, unmounted AudioRail and AudioToolbar hosts
+     (the Phase-2 GS-AUD-44 dead-code posture) were deleted on 2026-09-09, and
+     the twelve pure aliases only they read went with them — the six --audio-*
+     (panel, border, accent, hot, talk, engaged-fill) and the six .audioShell
+     --color-* overrides (surface-900/800/700, text-strong/muted/subtle). The
+     --color-* names still resolve app-wide from :root in the generated tokens,
+     which is where the portaled AudioTextDialog always read them from; only
+     the audio-scoped overrides are gone.
 
-     The rest of the legacy fork (all the --audio-text-*, --audio-panel-*,
-     --audio-warn-*, --color-*-500 etc. that the redesign no longer reads) was
-     removed once its last live consumer was migrated; only the names below still
-     have a consumer. These are verified 1:1 with the canonical tokens, so the
-     dead hosts + canvas render identically and re-theme automatically. */
-  --audio-panel: var(--bg-1);
-  --audio-border: var(--line);
+     What remains below is not alias residue — each is a real token with live
+     consumers, so this block is no longer a bridge to be dismantled. */
+
   /* Runtime-read by AudioMeterCanvasOverlay.readColors() — keep aliased even
      though no static CSS consumer remains (the meter overlay reads it by name
      via getComputedStyle, with #ff4b4b only as a hard fallback). */
@@ -152,16 +152,6 @@
      at 8 / 8.5 / 9 px (font-size-4xs, -4xs-plus, -3xs) reads this token, so
      nothing in the Console renders below 9.5 px (audio-legibility.spec.ts). */
   --audio-type-micro: var(--font-size-3xs-plus);
-  --audio-accent: var(--accent);
-  --audio-hot: var(--accent);
-  --audio-talk: var(--accent);
-  --audio-engaged-fill: var(--accent);
-  --color-surface-900: var(--bg);
-  --color-surface-800: var(--bg-1);
-  --color-surface-700: var(--bg-2);
-  --color-text-strong: var(--fg);
-  --color-text-muted: var(--fg-3);
-  --color-text-subtle: var(--fg-4);
 
   display: grid;
   /* C11 (2026-06-02): make the shell rows explicit. The persistent chrome is
@@ -194,13 +184,6 @@
    which `data-audio-theme` mirrors), so the private theme blocks that lived
    here are gone and the Console renders pixel-identically from tokens. Slice 4
    moves it onto the role tokens; Slice 11 removes the family. */
-
-/* Output-role accent overrides — kept for any consumer that still reads
-   --audio-accent, but the Console design routes everything through --accent. */
-.audioShell[data-output-role="phones-a"],
-.audioShell[data-output-role="phones-b"] {
-  --audio-accent: var(--accent);
-}
 
 .eyebrow {
   color: var(--fg-3);

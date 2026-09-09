@@ -65,12 +65,6 @@
     "radius": 0,
     "shadow": 1
   },
-  "app/src/app/audio/components/AudioRail.module.css": {
-    "colour": 3,
-    "fontSize": 4,
-    "radius": 10,
-    "shadow": 3
-  },
   "app/src/app/audio/components/AudioSignalCanvas.module.css": {
     "colour": 1,
     "fontSize": 0,
@@ -93,12 +87,6 @@
     "colour": 0,
     "fontSize": 0,
     "radius": 1,
-    "shadow": 0
-  },
-  "app/src/app/audio/components/AudioToolbar.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 5,
     "shadow": 0
   },
   "app/src/app/lighting/LightingWorkspace.module.css": {
