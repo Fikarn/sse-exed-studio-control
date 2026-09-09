@@ -21,8 +21,8 @@
   width: 1px;
   background: var(--color-bg-stroke);
   transition:
-    background var(--motion-duration-fast) ease,
-    width var(--motion-duration-fast) ease;
+    background var(--motion-duration-exit) ease,
+    width var(--motion-duration-exit) ease;
 }
 
 .resizer:hover::before,
@@ -35,12 +35,12 @@
   position: relative;
   width: 2px;
   height: 32px;
-  border-radius: 1px;
+  border-radius: var(--radius-ctl);
   background: var(--color-bg-border);
   opacity: 0;
   transition:
-    opacity var(--motion-duration-fast) ease,
-    background var(--motion-duration-fast) ease;
+    opacity var(--motion-duration-exit) ease,
+    background var(--motion-duration-exit) ease;
   pointer-events: none;
 }
 

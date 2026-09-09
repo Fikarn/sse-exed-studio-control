@@ -218,11 +218,11 @@ export function planningStatusTone(status: string): StatusTone {
     case "blocked":
       return "error";
     case "done":
-      return "healthy";
+      return "ok";
     case "in-progress":
-      return "connected";
+      return "ok";
     default:
-      return "idle";
+      return "neutral";
   }
 }
 

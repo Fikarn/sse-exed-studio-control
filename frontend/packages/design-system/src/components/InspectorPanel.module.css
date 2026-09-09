@@ -34,7 +34,7 @@
 
   .title {
     color: var(--color-studio-050);
-    font: var(--font-weight-semibold) var(--operator-font-size-title-sm, var(--font-size-lg)) / 1.2
+    font: var(--font-weight-semibold) var(--operator-font-size-title-sm, var(--font-size-value)) / 1.2
       var(--font-family-display);
     letter-spacing: 0;
     overflow: hidden;
@@ -59,7 +59,7 @@
 
   .section {
     border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-key);
     display: grid;
     gap: var(--space-3);
     padding: var(--space-5);
@@ -67,7 +67,7 @@
 
   .sectionTitle {
     color: var(--color-studio-200);
-    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-mono);
+    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-tick)) / 1.2 var(--font-family-mono);
     letter-spacing: 0;
     text-transform: uppercase;
   }

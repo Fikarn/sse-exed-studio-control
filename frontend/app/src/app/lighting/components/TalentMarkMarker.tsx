@@ -190,7 +190,7 @@ export function TalentMarkMarker({ depthCm, mark, onPositionCommit, widthCm }: T
           x={0}
           y={31}
           textAnchor="middle"
-          fontSize={8.5}
+          fontSize={12}
           fontWeight={700}
           letterSpacing={0}
           pointerEvents="none"
@@ -217,7 +217,7 @@ export function TalentMarkMarker({ depthCm, mark, onPositionCommit, widthCm }: T
             x={ghost.x + 47}
             y={ghost.y - 19}
             textAnchor="middle"
-            fontSize={10}
+            fontSize={12}
             fontWeight={600}
             style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
           >

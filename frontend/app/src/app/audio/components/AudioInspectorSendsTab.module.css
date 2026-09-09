@@ -16,7 +16,7 @@
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   background: var(--bg-2);
 }
 
@@ -44,7 +44,7 @@
 
 .sendCardTag {
   color: var(--fg-3);
-  font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -55,7 +55,7 @@
   gap: 6px;
   align-items: center;
   color: var(--fg-3);
-  font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
 }
 
@@ -73,7 +73,9 @@
 .sendCardValue {
   justify-self: end;
   color: var(--fg);
-  font: var(--font-weight-semibold) var(--font-size-xl-tight) / 1 var(--font-family-mono);
+  /* Slice 11: 18 px is not a step on the A scale (system §3); a value reads
+     at the value step. */
+  font: var(--font-weight-semibold) var(--font-size-value) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -83,10 +85,16 @@
   margin-top: 12px;
 }
 
+/* Visual overhaul A, Slice 11: four keys in a row was written for 10 px caps.
+   At the 12 px floor `PRE FADER` needs 65 px of its own, and on the fallback
+   surface — where the sends sit two cards to a row, so a card is about 170 px —
+   four columns gave each key 37 px and cut the R off `FADER`. The row folds to
+   2 × 2 when it cannot hold four, which gives a folded cap 55 px for a 36 px
+   word. At 2560 the card holds all four on one line and nothing moves. */
 .sendModeRow {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
   gap: 5px;
 }
 
@@ -96,7 +104,7 @@
   border-radius: var(--radius-key);
   background: color-mix(in srgb, var(--bg-1) 78%, transparent);
   color: var(--fg-3);
-  font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
   cursor: pointer;
@@ -122,7 +130,7 @@
   border-radius: var(--radius-key);
   background: color-mix(in srgb, var(--bg-1) 76%, transparent);
   color: var(--fg-3);
-  font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;
   text-transform: uppercase;

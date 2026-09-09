@@ -41,30 +41,31 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
   ] as const;
   const currentIndex = stages.indexOf(lifecycle as (typeof stages)[number]);
   // STA-08: reserve the success-green tone for the fully-ready lifecycle.
-  // Mid-boot, reached steps read as neutral "connected", not "healthy" green,
-  // so an in-progress boot no longer paints predominantly green.
-  const reachedTone: StatusTone = lifecycle === "ready" ? "healthy" : "connected";
+  // Mid-boot, reached steps read as neutral, not healthy green, so an
+  // in-progress boot no longer paints predominantly green. Slice 11: the
+  // shared vocabulary, so the surfaces no longer translate at the call site.
+  const reachedTone: StatusTone = lifecycle === "ready" ? "ok" : "info";
 
   return [
     {
       description: "Start the part of Studio Control that talks to the desk, the rig and the deck.",
       label: "Start up",
-      tone: currentIndex >= 0 ? reachedTone : "idle",
+      tone: currentIndex >= 0 ? reachedTone : "neutral",
     },
     {
       description: "Wait for Studio Control to confirm both halves of this install are the same version.",
       label: "Handshake",
-      tone: currentIndex >= 1 ? reachedTone : "idle",
+      tone: currentIndex >= 1 ? reachedTone : "neutral",
     },
     {
       description: "Load what the desk, the rig and the deck report about themselves.",
       label: "Health",
-      tone: currentIndex >= 2 ? reachedTone : "idle",
+      tone: currentIndex >= 2 ? reachedTone : "neutral",
     },
     {
       description: "Load where you were and whether commissioning has published.",
       label: "Workspaces",
-      tone: currentIndex >= 3 ? reachedTone : "idle",
+      tone: currentIndex >= 3 ? reachedTone : "neutral",
     },
   ];
 }
@@ -72,7 +73,7 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
 // Human label for a startup-step tone (STA-09) — the raw StatusTone enum
 // ("connected"/"idle") must not surface as operator-facing badge text.
 export function stepStatusLabel(tone: StatusTone): string {
-  return tone === "idle" ? "Pending" : "Done";
+  return tone === "neutral" ? "Pending" : "Done";
 }
 
 // Short, human-readable failure-code label for the recovery badges (COPY-04),
@@ -169,12 +170,12 @@ export function formatPathLabel(key: string) {
 
 export function feedbackBadgeTone(tone: FeedbackTone): StatusTone {
   if (tone === "ok") {
-    return "healthy";
+    return "ok";
   }
 
   if (tone === "error") {
     return "error";
   }
 
-  return "idle";
+  return "neutral";
 }

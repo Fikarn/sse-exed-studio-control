@@ -29,7 +29,7 @@ export function PatchAddressTag({ centerX, centerY, dmxStartAddress }: PatchAddr
       <text
         x={0}
         y={padY - 1}
-        fontSize={11}
+        fontSize={12}
         fontWeight={600}
         textAnchor="middle"
         style={{

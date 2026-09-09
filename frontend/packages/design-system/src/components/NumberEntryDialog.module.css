@@ -11,7 +11,7 @@
 .form label,
 .form small {
   color: var(--color-text-muted);
-  font: var(--font-weight-semibold) 10px / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }

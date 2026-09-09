@@ -49,7 +49,7 @@
   background: transparent;
   padding: 10px 14px;
   font-family: var(--font-ui);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-tick);
   font-weight: 500;
   letter-spacing: -0.005em;
   color: var(--fg-3);
@@ -130,14 +130,14 @@
 .emptyInspector h3 {
   margin: 0;
   color: var(--fg);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-body);
   font-weight: 600;
   letter-spacing: -0.005em;
 }
 
 .emptyInspector p {
   margin: 0;
-  font-size: var(--font-size-md-tight);
+  font-size: var(--font-size-label);
   line-height: 1.5;
   max-width: 280px;
   color: var(--fg-3);
@@ -150,7 +150,7 @@
   height: 46px;
   margin-bottom: 2px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   background: var(--bg-2);
   color: var(--fg-3);
 }
@@ -163,7 +163,7 @@
   justify-content: space-between;
   gap: 12px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-tick);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);
@@ -205,7 +205,7 @@
 
 .inspectorSubtitle {
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-tick);
   color: var(--fg-3);
 }
 
@@ -219,7 +219,7 @@
 .inspectorStickyHardwareCard {
   padding: 22px 16px 20px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   background: radial-gradient(
     120% 80% at 50% 0%,
     color-mix(in oklch, var(--accent) 6%, var(--bg-2)) 0%,
@@ -233,7 +233,7 @@
 .inspectorStickyHardwareCard .eyebrow {
   color: var(--fg-3);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-tick);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   /* Claude Design polish (DP4): this sticky-hardware card was the only
@@ -301,7 +301,7 @@
   border: 1px solid var(--line);
   color: var(--fg-2);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs-plus);
+  font-size: var(--font-size-tick);
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -311,9 +311,9 @@
   gap: 5px;
   cursor: pointer;
   transition:
-    background var(--motion-duration-fast) var(--easing),
-    color var(--motion-duration-fast) var(--easing),
-    border-color var(--motion-duration-fast) var(--easing);
+    background var(--motion-duration-exit) var(--easing),
+    color var(--motion-duration-exit) var(--easing),
+    border-color var(--motion-duration-exit) var(--easing);
   white-space: nowrap;
 }
 
@@ -325,8 +325,8 @@
   background: var(--fg-4);
   flex-shrink: 0;
   transition:
-    background var(--motion-duration-fast) var(--easing),
-    box-shadow var(--motion-duration-fast) var(--easing);
+    background var(--motion-duration-exit) var(--easing),
+    box-shadow var(--motion-duration-exit) var(--easing);
 }
 
 .unsupportedToggleRow > button:hover:not(:disabled) {
@@ -379,18 +379,18 @@
   border: 1px dashed var(--line-2);
   color: var(--fg-2);
   font-family: var(--font-ui);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-tick);
 }
 
 .unavailableTelemetry strong {
   color: var(--fg);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-tick);
   font-weight: 600;
 }
 
 .unavailableTelemetry span {
   color: var(--fg-3);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-tick);
   line-height: 1.4;
 }
 
@@ -405,7 +405,7 @@
   flex-direction: column;
   gap: 2px;
   padding: 8px;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   background: var(--bg-2);
   border: 1px solid var(--line);
 }
@@ -420,7 +420,7 @@
 
 .detailGrid strong {
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-tick);
   font-weight: 500;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
@@ -432,7 +432,7 @@
 .sourceCard {
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -442,7 +442,7 @@
 .inspectorMiniCard .eyebrow,
 .sourceCard .eyebrow {
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-tick);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);
@@ -450,7 +450,7 @@
 
 .inspectorMiniCard strong,
 .sourceCard strong {
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-body);
   font-weight: 600;
   color: var(--fg);
   letter-spacing: -0.01em;
@@ -459,7 +459,7 @@
 .inspectorMiniCard span:not([class]),
 .sourceCard span:not([class]) {
   color: var(--fg-2);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-tick);
   line-height: 1.4;
 }
 
@@ -503,7 +503,7 @@
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   background: var(--bg-2);
 }
 
@@ -513,7 +513,7 @@
   justify-content: space-between;
   gap: 12px;
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-tick);
   color: var(--fg-3);
 }
 
@@ -556,7 +556,7 @@
   background: var(--bg-3);
   border: 1px solid var(--line);
   font-family: var(--font-mono);
-  font-size: var(--font-size-2xs-plus);
+  font-size: var(--font-size-tick);
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -564,9 +564,9 @@
   align-items: center;
   justify-content: center;
   transition:
-    background var(--motion-duration-fast) var(--easing),
-    color var(--motion-duration-fast) var(--easing),
-    border-color var(--motion-duration-fast) var(--easing);
+    background var(--motion-duration-exit) var(--easing),
+    color var(--motion-duration-exit) var(--easing),
+    border-color var(--motion-duration-exit) var(--easing);
   white-space: nowrap;
 }
 
@@ -617,14 +617,14 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px 16px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   border: 1px dashed var(--line-2);
   background: var(--bg-2);
 }
 
 .preampTabHint p {
   margin: 0;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-tick);
   line-height: 1.4;
   color: var(--fg-3);
 }
@@ -661,7 +661,7 @@
 .eqPreviewCard [data-eq-preview-point] {
   width: 18px;
   height: 18px;
-  font-size: var(--font-size-5xs);
+  font-size: var(--font-size-tick);
   cursor: default;
   pointer-events: none;
 }
@@ -675,7 +675,7 @@
 }
 
 .eqPreviewCard [data-eq-preview-badge] strong {
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-tick);
 }
 
 .eqPreviewCard [data-eq-preview-badge] span {
@@ -709,6 +709,15 @@
   gap: 4px;
 }
 
+/* Slice 11: the band keys carry no class of their own, so they were sized by
+   the user agent — 21 px across for a one-character cap, under the 24 px target
+   floor (system §10). Only the floor is set here; what they look like is
+   `.eqTypeRow`'s question, and it is not this slice's. */
+.eqBandRow button {
+  min-width: 24px;
+  min-height: 24px;
+}
+
 /* ── Channel meter card (audio-inspector-metering) ─────────────────────────
    2026-05-27 redesign follow-up: the `.bigMeter*` rules were dropped when the
    inspector CSS was rewritten, so the card lost its 2-column layout and the
@@ -722,7 +731,7 @@
   gap: 10px;
   padding: 10px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   background: var(--bg-2);
 }
 
@@ -745,7 +754,7 @@
   min-height: 12px;
   padding: 0;
   color: var(--accent);
-  font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -774,7 +783,7 @@
 .bigMeterRow small,
 .bigMeterReferenceRow small {
   color: var(--fg-3);
-  font: var(--font-weight-medium) var(--font-size-2xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -784,14 +793,14 @@
   align-items: baseline;
   min-width: 0;
   color: var(--fg);
-  font: var(--font-weight-semibold) var(--font-size-lg-tight) / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-name) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .bigMeterReferenceRow strong {
   color: var(--fg-2);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
 }
 
 .bigMeterRow strong[data-tone="warn"] {

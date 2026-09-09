@@ -31,17 +31,26 @@
 .root,
 :global(body[data-operator-scale-host]) {
   --operator-ui-scale-factor: 1;
-  --operator-font-size-2xs: calc(9px * var(--operator-ui-scale-factor));
-  --operator-font-size-xs: calc(10px * var(--operator-ui-scale-factor));
-  --operator-font-size-sm: calc(11px * var(--operator-ui-scale-factor));
-  --operator-font-size-md: calc(12px * var(--operator-ui-scale-factor));
-  --operator-font-size-lg: calc(13px * var(--operator-ui-scale-factor));
-  --operator-font-size-xl: calc(14px * var(--operator-ui-scale-factor));
-  --operator-font-size-title-sm: calc(16px * var(--operator-ui-scale-factor));
-  --operator-font-size-title-md: calc(18px * var(--operator-ui-scale-factor));
-  --operator-font-size-title-lg: calc(22px * var(--operator-ui-scale-factor));
-  --operator-font-size-title-xl: calc(34px * var(--operator-ui-scale-factor));
-  --operator-font-size-shell-title: calc(30px * var(--operator-ui-scale-factor));
+  /* Visual overhaul A, Slice 11: the operator ladder is the A type scale, scaled
+     by the operator's UI-scale setting. It used to run 9 · 10 · 11 · 12 · 13 ·
+     14 · 16 · 18 · 22 · 34 · 30, which put its bottom three rungs under system
+     §3's 12 px floor and its three title rungs off the scale entirely — and the
+     Console and Lighting read most of their small print off those rungs, which
+     is why those two surfaces were the only ones still measuring 8.5 and 9.5 px
+     against a floor of 12. The rungs are the scale's own steps now: tick 12,
+     label 13, body 14, value 16, word 20, state 24, hero-small 32. The names
+     stay so every call site keeps working. */
+  --operator-font-size-2xs: calc(var(--font-size-tick) * var(--operator-ui-scale-factor));
+  --operator-font-size-xs: calc(var(--font-size-tick) * var(--operator-ui-scale-factor));
+  --operator-font-size-sm: calc(var(--font-size-tick) * var(--operator-ui-scale-factor));
+  --operator-font-size-md: calc(var(--font-size-tick) * var(--operator-ui-scale-factor));
+  --operator-font-size-lg: calc(var(--font-size-label) * var(--operator-ui-scale-factor));
+  --operator-font-size-xl: calc(var(--font-size-body) * var(--operator-ui-scale-factor));
+  --operator-font-size-title-sm: calc(var(--font-size-value) * var(--operator-ui-scale-factor));
+  --operator-font-size-title-md: calc(var(--font-size-word) * var(--operator-ui-scale-factor));
+  --operator-font-size-title-lg: calc(var(--font-size-state) * var(--operator-ui-scale-factor));
+  --operator-font-size-title-xl: calc(var(--font-size-hero-small) * var(--operator-ui-scale-factor));
+  --operator-font-size-shell-title: calc(var(--font-size-hero-small) * var(--operator-ui-scale-factor));
   /* Visual overhaul A, Slice 2 (plan D4): the header is the chrome token, scaled. */
   --operator-shell-height: calc(var(--chrome-studio-header) * var(--operator-ui-scale-factor));
   /* Visual overhaul A, Slice 3: the A type scale under the operator UI scale. */
@@ -68,7 +77,8 @@
   --operator-stage-control-padding: calc(2px * var(--operator-ui-scale-factor));
   --operator-stage-control-height: calc(26px * var(--operator-ui-scale-factor));
   --operator-stage-control-button-width: calc(28px * var(--operator-ui-scale-factor));
-  --operator-stage-control-bookmark-width: calc(22px * var(--operator-ui-scale-factor));
+  /* Slice 11: 22 px was under the 24 px target floor (system §10). */
+  --operator-stage-control-bookmark-width: calc(24px * var(--operator-ui-scale-factor));
   --operator-stage-control-mode-width: calc(62px * var(--operator-ui-scale-factor));
   --operator-stage-control-zoom-width: calc(44px * var(--operator-ui-scale-factor));
   --operator-health-toggle-gap: calc(6px * var(--operator-ui-scale-factor));
@@ -207,7 +217,7 @@
   z-index: var(--z-overlay);
   padding: 8px 12px;
   border: 1px solid color-mix(in srgb, var(--color-brand-green) 72%, var(--color-bg-border));
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   background: color-mix(in srgb, var(--color-bg-raised) 96%, var(--color-brand-green-soft));
   /* Slice 9 (system §5): a badge is not a lamp, so it does not bloom. */
   box-shadow: var(--elevation-float);

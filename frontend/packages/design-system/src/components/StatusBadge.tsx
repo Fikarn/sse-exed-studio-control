@@ -1,29 +1,15 @@
 import type { SharedStatusTone } from "./statusTone";
 import styles from "./StatusBadge.module.css";
 
-// Visual overhaul A, Slice 3 (system §8): the badge is a keyline that
-// encloses a word — its tones are the shared state vocabulary
-// (ok · attention · error · info · neutral). The pre-A names stay as
-// aliases until Slice 11.
-export type StatusBadgeLegacyTone = "healthy" | "ready" | "connected" | "degraded" | "warning" | "idle";
-export type StatusTone = SharedStatusTone | StatusBadgeLegacyTone;
-
-const CANONICAL: Record<StatusTone, SharedStatusTone> = {
-  ok: "ok",
-  attention: "attention",
-  error: "error",
-  info: "info",
-  neutral: "neutral",
-  healthy: "ok",
-  ready: "ok",
-  connected: "ok",
-  degraded: "attention",
-  warning: "attention",
-  idle: "neutral",
-};
+// Visual overhaul A, Slice 3 (system §8): the badge is a keyline that encloses
+// a word, and its tones are the shared state vocabulary — ok · attention ·
+// error · info · neutral. Slice 11: the pre-A names (healthy, ready, connected,
+// degraded, warning, idle) were aliases for those five and are gone, along with
+// the map that folded them in; every caller speaks the vocabulary directly.
+export type StatusTone = SharedStatusTone;
 
 export function canonicalBadgeTone(tone: StatusTone): SharedStatusTone {
-  return CANONICAL[tone] ?? "neutral";
+  return tone;
 }
 
 export interface StatusBadgeProps {
@@ -32,9 +18,8 @@ export interface StatusBadgeProps {
 }
 
 export const StatusBadge = ({ label, tone }: StatusBadgeProps) => {
-  const canonical = canonicalBadgeTone(tone);
   return (
-    <span className={`${styles.badge} ${styles[canonical]} ${styles[tone]}`} data-tone={canonical}>
+    <span className={`${styles.badge} ${styles[tone]}`} data-tone={tone}>
       {label}
     </span>
   );

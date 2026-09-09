@@ -21,7 +21,6 @@ import type {
   PlanningTask as PlanningTaskSnapshot,
   ShellState,
 } from "@sse/engine-client";
-import type { StatusTone } from "@sse/design-system";
 // Runtime import through the asset-free subpath: the specs that import app
 // source through Playwright cannot load the package index (it carries the
 // crest PNG), so the shared tone map is reached without it.
@@ -238,19 +237,6 @@ export function asRecord(value: unknown): SnapshotRecord | null {
 
 export function asStatusTone(value: unknown, fallback: StatusToneLike = "info"): StatusToneLike {
   return value === "ok" || value === "attention" || value === "error" || value === "info" ? value : fallback;
-}
-
-export function mapStatusBadgeTone(status: StatusToneLike): StatusTone {
-  switch (status) {
-    case "ok":
-      return "healthy";
-    case "attention":
-      return "warning";
-    case "error":
-      return "error";
-    default:
-      return "idle";
-  }
 }
 
 // Human-readable label for a StatusToneLike enum, so the raw machine token

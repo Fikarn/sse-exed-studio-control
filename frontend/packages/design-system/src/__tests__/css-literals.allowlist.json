@@ -1,21 +1,9 @@
 {
   "app/src/app/OperatorLayoutProvider.module.css": {
-    "colour": 1,
+    "colour": 0,
     "fontSize": 2,
     "radius": 0,
     "shadow": 1
-  },
-  "app/src/app/OperatorShell.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 4
-  },
-  "app/src/app/audio/AudioWorkspace.module.css": {
-    "colour": 1,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 2
   },
   "app/src/app/audio/components/AudioArmCountdown.module.css": {
     "colour": 0,
@@ -48,10 +36,10 @@
     "shadow": 2
   },
   "app/src/app/audio/components/AudioInspectorEqTab.module.css": {
-    "colour": 7,
+    "colour": 6,
     "fontSize": 0,
     "radius": 1,
-    "shadow": 4
+    "shadow": 3
   },
   "app/src/app/audio/components/AudioKnob.module.css": {
     "colour": 0,
@@ -72,7 +60,7 @@
     "shadow": 0
   },
   "app/src/app/audio/components/AudioSliderControl.module.css": {
-    "colour": 13,
+    "colour": 12,
     "fontSize": 0,
     "radius": 7,
     "shadow": 9
@@ -90,10 +78,10 @@
     "shadow": 0
   },
   "app/src/app/lighting/LightingWorkspace.module.css": {
-    "colour": 2,
+    "colour": 0,
     "fontSize": 3,
     "radius": 0,
-    "shadow": 2
+    "shadow": 0
   },
   "app/src/app/lighting/components/ColumnResizer.module.css": {
     "colour": 0,
@@ -113,18 +101,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "app/src/app/lighting/components/LightingBridgeBanner.module.css": {
-    "colour": 2,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 0
-  },
-  "app/src/app/lighting/components/LightingHealthBar.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 1,
-    "shadow": 1
-  },
   "app/src/app/lighting/components/LightingInspector.module.css": {
     "colour": 2,
     "fontSize": 43,
@@ -132,22 +108,10 @@
     "shadow": 1
   },
   "app/src/app/lighting/components/LightingRail.module.css": {
-    "colour": 7,
+    "colour": 5,
     "fontSize": 21,
     "radius": 6,
-    "shadow": 8
-  },
-  "app/src/app/lighting/components/LightingToolbar.module.css": {
-    "colour": 1,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 3
-  },
-  "app/src/app/lighting/components/PreviewBanner.module.css": {
-    "colour": 0,
-    "fontSize": 2,
-    "radius": 0,
-    "shadow": 0
+    "shadow": 6
   },
   "app/src/app/lighting/components/RenameDialog.module.css": {
     "colour": 0,
@@ -171,13 +135,13 @@
     "colour": 0,
     "fontSize": 0,
     "radius": 0,
-    "shadow": 11
+    "shadow": 7
   },
   "app/src/app/setup/SetupSupportPilot.module.css": {
     "colour": 0,
     "fontSize": 0,
     "radius": 1,
-    "shadow": 5
+    "shadow": 3
   },
   "app/src/app/shared/ShortcutOverlay.module.css": {
     "colour": 0,
@@ -231,7 +195,7 @@
     "colour": 0,
     "fontSize": 1,
     "radius": 1,
-    "shadow": 1
+    "shadow": 0
   },
   "packages/design-system/src/components/NumberEntryDialog.module.css": {
     "colour": 0,
@@ -249,7 +213,7 @@
     "colour": 0,
     "fontSize": 0,
     "radius": 1,
-    "shadow": 4
+    "shadow": 0
   },
   "packages/design-system/src/components/ScrubSlider.module.css": {
     "colour": 0,
@@ -276,10 +240,10 @@
     "shadow": 1
   },
   "packages/design-system/src/components/Surface.module.css": {
-    "colour": 10,
+    "colour": 8,
     "fontSize": 0,
     "radius": 0,
-    "shadow": 1
+    "shadow": 0
   },
   "packages/design-system/src/components/Tooltip.module.css": {
     "colour": 0,

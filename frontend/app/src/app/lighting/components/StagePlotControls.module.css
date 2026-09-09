@@ -36,7 +36,7 @@
   min-height: var(--operator-stage-control-height, 26px);
   background: transparent;
   border-color: transparent;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   padding: 0;
 }
 
@@ -45,7 +45,7 @@
   min-height: var(--operator-stage-control-height, 26px);
   padding: 0 calc(7px * var(--operator-ui-scale-factor, 1));
   font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
   font-weight: 700;
 }
 
@@ -55,19 +55,19 @@
   height: var(--operator-stage-control-height, 26px);
   padding: 0 calc(8px * var(--operator-ui-scale-factor, 1));
   border: 1px solid transparent;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   background: transparent;
   color: var(--color-brand-text-secondary);
   cursor: pointer;
   font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   transition:
-    background var(--motion-duration-fast) ease,
-    color var(--motion-duration-fast) ease,
-    border-color var(--motion-duration-fast) ease;
+    background var(--motion-duration-exit) ease,
+    color var(--motion-duration-exit) ease,
+    border-color var(--motion-duration-exit) ease;
 }
 
 .modeButton:hover {
@@ -96,16 +96,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   cursor: pointer;
   font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-xl, 14px);
   line-height: 1;
   transition:
-    background var(--motion-duration-fast) ease,
-    color var(--motion-duration-fast) ease,
-    transform var(--motion-duration-fast) ease,
-    box-shadow var(--motion-duration-fast) ease;
+    background var(--motion-duration-exit) ease,
+    color var(--motion-duration-exit) ease,
+    transform var(--motion-duration-exit) ease,
+    box-shadow var(--motion-duration-exit) ease;
 }
 
 .button:hover {
@@ -137,7 +137,7 @@
   /* Visual overhaul A, Slice 8 (system §9): "135 %" is one reading, so the
      number never leaves its unit on the line below. */
   white-space: nowrap;
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
   letter-spacing: 0;
   /* Slice 9: readable on the opaque plate at 10 px. */
   color: var(--color-brand-text-secondary);
@@ -160,23 +160,23 @@
   appearance: none;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   /* Slice 9: readable on the opaque plate at 10 px. */
   color: var(--color-brand-text-secondary);
   cursor: pointer;
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
   font-weight: 600;
   height: var(--operator-stage-control-height, 26px);
   letter-spacing: 0;
   line-height: 1;
   padding: 0;
-  width: var(--operator-stage-control-bookmark-width, 22px);
+  width: var(--operator-stage-control-bookmark-width, 24px);
   transition:
-    background var(--motion-duration-fast) ease,
-    color var(--motion-duration-fast) ease,
-    border-color var(--motion-duration-fast) ease;
+    background var(--motion-duration-exit) ease,
+    color var(--motion-duration-exit) ease,
+    border-color var(--motion-duration-exit) ease;
 }
 
 .bookmarkButton:hover {
@@ -214,6 +214,6 @@
   .renderModeGroup :global(button) {
     min-width: var(--operator-stage-control-render-mode-width, 56px);
     padding: 0 calc(5px * var(--operator-ui-scale-factor, 1));
-    font-size: var(--operator-font-size-xxs, 9px);
+    font-size: var(--operator-font-size-xxs, var(--font-size-tick));
   }
 }

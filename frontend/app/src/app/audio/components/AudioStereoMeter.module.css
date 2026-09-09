@@ -29,7 +29,12 @@
 .stereoMeter {
   position: relative;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  /* Visual overhaul A, Slice 11: the dBFS marks read at the 12 px floor now
+     (system §3), and `-60` in JetBrains Mono is 21.6 px wide at that size —
+     more than the 20 px lane they had, so every mark hung off the meter's left
+     edge. 26 px holds the widest mark and its 2 px inset, which `audio.spec.ts`
+     measures on three surfaces. */
+  grid-template-columns: 26px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 4px 3px;
   min-width: 0;
@@ -83,7 +88,7 @@
   min-height: 0;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--line) 84%, transparent);
-  border-radius: 2.5px;
+  border-radius: var(--radius-ctl);
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--audio-meter-bg) 86%, #000) 0%,
@@ -123,7 +128,7 @@
   top: 2px;
   bottom: 2px;
   left: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-ctl);
   /* The design's fixed-dBFS colour zones live in the CANVAS renderer
      (AudioMeterCanvasOverlay drawMeterBody) — the live app paints there and
      hides this CSS fill under it. This canvas-off FALLBACK must keep the
@@ -220,7 +225,7 @@
   grid-column: 1 / -1;
   grid-row: 2;
   color: var(--audio-caption-muted);
-  font: var(--font-weight-medium) var(--font-size-xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;
   text-transform: uppercase;
@@ -237,7 +242,10 @@
 .meterScale span {
   position: absolute;
   right: 2px;
-  bottom: clamp(4px, var(--meter-scale-position, 0%), calc(100% - 4px));
+  /* The mark is centred on its reading, so the end stops have to hold back half
+     a line — 6 px of the 12 px floor, where 4 px held back half of 9.5. Without
+     it `0` and `-60` hang off the top and bottom of the meter. */
+  bottom: clamp(6px, var(--meter-scale-position, 0%), calc(100% - 6px));
   color: var(--audio-caption-muted);
   font: var(--font-weight-medium) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;

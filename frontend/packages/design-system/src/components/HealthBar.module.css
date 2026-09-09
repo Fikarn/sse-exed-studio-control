@@ -102,7 +102,7 @@
     align-items: center;
     gap: 10px;
     font-family: var(--font-family-mono);
-    font-size: 11px;
+    font-size: var(--font-size-tick);
     color: var(--color-brand-text-muted);
     letter-spacing: 0;
     white-space: nowrap;
@@ -110,7 +110,7 @@
 
   .kbd {
     font-family: var(--font-family-mono);
-    font-size: 11px;
+    font-size: var(--font-size-tick);
     background: var(--color-bg-soft);
     border: 1px solid var(--color-bg-border);
     border-bottom-width: 2px;
@@ -188,7 +188,7 @@
     text-transform: uppercase;
     letter-spacing: 0.12em;
     cursor: pointer;
-    transition: color var(--motion-duration-fast) var(--hb-easing);
+    transition: color var(--motion-duration-exit) var(--hb-easing);
   }
 
   .captionShortcut:hover {

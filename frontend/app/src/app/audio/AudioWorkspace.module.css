@@ -151,7 +151,9 @@
   /* 2026-09 audit Slice 10: the microtype floor. Every audio caption that sat
      at 8 / 8.5 / 9 px (font-size-4xs, -4xs-plus, -3xs) reads this token, so
      nothing in the Console renders below 9.5 px (audio-legibility.spec.ts). */
-  --audio-type-micro: var(--font-size-3xs-plus);
+  /* Visual overhaul A, Slice 11: the floor is 12 px (system §3); this step was
+     9.5, which is what kept the Console under it. */
+  --audio-type-micro: var(--font-size-tick);
 
   display: grid;
   /* C11 (2026-06-02): make the shell rows explicit. The persistent chrome is
@@ -172,7 +174,7 @@
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-ui);
-  font-size: var(--font-size-md-tight);
+  font-size: var(--font-size-label);
   letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
 }
@@ -187,7 +189,7 @@
 
 .eyebrow {
   color: var(--fg-3);
-  font: 500 var(--font-size-xs) / 1 var(--font-mono);
+  font: 500 var(--font-size-tick) / 1 var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -233,7 +235,7 @@
 
 .shellPanel {
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   background: var(--bg-1);
   /* Slice 9 (system §5): the drawer's recipe is the one large blur. */
   box-shadow: var(--elevation-plate), var(--elevation-float);
@@ -265,7 +267,7 @@
 .loadingGrid span {
   min-height: 140px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-key);
   background: var(--bg-2);
 }
 
@@ -282,7 +284,7 @@
   border-bottom: 1px solid var(--line);
   background: var(--accent-soft);
   color: var(--accent);
-  font: 500 var(--font-size-sm) / 1.25 var(--font-ui);
+  font: 500 var(--font-size-tick) / 1.25 var(--font-ui);
   letter-spacing: 0;
 }
 

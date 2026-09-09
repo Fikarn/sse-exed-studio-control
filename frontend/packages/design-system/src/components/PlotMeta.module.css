@@ -9,9 +9,9 @@
     padding: 7px 13px;
     background: var(--elevation-plate-fill);
     border: 1px solid var(--material-line);
-    border-radius: var(--radius-tight-sm);
+    border-radius: var(--radius-ctl);
     font-family: var(--font-family-mono);
-    font-size: 11px;
+    font-size: var(--font-size-tick);
     /* Slice 9: on the new opaque plate the muted ink measured under 4.5:1
        at 10 px, so the label reads in the secondary ink. */
     color: var(--color-brand-text-secondary);

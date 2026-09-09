@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   font-family: var(--font-family-ui);
-  font-size: var(--operator-font-size-md, var(--font-size-md));
+  font-size: var(--operator-font-size-md, var(--font-size-body));
   line-height: 1.4;
   letter-spacing: 0;
   background:

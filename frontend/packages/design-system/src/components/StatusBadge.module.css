@@ -40,15 +40,4 @@
     border-color: var(--material-line2);
     color: var(--text-text2);
   }
-
-  /* Legacy tone names (aliases until Slice 11): the canonical class carries
-     the paint; these exist so `className` still names the tone a test asks for. */
-  .healthy,
-  .ready,
-  .connected,
-  .degraded,
-  .warning,
-  .idle {
-    letter-spacing: var(--font-tracking-cap);
-  }
 }

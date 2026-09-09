@@ -166,7 +166,7 @@
   background: var(--color-bg-soft);
   color: var(--color-brand-text-primary);
   font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-sm, 11px);
+  font-size: var(--operator-font-size-sm, var(--font-size-tick));
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -214,7 +214,7 @@
 
 .paletteQuickHeader span {
   font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
   color: var(--color-brand-text-muted);
   text-transform: uppercase;
 }
@@ -227,7 +227,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   background: var(--color-bg-default);
   color: var(--color-brand-text-primary);
   font: var(--font-weight-regular) var(--operator-font-size-md, 12px) / 1.3 var(--font-family-ui);
@@ -254,7 +254,7 @@
 .paletteQuickSectionTitle {
   margin: 0 0 8px;
   font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
   font-weight: 700;
   letter-spacing: 0;
   color: var(--color-brand-text-muted);
@@ -275,7 +275,7 @@
   gap: 9px;
   min-height: 48px;
   border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   background: var(--color-bg-soft);
   color: var(--color-brand-text-primary);
   cursor: pointer;
@@ -296,13 +296,13 @@
 .paletteQuickTile small {
   padding-right: 10px;
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   color: var(--color-brand-text-secondary);
 }
 
 .paletteQuickAccent {
   align-self: stretch;
-  border-radius: var(--radius-tight-sm) 0 0 var(--radius-tight-sm);
+  border-radius: var(--radius-ctl) 0 0 var(--radius-ctl);
 }
 
 .connectingState {

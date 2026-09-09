@@ -8,7 +8,6 @@ import {
   asStatusTone,
   formatBackupTimestamp,
   getSupportBackups,
-  mapStatusBadgeTone,
   statusToneLabel,
   type SnapshotRecord,
 } from "../shellData";
@@ -370,7 +369,7 @@ export function SetupRecoverySurface({
               <div key={check.label} className={styles.setupIncidentCheckCard}>
                 <div className={styles.setupIncidentCheckHeader}>
                   <div className={styles.setupIncidentCheckTitle}>{check.label}</div>
-                  <StatusBadge label={statusToneLabel(check.tone)} tone={mapStatusBadgeTone(check.tone)} />
+                  <StatusBadge label={statusToneLabel(check.tone)} tone={asStatusTone(check.tone)} />
                 </div>
                 <div className={styles.setupIncidentHint}>{check.detail}</div>
               </div>

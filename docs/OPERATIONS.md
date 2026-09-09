@@ -53,16 +53,18 @@ The engine streams the lighting state to the commissioned bridge as unicast sACN
 
 ### Audio stops responding
 
-1. Open the Audio workspace and read the Console badge; it names the problem and its way out:
-   - `NOT VERIFIED` — the audio probe has not passed since the last transport change. Every console control is locked until it does; press **Run audio probe** in the top bar.
+1. Open the Audio workspace and read the state display down the left; it names the state, says what happened
+   and what to do, and carries the key that does it:
+   - `NOT VERIFIED` — the audio probe has not passed since the last transport change. Every control on the Console is locked until it does; press **Run audio probe** on the state display.
    - `DISCONNECTED` — TotalMix itself reports the interface is gone (`/status/connection 0`). Check the UFX III's USB link and power.
    - `OFFLINE` / `STALE` — no meter data is arriving from TotalMix. Work through the metering checklist below.
-   - `ASSUMED` — a send was not confirmed by the console within 1.5 s, or a recall was only partly confirmed. Press **Sync**: it pulls the real console state and never changes hardware.
+   - `ASSUMED` — a send was not confirmed by the desk within 1.5 s, or a recall was only partly confirmed. Press
+     **Sync from TotalMix**: it pulls the desk's real state and never changes hardware.
    - `TALKBACK REFUSED` — TotalMix has no talkback input channel assigned (see step 4 under Metering over Global OSC).
 2. Review the native health and audio summaries.
 3. Confirm the TotalMix OSC checklists below still match the workstation (Global OSC remote 4 for control and metering, remotes 1-3 as the classic metering fallback).
 4. Re-run the audio commissioning probe if needed.
-5. If the console is still unavailable, restart the app and confirm the failure is not limited to one session.
+5. If the desk is still unavailable, restart the app and confirm the failure is not limited to one session.
 
 ### RME TotalMix OSC Metering Checklist
 
@@ -82,11 +84,12 @@ The audio page is a control surface for the fixed RME Fireface UFX III workstati
 
 Audio-page edits are transmitted to TotalMix over the Global OSC remote (send port base `+3`, default `7004`), using RME's official Global OSC protocol (2026-07-21 table). Everything is addressed by 0-based hardware channel number, so the TotalMix mixer layout never shifts control targets, and every value is absolute state — app and console cannot invert against each other.
 
-- The console link reads the desk back. TotalMix does not echo a write to the remote that sent it, so after every send the engine asks for the touched channel (`/sendchan`, `/sendsubmix`) and marks the send **Confirmed** when the reply matches, **Adjusted** when the console kept a different value (the console wins), or unconfirmed after 1.5 s (badge `ASSUMED`, the count in the status line). Changes made in TotalMix itself flow into the app the same way (**External**, within about 200 ms). The `aligned` badge is written only after a complete pull or a fully confirmed push — never by an ordinary edit.
-- **Sync = pull.** `/sendall` + `/sendstate` over remote 4, the answer is ingested, then `aligned`. Sync never changes hardware. `AUDIO_SYNC_NO_ECHO` means remote 4 did not answer: check it is In Use in Global OSC mode; `AUDIO_SYNC_INCOMPLETE` keeps what arrived and stays `unknown`.
-- **Recall = push, except 48V.** A snapshot recall sends mutes-on first, then faders, gains, polarity, solo and output levels, then mutes-off, then dim / mono, and waits for the confirmations; 48V is never sent — differences are listed in the band under the top bar and each one is armed and confirmed per channel.
-- **Gating.** While the badge is not `READY` (probe not passed, transport disabled, console disconnected) the engine refuses every console write and the app and the deck disable the controls with the reason; app-local edits (names, snapshot slots, settings) stay allowed. A request with any invalid field is rejected before a single OSC message leaves.
-- **Arm-then-apply** (48V, snapshot recall, snapshot overwrite) needs a second press at least 350 ms after the first; held keys do not repeat.
+- The desk link reads the desk back. TotalMix does not echo a write to the remote that sent it, so after every send the engine asks for the touched channel (`/sendchan`, `/sendsubmix`) and marks the send **Confirmed** when the reply matches, **Adjusted** when the desk kept a different value (the desk wins), or unconfirmed after 1.5 s (badge `ASSUMED`, the count in the status line). Changes made in TotalMix itself flow into the app the same way (**External**, within about 200 ms). The `aligned` badge is written only after a complete pull or a fully confirmed push — never by an ordinary edit.
+- **Sync from TotalMix = pull.** `/sendall` + `/sendstate` over remote 4, the answer is ingested, then `aligned`. Sync never changes hardware. `AUDIO_SYNC_NO_ECHO` means remote 4 did not answer: check it is In Use in Global OSC mode; `AUDIO_SYNC_INCOMPLETE` keeps what arrived and stays `unknown`.
+- **Recall = push, except 48 V.** A snapshot recall sends mutes-on first, then faders, gains, polarity, solo and output levels, then mutes-off, then dim / mono, and waits for the confirmations; 48 V is never sent — differences are listed on the Console's signal canvas and each one is armed and confirmed
+  per channel.
+- **Gating.** While the state display does not read `READY` (probe not passed, the hardware link disabled, the desk disconnected) the engine refuses every write to the desk and the app and the deck disable the controls with the reason; app-local edits (names, snapshot slots, settings) stay allowed. A request with any invalid field is rejected before a single OSC message leaves.
+- **Arm-then-apply** (48 V, snapshot recall, snapshot overwrite) needs a second press at least 350 ms after the first; held keys do not repeat.
 - Channel faders ride `/mix/{in|pb}/{ch}/{out}/faderlin` (linear 0..1, the app's own fader scale; the dB the app prints for a position follows RME's published fader curve, unity at step 836 of 1023) to the requested submix — Main (out 0), Phones 1 (out 8), or Phones 2 (out 10). Output levels ride `/output/{ch}/faderlin`.
 - Mute (`/input|playback|output/{ch}/mute`), solo (`/mix/{in|pb}/{ch}/0/solo`, main submix), phantom (`/input/{ch}/48v`), phase, pad, instrument, and auto-set are absolute 0/1 states.
 - Dim, mono, and talkback are control-room functions (`/controlroom/dim|mainmono|talkback`) — sent for the main out, app-local for the phones targets.
@@ -109,7 +112,7 @@ To commission it on the workstation:
 
 ### Stream Deck Audio Surface
 
-When the app is on the Audio workspace, the Stream Deck+ is its physical control surface. Companion drives the deck from the generated profile; every deck action calls the same engine audio path as the on-screen console, so the console, the app UI, and the deck cannot disagree.
+When the app is on the Audio workspace, the Stream Deck+ is its physical control surface. Companion drives the deck from the generated profile; every deck action calls the same engine audio path as the Console does, so the desk, the app UI and the deck cannot disagree.
 
 Layout of the AUDIO deck page:
 
@@ -120,7 +123,7 @@ Layout of the AUDIO deck page:
 
 State color follows the app's Console vocabulary: the active mix-target key is solid amber, `TALK` turns green while live, `SOLO CLR` turns warn-yellow with the live count, `DIM` and `GAIN` go amber while engaged, and a non-input dial bank tints the `BANK` key. The colors come from Companion feedbacks on custom variables the engine publishes (`lcd_audio_state_*`, `lcd_audio_strip_N_state/level`); the bar graphics are PNG assets rendered by `scripts/deck-assets.py` and embedded in the exported profile.
 
-Trust rules: deck actions pass the same gating as app commands — when audio is not verified, the strips show the reason (`AUDIO / NOT VERIFIED`), cells grey out, and actions are refused. The deck shows state, not meters, and has no snapshot or 48V controls by design.
+Trust rules: deck actions pass the same gating as app commands — when audio is not verified, the strips show the reason (`AUDIO / NOT VERIFIED`), cells grey out, and actions are refused. The deck shows state, not meters, and has no snapshot or 48 V controls by design.
 
 Deck freshness comes from the profile's `SSE audio LCD poll` trigger (1 s) plus per-action refreshes; the `SSE follow app - …` triggers flip the deck to the AUDIO / LIGHTS / PROJECTS page whenever the app workspace changes.
 
@@ -146,7 +149,7 @@ To commission or re-commission the deck:
 ### The app fails before the dashboard
 
 1. Open the recovery surface.
-2. Export diagnostics and note the engine log path.
+2. Export diagnostics and note the Engine log path.
 3. If storage is corrupt, restore from the latest support backup.
 4. If startup still fails, reinstall the latest known-good native build without deleting the app-data directory.
 
@@ -181,15 +184,15 @@ To commission or re-commission the deck:
 1. Launch the packaged native app and confirm it reaches the expected target surface. On the `1920x1080` studio monitor the Console runs at compact density (4 input / 4 playback / 3 output strips, the rest banked with `[` `]`); nothing should scroll sideways.
 2. Confirm lighting, audio, and support summaries show the expected ready state.
 3. Trigger a test light scene recall if lighting is in scope.
-4. Confirm the Console badge reads `READY` with live RME TotalMix OSC metering — not simulated, stale, or offline. If it reads `NOT VERIFIED`, run the audio probe.
-5. Walk the console link checklist below if audio is in scope.
+4. Confirm the Console's state display reads `READY` with live RME TotalMix OSC metering — not simulated, stale, or offline. If it reads `NOT VERIFIED`, run the audio probe.
+5. Walk the desk link checklist below if audio is in scope.
 6. Export a manual support backup before the session starts.
 
 ### Console link checklist before a live session
 
 1. Move one fader and toggle one mute in TotalMix — the app strip follows within about a second (the link is reading the desk).
 2. Press **Sync** — the toast reports the values pulled, the badge goes `aligned`, and nothing moves in TotalMix.
-3. Recall the session's opening snapshot — the band reports "N values pushed, N confirmed"; any 48V difference is listed by channel and is only applied when armed there.
+3. Recall the session's opening snapshot — the band reports "N values pushed, N confirmed"; any 48 V difference is listed by channel and is only applied when armed there.
 4. Hold **Talkback** (or `T`, or the deck's `TALK`) — TotalMix's talkback lights and clears on release. If the app says `TALKBACK REFUSED`, assign the talkback input channel in TotalMix first.
 5. On the Stream Deck, `→ MAIN` / `DIM` / `TALK` mirror the app; the Companion profile must have been re-imported after the fader-curve update (Setup step 1, Full Reset & Import).
 

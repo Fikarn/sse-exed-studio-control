@@ -9,7 +9,7 @@
   background: color-mix(in srgb, var(--tone, var(--color-bg-raised)) 28%, var(--color-bg-raised));
   color: var(--color-brand-text-primary);
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   font-weight: 500;
   letter-spacing: 0;
   font-feature-settings: "tnum", "zero";

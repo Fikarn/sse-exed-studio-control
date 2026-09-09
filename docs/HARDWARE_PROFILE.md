@@ -6,7 +6,7 @@ This repository is built around a specific studio installation. The product and 
 
 - Dedicated second monitor
 - Primary target resolution: `2560x1440` logical pixels on the fixed studio monitor. Operator ruling 2026-09-07 (visual overhaul A, plan D4): this is the only resolution that matters; the chrome budget is header `56`, footer `40`, cluster `424`, plate `416`, gutters `16` (`chrome.studio.*` tokens), and every design gate runs at `2560x1440` only. The two smaller layouts below stay as fallbacks with their guards, not as deliverables.
-- Minimum supported live-use resolution: `1920x1080` logical pixels. Below `2200` px logical width the Audio Console runs at compact density — 4 input, 4 playback and 3 output strips visible (remaining playback strips banked), inspector `380` px — so no tier ever scrolls sideways; at `2560x1440` it shows 4 / 6 / 3 with the `504` px inspector
+- Minimum supported live-use resolution: `1920x1080` logical pixels. Below `2200` px logical width the Audio Console runs at compact density — 4 input, 4 playback and 3 output strips visible (remaining playback strips banked), plate `360` px — so no tier ever scrolls sideways; at `2560x1440` it shows 4 / 6 / 3 with the `416` px plate (visual overhaul A, plan D4 — the numbers on line 8)
 - Utility/minimum mode: `1280x800` logical pixels for setup, inspection, and recovery workflows, not full simultaneous show control
 - No page scroll during normal operation
 - Dense, fixed-height operator surfaces preferred over document-style layouts

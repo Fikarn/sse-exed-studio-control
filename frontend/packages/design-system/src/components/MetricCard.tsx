@@ -15,7 +15,7 @@ export interface MetricCardProps {
   value: string;
 }
 
-export const MetricCard = ({ caption, label, showBadge = true, tone = "idle", value }: MetricCardProps) => {
+export const MetricCard = ({ caption, label, showBadge = true, tone = "neutral", value }: MetricCardProps) => {
   return (
     <div className={styles.card}>
       <span className={styles.caption}>{caption}</span>

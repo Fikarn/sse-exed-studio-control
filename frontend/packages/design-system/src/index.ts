@@ -100,7 +100,7 @@ export type { SharedStatusTone } from "./components/statusTone";
 export { toneForSubsystem, worstTone } from "./components/statusTone";
 export { StatusBadge } from "./components/StatusBadge";
 export { canonicalBadgeTone } from "./components/StatusBadge";
-export type { StatusBadgeLegacyTone, StatusBadgeProps, StatusTone } from "./components/StatusBadge";
+export type { StatusBadgeProps, StatusTone } from "./components/StatusBadge";
 export { StatusDot } from "./components/StatusDot";
 export type { StatusDotProps, StatusDotSize, StatusDotState } from "./components/StatusDot";
 export { StatusBand } from "./components/StatusBand";

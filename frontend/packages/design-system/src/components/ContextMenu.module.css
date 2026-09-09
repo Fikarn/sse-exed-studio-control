@@ -49,7 +49,7 @@
   font-size: 12px;
   text-align: left;
   cursor: pointer;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
 }
 
 .itemFocused {

@@ -10,7 +10,7 @@
 
     position: relative;
     padding: 11px 18px;
-    border-radius: var(--radius-tight-sm);
+    border-radius: var(--radius-ctl);
     font-family: var(--font-family-ui);
     font-size: 14.5px;
     font-weight: 500;
@@ -19,8 +19,8 @@
     align-items: center;
     gap: 9px;
     transition:
-      color var(--motion-duration-fast) ease,
-      opacity var(--motion-duration-fast) ease;
+      color var(--motion-duration-exit) ease,
+      opacity var(--motion-duration-exit) ease;
   }
 
   .item:hover {
@@ -44,7 +44,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: opacity var(--motion-duration-fast) ease;
+    transition: opacity var(--motion-duration-exit) ease;
   }
 
   .icon > svg {
@@ -70,7 +70,7 @@
     inset: auto 14px -14px 14px;
     height: 3px;
     background: var(--color-brand-green);
-    border-radius: 1.5px 1.5px 0 0;
+    border-radius: var(--radius-ctl) var(--radius-ctl) 0 0;
     /* Slice 9 (system §5): a lamp blooms at 10 px, and only at 10 px. */
     box-shadow: var(--elevation-lamp-green);
   }

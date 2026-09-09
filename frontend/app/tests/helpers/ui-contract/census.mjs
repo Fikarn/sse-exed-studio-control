@@ -220,6 +220,10 @@ export function censusInPage() {
     const r = el.getBoundingClientRect();
     if (!vis(el, r)) continue;
     const disabled = el.disabled === true || el.getAttribute("aria-disabled") === "true";
+    // Visual overhaul A, Slice 11: this stays strict. A rule that let a target
+    // count as reachable when some ancestor scrolls was tried and reverted: it
+    // changed no number on any of the 81 boards, and §1 says nothing scrolls, so
+    // the measure that says "on the board or not on it" is the one to keep.
     const fits = r.left >= -1 && r.top >= -1 && r.right <= vw + 1 && r.bottom <= vh + 1;
     if (!fits) offViewport++;
     targets.push({

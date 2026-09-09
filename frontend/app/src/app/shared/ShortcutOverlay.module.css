@@ -155,7 +155,7 @@
   align-items: center;
   gap: 16px;
   padding: 6px 8px;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
 }
 
 .row:hover {

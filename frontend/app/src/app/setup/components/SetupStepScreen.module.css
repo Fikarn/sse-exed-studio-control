@@ -38,7 +38,7 @@
 .lead {
   max-width: 760px;
   margin-top: 16px;
-  font: 500 var(--font-size-lg) / 1.4 var(--font-family-ui);
+  font: 500 var(--font-size-value) / 1.4 var(--font-family-ui);
   color: var(--display-text);
 }
 

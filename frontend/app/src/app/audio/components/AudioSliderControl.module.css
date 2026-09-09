@@ -48,7 +48,7 @@
 .sliderTrack {
   position: absolute;
   pointer-events: none;
-  border-radius: 2px;
+  border-radius: var(--radius-ctl);
   background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--line);
 }
@@ -60,7 +60,7 @@
   /* DP1 (channel-strip-refine): finer slot, visibly carved into the housing —
      recessed gradient + inset shadows replace the flat --bg + hairline. */
   width: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-ctl);
   transform: translateX(-50%);
   background: linear-gradient(180deg, color-mix(in srgb, #000 32%, var(--bg)), var(--bg));
   box-shadow:
@@ -82,7 +82,7 @@
   pointer-events: none;
   background: linear-gradient(180deg, var(--fg-2) 0%, var(--fg-3) 80%, var(--fg-4) 100%);
   opacity: 0.35;
-  border-radius: 0 0 1px 1px;
+  border-radius: 0 0 var(--radius-ctl) var(--radius-ctl);
   transition:
     height 0.35s var(--easing-out),
     opacity 0.15s var(--easing),
@@ -129,13 +129,13 @@
   z-index: 1;
   background: var(--bg-elev);
   border: 1px solid var(--line-2);
-  border-radius: 2px;
+  border-radius: var(--radius-ctl);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   transition:
-    border-color var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-exit) var(--easing),
     bottom 0.35s var(--easing-out),
     left 0.25s var(--easing),
-    box-shadow var(--motion-duration-fast) var(--easing);
+    box-shadow var(--motion-duration-exit) var(--easing);
 }
 
 .sliderCap::after {
@@ -159,7 +159,7 @@
      above and casting a shadow so it sits proud of the housing. */
   width: 26px;
   height: 17px;
-  border-radius: 3px;
+  border-radius: var(--radius-ctl);
   border: 1px solid color-mix(in srgb, var(--fg) 14%, var(--line-2));
   background: linear-gradient(
     180deg,
@@ -173,8 +173,8 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
   transform: translate(-50%, 50%);
   transition:
-    border-color var(--motion-duration-fast) var(--easing),
-    box-shadow var(--motion-duration-fast) var(--easing),
+    border-color var(--motion-duration-exit) var(--easing),
+    box-shadow var(--motion-duration-exit) var(--easing),
     bottom 0.35s var(--easing-out);
 }
 
@@ -184,7 +184,7 @@
   height: 2px;
   left: 5px;
   right: 5px;
-  border-radius: 1px;
+  border-radius: var(--radius-ctl);
   background: color-mix(in srgb, var(--fg) 58%, transparent);
   /* Slice 9 (system §5): the grip's two neighbour lines were drawn as
      shadows offset above and below, which is a light from below. They are
@@ -257,7 +257,7 @@
   bottom: calc(100% * var(--audio-fader-unity));
   width: 5px;
   height: 2px;
-  border-radius: 1px;
+  border-radius: var(--radius-ctl);
   background: color-mix(in srgb, var(--fg) 40%, transparent);
   transform: translateY(50%);
   pointer-events: none;

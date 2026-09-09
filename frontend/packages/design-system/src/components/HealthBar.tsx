@@ -30,9 +30,6 @@ export interface HealthBarProps {
   /** One or more keyboard-shortcut discoverability hints rendered after the
    *  health items. Multiple hints separate with thin spacing. */
   hints?: readonly HealthBarHint[];
-  /** Backward-compat single-hint alias; folded into `hints` if both are
-   *  provided. Prefer `hints` for new call sites. */
-  hint?: HealthBarHint;
   /** Optional trailing slot for clickable controls (e.g. visibility toggles).
    *  Hints are read-only by design; use `actions` when an interactive control
    *  belongs in the bar. Renders right of the hint group. */
@@ -54,7 +51,6 @@ export interface HealthBarProps {
 export const HealthBar = ({
   items,
   hints,
-  hint,
   actions,
   className,
   variant = "full",
@@ -62,7 +58,7 @@ export const HealthBar = ({
   itemsTestId,
   hintsTestId,
 }: HealthBarProps) => {
-  const allHints: readonly HealthBarHint[] = hints ?? (hint ? [hint] : []);
+  const allHints: readonly HealthBarHint[] = hints ?? [];
 
   if (variant === "caption") {
     const classes = [styles.caption, className].filter(Boolean).join(" ");

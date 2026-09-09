@@ -17,7 +17,7 @@ export function StartupSurface({
   onShowShortcuts: () => void;
 }) {
   const steps = buildStartupSteps(lifecycle);
-  const done = steps.filter((step) => step.tone !== "idle").length;
+  const done = steps.filter((step) => step.tone !== "neutral").length;
 
   return (
     <PreReadyState
@@ -31,7 +31,7 @@ export function StartupSurface({
       <div className={stepStyles.steps} data-testid="startup-steps">
         {steps.map((step) => (
           <div key={step.label} className={stepStyles.step} data-material="key">
-            <Lamp tone={step.tone === "idle" ? "off" : step.tone === "healthy" ? "ok" : "info"} />
+            <Lamp tone={step.tone === "neutral" ? "off" : step.tone} />
             <span className={stepStyles.stepLabel}>{step.label}</span>
             <span className={stepStyles.stepDetail}>{step.description}</span>
             <span className={stepStyles.stepStanding}>{stepStatusLabel(step.tone)}</span>

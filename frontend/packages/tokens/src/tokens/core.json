@@ -1064,35 +1064,11 @@
       "xs-plus": {
         "$value": "11.5px"
       },
-      "sm": {
-        "$value": "{font.size.tick}",
-        "$description": "deprecated alias (A S1) - use font.size.tick; removed in S11"
-      },
       "sm-plus": {
         "$value": "12.5px"
       },
-      "md-tight": {
-        "$value": "{font.size.label}",
-        "$description": "deprecated alias (A S1) - use font.size.label; removed in S11"
-      },
-      "md": {
-        "$value": "{font.size.body}",
-        "$description": "deprecated alias (A S1) - use font.size.body; removed in S11"
-      },
-      "lg-tight": {
-        "$value": "{font.size.name}",
-        "$description": "deprecated alias (A S1) - use font.size.name; removed in S11"
-      },
-      "lg": {
-        "$value": "{font.size.value}",
-        "$description": "deprecated alias (A S1) - use font.size.value; removed in S11"
-      },
       "xl-tight": {
         "$value": "18px"
-      },
-      "xl": {
-        "$value": "{font.size.word}",
-        "$description": "deprecated alias (A S1) - use font.size.word; removed in S11"
       },
       "2xl": {
         "$value": "22px"
@@ -1229,15 +1205,13 @@
     }
   },
   "radius": {
-    "sm": {
-      "$value": "{radius.key}",
-      "$description": "deprecated alias (A S1) - use radius.key; removed in S11"
-    },
     "md": {
-      "$value": "14px"
+      "$value": "{radius.screen}",
+      "$description": "Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 14px."
     },
     "lg": {
-      "$value": "20px"
+      "$value": "{radius.screen}",
+      "$description": "Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 20px."
     },
     "xl": {
       "$value": "24px"
@@ -1250,22 +1224,12 @@
     },
     "tight": {
       "xs": {
-        "$value": "3px"
-      },
-      "sm": {
         "$value": "{radius.ctl}",
-        "$description": "deprecated alias (A S1) - use radius.ctl; removed in S11"
+        "$description": "Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 3px."
       },
       "md": {
-        "$value": "6px"
-      },
-      "lg": {
         "$value": "{radius.key}",
-        "$description": "deprecated alias (A S1) - use radius.key; removed in S11"
-      },
-      "xl": {
-        "$value": "{radius.screen}",
-        "$description": "deprecated alias (A S1) - use radius.screen; removed in S11"
+        "$description": "Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 6px."
       }
     },
     "ctl": {
@@ -1284,6 +1248,9 @@
   "size": {
     "controlHeight": {
       "$value": "36px"
+    },
+    "compactControlHeight": {
+      "$value": "24px"
     },
     "toolbarHeight": {
       "$value": "44px"
@@ -1368,10 +1335,6 @@
   },
   "motion": {
     "duration": {
-      "fast": {
-        "$value": "{motion.duration.exit}",
-        "$description": "deprecated alias (A S1) - use motion.duration.exit; removed in S11"
-      },
       "normal": {
         "$value": "180ms"
       },

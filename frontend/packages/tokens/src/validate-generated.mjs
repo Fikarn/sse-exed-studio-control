@@ -52,9 +52,26 @@ const missing = A_FAMILIES.filter((name) => !css.includes(`${name}:`));
 if (missing.length) {
   throw new Error(`Generated tokens.css lacks A tokens: ${missing.join(", ")} — run npm run frontend:tokens:build`);
 }
-// The deprecated aliases resolve through var() so the value has one source.
-for (const alias of ["--font-size-sm: var(--font-size-tick)", "--radius-tight-sm: var(--radius-ctl)"]) {
-  if (!css.includes(alias)) throw new Error(`Generated tokens.css lacks the alias ${alias}`);
+// Visual overhaul A, Slice 11: the deprecated aliases are gone. This used to
+// assert that each still resolved through var() so the value had one source;
+// now it asserts the opposite — that nothing re-introduces a second name for a
+// size, a radius or a duration the A scale already names.
+for (const gone of [
+  "--font-size-sm:",
+  "--font-size-md:",
+  "--font-size-md-tight:",
+  "--font-size-lg:",
+  "--font-size-lg-tight:",
+  "--font-size-xl:",
+  "--radius-sm:",
+  "--radius-tight-sm:",
+  "--radius-tight-lg:",
+  "--radius-tight-xl:",
+  "--motion-duration-fast:",
+]) {
+  if (css.includes(gone)) {
+    throw new Error(`Generated tokens.css re-introduces the retired alias ${gone.slice(0, -1)}`);
+  }
 }
 
 const themes = readFileSync(path.join(packageDir, "themes.css"), "utf8");

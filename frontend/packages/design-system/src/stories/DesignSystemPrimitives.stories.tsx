@@ -147,9 +147,9 @@ function PrimitiveConsoleBoard() {
         />
 
         <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-          <MetricCard caption="Protocol" tone="ready" value="v1" />
-          <MetricCard caption="Audio" tone="connected" value="OSC live" />
-          <MetricCard caption="Lighting" tone="warning" value="2 notes" />
+          <MetricCard caption="Protocol" tone="ok" value="v1" />
+          <MetricCard caption="Audio" tone="ok" value="OSC live" />
+          <MetricCard caption="Lighting" tone="attention" value="2 notes" />
         </div>
 
         <MeterBridge
@@ -172,7 +172,7 @@ function PrimitiveConsoleBoard() {
           ]}
           rows={[
             {
-              cells: { address: "1-6", fixture: "Key Astra", state: <StatusBadge label="ready" tone="ready" /> },
+              cells: { address: "1-6", fixture: "Key Astra", state: <StatusBadge label="ready" tone="ok" /> },
               id: "fixture-key",
               tone: "ready",
             },
@@ -180,13 +180,13 @@ function PrimitiveConsoleBoard() {
               cells: {
                 address: "7-18",
                 fixture: "Infinibar PB12",
-                state: <StatusBadge label="warning" tone="warning" />,
+                state: <StatusBadge label="warning" tone="attention" />,
               },
               id: "fixture-bar",
               tone: "warning",
             },
             {
-              cells: { address: "19-26", fixture: "Apollo Bridge", state: <StatusBadge label="idle" tone="idle" /> },
+              cells: { address: "19-26", fixture: "Apollo Bridge", state: <StatusBadge label="idle" tone="neutral" /> },
               id: "fixture-bridge",
               tone: "muted",
             },
@@ -197,7 +197,7 @@ function PrimitiveConsoleBoard() {
       <InspectorPanel
         actions={<IconButton icon={WandSparkles} label="Run local preview" />}
         eyebrow="Inspector"
-        status={<StatusBadge label="degraded" tone="degraded" />}
+        status={<StatusBadge label="degraded" tone="attention" />}
         title="Selected workspace"
       >
         <InspectorSection title="Dense list rows">
@@ -322,7 +322,7 @@ export const DirectionDHealthBar: StoryObj<typeof meta> = {
           { label: "Session", value: "2h 47m" },
           { label: "App", value: "v2.2.2" },
         ]}
-        hint={{ kbd: "?", label: "Shortcuts" }}
+        hints={[{ kbd: "?", label: "Shortcuts" }]}
       />
     </div>
   ),
@@ -342,7 +342,7 @@ export const DirectionDHealthBarDirty: StoryObj<typeof meta> = {
           { label: "Session", value: "2h 47m" },
           { label: "App", value: "v2.2.2" },
         ]}
-        hint={{ kbd: "?", label: "Shortcuts" }}
+        hints={[{ kbd: "?", label: "Shortcuts" }]}
       />
     </div>
   ),

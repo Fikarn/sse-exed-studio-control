@@ -120,7 +120,7 @@
   font-family: var(--font-family-mono);
   /* LGS-07 — scale with operator density like the adjacent StagePlotControls
      (was a fixed 10px; --operator-font-size-xs carries --operator-ui-scale-factor). */
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);

@@ -2,7 +2,7 @@
   .picker {
     background: var(--color-surface-default);
     border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-key);
     box-shadow: var(--shadow-md);
     display: flex;
     flex-direction: column;
@@ -27,7 +27,7 @@
     align-items: center;
     background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 4px;
+    border-radius: var(--radius-ctl);
     cursor: pointer;
     display: inline-flex;
     height: 18px;
@@ -63,7 +63,7 @@
     align-items: center;
     background: transparent;
     border: 1px solid var(--color-surface-border);
-    border-radius: 4px;
+    border-radius: var(--radius-ctl);
     color: var(--color-studio-300);
     cursor: pointer;
     display: inline-flex;

@@ -103,7 +103,7 @@
 
 .dynamicsReadoutCluster strong {
   color: var(--fg);
-  font: var(--font-weight-semibold) var(--font-size-sm) / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-tick) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
@@ -215,7 +215,7 @@
   justify-self: end;
   min-width: 0;
   color: var(--fg);
-  font: var(--font-weight-semibold) var(--font-size-xs) / 1 var(--font-family-mono);
+  font: var(--font-weight-semibold) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   white-space: nowrap;
 }
@@ -238,6 +238,6 @@
 
   .processingControl strong {
     justify-self: end;
-    font-size: var(--font-size-2xs);
+    font-size: var(--font-size-tick);
   }
 }

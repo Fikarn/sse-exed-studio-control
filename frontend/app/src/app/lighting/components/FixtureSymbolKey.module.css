@@ -24,7 +24,7 @@
   min-height: 30px;
   color: var(--color-brand-text-secondary);
   font-family: var(--font-family-mono);
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
   line-height: 1;
 }
 
@@ -41,7 +41,7 @@
   width: 20px;
   height: 18px;
   border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   color: var(--color-brand-text-primary);
   font-feature-settings: "tnum", "zero";
   font-weight: 700;

@@ -301,16 +301,13 @@
   --space-8: 32px;
   --space-9: 36px;
   --space-10: 40px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
   --radius-xl: 24px;
   --radius-pill: 999px;
-  --radius-tight-xs: 3px;
-  --radius-tight-md: 6px;
   --radius-ctl: 4px; /** A: caps, fields, kbd, small lamps' boxes */
   --radius-key: 8px; /** A: keys, wells, cards */
   --radius-screen: 12px; /** A: the state display, the bay screen, the plot, the drawer */
   --size-control-height: 36px;
+  --size-compact-control-height: 24px;
   --size-toolbar-height: 44px;
   --size-monitor-rail-height: 52px;
   --size-context-rail-width: 344px;
@@ -392,14 +389,12 @@
   --font-size-state: var(--font-base-state); /** the state word, plate titles */
   --font-size-hero-small: var(--font-base-hero-small); /** Setup's step title */
   --font-size-hero: var(--font-base-hero); /** the one number read from a metre away */
-  --radius-sm: var(--radius-key); /** deprecated alias (A S1) - use radius.key; removed in S11 */
-  --radius-surface: var(--radius-lg);
-  --radius-tight-sm: var(--radius-ctl); /** deprecated alias (A S1) - use radius.ctl; removed in S11 */
-  --radius-tight-lg: var(--radius-key); /** deprecated alias (A S1) - use radius.key; removed in S11 */
-  --radius-tight-xl: var(--radius-screen); /** deprecated alias (A S1) - use radius.screen; removed in S11 */
+  --radius-md: var(--radius-screen); /** Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 14px. */
+  --radius-lg: var(--radius-screen); /** Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 20px. */
+  --radius-tight-xs: var(--radius-ctl); /** Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 3px. */
+  --radius-tight-md: var(--radius-key); /** Visual overhaul A, Slice 11: system §5 allows four radii — 4 · 8 · 12 · pill. This step used to be 6px. */
   --shadow-glow-yellow: 0 0 0 1px var(--color-brand-yellow), 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08);
   --shadow-glow-amber: 0 0 0 1px var(--color-warning-500), 0 12px 28px rgba(216, 169, 90, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
-  --motion-duration-fast: var(--motion-duration-exit); /** deprecated alias (A S1) - use motion.duration.exit; removed in S11 */
   --color-text-primary: var(--color-text-strong);
   --color-studio-100: var(--color-text-strong);
   --color-studio-200: var(--color-text-muted);
@@ -408,11 +403,6 @@
   --color-studio-050: var(--color-text-strong);
   --color-plot-guide: var(--color-brand-green);
   --audio-peak-hold-calm: var(--color-text-subtle);
-  --font-size-sm: var(--font-size-tick); /** deprecated alias (A S1) - use font.size.tick; removed in S11 */
-  --font-size-md-tight: var(--font-size-label); /** deprecated alias (A S1) - use font.size.label; removed in S11 */
-  --font-size-md: var(--font-size-body); /** deprecated alias (A S1) - use font.size.body; removed in S11 */
-  --font-size-lg-tight: var(--font-size-name); /** deprecated alias (A S1) - use font.size.name; removed in S11 */
-  --font-size-lg: var(--font-size-value); /** deprecated alias (A S1) - use font.size.value; removed in S11 */
-  --font-size-xl: var(--font-size-word); /** deprecated alias (A S1) - use font.size.word; removed in S11 */
+  --radius-surface: var(--radius-lg);
   --shadow-glow-green: 0 0 0 1px var(--color-brand-green), 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
 }

@@ -727,10 +727,10 @@ export function FixtureMarker({
         {labelVisible ? (
           <>
             <rect
-              x={renderX - labelChipWidth(displayName, 10) / 2}
-              y={renderY + nameOffsetY - 9}
-              width={labelChipWidth(displayName, 10)}
-              height={13}
+              x={renderX - labelChipWidth(displayName, 12) / 2}
+              y={renderY + nameOffsetY - 11}
+              width={labelChipWidth(displayName, 12)}
+              height={15}
               rx={4}
               fill="var(--material-well)"
               fillOpacity={0.86}
@@ -740,7 +740,7 @@ export function FixtureMarker({
               x={renderX}
               y={renderY + nameOffsetY}
               textAnchor="middle"
-              fontSize={10}
+              fontSize={12}
               fontWeight={600}
               letterSpacing={0}
               pointerEvents="none"
@@ -749,10 +749,10 @@ export function FixtureMarker({
               {displayName}
             </text>
             <rect
-              x={renderX - labelChipWidth(metaLabel, 9) / 2}
-              y={renderY + metaOffsetY - 8}
-              width={labelChipWidth(metaLabel, 9)}
-              height={12}
+              x={renderX - labelChipWidth(metaLabel, 12) / 2}
+              y={renderY + metaOffsetY - 11}
+              width={labelChipWidth(metaLabel, 12)}
+              height={15}
               rx={4}
               fill="var(--material-well)"
               fillOpacity={0.86}
@@ -762,7 +762,7 @@ export function FixtureMarker({
               x={renderX}
               y={renderY + metaOffsetY}
               textAnchor="middle"
-              fontSize={9}
+              fontSize={12}
               letterSpacing={0}
               pointerEvents="none"
               style={{ fill: LABEL_META_FILL, fontFamily: "var(--font-family-mono)" }}
@@ -789,7 +789,7 @@ export function FixtureMarker({
               x={ghost.x + 47}
               y={ghost.y + 16}
               textAnchor="middle"
-              fontSize={10}
+              fontSize={12}
               fontWeight={600}
               style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
             >
@@ -811,7 +811,7 @@ export function FixtureMarker({
               x={renderX + 33}
               y={renderY - rotateHandleRadius - 4}
               textAnchor="middle"
-              fontSize={10}
+              fontSize={12}
               fontWeight={600}
               style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
             >
