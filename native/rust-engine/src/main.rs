@@ -15,6 +15,7 @@ mod legacy_import;
 mod lighting;
 mod lighting_backend;
 mod lighting_sacn_output;
+#[cfg(feature = "dev-fixtures")]
 mod parity_fixtures;
 mod planning;
 mod planning_settings;
@@ -318,7 +319,25 @@ fn main() -> io::Result<()> {
     let stdout = io::stdout();
     let mut reader = BufReader::new(stdin.lock());
     let mut writer = stdout.lock();
-    let planned_paths = resolve_runtime_paths();
+    // The app-data directory defaults to the platform's durable location
+    // (2026-09 production readiness, Slice 1 — finding F22); a host with no
+    // APPDATA / HOME cannot start without SSE_APP_DATA_DIR.
+    let planned_paths = match resolve_runtime_paths() {
+        Ok(paths) => paths,
+        Err(message) => {
+            let startup_failure = event_message(
+                EVENT_ENGINE_STARTUP_FAILED,
+                json!({
+                    "stage": "bootstrap",
+                    "code": "BOOTSTRAP_FAILED",
+                    "message": message,
+                }),
+            );
+            let _ = write_json(&mut writer, &startup_failure);
+            eprintln!("Engine bootstrap failed: {message}");
+            return Err(io::Error::other(message));
+        }
+    };
 
     if let Err(message) = validate_protocol_version(&planned_paths.requested_protocol_version) {
         let startup_failure = event_message(

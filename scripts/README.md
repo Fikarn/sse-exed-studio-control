@@ -11,7 +11,10 @@ The remediation-plan audit categorised the scripts by risk (43 at the
 time; 46 non-test scripts as of 2026-08-12). Tests live as
 `*.test.mjs` siblings of the script under test; the `scripts:test`
 lane (now glob-driven via `scripts/**/*.test.mjs`) picks them up
-automatically.
+automatically. The glob is double-quoted in `package.json`: npm runs
+scripts through `cmd.exe` on Windows, which hands single quotes to Node
+literally, and that made the lane run zero tests on the workstation
+until 2026-09 (production readiness, Slice 1).
 
 The `_accepted gap_` rows below were audited 2026-08-12: each is
 either exercised end-to-end by a CI lane or requires signing
@@ -63,6 +66,14 @@ Lower-blast-radius helpers. Tests are nice-to-have.
 - `release/write-release-manifest.test.mjs` (PR 3)
 - `release/helpers.test.mjs` (PR 3)
 - `check-slice-rescope.test.mjs` (PR 9)
+
+### Repository guards
+
+Tests that hold a repository-wide property rather than a script:
+
+- `frontend/dev-server-host.test.mjs` — no local server surface (Vite,
+  Playwright, Storybook, Tauri dev) or helper script binds `0.0.0.0`
+  (2026-09 production readiness, Slice 1 — finding F24).
 
 ## Per-script test contract
 

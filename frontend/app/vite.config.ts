@@ -24,7 +24,11 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(rootPkg.version),
   },
   server: {
-    host: "0.0.0.0",
+    // Loopback only: the dev server serves the Tauri dev shell on this
+    // machine and must not listen on every interface (2026-09 production
+    // readiness, Slice 1 — finding F24; guarded by
+    // scripts/frontend/dev-server-host.test.mjs).
+    host: "127.0.0.1",
     port: 4173,
   },
 });

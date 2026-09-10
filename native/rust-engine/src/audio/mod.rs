@@ -51,9 +51,11 @@ mod types;
 pub use channels::*;
 pub use clips::*;
 pub use console_link::*;
-pub(crate) use helpers::{
-    audio_metering_is_simulated, confidence_setting, ensure_audio_action_allowed, ConsoleConfidence,
-};
+pub(crate) use helpers::{audio_metering_is_simulated, ensure_audio_action_allowed};
+// Re-exported for the dev parity fixtures only (2026-09 production readiness,
+// Slice 1 — finding F04); inside this module the writers use `helpers::`.
+#[cfg(feature = "dev-fixtures")]
+pub(crate) use helpers::{confidence_setting, ConsoleConfidence};
 pub use mix_targets::*;
 pub use parse::*;
 pub use recall::PushTiming;

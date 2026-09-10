@@ -117,7 +117,7 @@ Both Tauri qualification commands write a `summary.json` evidence file. By defau
 
 The promotion gate for the Tauri shipping switch lives in [FRONTEND_CUTOVER_PLAN.md](./archive/FRONTEND_CUTOVER_PLAN.md). Do not change shipping behavior, installer paths, or target-host gate status by inference; use that checklist as the cutover authority.
 
-`npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, workspace qualification, and visual review serially.
+`npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, workspace qualification, and visual review serially. None of those lanes calls the dev parity-fixture method; a session that needs it builds the engine with `npm run native:engine:build:dev-fixtures` first.
 
 `npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting, Audio, and Planning screenshots at `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` logical CSS pixels, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. Lighting also asserts toolbar primary-control fit, compact overflow reachability, narrow inspector drawer behavior, stage minimum bounds, and CSS-viewport-driven layout mode selection. Audio visual review also captures Scaled Studio Preview evidence for the key audio fixtures with `operatorReview=studio` and records preview fidelity metrics in the summary. This complements, but does not replace, live human review with Scaled Studio Preview or the fixed studio monitor.
 
@@ -328,6 +328,8 @@ npm run native:check
 npm run native:test
 npm run native:engine:build
 ```
+
+`npm run native:engine:build:dev-fixtures` builds the engine with the `dev-fixtures` cargo feature — the only build that answers `dev.parityFixture.load`; release engines and every current lane run without it and answer `METHOD_UNAVAILABLE`. `cd native && cargo test -p studio-control-engine --features dev-fixtures` runs that build's tests (2026-09 production readiness, Slice 1).
 
 #### Opt-in real-hardware lane
 

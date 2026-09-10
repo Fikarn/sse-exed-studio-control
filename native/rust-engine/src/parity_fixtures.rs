@@ -135,6 +135,9 @@ pub fn parse_parity_fixture_request(params: &Value) -> Result<ParityFixtureReque
         None => return Err(String::from("fixtureId is required")),
     };
 
+    // Default is a merge: a fixture load never replaces existing planning
+    // data unless the caller says so (2026-09 production readiness, Slice 1
+    // — finding F04). `import_legacy_db` refuses the merge when data exists.
     let replace_existing_data = params
         .get("replaceExistingData")
         .map(|value| {
@@ -143,7 +146,7 @@ pub fn parse_parity_fixture_request(params: &Value) -> Result<ParityFixtureReque
                 .ok_or_else(|| String::from("replaceExistingData must be a boolean"))
         })
         .transpose()?
-        .unwrap_or(true);
+        .unwrap_or(false);
 
     Ok(ParityFixtureRequest {
         fixture_id,
@@ -271,5 +274,41 @@ fn map_import_error(error: ImportLegacyError) -> ParityFixtureError {
             ParityFixtureError::InvalidParams(error.to_string())
         }
         other => ParityFixtureError::Storage(other.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_parity_fixture_request, ParityFixtureId};
+    use serde_json::json;
+
+    // 2026-09 production readiness, Slice 1 (finding F04): a fixture load
+    // merges by default; replacing the operator's planning data takes an
+    // explicit `replaceExistingData: true`.
+    #[test]
+    fn load_defaults_to_merge() {
+        let request = parse_parity_fixture_request(&json!({ "fixtureId": "planning-empty" }))
+            .expect("a fixture id alone should parse");
+
+        assert_eq!(request.fixture_id, ParityFixtureId::PlanningEmpty);
+        assert!(
+            !request.replace_existing_data,
+            "a fixture load must not replace existing planning data unless asked to"
+        );
+    }
+
+    #[test]
+    fn load_honours_an_explicit_replace_flag() {
+        let request = parse_parity_fixture_request(
+            &json!({ "fixtureId": "setup-ready", "replaceExistingData": true }),
+        )
+        .expect("an explicit replace flag should parse");
+        assert!(request.replace_existing_data);
+
+        let error = parse_parity_fixture_request(
+            &json!({ "fixtureId": "setup-ready", "replaceExistingData": "yes" }),
+        )
+        .expect_err("a non-boolean replace flag is invalid");
+        assert!(error.contains("boolean"), "{error}");
     }
 }

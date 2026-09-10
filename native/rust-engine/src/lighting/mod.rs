@@ -32,6 +32,9 @@ mod fixtures;
 mod groups;
 mod helpers;
 mod identify;
+// The legacy lighting fixture importer only serves the dev parity fixtures
+// (2026-09 production readiness, Slice 1 — finding F04).
+#[cfg(feature = "dev-fixtures")]
 mod legacy_import;
 mod palettes;
 mod parse;
@@ -46,6 +49,7 @@ pub use fixture_catalog::*;
 pub use fixtures::*;
 pub use groups::*;
 pub use identify::*;
+#[cfg(feature = "dev-fixtures")]
 pub use legacy_import::*;
 pub use palettes::*;
 pub use parse::*;

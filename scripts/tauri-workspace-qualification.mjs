@@ -363,6 +363,17 @@ async function runWorkspaceQualification() {
     });
     assertWorkspaceReady(initialStatus, "setup");
 
+    // All three probes run, so a workstation with live TotalMix publishes
+    // through the real gate. The engine refuses `stage: ready` while any probe
+    // is not `passed` (2026-09 audit Slice 8), so the explicit override is sent
+    // only when a probe cannot pass on this host: no TotalMix
+    // (SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1, CI) or port 80 not bindable
+    // for the lighting probe server (2026-09 production readiness, Slice 1).
+    await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
+      request: {
+        target: "control-surface",
+      },
+    });
     await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
       request: {
         receivePort: audioReceivePort,
@@ -383,10 +394,12 @@ async function runWorkspaceQualification() {
     } finally {
       await closeLightingProbeServer(lightingProbeServer);
     }
+    const overrideProbes = SKIP_AUDIO_PROBE || lightingProbeServer === null;
     await dispatchCommand(firstSession, firstRun, "updateCommissioning", {
       request: {
         runnerStage: "publish",
         stage: "ready",
+        ...(overrideProbes ? { overrideProbes: true } : {}),
       },
     });
     await dispatchCommand(firstSession, firstRun, "seedPlanningDemo", {
@@ -395,6 +408,7 @@ async function runWorkspaceQualification() {
     evidence.recordCheck("commissioning-probes-and-publish-complete", {
       audioReceivePort,
       lightingUniverse: 1,
+      overrideProbes,
     });
 
     const lightingWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {

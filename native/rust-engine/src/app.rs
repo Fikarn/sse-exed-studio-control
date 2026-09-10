@@ -56,6 +56,7 @@ use crate::lighting::{
     update_lighting_scene_with_preview, update_lighting_settings, LightingCommandError,
     LightingPreviewRuntimeState,
 };
+#[cfg(feature = "dev-fixtures")]
 use crate::parity_fixtures::{
     load_parity_fixture, parse_parity_fixture_request, ParityFixtureError,
 };
@@ -681,14 +682,27 @@ impl EngineApp {
             ),
 
             // -------------------------------------------------------------
-            // Dev parity fixture (M-multievent)
+            // Dev parity fixture (M-multievent). Compiled only with the
+            // `dev-fixtures` feature; a release engine keeps the method in
+            // the contract and answers METHOD_UNAVAILABLE (2026-09
+            // production readiness, Slice 1 — finding F04). Both arms stay
+            // literal on one line for tests/contract.rs.
             // -------------------------------------------------------------
+            #[cfg(feature = "dev-fixtures")]
             "dev.parityFixture.load" => self.dispatch_parity_fixture(
                 request,
                 parse_parity_fixture_request,
                 load_parity_fixture,
                 "parity-fixture-loaded",
             ),
+            #[cfg(not(feature = "dev-fixtures"))]
+            "dev.parityFixture.load" => Self::reply(error_response(
+                request.id,
+                "METHOD_UNAVAILABLE",
+                String::from(
+                    "dev.parityFixture.load is only available in an engine built with the dev-fixtures feature.",
+                ),
+            )),
 
             // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform
@@ -1421,6 +1435,7 @@ impl EngineApp {
         }
     }
 
+    #[cfg(feature = "dev-fixtures")]
     fn dispatch_parity_fixture<P, R, F, H>(
         &self,
         request: RequestEnvelope,
@@ -1539,6 +1554,7 @@ impl EngineApp {
         }
     }
 
+    #[cfg(feature = "dev-fixtures")]
     fn reply_with_app_commissioning_and_planning_change(
         response: ResponseEnvelope,
         reason: &str,
@@ -1700,7 +1716,153 @@ impl EngineApp {
 
 #[cfg(test)]
 mod tests {
-    use super::format_health_summary;
+    use super::{format_health_summary, EngineApp};
+    use crate::bootstrap::RuntimeContext;
+    use crate::control_surface::ControlSurfaceBridgeInfo;
+    use crate::lighting::LightingPreviewRuntimeState;
+    use crate::storage::{initialize_database, StorageBootstrap};
+    use serde_json::{json, Value};
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process;
+    use std::sync::Mutex;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use studio_control_protocol::RequestEnvelope;
+
+    struct TestDir {
+        path: PathBuf,
+    }
+
+    impl TestDir {
+        fn new(label: &str) -> Self {
+            let unique = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or(0);
+            let path = std::env::temp_dir().join(format!(
+                "studio-control-engine-app-{label}-{}-{unique}",
+                process::id()
+            ));
+            fs::create_dir_all(path.join("logs")).expect("test dir should be created");
+            Self { path }
+        }
+
+        fn path(&self) -> &Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn app_for(test_dir: &TestDir) -> EngineApp {
+        let runtime = RuntimeContext {
+            protocol_version: String::from("1"),
+            app_data_dir: test_dir.path().to_path_buf(),
+            backups_dir: test_dir.path().join("backups"),
+            logs_dir: test_dir.path().join("logs"),
+            log_file_path: test_dir.path().join("logs").join("engine.log"),
+            db_path: test_dir.path().join("native.sqlite3"),
+            update_repository_path: None,
+            storage_ready: true,
+            storage_bootstrap: StorageBootstrap {
+                schema_version: 4,
+                format_version: String::from("1"),
+                journal_mode: String::from("wal"),
+                integrity_check: String::from("ok"),
+            },
+            control_surface_bridge: ControlSurfaceBridgeInfo {
+                base_url: String::from("http://127.0.0.1:38201"),
+                port: 38201,
+                available: true,
+                status: String::from("ready"),
+                summary: String::from("Test bridge"),
+                error: None,
+            },
+        };
+        initialize_database(&runtime.db_path).expect("database should initialize");
+        EngineApp {
+            runtime,
+            lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
+        }
+    }
+
+    fn parity_fixture_request(params: Value) -> RequestEnvelope {
+        RequestEnvelope {
+            kind: String::from("request"),
+            id: json!("parity-1"),
+            method: String::from("dev.parityFixture.load"),
+            params,
+        }
+    }
+
+    // 2026-09 production readiness, Slice 1 (finding F04): a release engine
+    // keeps the method in the contract but does not carry the handler or
+    // the bundled fixture payloads; it answers METHOD_UNAVAILABLE and
+    // touches nothing.
+    #[cfg(not(feature = "dev-fixtures"))]
+    #[test]
+    fn parity_fixture_unavailable_without_feature() {
+        let test_dir = TestDir::new("parity-unavailable");
+        let app = app_for(&test_dir);
+
+        let reply = app.handle_request(parity_fixture_request(
+            json!({ "fixtureId": "planning-empty" }),
+        ));
+
+        assert!(!reply.response.ok, "release engines must refuse the method");
+        assert_eq!(
+            reply
+                .response
+                .error
+                .as_ref()
+                .and_then(|error| error.get("code"))
+                .and_then(Value::as_str),
+            Some("METHOD_UNAVAILABLE")
+        );
+        assert!(reply.events.is_empty(), "a refused load emits no events");
+        assert!(
+            !test_dir
+                .path()
+                .join("parity-fixture-planning-empty.json")
+                .exists(),
+            "a refused load writes no fixture file"
+        );
+    }
+
+    #[cfg(feature = "dev-fixtures")]
+    #[test]
+    fn parity_fixture_loads_with_feature() {
+        let test_dir = TestDir::new("parity-available");
+        let app = app_for(&test_dir);
+
+        let reply = app.handle_request(parity_fixture_request(
+            json!({ "fixtureId": "planning-empty" }),
+        ));
+
+        assert!(
+            reply.response.ok,
+            "a dev-fixtures engine loads the fixture (got {:?})",
+            reply.response.error
+        );
+        assert_eq!(
+            reply
+                .response
+                .result
+                .as_ref()
+                .and_then(|result| result.get("fixtureId"))
+                .and_then(Value::as_str),
+            Some("planning-empty")
+        );
+        assert_eq!(
+            reply.events.len(),
+            3,
+            "app, commissioning and planning change events"
+        );
+    }
 
     #[test]
     fn health_summary_includes_all_native_domains() {

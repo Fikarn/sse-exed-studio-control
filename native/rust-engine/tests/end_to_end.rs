@@ -49,16 +49,25 @@ struct EngineProcess {
 
 impl EngineProcess {
     fn spawn(label: &str) -> Self {
+        Self::spawn_with(label, |command, _runtime_dir| {
+            command.env("SSE_DISABLE_AUTO_IMPORT", "1");
+        })
+    }
+
+    /// Spawns the engine against a fresh runtime dir (`SSE_APP_DATA_DIR` and
+    /// `SSE_LOG_DIR` set) and lets the caller stage files in that dir or
+    /// adjust the command before the process starts.
+    fn spawn_with<F: FnOnce(&mut Command, &PathBuf)>(label: &str, configure: F) -> Self {
         let runtime_dir = unique_runtime_dir(label);
-        let mut child = Command::new(engine_binary_path())
+        let mut command = Command::new(engine_binary_path());
+        command
             .env("SSE_APP_DATA_DIR", &runtime_dir)
             .env("SSE_LOG_DIR", runtime_dir.join("logs"))
-            .env("SSE_DISABLE_AUTO_IMPORT", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("engine binary should spawn");
+            .stderr(Stdio::piped());
+        configure(&mut command, &runtime_dir);
+        let mut child = command.spawn().expect("engine binary should spawn");
         let stdin = child.stdin.take().expect("stdin pipe");
         let stdout = BufReader::new(child.stdout.take().expect("stdout pipe"));
         Self {
@@ -236,6 +245,90 @@ fn commissioning_publish_is_refused_until_probes_pass_or_the_operator_overrides(
     assert!(
         readiness.contains(&format!("Published with a probe override at {override_at}")),
         "{readiness}"
+    );
+
+    engine.shutdown();
+}
+
+fn legacy_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("fixtures")
+        .join("commissioning-sample-db.json")
+}
+
+fn wait_for_ready(engine: &mut EngineProcess) {
+    engine.wait_for("engine.ready event", |value| {
+        value.get("type").and_then(Value::as_str) == Some("event")
+            && value.get("event").and_then(Value::as_str) == Some("engine.ready")
+    });
+}
+
+fn planning_project_count(engine: &mut EngineProcess, id: &'static str) -> u64 {
+    engine.send(&json!({
+        "type": "request",
+        "id": id,
+        "method": "commissioning.snapshot",
+        "params": {}
+    }));
+    let snapshot = engine.wait_for("commissioning snapshot", response_with_id(id));
+    snapshot
+        .pointer("/result/planningProjectCount")
+        .and_then(Value::as_u64)
+        .unwrap_or_else(|| {
+            panic!("commissioning.snapshot must report planningProjectCount ({snapshot})")
+        })
+}
+
+// 2026-09 production readiness, Slice 1 (finding F23): the engine used to
+// auto-import `<cwd>/data/db.json` whenever its planning tables were empty,
+// so whatever directory a packaged engine happened to be launched from
+// could seed the operator's database. The only sources now are
+// `SSE_LEGACY_DB_PATH` and `<app-data>/import/db.json`.
+#[test]
+fn auto_import_ignores_cwd() {
+    let working_dir = unique_runtime_dir("auto-import-cwd");
+    fs::create_dir_all(working_dir.join("data")).expect("cwd data dir");
+    fs::copy(
+        legacy_fixture_path(),
+        working_dir.join("data").join("db.json"),
+    )
+    .expect("legacy fixture should copy under the working directory");
+
+    let mut engine = EngineProcess::spawn_with("auto-import-ignores-cwd", |command, _| {
+        command
+            .current_dir(&working_dir)
+            .env_remove("SSE_DISABLE_AUTO_IMPORT")
+            .env_remove("SSE_LEGACY_DB_PATH");
+    });
+    wait_for_ready(&mut engine);
+
+    assert_eq!(
+        planning_project_count(&mut engine, "cwd-snapshot"),
+        0,
+        "a db.json under the engine's working directory must not be imported"
+    );
+
+    engine.shutdown();
+    let _ = fs::remove_dir_all(&working_dir);
+}
+
+#[test]
+fn auto_import_reads_the_staged_app_data_file() {
+    let mut engine = EngineProcess::spawn_with("auto-import-staged", |command, runtime_dir| {
+        let import_dir = runtime_dir.join("import");
+        fs::create_dir_all(&import_dir).expect("app-data import dir");
+        fs::copy(legacy_fixture_path(), import_dir.join("db.json"))
+            .expect("legacy fixture should copy into app-data/import");
+        command
+            .env_remove("SSE_DISABLE_AUTO_IMPORT")
+            .env_remove("SSE_LEGACY_DB_PATH");
+    });
+    wait_for_ready(&mut engine);
+
+    assert_eq!(
+        planning_project_count(&mut engine, "staged-snapshot"),
+        2,
+        "the staged <app-data>/import/db.json (commissioning-sample-db.json, two projects) must be imported"
     );
 
     engine.shutdown();

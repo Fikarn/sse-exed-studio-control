@@ -10,6 +10,11 @@ default = []
 # binding export when `cargo test --features ts-rs` runs. Production
 # builds must NOT enable this feature; it adds a dev-only dependency.
 ts-rs = ["dep:ts-rs"]
+# Compiles the dev-only `dev.parityFixture.load` method together with its
+# bundled fixture payloads (`parity_fixtures.rs`). Release engines are built
+# without it and answer METHOD_UNAVAILABLE; the method stays in the protocol
+# contract (2026-09 production readiness, Slice 1 — finding F04).
+dev-fixtures = []
 
 [dependencies]
 rusqlite.workspace = true
