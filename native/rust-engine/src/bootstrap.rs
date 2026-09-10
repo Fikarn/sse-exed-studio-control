@@ -1,6 +1,5 @@
-use crate::control_surface::{
-    resolve_control_surface_port, start_control_surface_bridge, ControlSurfaceBridgeInfo,
-};
+use crate::control_surface::{resolve_control_surface_port, ControlSurfaceBridgeInfo};
+use crate::control_surface_http::{load_or_create_bridge_token, start_control_surface_bridge};
 use crate::diagnostics::append_log;
 use crate::legacy_import::LegacyImportRequest;
 use crate::planning::planning_data_present;
@@ -46,6 +45,10 @@ pub struct RuntimeContext {
     pub storage_ready: bool,
     pub storage_bootstrap: StorageBootstrap,
     pub control_surface_bridge: ControlSurfaceBridgeInfo,
+    /// The bearer token the bridge demands and the exported Stream Deck
+    /// profile carries (2026-09 production readiness, Slice 2 — F01). Never
+    /// part of a snapshot.
+    pub control_surface_token: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -229,11 +232,14 @@ pub fn bootstrap_runtime() -> EngineResult<RuntimeContext> {
         }
     }
 
+    let control_surface_token =
+        load_or_create_bridge_token(&runtime_paths.app_data_dir).map_err(std::io::Error::other)?;
     let requested_control_surface_port = resolve_control_surface_port();
     let control_surface_bridge = start_control_surface_bridge(
         &runtime_paths.db_path,
         &runtime_paths.log_file_path,
         requested_control_surface_port,
+        control_surface_token.clone(),
     );
     append_log(
         &runtime_paths.log_file_path,
@@ -256,6 +262,7 @@ pub fn bootstrap_runtime() -> EngineResult<RuntimeContext> {
         storage_ready: true,
         storage_bootstrap,
         control_surface_bridge,
+        control_surface_token,
     })
 }
 

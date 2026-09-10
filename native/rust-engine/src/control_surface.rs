@@ -7,7 +7,6 @@ use crate::control_surface_audio::{
     audio_strip_state_text, current_audio_snapshot, handle_audio_action, resolve_audio_deck_strip,
     AudioDeckStrip,
 };
-use crate::diagnostics::append_log;
 use crate::lighting::{
     load_lighting_editor_state, parse_lighting_scene_recall_request, read_lighting_snapshot,
     recall_lighting_scene, save_lighting_editor_state, LightingCommandError,
@@ -30,12 +29,8 @@ use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owne
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::mpsc::Sender;
-use std::thread;
-use std::time::Duration;
 
 pub const DEFAULT_CONTROL_SURFACE_HOST: &str = "127.0.0.1";
 pub const DEFAULT_CONTROL_SURFACE_PORT: u16 = 38201;
@@ -70,15 +65,36 @@ pub enum ControlSurfaceError {
     Unsupported(String),
     Rejected(String),
     Storage(String),
+    /// Missing or wrong bearer token (401) — `control_surface_http`.
+    Unauthorized(String),
+    /// A browser origin presented itself (403).
+    Forbidden(String),
+    /// The request did not arrive within the deadline (408).
+    Timeout(String),
+    /// A body without a usable `Content-Length` (411).
+    LengthRequired(String),
+    /// The declared body exceeds the cap (413).
+    TooLarge(String),
+    /// The headers exceed the cap (431).
+    HeadersTooLarge(String),
+    /// The worker queue is full (503).
+    Busy(String),
 }
 
 impl ControlSurfaceError {
-    fn status_code(&self) -> u16 {
+    pub(crate) fn status_code(&self) -> u16 {
         match self {
             Self::InvalidParams(_) => 400,
-            Self::Unsupported(_) => 501,
+            Self::Unauthorized(_) => 401,
+            Self::Forbidden(_) => 403,
+            Self::Timeout(_) => 408,
             Self::Rejected(_) => 409,
+            Self::LengthRequired(_) => 411,
+            Self::TooLarge(_) => 413,
+            Self::HeadersTooLarge(_) => 431,
             Self::Storage(_) => 500,
+            Self::Unsupported(_) => 501,
+            Self::Busy(_) => 503,
         }
     }
 
@@ -87,7 +103,14 @@ impl ControlSurfaceError {
             Self::InvalidParams(message)
             | Self::Unsupported(message)
             | Self::Rejected(message)
-            | Self::Storage(message) => message,
+            | Self::Storage(message)
+            | Self::Unauthorized(message)
+            | Self::Forbidden(message)
+            | Self::Timeout(message)
+            | Self::LengthRequired(message)
+            | Self::TooLarge(message)
+            | Self::HeadersTooLarge(message)
+            | Self::Busy(message) => message,
         }
     }
 }
@@ -110,49 +133,8 @@ pub(crate) fn emit_audio_changed() {
     crate::engine_events::emit_audio_changed("control-surface");
 }
 
-pub fn start_control_surface_bridge(
-    db_path: &Path,
-    log_file_path: &Path,
-    requested_port: u16,
-) -> ControlSurfaceBridgeInfo {
-    match bind_control_surface_listener(requested_port) {
-        Ok(listener) => {
-            let port = listener
-                .local_addr()
-                .map(|address| address.port())
-                .unwrap_or(requested_port);
-            let base_url = format!("http://{DEFAULT_CONTROL_SURFACE_HOST}:{port}");
-            let db_path = db_path.to_path_buf();
-            let log_file_path = log_file_path.to_path_buf();
-            let summary = format!(
-                "Native control-surface bridge is serving deck actions and LCD payloads at {base_url}."
-            );
-
-            let _ = append_log(log_file_path.as_path(), "INFO", &summary);
-
-            thread::spawn(move || run_control_surface_bridge(listener, db_path, log_file_path));
-
-            ControlSurfaceBridgeInfo {
-                base_url,
-                port,
-                available: true,
-                status: String::from("ready"),
-                summary,
-                error: None,
-            }
-        }
-        Err(message) => ControlSurfaceBridgeInfo {
-            base_url: format!("http://{DEFAULT_CONTROL_SURFACE_HOST}:{requested_port}"),
-            port: requested_port,
-            available: false,
-            status: String::from("unavailable"),
-            summary: format!(
-                "Native control-surface bridge is unavailable because the listener could not bind: {message}"
-            ),
-            error: Some(message),
-        },
-    }
-}
+// The listener, the bearer token, the request limits and the worker pool live
+// in `control_surface_http`; this module owns what a request does.
 
 pub fn read_control_surface_context(db_path: &Path) -> Result<Value, ControlSurfaceError> {
     let planning_settings = list_settings_by_prefix(db_path, PLANNING_SETTINGS_PREFIX)
@@ -477,227 +459,6 @@ pub fn control_surface_last_event(db_path: &Path) -> Value {
         .and_then(|settings| settings.get(LAST_EVENT_KEY).cloned())
         .and_then(|serialized| serde_json::from_str::<Value>(&serialized).ok())
         .unwrap_or(Value::Null)
-}
-
-fn bind_control_surface_listener(requested_port: u16) -> Result<TcpListener, String> {
-    TcpListener::bind((DEFAULT_CONTROL_SURFACE_HOST, requested_port))
-        .map_err(|error| error.to_string())
-}
-
-fn run_control_surface_bridge(
-    listener: TcpListener,
-    db_path: std::path::PathBuf,
-    log_file_path: std::path::PathBuf,
-) {
-    let _ = listener.set_nonblocking(false);
-    for incoming in listener.incoming() {
-        match incoming {
-            Ok(stream) => {
-                let db_path = db_path.clone();
-                let log_file_path = log_file_path.clone();
-                thread::spawn(move || {
-                    if let Err(error) = handle_control_surface_connection(stream, &db_path) {
-                        let _ = append_log(
-                            log_file_path.as_path(),
-                            "WARN",
-                            &format!("Control-surface bridge request failed: {}", error.message()),
-                        );
-                    }
-                });
-            }
-            Err(error) => {
-                let _ = append_log(
-                    log_file_path.as_path(),
-                    "WARN",
-                    &format!("Control-surface bridge accept failed: {error}"),
-                );
-                thread::sleep(Duration::from_millis(50));
-            }
-        }
-    }
-}
-
-fn handle_control_surface_connection(
-    mut stream: TcpStream,
-    db_path: &Path,
-) -> Result<(), ControlSurfaceError> {
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
-    let request = read_http_request(&mut stream)?;
-    let response = route_control_surface_request(db_path, &request);
-    write_http_response(&mut stream, response.status_code, &response.body)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
-}
-
-struct HttpRequest {
-    method: String,
-    target: String,
-    body: Vec<u8>,
-}
-
-struct HttpResponse {
-    status_code: u16,
-    body: Vec<u8>,
-}
-
-fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, ControlSurfaceError> {
-    let mut buffer = Vec::new();
-    let mut chunk = [0_u8; 1024];
-
-    loop {
-        let bytes_read = stream
-            .read(&mut chunk)
-            .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-        if bytes_read == 0 {
-            break;
-        }
-        buffer.extend_from_slice(&chunk[..bytes_read]);
-        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
-            break;
-        }
-        if buffer.len() > 64 * 1024 {
-            return Err(ControlSurfaceError::InvalidParams(String::from(
-                "HTTP request header exceeded the native bridge limit",
-            )));
-        }
-    }
-
-    let Some(header_end) = buffer.windows(4).position(|window| window == b"\r\n\r\n") else {
-        return Err(ControlSurfaceError::InvalidParams(String::from(
-            "Malformed HTTP request",
-        )));
-    };
-    let header_end = header_end + 4;
-    let header_text = String::from_utf8_lossy(&buffer[..header_end]).to_string();
-    let mut lines = header_text.lines();
-    let request_line = lines
-        .next()
-        .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("Missing request line")))?;
-    let mut parts = request_line.split_whitespace();
-    let method = parts
-        .next()
-        .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("Missing HTTP method")))?
-        .to_string();
-    let target = parts
-        .next()
-        .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("Missing HTTP target")))?
-        .to_string();
-
-    let content_length = header_text
-        .lines()
-        .skip(1)
-        .filter_map(|line| line.split_once(':'))
-        .find_map(|(name, value)| {
-            if name.trim().eq_ignore_ascii_case("content-length") {
-                value.trim().parse::<usize>().ok()
-            } else {
-                None
-            }
-        })
-        .unwrap_or(0);
-
-    while buffer.len() < header_end + content_length {
-        let bytes_read = stream
-            .read(&mut chunk)
-            .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-        if bytes_read == 0 {
-            break;
-        }
-        buffer.extend_from_slice(&chunk[..bytes_read]);
-    }
-
-    let mut body = buffer.split_off(header_end);
-    if body.len() > content_length {
-        body.truncate(content_length);
-    }
-
-    Ok(HttpRequest {
-        method,
-        target,
-        body,
-    })
-}
-
-fn route_control_surface_request(db_path: &Path, request: &HttpRequest) -> HttpResponse {
-    let (path, query) = split_target(&request.target);
-
-    let result = match (request.method.as_str(), path) {
-        ("GET", "/api/deck/context") => read_control_surface_context(db_path),
-        ("GET", "/api/deck/lcd") => {
-            let key = query_parameter(query, "key").ok_or_else(|| {
-                ControlSurfaceError::InvalidParams(String::from("Missing ?key= parameter"))
-            });
-            key.and_then(|key| read_control_surface_lcd_text(db_path, &key).map(Value::String))
-        }
-        ("POST", "/api/deck/action")
-        | ("POST", "/api/deck/light-action")
-        | ("POST", "/api/deck/audio-action") => parse_json_body(&request.body)
-            .and_then(|body| handle_control_surface_http_action(db_path, path, &body)),
-        _ => Err(ControlSurfaceError::InvalidParams(format!(
-            "Unsupported bridge endpoint: {} {}",
-            request.method, path
-        ))),
-    };
-
-    match result {
-        Ok(value) => HttpResponse {
-            status_code: 200,
-            body: serde_json::to_vec(&value).unwrap_or_else(|_| b"{}".to_vec()),
-        },
-        Err(error) => HttpResponse {
-            status_code: error.status_code(),
-            body: serde_json::to_vec(&json!({ "error": error.message() }))
-                .unwrap_or_else(|_| b"{\"error\":\"bridge failure\"}".to_vec()),
-        },
-    }
-}
-
-fn write_http_response(
-    stream: &mut TcpStream,
-    status_code: u16,
-    body: &[u8],
-) -> Result<(), std::io::Error> {
-    let status_text = match status_code {
-        200 => "OK",
-        400 => "Bad Request",
-        404 => "Not Found",
-        409 => "Conflict",
-        500 => "Internal Server Error",
-        501 => "Not Implemented",
-        _ => "Error",
-    };
-    let headers = format!(
-        "HTTP/1.1 {status_code} {status_text}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.len()
-    );
-    stream.write_all(headers.as_bytes())?;
-    stream.write_all(body)?;
-    stream.flush()
-}
-
-fn split_target(target: &str) -> (&str, &str) {
-    target.split_once('?').unwrap_or((target, ""))
-}
-
-fn query_parameter(query: &str, name: &str) -> Option<String> {
-    query
-        .split('&')
-        .filter_map(|pair| pair.split_once('='))
-        .find_map(|(key, value)| {
-            if key == name {
-                Some(value.replace("%20", " "))
-            } else {
-                None
-            }
-        })
-}
-
-fn parse_json_body(body: &[u8]) -> Result<Value, ControlSurfaceError> {
-    if body.is_empty() {
-        return Ok(json!({}));
-    }
-
-    serde_json::from_slice(body)
-        .map_err(|error| ControlSurfaceError::InvalidParams(error.to_string()))
 }
 
 fn handle_planning_action(
@@ -1397,21 +1158,21 @@ pub fn build_control_surface_health_check(runtime: &RuntimeContext) -> Value {
     })
 }
 
+/// Test fixtures shared with `control_surface_http::tests`.
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::storage::initialize_database;
+pub(crate) mod test_support {
+    use crate::storage::{initialize_database, set_settings_owned};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    struct TestDir {
+    pub(crate) struct TestDir {
         path: PathBuf,
     }
 
     impl TestDir {
-        fn new(label: &str) -> Self {
+        pub(crate) fn new(label: &str) -> Self {
             let unique = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .map(|duration| duration.as_nanos())
@@ -1424,7 +1185,11 @@ mod tests {
             Self { path }
         }
 
-        fn db_path(&self) -> PathBuf {
+        pub(crate) fn path(&self) -> &Path {
+            &self.path
+        }
+
+        pub(crate) fn db_path(&self) -> PathBuf {
             self.path.join("native.sqlite3")
         }
     }
@@ -1435,7 +1200,7 @@ mod tests {
         }
     }
 
-    fn ready_audio_test_db(label: &str) -> TestDir {
+    pub(crate) fn ready_audio_test_db(label: &str) -> TestDir {
         let test_dir = TestDir::new(label);
         initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
         set_settings_owned(
@@ -1458,6 +1223,13 @@ mod tests {
         .expect("ready audio settings should persist");
         test_dir
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::{ready_audio_test_db, TestDir};
+    use super::*;
+    use crate::storage::initialize_database;
 
     #[test]
     fn truncate_preserves_short_text() {

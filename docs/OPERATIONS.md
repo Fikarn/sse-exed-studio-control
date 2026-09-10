@@ -127,6 +127,8 @@ Trust rules: deck actions pass the same gating as app commands — when audio is
 
 Deck freshness comes from the profile's `SSE audio LCD poll` trigger (1 s) plus per-action refreshes; the `SSE follow app - …` triggers flip the deck to the AUDIO / LIGHTS / PROJECTS page whenever the app workspace changes.
 
+The bridge answers only requests that carry this workstation's bridge token. The app creates the token once per install (`control-surface.token` in the app-data directory, next to the saved data) and writes it into every request of the exported Stream Deck profile — the keys, the dials and the LCD poll. A profile exported before 2026-09-10 carries no token, and Companion's requests are refused with `401`: export the profile again from Setup step 1 and import it with Full Reset & Import. The token is never shown on screen and is not part of a diagnostics export; the exported profile file contains it, so keep that file with the app-data directory and do not share it.
+
 To commission or re-commission the deck:
 
 1. Start Companion (it must be running so the export can bind the page-follow triggers to the physical Stream Deck — the export summary reports the bound surface id; without Companion running it falls back to `self` and page-follow will not move the deck).
@@ -136,9 +138,10 @@ To commission or re-commission the deck:
 ### Control-surface bridge stops responding
 
 1. Open Setup or Support and verify the control-surface base URL is present in native diagnostics.
-2. If the bridge is unavailable, restart the app before changing deck mappings or network assumptions.
-3. If the problem persists, collect diagnostics and confirm the host can still bind `127.0.0.1` on the configured control-surface port.
-4. Reinstall the latest known-good native build only after preserving the app-data directory and the latest support backup.
+2. If the app is up but the deck keys do nothing and Companion's log shows `401`, the Stream Deck profile predates the bridge token or was exported on another install: export it again from Setup step 1 and import it with Full Reset & Import.
+3. If the bridge is unavailable, restart the app before changing deck mappings or network assumptions.
+4. If the problem persists, collect diagnostics and confirm the host can still bind `127.0.0.1` on the configured control-surface port.
+5. Reinstall the latest known-good native build only after preserving the app-data directory and the latest support backup.
 
 ### Planning data looks wrong or missing
 
@@ -203,6 +206,6 @@ Release validation must prove the local control-surface bridge can bind, listen,
 - `npm run native:bridge:mac:verify`
 - `npm run native:bridge:win:verify`
 
-Those lanes start the packaged engine on a dedicated localhost port, then verify `/api/deck/context`, `/api/deck/lcd`, `/api/deck/action`, `/api/deck/light-action`, and `/api/deck/audio-action` against the live bridge. Treat a bind failure as a release blocker, not as an acceptable warning.
+Those lanes start the packaged engine on a dedicated localhost port, read the bridge token it wrote, then verify `/api/deck/context`, `/api/deck/lcd`, `/api/deck/action`, `/api/deck/light-action`, and `/api/deck/audio-action` against the live bridge with that token. They then prove the refusals: a request without the token or with a wrong one (`401`), a browser `Origin` (`403`), a foreign `Host` (`400`), a body over 16 KiB (`413`), a body that stops arriving (`408` within the 1 s deadline), and a percent-encoded LCD key that must reach the handler decoded; and they export the Stream Deck profile and check that every one of its requests carries the token. Treat a bind failure or a failed refusal check as a release blocker, not as an acceptable warning.
 
 For the current handoff state, use [docs/HANDOFF.md](./HANDOFF.md). The historical parity appendix is preserved at [docs/archive/NATIVE_PARITY_HANDOFF.md](./archive/NATIVE_PARITY_HANDOFF.md) for reference only.

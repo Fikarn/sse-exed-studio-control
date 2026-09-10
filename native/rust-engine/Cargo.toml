@@ -19,6 +19,7 @@ dev-fixtures = []
 [dependencies]
 rusqlite.workspace = true
 rosc.workspace = true
+getrandom.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 studio-control-protocol.workspace = true

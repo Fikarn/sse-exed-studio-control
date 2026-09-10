@@ -1774,6 +1774,7 @@ mod tests {
                 journal_mode: String::from("wal"),
                 integrity_check: String::from("ok"),
             },
+            control_surface_token: String::from("bridge-token-for-tests"),
             control_surface_bridge: ControlSurfaceBridgeInfo {
                 base_url: String::from("http://127.0.0.1:38201"),
                 port: 38201,

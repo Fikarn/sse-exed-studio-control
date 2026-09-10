@@ -11,6 +11,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 rosc = "0.11.4"
+# OS-seeded randomness for the control-surface bridge token (2026-09
+# production readiness, Slice 2 — finding F01). The 0.3 line was already in
+# the lock file through the Tauri shell, so no new crate is fetched.
+getrandom = "0.3"
 studio-control-protocol = { path = "protocol/rust" }
 # Pinned to a minor range so generated TypeScript stays stable. Bumping
 # the minor must be paired with a `npm run protocol:generate` regen run

@@ -7,6 +7,7 @@ mod bootstrap;
 mod commissioning;
 mod control_surface;
 mod control_surface_audio;
+mod control_surface_http;
 mod diagnostics;
 mod engine_events;
 mod exports;

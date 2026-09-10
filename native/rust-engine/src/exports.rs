@@ -103,7 +103,11 @@ pub fn export_companion_config(
         .filter(|value| !value.is_empty())
         .unwrap_or(&runtime.control_surface_bridge.base_url);
     let deck_surface_id = discover_streamdeck_surface_id();
-    let config = generate_companion_config(base_url, deck_surface_id.as_deref());
+    let config = generate_companion_config(
+        base_url,
+        deck_surface_id.as_deref(),
+        &runtime.control_surface_token,
+    );
     let action_count = count_companion_actions(&config);
     let page_count = config
         .get("pages")
@@ -225,7 +229,52 @@ fn count_companion_actions(config: &Value) -> usize {
         .unwrap_or(0)
 }
 
-fn generate_companion_config(base_url: &str, deck_surface_id: Option<&str>) -> Value {
+fn generate_companion_config(
+    base_url: &str,
+    deck_surface_id: Option<&str>,
+    bridge_token: &str,
+) -> Value {
+    let mut config = generate_companion_config_without_auth(base_url, deck_surface_id);
+    apply_bridge_auth_header(&mut config, &bridge_auth_header_option(bridge_token));
+    config
+}
+
+/// The generic-http `header` option: a JSON object the module parses and sends
+/// with every request. Carrying the bridge token here is what makes the
+/// exported profile a client the bridge accepts (2026-09 production readiness,
+/// Slice 2 — finding F01).
+fn bridge_auth_header_option(bridge_token: &str) -> String {
+    json!({ "Authorization": format!("Bearer {bridge_token}") }).to_string()
+}
+
+/// Every action that talks to the bridge connection — key presses, dial turns,
+/// the per-action LCD refreshes and the 1 s poll trigger — gets the auth
+/// header, wherever it sits in the profile. Walking the finished profile is
+/// what guarantees no request is left out.
+fn apply_bridge_auth_header(value: &mut Value, header: &str) {
+    match value {
+        Value::Object(map) => {
+            if map.get("connectionId").and_then(Value::as_str) == Some(INSTANCE_ID) {
+                if let Some(Value::Object(options)) = map.get_mut("options") {
+                    if options.contains_key("header") {
+                        options.insert(String::from("header"), Value::String(header.to_string()));
+                    }
+                }
+            }
+            for child in map.values_mut() {
+                apply_bridge_auth_header(child, header);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                apply_bridge_auth_header(item, header);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn generate_companion_config_without_auth(base_url: &str, deck_surface_id: Option<&str>) -> Value {
     let mut pages = Map::new();
     pages.insert(
         String::from("1"),
@@ -1363,9 +1412,77 @@ mod tests {
     use super::*;
     use crate::exports_audio::{DECK_AMBER_BG, DECK_MUTED_INK, LEGACY_LCD_KEYS};
 
+    const TEST_TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    fn collect_bridge_actions<'a>(value: &'a Value, into: &mut Vec<&'a Value>) {
+        match value {
+            Value::Object(map) => {
+                if map.get("connectionId").and_then(Value::as_str) == Some(INSTANCE_ID) {
+                    into.push(value);
+                }
+                for child in map.values() {
+                    collect_bridge_actions(child, into);
+                }
+            }
+            Value::Array(items) => {
+                for item in items {
+                    collect_bridge_actions(item, into);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // 2026-09 production readiness, Slice 2 (finding F01): the profile is the
+    // client the bridge accepts, so every request it makes must carry the
+    // token — and nothing else in the file may.
+    #[test]
+    fn companion_export_carries_the_bridge_token_on_every_request() {
+        let config = generate_companion_config(
+            "http://127.0.0.1:38201",
+            Some("streamdeck:TESTSERIAL"),
+            TEST_TOKEN,
+        );
+        let mut actions = Vec::new();
+        collect_bridge_actions(&config, &mut actions);
+        assert!(
+            actions.len() > 50,
+            "every deck key, dial and LCD refresh talks to the bridge: {}",
+            actions.len()
+        );
+
+        let expected = json!({ "Authorization": format!("Bearer {TEST_TOKEN}") });
+        for action in &actions {
+            let header = action["options"]["header"]
+                .as_str()
+                .unwrap_or_else(|| panic!("bridge action without a header option: {action}"));
+            let parsed: Value = serde_json::from_str(header)
+                .expect("the header option is the JSON object generic-http parses");
+            assert_eq!(parsed, expected, "{action}");
+        }
+
+        let poll_actions = config["triggers"]["sse-trigger-lcd-poll"]["actions"]
+            .as_array()
+            .expect("poll actions");
+        assert!(
+            !poll_actions.is_empty()
+                && poll_actions.iter().all(|action| action["options"]["header"]
+                    .as_str()
+                    .is_some_and(|header| header.contains(TEST_TOKEN))),
+            "the 1 s LCD poll must be authenticated too"
+        );
+
+        let serialized = config.to_string();
+        assert_eq!(
+            serialized.matches(TEST_TOKEN).count(),
+            actions.len(),
+            "the token appears once per bridge request and nowhere else"
+        );
+    }
+
     #[test]
     fn companion_export_contains_native_bridge_instance() {
-        let config = generate_companion_config("http://127.0.0.1:38201", None);
+        let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
         let prefix = config["instances"][INSTANCE_ID]["config"]["prefix"]
             .as_str()
             .expect("prefix should be a string");
@@ -1379,7 +1496,7 @@ mod tests {
 
     #[test]
     fn companion_export_uses_override_base_url() {
-        let config = generate_companion_config("http://localhost:3000", None);
+        let config = generate_companion_config("http://localhost:3000", None, TEST_TOKEN);
         let prefix = config["instances"][INSTANCE_ID]["config"]["prefix"]
             .as_str()
             .expect("prefix should be a string");
@@ -1388,7 +1505,7 @@ mod tests {
 
     #[test]
     fn companion_export_is_a_native_v9_full_config() {
-        let config = generate_companion_config("http://127.0.0.1:38201", None);
+        let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
         assert_eq!(config["version"], COMPANION_EXPORT_FORMAT_VERSION);
         assert_eq!(config["type"], "full");
         assert_eq!(
@@ -1420,7 +1537,7 @@ mod tests {
 
     #[test]
     fn companion_export_audio_page_maps_the_deck_hardware() {
-        let config = generate_companion_config("http://127.0.0.1:38201", None);
+        let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
         let controls = config["pages"]["4"]["controls"]
             .as_object()
             .expect("audio controls should exist");
@@ -1467,7 +1584,7 @@ mod tests {
 
     #[test]
     fn companion_export_audio_page_carries_the_visual_language() {
-        let config = generate_companion_config("http://127.0.0.1:38201", None);
+        let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
         let controls = config["pages"]["4"]["controls"]
             .as_object()
             .expect("audio controls should exist");
@@ -1519,8 +1636,11 @@ mod tests {
 
     #[test]
     fn companion_export_triggers_poll_and_follow_the_app() {
-        let config =
-            generate_companion_config("http://127.0.0.1:38201", Some("streamdeck:TESTSERIAL"));
+        let config = generate_companion_config(
+            "http://127.0.0.1:38201",
+            Some("streamdeck:TESTSERIAL"),
+            TEST_TOKEN,
+        );
         let triggers = config["triggers"]
             .as_object()
             .expect("triggers should exist");
@@ -1549,7 +1669,7 @@ mod tests {
         );
         assert_eq!(follow["actions"][0]["options"]["page"], 4);
 
-        let fallback = generate_companion_config("http://127.0.0.1:38201", None);
+        let fallback = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
         assert_eq!(
             fallback["triggers"]["sse-trigger-follow-audio"]["actions"][0]["options"]["controller"],
             "self"
