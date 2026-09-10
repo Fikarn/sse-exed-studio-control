@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the top-level engineering handoff for the repository as of `2026-09-09`.
+This is the top-level engineering handoff for the repository as of `2026-09-10`.
 
 Read this first before resuming product, release, or cleanup work. Use it as the entry point into the more detailed documents linked below.
 
@@ -31,24 +31,53 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 
 ## Start Here
 
-Read these in order:
+If you are new to this repository, read these six in order. They are about two
+hours and they are the whole picture:
 
-1. `README.md`
-2. `docs/DEVELOPER_QUICKSTART.md`
-3. `docs/HANDOFF.md`
-4. `docs/RELEASE.md`
-5. `docs/HARDWARE_PROFILE.md`
-6. `docs/ARCHITECTURE.md`
-7. `docs/adr/0001-frontend-replatform.md`
-8. `docs/archive/FRONTEND_CUTOVER_PLAN.md`
-9. `docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md`
+1. `README.md` — what the product is and where everything lives.
+2. `docs/DEVELOPER_QUICKSTART.md` — clone to running app.
+3. `docs/HANDOFF.md` — this file. Current Operating Truth, then Current Blockers.
+4. `docs/ARCHITECTURE.md` — the two-process boundary. The one rule that must not
+   bend: no device or DB logic in React.
+5. `docs/HARDWARE_PROFILE.md` — the room this is built for. `2560×1440` on a fixed
+   second monitor is the only resolution that matters (operator ruling, plan D4).
+6. `AGENTS.md` — the working contract: lanes, rescope protocol, done criteria.
 
-Use these for deeper context only after the above are clear:
+Then, before you change anything the operator can see:
 
-- `docs/PRODUCTIZATION_PLAN.md`
-- `native/README.md`
-- `docs/archive/DESKTOP_ARCHITECTURE_PLAN.md` (historical; frozen at `v2.1.0`)
-- `docs/archive/NATIVE_PARITY_HANDOFF.md` (historical; frozen at `v2.1.0`)
+7. `docs/redesign/system-a-2026-09.md` — the visual system every surface is built
+   to. §10 is the list of things that are measured on every board.
+8. `docs/DEVELOPMENT.md §2c` — how those measures are run, re-seeded and refreshed,
+   and the traps that have cost real time here.
+
+Deeper context, once the above is clear:
+
+- `docs/RELEASE.md` and `docs/PRODUCTIZATION_PLAN.md` — versioning, installers, the
+  target-host gates, and the deferred signing posture.
+- `docs/OPERATIONS.md` — what the operator actually does with the app.
+- `docs/plans/visual-overhaul-a-2026-09.md` and
+  `docs/plans/audit-remediation-2026-09.md` — the two 13-slice ledgers behind the
+  current state of the app. Read the slice status before changing a surface it
+  names; it usually explains why something is the way it is.
+- `native/README.md`, `docs/adr/0001-frontend-replatform.md`.
+- Historical, frozen: `docs/archive/FRONTEND_CUTOVER_PLAN.md`,
+  `docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md`,
+  `docs/archive/DESKTOP_ARCHITECTURE_PLAN.md`,
+  `docs/archive/NATIVE_PARITY_HANDOFF.md` (the last two at `v2.1.0`).
+
+### The first thing to run
+
+```bash
+npm install
+npm run doctor          # environment check
+npm run dev:check       # the whole local code-health gate; exit 0 = green
+```
+
+`dev:check` is the gate every commit in the two 2026-09 programs was held to. If
+it is green on a clean checkout, your environment is right. From there,
+`docs/DEVELOPMENT.md §4` tells you which lane matches the risk of what you are
+about to change — do not run the full matrix for a typo, and do not skip
+`frontend:playwright:test` for a layout change.
 
 ## Locked Decisions
 
@@ -107,7 +136,13 @@ The highest-value unresolved work is:
 
 ## Execution Queue
 
-The current GitHub execution queue is empty as of `2026-05-20`; no open issues or pull requests are waiting for handoff. Audio meter PRs [#83](https://github.com/Fikarn/sse-exed-studio-control/pull/83) and [#84](https://github.com/Fikarn/sse-exed-studio-control/pull/84) were merged, required checks passed after rebasing #84 onto the updated `main`, and stale remote Claude branches were pruned from GitHub.
+As of `2026-09-10`:
+
+- **No open issues.**
+- **Seven open Dependabot pull requests**, all against `main`, opened `2026-09-01` and `2026-09-07`: [#192](https://github.com/Fikarn/sse-exed-studio-control/pull/192) `actions/setup-node` 6 → 7, [#193](https://github.com/Fikarn/sse-exed-studio-control/pull/193) `fuzzysort` 3.1.0 → 4.0.2, [#194](https://github.com/Fikarn/sse-exed-studio-control/pull/194) native-runtime group, [#195](https://github.com/Fikarn/sse-exed-studio-control/pull/195) tooling group, [#196](https://github.com/Fikarn/sse-exed-studio-control/pull/196) `tauri` 2.11.4 → 2.11.5, [#197](https://github.com/Fikarn/sse-exed-studio-control/pull/197) `storybook` 10.5.7 → 10.5.10, [#198](https://github.com/Fikarn/sse-exed-studio-control/pull/198) `browserslist` 4.28.2 → 4.28.9. Each is green on the four required checks. They target `main`, so none of them conflicts with the three feature branches — but every one of them will need re-running once the program work lands, and `storybook` and `tauri` in particular touch lanes the visual baselines depend on. Prefer landing the program work first, then the dependency queue.
+- **Four open Dependabot alerts** on the default branch: 1 high (`browserslist`, closed by #198), 1 medium (`@vitest/mocker`), 2 low (`@babel/core`, `esbuild`). All are dev-time dependencies; none reaches the shipped engine or shell.
+
+Historical: the queue was last empty on `2026-05-20`. Audio meter PRs [#83](https://github.com/Fikarn/sse-exed-studio-control/pull/83) and [#84](https://github.com/Fikarn/sse-exed-studio-control/pull/84) were merged, required checks passed after rebasing #84 onto the updated `main`, and stale remote Claude branches were pruned from GitHub.
 
 Completed repository-readiness record:
 
@@ -321,6 +356,15 @@ npm run tauri:foundation
 npm run native:acceptance
 ```
 
+Operator-visible frontend change (see `docs/DEVELOPMENT.md §2c`):
+
+```bash
+npm run build --workspace @sse/frontend-app   # Playwright serves dist — always build first
+cd frontend/app && npx playwright test        # 415 specs, 95 of them visual captures
+node scripts/ui-census.mjs                    # the 81-board UI contract; ~4 min
+cd ../.. && node scripts/check-operator-copy.mjs
+```
+
 Full release verification (before tagging):
 
 ```bash
@@ -328,7 +372,7 @@ npm run doctor:release
 npm run release:verify
 ```
 
-GitHub Actions runs the eight-job workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request: `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `frontend-e2e`, `rust` (rustfmt + clippy + cargo check + cargo test + `native:acceptance`), `tauri-foundation`, and `qualification` (see "Current Operating Truth" above for the per-job detail). Four of them are required merge hygiene on `main` (`format-protocol`, `lint`, `frontend-typecheck`, `rust`); the other four run on every PR but are advisory. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance mechanism for this repo; CI failures are merge blockers, not release evidence.
+GitHub Actions runs the eight-job workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request — and on `push` **to `main` only**, so pushing a feature branch runs nothing: `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `frontend-e2e`, `rust` (rustfmt + clippy + cargo check + cargo test + `native:acceptance`), `tauri-foundation`, and `qualification` (see "Current Operating Truth" above for the per-job detail). Four of them are required merge hygiene on `main` (`format-protocol`, `lint`, `frontend-typecheck`, `rust`); the other four run on every PR but are advisory. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance mechanism for this repo; CI failures are merge blockers, not release evidence.
 
 ## Repo Hygiene Rules
 
