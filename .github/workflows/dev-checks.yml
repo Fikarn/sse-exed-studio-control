@@ -2,8 +2,12 @@ name: dev-checks
 
 on:
   pull_request:
+  # Production readiness 2026-09, Slice 0 (finding F03): run on every branch
+  # push, not only on `main`, so a pushed slice is checked before a pull
+  # request exists. Dependabot branches are excluded because they already get
+  # a `pull_request` run and would otherwise run twice.
   push:
-    branches: [main]
+    branches: ["**", "!dependabot/**"]
 
 permissions:
   contents: read

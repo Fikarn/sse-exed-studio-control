@@ -59,6 +59,11 @@ Deeper context, once the above is clear:
   `docs/plans/audit-remediation-2026-09.md` — the two 13-slice ledgers behind the
   current state of the app. Read the slice status before changing a surface it
   names; it usually explains why something is the way it is.
+- `docs/plans/production-readiness-2026-09.md` — the execution record of the
+  production readiness remediation program (branch `production-readiness-2026-09`,
+  cut from `ui-gold-standard-2026-09` on 2026-09-10; sixteen slices S0–S15 closing
+  the 32 findings of the 2026-09-10 readiness audit). Its `Status:` lines say which
+  slice is current; its Appendix B is the operator hardware checklist.
 - `native/README.md`, `docs/adr/0001-frontend-replatform.md`.
 - Historical, frozen: `docs/archive/FRONTEND_CUTOVER_PLAN.md`,
   `docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md`,
@@ -129,8 +134,8 @@ The highest-value unresolved work is:
 
    Four things stand between here and `main`:
 
-   1. **CI has never run on a single commit on any of these three branches.** `dev-checks.yml` triggers on `pull_request` and on `push` **to `main` only** — pushing a feature branch runs nothing. Every gate reported in the two plan ledgers was run locally on the studio workstation (win32). Opening the PR is the first time Linux sees this work.
-   2. **The `linux` and `darwin` visual baselines were last refreshed at `35a4c2a`, which is `origin/main`** — they predate all three branches. 18 Storybook stories added by the overhaul have no `linux` or `darwin` baseline at all. The repository carries 93 `win32` baselines against 75 `linux` and 75 `darwin`. `frontend-e2e` will therefore fail on the first PR run: 75 `linux` baselines are stale and 18 have never existed. It is **advisory, not a merge blocker** — the four required checks on `main` are `format-protocol`, `lint`, `frontend-typecheck` and `rust` — and failing it is the _documented_ way to refresh the baselines: open the PR, let `frontend-e2e` fail, download the `playwright-test-results` artifact from the run, copy each `*-actual.png` over its `*-linux.png` baseline, commit, push. `darwin` is refreshed by running the visual lanes on the macOS release host; there is no macOS runner in CI.
+   1. **CI had never run on a single commit on any of these three branches until 2026-09-10.** `dev-checks.yml` triggered on `pull_request` and on `push` **to `main` only** — pushing a feature branch ran nothing. Every gate reported in the two plan ledgers was run locally on the studio workstation (win32). Production readiness Slice 0 (branch `production-readiness-2026-09`, cut on top of `ui-gold-standard-2026-09`; ledger `docs/plans/production-readiness-2026-09.md`) changed the trigger to every branch push (Dependabot branches excluded — they already run per pull request), so the push of that branch is the first time Linux sees the whole stack.
+   2. **The `linux` and `darwin` visual baselines were last refreshed at `35a4c2a`, which is `origin/main`** — they predate all three branches. 18 Storybook stories added by the overhaul have no `linux` or `darwin` baseline at all. The repository carries 93 `win32` baselines against 75 `linux` and 75 `darwin`. `frontend-e2e` will therefore fail on the first CI run: 75 `linux` baselines are stale and 18 have never existed. It is **advisory, not a merge blocker** — the four required checks on `main` are `format-protocol`, `lint`, `frontend-typecheck` and `rust` — and failing it is the _documented_ way to refresh the baselines: let `frontend-e2e` fail on a push or pull-request run, download the `playwright-test-results` artifact from the run, copy each `*-actual.png` over its `*-linux.png` baseline, commit, push. `darwin` is refreshed by running the visual lanes on the macOS release host; there is no macOS runner in CI.
    3. **Two operator checklists are unsigned**, and both are walked on the studio hardware, not in CI: `docs/plans/audit-remediation-2026-09.md` Appendix B (TotalMix talkback channel assignment first, then B1–B8) and `docs/plans/visual-overhaul-a-2026-09.md` Appendix B (nine items on the 2560×1440 monitor; item 7 — Bone and Graphite from the chair — is the one the gates can least stand in for).
    4. **Decide how it lands.** One PR for the whole stack, or three stacked PRs merged bottom-up. The repo is squash-merge-only, which would collapse either into one or three commits on `main` and lose the per-slice `git log` that both ledgers reference by subject line. That is a deliberate decision for the maintainer, not a default.
 
@@ -372,7 +377,7 @@ npm run doctor:release
 npm run release:verify
 ```
 
-GitHub Actions runs the eight-job workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request — and on `push` **to `main` only**, so pushing a feature branch runs nothing: `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `frontend-e2e`, `rust` (rustfmt + clippy + cargo check + cargo test + `native:acceptance`), `tauri-foundation`, and `qualification` (see "Current Operating Truth" above for the per-job detail). Four of them are required merge hygiene on `main` (`format-protocol`, `lint`, `frontend-typecheck`, `rust`); the other four run on every PR but are advisory. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance mechanism for this repo; CI failures are merge blockers, not release evidence.
+GitHub Actions runs the eight-job workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request and, since production readiness Slice 0 (2026-09-10), on every branch push (Dependabot branches excluded — their pull requests already run): `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `frontend-e2e`, `rust` (rustfmt + clippy + cargo check + cargo test + `native:acceptance`), `tauri-foundation`, and `qualification` (see "Current Operating Truth" above for the per-job detail). Four of them are required merge hygiene on `main` (`format-protocol`, `lint`, `frontend-typecheck`, `rust`); the other four run on every PR but are advisory. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance mechanism for this repo; CI failures are merge blockers, not release evidence.
 
 ## Repo Hygiene Rules
 
