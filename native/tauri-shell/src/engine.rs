@@ -1,5 +1,6 @@
 use serde::Serialize;
 use serde_json::{json, Value};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::create_dir_all;
@@ -10,11 +11,19 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use studio_control_protocol::{RequestEnvelope, ResponseEnvelope, PROTOCOL_VERSION};
+use studio_control_protocol::{
+    error_response, RequestEnvelope, ResponseEnvelope, PROTOCOL_VERSION,
+};
 use tauri::{AppHandle, Emitter};
 
 const ENGINE_EVENT_CHANNEL: &str = "engine://event";
 const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
+/// Sub-directory of the app-data directory that receives the shell's
+/// diagnostics exports (2026-09 production readiness, Slice 4 — finding F15).
+pub(crate) const EXPORTS_DIR_NAME: &str = "exports";
+/// Error code answered when a request id is already waiting for the engine's
+/// response (finding F08).
+pub const DUPLICATE_REQUEST_ID_CODE: &str = "DUPLICATE_REQUEST_ID";
 
 #[derive(Default)]
 pub struct EngineBridge {
@@ -54,6 +63,7 @@ impl EngineBridge {
         let (app_data_dir, logs_dir) = resolve_runtime_directories()?;
         create_dir_all(&app_data_dir).map_err(|error| error.to_string())?;
         create_dir_all(&logs_dir).map_err(|error| error.to_string())?;
+        create_dir_all(exports_dir_for(&app_data_dir)).map_err(|error| error.to_string())?;
 
         let mut command = Command::new(&binary_path);
         command
@@ -104,14 +114,37 @@ impl EngineBridge {
         })
     }
 
+    /// Sends `request` to the engine and waits for its response. An id that is
+    /// already waiting for a response is refused with `DUPLICATE_REQUEST_ID`
+    /// before anything is written, and the original waiter keeps its reply
+    /// slot (2026-09 production readiness, Slice 4 — finding F08): two live
+    /// requests under one id shared one slot, so whichever response arrived
+    /// first went to the wrong caller and the other timed out.
     pub fn request(&self, request: RequestEnvelope) -> Result<ResponseEnvelope, String> {
         let request_id = value_key(&request.id);
         let (sender, receiver): (Sender<Value>, Receiver<Value>) = mpsc::channel();
 
-        self.pending
-            .lock()
-            .map_err(|_| "Engine pending requests poisoned".to_string())?
-            .insert(request_id.clone(), sender);
+        {
+            let mut pending = self
+                .pending
+                .lock()
+                .map_err(|_| "Engine pending requests poisoned".to_string())?;
+            match pending.entry(request_id.clone()) {
+                Entry::Occupied(_) => {
+                    return Ok(error_response(
+                        request.id.clone(),
+                        DUPLICATE_REQUEST_ID_CODE,
+                        format!(
+                            "Request id {request_id} is already waiting for a response from the engine; the {} request was not sent.",
+                            request.method
+                        ),
+                    ));
+                }
+                Entry::Vacant(slot) => {
+                    slot.insert(sender);
+                }
+            }
+        }
 
         let result = self.write_request(&request).and_then(|_| {
             receiver
@@ -276,6 +309,11 @@ fn spawn_stderr_thread(stderr: ChildStderr) {
             eprintln!("engine stderr: {line}");
         }
     });
+}
+
+/// `<app-data>/exports`: the only place the shell writes a diagnostics export.
+pub(crate) fn exports_dir_for(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join(EXPORTS_DIR_NAME)
 }
 
 pub(crate) fn resolve_runtime_directories() -> Result<(PathBuf, PathBuf), String> {
@@ -610,5 +648,75 @@ mod tests {
                 .expect("dev engine candidate should resolve");
 
         assert_eq!(resolved, dev_engine);
+    }
+
+    // 2026-09 production readiness, Slice 4 (finding F08): an id that is
+    // already waiting for a response is refused before anything is written,
+    // the original waiter keeps its slot, and a fresh id still fails on the
+    // write (no engine) without leaving a slot behind.
+    #[test]
+    fn request_refuses_duplicate_pending_id() {
+        let bridge = EngineBridge::default();
+        let (first_sender, first_receiver) = mpsc::channel::<Value>();
+        bridge
+            .pending
+            .lock()
+            .expect("pending map should lock")
+            .insert("app.snapshot:1:abc".to_string(), first_sender);
+
+        let duplicate = RequestEnvelope {
+            kind: "request".to_string(),
+            id: json!("app.snapshot:1:abc"),
+            method: "app.snapshot".to_string(),
+            params: json!({}),
+        };
+        let response = bridge
+            .request(duplicate)
+            .expect("a duplicate id is answered, not dropped");
+
+        assert!(!response.ok);
+        assert_eq!(response.id, json!("app.snapshot:1:abc"));
+        assert_eq!(
+            response
+                .error
+                .as_ref()
+                .and_then(|error| error.get("code"))
+                .and_then(Value::as_str),
+            Some(DUPLICATE_REQUEST_ID_CODE)
+        );
+        let message = response
+            .error
+            .as_ref()
+            .and_then(|error| error.get("message"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        assert!(message.contains("app.snapshot:1:abc"), "{message}");
+
+        // The original waiter still owns the slot: a reply routed by id reaches it.
+        {
+            let pending = bridge.pending.lock().expect("pending map should lock");
+            let original = pending
+                .get("app.snapshot:1:abc")
+                .expect("the original slot survives the refusal");
+            original
+                .send(json!({ "type": "response", "id": "app.snapshot:1:abc", "ok": true }))
+                .expect("the original receiver is still alive");
+        }
+        assert!(first_receiver.try_recv().is_ok());
+
+        let fresh = RequestEnvelope {
+            kind: "request".to_string(),
+            id: json!("app.snapshot:2:abc"),
+            method: "app.snapshot".to_string(),
+            params: json!({}),
+        };
+        let error = bridge.request(fresh).expect_err("no engine is running");
+        assert!(error.contains("Engine is not running"), "{error}");
+        assert!(!bridge
+            .pending
+            .lock()
+            .expect("pending map should lock")
+            .contains_key("app.snapshot:2:abc"));
     }
 }

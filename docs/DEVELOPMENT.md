@@ -109,7 +109,7 @@ npm run tauri:package:win:evidence
 npm run native:release:win:evidence -- --issue-url <active-evidence-issue-url>
 ```
 
-`npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot, persisted restart, and degraded startup/recovery posture. `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence.
+`npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot (including the shell staying responsive while the engine sits in a stalled lighting probe against an unrouted address, and the diagnostics export landing in the app-data `exports` folder — 2026-09 production readiness, Slice 4), persisted restart, and degraded startup/recovery posture (a blocked app-data directory and a corrupt database). `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence.
 
 Both Tauri qualification lanes and Playwright preview use the fixed local port `127.0.0.1:4173` with strict port binding. Do not run them concurrently with each other or with the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`); a stale or competing server makes the result invalid.
 

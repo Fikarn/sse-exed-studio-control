@@ -187,6 +187,121 @@ async function dispatchCommand(session, child, action, payload = {}) {
   };
 }
 
+// Addresses whose port-80 connect neither answers nor fails promptly: the
+// documentation ranges (RFC 5737) and a shared-address-space host (RFC 6598)
+// are not routed on the public internet and have no host on a studio LAN or
+// a CI network, so the engine's lighting probe sits in its 1.5 s connect
+// timeout — the stalled request finding F07 describes. The first candidate
+// that stalls for Node stalls for the engine too (same host, same stack).
+const UNROUTED_BRIDGE_CANDIDATES = ["203.0.113.113", "198.51.100.113", "192.0.2.113", "100.127.255.113"];
+const UNROUTED_PRECHECK_MS = 1_200;
+const STALLED_REQUEST_MIN_PROBE_MS = 1_000;
+const STALLED_REQUEST_MAX_GAP_MS = 1_000;
+
+function connectStalls(host, port, timeoutMs) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host, port });
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve(true);
+    }, timeoutMs);
+    const settle = () => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(false);
+    };
+    socket.once("connect", settle);
+    socket.once("error", settle);
+  });
+}
+
+async function pickUnroutedBridgeAddress() {
+  for (const host of UNROUTED_BRIDGE_CANDIDATES) {
+    if (await connectStalls(host, 80, UNROUTED_PRECHECK_MS)) {
+      return host;
+    }
+  }
+  throw new Error(
+    `The stalled-request check needs an address whose port-80 connect neither answers nor fails within ${UNROUTED_PRECHECK_MS} ms; none of ${UNROUTED_BRIDGE_CANDIDATES.join(", ")} stalls on this host.`
+  );
+}
+
+// Finding F07 (2026-09 production readiness, Slice 4): a request the engine
+// takes seconds to answer must not stall the shell. The lighting probe
+// against an unrouted address sits in the engine's 1.5 s connect timeout;
+// while it does, the test bridge's 250 ms heartbeat must keep reaching the
+// status file. Every heartbeat is an IPC call the shell answers on its main
+// thread, so a main thread blocked on the engine's reply — the shell before
+// this slice — freezes the file for the whole stall.
+async function runStalledRequestCheck(session, child, bridgeIp) {
+  commandCounter += 1;
+  const id = `runCommissioningCheck-${commandCounter}`;
+  const startedAt = Date.now();
+  writeFileSync(
+    session.commandPath,
+    JSON.stringify(
+      { action: "runCommissioningCheck", id, request: { bridgeIp, target: "lighting", universe: 1 } },
+      null,
+      2
+    )
+  );
+
+  const heartbeats = [];
+  let lastHeartbeat = null;
+  let finalStatus = null;
+  const deadline = Date.now() + DEFAULT_WAIT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new Error(`Tauri shell exited early during the stalled-request check with code ${child.exitCode}.`);
+    }
+    const status = readJson(session.statusPath);
+    if (status) {
+      const heartbeat = status.testBridge?.heartbeat;
+      if (typeof heartbeat === "number" && heartbeat !== lastHeartbeat) {
+        lastHeartbeat = heartbeat;
+        heartbeats.push({ at: Date.now(), heartbeat });
+      }
+      if (status.testBridge?.lastCommand?.id === id) {
+        finalStatus = status;
+        break;
+      }
+    }
+    await delay(50);
+  }
+  const finishedAt = Date.now();
+  assert(finalStatus, `Timed out waiting for the stalled lighting probe '${id}' to finish.`);
+  const result = finalStatus.testBridge.lastCommand;
+  assert(result.ok === true, `Shell test command '${id}' failed: ${result.error ?? "unknown error"}`);
+
+  const probeMs = finishedAt - startedAt;
+  const checks = finalStatus.shellState.commissioningSnapshot?.checks;
+  const lightingCheck = (Array.isArray(checks) ? checks : []).find((check) => check?.id === "lighting");
+  assert(
+    lightingCheck?.status === "failed",
+    `Expected the lighting probe against ${bridgeIp} to fail as unreachable, got '${lightingCheck?.status}'.`
+  );
+  assert(
+    probeMs >= STALLED_REQUEST_MIN_PROBE_MS,
+    `Expected the lighting probe against ${bridgeIp} to sit in the engine's 1.5 s connect timeout, but it answered in ${probeMs} ms, so the check cannot prove anything on this network.`
+  );
+
+  const ticks = heartbeats.filter((tick) => tick.at > startedAt && tick.at < finishedAt);
+  const instants = [startedAt, ...ticks.map((tick) => tick.at), finishedAt];
+  let maxGapMs = 0;
+  for (let index = 1; index < instants.length; index += 1) {
+    maxGapMs = Math.max(maxGapMs, instants[index] - instants[index - 1]);
+  }
+  assert(
+    ticks.length >= 2,
+    `Expected the shell's status file to keep updating while the lighting probe stalled for ${probeMs} ms, but only ${ticks.length} heartbeat(s) landed.`
+  );
+  assert(
+    maxGapMs < STALLED_REQUEST_MAX_GAP_MS,
+    `The shell's status file stopped updating for ${maxGapMs} ms while a ${probeMs} ms lighting probe was in flight; a stalled engine reply must not block the shell.`
+  );
+  return { heartbeats: ticks.length, maxGapMs, probeMs };
+}
+
 function killWindowsProcessTree(pid) {
   if (!pid) {
     return;
@@ -293,6 +408,26 @@ async function runSetupSupportQualification() {
       section: "commissioning",
     });
 
+    // Finding F07 (2026-09 production readiness, Slice 4): the shell stays
+    // responsive while the engine sits in a stalled lighting probe.
+    const unroutedBridgeIp = await pickUnroutedBridgeAddress();
+    const stalledRequest = await runStalledRequestCheck(firstSession, firstRun, unroutedBridgeIp);
+    evidence.recordCheck("shell-stays-responsive-during-stalled-request", {
+      bridgeIp: unroutedBridgeIp,
+      ...stalledRequest,
+    });
+    // The probe persisted the unrouted address as the lighting bridge; point
+    // the bridge back at loopback so nothing streams off this host afterwards
+    // (nothing listens on 127.0.0.1:80, and a refused connect counts as a
+    // reachable host for the probe).
+    await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
+      request: {
+        bridgeIp: "127.0.0.1",
+        target: "lighting",
+        universe: 1,
+      },
+    });
+
     // No hardware on this host: explicit probe override (2026-09 audit Slice 8).
     const publishStatus = await dispatchCommand(firstSession, firstRun, "updateCommissioning", {
       request: {
@@ -323,6 +458,9 @@ async function runSetupSupportQualification() {
       backupCount: backupExport.status.shellState.supportSnapshot?.backupCount,
     });
 
+    // A directory of the lane's own reaches the shell through the test-bridge
+    // command `shell_test_bridge_export_diagnostics_to`; the production
+    // command takes no directory (2026-09 production readiness, Slice 4).
     const diagnosticsExport = await dispatchCommand(firstSession, firstRun, "exportShellDiagnostics", {
       directory: runtime.diagnosticsDir,
     });
@@ -331,6 +469,27 @@ async function runSetupSupportQualification() {
       "Expected diagnostics export to write a report through the live Tauri shell."
     );
     evidence.recordCheck("diagnostics-export-writes-report");
+
+    // Finding F15: without a directory of the lane's own, the export lands in
+    // the app-data `exports` folder and nowhere else.
+    const defaultDiagnosticsExport = await dispatchCommand(firstSession, firstRun, "exportShellDiagnostics");
+    const defaultDiagnosticsPath = defaultDiagnosticsExport.result;
+    assert(
+      typeof defaultDiagnosticsPath === "string" && existsSync(defaultDiagnosticsPath),
+      "Expected the default diagnostics export to write a report through the live Tauri shell."
+    );
+    const expectedExportsDir = path.join(runtime.appDataDir, "exports");
+    assert(
+      path.dirname(defaultDiagnosticsPath) === expectedExportsDir,
+      `Expected the default diagnostics export under ${expectedExportsDir}, got ${defaultDiagnosticsPath}.`
+    );
+    assert(
+      /^diagnostics-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/.test(path.basename(defaultDiagnosticsPath)),
+      `Expected a diagnostics-<UTC timestamp>.json name, got ${path.basename(defaultDiagnosticsPath)}.`
+    );
+    evidence.recordCheck("diagnostics-export-defaults-to-app-data-exports", {
+      file: path.basename(defaultDiagnosticsPath),
+    });
 
     const seedStatus = await dispatchCommand(firstSession, firstRun, "seedPlanningDemo", {
       replaceExistingData: true,

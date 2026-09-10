@@ -9,12 +9,13 @@ use engine::{EngineBootstrapSummary, EngineBridge};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::env;
-use std::fs::{create_dir_all, read_to_string, remove_file, write};
+use std::fs::{canonicalize, create_dir_all, read_to_string, remove_file, write};
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use studio_control_protocol::RequestEnvelope;
@@ -24,7 +25,9 @@ use tauri::{
 };
 
 struct EngineState {
-    bridge: EngineBridge,
+    /// Shared with the blocking tasks the async commands hand their waits to
+    /// (2026-09 production readiness, Slice 4 — finding F07).
+    bridge: Arc<EngineBridge>,
     /// Set by `shell_confirm_close` once the operator confirmed the close
     /// dialog; the `CloseRequested` hook lets the window close only then
     /// (2026-09 audit Slice 11).
@@ -666,14 +669,31 @@ fn current_runtime_paths() -> BTreeMap<String, String> {
     paths
 }
 
+/// Every shell command that can wait — for the engine's reply, for its exit,
+/// for the file system, for Explorer — hands that wait to the async runtime's
+/// blocking pool. The commands are `async fn`s, so Tauri never runs them on
+/// the thread that paints the window and dispatches the next IPC call: until
+/// this slice `engine_request` sat in `recv_timeout(10 s)` on exactly that
+/// thread, and every click, status write and window event queued behind a
+/// stalled engine reply (2026-09 production readiness, Slice 4 — finding F07).
+async fn off_main_thread<T, F>(task: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(task)
+        .await
+        .map_err(|error| format!("Shell task did not finish: {error}"))?
+}
+
 #[tauri::command]
-fn engine_start(
-    app: tauri::AppHandle,
+async fn engine_start(
+    app: AppHandle,
     state: tauri::State<'_, EngineState>,
 ) -> Result<EngineBootstrapSummary, ShellStartupFailure> {
-    state
-        .bridge
-        .start(&app)
+    let bridge = Arc::clone(&state.bridge);
+    off_main_thread(move || bridge.start(&app))
+        .await
         .map_err(|message| ShellStartupFailure {
             code: "BOOTSTRAP_FAILED".to_string(),
             message,
@@ -683,27 +703,34 @@ fn engine_start(
 }
 
 #[tauri::command]
-fn engine_request(
+async fn engine_request(
     state: tauri::State<'_, EngineState>,
     request: RequestEnvelope,
 ) -> Result<studio_control_protocol::ResponseEnvelope, String> {
-    state.bridge.request(request)
+    let bridge = Arc::clone(&state.bridge);
+    off_main_thread(move || bridge.request(request)).await
 }
 
 #[tauri::command]
-fn engine_stop(state: tauri::State<'_, EngineState>) -> Result<(), String> {
-    state.bridge.stop()
+async fn engine_stop(state: tauri::State<'_, EngineState>) -> Result<(), String> {
+    let bridge = Arc::clone(&state.bridge);
+    off_main_thread(move || bridge.stop()).await
 }
 
 /// The operator confirmed "Close Studio Control?": stop the engine gracefully
 /// (its stdin closes, its loop ends and releases any talkback hold, two
-/// seconds of grace before a kill), mark the close confirmed so the
-/// `CloseRequested` hook lets it through, then close the window — which also
-/// persists the window preferences on the way out.
+/// seconds of grace before a kill — waited for off the main thread), mark
+/// the close confirmed so the `CloseRequested` hook lets it through, then
+/// close the window — which also persists the window preferences on the way
+/// out.
 #[tauri::command]
-fn shell_confirm_close(app: AppHandle, state: tauri::State<'_, EngineState>) -> Result<(), String> {
+async fn shell_confirm_close(
+    app: AppHandle,
+    state: tauri::State<'_, EngineState>,
+) -> Result<(), String> {
     state.close_confirmed.store(true, Ordering::SeqCst);
-    if let Err(error) = state.bridge.stop() {
+    let bridge = Arc::clone(&state.bridge);
+    if let Err(error) = off_main_thread(move || bridge.stop()).await {
         eprintln!("Engine stop before close failed: {error}");
     }
     let window = main_window(&app)?;
@@ -714,37 +741,90 @@ fn shell_confirm_close(app: AppHandle, state: tauri::State<'_, EngineState>) -> 
 }
 
 #[tauri::command]
-fn engine_summary(
+async fn engine_summary(
     state: tauri::State<'_, EngineState>,
 ) -> Result<Option<EngineBootstrapSummary>, String> {
-    state.bridge.summary()
+    let bridge = Arc::clone(&state.bridge);
+    off_main_thread(move || bridge.summary()).await
+}
+
+/// Error code prefixes answered by `shell_open_path` (finding F15).
+const PATH_OUTSIDE_APP_DATA_CODE: &str = "PATH_OUTSIDE_APP_DATA";
+const PATH_NOT_FOUND_CODE: &str = "PATH_NOT_FOUND";
+
+/// The folders the shell opens for the operator: the app-data directory
+/// (which holds `backups` and `exports`), the logs directory (which may live
+/// elsewhere through `SSE_LOG_DIR`) and the update repository when the
+/// launcher configured one. Everything else is refused (2026-09 production
+/// readiness, Slice 4 — finding F15): the command took any path the webview
+/// named and handed it to Explorer.
+fn allowed_open_roots() -> Result<Vec<PathBuf>, String> {
+    let (app_data_dir, logs_dir) = engine::resolve_runtime_directories()?;
+    let mut roots = vec![app_data_dir, logs_dir];
+    if let Some(update_repository) = optional_env_path("SSE_UPDATE_REPOSITORY_PATH") {
+        roots.push(PathBuf::from(update_repository));
+    }
+    Ok(roots)
+}
+
+/// `target` must exist and, once every symlink, junction and `..` is
+/// resolved, sit inside one of `roots` (a root that does not exist cannot
+/// admit anything). Returns the canonical path.
+fn resolve_open_path(target: &Path, roots: &[PathBuf]) -> Result<PathBuf, String> {
+    let canonical = canonicalize(target).map_err(|error| {
+        format!(
+            "{PATH_NOT_FOUND_CODE}: {} could not be opened: {error}",
+            target.display()
+        )
+    })?;
+    let inside_a_root = roots.iter().any(|root| {
+        canonicalize(root)
+            .map(|root| canonical.starts_with(root))
+            .unwrap_or(false)
+    });
+    if inside_a_root {
+        Ok(canonical)
+    } else {
+        Err(format!(
+            "{PATH_OUTSIDE_APP_DATA_CODE}: {} is outside the app data, logs and update folders, so it was not opened.",
+            target.display()
+        ))
+    }
 }
 
 #[tauri::command]
-fn shell_open_path(path: String) -> Result<(), String> {
-    let target = PathBuf::from(path);
-    if !target.exists() {
-        return Err(format!("Path does not exist: {}", target.display()));
-    }
+async fn shell_open_path(path: String) -> Result<(), String> {
+    off_main_thread(move || {
+        let target = PathBuf::from(path);
+        let roots = allowed_open_roots()?;
+        resolve_open_path(&target, &roots)?;
+        open_path_with_system(&target)
+    })
+    .await
+}
 
+/// Hands an allowed path to the platform's opener. The original spelling is
+/// used rather than the canonical one: Explorer does not take the `\\?\`
+/// prefix `canonicalize` produces on Windows.
+fn open_path_with_system(target: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     let mut command = {
         let mut command = Command::new("open");
-        command.arg(&target);
+        command.arg(target);
         command
     };
 
     #[cfg(target_os = "windows")]
     let mut command = {
         let mut command = Command::new("explorer");
-        command.arg(&target);
+        command.arg(target);
         command
     };
 
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     let mut command = {
         let mut command = Command::new("xdg-open");
-        command.arg(&target);
+        command.arg(target);
         command
     };
 
@@ -754,37 +834,100 @@ fn shell_open_path(path: String) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-fn shell_export_diagnostics(report: Value, directory: Option<String>) -> Result<String, String> {
-    let output_dir = directory.map(PathBuf::from).unwrap_or_else(|| {
-        engine::resolve_runtime_directories()
-            .map(|(_, logs_dir)| logs_dir)
-            .unwrap_or_else(|_| {
-                std::env::temp_dir()
-                    .join("sse-exed-tauri")
-                    .join("diagnostics")
-            })
-    });
+/// UTC wall-clock time as `YYYY-MM-DDTHH-MM-SS-mmmZ` — the shape the engine's
+/// database backups and support archives use, so a directory listing sorts
+/// every export together (mirrors `storage_backups::file_timestamp`).
+fn file_timestamp(time: SystemTime) -> String {
+    let since_epoch = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+    let total_seconds = since_epoch.as_secs();
+    let millis = since_epoch.subsec_millis();
+    let seconds_of_day = total_seconds % 86_400;
+    let (year, month, day) = civil_from_days((total_seconds / 86_400) as i64);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}-{:02}-{:02}-{millis:03}Z",
+        seconds_of_day / 3_600,
+        (seconds_of_day % 3_600) / 60,
+        seconds_of_day % 60
+    )
+}
 
-    if !output_dir.is_absolute() {
+/// Howard Hinnant's `civil_from_days`: days since 1970-01-01 to (y, m, d).
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let day_of_era = (z - era * 146_097) as u64;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let day = (day_of_year - (153 * month_index + 2) / 5 + 1) as u32;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    } as u32;
+    let year = year_of_era as i64 + era * 400 + i64::from(month <= 2);
+    (year, month, day)
+}
+
+/// The name a diagnostics export gets: `diagnostics-<UTC ms timestamp>.json`.
+fn diagnostics_file_name(time: SystemTime) -> String {
+    format!("diagnostics-{}.json", file_timestamp(time))
+}
+
+/// Writes `report` under `directory` (created if needed) and returns the
+/// file's path. Two exports in the same millisecond get two files.
+fn write_diagnostics_report(directory: &Path, report: &Value) -> Result<PathBuf, String> {
+    if !directory.is_absolute() {
         return Err("Diagnostics directory must be an absolute path.".to_string());
     }
+    create_dir_all(directory).map_err(|error| {
+        format!(
+            "Failed to create diagnostics directory {}: {error}",
+            directory.display()
+        )
+    })?;
 
-    create_dir_all(&output_dir)
-        .map_err(|error| format!("Failed to create diagnostics directory: {error}"))?;
-
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|error| error.to_string())?
-        .as_secs();
-    let output_path = output_dir.join(format!("shell-diagnostics-{timestamp}.json"));
-    let payload = serde_json::to_vec_pretty(&report)
+    let payload = serde_json::to_vec_pretty(report)
         .map_err(|error| format!("Failed to serialize diagnostics report: {error}"))?;
+    let mut attempts = 0;
+    let output_path = loop {
+        let candidate = directory.join(diagnostics_file_name(SystemTime::now()));
+        if !candidate.exists() {
+            break candidate;
+        }
+        attempts += 1;
+        if attempts > 1_000 {
+            return Err(format!(
+                "Could not reserve a diagnostics file name in {}",
+                directory.display()
+            ));
+        }
+        thread::sleep(Duration::from_millis(1));
+    };
+    write(&output_path, payload).map_err(|error| {
+        format!(
+            "Failed to write diagnostics report {}: {error}",
+            output_path.display()
+        )
+    })?;
+    Ok(output_path)
+}
 
-    write(&output_path, payload)
-        .map_err(|error| format!("Failed to write diagnostics report: {error}"))?;
-
-    Ok(output_path.display().to_string())
+/// Writes the report to `<app-data>/exports/diagnostics-<ts>.json` and
+/// nowhere else (2026-09 production readiness, Slice 4 — finding F15): the
+/// command used to take any directory, which made it a write-anywhere
+/// primitive for whatever ran in the webview. Automation that needs another
+/// directory has `shell_test_bridge_export_diagnostics_to` under the
+/// `test-bridge` feature.
+#[tauri::command]
+async fn shell_export_diagnostics(report: Value) -> Result<String, String> {
+    off_main_thread(move || {
+        let (app_data_dir, _) = engine::resolve_runtime_directories()?;
+        write_diagnostics_report(&engine::exports_dir_for(&app_data_dir), &report)
+            .map(|path| path.display().to_string())
+    })
+    .await
 }
 
 #[cfg(feature = "test-bridge")]
@@ -857,6 +1000,21 @@ fn shell_test_bridge_read_command() -> Result<Option<Value>, String> {
         )
     })?;
     Ok(Some(command))
+}
+
+/// Test-bridge only: the qualification lanes read the report back from a
+/// directory of their own. Production builds do not carry this command.
+#[cfg(feature = "test-bridge")]
+#[tauri::command]
+async fn shell_test_bridge_export_diagnostics_to(
+    report: Value,
+    directory: String,
+) -> Result<String, String> {
+    off_main_thread(move || {
+        write_diagnostics_report(&PathBuf::from(directory), &report)
+            .map(|path| path.display().to_string())
+    })
+    .await
 }
 
 fn monitor_matches_logical_size(monitor: &Monitor, target_width: u32, target_height: u32) -> bool {
@@ -1039,7 +1197,7 @@ fn main() {
 
     let builder = tauri::Builder::default()
         .manage(EngineState {
-            bridge: EngineBridge::default(),
+            bridge: Arc::new(EngineBridge::default()),
             close_confirmed: AtomicBool::new(false),
         })
         .setup(|app| {
@@ -1094,7 +1252,8 @@ fn main() {
         shell_confirm_close,
         shell_test_bridge_config,
         shell_test_bridge_write_status,
-        shell_test_bridge_read_command
+        shell_test_bridge_read_command,
+        shell_test_bridge_export_diagnostics_to
     ]);
 
     #[cfg(not(feature = "test-bridge"))]
@@ -1132,6 +1291,196 @@ mod shell_close_policy_tests {
         assert_eq!(close_policy(false, Some("1")), ClosePolicy::Allow);
         assert_eq!(close_policy(false, Some(" 1 ")), ClosePolicy::Allow);
         assert_eq!(close_policy(true, Some("0")), ClosePolicy::Allow);
+    }
+}
+
+#[cfg(test)]
+mod shell_path_policy_tests {
+    use super::*;
+    use std::fs::{self, File};
+
+    struct TempTree {
+        root: PathBuf,
+    }
+
+    impl TempTree {
+        fn new(label: &str) -> Self {
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after epoch")
+                .as_nanos();
+            let root = std::env::temp_dir().join(format!(
+                "sse-tauri-shell-paths-{label}-{}-{nanos}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&root).expect("test temp root should be creatable");
+            Self { root }
+        }
+
+        fn path(&self, path: &str) -> PathBuf {
+            self.root.join(path)
+        }
+    }
+
+    impl Drop for TempTree {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn touch(path: &Path) {
+        fs::create_dir_all(path.parent().expect("test path should have a parent"))
+            .expect("test parent directory should be creatable");
+        File::create(path).expect("test file should be creatable");
+    }
+
+    // 2026-09 production readiness, Slice 4 (finding F15): the shell opens
+    // only what sits inside its own folders. Anything else — a system
+    // directory, a sibling of the app-data directory, a `..` that climbs out,
+    // a path that does not exist — is refused with a code the surface can show.
+    #[test]
+    fn open_path_rejects_outside_app_data() {
+        let tree = TempTree::new("open-path");
+        let app_data = tree.path("app-data");
+        let logs = tree.path("elsewhere/logs");
+        let update_repository = tree.path("updates");
+        let backup = app_data
+            .join("backups")
+            .join("db-2026-09-10T00-00-00-000Z-daily.sqlite3");
+        let export = app_data
+            .join("exports")
+            .join("diagnostics-2026-09-10T00-00-00-000Z.json");
+        let engine_log = logs.join("engine.log");
+        let sibling = tree.path("app-data-sibling/secret.txt");
+        let missing_root = tree.path("never-created");
+        touch(&backup);
+        touch(&export);
+        touch(&engine_log);
+        touch(&sibling);
+        touch(&update_repository.join("Updates.xml"));
+        let roots = vec![
+            app_data.clone(),
+            logs.clone(),
+            update_repository.clone(),
+            missing_root,
+        ];
+
+        // Inside a root: the roots themselves, and files beneath them.
+        for allowed in [
+            app_data.clone(),
+            app_data.join("backups"),
+            backup.clone(),
+            export.clone(),
+            logs.clone(),
+            engine_log.clone(),
+            update_repository.clone(),
+            update_repository.join("Updates.xml"),
+        ] {
+            let resolved = resolve_open_path(&allowed, &roots)
+                .unwrap_or_else(|error| panic!("{} should open: {error}", allowed.display()));
+            assert_eq!(
+                resolved,
+                canonicalize(&allowed).expect("allowed path should canonicalize")
+            );
+        }
+
+        // Outside every root, by any spelling.
+        let climbs_out = app_data
+            .join("..")
+            .join("app-data-sibling")
+            .join("secret.txt");
+        for refused in [
+            sibling.clone(),
+            climbs_out,
+            tree.root.clone(),
+            std::env::temp_dir(),
+        ] {
+            let error = resolve_open_path(&refused, &roots)
+                .expect_err(&format!("{} must be refused", refused.display()));
+            assert!(
+                error.starts_with(PATH_OUTSIDE_APP_DATA_CODE),
+                "{}: {error}",
+                refused.display()
+            );
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let windows = PathBuf::from(r"C:\Windows");
+            if windows.exists() {
+                let error = resolve_open_path(&windows, &roots)
+                    .expect_err("the Windows directory must be refused");
+                assert!(error.starts_with(PATH_OUTSIDE_APP_DATA_CODE), "{error}");
+            }
+        }
+
+        // A path that does not exist is refused before Explorer sees it.
+        let missing = app_data.join("backups").join("missing.sqlite3");
+        let error =
+            resolve_open_path(&missing, &roots).expect_err("a missing path must be refused");
+        assert!(error.starts_with(PATH_NOT_FOUND_CODE), "{error}");
+
+        // No roots at all admit nothing.
+        let error = resolve_open_path(&backup, &[]).expect_err("no roots admit nothing");
+        assert!(error.starts_with(PATH_OUTSIDE_APP_DATA_CODE), "{error}");
+    }
+
+    // Diagnostics exports get a UTC millisecond stamp, land where they are
+    // told, and never overwrite each other.
+    #[test]
+    fn diagnostics_report_lands_with_a_utc_stamp_and_never_overwrites() {
+        let tree = TempTree::new("diagnostics");
+        let exports = tree.path("app-data/exports");
+        let report = json!({ "lifecycle": "ready", "activeWorkspace": "lighting" });
+
+        let first = write_diagnostics_report(&exports, &report)
+            .expect("the exports directory is created on demand");
+        let second = write_diagnostics_report(&exports, &report)
+            .expect("a second export in the same instant still gets its own file");
+
+        assert_ne!(first, second);
+        for path in [&first, &second] {
+            assert_eq!(path.parent(), Some(exports.as_path()));
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .expect("export names are UTF-8");
+            assert!(
+                name.starts_with("diagnostics-") && name.ends_with("Z.json"),
+                "{name}"
+            );
+            assert_eq!(
+                name.len(),
+                "diagnostics-2026-09-10T00-00-00-000Z.json".len(),
+                "{name}"
+            );
+            let written: Value =
+                serde_json::from_slice(&fs::read(path).expect("export is readable"))
+                    .expect("export is JSON");
+            assert_eq!(written, report);
+        }
+
+        let relative = PathBuf::from("relative/exports");
+        let error = write_diagnostics_report(&relative, &report)
+            .expect_err("a relative directory is refused");
+        assert!(error.contains("absolute"), "{error}");
+    }
+
+    #[test]
+    fn file_timestamp_is_utc_to_the_millisecond() {
+        assert_eq!(file_timestamp(UNIX_EPOCH), "1970-01-01T00-00-00-000Z");
+        assert_eq!(
+            file_timestamp(UNIX_EPOCH + Duration::from_millis(1_000_000_000_500)),
+            "2001-09-09T01-46-40-500Z"
+        );
+        assert_eq!(
+            file_timestamp(UNIX_EPOCH + Duration::from_secs(1_709_164_800)),
+            "2024-02-29T00-00-00-000Z"
+        );
+        assert_eq!(
+            diagnostics_file_name(UNIX_EPOCH + Duration::from_secs(1_709_164_800)),
+            "diagnostics-2024-02-29T00-00-00-000Z.json"
+        );
     }
 }
 

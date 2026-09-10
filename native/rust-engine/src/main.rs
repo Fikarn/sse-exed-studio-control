@@ -34,7 +34,9 @@ use crate::audio::{
     refresh_audio_snapshot_metering, AudioChannelSnapshot, AudioMixTargetSnapshot, AudioSnapshot,
 };
 use crate::audio_backend::{read_default_audio_inventory, AudioBackendConfig};
-use crate::bootstrap::{resolve_runtime_paths, startup_failure_code, validate_protocol_version};
+use crate::bootstrap::{
+    resolve_runtime_paths, startup_failure_code, validate_protocol_version, EXPORTS_DIR_NAME,
+};
 use crate::diagnostics::append_log;
 use crate::protocol::{
     event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
@@ -408,6 +410,7 @@ fn main() -> io::Result<()> {
                     "logFilePath": planned_paths.log_file_path.display().to_string(),
                     "dbPath": planned_paths.db_path.display().to_string(),
                     "backupDir": planned_paths.backups_dir.display().to_string(),
+                    "exportsDir": planned_paths.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
                     "updateRepositoryPath": planned_paths
                         .update_repository_path
                         .as_ref()
@@ -438,6 +441,7 @@ fn main() -> io::Result<()> {
                         "logFilePath": planned_paths.log_file_path.display().to_string(),
                         "dbPath": planned_paths.db_path.display().to_string(),
                         "backupDir": planned_paths.backups_dir.display().to_string(),
+                        "exportsDir": planned_paths.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
                         "updateRepositoryPath": planned_paths
                             .update_repository_path
                             .as_ref()

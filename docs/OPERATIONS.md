@@ -152,7 +152,7 @@ To commission or re-commission the deck:
 ### The app fails before the dashboard
 
 1. Open the recovery surface.
-2. Export diagnostics and note the Engine log path.
+2. Export diagnostics — the report lands in the app-data `exports` folder as `diagnostics-<UTC timestamp>.json`, and the Diagnostics key opens that folder — and note the Engine log path.
 3. If the display reads `SAVED DATA NEEDS ATTENTION` (code `STORAGE_CORRUPT` or `STORAGE_MIGRATION_FAILED`), the database failed its integrity check or could not be upgraded. The sentence names the file and the newest database backup; the file itself was left untouched, and nothing was migrated. Until the Support surface restores database backups (production readiness Slice 7), restore by hand: close the app, move `studio-control.sqlite3` — and any `studio-control.sqlite3-wal` / `-shm` file beside it — out of the app-data directory, copy the newest `backups/db-<timestamp>-<reason>.sqlite3` into its place under the name `studio-control.sqlite3`, and start the app again. After `STORAGE_MIGRATION_FAILED` the newest `…-pre-migration.sqlite3` copy holds the data exactly as it was before the upgrade attempt; keep the moved-aside file until the app is back.
 4. If startup still fails, reinstall the latest known-good native build without deleting the app-data directory.
 

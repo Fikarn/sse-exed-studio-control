@@ -138,10 +138,7 @@ export function SetupRecoverySurface({
       liveTransportRequested,
       supportSnapshot: toJsonValue(supportSnapshot),
     };
-    const path = await exportShellDiagnostics(
-      report,
-      typeof runtimePaths.logsDir === "string" ? runtimePaths.logsDir : undefined
-    );
+    const path = await exportShellDiagnostics(report);
     return {
       message: `Shell diagnostics exported to ${path}.`,
       tone: "ok" as const,
@@ -338,10 +335,10 @@ export function SetupRecoverySurface({
               </button>
               <button
                 className={styles.setupIncidentRailButton}
-                disabled={!String(runtimePaths.logsDir ?? runtimePaths.appDataDir ?? "").trim()}
+                disabled={!String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? "").trim()}
                 onClick={() => {
                   void performAction("open-diagnostics", () =>
-                    openReferencePath("Diagnostics", String(runtimePaths.logsDir ?? runtimePaths.appDataDir ?? ""))
+                    openReferencePath("Diagnostics", String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? ""))
                   );
                 }}
                 type="button"

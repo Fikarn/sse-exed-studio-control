@@ -33,6 +33,8 @@ if (!protocolContract.devParityFixtures.includes("setup-required")) {
   throw new Error("Protocol contract must include the setup-required parity fixture.");
 }
 
+verifyContentSecurityPolicy(config);
+
 const engineBinary = resolveEngineBinary();
 
 await verifyReadyHandshake(engineBinary);
@@ -40,6 +42,66 @@ await verifyProtocolMismatch(engineBinary);
 await verifyBootstrapFailure(engineBinary);
 
 console.log("Tauri foundation smoke checks passed.");
+
+// 2026-09 production readiness, Slice 4 (finding F15): the shell ships a
+// Content Security Policy. Tauri injects `app.security.csp` into every HTML
+// document it serves from the packaged assets — a response header and a
+// <meta> tag on `http://tauri.localhost` — and only there: the dev webview
+// loads Vite's document straight from the dev server, so `devCsp` records the
+// policy the dev document would need (the HMR websocket, the React refresh
+// preamble) without Tauri 2.11 ever applying it. This check keeps both
+// present and keeps the packaged policy strict; removing either fails
+// `tauri:smoke` and with it the `tauri-foundation` CI job.
+function verifyContentSecurityPolicy(shellConfig) {
+  const csp = shellConfig.app?.security?.csp;
+  if (typeof csp !== "string" || !csp.trim()) {
+    throw new Error("Tauri shell must set app.security.csp (2026-09 production readiness, Slice 4 — finding F15).");
+  }
+  const directives = parseContentSecurityPolicy(csp);
+  expectCspSources(directives, "default-src", ["'self'"]);
+  expectCspSources(directives, "script-src", ["'self'"]);
+  expectCspSources(directives, "connect-src", ["ipc:", "http://ipc.localhost"]);
+  for (const forbidden of ["'unsafe-inline'", "'unsafe-eval'", "*", "http:", "https:"]) {
+    if (directives.get("script-src").includes(forbidden)) {
+      throw new Error(`Tauri shell CSP script-src must not allow ${forbidden}.`);
+    }
+  }
+  for (const [name, sources] of directives) {
+    if (sources.includes("*")) {
+      throw new Error(`Tauri shell CSP ${name} must not allow every origin.`);
+    }
+  }
+
+  const devCsp = shellConfig.app?.security?.devCsp;
+  if (typeof devCsp !== "string" || !devCsp.trim()) {
+    throw new Error("Tauri shell must set app.security.devCsp so the dev document keeps a policy of its own.");
+  }
+  const devDirectives = parseContentSecurityPolicy(devCsp);
+  expectCspSources(devDirectives, "connect-src", ["ipc:", "http://ipc.localhost", "ws://127.0.0.1:4173"]);
+}
+
+function parseContentSecurityPolicy(value) {
+  const directives = new Map();
+  for (const entry of value.split(";")) {
+    const [name, ...sources] = entry.trim().split(/\s+/).filter(Boolean);
+    if (name) {
+      directives.set(name, sources);
+    }
+  }
+  return directives;
+}
+
+function expectCspSources(directives, name, required) {
+  const sources = directives.get(name);
+  if (!sources) {
+    throw new Error(`Tauri shell CSP is missing ${name}.`);
+  }
+  for (const source of required) {
+    if (!sources.includes(source)) {
+      throw new Error(`Tauri shell CSP ${name} must include ${source}.`);
+    }
+  }
+}
 
 function resolveEngineBinary() {
   const binaryName = process.platform === "win32" ? "studio-control-engine.exe" : "studio-control-engine";

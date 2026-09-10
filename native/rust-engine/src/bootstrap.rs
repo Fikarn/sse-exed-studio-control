@@ -63,6 +63,10 @@ pub const STARTUP_CODE_STORAGE_CORRUPT: &str = "STORAGE_CORRUPT";
 /// A schema migration refused a stored value it could not read; nothing was
 /// changed and the pre-migration backup is on disk (Slice 3 — F13).
 pub const STARTUP_CODE_STORAGE_MIGRATION_FAILED: &str = "STORAGE_MIGRATION_FAILED";
+/// Sub-directory of the app-data directory where the shell writes diagnostics
+/// exports; reported as `runtime.paths.exportsDir` so the Support surfaces
+/// can open it (2026-09 production readiness, Slice 4 — finding F15).
+pub const EXPORTS_DIR_NAME: &str = "exports";
 
 /// A bootstrap failure with a stable code for `engine.startupFailed`, so the
 /// recovery display can name what happened instead of "startup failed". The

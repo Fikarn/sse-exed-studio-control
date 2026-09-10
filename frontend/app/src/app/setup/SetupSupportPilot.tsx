@@ -603,10 +603,7 @@ export function SetupSupportPilot({
       liveTransportRequested,
       supportSnapshot: toJsonValue(supportSnapshot),
     };
-    const path = await exportShellDiagnostics(
-      report,
-      typeof runtimePaths?.logsDir === "string" ? runtimePaths.logsDir : undefined
-    );
+    const path = await exportShellDiagnostics(report);
     return {
       message: `Diagnostics exported to ${path}. Attach it to the support ticket.`,
       tone: "ok" as const,
@@ -1483,12 +1480,12 @@ export function SetupSupportPilot({
                     </button>
                     <button
                       className={styles.railButton}
-                      disabled={!String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? "").trim()}
+                      disabled={!String(runtimePaths?.exportsDir ?? runtimePaths?.appDataDir ?? "").trim()}
                       onClick={() =>
                         void performAction("open-diagnostics-dir", () =>
                           openReferencePath(
                             "Diagnostics",
-                            String(runtimePaths?.logsDir ?? runtimePaths?.appDataDir ?? "")
+                            String(runtimePaths?.exportsDir ?? runtimePaths?.appDataDir ?? "")
                           )
                         )
                       }

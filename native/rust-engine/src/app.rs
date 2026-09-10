@@ -15,7 +15,7 @@ use crate::audio::{
     update_audio_channel_eq, update_audio_channel_send_mode, update_audio_mix_target,
     update_audio_settings, update_audio_snapshot, AudioCommandError,
 };
-use crate::bootstrap::{bootstrap_runtime, RuntimeContext};
+use crate::bootstrap::{bootstrap_runtime, RuntimeContext, EXPORTS_DIR_NAME};
 use crate::commissioning::{
     evaluate_publish_gate, publish_override_timestamp, PublishGate, PUBLISH_OVERRIDE_AT_KEY,
 };
@@ -1030,6 +1030,7 @@ impl EngineApp {
                 "logFilePath": self.runtime.log_file_path.display().to_string(),
                 "dbPath": self.runtime.db_path.display().to_string(),
                 "backupDir": self.runtime.backups_dir.display().to_string(),
+                "exportsDir": self.runtime.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
                 "updateRepositoryPath": self.runtime
                     .update_repository_path
                     .as_ref()

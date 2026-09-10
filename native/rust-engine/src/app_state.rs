@@ -1,4 +1,4 @@
-use crate::bootstrap::RuntimeContext;
+use crate::bootstrap::{RuntimeContext, EXPORTS_DIR_NAME};
 use crate::planning_settings::{
     DASHBOARD_VIEW_KEY, DECK_MODE_KEY, MODE_SECTION_KEY, PLANNING_SETTINGS_PREFIX,
     SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY, SORT_BY_KEY, TIMELINE_END_HOUR_KEY,
@@ -153,6 +153,7 @@ pub fn build_app_snapshot(
                 "logFilePath": runtime.log_file_path.display().to_string(),
                 "dbPath": runtime.db_path.display().to_string(),
                 "backupDir": runtime.backups_dir.display().to_string(),
+                "exportsDir": runtime.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
                 "updateRepositoryPath": runtime
                     .update_repository_path
                     .as_ref()

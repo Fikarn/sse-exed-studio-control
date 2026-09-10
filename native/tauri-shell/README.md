@@ -17,6 +17,14 @@ Key files:
 - `tauri.conf.json`: single-window shell config and frontend build wiring
 - `capabilities/default.json`: default window capability
 
+Shell hardening (2026-09 production readiness, Slice 4 — findings F07, F08, F15):
+
+- every command that can wait (`engine_start`, `engine_request`, `engine_stop`, `engine_summary`, `shell_confirm_close`, `shell_open_path`, `shell_export_diagnostics`) is an `async fn` that hands its wait to the async runtime's blocking pool, so the thread that paints the window and dispatches the next IPC call never blocks on an engine reply
+- `EngineBridge::request` refuses an id that is already waiting for a response (`DUPLICATE_REQUEST_ID`); the frontend transport numbers its requests per session (`<method>:<sequence>:<session nonce>`)
+- `tauri.conf.json` sets `app.security.csp` (`default-src 'self'`, no inline or remote scripts, IPC origins only in `connect-src`); Tauri injects it into the packaged document on `http://tauri.localhost` as a header and a `<meta>` tag. `devCsp` records the policy the Vite dev document would need; Tauri 2.11 does not inject a policy into a document loaded from `devUrl`. `scripts/tauri-smoke.mjs` fails if either is missing or the packaged policy loosens
+- `shell_open_path` canonicalises the path and opens it only when it sits under the app-data directory (which holds `backups` and `exports`), the logs directory or the configured update repository; anything else answers `PATH_OUTSIDE_APP_DATA`, a missing path `PATH_NOT_FOUND`
+- `shell_export_diagnostics(report)` writes `<app-data>/exports/diagnostics-<UTC timestamp>.json` and nowhere else; the `test-bridge` feature adds `shell_test_bridge_export_diagnostics_to(report, directory)` for the qualification lanes
+
 Repo-root commands:
 
 ```bash
