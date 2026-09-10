@@ -2,7 +2,7 @@ use super::helpers::fixture_cct_range;
 use super::*;
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::commissioning::{LIGHTING_BRIDGE_IP_KEY, LIGHTING_CHECK_ID, LIGHTING_UNIVERSE_KEY};
-use crate::storage::{initialize_database, list_settings_by_prefix, set_settings_owned};
+use crate::storage::{initialize_test_database, list_settings_by_prefix, set_settings_owned};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
@@ -40,7 +40,7 @@ impl Drop for TestDir {
 
 fn initialize_ready_lighting(label: &str) -> TestDir {
     let test_dir = TestDir::new(label);
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -556,7 +556,7 @@ fn lighting_palette_crud_round_trips_and_reorders_within_kind() {
 #[test]
 fn lighting_scene_recall_rejects_until_probe_passes() {
     let test_dir = TestDir::new("scene-rejects");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -584,7 +584,7 @@ fn lighting_scene_recall_rejects_until_probe_passes() {
 #[test]
 fn lighting_scene_recall_updates_last_recalled_scene() {
     let test_dir = TestDir::new("scene-ready");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -1322,7 +1322,7 @@ fn lighting_palette_parsers_validate_shapes() {
 #[test]
 fn lighting_fixture_effect_and_all_power_refresh_snapshot_state() {
     let test_dir = TestDir::new("fixture-update");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -1405,7 +1405,7 @@ fn lighting_fixture_effect_and_all_power_refresh_snapshot_state() {
 #[test]
 fn lighting_group_crud_updates_fixture_assignments() {
     let test_dir = TestDir::new("group-crud");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -1495,7 +1495,7 @@ fn lighting_group_crud_updates_fixture_assignments() {
 #[test]
 fn lighting_spatial_updates_and_markers_round_trip() {
     let test_dir = TestDir::new("spatial-state");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -1594,7 +1594,7 @@ fn lighting_spatial_updates_and_markers_round_trip() {
 #[test]
 fn lighting_settings_update_persists_transport_scene_focus_and_grand_master() {
     let test_dir = TestDir::new("lighting-settings");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -1650,7 +1650,7 @@ fn lighting_settings_update_persists_transport_scene_focus_and_grand_master() {
 #[test]
 fn lighting_fixture_crud_preserves_custom_and_deleted_inventory_state() {
     let test_dir = TestDir::new("fixture-crud");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -1755,7 +1755,7 @@ fn lighting_fixture_crud_preserves_custom_and_deleted_inventory_state() {
 #[test]
 fn lighting_scene_crud_uses_shared_editor_state() {
     let test_dir = TestDir::new("scene-crud");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -1893,7 +1893,7 @@ fn lighting_scene_create_accepts_explicit_fixture_states_for_restore() {
 #[test]
 fn lighting_fixture_rig_z_and_beam_angle_round_trip() {
     let test_dir = TestDir::new("fixture-rig-beam");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -1973,7 +1973,7 @@ fn lighting_fixture_rig_z_and_beam_angle_round_trip() {
 #[test]
 fn lighting_identify_overlay_reports_full_white_during_active_burst() {
     let test_dir = TestDir::new("identify-active");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -2024,7 +2024,7 @@ fn lighting_identify_overlay_reports_full_white_during_active_burst() {
 #[test]
 fn lighting_identify_overlay_clears_when_burst_expires() {
     let test_dir = TestDir::new("identify-expires");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -2072,7 +2072,7 @@ fn lighting_identify_overlay_clears_when_burst_expires() {
 #[test]
 fn lighting_identify_burst_rejects_unknown_fixture() {
     let test_dir = TestDir::new("identify-unknown");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -2102,7 +2102,7 @@ fn lighting_identify_burst_rejects_unknown_fixture() {
 #[test]
 fn output_override_highlight_overlays_intensity_and_neutral_cct() {
     let test_dir = TestDir::new("override-highlight");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -2162,7 +2162,7 @@ fn output_override_highlight_overlays_intensity_and_neutral_cct() {
 #[test]
 fn output_override_solo_dims_unselected() {
     let test_dir = TestDir::new("override-solo");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -2237,7 +2237,7 @@ fn output_override_solo_dims_unselected() {
 #[test]
 fn output_override_off_clears_overlay() {
     let test_dir = TestDir::new("override-off");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -2320,7 +2320,7 @@ fn output_override_off_clears_overlay() {
 #[test]
 fn identify_sequence_steps_through_in_order() {
     let test_dir = TestDir::new("identify-sequence");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -2418,7 +2418,7 @@ fn identify_sequence_steps_through_in_order() {
 #[test]
 fn identify_sequence_respects_unreachable_bridge() {
     let test_dir = TestDir::new("identify-sequence-unreachable");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     // Seed bridge ip but NOT the commissioning passed status — bridge
     // remains unreachable, mirroring an in-the-field "DMX unplugged" state.
     set_settings_owned(
@@ -2588,7 +2588,7 @@ fn lighting_scene_pin_parser_rejects_invalid_payloads() {
 #[test]
 fn lighting_scene_reorder_moves_scene_in_scene_order() {
     let test_dir = TestDir::new("scene-reorder-move");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -2674,7 +2674,7 @@ fn lighting_scene_reorder_moves_scene_in_scene_order() {
 #[test]
 fn lighting_scene_reorder_rejects_unknown_ids() {
     let test_dir = TestDir::new("scene-reorder-unknown");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -2714,7 +2714,7 @@ fn lighting_scene_reorder_rejects_unknown_ids() {
 #[test]
 fn lighting_scene_pin_floats_to_top_of_snapshot() {
     let test_dir = TestDir::new("scene-pin-top");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -2755,7 +2755,7 @@ fn lighting_scene_pin_floats_to_top_of_snapshot() {
 #[test]
 fn lighting_scene_pin_is_idempotent_and_unpin_clears_state() {
     let test_dir = TestDir::new("scene-pin-idempotent");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -2825,7 +2825,7 @@ fn lighting_scene_pin_is_idempotent_and_unpin_clears_state() {
 #[test]
 fn lighting_scene_pin_rejects_unknown_scene() {
     let test_dir = TestDir::new("scene-pin-unknown");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -2852,7 +2852,7 @@ fn lighting_scene_pin_rejects_unknown_scene() {
 #[test]
 fn lighting_scene_pin_and_reorder_keep_pinned_cluster_in_front() {
     let test_dir = TestDir::new("scene-pin-reorder-roundtrip");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -2953,7 +2953,7 @@ fn lighting_scene_pin_and_reorder_keep_pinned_cluster_in_front() {
 #[test]
 fn lighting_normalize_populates_scene_order_for_legacy_state() {
     let test_dir = TestDir::new("normalize-legacy-order");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -3006,7 +3006,7 @@ fn lighting_normalize_populates_scene_order_for_legacy_state() {
 #[test]
 fn lighting_normalize_drops_pinned_orphans_and_scene_order_orphans() {
     let test_dir = TestDir::new("normalize-orphans");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -3124,7 +3124,7 @@ fn lighting_group_reorder_parser_rejects_invalid_payloads() {
 #[test]
 fn lighting_group_reorder_move_before_anchor() {
     let test_dir = TestDir::new("group-reorder-before");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -3171,7 +3171,7 @@ fn lighting_group_reorder_move_before_anchor() {
 #[test]
 fn lighting_group_reorder_move_to_end() {
     let test_dir = TestDir::new("group-reorder-end");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -3206,7 +3206,7 @@ fn lighting_group_reorder_move_to_end() {
 #[test]
 fn lighting_group_reorder_rejects_unknown_ids() {
     let test_dir = TestDir::new("group-reorder-unknown");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -3246,7 +3246,7 @@ fn lighting_group_reorder_rejects_unknown_ids() {
 #[test]
 fn lighting_normalize_populates_group_order_for_legacy_state() {
     let test_dir = TestDir::new("normalize-legacy-group-order");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -3307,7 +3307,7 @@ fn lighting_normalize_populates_group_order_for_legacy_state() {
 #[test]
 fn lighting_scene_color_round_trip() {
     let test_dir = TestDir::new("scene-color-round-trip");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -3370,7 +3370,7 @@ fn lighting_scene_color_round_trip() {
 #[test]
 fn lighting_group_color_round_trip() {
     let test_dir = TestDir::new("group-color-round-trip");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(

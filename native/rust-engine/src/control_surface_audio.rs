@@ -791,7 +791,7 @@ fn handle_audio_solo_clear_all(db_path: &Path) -> Result<Value, ControlSurfaceEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::initialize_database;
+    use crate::storage::initialize_test_database;
     use std::fs;
     use std::path::PathBuf;
     use std::process;
@@ -828,7 +828,7 @@ mod tests {
 
     fn ready_audio_test_db(label: &str) -> TestDir {
         let test_dir = TestDir::new(label);
-        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
         set_settings_owned(
             test_dir.db_path().as_path(),
             &[
@@ -941,7 +941,7 @@ mod tests {
     #[test]
     fn audio_dial_turn_is_gated_until_probe_passes() {
         let test_dir = TestDir::new("gated");
-        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
 
         let error = handle_audio_action(test_dir.db_path().as_path(), "dialTurn", Some("1:up"))
             .expect_err("dial turn should be gated");
@@ -1287,7 +1287,7 @@ mod tests {
     #[test]
     fn audio_state_keys_report_offline_when_gated() {
         let test_dir = TestDir::new("state-gated");
-        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
         let app_settings = crate::storage::list_settings_by_prefix(
             test_dir.db_path().as_path(),
             APP_SETTINGS_PREFIX,

@@ -1161,7 +1161,7 @@ pub fn build_control_surface_health_check(runtime: &RuntimeContext) -> Value {
 /// Test fixtures shared with `control_surface_http::tests`.
 #[cfg(test)]
 pub(crate) mod test_support {
-    use crate::storage::{initialize_database, set_settings_owned};
+    use crate::storage::{initialize_test_database, set_settings_owned};
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process;
@@ -1202,7 +1202,7 @@ pub(crate) mod test_support {
 
     pub(crate) fn ready_audio_test_db(label: &str) -> TestDir {
         let test_dir = TestDir::new(label);
-        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
         set_settings_owned(
             test_dir.db_path().as_path(),
             &[
@@ -1229,7 +1229,7 @@ pub(crate) mod test_support {
 mod tests {
     use super::test_support::{ready_audio_test_db, TestDir};
     use super::*;
-    use crate::storage::initialize_database;
+    use crate::storage::initialize_test_database;
 
     #[test]
     fn truncate_preserves_short_text() {
@@ -1254,7 +1254,7 @@ mod tests {
     #[test]
     fn audio_strip_lcd_shows_gate_reason_until_verified() {
         let test_dir = TestDir::new("lcd-gated");
-        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
 
         let text = read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_strip_1")
             .expect("lcd text should render");
@@ -1365,7 +1365,7 @@ mod tests {
     #[test]
     fn workspace_lcd_key_reads_shell_workspace() {
         let test_dir = TestDir::new("workspace-key");
-        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
 
         assert_eq!(
             read_control_surface_lcd_text(test_dir.db_path().as_path(), "workspace")

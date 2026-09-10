@@ -1720,7 +1720,7 @@ mod tests {
     use crate::bootstrap::RuntimeContext;
     use crate::control_surface::ControlSurfaceBridgeInfo;
     use crate::lighting::LightingPreviewRuntimeState;
-    use crate::storage::{initialize_database, StorageBootstrap};
+    use crate::storage::{initialize_test_database, StorageBootstrap};
     use serde_json::{json, Value};
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -1784,7 +1784,7 @@ mod tests {
                 error: None,
             },
         };
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
         EngineApp {
             runtime,
             lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),

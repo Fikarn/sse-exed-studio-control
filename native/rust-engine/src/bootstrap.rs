@@ -3,9 +3,14 @@ use crate::control_surface_http::{load_or_create_bridge_token, start_control_sur
 use crate::diagnostics::append_log;
 use crate::legacy_import::LegacyImportRequest;
 use crate::planning::planning_data_present;
-use crate::storage::{import_legacy_db, initialize_database, EngineResult, StorageBootstrap};
+use crate::storage::{
+    import_legacy_db, initialize_database, EngineResult, StorageBootstrap, StorageError,
+};
+use crate::storage_backups::newest_snapshot;
 use std::env;
+use std::error::Error;
 use std::ffi::OsString;
+use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -49,6 +54,40 @@ pub struct RuntimeContext {
     /// profile carries (2026-09 production readiness, Slice 2 — F01). Never
     /// part of a snapshot.
     pub control_surface_token: String,
+}
+
+pub const STARTUP_CODE_BOOTSTRAP_FAILED: &str = "BOOTSTRAP_FAILED";
+/// The database failed its integrity check, or is not a database at all
+/// (2026-09 production readiness, Slice 3 — F02).
+pub const STARTUP_CODE_STORAGE_CORRUPT: &str = "STORAGE_CORRUPT";
+/// A schema migration refused a stored value it could not read; nothing was
+/// changed and the pre-migration backup is on disk (Slice 3 — F13).
+pub const STARTUP_CODE_STORAGE_MIGRATION_FAILED: &str = "STORAGE_MIGRATION_FAILED";
+
+/// A bootstrap failure with a stable code for `engine.startupFailed`, so the
+/// recovery display can name what happened instead of "startup failed". The
+/// message is the operator's sentence; the log gets the same line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartupFailure {
+    pub code: &'static str,
+    pub message: String,
+}
+
+impl fmt::Display for StartupFailure {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl Error for StartupFailure {}
+
+/// The code `engine.startupFailed` carries for a bootstrap error: the
+/// failure's own when it has one, `BOOTSTRAP_FAILED` otherwise.
+pub fn startup_failure_code(error: &(dyn Error + Send + Sync + 'static)) -> &'static str {
+    error
+        .downcast_ref::<StartupFailure>()
+        .map(|failure| failure.code)
+        .unwrap_or(STARTUP_CODE_BOOTSTRAP_FAILED)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -167,6 +206,12 @@ pub fn validate_protocol_version(requested_protocol_version: &str) -> Result<(),
 
 pub fn bootstrap_runtime() -> EngineResult<RuntimeContext> {
     let runtime_paths = resolve_runtime_paths().map_err(std::io::Error::other)?;
+    bootstrap_runtime_from_paths(runtime_paths)
+}
+
+pub(crate) fn bootstrap_runtime_from_paths(
+    runtime_paths: RuntimePaths,
+) -> EngineResult<RuntimeContext> {
     validate_protocol_version(&runtime_paths.requested_protocol_version)
         .map_err(std::io::Error::other)?;
 
@@ -179,7 +224,22 @@ pub fn bootstrap_runtime() -> EngineResult<RuntimeContext> {
         "INFO",
         "Bootstrapping runtime directories",
     )?;
-    let storage_bootstrap = initialize_database(&runtime_paths.db_path)?;
+    let storage_bootstrap =
+        match initialize_database(&runtime_paths.db_path, &runtime_paths.backups_dir) {
+            Ok(storage_bootstrap) => storage_bootstrap,
+            Err(error) => {
+                let failure = storage_startup_failure(&runtime_paths, error);
+                let _ = append_log(
+                    &runtime_paths.log_file_path,
+                    "ERROR",
+                    &format!(
+                        "Storage bootstrap failed ({}): {failure}",
+                        startup_failure_code(failure.as_ref())
+                    ),
+                );
+                return Err(failure);
+            }
+        };
     append_log(
         &runtime_paths.log_file_path,
         "INFO",
@@ -266,6 +326,46 @@ pub fn bootstrap_runtime() -> EngineResult<RuntimeContext> {
     })
 }
 
+/// A corrupt or un-upgradable database becomes a `StartupFailure` with its
+/// own code and a sentence that names the file, the newest database backup
+/// and the way out; every other storage error passes through unchanged.
+fn storage_startup_failure(
+    runtime_paths: &RuntimePaths,
+    error: Box<dyn Error + Send + Sync>,
+) -> Box<dyn Error + Send + Sync> {
+    let Some(storage_error) = error.downcast_ref::<StorageError>() else {
+        return error;
+    };
+    let backup_sentence = match newest_snapshot(&runtime_paths.backups_dir) {
+        Some(path) => format!("The newest database backup is {}.", path.display()),
+        None => format!(
+            "No database backup exists yet in {}.",
+            runtime_paths.backups_dir.display()
+        ),
+    };
+    let failure = match storage_error {
+        StorageError::Corrupt { db_path, detail } => StartupFailure {
+            code: STARTUP_CODE_STORAGE_CORRUPT,
+            message: format!(
+                "The saved data file {} failed its integrity check ({}). {backup_sentence} \
+                 Restore a backup from Setup / Support; the file itself was left untouched.",
+                db_path.display(),
+                detail.split("; ").next().unwrap_or(detail)
+            ),
+        },
+        StorageError::MigrationFailed { key, detail } => StartupFailure {
+            code: STARTUP_CODE_STORAGE_MIGRATION_FAILED,
+            message: format!(
+                "The saved data file {} could not be upgraded: the stored value {key} is not \
+                 readable ({detail}). Nothing was changed. {backup_sentence} Restore a backup \
+                 from Setup / Support.",
+                runtime_paths.db_path.display()
+            ),
+        },
+    };
+    Box::new(failure)
+}
+
 fn resolve_legacy_import_source(app_data_dir: &Path) -> Option<PathBuf> {
     resolve_legacy_import_source_from(app_data_dir, |name| env::var_os(name))
 }
@@ -300,10 +400,14 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        current_runtime_platform, default_app_data_dir_for_platform,
-        resolve_legacy_import_source_from, resolve_runtime_paths_from, validate_protocol_version,
-        RuntimePlatform, DEFAULT_APP_DATA_DIR_NAME, SUPPORTED_PROTOCOL_VERSION,
+        bootstrap_runtime_from_paths, current_runtime_platform, default_app_data_dir_for_platform,
+        resolve_legacy_import_source_from, resolve_runtime_paths_from, startup_failure_code,
+        storage_startup_failure, validate_protocol_version, RuntimePaths, RuntimePlatform,
+        StartupFailure, DEFAULT_APP_DATA_DIR_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
+        STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
+        SUPPORTED_PROTOCOL_VERSION,
     };
+    use crate::storage::StorageError;
     use std::ffi::OsString;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -542,6 +646,100 @@ mod tests {
         assert_eq!(
             resolve_legacy_import_source_from(app_data.path(), env_fixture(&[])),
             Some(staged.join("db.json"))
+        );
+    }
+
+    fn runtime_paths_for(test_dir: &TestDir) -> RuntimePaths {
+        let app_data_dir = test_dir.path().to_path_buf();
+        RuntimePaths {
+            protocol_version: String::from(SUPPORTED_PROTOCOL_VERSION),
+            requested_protocol_version: String::from(SUPPORTED_PROTOCOL_VERSION),
+            backups_dir: app_data_dir.join("backups"),
+            logs_dir: app_data_dir.join("logs"),
+            log_file_path: app_data_dir.join("logs").join("engine.log"),
+            db_path: app_data_dir.join("studio-control.sqlite3"),
+            update_repository_path: None,
+            app_data_dir,
+        }
+    }
+
+    // 2026-09 production readiness, Slice 3 (F02): a database SQLite refuses
+    // stops the bootstrap with the STORAGE_CORRUPT code, a sentence that
+    // names the file and the newest backup, and an ERROR line in the engine
+    // log — before the bridge is started or anything else is touched.
+    #[test]
+    fn corrupt_db_yields_storage_corrupt() {
+        let test_dir = TestDir::new("corrupt-db");
+        let paths = runtime_paths_for(&test_dir);
+        fs::create_dir_all(&paths.backups_dir).expect("backups dir");
+        let backup_name = "db-2026-09-09T22-00-00-000Z-daily.sqlite3";
+        fs::write(paths.backups_dir.join(backup_name), b"x").expect("fake backup");
+        fs::write(
+            &paths.db_path,
+            b"junk where the database should be\n".repeat(64),
+        )
+        .expect("junk db");
+        let log_file_path = paths.log_file_path.clone();
+        let db_display = paths.db_path.display().to_string();
+
+        let error = match bootstrap_runtime_from_paths(paths) {
+            Err(error) => error,
+            Ok(_) => panic!("a corrupt database must stop the bootstrap"),
+        };
+        let failure = error
+            .downcast_ref::<StartupFailure>()
+            .unwrap_or_else(|| panic!("expected a StartupFailure, got {error}"));
+        assert_eq!(failure.code, STARTUP_CODE_STORAGE_CORRUPT);
+        assert!(failure.message.contains(&db_display), "{}", failure.message);
+        assert!(failure.message.contains(backup_name), "{}", failure.message);
+        assert!(
+            failure
+                .message
+                .contains("Restore a backup from Setup / Support"),
+            "{}",
+            failure.message
+        );
+        assert_eq!(
+            startup_failure_code(error.as_ref()),
+            STARTUP_CODE_STORAGE_CORRUPT
+        );
+        let log = fs::read_to_string(&log_file_path).expect("engine log should exist");
+        assert!(
+            log.contains("ERROR") && log.contains(STARTUP_CODE_STORAGE_CORRUPT),
+            "{log}"
+        );
+    }
+
+    // 2026-09 production readiness, Slice 3 (F13): a refused migration has
+    // its own code and names the key; anything else stays BOOTSTRAP_FAILED.
+    #[test]
+    fn migration_failure_maps_to_its_own_code() {
+        let test_dir = TestDir::new("migration-failed");
+        let paths = runtime_paths_for(&test_dir);
+
+        let error = storage_startup_failure(
+            &paths,
+            Box::new(StorageError::MigrationFailed {
+                key: String::from("app.lighting.editor.state"),
+                detail: String::from("expected value at line 1 column 1"),
+            }),
+        );
+        let failure = error
+            .downcast_ref::<StartupFailure>()
+            .expect("a StartupFailure");
+        assert_eq!(failure.code, STARTUP_CODE_STORAGE_MIGRATION_FAILED);
+        assert!(failure.message.contains("app.lighting.editor.state"));
+        assert!(
+            failure.message.contains("No database backup exists yet"),
+            "{}",
+            failure.message
+        );
+
+        let other = storage_startup_failure(&paths, Box::new(std::io::Error::other("disk full")));
+        assert!(other.downcast_ref::<StartupFailure>().is_none());
+        assert_eq!(
+            startup_failure_code(other.as_ref()),
+            STARTUP_CODE_BOOTSTRAP_FAILED
         );
     }
 

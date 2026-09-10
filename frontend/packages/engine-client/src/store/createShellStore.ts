@@ -446,6 +446,11 @@ export function createShellStore(transport: EngineTransport): ShellStore {
   let unsubscribeTransport = () => {};
   let initializePromise: Promise<void> | null = null;
   let pendingStartupGate: PendingStartupGate | null = null;
+  // 2026-09 production readiness, Slice 3: the failure the engine reported
+  // during this bootstrap, if any. It can arrive while `engine_start` is still
+  // returning — before the ready gate exists — and it is the answer, not a
+  // ready timeout ten seconds later.
+  let engineStartupFailure: StartupFailure | null = null;
   let bootstrapGeneration = 0;
   let audioRefreshInFlight = false;
   let audioRefreshQueued = false;
@@ -590,6 +595,10 @@ export function createShellStore(transport: EngineTransport): ShellStore {
   const waitForEngineReady = () =>
     new Promise<JsonObject>((resolve, reject) => {
       clearStartupGate();
+      if (engineStartupFailure) {
+        reject(engineStartupFailure);
+        return;
+      }
       const timeoutId = window.setTimeout(() => {
         pendingStartupGate = null;
         reject(
@@ -712,6 +721,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
 
     if (event.event === "engine.startupFailed") {
       const startupFailure = normalizeStartupFailure(event.payload);
+      engineStartupFailure = startupFailure;
 
       setState({
         ...state,
@@ -761,6 +771,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     const isCurrentBootstrap = () => generation === bootstrapGeneration;
 
     clearStartupGate();
+    engineStartupFailure = null;
     unsubscribeTransport();
     unsubscribeTransport = () => {};
 
@@ -867,7 +878,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     } catch (error) {
       if (!isCurrentBootstrap()) return;
 
-      const startupFailure = normalizeStartupFailure(error);
+      // What the engine said about itself outranks whatever the bootstrap
+      // tripped over afterwards (a request against a process that is gone).
+      const startupFailure = engineStartupFailure ?? normalizeStartupFailure(error);
       setState({
         ...state,
         lifecycle: "failed",

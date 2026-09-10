@@ -25,17 +25,30 @@ export function createTauriTransport(): EngineTransport {
         return;
       }
 
-      unlistenPromise = listen<TauriEventPayload>("engine://event", (payload) => {
+      // 2026-09 production readiness, Slice 3: the listener is registered
+      // before the engine process exists. An engine that refuses its database
+      // emits `engine.startupFailed` within milliseconds of starting, and an
+      // event emitted before the webview listens is dropped — the shell then
+      // waited ten seconds and reported a ready timeout instead.
+      const pendingListen = listen<TauriEventPayload>("engine://event", (payload) => {
         const event = payload.payload.event;
         for (const listener of listeners) {
           listener(event);
         }
       });
+      unlistenPromise = pendingListen;
+
+      let unlisten: UnlistenFn;
+      try {
+        unlisten = await pendingListen;
+      } catch (error) {
+        unlistenPromise = null;
+        throw error;
+      }
 
       try {
         await invoke("engine_start");
       } catch (error) {
-        const unlisten = await unlistenPromise;
         unlisten();
         unlistenPromise = null;
         throw error;

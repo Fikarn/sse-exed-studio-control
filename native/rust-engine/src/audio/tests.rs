@@ -1,7 +1,7 @@
 use super::*;
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::commissioning::AUDIO_SEND_HOST_KEY;
-use crate::storage::{initialize_database, list_settings_by_prefix, set_settings_owned};
+use crate::storage::{initialize_test_database, list_settings_by_prefix, set_settings_owned};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -395,7 +395,7 @@ fn simulated_output_submix_uses_totalmix_fader_gain_curve() {
 fn audio_clip_clear_resets_live_rme_clip_latch() {
     crate::rme_totalmix_osc::with_shared_meter_state_for_test(|shared| {
         let test_dir = TestDir::new("clip-clear-rme-latch");
-        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
         set_settings_owned(
             test_dir.db_path().as_path(),
             &[
@@ -544,7 +544,7 @@ fn assert_meter_close(actual: f64, expected: f64) {
 #[test]
 fn audio_sync_rejects_until_probe_passes_and_records_failure_state() {
     let test_dir = TestDir::new("sync-rejects");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
 
     let error = sync_audio_console(test_dir.db_path().as_path()).expect_err("sync should reject");
     match error {
@@ -565,7 +565,7 @@ fn audio_sync_rejects_until_probe_passes_and_records_failure_state() {
 #[test]
 fn audio_snapshot_recall_marks_last_recalled_snapshot() {
     let test_dir = TestDir::new("snapshot-recall");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -624,7 +624,7 @@ fn audio_snapshot_recall_marks_last_recalled_snapshot() {
 #[test]
 fn audio_snapshot_crud_uses_persisted_native_state() {
     let test_dir = TestDir::new("snapshot-crud");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -697,7 +697,7 @@ fn audio_snapshot_crud_uses_persisted_native_state() {
 #[test]
 fn audio_channel_update_persists_front_preamp_controls() {
     let test_dir = TestDir::new("channel-front-preamp");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -813,7 +813,7 @@ fn assert_console_datagram_received(receiver: &std::net::UdpSocket, context: &st
 #[test]
 fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
     let test_dir = TestDir::new("clear-all-solo");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     // Solo is a console write, so this test now runs under the same gate the
     // operator faces (Slice 1); before it passed without any probe state.
     set_settings_owned(
@@ -869,7 +869,7 @@ fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
 #[test]
 fn audio_channel_update_is_refused_before_probe_passes() {
     let test_dir = TestDir::new("channel-not-verified");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
     let before = read_audio_snapshot(
         &list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
@@ -955,7 +955,7 @@ fn audio_channel_update_is_refused_before_probe_passes() {
 #[test]
 fn audio_channel_name_only_update_is_allowed_before_probe_passes() {
     let test_dir = TestDir::new("channel-rename-not-verified");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
 
     let updated = update_audio_channel(
@@ -990,7 +990,7 @@ fn audio_channel_name_only_update_is_allowed_before_probe_passes() {
 #[test]
 fn audio_channel_update_validates_before_sending() {
     let test_dir = TestDir::new("channel-validate-first");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     // Bind (which re-points the transport and therefore resets the probe
     // state) before marking the probe as passed.
     let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
@@ -1065,7 +1065,7 @@ fn audio_channel_update_validates_before_sending() {
 #[test]
 fn audio_channel_update_rejects_unsupported_gain_controls() {
     let test_dir = TestDir::new("channel-unsupported-field");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -1117,7 +1117,7 @@ fn audio_channel_update_rejects_unsupported_gain_controls() {
 #[test]
 fn audio_mix_target_update_is_refused_before_probe_passes() {
     let test_dir = TestDir::new("mix-target-not-verified");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
     let request = AudioMixTargetUpdateRequest {
         mix_target_id: String::from("audio-mix-main"),
@@ -1186,7 +1186,7 @@ fn audio_mix_target_update_is_refused_before_probe_passes() {
 #[test]
 fn audio_settings_update_persists_selection_and_checklist_flags() {
     let test_dir = TestDir::new("settings-update");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -1230,7 +1230,7 @@ fn audio_settings_update_persists_selection_and_checklist_flags() {
 #[test]
 fn audio_settings_update_resets_probe_when_transport_changes() {
     let test_dir = TestDir::new("settings-transport-reset");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[

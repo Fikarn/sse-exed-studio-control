@@ -895,7 +895,7 @@ mod tests {
     use crate::commissioning::read_commissioning_snapshot;
     use crate::control_surface::ControlSurfaceBridgeInfo;
     use crate::lighting::read_lighting_snapshot;
-    use crate::storage::{initialize_database, set_settings_owned};
+    use crate::storage::{initialize_test_database, set_settings_owned};
     use serde_json::json;
     use std::process;
 
@@ -925,7 +925,7 @@ mod tests {
             fs::create_dir_all(&backups_dir).expect("backups dir should be created");
             let db_path = app_data_dir.join("studio-control.sqlite3");
             let storage_bootstrap =
-                initialize_database(&db_path).expect("database should initialize");
+                initialize_test_database(&db_path).expect("database should initialize");
 
             RuntimeContext {
                 protocol_version: String::from("1"),

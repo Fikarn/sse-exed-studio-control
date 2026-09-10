@@ -153,14 +153,16 @@ To commission or re-commission the deck:
 
 1. Open the recovery surface.
 2. Export diagnostics and note the Engine log path.
-3. If storage is corrupt, restore from the latest support backup.
+3. If the display reads `SAVED DATA NEEDS ATTENTION` (code `STORAGE_CORRUPT` or `STORAGE_MIGRATION_FAILED`), the database failed its integrity check or could not be upgraded. The sentence names the file and the newest database backup; the file itself was left untouched, and nothing was migrated. Until the Support surface restores database backups (production readiness Slice 7), restore by hand: close the app, move `studio-control.sqlite3` — and any `studio-control.sqlite3-wal` / `-shm` file beside it — out of the app-data directory, copy the newest `backups/db-<timestamp>-<reason>.sqlite3` into its place under the name `studio-control.sqlite3`, and start the app again. After `STORAGE_MIGRATION_FAILED` the newest `…-pre-migration.sqlite3` copy holds the data exactly as it was before the upgrade attempt; keep the moved-aside file until the app is back.
 4. If startup still fails, reinstall the latest known-good native build without deleting the app-data directory.
 
 ## Data Safety
 
-- Primary store: native SQLite database
-- Backup/export path: native support backup archives written under the app-data backup directory
-- Restore path: native support restore from a support archive or legacy `db.json`
+- Primary store: native SQLite database (`studio-control.sqlite3` in the app-data directory); every commit waits for the disk
+- Integrity: the database is checked at every start; a file that fails the check stops the start-up at the recovery surface instead of being opened and migrated (`STORAGE_CORRUPT`, see above)
+- Database backups: the app writes verified copies of the whole database to the app-data `backups` directory as `db-<UTC timestamp>-<reason>.sqlite3` — `pre-migration` before any schema upgrade (keeps 5), `daily` five minutes after start and every 24 h (keeps 14), `shutdown` at every graceful close (keeps 3), `pre-restore` before a database restore (keeps 5; the restore itself arrives with Slice 7). Each copy is integrity-checked before it counts; a copy that fails is deleted
+- Backup/export path: native support backup archives (planning and settings, JSON) written under the same backup directory
+- Restore path: native support restore from a support archive or legacy `db.json`; a database backup is restored by hand until Slice 7 ("The app fails before the dashboard" above)
 - Rollback safety: restore creates a pre-restore backup before applying changes
 
 ## Health Signals

@@ -95,6 +95,15 @@ export function formatFailureCode(failure: StartupFailure | null): string {
   if (code === "ENGINE_READY_TIMEOUT") {
     return "Startup timed out";
   }
+  // 2026-09 production readiness, Slice 3 (F02, F13): the saved-data codes
+  // name the data, not the start-up; the engine's sentence says which file
+  // and which backup.
+  if (code === "STORAGE_CORRUPT") {
+    return "Saved data check failed";
+  }
+  if (code === "STORAGE_MIGRATION_FAILED") {
+    return "Saved data upgrade failed";
+  }
   return code
     .replace(/[_-]+/g, " ")
     .toLowerCase()
@@ -122,6 +131,13 @@ export function formatFailureStage(stage: string): string {
 export function getFailureTitle(startupFailure: StartupFailure | null) {
   if (startupFailure?.code === "PROTOCOL_MISMATCH") {
     return "Protocol mismatch";
+  }
+
+  // 2026-09 production readiness, Slice 3: a database that failed its
+  // integrity check, or one a migration could not upgrade, is the operator's
+  // data asking for attention — restore a backup from Setup / Support.
+  if (startupFailure?.code === "STORAGE_CORRUPT" || startupFailure?.code === "STORAGE_MIGRATION_FAILED") {
+    return "Saved data needs attention";
   }
 
   // Slice 8 gave every non-protocol failure the same word, so the stage no

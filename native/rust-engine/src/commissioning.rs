@@ -881,7 +881,7 @@ mod tests {
         COMMISSIONING_COMPLETED_KEY, COMMISSIONING_RUNNER_STAGE_KEY, COMMISSIONING_STAGE_KEY,
     };
     use crate::control_surface::ControlSurfaceBridgeInfo;
-    use crate::storage::{initialize_database, set_settings};
+    use crate::storage::{initialize_test_database, set_settings};
     use std::fs;
     use std::path::PathBuf;
     use std::process;
@@ -948,7 +948,7 @@ mod tests {
     fn commissioning_snapshot_reflects_seeded_planning_counts() {
         let test_dir = TestDir::new("commissioning-snapshot");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
 
         let snapshot = seed_sample_planning_data(
             &runtime,
@@ -1070,7 +1070,7 @@ mod tests {
     fn control_surface_probe_records_passed_status() {
         let test_dir = TestDir::new("commissioning-control-surface");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
 
         seed_sample_planning_data(
             &runtime,
@@ -1107,7 +1107,7 @@ mod tests {
     fn audio_probe_rejects_invalid_host() {
         let test_dir = TestDir::new("commissioning-audio-invalid-host");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
 
         let error = run_commissioning_check(
             &runtime.db_path,
@@ -1138,7 +1138,7 @@ mod tests {
         crate::rme_totalmix_osc::with_shared_meter_state_for_test(|_| {
             let test_dir = TestDir::new("commissioning-audio-no-meter-packets");
             let runtime = runtime_for(&test_dir);
-            initialize_database(&runtime.db_path).expect("database should initialize");
+            initialize_test_database(&runtime.db_path).expect("database should initialize");
 
             let snapshot = run_commissioning_check(
                 &runtime.db_path,
@@ -1189,7 +1189,7 @@ mod tests {
         // the same gate the operator faces.
         let test_dir = TestDir::new("commissioning-audio-simulated");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
         crate::storage::set_settings_owned(
             &runtime.db_path,
             &[(
@@ -1236,7 +1236,7 @@ mod tests {
     fn sample_seed_preserves_commissioning_stage_and_workspace() {
         let test_dir = TestDir::new("commissioning-seed-preserve");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
 
         set_settings(
             &runtime.db_path,

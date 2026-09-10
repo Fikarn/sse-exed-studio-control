@@ -242,7 +242,7 @@ async function runSetupSupportQualification() {
   const runtime = createRuntimeDirs("sse-tauri-setup-support-");
   const firstSession = createSessionFiles("sse-tauri-session-");
 
-  console.log("Tauri Setup/Support qualification: step 1/3 clean startup and support workflow.");
+  console.log("Tauri Setup/Support qualification: step 1/4 clean startup and support workflow.");
 
   const firstRun = launchTauriShell({
     appDataDir: runtime.appDataDir,
@@ -383,7 +383,7 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
-  console.log("Tauri Setup/Support qualification: step 2/3 persisted restart on the same runtime.");
+  console.log("Tauri Setup/Support qualification: step 2/4 persisted restart on the same runtime.");
 
   const secondSession = createSessionFiles("sse-tauri-session-");
   const secondRun = launchTauriShell({
@@ -427,7 +427,7 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
-  console.log("Tauri Setup/Support qualification: step 3/3 recovery posture for bootstrap failure.");
+  console.log("Tauri Setup/Support qualification: step 3/4 recovery posture for bootstrap failure.");
 
   const blockedRuntime = createBlockedRuntimeDirs("sse-tauri-bootstrap-failure-");
   const recoverySession = createSessionFiles("sse-tauri-session-");
@@ -462,6 +462,63 @@ async function runSetupSupportQualification() {
     await closeTauriShell(recoveryRun);
     recoverySession.cleanup();
     blockedRuntime.cleanup();
+  }
+
+  await delay(1_500);
+  await assertTcpPortAvailable(devServerPort);
+
+  // Scenario `corrupt-db` (2026-09 production readiness, Slice 3 — F02): junk
+  // where the database should be reaches the recovery surface as
+  // STORAGE_CORRUPT, the engine's sentence names a backup, and the damaged
+  // file is left exactly as it was — nothing migrates or overwrites it.
+  console.log("Tauri Setup/Support qualification: step 4/4 recovery posture for a corrupt database.");
+
+  const corruptRuntime = createRuntimeDirs("sse-tauri-corrupt-db-");
+  const corruptDbPath = path.join(corruptRuntime.appDataDir, "studio-control.sqlite3");
+  const junk = Buffer.from("this is not a database\n".repeat(400), "utf8");
+  writeFileSync(corruptDbPath, junk);
+  const corruptSession = createSessionFiles("sse-tauri-session-");
+  const corruptRun = launchTauriShell({
+    appDataDir: corruptRuntime.appDataDir,
+    commandPath: corruptSession.commandPath,
+    logsDir: corruptRuntime.logsDir,
+    statusPath: corruptSession.statusPath,
+    updateRepoDir: corruptRuntime.updateRepoDir,
+  });
+
+  try {
+    const corruptStatus = await waitForStatus({
+      child: corruptRun,
+      label: "corrupt database recovery state",
+      predicate: (value) => value?.shellState?.lifecycle === "failed",
+      statusPath: corruptSession.statusPath,
+    });
+    const failure = corruptStatus.shellState.startupFailure;
+
+    assert(
+      failure?.code === "STORAGE_CORRUPT",
+      `Expected corrupt database recovery code 'STORAGE_CORRUPT', got '${failure?.code}'.`
+    );
+    assert(
+      failure?.stage === "bootstrap",
+      `Expected corrupt database recovery stage 'bootstrap', got '${failure?.stage}'.`
+    );
+    assert(
+      typeof failure?.message === "string" && failure.message.includes("backup"),
+      `Expected the corrupt database sentence to name a backup, got '${failure?.message}'.`
+    );
+    assert(
+      existsSync(corruptDbPath) && readFileSync(corruptDbPath).equals(junk),
+      "Expected the damaged database file to be left exactly as it was."
+    );
+    evidence.recordCheck("corrupt-db-reaches-recovery-surface", {
+      code: failure?.code,
+      stage: failure?.stage,
+    });
+  } finally {
+    await closeTauriShell(corruptRun);
+    corruptSession.cleanup();
+    corruptRuntime.cleanup();
   }
 }
 

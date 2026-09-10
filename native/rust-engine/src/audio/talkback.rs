@@ -292,7 +292,7 @@ mod tests {
     use super::*;
     use crate::app_state::APP_SETTINGS_PREFIX;
     use crate::audio::tests::TestDir;
-    use crate::storage::{initialize_database, list_settings_by_prefix, set_settings_owned};
+    use crate::storage::{initialize_test_database, list_settings_by_prefix, set_settings_owned};
     use std::sync::Mutex as TestMutex;
 
     // The hold table is process-wide; serialize the tests that read it.
@@ -300,7 +300,7 @@ mod tests {
 
     fn ready_db(label: &str) -> TestDir {
         let test_dir = TestDir::new(label);
-        initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
         set_settings_owned(
             test_dir.db_path().as_path(),
             &[
@@ -439,7 +439,7 @@ mod tests {
             .unwrap_or_else(|poison| poison.into_inner());
         let test_dir = TestDir::new("talkback-gated");
         let db = test_dir.db_path();
-        initialize_database(db.as_path()).expect("database should initialize");
+        initialize_test_database(db.as_path()).expect("database should initialize");
 
         let error = hold_audio_talkback(
             &db,

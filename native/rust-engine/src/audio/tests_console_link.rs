@@ -5,7 +5,7 @@
 use super::tests::TestDir;
 use super::*;
 use crate::app_state::APP_SETTINGS_PREFIX;
-use crate::storage::{initialize_database, list_settings_by_prefix, set_settings_owned};
+use crate::storage::{initialize_test_database, list_settings_by_prefix, set_settings_owned};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -18,7 +18,7 @@ fn audio_sync_in_simulated_mode_reports_aligned_without_a_pull() {
     // Sync = console pull (Slice 3) that is only true for the simulated
     // console, which mirrors the app by construction.
     let test_dir = TestDir::new("sync-simulated");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -193,7 +193,7 @@ fn fast_pull_timing() -> PullTiming {
 /// A ready engine database whose transport points at `fake_port - 3`.
 fn pull_test_db(label: &str, fake_port: u16) -> TestDir {
     let test_dir = TestDir::new(label);
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     update_audio_settings(
         test_dir.db_path().as_path(),
         &AudioSettingsUpdateRequest {
@@ -439,7 +439,7 @@ fn live_totalmix_pull_round_trip() {
     }
     let _serial = serialize_shared_link();
     let test_dir = TestDir::new("console-pull-live");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -475,7 +475,7 @@ fn console_echo_updates_channel_and_mix_target_state() {
         ChannelFlag, ConsoleBus, ConsoleUpdate, ConsoleValue, ControlRoomFunction, ParamKey,
     };
     let test_dir = TestDir::new("console-echo-apply");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
 
     let update = |key: ParamKey, value: ConsoleValue| ConsoleUpdate {
         key,
@@ -618,7 +618,7 @@ fn console_echo_updates_channel_and_mix_target_state() {
 fn unconfirmed_sends_downgrade_confidence_to_assumed() {
     use crate::rme_console_link::{ChannelFlag, ConsoleBus, ConsoleValue, ParamKey, PendingSend};
     let test_dir = TestDir::new("console-unconfirmed");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -676,7 +676,7 @@ fn unconfirmed_sends_downgrade_confidence_to_assumed() {
 #[test]
 fn console_refusing_talkback_records_the_reason_and_drops_the_hold() {
     let test_dir = TestDir::new("talkback-refused");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[
@@ -737,7 +737,7 @@ fn console_refusing_talkback_records_the_reason_and_drops_the_hold() {
 #[test]
 fn console_disconnect_resets_confidence_to_unknown() {
     let test_dir = TestDir::new("console-disconnect");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -1270,7 +1270,7 @@ fn recall_without_console_answer_stays_assumed_and_lists_unconfirmed() {
 #[test]
 fn recall_in_simulated_mode_is_app_local_and_aligned() {
     let test_dir = TestDir::new("recall-simulated");
-    initialize_database(test_dir.db_path().as_path()).expect("database should initialize");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[

@@ -25,6 +25,7 @@ mod rme_console_link;
 mod rme_totalmix_osc;
 mod shell_settings;
 mod storage;
+mod storage_backups;
 mod support;
 
 use crate::app::EngineApp;
@@ -33,11 +34,13 @@ use crate::audio::{
     refresh_audio_snapshot_metering, AudioChannelSnapshot, AudioMixTargetSnapshot, AudioSnapshot,
 };
 use crate::audio_backend::{read_default_audio_inventory, AudioBackendConfig};
-use crate::bootstrap::{resolve_runtime_paths, validate_protocol_version};
+use crate::bootstrap::{resolve_runtime_paths, startup_failure_code, validate_protocol_version};
+use crate::diagnostics::append_log;
 use crate::protocol::{
     event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
 };
 use crate::storage::list_settings_by_prefix;
+use crate::storage_backups::{snapshot_database, SnapshotReason};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, BufReader, Write};
@@ -55,6 +58,11 @@ const CONSOLE_METER_POINT_PLAYBACK: &str = "playback";
 const CONSOLE_METER_POINT_POST_FADER: &str = "post-fader";
 const CONSOLE_PEAK_WARNING_DBFS: f64 = -3.0;
 const CONSOLE_OVER_DBFS: f64 = 0.0;
+/// Database backups the engine writes on its own (2026-09 production
+/// readiness, Slice 3 — F02): the first daily copy five minutes after start,
+/// then one every 24 h, plus one at every graceful shutdown.
+const DATABASE_BACKUP_INITIAL_DELAY: Duration = Duration::from_secs(5 * 60);
+const DATABASE_BACKUP_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 fn meter_point_for_channel(channel: &AudioChannelSnapshot) -> &'static str {
     if channel.role == "playback-pair" {
@@ -295,6 +303,51 @@ impl SimulatedAudioMeterCache {
     }
 }
 
+fn write_database_backup(
+    db_path: &Path,
+    backups_dir: &Path,
+    log_file_path: &Path,
+    reason: SnapshotReason,
+) {
+    match snapshot_database(db_path, backups_dir, reason) {
+        Ok(path) => {
+            let _ = append_log(
+                log_file_path,
+                "INFO",
+                &format!(
+                    "Database backup ({}) written: {}",
+                    reason.as_str(),
+                    path.display()
+                ),
+            );
+        }
+        Err(error) => {
+            let _ = append_log(
+                log_file_path,
+                "WARN",
+                &format!("Database backup ({}) failed: {error}", reason.as_str()),
+            );
+        }
+    }
+}
+
+fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_path: PathBuf) {
+    let _ = thread::Builder::new()
+        .name(String::from("database-backup"))
+        .spawn(move || {
+            thread::sleep(DATABASE_BACKUP_INITIAL_DELAY);
+            loop {
+                write_database_backup(
+                    &db_path,
+                    &backups_dir,
+                    &log_file_path,
+                    SnapshotReason::Daily,
+                );
+                thread::sleep(DATABASE_BACKUP_INTERVAL);
+            }
+        });
+}
+
 fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
     thread::spawn(move || {
         let mut cache = SimulatedAudioMeterCache::new();
@@ -370,11 +423,14 @@ fn main() -> io::Result<()> {
     let app = match EngineApp::bootstrap() {
         Ok(app) => app,
         Err(error) => {
+            // A typed failure (a corrupt or un-upgradable database, Slice 3)
+            // keeps its own code; everything else is BOOTSTRAP_FAILED.
+            let code = startup_failure_code(error.as_ref());
             let startup_failure = event_message(
                 EVENT_ENGINE_STARTUP_FAILED,
                 json!({
                     "stage": "bootstrap",
-                    "code": "BOOTSTRAP_FAILED",
+                    "code": code,
                     "message": error.to_string(),
                     "paths": {
                         "appDataDir": planned_paths.app_data_dir.display().to_string(),
@@ -397,6 +453,10 @@ fn main() -> io::Result<()> {
 
     drop(writer);
 
+    let db_path = planned_paths.db_path.clone();
+    let backups_dir = planned_paths.backups_dir.clone();
+    let log_file_path = planned_paths.log_file_path.clone();
+
     let (output_sender, output_receiver) = mpsc::channel::<Value>();
     spawn_output_writer(output_receiver);
     control_surface::register_control_surface_event_sender(output_sender.clone());
@@ -413,6 +473,7 @@ fn main() -> io::Result<()> {
             planned_paths.db_path,
         );
     }
+    spawn_snapshot_scheduler(db_path.clone(), backups_dir.clone(), log_file_path.clone());
 
     let mut line = String::new();
     loop {
@@ -448,6 +509,14 @@ fn main() -> io::Result<()> {
     // stdin closed: the shell is going away. Release talkback holds before we
     // do (2026-09 audit, Slice 6) — a hard kill cannot, and that is documented.
     app.shutdown();
+    // A verified copy of the database on every graceful stop (2026-09
+    // production readiness, Slice 3 — F02); a failure is logged, never fatal.
+    write_database_backup(
+        &db_path,
+        &backups_dir,
+        &log_file_path,
+        SnapshotReason::Shutdown,
+    );
 
     Ok(())
 }
