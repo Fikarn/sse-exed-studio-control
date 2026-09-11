@@ -21,6 +21,8 @@ interface ShellTestBridgeConfig {
 
 interface EngineSummary {
   binary_path?: string;
+  generation?: number;
+  pid?: number;
   protocol?: string;
   running?: boolean;
 }
@@ -50,6 +52,7 @@ function buildDiagnosticsReport(shellState: ShellState) {
   return {
     activeWorkspace: shellState.activeWorkspace,
     appSnapshot: toJsonValue(shellState.appSnapshot),
+    backgroundFailures: toJsonValue(shellState.backgroundFailures),
     commissioningSnapshot: toJsonValue(shellState.commissioningSnapshot),
     controlSurfaceSnapshot: toJsonValue(shellState.controlSurfaceSnapshot),
     healthSnapshot: toJsonValue(shellState.healthSnapshot),
@@ -317,6 +320,12 @@ export function useTauriShellTestBridge(shellState: ShellState, store: ShellStor
       testBridge: {
         commandPath: config?.commandPath ?? null,
         cspViolations,
+        // 2026-09 production readiness, Slice 5 (finding F09): the engine's
+        // process id and launch number, so a lane can end the process from
+        // outside and watch the shell notice, report ENGINE_EXITED and
+        // restart it.
+        engineGeneration: engineSummary?.generation ?? null,
+        enginePid: engineSummary?.pid ?? null,
         engineSummary: toJsonValue(engineSummary),
         heartbeat,
         lastCommand,

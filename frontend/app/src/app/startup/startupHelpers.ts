@@ -104,6 +104,14 @@ export function formatFailureCode(failure: StartupFailure | null): string {
   if (code === "STORAGE_MIGRATION_FAILED") {
     return "Saved data upgrade failed";
   }
+  // 2026-09 production readiness, Slice 5 (F09, F19): the link that stopped
+  // during a session, and the second copy of the app that was refused.
+  if (code === "ENGINE_EXITED") {
+    return "Hardware link stopped";
+  }
+  if (code === "ENGINE_ALREADY_RUNNING") {
+    return "Already open";
+  }
   return code
     .replace(/[_-]+/g, " ")
     .toLowerCase()
@@ -123,6 +131,9 @@ export function formatFailureStage(stage: string): string {
       return "ready";
     case "protocol-negotiation":
       return "version check";
+    // Slice 5: the engine was up and stopped during the session.
+    case "runtime":
+      return "running";
     default:
       return stage.replace(/[_-]+/g, " ");
   }
@@ -138,6 +149,19 @@ export function getFailureTitle(startupFailure: StartupFailure | null) {
   // data asking for attention — restore a backup from Setup / Support.
   if (startupFailure?.code === "STORAGE_CORRUPT" || startupFailure?.code === "STORAGE_MIGRATION_FAILED") {
     return "Saved data needs attention";
+  }
+
+  // 2026-09 production readiness, Slice 5 (F09): the hardware link stopped
+  // during the session; the sentence says whether Studio Control restarts
+  // it on its own or is waiting for the operator.
+  if (startupFailure?.code === "ENGINE_EXITED") {
+    return "The hardware link stopped";
+  }
+
+  // Slice 5 (F19): a second copy of the app was refused; the first one is
+  // the one to use.
+  if (startupFailure?.code === "ENGINE_ALREADY_RUNNING") {
+    return "Studio Control is already open";
   }
 
   // Slice 8 gave every non-protocol failure the same word, so the stage no

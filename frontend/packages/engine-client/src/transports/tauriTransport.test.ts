@@ -17,8 +17,11 @@ const { calls, requestIds } = vi.hoisted(() => ({ calls: [] as string[], request
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (command: string, args?: Record<string, unknown>) => {
     calls.push(`invoke:${command}`);
-    if (command === "engine_start" && calls.includes("fail:engine_start")) {
-      throw new Error("engine_start refused");
+    if (command === "engine_start") {
+      if (calls.includes("fail:engine_start")) {
+        throw new Error("engine_start refused");
+      }
+      return { binary_path: "engine", generation: 3, pid: 4242, protocol: "1", running: true };
     }
     if (command === "engine_request") {
       const { request } = args as { request: { id: string; method: string } };
@@ -73,6 +76,18 @@ describe("createTauriTransport", () => {
     await transport.initialize?.();
     expect(calls).toContain("listening:engine://event");
     expect(calls).toContain("invoke:engine_start");
+  });
+
+  // 2026-09 production readiness, Slice 5 (finding F09): the shell's launch
+  // summary reaches the store, which keeps the launch number to tell a stale
+  // `engine.exited` from a current one.
+  it("resolves initialize with the launch the shell reported", async () => {
+    const transport = createTauriTransport();
+
+    await expect(transport.initialize?.()).resolves.toEqual({ generation: 3, pid: 4242 });
+    // A second initialize on a live listener changes nothing and reports nothing.
+    await expect(transport.initialize?.()).resolves.toBeUndefined();
+    expect(calls.filter((call) => call === "invoke:engine_start")).toHaveLength(1);
   });
 
   it("ids unique within one millisecond", async () => {

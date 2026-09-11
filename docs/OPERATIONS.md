@@ -31,6 +31,8 @@ This document describes runtime behavior and operator recovery for the native `S
 - Machines with completed commissioning route back to `dashboard`.
 - Clean-start or reset machines route back to `commissioning`.
 - Corrupt storage, runtime-path failures, and protocol mismatches surface recovery details through the native health and support snapshots.
+- If the hardware link stops during a session (the display reads `THE HARDWARE LINK STOPPED`, code `ENGINE_EXITED`), Studio Control restarts it on its own: one, two and four seconds after the first, second and third stop within five minutes. A fourth stop within those five minutes stays on the recovery surface; use Retry startup once the desk and the rig are ready, and export diagnostics if it keeps stopping.
+- One Studio Control runs per workstation. Launching it again brings the running window to the front. If the display reads `STUDIO CONTROL IS ALREADY OPEN` (code `ENGINE_ALREADY_RUNNING`), another copy — possibly one still closing — holds the app-data directory; close it, then start again.
 
 ## Lighting Output
 
@@ -154,7 +156,8 @@ To commission or re-commission the deck:
 1. Open the recovery surface.
 2. Export diagnostics — the report lands in the app-data `exports` folder as `diagnostics-<UTC timestamp>.json`, and the Diagnostics key opens that folder — and note the Engine log path.
 3. If the display reads `SAVED DATA NEEDS ATTENTION` (code `STORAGE_CORRUPT` or `STORAGE_MIGRATION_FAILED`), the database failed its integrity check or could not be upgraded. The sentence names the file and the newest database backup; the file itself was left untouched, and nothing was migrated. Until the Support surface restores database backups (production readiness Slice 7), restore by hand: close the app, move `studio-control.sqlite3` — and any `studio-control.sqlite3-wal` / `-shm` file beside it — out of the app-data directory, copy the newest `backups/db-<timestamp>-<reason>.sqlite3` into its place under the name `studio-control.sqlite3`, and start the app again. After `STORAGE_MIGRATION_FAILED` the newest `…-pre-migration.sqlite3` copy holds the data exactly as it was before the upgrade attempt; keep the moved-aside file until the app is back.
-4. If startup still fails, reinstall the latest known-good native build without deleting the app-data directory.
+4. If the display reads `STUDIO CONTROL IS ALREADY OPEN` (code `ENGINE_ALREADY_RUNNING`), another copy of the app holds the app-data directory: find its window (a second launch brings it to the front), or wait for a copy that is still closing, then start again. Nothing was changed.
+5. If startup still fails, reinstall the latest known-good native build without deleting the app-data directory.
 
 ## Data Safety
 

@@ -11,8 +11,9 @@ use std::env;
 use std::error::Error;
 use std::ffi::OsString;
 use std::fmt;
-use std::fs;
+use std::fs::{self, File, OpenOptions, TryLockError};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 pub const SUPPORTED_PROTOCOL_VERSION: &str = "1";
 
@@ -67,6 +68,19 @@ pub const STARTUP_CODE_STORAGE_MIGRATION_FAILED: &str = "STORAGE_MIGRATION_FAILE
 /// exports; reported as `runtime.paths.exportsDir` so the Support surfaces
 /// can open it (2026-09 production readiness, Slice 4 — finding F15).
 pub const EXPORTS_DIR_NAME: &str = "exports";
+/// Another engine already holds this app-data directory's instance lock
+/// (2026-09 production readiness, Slice 5 — F19): a second copy of the app
+/// would otherwise open the same database and drive the same light outputs.
+pub const STARTUP_CODE_ENGINE_ALREADY_RUNNING: &str = "ENGINE_ALREADY_RUNNING";
+/// The file under the app-data directory whose exclusive OS lock marks the
+/// one engine allowed to use that directory. The OS releases the lock when
+/// the holder ends, however it ends; the file itself stays and is empty.
+pub const INSTANCE_LOCK_FILE_NAME: &str = "engine.lock";
+
+/// The instance lock, held for the life of the process. A test that
+/// bootstraps one directory twice in one process replaces the earlier hold
+/// (`release_instance_lock_for`); a real engine bootstraps once.
+static INSTANCE_LOCK: Mutex<Option<(PathBuf, File)>> = Mutex::new(None);
 
 /// A bootstrap failure with a stable code for `engine.startupFailed`, so the
 /// recovery display can name what happened instead of "startup failed". The
@@ -228,6 +242,24 @@ pub(crate) fn bootstrap_runtime_from_paths(
         "INFO",
         "Bootstrapping runtime directories",
     )?;
+    // One engine per app-data directory, before the database is touched
+    // (Slice 5 — F19).
+    release_instance_lock_for(&runtime_paths.app_data_dir);
+    let instance_lock = match acquire_instance_lock(&runtime_paths.app_data_dir) {
+        Ok(lock) => lock,
+        Err(failure) => {
+            let _ = append_log(
+                &runtime_paths.log_file_path,
+                "ERROR",
+                &format!(
+                    "Instance lock refused ({}): {failure}",
+                    startup_failure_code(failure.as_ref())
+                ),
+            );
+            return Err(failure);
+        }
+    };
+    hold_instance_lock(&runtime_paths.app_data_dir, instance_lock);
     let storage_bootstrap =
         match initialize_database(&runtime_paths.db_path, &runtime_paths.backups_dir) {
             Ok(storage_bootstrap) => storage_bootstrap,
@@ -330,6 +362,62 @@ pub(crate) fn bootstrap_runtime_from_paths(
     })
 }
 
+/// Takes the exclusive OS lock on `<app-data>/engine.lock` (Slice 5 — F19).
+/// A directory another engine holds answers `ENGINE_ALREADY_RUNNING` with
+/// the operator's sentence; the lock is released when the returned handle
+/// is dropped or the process ends. A file system that cannot lock at all is
+/// a plain bootstrap failure, never a silent pass.
+pub(crate) fn acquire_instance_lock(
+    app_data_dir: &Path,
+) -> Result<File, Box<dyn Error + Send + Sync>> {
+    let lock_path = app_data_dir.join(INSTANCE_LOCK_FILE_NAME);
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .map_err(|error| {
+            std::io::Error::new(
+                error.kind(),
+                format!("Could not open {}: {error}", lock_path.display()),
+            )
+        })?;
+    match file.try_lock() {
+        Ok(()) => Ok(file),
+        Err(TryLockError::WouldBlock) => Err(Box::new(StartupFailure {
+            code: STARTUP_CODE_ENGINE_ALREADY_RUNNING,
+            message: format!(
+                "Studio Control is already open on this workstation: another copy holds {}. \
+                 Close the other copy, then start again.",
+                lock_path.display()
+            ),
+        })),
+        Err(TryLockError::Error(error)) => Err(Box::new(std::io::Error::new(
+            error.kind(),
+            format!("Could not lock {}: {error}", lock_path.display()),
+        ))),
+    }
+}
+
+/// Keeps `lock` for the life of the process.
+fn hold_instance_lock(app_data_dir: &Path, lock: File) {
+    if let Ok(mut held) = INSTANCE_LOCK.lock() {
+        *held = Some((app_data_dir.to_path_buf(), lock));
+    }
+}
+
+/// Drops an earlier hold on the same directory, so a process that
+/// bootstraps one directory again (the engine's own tests) is not refused by
+/// itself. A hold on any other directory stays.
+fn release_instance_lock_for(app_data_dir: &Path) {
+    if let Ok(mut held) = INSTANCE_LOCK.lock() {
+        if held.as_ref().is_some_and(|(path, _)| path == app_data_dir) {
+            *held = None;
+        }
+    }
+}
+
 /// A corrupt or un-upgradable database becomes a `StartupFailure` with its
 /// own code and a sentence that names the file, the newest database backup
 /// and the way out; every other storage error passes through unchanged.
@@ -404,12 +492,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        bootstrap_runtime_from_paths, current_runtime_platform, default_app_data_dir_for_platform,
-        resolve_legacy_import_source_from, resolve_runtime_paths_from, startup_failure_code,
-        storage_startup_failure, validate_protocol_version, RuntimePaths, RuntimePlatform,
-        StartupFailure, DEFAULT_APP_DATA_DIR_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
-        STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
-        SUPPORTED_PROTOCOL_VERSION,
+        acquire_instance_lock, bootstrap_runtime_from_paths, current_runtime_platform,
+        default_app_data_dir_for_platform, resolve_legacy_import_source_from,
+        resolve_runtime_paths_from, startup_failure_code, storage_startup_failure,
+        validate_protocol_version, RuntimePaths, RuntimePlatform, StartupFailure,
+        DEFAULT_APP_DATA_DIR_NAME, INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
+        STARTUP_CODE_ENGINE_ALREADY_RUNNING, STARTUP_CODE_STORAGE_CORRUPT,
+        STARTUP_CODE_STORAGE_MIGRATION_FAILED, SUPPORTED_PROTOCOL_VERSION,
     };
     use crate::storage::StorageError;
     use std::ffi::OsString;
@@ -712,6 +801,74 @@ mod tests {
             log.contains("ERROR") && log.contains(STARTUP_CODE_STORAGE_CORRUPT),
             "{log}"
         );
+    }
+
+    // 2026-09 production readiness, Slice 5 (F19): the app-data directory's
+    // lock file admits one holder; a second holder is refused with
+    // ENGINE_ALREADY_RUNNING and the operator's sentence, and the lock goes
+    // away with its holder.
+    #[test]
+    fn second_lock_holder_is_refused() {
+        let app_data = TestDir::new("instance-lock");
+        let first =
+            acquire_instance_lock(app_data.path()).expect("the first holder takes the lock");
+        assert!(app_data.path().join(INSTANCE_LOCK_FILE_NAME).is_file());
+
+        let refused = acquire_instance_lock(app_data.path())
+            .expect_err("a second holder is refused while the first lives");
+        let failure = refused
+            .downcast_ref::<StartupFailure>()
+            .unwrap_or_else(|| panic!("expected a StartupFailure, got {refused}"));
+        assert_eq!(failure.code, STARTUP_CODE_ENGINE_ALREADY_RUNNING);
+        assert!(
+            failure.message.contains("already open"),
+            "{}",
+            failure.message
+        );
+        assert!(
+            failure.message.contains(INSTANCE_LOCK_FILE_NAME),
+            "{}",
+            failure.message
+        );
+        assert_eq!(
+            startup_failure_code(refused.as_ref()),
+            STARTUP_CODE_ENGINE_ALREADY_RUNNING
+        );
+
+        drop(first);
+        let third =
+            acquire_instance_lock(app_data.path()).expect("the lock is released with its holder");
+        drop(third);
+    }
+
+    // The bootstrap refuses a directory another engine holds before it
+    // touches the database, with the code in the log.
+    #[test]
+    fn bootstrap_refuses_a_held_app_data_dir() {
+        let test_dir = TestDir::new("held-app-data");
+        let paths = runtime_paths_for(&test_dir);
+        let log_file_path = paths.log_file_path.clone();
+        let db_path = paths.db_path.clone();
+        let holder = acquire_instance_lock(test_dir.path()).expect("the holder takes the lock");
+
+        let error = match bootstrap_runtime_from_paths(paths) {
+            Err(error) => error,
+            Ok(_) => panic!("a held directory must stop the bootstrap"),
+        };
+        assert_eq!(
+            startup_failure_code(error.as_ref()),
+            STARTUP_CODE_ENGINE_ALREADY_RUNNING
+        );
+        assert!(
+            !db_path.exists(),
+            "the database is not created for a refused engine"
+        );
+        let log = fs::read_to_string(&log_file_path).expect("engine log should exist");
+        assert!(
+            log.contains("ERROR") && log.contains(STARTUP_CODE_ENGINE_ALREADY_RUNNING),
+            "{log}"
+        );
+        drop(holder);
     }
 
     // 2026-09 production readiness, Slice 3 (F13): a refused migration has

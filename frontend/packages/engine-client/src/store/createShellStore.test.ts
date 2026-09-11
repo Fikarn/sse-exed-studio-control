@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFixtureScenario } from "@sse/test-fixtures";
 
@@ -99,5 +99,187 @@ describe("createShellStore startup failure before the ready gate", () => {
     expect(snapshot.startupFailure?.stage).toBe("bootstrap");
     expect(snapshot.errorSummary).toContain("Restore a backup");
     expect(Date.now() - startedAt).toBeLessThan(5_000);
+  });
+});
+
+// 2026-09 production readiness, Slice 5 (finding F09): the shell reports an
+// engine process that is gone as `engine.exited`. The store shows the
+// recovery surface with ENGINE_EXITED and restarts the engine on its own —
+// one, two and four seconds after the first three stops within five
+// minutes — then leaves the fourth stop to the operator. A report about a
+// process this bootstrap already replaced, a stop the shell asked for, and
+// the exit that follows a start-up failure the engine reported are ignored.
+function supervisedTransport() {
+  const listeners = new Set<Parameters<EngineTransport["subscribe"]>[0]>();
+  const refusing = new Set<string>();
+  const calls: string[] = [];
+  let launches = 0;
+  const transport: EngineTransport = {
+    initialize: async () => {
+      launches += 1;
+      calls.push(`initialize:${launches}`);
+      return { generation: launches, pid: 1000 + launches };
+    },
+    request: async (method) => {
+      if (refusing.has(method)) {
+        throw new Error(`${method} refused`);
+      }
+      // No console in this double: the audio snapshot is absent, every other
+      // answer is the smallest object the store accepts (the ping's protocol).
+      return method === "audio.snapshot" ? null : { protocol: "1" };
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    dispose: async () => {
+      calls.push("dispose");
+    },
+  };
+  return {
+    calls,
+    emit: (event: EventEnvelope<EventName>) => {
+      for (const listener of [...listeners]) {
+        listener(event);
+      }
+    },
+    launches: () => launches,
+    refuse: (method: string) => refusing.add(method),
+    transport,
+  };
+}
+
+function exited(generation: number, extra: Record<string, boolean | number> = {}): EventEnvelope<EventName> {
+  return {
+    type: "event",
+    event: "engine.exited",
+    payload: { generation, graceful: false, pid: 1000 + generation, status: 1, ...extra },
+  };
+}
+
+async function settle(until: () => boolean) {
+  for (let turn = 0; turn < 50 && !until(); turn += 1) {
+    await vi.advanceTimersByTimeAsync(0);
+  }
+}
+
+describe("createShellStore engine supervision", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("engine.exited → recovery + bounded restart", async () => {
+    const { calls, emit, launches, transport } = supervisedTransport();
+    const store = createShellStore(transport);
+    await store.initialize();
+    expect(store.getSnapshot().startupFailure).toBeNull();
+    expect(store.getSnapshot().errorSummary).toBeNull();
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(launches()).toBe(1);
+
+    emit(exited(1));
+    let snapshot = store.getSnapshot();
+    expect(snapshot.lifecycle).toBe("failed");
+    expect(snapshot.recovery).toBe("recovery");
+    expect(snapshot.startupFailure).toMatchObject({ code: "ENGINE_EXITED", stage: "runtime" });
+    expect(snapshot.startupFailure?.message).toContain("exit status 1");
+    expect(snapshot.startupFailure?.message).toContain("restarts it on its own in 1 s (attempt 1 of 3)");
+    expect(snapshot.errorSummary).toBe(snapshot.startupFailure?.message);
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(launches()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await settle(() => store.getSnapshot().lifecycle === "ready");
+    expect(launches()).toBe(2);
+    expect(calls.filter((call) => call === "dispose")).toHaveLength(1);
+    expect(store.getSnapshot().startupFailure).toBeNull();
+
+    emit(exited(2));
+    expect(store.getSnapshot().startupFailure?.message).toContain("in 2 s (attempt 2 of 3)");
+    await vi.advanceTimersByTimeAsync(2_000);
+    await settle(() => store.getSnapshot().lifecycle === "ready");
+    expect(launches()).toBe(3);
+
+    emit(exited(3));
+    expect(store.getSnapshot().startupFailure?.message).toContain("in 4 s (attempt 3 of 3)");
+    await vi.advanceTimersByTimeAsync(4_000);
+    await settle(() => store.getSnapshot().lifecycle === "ready");
+    expect(launches()).toBe(4);
+
+    // The fourth stop inside five minutes stays with the operator.
+    emit(exited(4));
+    snapshot = store.getSnapshot();
+    expect(snapshot.lifecycle).toBe("failed");
+    expect(snapshot.startupFailure?.message).toContain("not restarted again on its own");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(launches()).toBe(4);
+    expect(store.getSnapshot().lifecycle).toBe("failed");
+
+    // Retry startup still works by hand.
+    await store.restart();
+    expect(launches()).toBe(5);
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    await store.dispose();
+  });
+
+  it("stale generation ignored", async () => {
+    const { emit, launches, transport } = supervisedTransport();
+    const store = createShellStore(transport);
+    await store.initialize();
+
+    // A report about the process this shell already replaced.
+    emit(exited(0));
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    // A stop the shell asked for.
+    emit(exited(1, { graceful: true }));
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(launches()).toBe(1);
+    expect(store.getSnapshot().startupFailure).toBeNull();
+
+    // The exit that follows a start-up failure the engine reported says
+    // nothing new, and an engine that would only refuse again is not
+    // restarted on its own.
+    emit({
+      type: "event",
+      event: "engine.startupFailed",
+      payload: {
+        code: "ENGINE_ALREADY_RUNNING",
+        message: "Studio Control is already open on this workstation.",
+        stage: "bootstrap",
+      },
+    });
+    emit(exited(1));
+    expect(store.getSnapshot().startupFailure?.code).toBe("ENGINE_ALREADY_RUNNING");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(launches()).toBe(1);
+    await store.dispose();
+  });
+
+  it("keeps the last twenty background failures without leaving ready", async () => {
+    const { emit, refuse, transport } = supervisedTransport();
+    const store = createShellStore(transport);
+    await store.initialize();
+
+    refuse("lighting.snapshot");
+    emit({ type: "event", event: "lighting.changed", payload: {} });
+    await settle(() => store.getSnapshot().backgroundFailures.length > 0);
+    const [failure] = store.getSnapshot().backgroundFailures;
+    expect(failure).toMatchObject({ context: "refresh after lighting.changed", message: "lighting.snapshot refused" });
+    expect(typeof failure?.at).toBe("string");
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+
+    for (let index = 0; index < 25; index += 1) {
+      store.reportBackgroundFailure(new Error(`failure ${index}`), "test");
+    }
+    const kept = store.getSnapshot().backgroundFailures;
+    expect(kept).toHaveLength(20);
+    expect(kept[0]?.message).toBe("failure 5");
+    expect(kept[kept.length - 1]?.message).toBe("failure 24");
+    await store.dispose();
   });
 });

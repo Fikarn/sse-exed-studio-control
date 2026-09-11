@@ -284,6 +284,27 @@ export interface LightingGroupUpdateRequest {
   colorIndex?: number | null;
 }
 
+/**
+ * What the shell reported when it launched the engine (2026-09 production
+ * readiness, Slice 5 — finding F09): the launch number within this shell
+ * and the process id. The fixture transport reports nothing.
+ */
+export interface EngineLaunchInfo {
+  generation: number | null;
+  pid: number | null;
+}
+
+/**
+ * A failure that happened in the background and changed nothing on screen
+ * (Slice 5): a refresh the engine did not answer, an error nothing caught.
+ * The store keeps the last twenty for the diagnostics export.
+ */
+export interface BackgroundFailure {
+  at: string;
+  context: string;
+  message: string;
+}
+
 export interface StartupFailure {
   code: string;
   message: string;
@@ -316,7 +337,7 @@ export interface FixtureScenario {
 }
 
 export interface EngineTransport {
-  initialize?(): Promise<void>;
+  initialize?(): Promise<void | EngineLaunchInfo>;
   request(method: RequestMethod, params?: JsonObject): Promise<JsonValue>;
   subscribe(listener: (event: EventEnvelope<EventName>) => void): () => void;
   dispose?(): Promise<void>;
@@ -386,6 +407,7 @@ export interface ShellState {
   startupFailure: StartupFailure | null;
   lastEvent: EventName | null;
   errorSummary: string | null;
+  backgroundFailures: BackgroundFailure[];
 }
 
 export interface ShellStore {
@@ -394,6 +416,8 @@ export interface ShellStore {
   getAudioMeterFrame(): AudioMeterFrame;
   refresh(): Promise<void>;
   restart(): Promise<void>;
+  /** Records a failure that changed nothing on screen (Slice 5); last twenty kept. */
+  reportBackgroundFailure(error: unknown, context?: string): void;
   subscribeAudioMeters(listener: () => void): () => void;
   setWorkspace(workspaceId: WorkspaceId): Promise<JsonValue>;
   setSetupSection(section: SetupSection): Promise<JsonValue>;

@@ -19,6 +19,9 @@ serde.workspace = true
 serde_json.workspace = true
 studio-control-protocol.workspace = true
 tauri = { version = "2.11.2", features = [] }
+# One shell per workstation: a second launch hands its arguments to the running
+# one and exits (2026-09 production readiness, Slice 5 - finding F19).
+tauri-plugin-single-instance = "2.4.4"
 
 [lints]
 workspace = true

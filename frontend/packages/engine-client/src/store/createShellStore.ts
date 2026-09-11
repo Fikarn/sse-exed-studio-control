@@ -38,8 +38,10 @@ import type {
   AudioMixTargetUpdateRequest,
   AudioSettingsUpdateRequest,
   AudioTalkbackHoldRequest,
+  BackgroundFailure,
   CommissioningCheckRequest,
   CommissioningUpdateRequest,
+  EngineLaunchInfo,
   EngineTransport,
   LightingFixtureCreateRequest,
   LightingFixtureUpdateRequest,
@@ -79,6 +81,7 @@ const initialState: ShellState = {
   startupFailure: null,
   lastEvent: null,
   errorSummary: null,
+  backgroundFailures: [],
 };
 
 const initialAudioMeterFrame: AudioMeterFrame = {
@@ -98,6 +101,39 @@ interface PendingStartupGate {
   reject: (failure: StartupFailure) => void;
   resolve: (payload: JsonObject) => void;
   timeoutId: number;
+}
+
+// 2026-09 production readiness, Slice 5 (finding F09): an engine that stops
+// on its own is restarted on its own — one, two and four seconds after the
+// first, second and third stop within five minutes — and a fourth stop is
+// left on the recovery surface for the operator.
+const AUTOMATIC_RESTART_LIMIT = 3;
+const AUTOMATIC_RESTART_WINDOW_MS = 5 * 60_000;
+const AUTOMATIC_RESTART_BACKOFF_MS: readonly number[] = [1_000, 2_000, 4_000];
+/** Background failures kept for the diagnostics export (Slice 9 renders them). */
+const BACKGROUND_FAILURE_LIMIT = 20;
+
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  const record = asRecord(error);
+  if (record && typeof record.message === "string") {
+    return record.message;
+  }
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function launchGeneration(launch: EngineLaunchInfo | void | undefined): number | null {
+  const record = asRecord(launch);
+  return typeof record?.generation === "number" ? record.generation : null;
 }
 
 function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
@@ -451,6 +487,11 @@ export function createShellStore(transport: EngineTransport): ShellStore {
   // returning — before the ready gate exists — and it is the answer, not a
   // ready timeout ten seconds later.
   let engineStartupFailure: StartupFailure | null = null;
+  // Slice 5 (F09): the launch the shell reported for this bootstrap, so an
+  // `engine.exited` about a process the shell already replaced is ignored.
+  let engineGeneration: number | null = null;
+  let automaticRestartTimeoutId: number | null = null;
+  let automaticRestartsAt: number[] = [];
   let bootstrapGeneration = 0;
   let audioRefreshInFlight = false;
   let audioRefreshQueued = false;
@@ -708,9 +749,104 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       audioRefreshInFlight = false;
       if (audioRefreshQueued) {
         audioRefreshQueued = false;
-        void refreshAudioSnapshot(eventName);
+        void refreshAudioSnapshot(eventName).catch(inBackground("queued audio refresh"));
       }
     }
+  };
+
+  // 2026-09 production readiness, Slice 5 (finding F09): what went wrong in
+  // the background — a refresh the engine did not answer, an error nothing
+  // caught — is kept, last twenty, for the diagnostics export. It never
+  // changes what the operator sees; Slice 9 renders the ring.
+  const recordBackgroundFailure = (error: unknown, context = "background") => {
+    const failure: BackgroundFailure = {
+      at: new Date().toISOString(),
+      context,
+      message: describeError(error),
+    };
+    setState({
+      ...state,
+      backgroundFailures: [...state.backgroundFailures.slice(-(BACKGROUND_FAILURE_LIMIT - 1)), failure],
+    });
+  };
+
+  const inBackground = (context: string) => (error: unknown) => recordBackgroundFailure(error, context);
+
+  const cancelAutomaticRestart = () => {
+    if (automaticRestartTimeoutId !== null) {
+      window.clearTimeout(automaticRestartTimeoutId);
+      automaticRestartTimeoutId = null;
+    }
+  };
+
+  const restartEngine = async () => {
+    cancelAutomaticRestart();
+    bootstrapGeneration++;
+    initializePromise = null;
+    clearStartupGate();
+    unsubscribeTransport();
+    unsubscribeTransport = () => {};
+    await transport.dispose?.();
+    return start();
+  };
+
+  // The restart policy: one, two and four seconds after the first, second
+  // and third stop inside five minutes; a fourth stop stays on the recovery
+  // surface. Returns the sentence the surface shows.
+  const scheduleAutomaticRestart = (stopped: string) => {
+    const now = Date.now();
+    automaticRestartsAt = automaticRestartsAt.filter((at) => now - at < AUTOMATIC_RESTART_WINDOW_MS);
+    if (automaticRestartsAt.length >= AUTOMATIC_RESTART_LIMIT) {
+      return `${stopped} It stopped ${AUTOMATIC_RESTART_LIMIT} times within five minutes, so it is not restarted again on its own; use Retry startup once the desk and the rig are ready.`;
+    }
+    const delayMs =
+      AUTOMATIC_RESTART_BACKOFF_MS[Math.min(automaticRestartsAt.length, AUTOMATIC_RESTART_BACKOFF_MS.length - 1)] ??
+      4_000;
+    automaticRestartsAt.push(now);
+    const attempt = automaticRestartsAt.length;
+    cancelAutomaticRestart();
+    automaticRestartTimeoutId = window.setTimeout(() => {
+      automaticRestartTimeoutId = null;
+      void restartEngine().catch(inBackground("automatic restart"));
+    }, delayMs);
+    return `${stopped} Studio Control restarts it on its own in ${delayMs / 1000} s (attempt ${attempt} of ${AUTOMATIC_RESTART_LIMIT}).`;
+  };
+
+  // The shell reports that the engine process is gone. A stop the shell
+  // asked for (a restart, the close) is not a failure; a report about a
+  // process the shell already replaced is stale; and a start-up failure the
+  // engine reported itself stands — the exit that follows it says nothing
+  // new and must not restart an engine that would only refuse again.
+  const handleEngineExited = (event: EventEnvelope<EventName>) => {
+    const payload = asRecord(event.payload);
+    if (payload?.graceful === true) {
+      return;
+    }
+    const generation = typeof payload?.generation === "number" ? payload.generation : null;
+    if (generation !== null && engineGeneration !== null && generation !== engineGeneration) {
+      return;
+    }
+    if (engineStartupFailure) {
+      return;
+    }
+
+    const status = typeof payload?.status === "number" ? `exit status ${payload.status}` : "no exit status";
+    const failure: StartupFailure = {
+      code: "ENGINE_EXITED",
+      message: scheduleAutomaticRestart(`The hardware link stopped unexpectedly (${status}).`),
+      stage: "runtime",
+    };
+    engineStartupFailure = failure;
+    setState({
+      ...state,
+      lifecycle: "failed",
+      recovery: "recovery",
+      startupFailure: failure,
+      lastEvent: event.event,
+      errorSummary: failure.message,
+    });
+    publishAudioMeterFrame(null);
+    pendingStartupGate?.reject(failure);
   };
 
   const handleTransportEvent = (event: EventEnvelope<EventName>) => {
@@ -736,6 +872,13 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return;
     }
 
+    // Handled before the refresh path below: the engine is gone, so there
+    // is nothing to refresh from.
+    if (event.event === "engine.exited") {
+      handleEngineExited(event);
+      return;
+    }
+
     if (state.lifecycle === "ready") {
       const payload = asRecord(event.payload);
       if (event.event === "audio.meters" || (event.event === "audio.changed" && payload?.reason === "metering-tick")) {
@@ -753,16 +896,16 @@ export function createShellStore(transport: EngineTransport): ShellStore {
             audioEchoRefreshPending = true;
             return;
           }
-          void refreshAudioSnapshot(event.event);
+          void refreshAudioSnapshot(event.event).catch(inBackground(`refresh audio after ${event.event}`));
           return;
         }
         if (audioLocalMutationDepth > 0 || currentMonotonicTimestampMs() < audioRefreshSuppressUntilMs) {
           return;
         }
-        void refreshAudioSnapshot(event.event);
+        void refreshAudioSnapshot(event.event).catch(inBackground(`refresh audio after ${event.event}`));
         return;
       }
-      void refreshDomain(event.event);
+      void refreshDomain(event.event).catch(inBackground(`refresh after ${event.event}`));
     }
   };
 
@@ -770,13 +913,18 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     const generation = ++bootstrapGeneration;
     const isCurrentBootstrap = () => generation === bootstrapGeneration;
 
+    cancelAutomaticRestart();
     clearStartupGate();
     engineStartupFailure = null;
+    engineGeneration = null;
     unsubscribeTransport();
     unsubscribeTransport = () => {};
 
     setState({
       ...initialState,
+      // The failure ring outlives a restart: it is what the diagnostics
+      // export carries about the session.
+      backgroundFailures: state.backgroundFailures,
       lifecycle: transitionStartupState("idle", { type: "spawned" }),
     });
     publishAudioMeterFrame(null);
@@ -788,8 +936,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     });
 
     try {
-      await transport.initialize?.();
+      const launch = await transport.initialize?.();
       if (!isCurrentBootstrap()) return;
+      engineGeneration = launchGeneration(launch);
 
       updateState({
         lifecycle: transitionStartupState("launching-process", {
@@ -873,6 +1022,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         startupFailure: null,
         lastEvent: "engine.ready",
         errorSummary: null,
+        backgroundFailures: state.backgroundFailures,
       });
       publishAudioMeterFrame(audioSnapshot);
     } catch (error) {
@@ -934,7 +1084,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       audioLocalMutationDepth = Math.max(0, audioLocalMutationDepth - 1);
       if (audioLocalMutationDepth === 0 && audioEchoRefreshPending) {
         audioEchoRefreshPending = false;
-        void refreshAudioSnapshot("audio.changed");
+        void refreshAudioSnapshot("audio.changed").catch(inBackground("console echo refresh"));
       }
     }
   };
@@ -953,13 +1103,10 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       await refreshDomain(state.lastEvent);
     },
     async restart() {
-      bootstrapGeneration++;
-      initializePromise = null;
-      clearStartupGate();
-      unsubscribeTransport();
-      unsubscribeTransport = () => {};
-      await transport.dispose?.();
-      return start();
+      return restartEngine();
+    },
+    reportBackgroundFailure(error, context) {
+      recordBackgroundFailure(error, context);
     },
     async setWorkspace(workspaceId) {
       return performRequest("settings.update", { workspace: workspaceId });
@@ -1198,6 +1345,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return () => listeners.delete(listener);
     },
     async dispose() {
+      cancelAutomaticRestart();
       bootstrapGeneration++;
       initializePromise = null;
       clearStartupGate();

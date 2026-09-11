@@ -7,12 +7,13 @@ use std::fs::create_dir_all;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use studio_control_protocol::{
-    error_response, RequestEnvelope, ResponseEnvelope, PROTOCOL_VERSION,
+    error_response, RequestEnvelope, ResponseEnvelope, EVENT_ENGINE_EXITED, PROTOCOL_VERSION,
 };
 use tauri::{AppHandle, Emitter};
 
@@ -24,17 +25,65 @@ pub(crate) const EXPORTS_DIR_NAME: &str = "exports";
 /// Error code answered when a request id is already waiting for the engine's
 /// response (finding F08).
 pub const DUPLICATE_REQUEST_ID_CODE: &str = "DUPLICATE_REQUEST_ID";
+/// Error code answered to every request still waiting for a response when the
+/// engine process exits (2026-09 production readiness, Slice 5 — finding F09).
+pub const ENGINE_EXITED_CODE: &str = "ENGINE_EXITED";
+/// How often the exit watcher polls the engine process (finding F09). The
+/// process mutex is held only for the poll itself.
+pub const ENGINE_EXIT_WATCH_INTERVAL: Duration = Duration::from_millis(250);
+/// How long a graceful stop waits for the engine to exit after stdin closes
+/// before falling back to a kill.
+pub const ENGINE_STOP_GRACE: Duration = Duration::from_secs(2);
+const ENGINE_STOP_POLL_INTERVAL: Duration = Duration::from_millis(25);
+
+/// Where the shell delivers what the engine says: every event line the engine
+/// writes to stdout, and the `engine.exited` event the shell raises itself
+/// when the process is gone. Production wraps the Tauri event channel; the
+/// unit tests record into a channel.
+type EventSink = Arc<dyn Fn(Value) + Send + Sync>;
+
+fn app_event_sink(app: AppHandle) -> EventSink {
+    Arc::new(move |message: Value| {
+        let _ = app.emit(ENGINE_EVENT_CHANNEL, json!({ "event": message }));
+    })
+}
 
 #[derive(Default)]
 pub struct EngineBridge {
-    process: Mutex<Option<EngineProcess>>,
+    process: Arc<Mutex<Option<EngineProcess>>>,
     pending: Arc<Mutex<HashMap<String, Sender<Value>>>>,
+    /// Counts engine launches for the life of the shell. Each launch's
+    /// generation tags its `engine.exited` event, so the front-end can tell
+    /// a report about a process it already replaced from one about the
+    /// process it is talking to.
+    generations: AtomicU64,
 }
 
 struct EngineProcess {
     child: Child,
-    stdin: Arc<Mutex<ChildStdin>>,
+    /// `None` once a stop closed the pipe: the engine's request loop ends on
+    /// EOF and it releases any talkback hold on its way out.
+    stdin: Option<ChildStdin>,
     binary_path: PathBuf,
+    generation: u64,
+    pid: u32,
+    /// Set by `stop()` before it closes stdin, so an exit the watcher sees
+    /// first is still reported as `graceful: true`. Only read and written
+    /// under the process mutex.
+    expected_exit: bool,
+    sink: EventSink,
+}
+
+impl EngineProcess {
+    fn summary(&self) -> EngineBootstrapSummary {
+        EngineBootstrapSummary {
+            running: true,
+            protocol: PROTOCOL_VERSION,
+            binary_path: self.binary_path.display().to_string(),
+            pid: self.pid,
+            generation: self.generation,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -42,21 +91,17 @@ pub struct EngineBootstrapSummary {
     pub running: bool,
     pub protocol: &'static str,
     pub binary_path: String,
+    /// The engine's process id, so a qualification lane can end the process
+    /// from outside and watch the shell notice (finding F09).
+    pub pid: u32,
+    /// The launch number within this shell; `engine.exited` carries it.
+    pub generation: u64,
 }
 
 impl EngineBridge {
     pub fn start(&self, app: &AppHandle) -> Result<EngineBootstrapSummary, String> {
-        let mut process_guard = self
-            .process
-            .lock()
-            .map_err(|_| "Engine bridge poisoned".to_string())?;
-
-        if let Some(process) = process_guard.as_ref() {
-            return Ok(EngineBootstrapSummary {
-                running: true,
-                protocol: PROTOCOL_VERSION,
-                binary_path: process.binary_path.display().to_string(),
-            });
+        if let Some(summary) = self.summary()? {
+            return Ok(summary);
         }
 
         let binary_path = resolve_engine_binary()?;
@@ -69,10 +114,7 @@ impl EngineBridge {
         command
             .env("SSE_PROTOCOL_VERSION", PROTOCOL_VERSION)
             .env("SSE_APP_DATA_DIR", &app_data_dir)
-            .env("SSE_LOG_DIR", &logs_dir)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .env("SSE_LOG_DIR", &logs_dir);
         // The engine is a console-subsystem binary; without CREATE_NO_WINDOW a
         // GUI-subsystem shell would pop a fresh terminal for it on Windows.
         #[cfg(windows)]
@@ -81,6 +123,32 @@ impl EngineBridge {
             const CREATE_NO_WINDOW: u32 = 0x0800_0000;
             command.creation_flags(CREATE_NO_WINDOW);
         }
+
+        self.launch(command, binary_path, app_event_sink(app.clone()))
+    }
+
+    /// Spawns `command` as the engine process, wires its stdout to `sink`,
+    /// and starts the exit watcher for it. A running engine is returned as it
+    /// is; nothing is spawned twice.
+    fn launch(
+        &self,
+        mut command: Command,
+        binary_path: PathBuf,
+        sink: EventSink,
+    ) -> Result<EngineBootstrapSummary, String> {
+        let mut process_guard = self
+            .process
+            .lock()
+            .map_err(|_| "Engine bridge poisoned".to_string())?;
+
+        if let Some(process) = process_guard.as_ref() {
+            return Ok(process.summary());
+        }
+
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         let mut child = command
             .spawn()
             .map_err(|error| format!("Failed to start engine: {error}"))?;
@@ -98,20 +166,29 @@ impl EngineBridge {
             .take()
             .ok_or_else(|| "Engine stderr was unavailable".to_string())?;
 
-        spawn_stdout_thread(app.clone(), stdout, Arc::clone(&self.pending));
+        let generation = self.generations.fetch_add(1, Ordering::SeqCst) + 1;
+        let pid = child.id();
+        spawn_stdout_thread(Arc::clone(&sink), stdout, Arc::clone(&self.pending));
         spawn_stderr_thread(stderr);
 
-        *process_guard = Some(EngineProcess {
+        let process = EngineProcess {
             child,
-            stdin: Arc::new(Mutex::new(stdin)),
-            binary_path: binary_path.clone(),
-        });
+            stdin: Some(stdin),
+            binary_path,
+            generation,
+            pid,
+            expected_exit: false,
+            sink,
+        };
+        let summary = process.summary();
+        *process_guard = Some(process);
+        spawn_exit_watcher(
+            Arc::clone(&self.process),
+            Arc::clone(&self.pending),
+            generation,
+        );
 
-        Ok(EngineBootstrapSummary {
-            running: true,
-            protocol: PROTOCOL_VERSION,
-            binary_path: binary_path.display().to_string(),
-        })
+        Ok(summary)
     }
 
     /// Sends `request` to the engine and waits for its response. An id that is
@@ -166,27 +243,60 @@ impl EngineBridge {
     /// so the request loop ends — the engine releases any talkback hold on
     /// its way out — wait up to `ENGINE_STOP_GRACE` for it to exit, and kill
     /// it only if it does not. Used by the close confirmation and by engine
-    /// restarts alike.
+    /// restarts alike. The exit is reported like any other, with
+    /// `graceful: true` (2026-09 production readiness, Slice 5 — finding F09).
     pub fn stop(&self) -> Result<(), String> {
-        let mut process_guard = self
-            .process
-            .lock()
-            .map_err(|_| "Engine bridge poisoned".to_string())?;
+        self.stop_with_grace(ENGINE_STOP_GRACE)
+    }
 
-        if let Some(process) = process_guard.take() {
-            let EngineProcess {
-                mut child,
-                stdin,
-                binary_path: _,
-            } = process;
-            // The only other holder of the stdin Arc is a write_request that
-            // has already returned, so dropping ours closes the pipe.
-            drop(stdin);
-            if !wait_for_exit(&mut child, ENGINE_STOP_GRACE) {
-                child
-                    .kill()
-                    .map_err(|error| format!("Failed to stop engine process: {error}"))?;
-                let _ = child.wait();
+    fn stop_with_grace(&self, grace: Duration) -> Result<(), String> {
+        let stopping = {
+            let mut slot = self
+                .process
+                .lock()
+                .map_err(|_| "Engine bridge poisoned".to_string())?;
+            slot.as_mut().map(|process| {
+                // The flag goes up before the pipe closes: whichever of the
+                // watcher and this call sees the exit first reports it as
+                // expected.
+                process.expected_exit = true;
+                process.stdin = None;
+                process.generation
+            })
+        };
+
+        if let Some(generation) = stopping {
+            let deadline = Instant::now() + grace;
+            loop {
+                let taken = {
+                    let mut slot = self
+                        .process
+                        .lock()
+                        .map_err(|_| "Engine bridge poisoned".to_string())?;
+                    let exit = match slot.as_mut() {
+                        Some(process) if process.generation == generation => {
+                            match process.child.try_wait() {
+                                Ok(None) if Instant::now() < deadline => None,
+                                Ok(None) => {
+                                    let _ = process.child.kill();
+                                    Some(process.child.wait().ok().and_then(|status| status.code()))
+                                }
+                                Ok(Some(status)) => Some(status.code()),
+                                Err(_) => Some(None),
+                            }
+                        }
+                        // The watcher saw the exit first and reported it.
+                        _ => break,
+                    };
+                    exit.and_then(|status| slot.take().map(|process| (process, status)))
+                };
+                match taken {
+                    Some((process, status)) => {
+                        report_engine_exit(process, status, &self.pending);
+                        break;
+                    }
+                    None => thread::sleep(ENGINE_STOP_POLL_INTERVAL),
+                }
             }
         }
 
@@ -204,28 +314,21 @@ impl EngineBridge {
             .lock()
             .map_err(|_| "Engine bridge poisoned".to_string())?;
 
-        Ok(process_guard
-            .as_ref()
-            .map(|process| EngineBootstrapSummary {
-                running: true,
-                protocol: PROTOCOL_VERSION,
-                binary_path: process.binary_path.display().to_string(),
-            }))
+        Ok(process_guard.as_ref().map(EngineProcess::summary))
     }
 
     fn write_request(&self, request: &RequestEnvelope) -> Result<(), String> {
-        let process_guard = self
+        let mut process_guard = self
             .process
             .lock()
             .map_err(|_| "Engine bridge poisoned".to_string())?;
         let process = process_guard
-            .as_ref()
+            .as_mut()
             .ok_or_else(|| "Engine is not running".to_string())?;
-
-        let mut stdin = process
+        let stdin = process
             .stdin
-            .lock()
-            .map_err(|_| "Engine stdin mutex poisoned".to_string())?;
+            .as_mut()
+            .ok_or_else(|| "Engine is stopping".to_string())?;
 
         serde_json::to_writer(&mut *stdin, request)
             .map_err(|error| format!("Failed to serialize engine request: {error}"))?;
@@ -239,28 +342,91 @@ impl EngineBridge {
     }
 }
 
-/// How long a graceful stop waits for the engine to exit after stdin closes
-/// before falling back to a kill.
-pub const ENGINE_STOP_GRACE: Duration = Duration::from_secs(2);
+/// Polls the engine process every `ENGINE_EXIT_WATCH_INTERVAL` and reports
+/// its exit (2026-09 production readiness, Slice 5 — finding F09): until this
+/// slice nothing watched the child, so a crashed engine left every request
+/// waiting for its ten-second timeout and the front-end painting a session
+/// that no longer existed. The mutex is held only for the poll; whichever of
+/// the watcher and `stop()` takes the process out of the slot reports it, so
+/// an exit is reported exactly once.
+fn spawn_exit_watcher(
+    process: Arc<Mutex<Option<EngineProcess>>>,
+    pending: Arc<Mutex<HashMap<String, Sender<Value>>>>,
+    generation: u64,
+) {
+    let _ = thread::Builder::new()
+        .name(format!("engine-exit-watcher-{generation}"))
+        .spawn(move || loop {
+            thread::sleep(ENGINE_EXIT_WATCH_INTERVAL);
+            let exited = {
+                let Ok(mut slot) = process.lock() else {
+                    return;
+                };
+                let status = match slot.as_mut() {
+                    Some(current) if current.generation == generation => {
+                        match current.child.try_wait() {
+                            Ok(None) => continue,
+                            Ok(Some(status)) => status.code(),
+                            Err(_) => None,
+                        }
+                    }
+                    // Taken by `stop()`, which reports it, or replaced by a
+                    // newer launch: nothing left to watch.
+                    _ => return,
+                };
+                slot.take().map(|process| (process, status))
+            };
+            if let Some((process, status)) = exited {
+                report_engine_exit(process, status, &pending);
+            }
+            return;
+        });
+}
 
-/// Polls `child` until it exits or `grace` elapses. True when it exited.
-fn wait_for_exit(child: &mut Child, grace: Duration) -> bool {
-    let deadline = std::time::Instant::now() + grace;
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => return true,
-            Ok(None) => {}
-            Err(_) => return false,
+/// Fails every request still waiting for the process with `ENGINE_EXITED`,
+/// then raises `engine.exited` for the front-end. Called once per process,
+/// by whoever took it out of the slot.
+fn report_engine_exit(
+    mut process: EngineProcess,
+    status: Option<i32>,
+    pending: &Mutex<HashMap<String, Sender<Value>>>,
+) {
+    // Reaps the process: a no-op after `try_wait` saw the exit, required
+    // after a kill.
+    let _ = process.child.wait();
+
+    let waiters: Vec<(String, Sender<Value>)> = match pending.lock() {
+        Ok(mut pending) => pending.drain().collect(),
+        Err(_) => Vec::new(),
+    };
+    let status_text = status
+        .map(|code| format!("exit status {code}"))
+        .unwrap_or_else(|| "no exit status".to_string());
+    for (id, sender) in waiters {
+        let response = error_response(
+            Value::String(id),
+            ENGINE_EXITED_CODE,
+            format!("The hardware link stopped ({status_text}) before it answered this request."),
+        );
+        if let Ok(value) = serde_json::to_value(&response) {
+            let _ = sender.send(value);
         }
-        if std::time::Instant::now() >= deadline {
-            return false;
-        }
-        std::thread::sleep(Duration::from_millis(25));
     }
+
+    (process.sink)(json!({
+        "type": "event",
+        "event": EVENT_ENGINE_EXITED,
+        "payload": {
+            "status": status,
+            "graceful": process.expected_exit,
+            "generation": process.generation,
+            "pid": process.pid,
+        },
+    }));
 }
 
 fn spawn_stdout_thread(
-    app: AppHandle,
+    sink: EventSink,
     stdout: ChildStdout,
     pending: Arc<Mutex<HashMap<String, Sender<Value>>>>,
 ) {
@@ -293,7 +459,7 @@ fn spawn_stdout_thread(
             }
 
             if message_type == "event" {
-                let _ = app.emit(ENGINE_EVENT_CHANNEL, json!({ "event": message }));
+                sink(message);
             }
         }
     });
@@ -497,6 +663,7 @@ mod tests {
         }
     }
 
+    /// A process that exits on its own right away.
     fn short_lived_process() -> std::process::Command {
         if cfg!(windows) {
             let mut command = std::process::Command::new("cmd");
@@ -507,6 +674,7 @@ mod tests {
         }
     }
 
+    /// A process that ignores its stdin and lives for half a minute.
     fn lingering_process() -> std::process::Command {
         if cfg!(windows) {
             let mut command = std::process::Command::new("cmd");
@@ -519,23 +687,137 @@ mod tests {
         }
     }
 
-    // 2026-09 audit Slice 11: the graceful stop must notice a prompt exit and
-    // must give up (so the caller kills) when the child lingers.
-    #[test]
-    fn wait_for_exit_sees_a_prompt_exit_and_gives_up_on_a_lingering_child() {
-        let mut quick = short_lived_process()
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("short-lived process should spawn");
-        assert!(wait_for_exit(&mut quick, Duration::from_secs(5)));
+    /// A process that exits once its stdin closes — the engine's own
+    /// behaviour on a graceful stop.
+    fn stdin_bound_process() -> std::process::Command {
+        std::process::Command::new("sort")
+    }
 
-        let mut slow = lingering_process()
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .expect("lingering process should spawn");
-        assert!(!wait_for_exit(&mut slow, Duration::from_millis(150)));
-        slow.kill().expect("lingering process should be killable");
-        let _ = slow.wait();
+    /// An event sink that records into a channel, standing in for the Tauri
+    /// event channel the production sink wraps.
+    fn recording_sink() -> (EventSink, Receiver<Value>) {
+        let (sender, receiver) = mpsc::channel::<Value>();
+        let sink: EventSink = Arc::new(move |message: Value| {
+            let _ = sender.send(message);
+        });
+        (sink, receiver)
+    }
+
+    fn payload_of(event: &Value) -> &Value {
+        assert_eq!(event["type"], json!("event"), "{event}");
+        assert_eq!(event["event"], json!(EVENT_ENGINE_EXITED), "{event}");
+        &event["payload"]
+    }
+
+    // 2026-09 production readiness, Slice 5 (finding F09): an engine that
+    // dies fails every waiting request with ENGINE_EXITED, raises
+    // `engine.exited` with the exit status and its generation, and leaves the
+    // bridge empty so the next start spawns a new process.
+    #[test]
+    fn exit_watcher_fails_pending_and_emits_event() {
+        let bridge = EngineBridge::default();
+        let (sink, events) = recording_sink();
+        let (waiter_sender, waiter) = mpsc::channel::<Value>();
+        bridge
+            .pending
+            .lock()
+            .expect("pending map should lock")
+            .insert("app.snapshot:7:abc".to_string(), waiter_sender);
+
+        let summary = bridge
+            .launch(short_lived_process(), PathBuf::from("short-lived"), sink)
+            .expect("the short-lived process should launch");
+        assert!(summary.running);
+        assert_eq!(summary.generation, 1);
+        assert!(summary.pid > 0);
+
+        let raw = waiter
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the waiting request is answered when the process exits");
+        let response: ResponseEnvelope =
+            serde_json::from_value(raw).expect("the drain sends a response envelope");
+        assert!(!response.ok);
+        assert_eq!(response.id, json!("app.snapshot:7:abc"));
+        assert_eq!(
+            response
+                .error
+                .as_ref()
+                .and_then(|error| error.get("code"))
+                .and_then(Value::as_str),
+            Some(ENGINE_EXITED_CODE)
+        );
+
+        let event = events
+            .recv_timeout(Duration::from_secs(10))
+            .expect("engine.exited is raised");
+        let payload = payload_of(&event);
+        assert_eq!(payload["status"], json!(0));
+        assert_eq!(payload["graceful"], json!(false));
+        assert_eq!(payload["generation"], json!(1));
+        assert_eq!(payload["pid"], json!(summary.pid));
+
+        assert!(bridge.summary().expect("summary should answer").is_none());
+        assert!(bridge
+            .pending
+            .lock()
+            .expect("pending map should lock")
+            .is_empty());
+        assert!(events.try_recv().is_err(), "the exit is reported once");
+    }
+
+    // 2026-09 production readiness, Slice 5 (finding F09), replacing the
+    // audit Slice 11 wait_for_exit test: a graceful stop closes stdin, waits
+    // for the process to exit, and reports `graceful: true`; a process that
+    // ignores its stdin is killed once the grace elapses and still gets its
+    // report. Whichever path takes the process reports it exactly once.
+    #[test]
+    fn stop_reports_a_graceful_exit_and_kills_a_lingering_engine() {
+        let bridge = EngineBridge::default();
+        let (sink, events) = recording_sink();
+
+        bridge
+            .launch(stdin_bound_process(), PathBuf::from("stdin-bound"), sink)
+            .expect("the stdin-bound process should launch");
+        let started = Instant::now();
+        bridge
+            .stop_with_grace(Duration::from_secs(10))
+            .expect("stop should succeed");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "closing stdin ends the process without waiting for the grace"
+        );
+        let event = events
+            .recv_timeout(Duration::from_secs(5))
+            .expect("the stop reports the exit");
+        let payload = payload_of(&event);
+        assert_eq!(payload["graceful"], json!(true));
+        assert_eq!(payload["generation"], json!(1));
+        assert!(bridge.summary().expect("summary").is_none());
+
+        let (sink, events) = recording_sink();
+        let summary = bridge
+            .launch(lingering_process(), PathBuf::from("lingering"), sink)
+            .expect("the lingering process should launch");
+        assert_eq!(summary.generation, 2);
+        let started = Instant::now();
+        bridge
+            .stop_with_grace(Duration::from_millis(200))
+            .expect("stop should succeed");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the lingering process is killed after the grace"
+        );
+        let event = events
+            .recv_timeout(Duration::from_secs(5))
+            .expect("the kill is reported too");
+        let payload = payload_of(&event);
+        assert_eq!(payload["graceful"], json!(true));
+        assert_eq!(payload["generation"], json!(2));
+        assert!(bridge.summary().expect("summary").is_none());
+        // The watcher of the killed process finds an empty slot and stays
+        // silent.
+        thread::sleep(ENGINE_EXIT_WATCH_INTERVAL * 2);
+        assert!(events.try_recv().is_err(), "the exit is reported once");
     }
 
     #[test]

@@ -25,6 +25,12 @@ Shell hardening (2026-09 production readiness, Slice 4 — findings F07, F08, F1
 - `shell_open_path` canonicalises the path and opens it only when it sits under the app-data directory (which holds `backups` and `exports`), the logs directory or the configured update repository; anything else answers `PATH_OUTSIDE_APP_DATA`, a missing path `PATH_NOT_FOUND`
 - `shell_export_diagnostics(report)` writes `<app-data>/exports/diagnostics-<UTC timestamp>.json` and nowhere else; the `test-bridge` feature adds `shell_test_bridge_export_diagnostics_to(report, directory)` for the qualification lanes
 
+Engine supervision and single instance (2026-09 production readiness, Slice 5 — findings F09, F19):
+
+- an exit watcher polls the engine process every 250 ms (the process mutex is held only for the poll); when the process is gone, every request still waiting is answered `ENGINE_EXITED`, `engine://event` carries `engine.exited { status, graceful, generation, pid }`, and the bridge is empty for the next `engine_start`. `stop()` marks the exit expected before it closes stdin, so a restart or the close reports `graceful: true`; whichever of the watcher and `stop()` takes the process reports it, exactly once
+- `engine_start` and `engine_summary` answer `pid` and `generation` (the launch number within this shell); the front-end keeps the generation to tell a stale `engine.exited` from a current one, and the test bridge's status carries `enginePid` / `engineGeneration` for the qualification lane
+- `tauri-plugin-single-instance` is the first plugin registered: a second launch hands its arguments to the running shell, which unminimises, shows and focuses its window, and exits. On Linux the plugin needs a D-Bus session bus; without one it stays silent and the engine's exclusive lock on `<app-data>/engine.lock` (`ENGINE_ALREADY_RUNNING` for the second engine) is the guard
+
 Repo-root commands:
 
 ```bash

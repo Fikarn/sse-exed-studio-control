@@ -15,6 +15,15 @@ interface TauriEventPayload {
   event: EventEnvelope<EventName>;
 }
 
+/** What `engine_start` answers: the shell's `EngineBootstrapSummary`. */
+interface EngineStartSummary {
+  binary_path?: string;
+  generation?: number;
+  pid?: number;
+  protocol?: string;
+  running?: boolean;
+}
+
 /**
  * A nonce for this transport instance, so the ids of one webview session
  * never collide with ids still pending in the shell from an earlier one — a
@@ -69,7 +78,14 @@ export function createTauriTransport(): EngineTransport {
       }
 
       try {
-        await invoke("engine_start");
+        const launch = await invoke<EngineStartSummary | null>("engine_start");
+        // 2026-09 production readiness, Slice 5 (finding F09): the store keeps
+        // the launch number, so an `engine.exited` about a process the shell
+        // already replaced is told apart from one about the current process.
+        return {
+          generation: typeof launch?.generation === "number" ? launch.generation : null,
+          pid: typeof launch?.pid === "number" ? launch.pid : null,
+        };
       } catch (error) {
         unlisten();
         unlistenPromise = null;

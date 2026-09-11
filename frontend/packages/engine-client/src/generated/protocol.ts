@@ -91,6 +91,7 @@ export const EVENT_NAMES = [
   "audio.changed",
   "audio.meters",
   "commissioning.changed",
+  "engine.exited",
   "engine.ready",
   "engine.startupFailed",
   "lighting.changed",

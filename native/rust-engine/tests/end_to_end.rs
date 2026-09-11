@@ -397,3 +397,51 @@ fn engine_boots_dispatches_a_request_and_exits_cleanly() {
     // 4. Clean shutdown.
     engine.shutdown();
 }
+
+// 2026-09 production readiness, Slice 5 (F19): a second engine pointed at an
+// app-data directory another engine holds reports ENGINE_ALREADY_RUNNING and
+// exits without touching the database; once the holder shuts down, the
+// directory accepts a new engine again.
+#[test]
+fn second_engine_on_the_same_app_data_dir_is_refused() {
+    let mut first = EngineProcess::spawn("single-instance-first");
+    wait_for_ready(&mut first);
+    let shared_dir = first.runtime_dir.clone();
+
+    let mut second = EngineProcess::spawn_with("single-instance-second", |command, _| {
+        command
+            .env("SSE_DISABLE_AUTO_IMPORT", "1")
+            .env("SSE_APP_DATA_DIR", &shared_dir)
+            .env("SSE_LOG_DIR", shared_dir.join("logs"));
+    });
+    let failure = second.wait_for("engine.startupFailed event", |value| {
+        value.get("type").and_then(Value::as_str) == Some("event")
+            && value.get("event").and_then(Value::as_str) == Some("engine.startupFailed")
+    });
+    assert_eq!(failure["payload"]["code"], json!("ENGINE_ALREADY_RUNNING"));
+    assert_eq!(failure["payload"]["stage"], json!("bootstrap"));
+    let message = failure["payload"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(message.contains("already open"), "{message}");
+    let status = second.child.wait().expect("the refused engine exits");
+    assert!(
+        !status.success(),
+        "a refused engine exits with an error status (got {status:?})"
+    );
+    let _ = fs::remove_dir_all(&second.runtime_dir);
+
+    first.shutdown();
+
+    let mut third = EngineProcess::spawn_with("single-instance-third", |command, _| {
+        command
+            .env("SSE_DISABLE_AUTO_IMPORT", "1")
+            .env("SSE_APP_DATA_DIR", &shared_dir)
+            .env("SSE_LOG_DIR", shared_dir.join("logs"));
+    });
+    wait_for_ready(&mut third);
+    let _ = fs::remove_dir_all(&third.runtime_dir);
+    third.shutdown();
+    let _ = fs::remove_dir_all(&shared_dir);
+}

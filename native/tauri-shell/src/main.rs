@@ -296,6 +296,18 @@ fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
         .ok_or_else(|| "Main Tauri window is unavailable.".to_string())
 }
 
+/// Brings the operator's window forward when a second copy of the shell was
+/// launched (2026-09 production readiness, Slice 5 — finding F19): the
+/// second copy hands over and exits, and the one that is running may be
+/// minimised behind the show.
+fn focus_main_window(app: &AppHandle) {
+    if let Ok(window) = main_window(app) {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 fn window_scale_factor(window: &WebviewWindow) -> f64 {
     window
         .scale_factor()
@@ -1196,6 +1208,17 @@ fn main() {
     }
 
     let builder = tauri::Builder::default()
+        // One shell per workstation (2026-09 production readiness, Slice 5 —
+        // finding F19): registered first so it runs before anything else
+        // initialises and before the window exists. A second launch hands
+        // its arguments to the running shell, which brings its window
+        // forward, and exits. The engine's own lock on
+        // `<app-data>/engine.lock` guards the database and the light
+        // outputs even where this plugin cannot (a Linux session without a
+        // D-Bus session bus).
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            focus_main_window(app);
+        }))
         .manage(EngineState {
             bridge: Arc::new(EngineBridge::default()),
             close_confirmed: AtomicBool::new(false),

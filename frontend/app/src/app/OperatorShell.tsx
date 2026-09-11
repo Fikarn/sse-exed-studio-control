@@ -48,7 +48,9 @@ declare global {
 const CLOSE_DIALOG_BODY =
   "Closing ends Studio Control's link to the desk, the rig and the deck. TotalMix keeps its current state, sACN output stops and fixtures hold their last levels, and the Stream Deck goes idle.";
 
-export function OperatorShell() {
+export type ShellEnvironment = ReturnType<typeof createShellEnvironment>;
+
+export function OperatorShell({ environment }: { environment?: ShellEnvironment }) {
   // Toast portal hosts cross-workspace bottom-right notifications + the ⌘K
   // command palette. Both mount once at the shell root so every workspace
   // (and any startup/recovery surface) inherits the same stacks.
@@ -56,15 +58,18 @@ export function OperatorShell() {
     <ToastProvider>
       <PaletteProvider>
         <OperatorLayoutProvider>
-          <OperatorShellInner />
+          <OperatorShellInner environment={environment} />
         </OperatorLayoutProvider>
       </PaletteProvider>
     </ToastProvider>
   );
 }
 
-function OperatorShellInner() {
-  const environment = useMemo(() => createShellEnvironment(), []);
+function OperatorShellInner({ environment: providedEnvironment }: { environment?: ShellEnvironment }) {
+  // 2026-09 production readiness, Slice 5: `main.tsx` creates the environment
+  // so it can forward uncaught window errors to the store; tests and stories
+  // render the shell without one.
+  const environment = useMemo(() => providedEnvironment ?? createShellEnvironment(), [providedEnvironment]);
   const palette = usePalette();
   const { reviewSurface, setReviewSurface, setTheme, setUiScale } = useOperatorLayout();
   const shellState = useShellSnapshot(environment.store);

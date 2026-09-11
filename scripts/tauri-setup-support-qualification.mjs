@@ -302,6 +302,64 @@ async function runStalledRequestCheck(session, child, bridgeIp) {
   return { heartbeats: ticks.length, maxGapMs, probeMs };
 }
 
+// Scenario `engine-crash` (2026-09 production readiness, Slice 5 — finding
+// F09): the shell must notice a dead engine within two seconds, and a second
+// copy of the shell (`second-instance`, finding F19) must be refused within
+// five.
+const ENGINE_CRASH_DETECT_MS = 2_000;
+const SECOND_INSTANCE_EXIT_MS = 5_000;
+
+// Ends the engine process from outside the shell — what a crash looks like
+// to it. The engine has no children of its own, so no tree kill.
+function killEngineProcess(pid) {
+  if (process.platform === "win32") {
+    const result = spawnSync("taskkill", ["/PID", String(pid), "/F"], { encoding: "utf8" });
+    assert(result.status === 0, `taskkill /PID ${pid} /F failed: ${result.stderr || result.stdout}`);
+    return;
+  }
+  process.kill(pid, "SIGKILL");
+}
+
+function debugShellBinaryPath() {
+  const binaryName = process.platform === "win32" ? "sse-exed-tauri-shell.exe" : "sse-exed-tauri-shell";
+  return path.join(rootDir, "native", "target", "debug", binaryName);
+}
+
+// A second copy of the shell, launched as the debug binary the first
+// `tauri dev` run compiled: it loads the same devUrl, which the first run's
+// Vite serves. `tauri dev` itself cannot be the second copy — its Vite
+// would refuse port 4173 before the shell ever ran, proving nothing about
+// the shell.
+function launchSecondShellInstance({ appDataDir, commandPath, logsDir, statusPath, updateRepoDir }) {
+  const binaryPath = debugShellBinaryPath();
+  assert(existsSync(binaryPath), `Expected the debug shell binary at ${binaryPath} after the first tauri dev run.`);
+  const child = spawn(binaryPath, [], {
+    cwd: rootDir,
+    detached: process.platform !== "win32",
+    env: {
+      ...process.env,
+      SSE_APP_DATA_DIR: appDataDir,
+      SSE_DISABLE_AUTO_IMPORT: "1",
+      SSE_LOG_DIR: logsDir,
+      SSE_TAURI_TEST_COMMAND_PATH: commandPath,
+      SSE_TAURI_TEST_STATUS_PATH: statusPath,
+      SSE_UPDATE_REPOSITORY_PATH: updateRepoDir ?? "",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", (chunk) => {
+    process.stdout.write(`[second-shell stdout] ${chunk}`);
+  });
+  child.stderr.on("data", (chunk) => {
+    process.stderr.write(`[second-shell stderr] ${chunk}`);
+  });
+
+  return child;
+}
+
 function killWindowsProcessTree(pid) {
   if (!pid) {
     return;
@@ -357,7 +415,7 @@ async function runSetupSupportQualification() {
   const runtime = createRuntimeDirs("sse-tauri-setup-support-");
   const firstSession = createSessionFiles("sse-tauri-session-");
 
-  console.log("Tauri Setup/Support qualification: step 1/4 clean startup and support workflow.");
+  console.log("Tauri Setup/Support qualification: step 1/6 clean startup and support workflow.");
 
   const firstRun = launchTauriShell({
     appDataDir: runtime.appDataDir,
@@ -542,7 +600,7 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
-  console.log("Tauri Setup/Support qualification: step 2/4 persisted restart on the same runtime.");
+  console.log("Tauri Setup/Support qualification: step 2/6 persisted restart on the same runtime.");
 
   const secondSession = createSessionFiles("sse-tauri-session-");
   const secondRun = launchTauriShell({
@@ -586,7 +644,7 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
-  console.log("Tauri Setup/Support qualification: step 3/4 recovery posture for bootstrap failure.");
+  console.log("Tauri Setup/Support qualification: step 3/6 recovery posture for bootstrap failure.");
 
   const blockedRuntime = createBlockedRuntimeDirs("sse-tauri-bootstrap-failure-");
   const recoverySession = createSessionFiles("sse-tauri-session-");
@@ -630,7 +688,7 @@ async function runSetupSupportQualification() {
   // where the database should be reaches the recovery surface as
   // STORAGE_CORRUPT, the engine's sentence names a backup, and the damaged
   // file is left exactly as it was — nothing migrates or overwrites it.
-  console.log("Tauri Setup/Support qualification: step 4/4 recovery posture for a corrupt database.");
+  console.log("Tauri Setup/Support qualification: step 4/6 recovery posture for a corrupt database.");
 
   const corruptRuntime = createRuntimeDirs("sse-tauri-corrupt-db-");
   const corruptDbPath = path.join(corruptRuntime.appDataDir, "studio-control.sqlite3");
@@ -678,6 +736,171 @@ async function runSetupSupportQualification() {
     await closeTauriShell(corruptRun);
     corruptSession.cleanup();
     corruptRuntime.cleanup();
+  }
+
+  await delay(1_500);
+  await assertTcpPortAvailable(devServerPort);
+
+  // Scenario `engine-crash` (2026-09 production readiness, Slice 5 — F09):
+  // the engine process is ended from outside. The shell notices within two
+  // seconds, the recovery surface reads ENGINE_EXITED with the automatic
+  // restart announced, and the engine is restarted on its own — a new
+  // process, the next launch number, the dashboard back.
+  console.log(
+    "Tauri Setup/Support qualification: step 5/6 an engine ended from outside reaches recovery and restarts on its own."
+  );
+
+  const crashRuntime = createRuntimeDirs("sse-tauri-engine-crash-");
+  const crashSession = createSessionFiles("sse-tauri-session-");
+  const crashRun = launchTauriShell({
+    appDataDir: crashRuntime.appDataDir,
+    commandPath: crashSession.commandPath,
+    logsDir: crashRuntime.logsDir,
+    statusPath: crashSession.statusPath,
+    updateRepoDir: crashRuntime.updateRepoDir,
+  });
+
+  try {
+    const readyStatus = await waitForStatus({
+      child: crashRun,
+      label: "engine-crash ready state",
+      predicate: (value) =>
+        value?.shellState?.lifecycle === "ready" && typeof value?.testBridge?.enginePid === "number",
+      statusPath: crashSession.statusPath,
+    });
+    const enginePid = readyStatus.testBridge.enginePid;
+    const engineGeneration = readyStatus.testBridge.engineGeneration;
+    assert(
+      Number.isInteger(enginePid) && enginePid > 0,
+      `Expected the status file to carry the engine pid, got ${enginePid}.`
+    );
+
+    killEngineProcess(enginePid);
+    const killedAt = Date.now();
+    const exitedStatus = await waitForStatus({
+      child: crashRun,
+      label: "ENGINE_EXITED recovery state",
+      predicate: (value) => value?.shellState?.startupFailure?.code === "ENGINE_EXITED",
+      statusPath: crashSession.statusPath,
+      timeoutMs: ENGINE_CRASH_DETECT_MS,
+    });
+    const detectMs = Date.now() - killedAt;
+    const exitFailure = exitedStatus.shellState.startupFailure;
+    assert(
+      exitedStatus.shellState.lifecycle === "failed",
+      `Expected the shell to leave ready when the engine died, got '${exitedStatus.shellState.lifecycle}'.`
+    );
+    assert(
+      exitFailure?.stage === "runtime",
+      `Expected the ENGINE_EXITED stage 'runtime', got '${exitFailure?.stage}'.`
+    );
+    assert(
+      typeof exitFailure?.message === "string" && exitFailure.message.includes("restarts it on its own"),
+      `Expected the ENGINE_EXITED sentence to announce the automatic restart, got '${exitFailure?.message}'.`
+    );
+
+    const recoveredStatus = await waitForStatus({
+      child: crashRun,
+      label: "automatic restart ready state",
+      predicate: (value) =>
+        value?.shellState?.lifecycle === "ready" &&
+        typeof value?.testBridge?.enginePid === "number" &&
+        value.testBridge.enginePid !== enginePid,
+      statusPath: crashSession.statusPath,
+    });
+    const restartMs = Date.now() - killedAt;
+    assert(
+      recoveredStatus.shellState.startupFailure === null,
+      "Expected the automatic restart to clear the recovery surface."
+    );
+    assert(
+      recoveredStatus.testBridge.engineGeneration === engineGeneration + 1,
+      `Expected launch ${engineGeneration + 1} after the automatic restart, got ${recoveredStatus.testBridge.engineGeneration}.`
+    );
+    evidence.recordCheck("engine-crash-reaches-recovery-and-restarts", {
+      detectMs,
+      killedPid: enginePid,
+      newPid: recoveredStatus.testBridge.enginePid,
+      restartMs,
+    });
+
+    // Scenario `second-instance` (Slice 5 — F19): a second copy of the shell
+    // launched while the first is up never gets a working engine. On Windows
+    // and macOS the shell's single-instance plugin hands the launch to the
+    // running shell and exits; on a Linux session without a D-Bus session
+    // bus the plugin cannot see the first shell, and the engine's lock on
+    // `<app-data>/engine.lock` refuses the second engine instead, so the
+    // second shell stops at ENGINE_ALREADY_RUNNING. Both are recorded; only
+    // the plugin's refusal is accepted on Windows and macOS.
+    console.log("Tauri Setup/Support qualification: step 6/6 a second copy of the shell is refused.");
+    const secondSession = createSessionFiles("sse-tauri-second-instance-");
+    const secondRun = launchSecondShellInstance({
+      appDataDir: crashRuntime.appDataDir,
+      commandPath: secondSession.commandPath,
+      logsDir: crashRuntime.logsDir,
+      statusPath: secondSession.statusPath,
+      updateRepoDir: crashRuntime.updateRepoDir,
+    });
+    const launchedAt = Date.now();
+
+    try {
+      const exitDeadline = launchedAt + SECOND_INSTANCE_EXIT_MS;
+      while (secondRun.exitCode === null && Date.now() < exitDeadline) {
+        await delay(100);
+      }
+      let refusal;
+      if (secondRun.exitCode !== null) {
+        assert(
+          secondRun.exitCode === 0,
+          `Expected the second shell to exit cleanly after handing over, got code ${secondRun.exitCode}.`
+        );
+        refusal = {
+          exitCode: secondRun.exitCode,
+          refusalMs: Date.now() - launchedAt,
+          refusedBy: "shell-single-instance",
+        };
+      } else {
+        assert(
+          process.platform === "linux",
+          `Expected the second shell to exit within ${SECOND_INSTANCE_EXIT_MS} ms on ${process.platform}; it is still running.`
+        );
+        const refusedStatus = await waitForStatus({
+          child: secondRun,
+          label: "second shell refused by the engine lock",
+          predicate: (value) => value?.shellState?.startupFailure?.code === "ENGINE_ALREADY_RUNNING",
+          statusPath: secondSession.statusPath,
+        });
+        refusal = {
+          exitCode: null,
+          refusalMs: Date.now() - launchedAt,
+          refusedBy: "engine-lock",
+          stage: refusedStatus.shellState.startupFailure?.stage,
+        };
+      }
+
+      // The first shell is untouched: still ready, its engine the same, its
+      // status file still moving.
+      const before = readJson(crashSession.statusPath);
+      const after = await waitForStatus({
+        child: crashRun,
+        label: "first shell heartbeat after the second launch",
+        predicate: (value) =>
+          value?.shellState?.lifecycle === "ready" && value?.testBridge?.heartbeat !== before?.testBridge?.heartbeat,
+        statusPath: crashSession.statusPath,
+      });
+      assert(
+        after.testBridge.enginePid === recoveredStatus.testBridge.enginePid,
+        "Expected the first shell's engine to be untouched by the second launch."
+      );
+      evidence.recordCheck("second-instance-is-refused", refusal);
+    } finally {
+      await closeTauriShell(secondRun);
+      secondSession.cleanup();
+    }
+  } finally {
+    await closeTauriShell(crashRun);
+    crashSession.cleanup();
+    crashRuntime.cleanup();
   }
 }
 
