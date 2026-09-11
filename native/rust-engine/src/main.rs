@@ -475,6 +475,7 @@ fn main() -> io::Result<()> {
         rme_totalmix_osc::spawn_rme_totalmix_audio_metering(
             output_sender.clone(),
             planned_paths.db_path,
+            log_file_path.clone(),
         );
     }
     spawn_snapshot_scheduler(db_path.clone(), backups_dir.clone(), log_file_path.clone());

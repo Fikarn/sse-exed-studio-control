@@ -1,18 +1,33 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::audio::{
-    read_audio_snapshot, AudioChannelSnapshot, AudioChannelUpdateRequest, AudioEqUpdateRequest,
-    AudioMixTargetSnapshot, AudioMixTargetUpdateRequest, AudioSnapshot,
+    read_audio_snapshot, AudioChannelSnapshot, AudioMixTargetSnapshot, AudioSnapshot,
 };
+use crate::diagnostics::append_log;
 use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
 use crate::storage::list_settings_by_prefix;
 use rosc::{decoder, encoder, OscMessage, OscPacket, OscType};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::net::UdpSocket;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket};
 use std::path::PathBuf;
 use std::sync::{mpsc::Sender, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
+
+// The command paths, split by remote generation (2026-09 production readiness,
+// Slice 6): the classic page-2 EQ path on the first classic remote, and the
+// Global OSC remote's absolute channel / output-mix commands. The metering
+// paths of both generations stay here because they share the meter state.
+mod classic_eq;
+mod global_commands;
+
+pub use classic_eq::send_totalmix_eq_update;
+pub(crate) use global_commands::{
+    global_channel_surface, global_channel_target, global_output_channel, global_output_mix_target,
+};
+pub use global_commands::{
+    send_totalmix_channel_update, send_totalmix_mix_target_update, TotalMixSendReport,
+};
 
 pub const RME_TOTALMIX_OSC_SOURCE: &str = "rme-totalmix-osc";
 pub const SIMULATED_AUDIO_SOURCE: &str = "simulated";
@@ -37,6 +52,17 @@ const KEEPALIVE_INTERVAL: Duration = Duration::from_millis(1_000);
 // controller 4 in Global OSC mode; /sendall re-primes it when levels stop.
 const GLOBAL_OSC_PORT_OFFSET: u16 = 3;
 const GLOBAL_OSC_REFRESH_STALE: Duration = Duration::from_millis(3_000);
+/// Lab override for the local address the metering receive ports bind (an IP
+/// address). Unset, the ports bind loopback for a loopback console and every
+/// interface for a console on another host (2026-09 production readiness,
+/// Slice 6 — finding F05).
+pub(crate) const OSC_BIND_HOST_ENV: &str = "SSE_OSC_BIND_HOST";
+/// A datagram from a host other than the console is dropped and noted in the
+/// engine log at most this often per source address.
+const DROPPED_SOURCE_LOG_INTERVAL: Duration = Duration::from_secs(60);
+/// Source addresses remembered for that rate limit; past this a flood of new
+/// sources is dropped without further log lines until old entries expire.
+const MAX_TRACKED_DROP_SOURCES: usize = 256;
 const DEFAULT_POLL_INTERVAL_MS: u64 = 16;
 const MIN_POLL_INTERVAL_MS: u64 = 5;
 const MAX_POLL_INTERVAL_MS: u64 = 100;
@@ -553,40 +579,6 @@ pub fn parse_totalmix_meter_message(message: &OscMessage) -> Option<RmeTotalMixM
     })
 }
 
-pub fn send_totalmix_eq_update(
-    send_host: &str,
-    send_port: i64,
-    channel_id: &str,
-    request: &AudioEqUpdateRequest,
-) -> Result<usize, String> {
-    let Some((bus_command, channel_index)) = totalmix_channel_target(channel_id) else {
-        return Err(format!(
-            "Audio channel '{channel_id}' is not addressable by TotalMix Page 2 EQ."
-        ));
-    };
-    if send_port <= 0 || send_port > u16::MAX as i64 {
-        return Err(String::from("TotalMix OSC send port is invalid."));
-    }
-
-    let mut messages = totalmix_eq_parameter_messages(request);
-    if messages.is_empty() {
-        return Ok(0);
-    }
-    messages.splice(
-        0..0,
-        [
-            (format!("/2/{bus_command}"), OscType::Float(1.0)),
-            (
-                String::from("/setBankStart"),
-                OscType::Int(channel_index as i32),
-            ),
-            (String::from("/setOffsetInBank"), OscType::Int(0)),
-        ],
-    );
-
-    send_osc_messages(send_host, send_port as u16, &messages)
-}
-
 fn send_osc_messages(
     send_host: &str,
     send_port: u16,
@@ -640,342 +632,11 @@ fn test_guard_blocks_console_port(port: u16) -> bool {
     TOTALMIX_REMOTE_PORTS.contains(&port) && !writes_allowed
 }
 
-fn totalmix_channel_target(channel_id: &str) -> Option<(&'static str, usize)> {
-    if let Some(raw) = channel_id.strip_prefix("audio-input-") {
-        let index = raw.parse::<usize>().ok()?.checked_sub(1)?;
-        return Some(("busInput", index));
-    }
-    if let Some(raw) = channel_id.strip_prefix("audio-playback-") {
-        let left = raw.split('-').next()?.parse::<usize>().ok()?;
-        let index = left.checked_sub(1)?;
-        return Some(("busPlayback", index));
-    }
-    None
-}
-
-fn totalmix_eq_parameter_messages(request: &AudioEqUpdateRequest) -> Vec<(String, OscType)> {
-    let mut messages = Vec::new();
-    if request.enabled.is_some() {
-        messages.push((String::from("/2/eqEnable"), OscType::Float(1.0)));
-    }
-    if request.low_cut_enabled.is_some() {
-        messages.push((String::from("/2/lowcutEnable"), OscType::Float(1.0)));
-    }
-    if let Some(frequency_hz) = request.low_cut_frequency_hz {
-        messages.push((
-            String::from("/2/lowcutFreq"),
-            OscType::Float(totalmix_frequency_scale(frequency_hz)),
-        ));
-    }
-    if let Some(slope) = request.low_cut_slope_db_per_octave {
-        messages.push((
-            String::from("/2/lowcutGrade"),
-            OscType::Float(totalmix_low_cut_grade_scale(slope)),
-        ));
-    }
-
-    if let Some(band_id) = request.band_id.as_deref() {
-        if let Some(band_index) = totalmix_eq_band_index(band_id) {
-            if let Some(band_type) = request.band_type.as_deref() {
-                if band_index == 1 || band_index == 3 {
-                    messages.push((
-                        format!("/2/eqType{band_index}"),
-                        OscType::Float(totalmix_eq_type_scale(band_index, band_type)),
-                    ));
-                }
-            }
-            if let Some(gain_db) = request.gain_db {
-                messages.push((
-                    format!("/2/eqGain{band_index}"),
-                    OscType::Float(totalmix_linear_scale(gain_db, -20.0, 20.0)),
-                ));
-            }
-            if let Some(frequency_hz) = request.frequency_hz {
-                messages.push((
-                    format!("/2/eqFreq{band_index}"),
-                    OscType::Float(totalmix_frequency_scale(frequency_hz)),
-                ));
-            }
-            if let Some(q) = request.q {
-                messages.push((
-                    format!("/2/eqQ{band_index}"),
-                    OscType::Float(totalmix_linear_scale(q, 0.4, 9.9)),
-                ));
-            }
-        }
-    }
-
-    messages
-}
-
-fn totalmix_eq_band_index(band_id: &str) -> Option<i64> {
-    match band_id {
-        "1" => Some(1),
-        "2" => Some(2),
-        "3" => Some(3),
-        _ => None,
-    }
-}
-
-fn totalmix_frequency_scale(frequency_hz: f64) -> f32 {
-    let min = 20.0_f64.ln();
-    let max = 20_000.0_f64.ln();
-    (((frequency_hz.clamp(20.0, 20_000.0).ln() - min) / (max - min)).clamp(0.0, 1.0)) as f32
-}
-
-fn totalmix_linear_scale(value: f64, min: f64, max: f64) -> f32 {
-    (((value.clamp(min, max) - min) / (max - min)).clamp(0.0, 1.0)) as f32
-}
-
-fn totalmix_low_cut_grade_scale(slope: i64) -> f32 {
-    match slope {
-        6 => 0.0,
-        12 => 1.0 / 3.0,
-        18 => 2.0 / 3.0,
-        24 => 1.0,
-        _ => 1.0 / 3.0,
-    }
-}
-
-fn totalmix_eq_type_scale(band_index: i64, band_type: &str) -> f32 {
-    match (band_index, band_type) {
-        (1, "low-shelf") | (3, "high-shelf") => 1.0 / 3.0,
-        (1, "high-pass") | (3, "low-pass") => 2.0 / 3.0,
-        (1, "low-pass") | (3, "high-pass") => 1.0,
-        _ => 0.0,
-    }
-}
-
-/// Outcome of one outbound TotalMix control send: how many OSC commands went
-/// to the wire, and which requested fields stayed app-local because TotalMix
-/// exposes no OSC command for them on this surface.
-#[derive(Debug, Default)]
-pub struct TotalMixSendReport {
-    pub sent: usize,
-    pub local_only: Vec<&'static str>,
-}
-
-/// Maps a console channel surface onto the Global OSC namespace: the bus
-/// word plus the 0-based hardware channel number (left channel of a stereo
-/// pair, per RME's protocol table). Hardware numbering never shifts with
-/// the TotalMix mixer layout.
-pub(crate) fn global_channel_target(surface_id: &str) -> Option<(&'static str, usize)> {
-    if let Some(raw) = surface_id.strip_prefix("audio-input-") {
-        let number = raw.parse::<usize>().ok()?;
-        if (1..=12).contains(&number) {
-            return Some(("input", number - 1));
-        }
-        return None;
-    }
-    if let Some(raw) = surface_id.strip_prefix("audio-playback-") {
-        let left = raw.split('-').next()?.parse::<usize>().ok()?;
-        if left % 2 == 1 && (1..=11).contains(&left) {
-            return Some(("playback", left - 1));
-        }
-        return None;
-    }
-    None
-}
-
-/// Maps a mix-target surface onto its 0-based hardware output channel (left
-/// channel of the pair): Main = AN 1/2, Phones 1 = PH 9/10, Phones 2 =
-/// PH 11/12. Doubles as the submix address for `/mix/{in|pb}/{ch}/{out}/…`
-/// sends.
-pub(crate) fn global_output_channel(mix_target_id: &str) -> Option<usize> {
-    match mix_target_id {
-        "audio-mix-main" => Some(0),
-        "audio-mix-phones-a" => Some(8),
-        "audio-mix-phones-b" => Some(10),
-        _ => None,
-    }
-}
-
-/// Inverse of [`global_channel_target`]: the app surface for a hardware
-/// channel the console reported. Right channels of stereo pairs and channels
-/// outside the modelled range map to nothing.
-pub(crate) fn global_channel_surface(bus_word: &str, channel: usize) -> Option<String> {
-    match bus_word {
-        "input" if channel < 12 => Some(format!("audio-input-{}", channel + 1)),
-        "playback" if channel.is_multiple_of(2) && channel <= 10 => {
-            Some(format!("audio-playback-{}-{}", channel + 1, channel + 2))
-        }
-        _ => None,
-    }
-}
-
-/// Inverse of [`global_output_channel`].
-pub(crate) fn global_output_mix_target(output: usize) -> Option<&'static str> {
-    match output {
-        0 => Some("audio-mix-main"),
-        8 => Some("audio-mix-phones-a"),
-        10 => Some("audio-mix-phones-b"),
-        _ => None,
-    }
-}
-
-fn osc_bool(value: bool) -> OscType {
-    OscType::Float(if value { 1.0 } else { 0.0 })
-}
-
 fn validated_command_port(send_port: i64, offset: u16) -> Result<u16, String> {
     let base =
         u16::try_from(send_port).map_err(|_| String::from("TotalMix OSC send port is invalid."))?;
     base.checked_add(offset)
         .ok_or_else(|| String::from("TotalMix OSC send port leaves no room for the +1/+2 slots."))
-}
-
-/// Sends one operator channel edit to TotalMix over the Global OSC
-/// namespace (RME protocol table, 2026-07-21): hardware channel numbering
-/// that never shifts with the mixer layout, and absolute values throughout
-/// — mute/solo/48V state can no longer invert against the console. Faders
-/// route to the requested submix node (`/mix/{in|pb}/{ch}/{out}/faderlin`,
-/// linear 0..1 — the app's own fader scale); preamp gain is sent in real
-/// dB. Fields with no OSC command on this surface stay app-local.
-pub fn send_totalmix_channel_update(
-    send_host: &str,
-    send_port: i64,
-    channel: &AudioChannelSnapshot,
-    request: &AudioChannelUpdateRequest,
-) -> Result<TotalMixSendReport, String> {
-    let Some((bus_word, ch)) = global_channel_target(&channel.id) else {
-        return Ok(TotalMixSendReport {
-            sent: 0,
-            local_only: vec!["all fields (channel is not on the console)"],
-        });
-    };
-    let port = validated_command_port(send_port, GLOBAL_OSC_PORT_OFFSET)?;
-    let is_input = bus_word == "input";
-    let mix_word = if is_input { "in" } else { "pb" };
-
-    let mut report = TotalMixSendReport::default();
-    let mut messages: Vec<(String, OscType)> = Vec::new();
-
-    if let Some(fader) = request.fader {
-        let target_id = request.mix_target_id.as_deref().unwrap_or("audio-mix-main");
-        if let Some(out) = global_output_channel(target_id) {
-            messages.push((
-                format!("/mix/{mix_word}/{ch}/{out}/faderlin"),
-                OscType::Float(fader.clamp(0.0, 1.0) as f32),
-            ));
-        } else {
-            report.local_only.push("fader (unknown submix)");
-        }
-    }
-    if let Some(gain) = request.gain {
-        if channel.role == "front-preamp" {
-            messages.push((format!("/input/{ch}/gain"), OscType::Float(gain as f32)));
-        } else {
-            report.local_only.push("gain (no preamp on this channel)");
-        }
-    }
-    if let Some(mute) = request.mute {
-        messages.push((format!("/{bus_word}/{ch}/mute"), osc_bool(mute)));
-    }
-    if let Some(solo) = request.solo {
-        // Solo is a per-mix-node flag; the operator's solo acts on the main
-        // submix, matching the console's default solo bus.
-        messages.push((format!("/mix/{mix_word}/{ch}/0/solo"), osc_bool(solo)));
-    }
-    if let Some(phantom) = request.phantom {
-        if is_input {
-            messages.push((format!("/input/{ch}/48v"), osc_bool(phantom)));
-        } else {
-            report.local_only.push("phantom (input channels only)");
-        }
-    }
-    if let Some(phase) = request.phase {
-        if is_input {
-            messages.push((format!("/input/{ch}/phase"), osc_bool(phase)));
-        } else {
-            report.local_only.push("phase (input channels only)");
-        }
-    }
-    if let Some(pad) = request.pad {
-        if is_input {
-            messages.push((format!("/input/{ch}/pad"), osc_bool(pad)));
-        } else {
-            report.local_only.push("pad (input channels only)");
-        }
-    }
-    if let Some(instrument) = request.instrument {
-        if is_input {
-            messages.push((format!("/input/{ch}/instrument"), osc_bool(instrument)));
-        } else {
-            report.local_only.push("instrument (input channels only)");
-        }
-    }
-    if let Some(auto_set) = request.auto_set {
-        if is_input {
-            messages.push((format!("/input/{ch}/autoset"), osc_bool(auto_set)));
-        } else {
-            report.local_only.push("auto-set (input channels only)");
-        }
-    }
-
-    report.sent = send_osc_messages(send_host, port, &messages)?;
-    // Registered after the datagrams left: the console link now expects each
-    // parameter to read back with this value (rme_console_link).
-    crate::rme_console_link::register_outgoing_commands(&messages);
-    Ok(report)
-}
-
-/// Sends one operator output-mix edit to TotalMix over the Global OSC
-/// namespace. Output level rides `/output/{ch}/faderlin` (linear 0..1) and
-/// mute is absolute; dim, mono, and talkback are control-room functions
-/// that TotalMix exposes only for the main out, so they are sent for
-/// `audio-mix-main` and reported local-only for the phones targets.
-pub fn send_totalmix_mix_target_update(
-    send_host: &str,
-    send_port: i64,
-    mix_target_id: &str,
-    request: &AudioMixTargetUpdateRequest,
-) -> Result<TotalMixSendReport, String> {
-    let Some(out) = global_output_channel(mix_target_id) else {
-        return Ok(TotalMixSendReport {
-            sent: 0,
-            local_only: vec!["all fields (mix target is not on the console)"],
-        });
-    };
-    let port = validated_command_port(send_port, GLOBAL_OSC_PORT_OFFSET)?;
-    let is_main = mix_target_id == "audio-mix-main";
-
-    let mut report = TotalMixSendReport::default();
-    let mut messages: Vec<(String, OscType)> = Vec::new();
-
-    if let Some(volume) = request.volume {
-        messages.push((
-            format!("/output/{out}/faderlin"),
-            OscType::Float(volume.clamp(0.0, 1.0) as f32),
-        ));
-    }
-    if let Some(mute) = request.mute {
-        messages.push((format!("/output/{out}/mute"), osc_bool(mute)));
-    }
-    if let Some(dim) = request.dim {
-        if is_main {
-            messages.push((String::from("/controlroom/dim"), osc_bool(dim)));
-        } else {
-            report.local_only.push("dim (main out only)");
-        }
-    }
-    if let Some(mono) = request.mono {
-        if is_main {
-            messages.push((String::from("/controlroom/mainmono"), osc_bool(mono)));
-        } else {
-            report.local_only.push("mono (main out only)");
-        }
-    }
-    if let Some(talkback) = request.talkback {
-        if is_main {
-            messages.push((String::from("/controlroom/talkback"), osc_bool(talkback)));
-        } else {
-            report.local_only.push("talkback (main out only)");
-        }
-    }
-
-    report.sent = send_osc_messages(send_host, port, &messages)?;
-    crate::rme_console_link::register_outgoing_commands(&messages);
-    Ok(report)
 }
 
 pub fn shared_meter_state() -> Arc<Mutex<RmeTotalMixMeterState>> {
@@ -1030,10 +691,23 @@ pub fn wait_for_live_metering(timeout: Duration) -> bool {
     }
 }
 
-pub fn spawn_rme_totalmix_audio_metering(sender: Sender<Value>, db_path: PathBuf) {
+pub fn spawn_rme_totalmix_audio_metering(
+    sender: Sender<Value>,
+    db_path: PathBuf,
+    log_file_path: PathBuf,
+) {
     let state = shared_meter_state();
     thread::spawn(move || {
         let poll_interval = configured_poll_interval();
+        let bind_override =
+            match parse_bind_override(std::env::var(OSC_BIND_HOST_ENV).ok().as_deref()) {
+                Ok(value) => value,
+                Err(message) => {
+                    let _ = append_log(&log_file_path, "WARN", &message);
+                    None
+                }
+            };
+        let mut drops = DroppedSourceLog::new(Some(log_file_path.clone()));
         let metering_started_at = Instant::now();
         let mut sequence = 0_u64;
         let mut sockets = Vec::<BoundRmeSlot>::new();
@@ -1071,8 +745,26 @@ pub fn spawn_rme_totalmix_audio_metering(sender: Sender<Value>, db_path: PathBuf
                     && snapshot.osc_enabled
                     && bound_key.as_ref() != Some(&key)
                 {
-                    sockets = bind_slots(snapshot.send_port, snapshot.receive_port);
-                    global_slot = bind_global_slot(snapshot.send_port, snapshot.receive_port);
+                    match resolve_console_address(&snapshot.send_host) {
+                        Some(console) => {
+                            let policy = ReceivePolicy::for_console(console, bind_override);
+                            sockets = bind_slots(policy, snapshot.send_port, snapshot.receive_port);
+                            global_slot =
+                                bind_global_slot(policy, snapshot.send_port, snapshot.receive_port);
+                        }
+                        None => {
+                            let _ = append_log(
+                                &log_file_path,
+                                "WARN",
+                                &format!(
+                                    "RME TotalMix metering is not listening: the TotalMix address {:?} does not resolve to an IP address (Setup, TotalMix address)",
+                                    snapshot.send_host
+                                ),
+                            );
+                            sockets = Vec::new();
+                            global_slot = None;
+                        }
+                    }
                     mark_console_link_slot(global_slot.is_some());
                     bound_key = Some(key);
                     last_keepalive_at = None;
@@ -1118,9 +810,9 @@ pub fn spawn_rme_totalmix_audio_metering(sender: Sender<Value>, db_path: PathBuf
             }
 
             let now_ms = monotonic_now_ms();
-            read_available_packets(&sockets, state.clone(), now_ms);
+            read_available_packets(&sockets, state.clone(), now_ms, &mut drops);
             if let Some(slot) = global_slot.as_mut() {
-                read_global_packets(slot, &state, now_ms);
+                read_global_packets(slot, &state, now_ms, &mut drops);
                 if let Some((send_host, _, _)) = bound_key.as_ref() {
                     service_console_link(slot, send_host);
                 }
@@ -1179,33 +871,181 @@ pub fn spawn_rme_totalmix_audio_metering(sender: Sender<Value>, db_path: PathBuf
     });
 }
 
-fn bind_slots(send_port: i64, receive_port: i64) -> Vec<BoundRmeSlot> {
+/// Where the metering thread listens, decided once per bind from the TotalMix
+/// address the operator commissioned (2026-09 production readiness, Slice 6 —
+/// finding F05). TotalMix on this workstation sends to the remote IP set in
+/// Options › Settings › OSC, `127.0.0.1`, so a loopback console gets a
+/// loopback bind and nothing on the studio LAN can reach receive ports
+/// 9001–9004; a console on another host needs the wildcard bind. Either way
+/// only datagrams from the console's own address are read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ReceivePolicy {
+    /// The console's address: the one source whose datagrams are read.
+    pub(crate) console: IpAddr,
+    /// The local address every receive port binds.
+    pub(crate) bind_host: IpAddr,
+}
+
+impl ReceivePolicy {
+    pub(crate) fn for_console(console: IpAddr, bind_override: Option<IpAddr>) -> Self {
+        let bind_host = match bind_override {
+            Some(host) => host,
+            None => match console {
+                IpAddr::V4(address) if address.is_loopback() => IpAddr::V4(Ipv4Addr::LOCALHOST),
+                IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                IpAddr::V6(address) if address.is_loopback() => IpAddr::V6(Ipv6Addr::LOCALHOST),
+                IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+            },
+        };
+        Self { console, bind_host }
+    }
+}
+
+/// The commissioned TotalMix address (`sendHost`) as the address the receive
+/// sockets expect datagrams from: `localhost` is the IPv4 loopback, a literal
+/// address is itself, anything else goes through the resolver the send path
+/// uses. `None` for an empty or unresolvable host.
+pub(crate) fn resolve_console_address(send_host: &str) -> Option<IpAddr> {
+    let host = send_host.trim();
+    if host.is_empty() {
+        return None;
+    }
+    if host.eq_ignore_ascii_case("localhost") {
+        return Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
+    }
+    if let Ok(address) = host.parse::<IpAddr>() {
+        return Some(address);
+    }
+    (host, 0_u16)
+        .to_socket_addrs()
+        .ok()?
+        .next()
+        .map(|address| address.ip())
+}
+
+/// `SSE_OSC_BIND_HOST`: unset or empty → no override; an IP address → that
+/// address; anything else is refused with the sentence the caller logs.
+pub(crate) fn parse_bind_override(raw: Option<&str>) -> Result<Option<IpAddr>, String> {
+    match raw.map(str::trim) {
+        None | Some("") => Ok(None),
+        Some(value) => value.parse::<IpAddr>().map(Some).map_err(|_| {
+            format!(
+                "{}={value:?} is not an IP address; the metering receive ports bind by the TotalMix address instead",
+                OSC_BIND_HOST_ENV
+            )
+        }),
+    }
+}
+
+/// Whether a datagram from `source` is read: only one from the console's own
+/// address is (an IPv4 console seen through an IPv4-mapped IPv6 address is
+/// still the console).
+pub(crate) fn accept_source(source: SocketAddr, expected: IpAddr) -> bool {
+    match (source.ip(), expected) {
+        (IpAddr::V4(got), IpAddr::V4(want)) => got == want,
+        (IpAddr::V6(got), IpAddr::V6(want)) => got == want,
+        (IpAddr::V6(got), IpAddr::V4(want)) => got.to_ipv4_mapped() == Some(want),
+        (IpAddr::V4(got), IpAddr::V6(want)) => want.to_ipv4_mapped() == Some(got),
+    }
+}
+
+/// Dropped-datagram bookkeeping for the metering thread: a source that is not
+/// the console is noted in the engine log (WARN) at most once a minute, keyed
+/// by address, and the datagram is discarded. Written through `append_log`
+/// until Slice 8 moves the module to `log_event`.
+pub(crate) struct DroppedSourceLog {
+    log_file_path: Option<PathBuf>,
+    last_logged: HashMap<IpAddr, Instant>,
+}
+
+impl DroppedSourceLog {
+    pub(crate) fn new(log_file_path: Option<PathBuf>) -> Self {
+        Self {
+            log_file_path,
+            last_logged: HashMap::new(),
+        }
+    }
+
+    fn record(&mut self, source: SocketAddr, expected: IpAddr, receive_port: u16) {
+        self.record_at(source, expected, receive_port, Instant::now());
+    }
+
+    /// Returns whether a log line was due (and written when a log path is set).
+    fn record_at(
+        &mut self,
+        source: SocketAddr,
+        expected: IpAddr,
+        receive_port: u16,
+        now: Instant,
+    ) -> bool {
+        if !self.due(source.ip(), now) {
+            return false;
+        }
+        if let Some(path) = self.log_file_path.as_deref() {
+            let _ = append_log(
+                path,
+                "WARN",
+                &format!(
+                    "RME TotalMix OSC datagram from {source} dropped on receive port {receive_port}: only the TotalMix address {expected} is read; further drops from this source are noted once a minute"
+                ),
+            );
+        }
+        true
+    }
+
+    /// The rate limit on its own: true when `source` is due for a line now.
+    fn due(&mut self, source: IpAddr, now: Instant) -> bool {
+        if let Some(last) = self.last_logged.get(&source) {
+            if now.duration_since(*last) < DROPPED_SOURCE_LOG_INTERVAL {
+                return false;
+            }
+        } else if self.last_logged.len() >= MAX_TRACKED_DROP_SOURCES {
+            self.last_logged
+                .retain(|_, last| now.duration_since(*last) < DROPPED_SOURCE_LOG_INTERVAL);
+            if self.last_logged.len() >= MAX_TRACKED_DROP_SOURCES {
+                return false;
+            }
+        }
+        self.last_logged.insert(source, now);
+        true
+    }
+}
+
+/// One non-blocking receive socket on the policy's bind host.
+fn bind_receive_socket(bind_host: IpAddr, port: u16) -> std::io::Result<UdpSocket> {
+    let socket = UdpSocket::bind((bind_host, port))?;
+    socket.set_nonblocking(true)?;
+    Ok(socket)
+}
+
+fn local_port_of(socket: &UdpSocket) -> u16 {
+    socket
+        .local_addr()
+        .map(|address| address.port())
+        .unwrap_or(0)
+}
+
+fn bind_slots(policy: ReceivePolicy, send_port: i64, receive_port: i64) -> Vec<BoundRmeSlot> {
     let Ok(slots) = slot_configs(send_port, receive_port) else {
         return Vec::new();
     };
     slots
         .into_iter()
         .filter_map(|slot| {
-            let socket = UdpSocket::bind(("0.0.0.0", slot.receive_port))
+            let socket = bind_receive_socket(policy.bind_host, slot.receive_port)
                 .map_err(|error| {
                     eprintln!(
-                        "RME TotalMix metering could not bind receive port {}: {}",
-                        slot.receive_port, error
+                        "RME TotalMix metering could not bind receive port {} on {}: {}",
+                        slot.receive_port, policy.bind_host, error
                     );
                     error
                 })
                 .ok()?;
-            if let Err(error) = socket.set_nonblocking(true) {
-                eprintln!(
-                    "RME TotalMix metering could not set receive port {} nonblocking: {}",
-                    slot.receive_port, error
-                );
-                return None;
-            }
             Some(BoundRmeSlot {
                 bus: slot.bus,
                 send_port: slot.send_port,
                 socket,
+                console: policy.console,
             })
         })
         .collect()
@@ -1250,19 +1090,26 @@ fn read_available_packets(
     sockets: &[BoundRmeSlot],
     state: Arc<Mutex<RmeTotalMixMeterState>>,
     now_ms: u64,
+    drops: &mut DroppedSourceLog,
 ) {
     let mut buffer = [0_u8; RECEIVE_BUFFER_BYTES];
     for slot in sockets {
         loop {
             match slot.socket.recv_from(&mut buffer) {
-                Ok((len, _source)) => match decoder::decode_udp(&buffer[..len]) {
-                    Ok((_remainder, packet)) => {
-                        if let Ok(mut state) = state.lock() {
-                            state.apply_packet(slot.bus, &packet, now_ms);
-                        }
+                Ok((len, source)) => {
+                    if !accept_source(source, slot.console) {
+                        drops.record(source, slot.console, local_port_of(&slot.socket));
+                        continue;
                     }
-                    Err(error) => eprintln!("RME TotalMix OSC decode failed: {error}"),
-                },
+                    match decoder::decode_udp(&buffer[..len]) {
+                        Ok((_remainder, packet)) => {
+                            if let Ok(mut state) = state.lock() {
+                                state.apply_packet(slot.bus, &packet, now_ms);
+                            }
+                        }
+                        Err(error) => eprintln!("RME TotalMix OSC decode failed: {error}"),
+                    }
+                }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
                 // Windows surfaces a keepalive sent to a TotalMix remote that is
                 // not listening as ConnectionReset (10054) on the next receive.
@@ -1281,27 +1128,35 @@ struct BoundRmeSlot {
     bus: RmeTotalMixBus,
     send_port: u16,
     socket: UdpSocket,
+    /// The console's address: the one source this slot reads.
+    console: IpAddr,
 }
 
 pub(crate) struct GlobalOscSlot {
     send_port: u16,
     socket: UdpSocket,
     last_rx_at: Option<Instant>,
+    /// The console's address: the one source this slot reads.
+    console: IpAddr,
 }
 
-fn bind_global_slot(send_port: i64, receive_port: i64) -> Option<GlobalOscSlot> {
+fn bind_global_slot(
+    policy: ReceivePolicy,
+    send_port: i64,
+    receive_port: i64,
+) -> Option<GlobalOscSlot> {
     let send = u16::try_from(send_port)
         .ok()?
         .checked_add(GLOBAL_OSC_PORT_OFFSET)?;
     let recv = u16::try_from(receive_port)
         .ok()?
         .checked_add(GLOBAL_OSC_PORT_OFFSET)?;
-    let socket = UdpSocket::bind(("0.0.0.0", recv)).ok()?;
-    socket.set_nonblocking(true).ok()?;
+    let socket = bind_receive_socket(policy.bind_host, recv).ok()?;
     Some(GlobalOscSlot {
         send_port: send,
         socket,
         last_rx_at: None,
+        console: policy.console,
     })
 }
 
@@ -1309,11 +1164,16 @@ pub(crate) fn read_global_packets(
     slot: &mut GlobalOscSlot,
     state: &Arc<Mutex<RmeTotalMixMeterState>>,
     now_ms: u64,
+    drops: &mut DroppedSourceLog,
 ) {
     let mut buffer = [0_u8; RECEIVE_BUFFER_BYTES];
     loop {
         match slot.socket.recv_from(&mut buffer) {
-            Ok((len, _source)) => {
+            Ok((len, source)) => {
+                if !accept_source(source, slot.console) {
+                    drops.record(source, slot.console, local_port_of(&slot.socket));
+                    continue;
+                }
                 slot.last_rx_at = Some(Instant::now());
                 if let Ok((_remainder, packet)) = decoder::decode_udp(&buffer[..len]) {
                     route_global_packet(&packet, state, now_ms);
@@ -1475,7 +1335,8 @@ pub(crate) fn pump_global_slot_for_test(
     db_path: &std::path::Path,
 ) {
     let state = shared_meter_state();
-    read_global_packets(slot, &state, monotonic_now_ms());
+    let mut drops = DroppedSourceLog::new(None);
+    read_global_packets(slot, &state, monotonic_now_ms(), &mut drops);
     service_console_link(slot, send_host);
     flush_console_link_to_db(db_path);
 }
@@ -1484,14 +1345,13 @@ pub(crate) fn pump_global_slot_for_test(
 /// `send_port` (a fake console in tests).
 #[cfg(test)]
 pub(crate) fn bind_test_global_slot(send_port: u16) -> GlobalOscSlot {
-    let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("test global slot should bind");
-    socket
-        .set_nonblocking(true)
-        .expect("test global slot should be non-blocking");
+    let console = IpAddr::V4(Ipv4Addr::LOCALHOST);
+    let socket = bind_receive_socket(console, 0).expect("test global slot should bind");
     GlobalOscSlot {
         send_port,
         socket,
         last_rx_at: None,
+        console,
     }
 }
 
@@ -1503,18 +1363,23 @@ impl GlobalOscSlot {
 }
 
 /// The real Global OSC slot (`send_port`, `receive_port` already +3) for the
-/// hardware-lane pull test.
+/// hardware-lane pull test, bound by the engine's own rule: the studio
+/// TotalMix is at 127.0.0.1, so the slot binds loopback and reads loopback
+/// only, unless `SSE_OSC_BIND_HOST` names another local address.
 #[cfg(test)]
 pub(crate) fn bind_live_global_slot_for_test(
     send_port: u16,
     receive_port: u16,
 ) -> Option<GlobalOscSlot> {
-    let socket = UdpSocket::bind(("0.0.0.0", receive_port)).ok()?;
-    socket.set_nonblocking(true).ok()?;
+    let bind_override =
+        parse_bind_override(std::env::var(OSC_BIND_HOST_ENV).ok().as_deref()).unwrap_or(None);
+    let policy = ReceivePolicy::for_console(IpAddr::V4(Ipv4Addr::LOCALHOST), bind_override);
+    let socket = bind_receive_socket(policy.bind_host, receive_port).ok()?;
     Some(GlobalOscSlot {
         send_port,
         socket,
         last_rx_at: None,
+        console: policy.console,
     })
 }
 
@@ -1819,1074 +1684,4 @@ fn monotonic_now_ms() -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::audio_backend::{read_default_audio_inventory, AudioBackendConfig};
-    use rosc::{OscBundle, OscMessage, OscTime, OscType};
-
-    fn message(addr: &str, arg: OscType) -> OscMessage {
-        OscMessage {
-            addr: addr.to_string(),
-            args: vec![arg],
-        }
-    }
-
-    #[test]
-    fn parses_numbered_totalmix_level_messages() {
-        let parsed = parse_totalmix_meter_message(&message("/1/level9Left", OscType::Float(0.5)))
-            .expect("level9 left should parse");
-
-        assert_eq!(parsed.channel_index, 8);
-        assert_eq!(parsed.side, RmeMeterSide::Left);
-        assert!((parsed.normalized - 0.5).abs() < 0.000_001);
-        assert!((parsed.dbfs + 6.020_6).abs() < 0.001);
-    }
-
-    #[test]
-    fn clamps_configured_poll_interval() {
-        assert_eq!(poll_interval_from_value(None), Duration::from_millis(16));
-        assert_eq!(
-            poll_interval_from_value(Some("1")),
-            Duration::from_millis(5)
-        );
-        assert_eq!(
-            poll_interval_from_value(Some("40")),
-            Duration::from_millis(40)
-        );
-        assert_eq!(
-            poll_interval_from_value(Some("250")),
-            Duration::from_millis(100)
-        );
-        assert_eq!(
-            poll_interval_from_value(Some("bad")),
-            Duration::from_millis(16)
-        );
-    }
-
-    #[test]
-    fn builds_totalmix_page_two_eq_messages_for_rme_model() {
-        assert_eq!(
-            totalmix_channel_target("audio-input-9"),
-            Some(("busInput", 8))
-        );
-        assert_eq!(
-            totalmix_channel_target("audio-playback-3-4"),
-            Some(("busPlayback", 2))
-        );
-
-        let request = AudioEqUpdateRequest {
-            channel_id: String::from("audio-input-9"),
-            enabled: Some(true),
-            low_cut_enabled: Some(true),
-            low_cut_frequency_hz: Some(80.0),
-            low_cut_slope_db_per_octave: Some(18),
-            band_id: Some(String::from("3")),
-            band_enabled: None,
-            band_type: Some(String::from("high-shelf")),
-            frequency_hz: Some(8_500.0),
-            gain_db: Some(6.0),
-            q: Some(1.4),
-        };
-        let messages = totalmix_eq_parameter_messages(&request);
-        let addresses = messages
-            .iter()
-            .map(|(address, _)| address.as_str())
-            .collect::<Vec<_>>();
-        assert_eq!(
-            addresses,
-            vec![
-                "/2/eqEnable",
-                "/2/lowcutEnable",
-                "/2/lowcutFreq",
-                "/2/lowcutGrade",
-                "/2/eqType3",
-                "/2/eqGain3",
-                "/2/eqFreq3",
-                "/2/eqQ3",
-            ]
-        );
-        assert!(
-            matches!(messages[3].1, OscType::Float(value) if (value - (2.0 / 3.0)).abs() < 0.000_001)
-        );
-        assert!(
-            matches!(messages[4].1, OscType::Float(value) if (value - (1.0 / 3.0)).abs() < 0.000_001)
-        );
-    }
-
-    #[test]
-    fn parses_totalmix_db_display_values_including_negative_infinity() {
-        let finite = parse_totalmix_meter_message(&message(
-            "/1/level2RightVal",
-            OscType::String("-18.0 dB".to_string()),
-        ))
-        .expect("level2 right display value should parse");
-        assert_eq!(finite.channel_index, 1);
-        assert_eq!(finite.side, RmeMeterSide::Right);
-        assert!((finite.dbfs + 18.0).abs() < 0.001);
-        assert!((finite.normalized - 0.125_893).abs() < 0.000_01);
-
-        let silent = parse_totalmix_meter_message(&message(
-            "/1/level2RightVal",
-            OscType::String("-oo".to_string()),
-        ))
-        .expect("-oo display value should parse");
-        assert!(silent.dbfs.is_infinite());
-        assert!(silent.dbfs.is_sign_negative());
-        assert_eq!(silent.normalized, 0.0);
-    }
-
-    #[test]
-    fn maps_three_totalmix_slots_to_commissioned_tidied_layout_surface_ids() {
-        let mut state = RmeTotalMixMeterState::new();
-        // Tidied layout: input strip 1 = front preamp 9.
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1LeftVal", OscType::String("-12 dB".to_string())),
-            1_000,
-        ));
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1RightVal", OscType::String("-12 dB".to_string())),
-            1_000,
-        ));
-        assert!(state.apply_message(
-            RmeTotalMixBus::Playback,
-            &message("/1/level2LeftVal", OscType::String("-20 dB".to_string())),
-            1_010,
-        ));
-        assert!(state.apply_message(
-            RmeTotalMixBus::Playback,
-            &message("/1/level2RightVal", OscType::String("-21 dB".to_string())),
-            1_010,
-        ));
-        // Tidied layout: output strip 5 = Phones 1 (Main sits at strip 1).
-        assert!(state.apply_message(
-            RmeTotalMixBus::Output,
-            &message("/1/level5LeftVal", OscType::String("-9 dB".to_string())),
-            1_020,
-        ));
-        assert!(state.apply_message(
-            RmeTotalMixBus::Output,
-            &message("/1/level5RightVal", OscType::String("-10 dB".to_string())),
-            1_020,
-        ));
-
-        let host = state
-            .entry_for_surface_id("audio-input-9")
-            .expect("input strip 1 should map to front preamp 9");
-        assert!((host.left_dbfs + 12.0).abs() < 0.001);
-        assert!((host.right_dbfs + 12.0).abs() < 0.001);
-
-        let playback = state
-            .entry_for_surface_id("audio-playback-3-4")
-            .expect("playback 3/4 should be mapped from slot playback strip 2");
-        assert!((playback.left_dbfs + 20.0).abs() < 0.001);
-        assert!((playback.right_dbfs + 21.0).abs() < 0.001);
-
-        let phones = state
-            .entry_for_surface_id("audio-mix-phones-a")
-            .expect("phones 1 should be mapped from output strip 5");
-        assert!((phones.left_dbfs + 9.0).abs() < 0.001);
-        assert!((phones.right_dbfs + 10.0).abs() < 0.001);
-
-        // Strips outside the tidied layout stay unmapped.
-        assert!(!state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level9LeftVal", OscType::String("-3 dB".to_string())),
-            1_030,
-        ));
-    }
-
-    #[test]
-    fn applies_every_meter_message_in_osc_bundles() {
-        let mut state = RmeTotalMixMeterState::new();
-        let packet = OscPacket::Bundle(OscBundle {
-            timetag: OscTime::from((0, 1)),
-            content: vec![
-                OscPacket::Message(message("/1/level1Left", OscType::Float(0.25))),
-                OscPacket::Message(message("/1/level2Left", OscType::Float(0.5))),
-            ],
-        });
-
-        assert!(state.apply_packet(RmeTotalMixBus::Input, &packet, 1_000));
-
-        assert_eq!(state.diagnostics().mapped_packet_count, 2);
-        assert!(state.entry_for_surface_id("audio-input-9").is_some());
-        assert!(state.entry_for_surface_id("audio-input-10").is_some());
-    }
-
-    #[test]
-    fn reports_live_stale_and_offline_from_real_packet_age() {
-        let mut state = RmeTotalMixMeterState::new();
-        assert_eq!(state.status_at(1_000), RmeMeteringState::Offline);
-
-        state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1Left", OscType::Float(0.25)),
-            1_000,
-        );
-
-        assert_eq!(state.status_at(1_250), RmeMeteringState::Live);
-        assert_eq!(state.last_packet_age_ms(1_250), Some(250));
-        assert_eq!(state.status_at(1_700), RmeMeteringState::Stale);
-        assert_eq!(state.status_at(3_100), RmeMeteringState::Offline);
-    }
-
-    #[test]
-    fn default_inventory_is_rme_totalmix_with_no_synthetic_meter_motion() {
-        let config = AudioBackendConfig {
-            send_host: "127.0.0.1".to_string(),
-            send_port: 7001,
-            receive_port: 9001,
-            metering_source: RME_TOTALMIX_OSC_SOURCE.to_string(),
-        };
-
-        let first = read_default_audio_inventory(&config);
-        std::thread::sleep(std::time::Duration::from_millis(140));
-        let second = read_default_audio_inventory(&config);
-
-        assert_eq!(first.adapter_mode, RME_TOTALMIX_OSC_SOURCE);
-        assert_eq!(second.adapter_mode, RME_TOTALMIX_OSC_SOURCE);
-        assert_eq!(first.channels.len(), 18);
-        assert_eq!(first.mix_targets.len(), 3);
-        assert!(
-            second
-                .channels
-                .iter()
-                .all(|channel| channel.meter_level == 0.0
-                    && channel.meter_left == 0.0
-                    && channel.meter_right == 0.0),
-            "production RME inventory must not synthesize moving meters"
-        );
-    }
-
-    #[test]
-    fn compact_rme_meter_payload_separates_current_body_from_held_peak() {
-        let config = AudioBackendConfig {
-            send_host: "127.0.0.1".to_string(),
-            send_port: 7001,
-            receive_port: 9001,
-            metering_source: RME_TOTALMIX_OSC_SOURCE.to_string(),
-        };
-        let inventory = read_default_audio_inventory(&config);
-        let mut channel = inventory
-            .channels
-            .into_iter()
-            .find(|channel| channel.id == "audio-input-9")
-            .expect("default inventory should include host input");
-
-        channel.stereo = true;
-        channel.meter_left = 0.25;
-        channel.meter_right = 0.10;
-        channel.meter_level = 0.25;
-        channel.peak_hold_left = 0.80;
-        channel.peak_hold_right = 0.40;
-        channel.peak_hold = 0.80;
-
-        let payload = channel_meter_payload(&channel);
-
-        assert!(
-            (payload["rmsLeftDbfs"].as_f64().unwrap() - normalized_to_payload_dbfs(0.25)).abs()
-                < 0.001
-        );
-        assert!(
-            (payload["rmsRightDbfs"].as_f64().unwrap() - normalized_to_payload_dbfs(0.10)).abs()
-                < 0.001
-        );
-        assert!(
-            (payload["peakLeftDbfs"].as_f64().unwrap() - normalized_to_payload_dbfs(0.80)).abs()
-                < 0.001
-        );
-        assert!(
-            (payload["peakRightDbfs"].as_f64().unwrap() - normalized_to_payload_dbfs(0.40)).abs()
-                < 0.001
-        );
-    }
-
-    #[test]
-    fn compact_rme_meter_payload_exposes_console_meter_fields() {
-        let config = AudioBackendConfig {
-            send_host: "127.0.0.1".to_string(),
-            send_port: 7001,
-            receive_port: 9001,
-            metering_source: RME_TOTALMIX_OSC_SOURCE.to_string(),
-        };
-        let inventory = read_default_audio_inventory(&config);
-        let mut channel = inventory
-            .channels
-            .into_iter()
-            .find(|channel| channel.id == "audio-input-9")
-            .expect("default inventory should include host input");
-
-        channel.meter_left = dbfs_to_normalized(-3.0);
-        channel.meter_right = dbfs_to_normalized(-24.0);
-        channel.meter_level = channel.meter_left.max(channel.meter_right);
-        channel.peak_hold_left = dbfs_to_normalized(-1.5);
-        channel.peak_hold_right = dbfs_to_normalized(-18.0);
-        channel.peak_hold = channel.peak_hold_left.max(channel.peak_hold_right);
-        channel.clip = true;
-
-        let payload = channel_meter_payload(&channel);
-
-        assert_eq!(payload["meterPoint"], "input");
-        assert!((payload["levelLeftDbfs"].as_f64().unwrap() + 3.0).abs() < 0.001);
-        assert!((payload["levelRightDbfs"].as_f64().unwrap() + 24.0).abs() < 0.001);
-        assert_eq!(payload["peakWarning"], true);
-        assert_eq!(payload["meterPointOver"], false);
-        assert_eq!(payload["meterPointOverLeft"], false);
-        assert_eq!(payload["meterPointOverRight"], false);
-        assert_eq!(payload["channelPathClip"], true);
-        assert_eq!(payload["over"], false);
-        assert_eq!(payload["overLeft"], false);
-        assert_eq!(payload["overRight"], false);
-        assert_eq!(payload["clipHold"], true);
-    }
-
-    #[test]
-    fn rme_meter_state_holds_and_decays_peaks_with_console_ballistics() {
-        let config = AudioBackendConfig {
-            send_host: "127.0.0.1".to_string(),
-            send_port: 7001,
-            receive_port: 9001,
-            metering_source: RME_TOTALMIX_OSC_SOURCE.to_string(),
-        };
-        let mut snapshot = AudioSnapshot {
-            status: String::from("ready"),
-            ..crate::audio::read_audio_snapshot(&std::collections::HashMap::from([(
-                String::from("app.audio.metering_source"),
-                String::from(RME_TOTALMIX_OSC_SOURCE),
-            )]))
-        };
-        snapshot.channels = read_default_audio_inventory(&config).channels;
-        let mut state = RmeTotalMixMeterState::new();
-
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1LeftVal", OscType::String("-1.0 dB".to_string())),
-            1_000,
-        ));
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1RightVal", OscType::String("-1.0 dB".to_string())),
-            1_000,
-        ));
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1LeftVal", OscType::String("-24.0 dB".to_string())),
-            1_033,
-        ));
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1RightVal", OscType::String("-24.0 dB".to_string())),
-            1_033,
-        ));
-
-        state.apply_to_snapshot(&mut snapshot, 1_033);
-        let held = snapshot
-            .channels
-            .iter()
-            .find(|channel| channel.id == "audio-input-9")
-            .expect("host input should be mapped after first packet");
-        assert!((normalized_to_payload_dbfs(held.meter_left) + 24.0).abs() < 0.001);
-        assert!((normalized_to_payload_dbfs(held.peak_hold_left) + 1.0).abs() < 0.001);
-
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1LeftVal", OscType::String("-24.0 dB".to_string())),
-            2_750,
-        ));
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1RightVal", OscType::String("-24.0 dB".to_string())),
-            2_750,
-        ));
-        state.apply_to_snapshot(&mut snapshot, 2_800);
-        let decayed = snapshot
-            .channels
-            .iter()
-            .find(|channel| channel.id == "audio-input-9")
-            .expect("host input should still be mapped");
-        assert!(
-            (normalized_to_payload_dbfs(decayed.peak_hold_left) + 7.0).abs() < 0.25,
-            "peak should decay by roughly 20 dB/s after the 1500 ms hold window"
-        );
-    }
-
-    // plan PR 8 / workstream E6: wire-level OSC test. Binds a local UDP
-    // receiver and asserts that `send_totalmix_eq_update` emits the
-    // documented prefix sequence (`/2/busInput` + `/setBankStart` +
-    // `/setOffsetInBank`) followed by the per-band parameter messages.
-    // Exercises the bytes that actually go on the wire — the higher-level
-    // simulator/parser tests above cover the receive side; this fills in
-    // the send-side coverage the plan called out.
-    #[test]
-    fn send_totalmix_eq_update_emits_documented_address_prefix_on_the_wire() {
-        use crate::audio::AudioEqUpdateRequest;
-        use rosc::OscPacket;
-        use std::time::Duration;
-
-        let receiver = UdpSocket::bind(("127.0.0.1", 0)).expect("test UDP receiver should bind");
-        receiver
-            .set_read_timeout(Some(Duration::from_secs(1)))
-            .expect("test receiver should accept timeout");
-        let port = receiver
-            .local_addr()
-            .expect("receiver should expose port")
-            .port();
-
-        let request = AudioEqUpdateRequest {
-            channel_id: String::from("audio-input-9"),
-            enabled: None,
-            low_cut_enabled: None,
-            low_cut_frequency_hz: None,
-            low_cut_slope_db_per_octave: None,
-            band_id: Some(String::from("1")),
-            band_enabled: None,
-            band_type: Some(String::from("bell")),
-            frequency_hz: Some(180.0),
-            gain_db: Some(3.0),
-            q: Some(0.9),
-        };
-
-        let count =
-            super::send_totalmix_eq_update("127.0.0.1", port as i64, "audio-input-9", &request)
-                .expect("send_totalmix_eq_update should succeed against the local receiver");
-        assert!(
-            count >= 3,
-            "sender should emit at least the 3-message prefix (got {count})"
-        );
-
-        let mut addresses: Vec<String> = Vec::new();
-        let mut buffer = [0u8; 4096];
-        for _ in 0..count {
-            let (read, _from) = receiver
-                .recv_from(&mut buffer)
-                .expect("each sent message should arrive on the loopback");
-            let packet = rosc::decoder::decode_udp(&buffer[..read])
-                .expect("each datagram should decode as OSC")
-                .1;
-            if let OscPacket::Message(message) = packet {
-                addresses.push(message.addr);
-            }
-        }
-
-        // Prefix contract per `send_totalmix_eq_update`:
-        //   1. `/2/<bus>` (busInput / busOutput)
-        //   2. `/setBankStart`
-        //   3. `/setOffsetInBank`
-        assert!(
-            addresses.iter().any(|addr| addr == "/2/busInput"),
-            "prefix should include /2/busInput, saw {addresses:?}"
-        );
-        assert!(
-            addresses.contains(&String::from("/setBankStart")),
-            "prefix should include /setBankStart, saw {addresses:?}"
-        );
-        assert!(
-            addresses.contains(&String::from("/setOffsetInBank")),
-            "prefix should include /setOffsetInBank, saw {addresses:?}"
-        );
-        // And at least one per-band parameter address after the prefix.
-        assert!(
-            addresses.iter().any(|addr| addr.starts_with("/2/eq")),
-            "wire payload should include at least one /2/eq* parameter address, saw {addresses:?}"
-        );
-    }
-
-    fn bind_test_receiver() -> (UdpSocket, u16) {
-        let receiver = UdpSocket::bind(("127.0.0.1", 0)).expect("test UDP receiver should bind");
-        receiver
-            .set_read_timeout(Some(Duration::from_secs(1)))
-            .expect("test receiver should accept timeout");
-        let port = receiver
-            .local_addr()
-            .expect("receiver should expose port")
-            .port();
-        (receiver, port)
-    }
-
-    fn receive_messages(receiver: &UdpSocket, count: usize) -> Vec<(String, Option<f32>)> {
-        let mut received = Vec::new();
-        let mut buffer = [0u8; 4096];
-        for _ in 0..count {
-            let (read, _from) = receiver
-                .recv_from(&mut buffer)
-                .expect("each sent message should arrive on the loopback");
-            let packet = rosc::decoder::decode_udp(&buffer[..read])
-                .expect("each datagram should decode as OSC")
-                .1;
-            if let OscPacket::Message(message) = packet {
-                let value = message.args.first().and_then(|arg| match arg {
-                    OscType::Float(value) => Some(*value),
-                    _ => None,
-                });
-                received.push((message.addr, value));
-            }
-        }
-        received
-    }
-
-    #[test]
-    fn send_slot_keepalives_pins_each_slot_to_its_bus_and_bank_start() {
-        let (receiver, port) = bind_test_receiver();
-        let slot_socket = UdpSocket::bind(("127.0.0.1", 0)).expect("slot send socket should bind");
-        let slots = vec![super::BoundRmeSlot {
-            bus: RmeTotalMixBus::Playback,
-            send_port: port,
-            socket: slot_socket,
-        }];
-
-        super::send_slot_keepalives(&slots, "127.0.0.1");
-
-        let mut addresses = Vec::new();
-        let mut buffer = [0u8; 512];
-        for _ in 0..2 {
-            let (read, _from) = receiver
-                .recv_from(&mut buffer)
-                .expect("keepalive messages should arrive on the slot send port");
-            let packet = rosc::decoder::decode_udp(&buffer[..read])
-                .expect("keepalive should decode as OSC")
-                .1;
-            if let OscPacket::Message(message) = packet {
-                addresses.push(message.addr);
-            }
-        }
-        assert_eq!(addresses, vec!["/1/busPlayback", "/setBankStart"]);
-    }
-
-    #[test]
-    fn global_osc_output_levels_map_to_mix_target_meters() {
-        let mut state = RmeTotalMixMeterState::new();
-
-        // Main out = hardware output channels 0/1, values are peak dB.
-        assert!(state.apply_global_message(&message("/level/out/0", OscType::Float(-10.5)), 1_000,));
-        assert!(state.apply_global_message(&message("/level/out/1", OscType::Float(-11.5)), 1_000,));
-        // Phones 1 = channels 8/9.
-        assert!(state.apply_global_message(&message("/level/out/9", OscType::Float(-20.0)), 1_005,));
-
-        let main = state
-            .entry_for_surface_id("audio-mix-main")
-            .expect("main out should be mapped from output channels 0/1");
-        assert!((main.left_dbfs + 10.5).abs() < 0.001);
-        assert!((main.right_dbfs + 11.5).abs() < 0.001);
-
-        let phones = state
-            .entry_for_surface_id("audio-mix-phones-a")
-            .expect("phones 1 should be mapped from output channel 9");
-        assert!((phones.right_dbfs + 20.0).abs() < 0.001);
-
-        // Liveness advances on mapped global packets.
-        assert_eq!(state.status_at(1_010), RmeMeteringState::Live);
-    }
-
-    #[test]
-    fn global_osc_maps_input_and_playback_levels_on_hardware_numbering() {
-        let mut state = RmeTotalMixMeterState::new();
-        // Mono input channel 9 (0-based 8) drives both meter sides.
-        assert!(state.apply_global_message(&message("/level/in/8", OscType::Float(-24.0)), 1_000));
-        let host = state
-            .entry_for_surface_id("audio-input-9")
-            .expect("input channel 8 should map to front preamp 9");
-        assert!((host.left_dbfs + 24.0).abs() < 0.001);
-        assert!((host.right_dbfs + 24.0).abs() < 0.001);
-
-        // Playback channels 0/1 form pair 1/2 with distinct sides.
-        assert!(state.apply_global_message(&message("/level/pb/0", OscType::Float(-12.0)), 1_000));
-        assert!(state.apply_global_message(&message("/level/pb/1", OscType::Float(-13.0)), 1_000));
-        let program = state
-            .entry_for_surface_id("audio-playback-1-2")
-            .expect("playback channels 0/1 should map to pair 1/2");
-        assert!((program.left_dbfs + 12.0).abs() < 0.001);
-        assert!((program.right_dbfs + 13.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn global_osc_ignores_unmapped_channels_and_status_traffic() {
-        let mut state = RmeTotalMixMeterState::new();
-        // Unmapped channels (AN 3-8 outputs, digital I/O) are dropped.
-        assert!(!state.apply_global_message(&message("/level/out/5", OscType::Float(-6.0)), 1_000));
-        assert!(!state.apply_global_message(&message("/level/in/12", OscType::Float(-6.0)), 1_000));
-        assert!(!state.apply_global_message(
-            &message("/status/device", OscType::String(String::from("UFX III"))),
-            1_000,
-        ));
-        assert!(state.entry_for_surface_id("audio-mix-main").is_none());
-    }
-
-    #[test]
-    fn live_global_levels_suppress_classic_bank_levels() {
-        let mut state = RmeTotalMixMeterState::new();
-        assert!(state.apply_global_message(&message("/level/in/8", OscType::Float(-24.0)), 1_000));
-
-        // A classic bank message inside the authority window is ignored —
-        // bank strip indexes shift with the mixer layout, global numbering
-        // does not.
-        assert!(!state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1LeftVal", OscType::String("-3.0 dB".to_string())),
-            1_500,
-        ));
-        let host = state
-            .entry_for_surface_id("audio-input-9")
-            .expect("global entry should survive");
-        assert!((host.left_dbfs + 24.0).abs() < 0.001);
-
-        // Once the global stream has been quiet long enough, classic levels
-        // resume as the fallback source.
-        assert!(state.apply_message(
-            RmeTotalMixBus::Input,
-            &message("/1/level1LeftVal", OscType::String("-3.0 dB".to_string())),
-            4_000,
-        ));
-    }
-
-    #[test]
-    fn service_console_link_reads_back_over_the_global_slot_and_confirms() {
-        use crate::rme_console_link::{
-            link_now_ms, shared_console_link, ChannelFlag, ConsoleBus, ConsoleValue, ParamKey,
-            READBACK_DELAY_MS,
-        };
-        // Fake TotalMix: receives the read-back request on the slot's send
-        // port and answers on the slot socket, like the real console does.
-        let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if let Ok(mut link) = shared_console_link().lock() {
-            link.reset_for_test();
-        }
-        let (fake_totalmix, fake_port) = bind_test_receiver();
-        let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("global slot socket should bind");
-        socket
-            .set_nonblocking(true)
-            .expect("slot socket should be non-blocking");
-        let slot_port = socket.local_addr().expect("slot addr").port();
-        let mut slot = super::GlobalOscSlot {
-            send_port: fake_port,
-            socket,
-            last_rx_at: None,
-        };
-        let key = ParamKey::ChannelFlag {
-            bus: ConsoleBus::Input,
-            channel: 11,
-            flag: ChannelFlag::Mute,
-        };
-        {
-            let link = shared_console_link();
-            let mut link = link.lock().expect("link lock");
-            link.register_send(key.clone(), ConsoleValue::Flag(true), link_now_ms());
-        }
-        std::thread::sleep(Duration::from_millis(READBACK_DELAY_MS + 20));
-        super::service_console_link(&slot, "127.0.0.1");
-
-        // The read-back for input 11 must reach the fake console (other tests
-        // may have queued unrelated read-backs on the shared link).
-        let mut saw_readback = false;
-        for _ in 0..64 {
-            let mut buffer = [0u8; 512];
-            let Ok((read, _)) = fake_totalmix.recv_from(&mut buffer) else {
-                break;
-            };
-            if let Ok((_, OscPacket::Message(message))) = rosc::decoder::decode_udp(&buffer[..read])
-            {
-                if message.addr == "/sendchan/input/11" {
-                    assert_eq!(message.args, vec![OscType::Float(1.0)]);
-                    saw_readback = true;
-                    break;
-                }
-            }
-        }
-        assert!(
-            saw_readback,
-            "the console link should ask TotalMix to report input 11"
-        );
-
-        // The fake console reports the channel; the link confirms the send.
-        let reply = encoder::encode(&OscPacket::Message(OscMessage {
-            addr: String::from("/input/11/mute"),
-            args: vec![OscType::Float(1.0)],
-        }))
-        .expect("reply should encode");
-        fake_totalmix
-            .send_to(&reply, ("127.0.0.1", slot_port))
-            .expect("reply should send");
-        std::thread::sleep(Duration::from_millis(30));
-        let state = shared_meter_state();
-        super::read_global_packets(&mut slot, &state, monotonic_now_ms());
-
-        let link = shared_console_link();
-        let link = link.lock().expect("link lock");
-        assert!(
-            !link.has_pending(&key),
-            "the read-back reply should confirm the send"
-        );
-    }
-
-    #[test]
-    fn test_guard_drops_sends_to_real_totalmix_ports_only() {
-        // The studio workstation runs this suite with TotalMix listening on
-        // 7001-7004; nothing a test sends may reach it.
-        assert!(super::test_guard_blocks_console_port(7001));
-        assert!(super::test_guard_blocks_console_port(7004));
-        assert!(!super::test_guard_blocks_console_port(19_004));
-        assert!(!super::test_guard_blocks_console_port(1));
-
-        let request = AudioChannelUpdateRequest {
-            channel_id: String::from("audio-input-9"),
-            mix_target_id: None,
-            name: None,
-            gain: None,
-            fader: None,
-            mute: Some(true),
-            solo: None,
-            phantom: None,
-            phase: None,
-            pad: None,
-            instrument: None,
-            auto_set: None,
-        };
-        let snapshot = read_audio_snapshot(&HashMap::new());
-        let channel = snapshot
-            .channels
-            .iter()
-            .find(|channel| channel.id == "audio-input-9")
-            .expect("default snapshot should expose front preamp 9");
-        // Aimed at the default remote (7001 + 3): reported as sent, never
-        // put on the wire.
-        let report = super::send_totalmix_channel_update("127.0.0.1", 7001, channel, &request)
-            .expect("guarded send should not error");
-        assert_eq!(report.sent, 1);
-
-        // Aimed at a loopback receiver on an ephemeral port: delivered.
-        let (receiver, port) = bind_test_receiver();
-        let report = super::send_totalmix_channel_update(
-            "127.0.0.1",
-            i64::from(port) - 3,
-            channel,
-            &request,
-        )
-        .expect("loopback send should succeed");
-        assert_eq!(report.sent, 1);
-        let received = receive_messages(&receiver, 1);
-        assert_eq!(received[0].0, "/input/8/mute");
-    }
-
-    #[test]
-    fn refresh_global_slot_sends_sendall_and_sendstate_to_the_slot_port() {
-        let (receiver, port) = bind_test_receiver();
-        let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("global slot socket should bind");
-        let slot = super::GlobalOscSlot {
-            send_port: port,
-            socket,
-            last_rx_at: None,
-        };
-
-        super::refresh_global_slot(&slot, "127.0.0.1");
-
-        // `/sendall 2` asks for every parameter with mix nodes above -65 dB
-        // (RME protocol table); `/sendstate 1` adds the status messages.
-        let received = receive_messages(&receiver, 2);
-        assert_eq!(
-            received,
-            vec![
-                (String::from("/sendall"), Some(2.0)),
-                (String::from("/sendstate"), Some(1.0)),
-            ]
-        );
-    }
-
-    #[test]
-    fn send_console_pull_request_targets_the_global_slot() {
-        let (receiver, port) = bind_test_receiver();
-        let sent = super::send_console_pull_request("127.0.0.1", i64::from(port) - 3)
-            .expect("pull request should send");
-        assert_eq!(sent, 2);
-        let received = receive_messages(&receiver, 2);
-        assert_eq!(received[0], (String::from("/sendall"), Some(2.0)));
-        assert_eq!(received[1], (String::from("/sendstate"), Some(1.0)));
-    }
-
-    #[test]
-    fn global_channel_target_maps_hardware_numbering() {
-        assert_eq!(
-            super::global_channel_target("audio-input-1"),
-            Some(("input", 0))
-        );
-        assert_eq!(
-            super::global_channel_target("audio-input-9"),
-            Some(("input", 8))
-        );
-        assert_eq!(
-            super::global_channel_target("audio-input-12"),
-            Some(("input", 11))
-        );
-        assert_eq!(super::global_channel_target("audio-input-13"), None);
-        assert_eq!(
-            super::global_channel_target("audio-playback-1-2"),
-            Some(("playback", 0))
-        );
-        assert_eq!(
-            super::global_channel_target("audio-playback-11-12"),
-            Some(("playback", 10))
-        );
-        assert_eq!(super::global_channel_target("audio-mix-main"), None);
-
-        assert_eq!(super::global_output_channel("audio-mix-main"), Some(0));
-        assert_eq!(super::global_output_channel("audio-mix-phones-a"), Some(8));
-        assert_eq!(super::global_output_channel("audio-mix-phones-b"), Some(10));
-        assert_eq!(super::global_output_channel("audio-mix-unknown"), None);
-    }
-
-    #[test]
-    fn send_totalmix_channel_update_emits_global_absolute_commands() {
-        let (receiver, port) = bind_test_receiver();
-        // Global OSC commands go to the global slot at send_port + 3.
-        let base_port = port as i64 - 3;
-        let snapshot = read_audio_snapshot(&HashMap::new());
-        let channel = snapshot
-            .channels
-            .iter()
-            .find(|channel| channel.id == "audio-input-9")
-            .expect("default snapshot should expose front preamp 9");
-
-        let request = AudioChannelUpdateRequest {
-            channel_id: String::from("audio-input-9"),
-            mix_target_id: None,
-            name: None,
-            gain: Some(30),
-            fader: Some(0.5),
-            mute: Some(true),
-            solo: None,
-            phantom: Some(true),
-            phase: Some(true),
-            pad: None,
-            instrument: None,
-            auto_set: None,
-        };
-
-        let report = super::send_totalmix_channel_update("127.0.0.1", base_port, channel, &request)
-            .expect("channel update should send against the local receiver");
-        assert_eq!(
-            report.sent, 5,
-            "fader + gain + mute + phantom + phase should send"
-        );
-        assert!(report.local_only.is_empty());
-
-        let received = receive_messages(&receiver, report.sent);
-        let addresses: Vec<&str> = received.iter().map(|(addr, _)| addr.as_str()).collect();
-        // Front preamp 9 = hardware channel 8; main mix = output channel 0.
-        assert!(
-            addresses.contains(&"/mix/in/8/0/faderlin"),
-            "saw {addresses:?}"
-        );
-        assert!(addresses.contains(&"/input/8/gain"), "saw {addresses:?}");
-        assert!(addresses.contains(&"/input/8/mute"), "saw {addresses:?}");
-        assert!(addresses.contains(&"/input/8/48v"), "saw {addresses:?}");
-        assert!(addresses.contains(&"/input/8/phase"), "saw {addresses:?}");
-
-        let fader = received
-            .iter()
-            .find(|(addr, _)| addr == "/mix/in/8/0/faderlin")
-            .and_then(|(_, value)| *value)
-            .expect("faderlin message should carry a float");
-        assert!(
-            (fader - 0.5).abs() < 0.001,
-            "faderlin is the app's 0..1 scale"
-        );
-        let gain = received
-            .iter()
-            .find(|(addr, _)| addr == "/input/8/gain")
-            .and_then(|(_, value)| *value)
-            .expect("gain message should carry a float");
-        assert!((gain - 30.0).abs() < 0.001, "gain is sent in real dB");
-        let mute = received
-            .iter()
-            .find(|(addr, _)| addr == "/input/8/mute")
-            .and_then(|(_, value)| *value)
-            .expect("mute message should carry a float");
-        assert!(
-            (mute - 1.0).abs() < 0.001,
-            "mute is absolute state, not a toggle"
-        );
-    }
-
-    #[test]
-    fn send_totalmix_channel_update_reaches_non_main_submixes_and_absolute_off() {
-        let (receiver, port) = bind_test_receiver();
-        let base_port = port as i64 - 3;
-        let snapshot = read_audio_snapshot(&HashMap::new());
-        let channel = snapshot
-            .channels
-            .iter()
-            .find(|channel| channel.id == "audio-input-9")
-            .expect("default snapshot should expose front preamp 9");
-
-        let request = AudioChannelUpdateRequest {
-            channel_id: String::from("audio-input-9"),
-            mix_target_id: Some(String::from("audio-mix-phones-a")),
-            name: None,
-            gain: None,
-            fader: Some(0.7),
-            mute: Some(false),
-            solo: None,
-            phantom: None,
-            phase: None,
-            pad: None,
-            instrument: None,
-            auto_set: None,
-        };
-
-        let report = super::send_totalmix_channel_update("127.0.0.1", base_port, channel, &request)
-            .expect("phones-submix fader should send over Global OSC");
-        assert_eq!(report.sent, 2, "fader + mute should send");
-        assert!(report.local_only.is_empty());
-
-        let received = receive_messages(&receiver, report.sent);
-        // Phones 1 submix = output channel 8.
-        let fader = received
-            .iter()
-            .find(|(addr, _)| addr == "/mix/in/8/8/faderlin")
-            .and_then(|(_, value)| *value)
-            .expect("phones-submix faderlin should arrive");
-        assert!((fader - 0.7).abs() < 0.001);
-        let mute = received
-            .iter()
-            .find(|(addr, _)| addr == "/input/8/mute")
-            .and_then(|(_, value)| *value)
-            .expect("mute message should arrive");
-        assert!(mute.abs() < 0.001, "unmute sends absolute 0.0");
-    }
-
-    #[test]
-    fn send_totalmix_channel_update_handles_lines_and_playback_channels() {
-        let (receiver, port) = bind_test_receiver();
-        let base_port = port as i64 - 3;
-        let snapshot = read_audio_snapshot(&HashMap::new());
-
-        // Rear line 1 = hardware channel 0: fader/mute send, gain stays local.
-        let line = snapshot
-            .channels
-            .iter()
-            .find(|channel| channel.id == "audio-input-1")
-            .expect("default snapshot should expose rear line 1");
-        let request = AudioChannelUpdateRequest {
-            channel_id: String::from("audio-input-1"),
-            mix_target_id: None,
-            name: None,
-            gain: Some(10),
-            fader: Some(0.4),
-            mute: Some(true),
-            solo: None,
-            phantom: None,
-            phase: None,
-            pad: None,
-            instrument: None,
-            auto_set: None,
-        };
-        let report = super::send_totalmix_channel_update("127.0.0.1", base_port, line, &request)
-            .expect("line-channel edits should send fader and mute");
-        assert_eq!(report.sent, 2);
-        assert!(report
-            .local_only
-            .contains(&"gain (no preamp on this channel)"));
-        let received = receive_messages(&receiver, report.sent);
-        let addresses: Vec<&str> = received.iter().map(|(addr, _)| addr.as_str()).collect();
-        assert!(
-            addresses.contains(&"/mix/in/0/0/faderlin"),
-            "saw {addresses:?}"
-        );
-        assert!(addresses.contains(&"/input/0/mute"), "saw {addresses:?}");
-
-        // Playback pair 1/2 = pb channel 0: mute on the playback bus,
-        // phantom is input-only.
-        let playback = snapshot
-            .channels
-            .iter()
-            .find(|channel| channel.id == "audio-playback-1-2")
-            .expect("default snapshot should expose playback pair 1/2");
-        let request = AudioChannelUpdateRequest {
-            channel_id: String::from("audio-playback-1-2"),
-            mix_target_id: None,
-            name: None,
-            gain: None,
-            fader: None,
-            mute: Some(true),
-            solo: None,
-            phantom: Some(true),
-            phase: None,
-            pad: None,
-            instrument: None,
-            auto_set: None,
-        };
-        let report =
-            super::send_totalmix_channel_update("127.0.0.1", base_port, playback, &request)
-                .expect("playback edits should send mute");
-        assert_eq!(report.sent, 1);
-        assert!(report.local_only.contains(&"phantom (input channels only)"));
-        let received = receive_messages(&receiver, report.sent);
-        assert_eq!(received[0].0, "/playback/0/mute");
-    }
-
-    #[test]
-    fn send_totalmix_mix_target_update_uses_output_faderlin_and_control_room() {
-        let (receiver, port) = bind_test_receiver();
-        let base_port = port as i64 - 3;
-
-        let request = AudioMixTargetUpdateRequest {
-            mix_target_id: String::from("audio-mix-main"),
-            volume: Some(0.8),
-            mute: None,
-            dim: Some(true),
-            mono: None,
-            talkback: None,
-        };
-
-        let report = super::send_totalmix_mix_target_update(
-            "127.0.0.1",
-            base_port,
-            "audio-mix-main",
-            &request,
-        )
-        .expect("mix target update should send against the local receiver");
-        assert_eq!(report.sent, 2, "volume + dim should send");
-        assert!(report.local_only.is_empty());
-
-        let received = receive_messages(&receiver, report.sent);
-        let addresses: Vec<&str> = received.iter().map(|(addr, _)| addr.as_str()).collect();
-        // Main out = hardware output channel 0.
-        assert!(
-            addresses.contains(&"/output/0/faderlin"),
-            "saw {addresses:?}"
-        );
-        assert!(addresses.contains(&"/controlroom/dim"), "saw {addresses:?}");
-    }
-
-    #[test]
-    fn send_totalmix_mix_target_update_keeps_phones_control_room_functions_local() {
-        let (receiver, port) = bind_test_receiver();
-        let base_port = port as i64 - 3;
-
-        let request = AudioMixTargetUpdateRequest {
-            mix_target_id: String::from("audio-mix-phones-b"),
-            volume: Some(0.6),
-            mute: None,
-            dim: Some(true),
-            mono: Some(true),
-            talkback: None,
-        };
-
-        let report = super::send_totalmix_mix_target_update(
-            "127.0.0.1",
-            base_port,
-            "audio-mix-phones-b",
-            &request,
-        )
-        .expect("phones update should send volume and keep dim/mono local");
-        assert_eq!(report.sent, 1, "only the volume message should send");
-        assert!(report.local_only.contains(&"dim (main out only)"));
-        assert!(report.local_only.contains(&"mono (main out only)"));
-
-        let received = receive_messages(&receiver, report.sent);
-        // Phones 2 = hardware output channel 10.
-        assert_eq!(received[0].0, "/output/10/faderlin");
-    }
-}
+mod tests;

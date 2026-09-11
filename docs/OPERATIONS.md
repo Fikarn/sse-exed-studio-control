@@ -72,7 +72,7 @@ The engine streams the lighting state to the commissioned bridge as unicast sACN
 
 The audio page is a control surface for the fixed RME Fireface UFX III workstation. Production meters are trusted only when live TotalMix OSC peak packets arrive. Metering prefers the Global OSC remote 4 described in the next section; the three classic remotes below remain the fallback and still feed the page-2 EQ path.
 
-1. In TotalMix, configure three OSC remote slots for the app:
+1. In TotalMix, configure three OSC remote slots for the app, each with IP `127.0.0.1` (the app reads the console at the TotalMix address set in Setup and nothing else):
    - slot 1: hardware inputs, outgoing to the app base receive port, incoming from the app base send port
    - slot 2: software playback, outgoing to app receive `+1`, incoming from app send `+1`
    - slot 3: hardware outputs, outgoing to app receive `+2`, incoming from app send `+2`
@@ -81,6 +81,8 @@ The audio page is a control surface for the fixed RME Fireface UFX III workstati
 4. Run the audio commissioning probe. It passes only after mapped meter packets are received; a successful UDP bind alone is not verification. (Test benches that set `SSE_AUDIO_SIMULATED_INPUT_MODE=1` pass the probe without TotalMix and say so in the result.)
 5. If the app reports `STALE` or `OFFLINE`, treat the displayed meters as unavailable until packet flow is restored. Do not trust simulated movement unless the UI explicitly shows simulated input mode.
 6. Treat audio-page meters as live console channel-strip meters: the visible reference is `-18 dBFS`, meter-point over is separate from the latched channel clip state, and the operator can toggle or reset the held peak marks from the audio canvas peak controls.
+
+The four receive ports the engine listens on (the base receive port and `+1`, `+2`, `+3` — `9001`–`9004` on the workstation) are bound to `127.0.0.1` whenever the TotalMix address in Setup is `127.0.0.1` or `localhost`, and to every interface only when TotalMix runs on another machine; in both cases only datagrams from that TotalMix address are read, and a packet from any other host is dropped and noted in the engine log (`WARN`, once a minute per source). TotalMix must therefore send to `127.0.0.1` — the remote IP in `Options → Settings → OSC` for every remote the app uses, which is how the workstation is commissioned — and `netstat -an | findstr 900` shows the four ports on `127.0.0.1` while the app runs (2026-09 production readiness, Slice 6).
 
 ### Audio Control Output
 
