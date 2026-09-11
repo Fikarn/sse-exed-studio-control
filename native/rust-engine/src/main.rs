@@ -36,6 +36,7 @@ use crate::audio::{
 use crate::audio_backend::{read_default_audio_inventory, AudioBackendConfig};
 use crate::bootstrap::{
     resolve_runtime_paths, startup_failure_code, validate_protocol_version, EXPORTS_DIR_NAME,
+    STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
 };
 use crate::diagnostics::append_log;
 use crate::protocol::{
@@ -305,6 +306,45 @@ impl SimulatedAudioMeterCache {
     }
 }
 
+/// The request loop: one JSON request per line on stdin until the shell
+/// closes it, each answered through the output writer.
+fn serve_requests(
+    app: &EngineApp,
+    reader: &mut impl BufRead,
+    output_sender: &Sender<Value>,
+) -> io::Result<()> {
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line)? == 0 {
+            return Ok(());
+        }
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let request = match serde_json::from_str::<RequestEnvelope>(trimmed) {
+            Ok(value) => value,
+            Err(error) => {
+                eprintln!("Malformed request: {error}");
+                continue;
+            }
+        };
+
+        let reply = app.handle_request(request);
+        send_output(
+            output_sender,
+            serde_json::to_value(&reply.response)
+                .map_err(|error| io::Error::other(error.to_string()))?,
+        )?;
+        for event in reply.events {
+            send_output(output_sender, event)?;
+        }
+    }
+}
+
 fn write_database_backup(
     db_path: &Path,
     backups_dir: &Path,
@@ -451,6 +491,20 @@ fn main() -> io::Result<()> {
             );
             let _ = write_json(&mut writer, &startup_failure);
             eprintln!("Engine bootstrap failed: {error}");
+            if code == STARTUP_CODE_STORAGE_CORRUPT || code == STARTUP_CODE_STORAGE_MIGRATION_FAILED
+            {
+                // Recovery mode (Slice 7 — F20): the saved data needs a
+                // backup restored, and the Support surface does that through
+                // this process — so it stays up, answering only the backup
+                // requests, until the shell restarts it into the restored
+                // database.
+                drop(writer);
+                let app = EngineApp::recovery(&planned_paths);
+                let (output_sender, output_receiver) = mpsc::channel::<Value>();
+                spawn_output_writer(output_receiver);
+                serve_requests(&app, &mut reader, &output_sender)?;
+                return Ok(());
+            }
             return Err(io::Error::other(error));
         }
     };
@@ -480,36 +534,7 @@ fn main() -> io::Result<()> {
     }
     spawn_snapshot_scheduler(db_path.clone(), backups_dir.clone(), log_file_path.clone());
 
-    let mut line = String::new();
-    loop {
-        line.clear();
-        if reader.read_line(&mut line)? == 0 {
-            break;
-        }
-
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        let request = match serde_json::from_str::<RequestEnvelope>(trimmed) {
-            Ok(value) => value,
-            Err(error) => {
-                eprintln!("Malformed request: {error}");
-                continue;
-            }
-        };
-
-        let reply = app.handle_request(request);
-        send_output(
-            &output_sender,
-            serde_json::to_value(&reply.response)
-                .map_err(|error| io::Error::other(error.to_string()))?,
-        )?;
-        for event in reply.events {
-            send_output(&output_sender, event)?;
-        }
-    }
+    serve_requests(&app, &mut reader, &output_sender)?;
 
     // stdin closed: the shell is going away. Release talkback holds before we
     // do (2026-09 audit, Slice 6) — a hard kill cannot, and that is documented.

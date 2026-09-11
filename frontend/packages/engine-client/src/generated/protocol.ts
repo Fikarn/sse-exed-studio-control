@@ -82,6 +82,7 @@ export const REQUEST_METHODS = [
   "storage.importLegacyDb",
   "support.backup.export",
   "support.backup.restore",
+  "support.backup.verify",
   "support.snapshot",
 ] as const;
 export type RequestMethod = (typeof REQUEST_METHODS)[number];

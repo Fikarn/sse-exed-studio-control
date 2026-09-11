@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
 import { createFixtureTransport } from "../transports/fixtureTransport";
-import type { EventEnvelope, EventName } from "../generated/protocol";
+import type { EventEnvelope, EventName, JsonValue } from "../generated/protocol";
 import type { EngineTransport } from "../types";
 import { createShellStore } from "./createShellStore";
 
@@ -112,6 +112,7 @@ describe("createShellStore startup failure before the ready gate", () => {
 function supervisedTransport() {
   const listeners = new Set<Parameters<EngineTransport["subscribe"]>[0]>();
   const refusing = new Set<string>();
+  const answers = new Map<string, JsonValue>();
   const calls: string[] = [];
   let launches = 0;
   const transport: EngineTransport = {
@@ -121,8 +122,12 @@ function supervisedTransport() {
       return { generation: launches, pid: 1000 + launches };
     },
     request: async (method) => {
+      calls.push(`request:${method}`);
       if (refusing.has(method)) {
         throw new Error(`${method} refused`);
+      }
+      if (answers.has(method)) {
+        return answers.get(method) ?? null;
       }
       // No console in this double: the audio snapshot is absent, every other
       // answer is the smallest object the store accepts (the ping's protocol).
@@ -145,6 +150,7 @@ function supervisedTransport() {
     },
     launches: () => launches,
     refuse: (method: string) => refusing.add(method),
+    answer: (method: string, value: JsonValue) => answers.set(method, value),
     transport,
   };
 }
@@ -223,6 +229,87 @@ describe("createShellStore engine supervision", () => {
     await store.restart();
     expect(launches()).toBe(5);
     expect(store.getSnapshot().lifecycle).toBe("ready");
+    await store.dispose();
+  });
+
+  // 2026-09 production readiness, Slice 7 (F20): a database backup answers
+  // `requiresRestart`; the store restarts the link once, through the same
+  // path as Retry startup, and the graceful stop that restart causes is not
+  // a failure — the automatic-restart budget is untouched afterwards.
+  it("restore with requiresRestart restarts the link once and spends no restart budget", async () => {
+    const { answer, calls, emit, launches, transport } = supervisedTransport();
+    const store = createShellStore(transport);
+    await store.initialize();
+    answer("support.backup.restore", { requiresRestart: true, sourceFormat: "database-backup" });
+
+    const restore = store.restoreSupportBackup("C:/app-data/backups/db-2026-09-11T10-00-00-000Z-shutdown.sqlite3");
+    await settle(() => launches() === 2);
+    // The stop the restart asked for: the shell reports it as graceful.
+    emit(exited(1, { graceful: true }));
+    const result = await restore;
+    expect(result).toMatchObject({ requiresRestart: true });
+    expect(launches()).toBe(2);
+    expect(calls.filter((call) => call === "dispose")).toHaveLength(1);
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(store.getSnapshot().startupFailure).toBeNull();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(launches()).toBe(2);
+
+    // An archive restore does not restart anything.
+    answer("support.backup.restore", { requiresRestart: false, sourceFormat: "native-support-backup" });
+    await store.restoreSupportBackup("C:/app-data/backups/native-backup-2026-09-11T10-00-00-000Z.json");
+    expect(launches()).toBe(2);
+
+    // The budget is untouched: the next real stop is attempt 1 of 3.
+    emit(exited(2));
+    expect(store.getSnapshot().startupFailure?.message).toContain("attempt 1 of 3");
+    await store.dispose();
+  });
+
+  // Recovery mode (Slice 7 — F20): after a storage failure the engine stays
+  // up for the backup requests, and the store fetches the backup list so the
+  // recovery surface can offer a restore; any other failure fetches nothing.
+  it("fetches the backup list after a storage failure at start", async () => {
+    const listeners = new Set<Parameters<EngineTransport["subscribe"]>[0]>();
+    const requests: string[] = [];
+    let code = "STORAGE_CORRUPT";
+    const transport: EngineTransport = {
+      initialize: async () => {
+        for (const listener of listeners) {
+          listener({
+            type: "event",
+            event: "engine.startupFailed",
+            payload: { stage: "bootstrap", code, message: "The saved data file failed its integrity check." },
+          });
+        }
+      },
+      request: async (method) => {
+        requests.push(method);
+        if (method === "support.snapshot") {
+          return { backupCount: 1, backups: [{ kind: "database", name: "db-x-shutdown.sqlite3", path: "x" }] };
+        }
+        throw new Error("Engine is not running");
+      },
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      dispose: () => Promise.resolve(),
+    };
+
+    const store = createShellStore(transport);
+    await store.initialize();
+    await settle(() => store.getSnapshot().supportSnapshot !== null);
+    expect(store.getSnapshot().lifecycle).toBe("failed");
+    expect(store.getSnapshot().supportSnapshot).toMatchObject({ backupCount: 1 });
+    expect(requests.filter((method) => method === "support.snapshot")).toHaveLength(1);
+
+    code = "ENGINE_ALREADY_RUNNING";
+    requests.length = 0;
+    await store.restart();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.getSnapshot().supportSnapshot).toBeNull();
+    expect(requests).not.toContain("support.snapshot");
     await store.dispose();
   });
 

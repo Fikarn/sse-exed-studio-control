@@ -5,8 +5,10 @@ use crate::legacy_import::LegacyImportRequest;
 use crate::planning::planning_data_present;
 use crate::storage::{
     import_legacy_db, initialize_database, EngineResult, StorageBootstrap, StorageError,
+    STORAGE_SCHEMA_VERSION,
 };
-use crate::storage_backups::newest_snapshot;
+use crate::storage_backups::{newest_snapshot, reserve_snapshot_path, SnapshotReason};
+use crate::support::{inspect_database_backup, prune_exports, RESTORE_PENDING_FILE_NAME};
 use std::env;
 use std::error::Error;
 use std::ffi::OsString;
@@ -14,6 +16,7 @@ use std::fmt;
 use std::fs::{self, File, OpenOptions, TryLockError};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::SystemTime;
 
 pub const SUPPORTED_PROTOCOL_VERSION: &str = "1";
 
@@ -260,6 +263,16 @@ pub(crate) fn bootstrap_runtime_from_paths(
         }
     };
     hold_instance_lock(&runtime_paths.app_data_dir, instance_lock);
+    // A database restore the Support surface staged is applied here (Slice 7
+    // — F20): after the lock, before the database is opened.
+    if let Err(error) = apply_pending_restore(&runtime_paths) {
+        let _ = append_log(
+            &runtime_paths.log_file_path,
+            "ERROR",
+            &format!("Pending database restore could not be applied: {error}"),
+        );
+        return Err(error);
+    }
     let storage_bootstrap =
         match initialize_database(&runtime_paths.db_path, &runtime_paths.backups_dir) {
             Ok(storage_bootstrap) => storage_bootstrap,
@@ -287,6 +300,26 @@ pub(crate) fn bootstrap_runtime_from_paths(
             storage_bootstrap.integrity_check
         ),
     )?;
+    // Diagnostics exports are not kept forever (Slice 7): thirty days.
+    match prune_exports(
+        &runtime_paths.app_data_dir.join(EXPORTS_DIR_NAME),
+        SystemTime::now(),
+    ) {
+        Ok(removed) if !removed.is_empty() => append_log(
+            &runtime_paths.log_file_path,
+            "INFO",
+            &format!(
+                "Removed {} diagnostics export(s) older than thirty days",
+                removed.len()
+            ),
+        )?,
+        Ok(_) => {}
+        Err(error) => append_log(
+            &runtime_paths.log_file_path,
+            "WARN",
+            &format!("Diagnostics export pruning failed: {error}"),
+        )?,
+    }
 
     if !planning_data_present(&runtime_paths.db_path)? {
         if let Some(source_path) = resolve_legacy_import_source(&runtime_paths.app_data_dir) {
@@ -360,6 +393,112 @@ pub(crate) fn bootstrap_runtime_from_paths(
         control_surface_bridge,
         control_surface_token,
     })
+}
+
+/// The context a recovery-mode engine runs with after a storage failure at
+/// start (Slice 7 — F20): the paths are real, nothing else is — no database
+/// (`storage_ready` false), no bridge, no token. `EngineApp` answers only the
+/// backup requests with it.
+pub(crate) fn recovery_runtime_context(runtime_paths: &RuntimePaths) -> RuntimeContext {
+    RuntimeContext {
+        protocol_version: runtime_paths.protocol_version.clone(),
+        app_data_dir: runtime_paths.app_data_dir.clone(),
+        backups_dir: runtime_paths.backups_dir.clone(),
+        logs_dir: runtime_paths.logs_dir.clone(),
+        log_file_path: runtime_paths.log_file_path.clone(),
+        db_path: runtime_paths.db_path.clone(),
+        update_repository_path: runtime_paths.update_repository_path.clone(),
+        storage_ready: false,
+        storage_bootstrap: StorageBootstrap {
+            schema_version: 0,
+            format_version: String::from("unknown"),
+            journal_mode: String::from("unknown"),
+            integrity_check: String::from("failed"),
+        },
+        control_surface_bridge: ControlSurfaceBridgeInfo {
+            base_url: String::new(),
+            port: 0,
+            available: false,
+            status: String::from("not-started"),
+            summary: String::from(
+                "Control-surface bridge not started: the saved data needs attention.",
+            ),
+            error: None,
+        },
+        control_surface_token: String::new(),
+    }
+}
+
+/// Applies a database restore the Support surface staged as
+/// `<app-data>/restore-pending.sqlite3` (Slice 7 — F20). The pending file is
+/// checked again first; one that fails is removed and the live database is
+/// kept, so a restore never trades a good database for a bad one. Then the
+/// live database file is moved aside as a `replaced` backup, its `-wal` /
+/// `-shm` files are removed (they belong to the old file; the `pre-restore`
+/// copy taken when the restore was requested holds what they held), and the
+/// pending file takes its name. Returns the replaced file's new path when a
+/// restore was applied.
+pub(crate) fn apply_pending_restore(runtime_paths: &RuntimePaths) -> EngineResult<Option<PathBuf>> {
+    let pending = runtime_paths.app_data_dir.join(RESTORE_PENDING_FILE_NAME);
+    if !pending.is_file() {
+        return Ok(None);
+    }
+    let refusal = match inspect_database_backup(&pending) {
+        Ok(facts) if facts.schema_version <= STORAGE_SCHEMA_VERSION => None,
+        Ok(facts) => Some(format!(
+            "schema {} is newer than this app's {}",
+            facts.schema_version, STORAGE_SCHEMA_VERSION
+        )),
+        Err(detail) => Some(detail),
+    };
+    if let Some(detail) = refusal {
+        fs::remove_file(&pending)?;
+        append_log(
+            &runtime_paths.log_file_path,
+            "WARN",
+            &format!(
+                "Pending database restore {} refused and removed ({detail}); the current database is kept",
+                pending.display()
+            ),
+        )?;
+        return Ok(None);
+    }
+
+    let db_path = &runtime_paths.db_path;
+    let mut replaced = None;
+    if db_path.exists() {
+        let target = reserve_snapshot_path(&runtime_paths.backups_dir, SnapshotReason::Replaced)?;
+        fs::rename(db_path, &target)?;
+        replaced = Some(target);
+    }
+    for suffix in ["-wal", "-shm"] {
+        let sidecar = sidecar_path(db_path, suffix);
+        if sidecar.exists() {
+            fs::remove_file(&sidecar)?;
+        }
+    }
+    fs::rename(&pending, db_path)?;
+    append_log(
+        &runtime_paths.log_file_path,
+        "INFO",
+        &format!(
+            "Database restore applied: {} is now {}; the replaced database is kept as {}",
+            pending.display(),
+            db_path.display(),
+            replaced
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| String::from("nothing (there was no database)"))
+        ),
+    )?;
+    Ok(replaced)
+}
+
+/// `studio-control.sqlite3-wal` beside `studio-control.sqlite3`.
+fn sidecar_path(db_path: &Path, suffix: &str) -> PathBuf {
+    let mut name = db_path.as_os_str().to_owned();
+    name.push(suffix);
+    PathBuf::from(name)
 }
 
 /// Takes the exclusive OS lock on `<app-data>/engine.lock` (Slice 5 — F19).
@@ -492,15 +631,20 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        acquire_instance_lock, bootstrap_runtime_from_paths, current_runtime_platform,
-        default_app_data_dir_for_platform, resolve_legacy_import_source_from,
-        resolve_runtime_paths_from, startup_failure_code, storage_startup_failure,
-        validate_protocol_version, RuntimePaths, RuntimePlatform, StartupFailure,
-        DEFAULT_APP_DATA_DIR_NAME, INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
-        STARTUP_CODE_ENGINE_ALREADY_RUNNING, STARTUP_CODE_STORAGE_CORRUPT,
-        STARTUP_CODE_STORAGE_MIGRATION_FAILED, SUPPORTED_PROTOCOL_VERSION,
+        acquire_instance_lock, apply_pending_restore, bootstrap_runtime_from_paths,
+        current_runtime_platform, default_app_data_dir_for_platform,
+        resolve_legacy_import_source_from, resolve_runtime_paths_from, startup_failure_code,
+        storage_startup_failure, validate_protocol_version, RuntimePaths, RuntimePlatform,
+        StartupFailure, DEFAULT_APP_DATA_DIR_NAME, INSTANCE_LOCK_FILE_NAME,
+        STARTUP_CODE_BOOTSTRAP_FAILED, STARTUP_CODE_ENGINE_ALREADY_RUNNING,
+        STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
+        SUPPORTED_PROTOCOL_VERSION,
     };
-    use crate::storage::StorageError;
+    use crate::storage::{
+        initialize_database, list_settings_by_prefix, set_settings_owned, StorageError,
+    };
+    use crate::storage_backups::{snapshot_database, SnapshotReason};
+    use crate::support::{inspect_database_backup, RESTORE_PENDING_FILE_NAME};
     use std::ffi::OsString;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -901,6 +1045,126 @@ mod tests {
         assert_eq!(
             startup_failure_code(other.as_ref()),
             STARTUP_CODE_BOOTSTRAP_FAILED
+        );
+    }
+
+    // 2026-09 production readiness, Slice 7 (F20): a staged database restore
+    // is applied at start — after the pre-restore copy exists and before the
+    // database is opened. The live file is kept as a `replaced` backup, its
+    // sidecars go, the pending file takes its name, and the next bootstrap
+    // opens the restored data.
+    #[test]
+    fn pending_restore_applied_after_snapshot() {
+        let test_dir = TestDir::new("pending-restore");
+        let paths = runtime_paths_for(&test_dir);
+        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
+        initialize_database(&paths.db_path, &paths.backups_dir)
+            .expect("database should initialize");
+        set_settings_owned(
+            &paths.db_path,
+            &[(String::from("app.test.marker"), String::from("before"))],
+        )
+        .expect("marker should write");
+        let backup = snapshot_database(&paths.db_path, &paths.backups_dir, SnapshotReason::Daily)
+            .expect("backup should write");
+        set_settings_owned(
+            &paths.db_path,
+            &[(String::from("app.test.marker"), String::from("after"))],
+        )
+        .expect("marker should change");
+        let pre_restore = snapshot_database(
+            &paths.db_path,
+            &paths.backups_dir,
+            SnapshotReason::PreRestore,
+        )
+        .expect("pre-restore copy should write");
+        let pending = paths.app_data_dir.join(RESTORE_PENDING_FILE_NAME);
+        fs::copy(&backup, &pending).expect("pending should stage");
+        fs::write(format!("{}-wal", paths.db_path.display()), b"").expect("fake wal");
+        fs::write(format!("{}-shm", paths.db_path.display()), b"").expect("fake shm");
+
+        let replaced = apply_pending_restore(&paths)
+            .expect("the pending restore applies")
+            .expect("the live database was replaced");
+        assert_eq!(replaced.parent(), Some(paths.backups_dir.as_path()));
+        assert!(
+            replaced
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("db-") && name.ends_with("-replaced.sqlite3")),
+            "{}",
+            replaced.display()
+        );
+        assert!(replaced.is_file());
+        assert!(
+            pre_restore.is_file(),
+            "the pre-restore copy is kept beside it"
+        );
+        assert!(!pending.exists());
+        assert!(!Path::new(&format!("{}-wal", paths.db_path.display())).exists());
+        assert!(!Path::new(&format!("{}-shm", paths.db_path.display())).exists());
+        let marker = list_settings_by_prefix(&paths.db_path, "app.test.").expect("settings");
+        assert_eq!(
+            marker.get("app.test.marker").map(String::as_str),
+            Some("before")
+        );
+        assert!(
+            inspect_database_backup(&replaced).is_ok(),
+            "the replaced file is intact"
+        );
+        let log = fs::read_to_string(&paths.log_file_path).expect("engine log should exist");
+        assert!(log.contains("Database restore applied"), "{log}");
+
+        // Nothing pending: the bootstrap opens the restored database as is.
+        assert!(apply_pending_restore(&paths)
+            .expect("nothing to apply")
+            .is_none());
+        let db_display = paths.db_path.display().to_string();
+        let runtime = bootstrap_runtime_from_paths(paths).expect("the restored database boots");
+        assert!(runtime.storage_ready);
+        assert_eq!(runtime.db_path.display().to_string(), db_display);
+        let marker = list_settings_by_prefix(&runtime.db_path, "app.test.").expect("settings");
+        assert_eq!(
+            marker.get("app.test.marker").map(String::as_str),
+            Some("before")
+        );
+    }
+
+    // A pending file that fails its check is refused and removed; the live
+    // database is kept exactly as it was, and the log says why.
+    #[test]
+    fn pending_restore_that_fails_its_check_is_refused() {
+        let test_dir = TestDir::new("pending-junk");
+        let paths = runtime_paths_for(&test_dir);
+        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
+        initialize_database(&paths.db_path, &paths.backups_dir)
+            .expect("database should initialize");
+        set_settings_owned(
+            &paths.db_path,
+            &[(String::from("app.test.marker"), String::from("kept"))],
+        )
+        .expect("marker should write");
+        let pending = paths.app_data_dir.join(RESTORE_PENDING_FILE_NAME);
+        fs::write(&pending, b"this is not a database\n".repeat(64)).expect("junk pending");
+        let before = fs::read(&paths.db_path).expect("live database should read");
+
+        assert!(apply_pending_restore(&paths)
+            .expect("a refused pending file is not an error")
+            .is_none());
+        assert!(!pending.exists(), "the junk pending file is removed");
+        assert_eq!(fs::read(&paths.db_path).expect("live database"), before);
+        let marker = list_settings_by_prefix(&paths.db_path, "app.test.").expect("settings");
+        assert_eq!(
+            marker.get("app.test.marker").map(String::as_str),
+            Some("kept")
+        );
+        assert!(fs::read_dir(&paths.backups_dir)
+            .map(|entries| entries.count() == 0)
+            .unwrap_or(true));
+        let log = fs::read_to_string(&paths.log_file_path).expect("engine log should exist");
+        assert!(
+            log.contains("WARN") && log.contains("refused and removed"),
+            "{log}"
         );
     }
 

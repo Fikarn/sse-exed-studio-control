@@ -93,6 +93,11 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("restoreSupportBackup requires a path.");
       }
       return store.restoreSupportBackup(command.path);
+    case "verifySupportBackup":
+      if (typeof command.path !== "string" || !command.path.trim()) {
+        throw new Error("verifySupportBackup requires a path.");
+      }
+      return store.verifySupportBackup(command.path);
     case "runCommissioningCheck":
       if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
         throw new Error("runCommissioningCheck requires a request object.");

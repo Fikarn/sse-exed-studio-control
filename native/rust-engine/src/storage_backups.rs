@@ -4,7 +4,10 @@
 //! self-contained file each — before a schema upgrade, daily, at every
 //! graceful shutdown, and before a database restore (Slice 7). Retention is
 //! per reason; anything in the directory that is not an engine backup (the
-//! JSON support archives, for one) is never touched.
+//! JSON support archives, for one) is never touched. The `replaced` reason
+//! (Slice 7 — F20) is not a copy the engine verified: it is the database file
+//! a restore moved aside, kept next to the pre-restore copy so nothing a
+//! restore replaced is lost, and pruned like the others.
 
 use crate::storage::{open_connection, run_integrity_check, EngineResult, StorageError};
 use rusqlite::{Connection, OpenFlags};
@@ -26,14 +29,19 @@ pub enum SnapshotReason {
     Daily,
     Shutdown,
     PreRestore,
+    /// The live database file a restore moved aside when the pending
+    /// database backup took its place (Slice 7). Not verified by the engine
+    /// — it is whatever was there, damaged file included.
+    Replaced,
 }
 
 impl SnapshotReason {
-    pub const ALL: [SnapshotReason; 4] = [
+    pub const ALL: [SnapshotReason; 5] = [
         SnapshotReason::PreMigration,
         SnapshotReason::Daily,
         SnapshotReason::Shutdown,
         SnapshotReason::PreRestore,
+        SnapshotReason::Replaced,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -42,17 +50,20 @@ impl SnapshotReason {
             SnapshotReason::Daily => "daily",
             SnapshotReason::Shutdown => "shutdown",
             SnapshotReason::PreRestore => "pre-restore",
+            SnapshotReason::Replaced => "replaced",
         }
     }
 
     /// How many backups of this reason `prune_snapshots` keeps: two weeks of
-    /// dailies, the last five upgrades and restores, the last three shutdowns.
+    /// dailies, the last five upgrades, restores and replaced files, the last
+    /// three shutdowns.
     pub fn retention(self) -> usize {
         match self {
             SnapshotReason::PreMigration => 5,
             SnapshotReason::Daily => 14,
             SnapshotReason::Shutdown => 3,
             SnapshotReason::PreRestore => 5,
+            SnapshotReason::Replaced => 5,
         }
     }
 }
@@ -96,8 +107,12 @@ pub(crate) fn snapshot_database_with(
 
 /// `db-<UTC time to the millisecond>-<reason>.sqlite3`, never a name that
 /// already exists: `VACUUM INTO` refuses an existing file, and the names must
-/// sort in the order they were written.
-fn reserve_snapshot_path(backups_dir: &Path, reason: SnapshotReason) -> EngineResult<PathBuf> {
+/// sort in the order they were written. The bootstrap uses it for the
+/// `replaced` name a database restore moves the live file to (Slice 7).
+pub(crate) fn reserve_snapshot_path(
+    backups_dir: &Path,
+    reason: SnapshotReason,
+) -> EngineResult<PathBuf> {
     for _ in 0..50 {
         let candidate = backups_dir.join(format!(
             "{DATABASE_BACKUP_PREFIX}{}-{}.{DATABASE_BACKUP_EXTENSION}",
@@ -215,14 +230,17 @@ pub fn prune_snapshots(backups_dir: &Path) -> EngineResult<Vec<PathBuf>> {
     Ok(removed)
 }
 
-/// The newest engine-written backup of any reason, by name.
+/// The newest verified engine-written backup, by name. A `replaced` file is
+/// not a verified copy, so the recovery sentence never points at one.
 pub fn newest_snapshot(backups_dir: &Path) -> Option<PathBuf> {
     fs::read_dir(backups_dir)
         .ok()?
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_file())
         .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
-        .filter(|name| snapshot_reason_of(name).is_some())
+        .filter(|name| {
+            snapshot_reason_of(name).is_some_and(|reason| reason != SnapshotReason::Replaced)
+        })
         .max()
         .map(|name| backups_dir.join(name))
 }
@@ -390,6 +408,32 @@ mod tests {
         assert_eq!(
             snapshot_reason_of("db-2026-09-01T00-00-00-000Z-pre-restore.sqlite3"),
             Some(SnapshotReason::PreRestore)
+        );
+        assert_eq!(
+            snapshot_reason_of("db-2026-09-01T00-00-00-000Z-replaced.sqlite3"),
+            Some(SnapshotReason::Replaced)
+        );
+    }
+
+    // 2026-09 production readiness, Slice 7 (F20): the file a restore moved
+    // aside is kept and pruned like a backup, but it was never verified, so
+    // the recovery sentence names the newest verified copy instead.
+    #[test]
+    fn newest_snapshot_skips_replaced_files() {
+        let test_dir = TestDir::new("storage-newest");
+        let backups_dir = test_dir.path().join("backups");
+        fs::create_dir_all(&backups_dir).expect("backups dir should be created");
+        let daily = "db-2026-09-10T00-00-00-000Z-daily.sqlite3";
+        let replaced = "db-2026-09-11T00-00-00-000Z-replaced.sqlite3";
+        fs::write(backups_dir.join(daily), b"x").expect("daily should write");
+        fs::write(backups_dir.join(replaced), b"junk").expect("replaced should write");
+
+        assert_eq!(newest_snapshot(&backups_dir), Some(backups_dir.join(daily)));
+        let reserved = reserve_snapshot_path(&backups_dir, SnapshotReason::Replaced)
+            .expect("a replaced name should be reserved");
+        assert_eq!(
+            snapshot_reason_of(reserved.file_name().and_then(|n| n.to_str()).unwrap()),
+            Some(SnapshotReason::Replaced)
         );
     }
 

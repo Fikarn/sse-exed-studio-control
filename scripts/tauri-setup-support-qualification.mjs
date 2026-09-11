@@ -1,5 +1,15 @@
 import { spawn, spawnSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -610,6 +620,9 @@ async function runSetupSupportQualification() {
 
   console.log("Tauri Setup/Support qualification: step 2/6 persisted restart on the same runtime.");
 
+  // Slice 7 (F20): the database backup step 2 restores is kept for the
+  // corrupt-database scenario, which restores it from the recovery surface.
+  let databaseBackupBytes;
   const secondSession = createSessionFiles("sse-tauri-session-");
   const secondRun = launchTauriShell({
     appDataDir: runtime.appDataDir,
@@ -642,6 +655,122 @@ async function runSetupSupportQualification() {
     evidence.recordCheck("persisted-restart-restores-dashboard-state", {
       activeWorkspace: restartStatus.shellState.activeWorkspace,
       targetSurface: restartStatus.shellState.appSnapshot?.startup?.targetSurface,
+    });
+
+    // Scenario `database-restore` (2026-09 production readiness, Slice 7 —
+    // F20): a database backup is verified and restored through the running
+    // shell. The restart the test bridge asks for stops the engine
+    // gracefully, which writes a `shutdown` database backup; a project added
+    // after it is the change the restore must undo. Verify reads the backup
+    // without touching anything (and calls junk junk); the restore stages
+    // the backup, the store restarts the hardware link, and the bootstrap
+    // moves the backup into place with the old file kept as `replaced`.
+    const seededStatus = await dispatchCommand(secondSession, secondRun, "seedPlanningDemo", {
+      replaceExistingData: true,
+    });
+    assert(
+      seededStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
+      "Expected demo seeding to populate two planning projects before the database backup."
+    );
+    const generationBeforeRestart = seededStatus.status.testBridge.engineGeneration;
+    const restartedStatus = await dispatchCommand(secondSession, secondRun, "restart");
+    assert(
+      restartedStatus.status.shellState.lifecycle === "ready",
+      `Expected the shell to be ready after the requested restart, got '${restartedStatus.status.shellState.lifecycle}'.`
+    );
+    assert(
+      restartedStatus.status.testBridge.engineGeneration === generationBeforeRestart + 1,
+      `Expected launch ${generationBeforeRestart + 1} after the requested restart, got ${restartedStatus.status.testBridge.engineGeneration}.`
+    );
+    const backupsDir = restartedStatus.status.shellState.supportSnapshot?.backupDir;
+    assert(
+      typeof backupsDir === "string" && existsSync(backupsDir),
+      "Expected the support snapshot to name the backups folder."
+    );
+    const listedBackups = restartedStatus.status.shellState.supportSnapshot?.backups ?? [];
+    const shutdownBackup = listedBackups.find(
+      (entry) =>
+        entry?.kind === "database" && typeof entry?.name === "string" && entry.name.endsWith("-shutdown.sqlite3")
+    );
+    assert(
+      shutdownBackup && existsSync(shutdownBackup.path),
+      `Expected the graceful restart to leave a shutdown database backup in the backups folder, got ${JSON.stringify(listedBackups.map((entry) => entry?.name))}.`
+    );
+    databaseBackupBytes = readFileSync(shutdownBackup.path);
+
+    const addedStatus = await dispatchCommand(secondSession, secondRun, "createPlanningProject", {
+      request: { title: "Added after the backup" },
+    });
+    assert(
+      addedStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 3,
+      "Expected a third planning project after the backup was written."
+    );
+
+    const verifyStatus = await dispatchCommand(secondSession, secondRun, "verifySupportBackup", {
+      path: shutdownBackup.path,
+    });
+    assert(
+      verifyStatus.result?.ok === true && verifyStatus.result?.kind === "database",
+      `Expected the shutdown backup to verify as a database backup, got ${JSON.stringify(verifyStatus.result)}.`
+    );
+    assert(
+      Number.isInteger(verifyStatus.result?.schemaVersion) && verifyStatus.result.schemaVersion > 0,
+      `Expected the verification to report the schema version, got ${JSON.stringify(verifyStatus.result)}.`
+    );
+    const junkBackupPath = path.join(backupsDir, "db-2026-01-01T00-00-00-000Z-daily.sqlite3");
+    writeFileSync(junkBackupPath, Buffer.from("this is not a database\n".repeat(64), "utf8"));
+    const junkStatus = await dispatchCommand(secondSession, secondRun, "verifySupportBackup", {
+      path: junkBackupPath,
+    });
+    assert(
+      junkStatus.result?.ok === false &&
+        typeof junkStatus.result?.detail === "string" &&
+        junkStatus.result.detail.length > 0,
+      `Expected junk where a database backup should be to fail its check, got ${JSON.stringify(junkStatus.result)}.`
+    );
+    rmSync(junkBackupPath, { force: true });
+
+    const restoreDatabaseStatus = await dispatchCommand(secondSession, secondRun, "restoreSupportBackup", {
+      path: shutdownBackup.path,
+    });
+    assert(
+      restoreDatabaseStatus.result?.requiresRestart === true &&
+        restoreDatabaseStatus.result?.sourceFormat === "database-backup",
+      `Expected a database restore to answer requiresRestart, got ${JSON.stringify(restoreDatabaseStatus.result)}.`
+    );
+    assert(
+      typeof restoreDatabaseStatus.result?.rollbackBackupPath === "string" &&
+        restoreDatabaseStatus.result.rollbackBackupPath.endsWith("-pre-restore.sqlite3") &&
+        existsSync(restoreDatabaseStatus.result.rollbackBackupPath),
+      `Expected a pre-restore database backup before the restore, got '${restoreDatabaseStatus.result?.rollbackBackupPath}'.`
+    );
+    assert(
+      restoreDatabaseStatus.status.shellState.lifecycle === "ready" &&
+        restoreDatabaseStatus.status.shellState.startupFailure === null,
+      `Expected the shell to be ready again after the restart the restore asked for, got '${restoreDatabaseStatus.status.shellState.lifecycle}'.`
+    );
+    assert(
+      restoreDatabaseStatus.status.testBridge.engineGeneration === generationBeforeRestart + 2,
+      `Expected launch ${generationBeforeRestart + 2} after the restore's restart, got ${restoreDatabaseStatus.status.testBridge.engineGeneration}.`
+    );
+    assert(
+      restoreDatabaseStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
+      `Expected the database restore to undo the project added after the backup, got ${restoreDatabaseStatus.status.shellState.commissioningSnapshot?.planningProjectCount} projects.`
+    );
+    assert(
+      !existsSync(path.join(runtime.appDataDir, "restore-pending.sqlite3")),
+      "Expected the pending restore file to be gone once applied."
+    );
+    const replacedFiles = readdirSync(backupsDir).filter((name) => name.endsWith("-replaced.sqlite3"));
+    assert(
+      replacedFiles.length === 1,
+      `Expected the replaced database to be kept as one replaced backup, got ${JSON.stringify(replacedFiles)}.`
+    );
+    evidence.recordCheck("database-backup-verifies-and-restores-after-restart", {
+      backup: shutdownBackup.name,
+      replaced: replacedFiles[0],
+      rollback: path.basename(restoreDatabaseStatus.result.rollbackBackupPath),
+      schemaVersion: verifyStatus.result?.schemaVersion,
     });
   } finally {
     await closeTauriShell(secondRun);
@@ -702,6 +831,16 @@ async function runSetupSupportQualification() {
   const corruptDbPath = path.join(corruptRuntime.appDataDir, "studio-control.sqlite3");
   const junk = Buffer.from("this is not a database\n".repeat(400), "utf8");
   writeFileSync(corruptDbPath, junk);
+  // Slice 7 (F20): a database backup in the backups folder is what the
+  // recovery surface restores from; step 2's shutdown backup stands in.
+  const corruptBackupsDir = path.join(corruptRuntime.appDataDir, "backups");
+  mkdirSync(corruptBackupsDir, { recursive: true });
+  const recoveryBackupPath = path.join(corruptBackupsDir, "db-2026-09-11T00-00-00-000Z-daily.sqlite3");
+  assert(
+    Buffer.isBuffer(databaseBackupBytes),
+    "Expected step 2 to have kept a database backup for the recovery scenario."
+  );
+  writeFileSync(recoveryBackupPath, databaseBackupBytes);
   const corruptSession = createSessionFiles("sse-tauri-session-");
   const corruptRun = launchTauriShell({
     appDataDir: corruptRuntime.appDataDir,
@@ -739,6 +878,56 @@ async function runSetupSupportQualification() {
     evidence.recordCheck("corrupt-db-reaches-recovery-surface", {
       code: failure?.code,
       stage: failure?.stage,
+    });
+
+    // Recovery mode (Slice 7 — F20): the engine stays up for the backup
+    // requests and the store fetched the backup list; a database backup
+    // restored from the recovery surface stages without a rollback copy (the
+    // damaged file cannot be copied), the shell restarts into it, and the
+    // damaged file is kept as a `replaced` backup, byte for byte.
+    const listedInRecovery = await waitForStatus({
+      child: corruptRun,
+      label: "backup list on the recovery surface",
+      predicate: (value) =>
+        value?.shellState?.lifecycle === "failed" && (value?.shellState?.supportSnapshot?.backupCount ?? 0) >= 1,
+      statusPath: corruptSession.statusPath,
+    });
+    const recoveryGeneration = listedInRecovery.testBridge.engineGeneration;
+    const recoveryVerify = await dispatchCommand(corruptSession, corruptRun, "verifySupportBackup", {
+      path: recoveryBackupPath,
+    });
+    assert(
+      recoveryVerify.result?.ok === true && recoveryVerify.result?.kind === "database",
+      `Expected the seeded backup to verify from the recovery surface, got ${JSON.stringify(recoveryVerify.result)}.`
+    );
+    const recoveryRestore = await dispatchCommand(corruptSession, corruptRun, "restoreSupportBackup", {
+      path: recoveryBackupPath,
+    });
+    assert(
+      recoveryRestore.result?.requiresRestart === true && recoveryRestore.result?.rollbackBackupPath === null,
+      `Expected a database restore from the recovery surface to stage without a rollback copy, got ${JSON.stringify(recoveryRestore.result)}.`
+    );
+    assert(
+      recoveryRestore.status.shellState.lifecycle === "ready" &&
+        recoveryRestore.status.shellState.startupFailure === null,
+      `Expected the shell to reach ready after restoring from the recovery surface, got '${recoveryRestore.status.shellState.lifecycle}'.`
+    );
+    assert(
+      recoveryRestore.status.testBridge.engineGeneration === recoveryGeneration + 1,
+      `Expected launch ${recoveryGeneration + 1} after the restore's restart, got ${recoveryRestore.status.testBridge.engineGeneration}.`
+    );
+    assert(
+      recoveryRestore.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
+      `Expected the restored database to carry the two seeded projects, got ${recoveryRestore.status.shellState.commissioningSnapshot?.planningProjectCount}.`
+    );
+    const replacedJunk = readdirSync(corruptBackupsDir).filter((name) => name.endsWith("-replaced.sqlite3"));
+    assert(
+      replacedJunk.length === 1 && readFileSync(path.join(corruptBackupsDir, replacedJunk[0])).equals(junk),
+      `Expected the damaged file to be kept as one replaced backup, byte for byte, got ${JSON.stringify(replacedJunk)}.`
+    );
+    evidence.recordCheck("corrupt-db-restores-from-database-backup", {
+      generation: recoveryRestore.status.testBridge.engineGeneration,
+      replaced: replacedJunk[0],
     });
   } finally {
     await closeTauriShell(corruptRun);

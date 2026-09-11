@@ -110,6 +110,7 @@
     "storage.importLegacyDb",
     "support.backup.export",
     "support.backup.restore",
+    "support.backup.verify",
     "support.snapshot"
   ],
   "events": [

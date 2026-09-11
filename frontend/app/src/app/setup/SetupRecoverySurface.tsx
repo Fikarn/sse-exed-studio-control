@@ -6,6 +6,7 @@ import type { JsonValue, ShellStore, StartupFailure } from "@sse/engine-client";
 import {
   asRecord,
   asStatusTone,
+  describeBackupKind,
   formatBackupTimestamp,
   getSupportBackups,
   statusToneLabel,
@@ -76,7 +77,11 @@ export function SetupRecoverySurface({
     );
   const detailEntries = Object.entries(asRecord(healthSnapshot?.details) ?? {});
   const pathEntries = Object.entries(runtimePaths);
-  const engineRequestsAvailable = failure?.code !== "PROTOCOL_MISMATCH";
+  // The hardware link answers the backup requests here only in recovery
+  // mode — after a storage failure it stays up for exactly that (2026-09
+  // production readiness, Slice 7 — F20); after any other failure it is gone.
+  const engineRequestsAvailable =
+    failure === null || failure.code === "STORAGE_CORRUPT" || failure.code === "STORAGE_MIGRATION_FAILED";
   // Slice 8 (system §9): name the hardware. "Control surface", "DMX" and "OSC"
   // are the wires; the operator knows the deck, the bridge and the desk.
   const diagnosticsChecks = [
@@ -148,7 +153,10 @@ export function SetupRecoverySurface({
   const restoreBackup = async (path: string) => {
     const result = asRecord(await store.restoreSupportBackup(path));
     return {
-      message: `Restore requested from ${String(result?.sourcePath ?? path)}.`,
+      message:
+        result?.requiresRestart === true
+          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
+          : `Restore requested from ${String(result?.sourcePath ?? path)}.`,
       tone: "ok" as const,
     };
   };
@@ -216,8 +224,10 @@ export function SetupRecoverySurface({
                 {String(
                   supportSnapshot?.restoreSummary ??
                     (engineRequestsAvailable
-                      ? "Restore from a native support archive or a legacy db.json export."
-                      : "Nothing can be restored until the app and the hardware link are the same version.")
+                      ? "Restore a backup archive or a database backup from the backups folder."
+                      : failure?.code === "PROTOCOL_MISMATCH"
+                        ? "Nothing can be restored until the app and the hardware link are the same version."
+                        : "Nothing can be restored from here; use Retry startup, or Setup / Support once Studio Control is back.")
                 )}
               </span>
             </div>
@@ -226,7 +236,7 @@ export function SetupRecoverySurface({
               <input
                 className={styles.setupIncidentInput}
                 onChange={(event) => setRestorePath(event.target.value)}
-                placeholder={String(runtimePaths.backupDir ?? "/path/to/backup.json")}
+                placeholder={String(runtimePaths.backupDir ?? "a file inside the backups folder")}
                 value={restorePath}
               />
             </label>
@@ -282,14 +292,15 @@ export function SetupRecoverySurface({
                     <small>{backup.path}</small>
                   </span>
                   <span className={styles.setupIncidentHint}>
-                    {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)}
+                    {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)} ·{" "}
+                    {describeBackupKind(backup.kind)}
                   </span>
                 </button>
               ))
             ) : (
               <div className={styles.setupIncidentEmptyState}>
-                No backup list was published before startup failed. Use the archive path below or restore a known file
-                directly.
+                No backup list was published before startup failed. Name a file inside the backups folder above and
+                restore it directly.
               </div>
             )}
           </div>

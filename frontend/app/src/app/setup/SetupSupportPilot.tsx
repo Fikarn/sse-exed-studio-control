@@ -8,6 +8,7 @@ import { useLiveCallback } from "../shared/useLiveCallback";
 import {
   asRecord,
   asStatusTone,
+  describeBackupKind,
   formatBackupTimestamp,
   getCommissioningChecks,
   getSupportBackups,
@@ -579,10 +580,27 @@ export function SetupSupportPilot({
 
   const restoreBackup = async (path: string) => {
     const result = asRecord(await store.restoreSupportBackup(path));
+    // A database backup restarts the hardware link before this resolves
+    // (2026-09 production readiness, Slice 7 — F20); the restored data is
+    // what comes back on screen.
     return {
-      message: `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(result?.sourcePath ?? path)}.`,
+      message:
+        result?.requiresRestart === true
+          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
+          : `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(result?.sourcePath ?? path)}.`,
       tone: "ok" as const,
     };
+  };
+
+  // Slice 7 (F20): a backup is checked without anything changing — a JSON
+  // archive must parse as one this app reads, a database backup must open
+  // and pass its integrity check — and the answer is shown inline.
+  const verifyBackup = async (path: string) => {
+    const result = asRecord(await store.verifySupportBackup(path));
+    const detail = String(result?.detail ?? "No detail was reported.");
+    return result?.ok === true
+      ? { message: `Backup checked: ${detail}`, tone: "ok" as const }
+      : { message: `Backup failed its check: ${detail}`, tone: "error" as const };
   };
 
   const openReferencePath = async (label: string, path: string, tone: FeedbackTone = "info") => {
@@ -1349,13 +1367,13 @@ export function SetupSupportPilot({
               head={bayHead}
               eyebrow="Support"
               title="Backup and recovery"
-              lead="What went wrong? Restore from a native support archive or a legacy db.json export, then run the deck, bridge and desk probes again before resuming operator work."
+              lead="What went wrong? Verify a backup, restore a backup archive or a database backup from the backups folder, then run the deck, bridge and desk probes again before resuming operator work."
               rules={[
                 {
                   id: "restore",
                   text: String(
                     supportSnapshot?.restoreSummary ??
-                      "Restore from a native support archive or a legacy db.json export."
+                      "Restore a backup archive or a database backup from the backups folder."
                   ),
                   tone: backups.length > 0 ? "ok" : "attention",
                 },
@@ -1370,7 +1388,7 @@ export function SetupSupportPilot({
                   <SetupFactCard
                     label="Latest backup"
                     value={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No backup exported yet"}
-                    standing={backups.length > 0 ? `${backups.length} archives` : "empty backup history"}
+                    standing={backups.length > 0 ? `${backups.length} backups` : "empty backup history"}
                     tone={backups.length > 0 ? "ok" : "attention"}
                   />
                   <label className={styles.field}>
@@ -1378,7 +1396,7 @@ export function SetupSupportPilot({
                     <input
                       className={styles.textField}
                       onChange={(event) => setRestorePath(event.target.value)}
-                      placeholder={String(runtimePaths?.backupDir ?? "/path/to/backup.json")}
+                      placeholder={String(runtimePaths?.backupDir ?? "a file inside the backups folder")}
                       value={restorePath}
                     />
                   </label>
@@ -1403,6 +1421,14 @@ export function SetupSupportPilot({
                   <Key
                     take
                     disabled={!restorePath.trim() || busyAction !== null}
+                    testId="support-verify-path"
+                    onClick={() => void performAction("verify-backup", () => verifyBackup(restorePath.trim()))}
+                  >
+                    Verify path
+                  </Key>
+                  <Key
+                    take
+                    disabled={!restorePath.trim() || busyAction !== null}
                     testId="support-restore-path"
                     onClick={() => void performAction("restore-path", () => restoreBackup(restorePath.trim()))}
                   >
@@ -1410,10 +1436,10 @@ export function SetupSupportPilot({
                   </Key>
                 </>
               }
-              note="Restoring replaces the workstation database. Export a backup first."
+              note="Restoring replaces the workstation's saved data; a database backup restarts the hardware link. Export a backup first."
               record={
                 <>
-                  <SetupRecordHeading>Archives</SetupRecordHeading>
+                  <SetupRecordHeading>Backups</SetupRecordHeading>
                   <div className={styles.backupList}>
                     {backups.length > 0 ? (
                       backups.map((backup) => (
@@ -1428,7 +1454,8 @@ export function SetupSupportPilot({
                             <small>{backup.path}</small>
                           </span>
                           <span className={styles.metaCopy}>
-                            {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)}
+                            {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)} ·{" "}
+                            {describeBackupKind(backup.kind)}
                           </span>
                         </button>
                       ))
@@ -1527,7 +1554,7 @@ export function SetupSupportPilot({
           <SupportPlate
             appVersion={APP_VERSION}
             archiveCount={backups.length}
-            backupKind={lastBackup ? "native archive" : "none yet"}
+            backupKind={lastBackup ? describeBackupKind(lastBackup.kind) : "none yet"}
             busy={busyAction !== null}
             canOpenEngineLog={engineLogPath.trim().length > 0}
             engineVersion={String(runtime?.engineVersion ?? "—")}
@@ -1548,6 +1575,10 @@ export function SetupSupportPilot({
             }}
             onSelectTheme={setTheme}
             onSelectUiScale={setUiScale}
+            onVerifyBackup={() => {
+              if (!lastBackup) return;
+              void performAction("verify-backup", () => verifyBackup(lastBackup.path));
+            }}
           />
         </aside>
       </div>

@@ -108,6 +108,9 @@ interface PendingStartupGate {
 // first, second and third stop within five minutes — and a fourth stop is
 // left on the recovery surface for the operator.
 const AUTOMATIC_RESTART_LIMIT = 3;
+/** The start-up failures after which the engine stays up in recovery mode,
+ *  answering only the backup requests (Slice 7 — F20). */
+const RECOVERY_MODE_CODES = new Set(["STORAGE_CORRUPT", "STORAGE_MIGRATION_FAILED"]);
 const AUTOMATIC_RESTART_WINDOW_MS = 5 * 60_000;
 const AUTOMATIC_RESTART_BACKOFF_MS: readonly number[] = [1_000, 2_000, 4_000];
 /** Background failures kept for the diagnostics export (Slice 9 renders them). */
@@ -1038,6 +1041,19 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         startupFailure,
         errorSummary: startupFailure.message,
       });
+      // Recovery mode (Slice 7 — F20): after a storage failure the engine
+      // stays up to list, verify and restore backups, so the recovery
+      // surface gets the backup list it needs to do that.
+      if (RECOVERY_MODE_CODES.has(startupFailure.code)) {
+        void transport
+          .request("support.snapshot")
+          .then((supportSnapshot) => {
+            if (isCurrentBootstrap()) {
+              setState({ ...state, supportSnapshot: supportSnapshot as JsonObject });
+            }
+          })
+          .catch(inBackground("backup list in recovery"));
+      }
     } finally {
       if (isCurrentBootstrap()) {
         clearStartupGate();
@@ -1321,7 +1337,23 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return performRequest("support.backup.export");
     },
     async restoreSupportBackup(path: string) {
-      return performRequest("support.backup.restore", { path });
+      const result = await performRequest("support.backup.restore", { path });
+      // A database backup is staged, not applied (2026-09 production
+      // readiness, Slice 7 — F20): the engine takes it at its next start, so
+      // the link is restarted here through the same path as Retry startup.
+      // The shell reports that stop as graceful, so no automatic-restart
+      // budget is spent on it.
+      if (asRecord(result)?.requiresRestart === true) {
+        try {
+          await restartEngine();
+        } catch (error) {
+          recordBackgroundFailure(error, "restart after a database restore");
+        }
+      }
+      return result;
+    },
+    async verifySupportBackup(path: string) {
+      return transport.request("support.backup.verify", { path });
     },
     async exportCompanionConfig(baseUrl?: string) {
       return performRequest("exports.companion.export", baseUrl ? { baseUrl } : {});

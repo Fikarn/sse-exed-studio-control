@@ -6,6 +6,11 @@ import { defineConfig } from "vitest/config";
 // files in src/. Subsequent plan PRs (D2, D3, D6) populate the suite.
 
 export default defineConfig({
+  // The app version is a Vite define (vite.config.ts); component tests that
+  // render a surface printing it need the same symbol.
+  define: {
+    __APP_VERSION__: JSON.stringify("test"),
+  },
   test: {
     environment: "jsdom",
     globals: false,

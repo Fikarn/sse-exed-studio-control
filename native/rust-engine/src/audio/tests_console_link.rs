@@ -822,7 +822,9 @@ fn console_confidence_has_one_writer() {
         "audio/helpers.rs",
         "audio/tests.rs",
         "audio/tests_console_link.rs",
-        "support.rs",
+        // The support tests moved to their own file (Slice 7); the restore
+        // round trip seeds the key to prove a restore rolls it back.
+        "support/tests.rs",
     ];
     // Every path that moves confidence must go through the single writer.
     let required_writers = [

@@ -241,6 +241,12 @@ function ensurePaths(state: MutableFixtureState) {
       typeof paths.dbPath === "string"
         ? paths.dbPath
         : "/Users/operator/Library/Application Support/SSE ExEd Studio Control/studio-control.sqlite3",
+    // 2026-09 production readiness, Slice 4 (F15): the diagnostics folder the
+    // Support surfaces open; the engine reports it as `runtime.paths.exportsDir`.
+    exportsDir:
+      typeof paths.exportsDir === "string"
+        ? paths.exportsDir
+        : "/Users/operator/Library/Application Support/SSE ExEd Studio Control/exports",
     logFilePath:
       typeof paths.logFilePath === "string"
         ? paths.logFilePath
@@ -3304,7 +3310,7 @@ function synchronizeFixtureState(state: MutableFixtureState) {
   state.supportSnapshot.latestBackupPath = backups[0]?.path ?? null;
   state.supportSnapshot.restoreSummary = asString(
     state.supportSnapshot.restoreSummary,
-    "Restore from a native support backup archive or a legacy db.json export."
+    "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link."
   );
   state.supportSnapshot.recentBackups = backups.map((entry) =>
     new Date(asNumber(entry.modifiedAt, Date.now())).toISOString()
@@ -3611,11 +3617,33 @@ function buildFixtureBackupEntry(state: MutableFixtureState) {
   const fileName = `native-backup-${timestamp}.json`;
 
   return {
+    kind: "archive",
     name: fileName,
     path: `${backupDir}/${fileName}`,
     sizeBytes: 4096,
     modifiedAt,
   };
+}
+
+// 2026-09 production readiness, Slice 7 (F29): only a file inside the backups
+// folder can be named, and it must be one the fixture lists (a legacy
+// `db.json` inside the folder counts, as the engine's importer accepts it).
+// The sentences mirror the engine's.
+function findFixtureBackup(state: MutableFixtureState, path: string) {
+  const backupDir = asString(state.supportSnapshot.backupDir);
+  if (!path.startsWith(backupDir)) {
+    throw new Error(
+      `Only files inside the backups folder can be restored or verified: ${path} is outside ${backupDir}.`
+    );
+  }
+  const match = asArray(state.supportSnapshot.backups)
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is JsonObject => entry !== null)
+    .find((entry) => entry.path === path);
+  if (!match && !path.endsWith("db.json")) {
+    throw new Error(`Backup file was not found: ${path}`);
+  }
+  return match ?? null;
 }
 
 function ensureAudioSnapshotAvailable(state: MutableFixtureState) {
@@ -5899,7 +5927,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           actionCount: countControls(state),
           activityEntryCount: countPlanningActivity(state),
           fileName: backupEntry.name,
-          formatVersion: 2,
+          formatVersion: 4,
           path: backupEntry.path,
           projectCount: asNumber(state.commissioningSnapshot.planningProjectCount, 0),
           taskCount: asNumber(state.commissioningSnapshot.planningTaskCount, 0),
@@ -6539,17 +6567,37 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
           task: cloneJson(updatedTask),
         };
       }
+      case "support.backup.verify": {
+        const path = asString(params.path);
+        const match = findFixtureBackup(state, path);
+        const kind = path.endsWith(".sqlite3") ? "database" : "archive";
+        const projectCount = asNumber(state.commissioningSnapshot.planningProjectCount, 0);
+        const taskCount = asNumber(state.commissioningSnapshot.planningTaskCount, 0);
+        if (kind === "database") {
+          return {
+            detail: `Database backup, schema 6, integrity ok: ${projectCount} projects, ${taskCount} tasks and 40 settings.`,
+            kind,
+            ok: true,
+            path,
+            schemaVersion: 6,
+          };
+        }
+        const exportedAt = new Date(asNumber(match?.modifiedAt, Date.now())).toISOString();
+        return {
+          detail: `Backup archive, format 4, exported ${exportedAt}: ${projectCount} projects and ${taskCount} tasks.`,
+          formatVersion: 4,
+          kind,
+          ok: true,
+          path,
+        };
+      }
       case "support.backup.restore": {
         const path = asString(params.path);
-        const backups = asArray(state.supportSnapshot.backups)
-          .map((entry) => asRecord(entry))
-          .filter((entry): entry is JsonObject => entry !== null);
-        const backupMatch = backups.find((entry) => entry.path === path);
+        findFixtureBackup(state, path);
         const legacyImport = path.endsWith("db.json");
-
-        if (!backupMatch && !legacyImport) {
-          throw new Error("Backup file was not found.");
-        }
+        // A database backup is staged and applied at the next start; the
+        // store restarts the link on `requiresRestart` (Slice 7 — F20).
+        const databaseRestore = path.endsWith(".sqlite3");
 
         state.planningSnapshot = buildSeededPlanningSnapshot();
         state.commissioningSnapshot.runnerStage = "publish";
@@ -6564,17 +6612,22 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         updateFixtureCheck(state, "lighting", "passed", "Lighting bridge settings were restored from support backup.");
         updateFixtureCheck(state, "audio", "passed", "Audio transport settings were restored from support backup.");
         synchronizeFixtureState(state);
-        emit("support.changed", { reason: "backup-restored" });
-        emit("commissioning.changed", { reason: "backup-restored" });
-        emit("planning.changed", { reason: "backup-restored" });
-        emit("app.changed", { reason: "backup-restored" });
+        if (databaseRestore) {
+          emit("support.changed", { reason: "backup-restore-staged" });
+        } else {
+          emit("support.changed", { reason: "backup-restored" });
+          emit("commissioning.changed", { reason: "backup-restored" });
+          emit("planning.changed", { reason: "backup-restored" });
+          emit("app.changed", { reason: "backup-restored" });
+        }
         return {
           activityEntryCount: countPlanningActivity(state),
           checklistItemCount: Math.max(1, Math.floor(asNumber(state.commissioningSnapshot.planningTaskCount, 0) / 2)),
           projectCount: asNumber(state.commissioningSnapshot.planningProjectCount, 0),
+          requiresRestart: databaseRestore,
           rollbackBackupPath: buildFixtureBackupEntry(state).path,
           settingsRestored: 12,
-          sourceFormat: legacyImport ? "legacy-db-json" : "native-support-backup",
+          sourceFormat: databaseRestore ? "database-backup" : legacyImport ? "legacy-db-json" : "native-support-backup",
           sourcePath: path,
           taskCount: asNumber(state.commissioningSnapshot.planningTaskCount, 0),
         };

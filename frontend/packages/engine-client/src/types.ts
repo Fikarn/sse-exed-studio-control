@@ -482,7 +482,12 @@ export interface ShellStore {
   setPlanningTaskTimer(taskId: string, action: "start" | "stop" | "toggle"): Promise<JsonValue>;
   deletePlanningTask(taskId: string): Promise<JsonValue>;
   exportSupportBackup(): Promise<JsonValue>;
+  /** 2026-09 production readiness, Slice 7 (F20): a database backup answers
+   *  `requiresRestart`, and the store restarts the hardware link into it. */
   restoreSupportBackup(path: string): Promise<JsonValue>;
+  /** `support.backup.verify`: reads a file inside the backups folder without
+   *  changing anything and answers `{ ok, kind, detail, … }`. */
+  verifySupportBackup(path: string): Promise<JsonValue>;
   exportCompanionConfig(baseUrl?: string): Promise<JsonValue>;
   refreshControlSurfaceSnapshot(): Promise<void>;
   getAudioMeterFrame(): AudioMeterFrame;

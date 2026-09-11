@@ -42,11 +42,27 @@ export interface CommissioningCheck {
   status: StatusToneLike;
 }
 
+// 2026-09 production readiness, Slice 7 (F20): a backup is a JSON support
+// archive or a whole database backup; the engine says which.
+export type SupportBackupKind = "archive" | "database";
+
 export interface SupportBackupEntry {
+  kind: SupportBackupKind;
   modifiedAt: number;
   name: string;
   path: string;
   sizeBytes: number;
+}
+
+export function describeBackupKind(kind: SupportBackupKind) {
+  return kind === "database" ? "database backup" : "backup archive";
+}
+
+function backupKindOf(record: Record<string, unknown>, name: string): SupportBackupKind {
+  if (record.kind === "database" || record.kind === "archive") {
+    return record.kind;
+  }
+  return name.endsWith(".sqlite3") ? "database" : "archive";
 }
 
 // UI-domain shapes. They are derived from the engine snapshots via the
@@ -325,11 +341,13 @@ export function getSupportBackups(snapshot: SnapshotRecord | null): SupportBacku
         return [];
       }
 
+      const name = String(record.name ?? "support-backup.json");
       return [
         {
+          kind: backupKindOf(record, name),
           modifiedAt:
             typeof record.modifiedAt === "number" ? record.modifiedAt : Date.parse(String(record.modifiedAt ?? "")),
-          name: String(record.name ?? "support-backup.json"),
+          name,
           path: String(record.path ?? ""),
           sizeBytes: typeof record.sizeBytes === "number" ? record.sizeBytes : 0,
         },
@@ -349,6 +367,7 @@ export function getSupportBackups(snapshot: SnapshotRecord | null): SupportBacku
 
     return [
       {
+        kind: "archive",
         modifiedAt: Date.parse(backup),
         name: `fixture-backup-${index + 1}.json`,
         path: backup,

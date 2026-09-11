@@ -15,7 +15,9 @@ use crate::audio::{
     update_audio_channel_eq, update_audio_channel_send_mode, update_audio_mix_target,
     update_audio_settings, update_audio_snapshot, AudioCommandError,
 };
-use crate::bootstrap::{bootstrap_runtime, RuntimeContext, EXPORTS_DIR_NAME};
+use crate::bootstrap::{
+    bootstrap_runtime, recovery_runtime_context, RuntimeContext, RuntimePaths, EXPORTS_DIR_NAME,
+};
 use crate::commissioning::{
     evaluate_publish_gate, publish_override_timestamp, PublishGate, PUBLISH_OVERRIDE_AT_KEY,
 };
@@ -89,7 +91,7 @@ use crate::storage::{
 };
 use crate::support::{
     export_support_backup, parse_support_restore_request, read_support_snapshot,
-    restore_support_backup, SupportCommandError,
+    restore_support_backup, verify_support_backup, SupportCommandError,
 };
 use serde_json::json;
 use std::sync::{Mutex, MutexGuard};
@@ -102,6 +104,26 @@ pub struct EngineApp {
 pub struct EngineReply {
     pub response: ResponseEnvelope,
     pub events: Vec<serde_json::Value>,
+}
+
+/// The requests a recovery-mode engine answers (Slice 7 — F20): the ones
+/// that list, verify and restore backups without opening the database that
+/// failed its check. Everything else is `ENGINE_NOT_READY`.
+const RECOVERY_METHODS: &[&str] = &[
+    "engine.ping",
+    "support.snapshot",
+    "support.backup.verify",
+    "support.backup.restore",
+];
+
+fn support_error_response(id: serde_json::Value, error: SupportCommandError) -> ResponseEnvelope {
+    match error {
+        SupportCommandError::InvalidParams(message) => invalid_params(id, message),
+        SupportCommandError::Storage(message) => error_response(id, "STORAGE_ERROR", message),
+        SupportCommandError::UnsupportedVersion(message) => {
+            error_response(id, "SUPPORT_RESTORE_UNSUPPORTED_VERSION", message)
+        }
+    }
 }
 
 fn format_health_summary(
@@ -125,6 +147,17 @@ impl EngineApp {
             runtime,
             lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
         })
+    }
+
+    /// The engine after a storage failure at start (Slice 7 — F20): no
+    /// database, no bridge, no metering. Only the support requests that list,
+    /// verify and restore backups are answered, so the recovery surface can
+    /// put a database backup in place and restart into it.
+    pub fn recovery(runtime_paths: &RuntimePaths) -> Self {
+        Self {
+            runtime: recovery_runtime_context(runtime_paths),
+            lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
+        }
     }
 
     pub fn ready_event(&self) -> serde_json::Value {
@@ -179,6 +212,20 @@ impl EngineApp {
             "INFO",
             &format!("Handling request: {}", request.method),
         );
+
+        // Recovery mode (Slice 7 — F20): the database could not be opened,
+        // so only the requests that verify and restore a backup are served;
+        // anything else would touch the file that failed its check.
+        if !self.runtime.storage_ready && !RECOVERY_METHODS.contains(&request.method.as_str()) {
+            return Self::reply(error_response(
+                request.id,
+                "ENGINE_NOT_READY",
+                format!(
+                    "The saved data needs attention, so {} is not available; verify and restore a database backup from Setup / Support first.",
+                    request.method
+                ),
+            ));
+        }
 
         match request.method.as_str() {
             "engine.ping" => Self::reply(ok_response(
@@ -718,33 +765,33 @@ impl EngineApp {
                     ),
                     "backup-exported",
                 ),
-                Err(error) => match error {
-                    SupportCommandError::InvalidParams(message) => {
-                        Self::reply(invalid_params(request.id, message))
-                    }
-                    SupportCommandError::Storage(message) => {
-                        Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                    }
-                },
+                Err(error) => Self::reply(support_error_response(request.id, error)),
             },
-            "support.backup.restore" => match parse_support_restore_request(&request.params) {
+            "support.backup.verify" => match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
+                Ok(verify_request) => Self::reply(ok_response(
+                    request.id,
+                    serde_json::to_value(verify_support_backup(&verify_request))
+                        .unwrap_or_else(|_| json!({})),
+                )),
+                Err(message) => Self::reply(invalid_params(request.id, message)),
+            },
+            "support.backup.restore" => match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
                 Ok(restore_request) => {
                     match restore_support_backup(&self.runtime, &restore_request) {
-                        Ok(result) => Self::reply_with_support_restore_change(
-                            ok_response(
+                        Ok(result) => {
+                            let response = ok_response(
                                 request.id,
                                 serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "backup-restored",
-                        ),
-                        Err(error) => match error {
-                            SupportCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
+                            );
+                            if result.requires_restart {
+                                // Nothing changed yet: the database backup is
+                                // applied at the next start (Slice 7 — F20).
+                                Self::reply_with_support_change(response, "backup-restore-staged")
+                            } else {
+                                Self::reply_with_support_restore_change(response, "backup-restored")
                             }
-                            SupportCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
+                        }
+                        Err(error) => Self::reply(support_error_response(request.id, error)),
                     }
                 }
                 Err(message) => Self::reply(invalid_params(request.id, message)),

@@ -46,6 +46,9 @@ export interface SupportPlateProps {
   onRestoreLatest: () => void;
   onSelectTheme: (theme: OperatorTheme) => void;
   onSelectUiScale: (scale: OperatorUiScale) => void;
+  /** 2026-09 production readiness, Slice 7 (F20): checks the latest backup
+   *  without changing anything; the answer lands in the pilot's feedback. */
+  onVerifyBackup: () => void;
   restoreDisabled: boolean;
 }
 
@@ -69,6 +72,7 @@ export function SupportPlate({
   onRestoreLatest,
   onSelectTheme,
   onSelectUiScale,
+  onVerifyBackup,
   restoreDisabled,
 }: SupportPlateProps) {
   return (
@@ -115,7 +119,7 @@ export function SupportPlate({
 
       <Section
         title="Backups"
-        detail={archiveCount === 1 ? "1 archive" : `${archiveCount} archives`}
+        detail={archiveCount === 1 ? "1 backup" : `${archiveCount} backups`}
         testId="support-backups"
       >
         <Readouts
@@ -135,6 +139,9 @@ export function SupportPlate({
             onClick={onRestoreLatest}
           >
             Restore latest
+          </Key>
+          <Key size="small" disabled={busy || restoreDisabled} testId="support-verify-latest" onClick={onVerifyBackup}>
+            Verify latest
           </Key>
         </div>
       </Section>
