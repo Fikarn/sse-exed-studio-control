@@ -307,7 +307,15 @@ async function runStalledRequestCheck(session, child, bridgeIp) {
 // copy of the shell (`second-instance`, finding F19) must be refused within
 // five.
 const ENGINE_CRASH_DETECT_MS = 2_000;
-const SECOND_INSTANCE_EXIT_MS = 5_000;
+// On Windows and macOS the single-instance plugin refuses the second copy
+// before its window exists — within 5 s (113 ms on the workstation). On
+// Linux the second copy first goes through GTK's start-up, which under xvfb
+// waits about 30 s on the AT-SPI bus lookup before any Tauri plugin runs
+// (the first CI run of Slice 5 saw the refusal land after ~30 s), so its
+// bound is the lane's wait timeout; and a Linux session without a D-Bus
+// session bus refuses through the engine lock instead, which shows in the
+// second shell's own status file. Whichever refusal comes first counts.
+const SECOND_INSTANCE_EXIT_MS = process.platform === "linux" ? DEFAULT_WAIT_TIMEOUT_MS : 5_000;
 
 // Ends the engine process from outside the shell — what a crash looks like
 // to it. The engine has no children of its own, so no tree kill.
@@ -844,39 +852,41 @@ async function runSetupSupportQualification() {
     const launchedAt = Date.now();
 
     try {
-      const exitDeadline = launchedAt + SECOND_INSTANCE_EXIT_MS;
-      while (secondRun.exitCode === null && Date.now() < exitDeadline) {
+      const refusalDeadline = launchedAt + SECOND_INSTANCE_EXIT_MS;
+      let refusal = null;
+      while (refusal === null && Date.now() < refusalDeadline) {
+        if (secondRun.exitCode !== null) {
+          assert(
+            secondRun.exitCode === 0,
+            `Expected the second shell to exit cleanly after handing over, got code ${secondRun.exitCode}.`
+          );
+          refusal = {
+            exitCode: secondRun.exitCode,
+            refusalMs: Date.now() - launchedAt,
+            refusedBy: "shell-single-instance",
+          };
+          break;
+        }
+        const secondStatus = readJson(secondSession.statusPath);
+        if (secondStatus?.shellState?.startupFailure?.code === "ENGINE_ALREADY_RUNNING") {
+          assert(
+            process.platform === "linux",
+            `Expected the single-instance plugin to refuse the second shell on ${process.platform}, but it reached the recovery surface as ENGINE_ALREADY_RUNNING.`
+          );
+          refusal = {
+            exitCode: null,
+            refusalMs: Date.now() - launchedAt,
+            refusedBy: "engine-lock",
+            stage: secondStatus.shellState.startupFailure.stage,
+          };
+          break;
+        }
         await delay(100);
       }
-      let refusal;
-      if (secondRun.exitCode !== null) {
-        assert(
-          secondRun.exitCode === 0,
-          `Expected the second shell to exit cleanly after handing over, got code ${secondRun.exitCode}.`
-        );
-        refusal = {
-          exitCode: secondRun.exitCode,
-          refusalMs: Date.now() - launchedAt,
-          refusedBy: "shell-single-instance",
-        };
-      } else {
-        assert(
-          process.platform === "linux",
-          `Expected the second shell to exit within ${SECOND_INSTANCE_EXIT_MS} ms on ${process.platform}; it is still running.`
-        );
-        const refusedStatus = await waitForStatus({
-          child: secondRun,
-          label: "second shell refused by the engine lock",
-          predicate: (value) => value?.shellState?.startupFailure?.code === "ENGINE_ALREADY_RUNNING",
-          statusPath: secondSession.statusPath,
-        });
-        refusal = {
-          exitCode: null,
-          refusalMs: Date.now() - launchedAt,
-          refusedBy: "engine-lock",
-          stage: refusedStatus.shellState.startupFailure?.stage,
-        };
-      }
+      assert(
+        refusal !== null,
+        `Expected the second shell to be refused within ${SECOND_INSTANCE_EXIT_MS} ms on ${process.platform}; it is still running and reported no refusal.`
+      );
 
       // The first shell is untouched: still ready, its engine the same, its
       // status file still moving.
