@@ -408,6 +408,11 @@ export interface ShellState {
   lastEvent: EventName | null;
   errorSummary: string | null;
   backgroundFailures: BackgroundFailure[];
+  /**
+   * Development builds only (Slice 9): the reply that failed its shape guard,
+   * request and field named. `useShellSnapshot` throws it while rendering.
+   */
+  snapshotFault: string | null;
 }
 
 export interface ShellStore {

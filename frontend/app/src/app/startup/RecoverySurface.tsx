@@ -11,6 +11,18 @@ import { formatFailureCode, formatFailureStage, formatPathLabel, getFailureTitle
 // display's code slot, and Retry startup is the key on the display. Every band
 // below it names the next step the operator takes.
 
+/**
+ * The health snapshot's log excerpt as lines. The hardware link has always
+ * sent one string (the last lines of its log, `native/protocol/v1.md`); this
+ * surface used to read a list, which only the fixtures carried, so on the
+ * workstation the section never appeared (2026-09 production readiness,
+ * Slice 9). A list is still read, for a reply from an older build.
+ */
+export function readLogExcerpt(value: unknown): string[] {
+  const lines = typeof value === "string" ? value.split(/\r?\n/) : Array.isArray(value) ? value : [];
+  return lines.flatMap((line) => (typeof line === "string" && line.trim().length > 0 ? [line] : []));
+}
+
 export function RecoverySurface({
   failure,
   healthSnapshot,
@@ -35,9 +47,7 @@ export function RecoverySurface({
         "Studio Control stopped before it was ready. Retry startup, then export diagnostics from Setup / Support."
     );
   const details = Object.entries(asRecord(healthSnapshot?.details) ?? {});
-  const recentLogExcerpt = Array.isArray(healthSnapshot?.recentLogExcerpt)
-    ? healthSnapshot.recentLogExcerpt.flatMap((line) => (typeof line === "string" ? [line] : []))
-    : [];
+  const recentLogExcerpt = readLogExcerpt(healthSnapshot?.recentLogExcerpt);
 
   return (
     <PreReadyState

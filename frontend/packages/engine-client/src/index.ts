@@ -1,4 +1,7 @@
 export { createShellStore, useAudioMeterFrame, useShellSnapshot } from "./store/createShellStore";
+export type { ShellStoreOptions } from "./store/createShellStore";
+export { EVENT_DOMAIN_REFRESH } from "./store/domainRefresh";
+export type { DomainKey } from "./store/domainRefresh";
 export {
   AUDIO_FADER_UNITY,
   FADER_MAX_DB,

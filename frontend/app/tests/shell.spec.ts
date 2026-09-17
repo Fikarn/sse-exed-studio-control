@@ -280,3 +280,64 @@ test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
   await nav.getByRole("button", { name: "Lighting", exact: true }).click();
   await expect(page.getByTestId("lighting-stage")).toBeVisible();
 });
+
+// 2026-09 production readiness, Slice 9 (finding F10): a render error inside a
+// workspace used to leave a blank webview — header, tabs and dialogs gone with
+// it. `?crash=lighting` (fixture double only) makes Lighting throw while it
+// renders; the shell must survive it, Audio must stay usable, the failure must
+// reach the attention band, and "Reload this area" must bring Lighting back
+// once the fault is gone.
+test("workspace crash keeps shell alive", async ({ page }) => {
+  await openFixture(page, "audio-populated", { crash: "lighting" });
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  const boundary = page.getByTestId("workspace-boundary");
+  const band = page.getByTestId("background-failure-band");
+  await expect(page.getByTestId("audio-workspace")).toBeVisible();
+  await expect(band).toHaveCount(0);
+
+  await nav.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expect(boundary).toContainText("LIGHTING STOPPED");
+  await expect(boundary).toContainText("The rest of Studio Control keeps working");
+  await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
+  // The area failed, not the screen: the shell's own chrome is all still here.
+  await expect(page.getByTestId("shell-boundary")).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Lighting", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("shell-clock")).toHaveText(/^\d\d:\d\d$/);
+  await expect(page.getByTestId("shell-lamp-audio")).toBeVisible();
+  await page.keyboard.press(modifierShortcut("Shift+KeyR"));
+  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(band).toContainText("1 problem since");
+
+  // Audio is one tab away and works.
+  await nav.getByRole("button", { name: "Audio", exact: true }).click();
+  await expect(page.getByTestId("audio-workspace")).toBeVisible();
+  await expect(boundary).toHaveCount(0);
+  const soloButton = page.getByTestId("audio-strip-audio-playback-3-4").getByRole("button", { name: "Solo FX 3/4" });
+  await expect(soloButton).toHaveAttribute("aria-pressed", "true");
+  await soloButton.click();
+  await expect(soloButton).toHaveAttribute("aria-pressed", "false");
+  await page.getByTestId("background-failure-dismiss").click();
+  await expect(band).toHaveCount(0);
+
+  // While the fault stands Lighting fails again, and says so again.
+  await nav.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expect(boundary).toContainText("LIGHTING STOPPED");
+  await expect(band).toContainText("2 problems since");
+
+  // The fault goes away; reloading the area brings the workspace back whole.
+  await page.evaluate(() => window.__SSE_TEST_DISARM_CRASH__?.());
+  await page.getByTestId("workspace-boundary-reload").click();
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
+  await expect(boundary).toHaveCount(0);
+  await expect(page.locator('[data-region="footer"]')).toBeVisible();
+});
+
+// The hook is the fixture double's alone: without `?crash=` nothing is armed
+// and nothing about it is on the window.
+test("the crash hook is absent unless the fixture URL asks for it", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
+  expect(await page.evaluate(() => typeof window.__SSE_TEST_DISARM_CRASH__)).toBe("undefined");
+  await expect(page.getByTestId("background-failure-band")).toHaveCount(0);
+});

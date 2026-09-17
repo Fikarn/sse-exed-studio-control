@@ -217,10 +217,7 @@
         "lighting": "DMX bridge answered, but the configured universe changed after the last verification pass.",
         "controlSurface": "Companion export is older than the last planning seed."
       },
-      "recentLogExcerpt": [
-        "[WARN] Lighting bridge changed universe after commissioning.",
-        "[WARN] Companion profile export is older than the current planning data."
-      ],
+      "recentLogExcerpt": "[WARN] Lighting bridge changed universe after commissioning.\n[WARN] Companion profile export is older than the current planning data.",
       "checks": {
         "lighting": {
           "status": "attention",
@@ -313,10 +310,7 @@
         "storage": "SQLite integrity check returned corruption in the primary database file.",
         "support": "Use the support backup directory to recover a known-good archive."
       },
-      "recentLogExcerpt": [
-        "[ERROR] pragma integrity_check returned corruption.",
-        "[INFO] Startup aborted before app snapshot."
-      ]
+      "recentLogExcerpt": "[ERROR] pragma integrity_check returned corruption.\n[INFO] Startup aborted before app snapshot."
     },
     "startupFailure": {
       "stage": "bootstrap",

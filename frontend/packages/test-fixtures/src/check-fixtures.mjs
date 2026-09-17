@@ -110,6 +110,13 @@ function validateFixture(scenario, entry) {
 
   if (entry.healthSnapshot !== undefined) {
     requireObject(scenario, entry.healthSnapshot, "healthSnapshot");
+    // 2026-09 production readiness, Slice 9: the hardware link sends the log
+    // excerpt as one string (`native/protocol/v1.md`). The fixtures carried a
+    // list, which is what the recovery surface read and why it showed nothing
+    // on the workstation.
+    if (entry.healthSnapshot.recentLogExcerpt !== undefined) {
+      requireString(scenario, entry.healthSnapshot.recentLogExcerpt, "healthSnapshot.recentLogExcerpt");
+    }
   }
 
   if (entry.commissioningSnapshot !== undefined) {

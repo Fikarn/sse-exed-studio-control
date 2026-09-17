@@ -192,6 +192,12 @@ To commission or re-commission the deck:
 - `audio.snapshot`
 - `support.snapshot`
 
+### When part of the screen stops
+
+A workspace that fails to draw says so in its own area — `LIGHTING STOPPED`, `AUDIO STOPPED` — and the rest of Studio Control keeps working (2026-09 production readiness, Slice 9): the header, the lamps, the other tabs, the restart and close dialogs. Press **Reload this area**; if it stops again, carry on in the other workspaces and export diagnostics from Setup / Support. If the whole window shows `THIS SCREEN STOPPED`, press **Export diagnostics** and then **Reload**. Neither stops the hardware link: TotalMix keeps its state, the lights keep their levels and the Stream Deck keeps working while the screen comes back.
+
+A band at the foot of the screen — "Studio Control hit a problem in the background" — means a request to the hardware link failed or an error was caught without anything on screen changing. It says how many and since when; **Dismiss** puts it away until the next one. One or two after a restart of the hardware link are expected. If it keeps coming back, export diagnostics from Setup / Support: the file lists each failure with its time.
+
 ### Shell indicators
 
 - startup target and current workspace

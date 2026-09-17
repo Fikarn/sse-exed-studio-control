@@ -26,15 +26,19 @@ import { AudioWorkspace } from "./audio/AudioWorkspace";
 import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
 import { PlanningWorkspaceSurface } from "./planning/PlanningWorkspace";
+import { BackgroundFailureBand } from "./shared/BackgroundFailureBand";
 import { PaletteProvider, usePalette } from "./shared/paletteContext";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ShortcutOverlay } from "./shared/ShortcutOverlay";
 import { ToastProvider } from "./shared/toastContext";
 import { useLiveCallback } from "./shared/useLiveCallback";
 import { RecoverySurface } from "./startup/RecoverySurface";
+import { reportUiFailure } from "./startup/reportUiFailure";
 import { SetupStartupSurface } from "./startup/SetupStartupSurface";
 import { StartupSurface } from "./startup/StartupSurface";
 import { deriveShellExperience } from "./startup/startupHelpers";
+import { WorkspaceCrashProbe } from "./startup/WorkspaceCrashProbe";
+import { WorkspaceErrorBoundary } from "./startup/WorkspaceErrorBoundary";
 
 type ConfirmIntent = "restart-engine" | "close-window" | null;
 
@@ -78,6 +82,9 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const setupModalActive = activeWorkspace === "setup";
   const [confirmIntent, setConfirmIntent] = useState<ConfirmIntent>(null);
   const [showShortcutGuide, setShowShortcutGuide] = useState(false);
+  // Slice 9 (F10): advanced by "Reload this area"; with the area's name it is
+  // the workspace boundary's key.
+  const [areaReloads, setAreaReloads] = useState(0);
   const deferredLightingDmxMonitorSnapshot = useDeferredValue(shellState.lightingDmxMonitorSnapshot);
   const deferredLightingFixtureCatalogSnapshot = useDeferredValue(shellState.lightingFixtureCatalogSnapshot);
   const deferredLightingSnapshot = useDeferredValue(shellState.lightingSnapshot);
@@ -499,6 +506,14 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
       ? ("slot" as const)
       : undefined;
 
+  // What the workspace boundary calls the area it wraps (Slice 9).
+  const areaLabel =
+    shellExperience === "ready"
+      ? (workspaces.find((workspace) => workspace.id === activeWorkspace)?.label ?? "This area")
+      : shellExperience === "recovery"
+        ? "Recovery"
+        : "Startup";
+
   let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
     surface = (
@@ -596,7 +611,26 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
           void tryNavigateWorkspace(workspaceId as ShellState["activeWorkspace"]);
         }}
       >
-        <div className={styles.workspaceStack}>{surface}</div>
+        <div className={styles.workspaceStack}>
+          {/* Slice 9 (F10). The band is absent while nothing has failed, and the
+              boundary adds no element of its own, so the surface is still the
+              stack's only child on every board. The pre-ready surfaces sit
+              inside the same boundary: a recovery surface that fails to draw
+              must not take the header, the restart dialog and the close dialog
+              with it. */}
+          {shellExperience === "ready" ? <BackgroundFailureBand failures={shellState.backgroundFailures} /> : null}
+          <WorkspaceErrorBoundary
+            key={`${shellExperience}:${activeWorkspace}:${areaReloads}`}
+            area={areaLabel}
+            onError={(error) => reportUiFailure(environment.store, error, `${areaLabel} stopped drawing`)}
+            onReset={() => setAreaReloads((count) => count + 1)}
+          >
+            {shellExperience === "ready" && environment.crashWorkspace === activeWorkspace ? (
+              <WorkspaceCrashProbe area={areaLabel} />
+            ) : null}
+            {surface}
+          </WorkspaceErrorBoundary>
+        </div>
       </AppShellFrame>
       {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
       {restartDialog}

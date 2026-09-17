@@ -12,6 +12,8 @@ interface Window {
     audioSignalCanvas?: number;
     audioWorkspace?: number;
   };
+  /** Slice 9: ends the fault `?crash=<workspace>` armed (fixture double only). */
+  __SSE_TEST_DISARM_CRASH__?: () => void;
   __SSE_TEST_NATIVE_DIALOG_COUNTS__?: {
     confirm: number;
     prompt: number;

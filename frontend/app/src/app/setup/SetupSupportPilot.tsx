@@ -614,6 +614,9 @@ export function SetupSupportPilot({
   const exportDiagnostics = async () => {
     const report: Record<string, JsonValue> = {
       appSnapshot: toJsonValue(appSnapshot),
+      // Slice 9: what went wrong in the background this session (last twenty),
+      // read from the store at the moment of the export.
+      backgroundFailures: toJsonValue(store.getSnapshot().backgroundFailures),
       commissioningSnapshot: toJsonValue(commissioningSnapshot),
       controlSurfaceSnapshot: toJsonValue(controlSurfaceSnapshot),
       generatedAt: new Date().toISOString(),

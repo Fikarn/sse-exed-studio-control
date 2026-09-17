@@ -16,7 +16,12 @@ export const fixtureMap = JSON.parse(
 export async function openFixture(
   page: Page,
   fixtureId: string,
-  options?: { operatorReview?: "studio"; theme?: "graphite" | "bone" }
+  options?: {
+    /** Slice 9: make this workspace throw while it renders (fixture double only). */
+    crash?: "setup" | "lighting" | "audio" | "planning";
+    operatorReview?: "studio";
+    theme?: "graphite" | "bone";
+  }
 ) {
   if (fixtureId.startsWith("planning-")) {
     await page.clock.setFixedTime(FIXTURE_NOW);
@@ -30,6 +35,9 @@ export async function openFixture(
   }
   if (options?.operatorReview) {
     params.set("operatorReview", options.operatorReview);
+  }
+  if (options?.crash) {
+    params.set("crash", options.crash);
   }
   const response = await page.goto(`/?${params.toString()}`);
   expect(response, `fixture ${fixtureId} should return a document response`).not.toBeNull();
