@@ -72,6 +72,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+          # setup-node caches npm downloads by itself as soon as package.json
+          # names a `packageManager`. It does not today; "no cache" should not
+          # depend on that staying true.
+          package-manager-cache: false
 
       - name: Rust toolchain from native/rust-toolchain.toml
         working-directory: native
