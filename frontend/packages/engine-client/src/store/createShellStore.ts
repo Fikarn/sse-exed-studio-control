@@ -506,6 +506,11 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
   let refreshWaiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> = [];
   let refreshEvent: EventName | null = null;
   let refreshRunning = false;
+  // Advanced by every bootstrap and dispose. A batch belongs to the run that
+  // sent it: a request that never settles must not hold the queue past a
+  // restart, which is the operator's remedy for a screen that stopped updating.
+  let refreshRun = 0;
+  let refreshInFlightWaiters: typeof refreshWaiters = [];
   // The fixture catalog is compiled into the hardware link: fetched once per
   // session, kept across a restart, fetched again only by `refresh()`.
   let catalogLoaded = false;
@@ -784,20 +789,21 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     return partial as Partial<ShellState>;
   };
 
-  const runRefresh = async () => {
+  const runRefresh = async (run: number) => {
     try {
-      while (dirtyDomains.size > 0) {
+      while (run === refreshRun && dirtyDomains.size > 0) {
         const domains = [...dirtyDomains];
         const waiters = refreshWaiters;
         const eventName = refreshEvent;
         dirtyDomains = new Set();
         refreshWaiters = [];
         refreshEvent = null;
+        refreshInFlightWaiters = waiters;
         const generation = bootstrapGeneration;
         try {
           const fetched = await fetchDomains(
             domains,
-            () => generation === bootstrapGeneration && state.lifecycle === "ready"
+            () => run === refreshRun && generation === bootstrapGeneration && state.lifecycle === "ready"
           );
           if (fetched) {
             setState({
@@ -822,7 +828,10 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
         }
       }
     } finally {
-      refreshRunning = false;
+      // A run that was abandoned leaves the flag to the run that replaced it.
+      if (run === refreshRun) {
+        refreshRunning = false;
+      }
     }
   };
 
@@ -839,15 +848,21 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       refreshWaiters.push({ resolve, reject });
       if (!refreshRunning) {
         refreshRunning = true;
-        queueMicrotask(() => void runRefresh());
+        const run = refreshRun;
+        queueMicrotask(() => void runRefresh(run));
       }
     });
   };
 
   // A restart or a dispose makes whatever was still queued pointless: the
-  // bootstrap that follows fetches everything.
+  // bootstrap that follows fetches everything. The batch that is out is
+  // abandoned with it — its answers are dropped if they ever come — so the
+  // queue starts clean however the last run ended.
   const cancelQueuedRefresh = () => {
-    const waiters = refreshWaiters;
+    refreshRun += 1;
+    refreshRunning = false;
+    const waiters = [...refreshInFlightWaiters, ...refreshWaiters];
+    refreshInFlightWaiters = [];
     dirtyDomains = new Set();
     refreshWaiters = [];
     refreshEvent = null;

@@ -122,6 +122,7 @@ function supervisedTransport() {
   const refusing = new Set<string>();
   const answers = new Map<string, JsonValue>();
   const gates = new Map<string, Promise<void>>();
+  const stalled = new Set<string>();
   const calls: string[] = [];
   let launches = 0;
   const transport: EngineTransport = {
@@ -133,6 +134,9 @@ function supervisedTransport() {
     request: async (method) => {
       calls.push(`request:${method}`);
       await gates.get(method);
+      if (stalled.delete(method)) {
+        await new Promise<never>(() => {});
+      }
       if (refusing.has(method)) {
         throw new Error(`${method} refused`);
       }
@@ -177,6 +181,8 @@ function supervisedTransport() {
         release();
       };
     },
+    /** The next `method` request never settles; the ones after it answer as usual. */
+    stall: (method: string) => stalled.add(method),
     /** The snapshot requests sent since `calls` was last cleared, sorted. */
     snapshotRequests: () =>
       calls
@@ -664,6 +670,39 @@ describe("createShellStore scoped refresh", () => {
     await tick();
     // One batch was out, one followed for the five that arrived meanwhile.
     expect(lightingRequests()).toBe(2);
+    await store.dispose();
+  });
+
+  // Every request is bounded on the hardware link (the shell gives up after
+  // ten seconds and fails what is pending when the link stops), so a batch
+  // that never settles should not happen. If one ever does, it must not hold
+  // the queue past a restart: restarting the hardware link is the operator's
+  // remedy for a screen that stopped updating.
+  it("a restart abandons a batch that never settles", async () => {
+    const { calls, emit, launches, snapshotRequests, stall, transport } = supervisedTransport();
+    const store = createShellStore(transport);
+    await store.initialize();
+
+    stall("lighting.snapshot");
+    emit(changed("lighting.changed", "fixture-updated"));
+    await tick();
+    // A request whose refresh queues behind the batch that is out.
+    const waiting = store.setLightingAllPower(true);
+    await tick();
+    calls.length = 0;
+    emit(changed("planning.changed", "task-created"));
+    await tick();
+    expect(snapshotRequests()).toEqual([]);
+
+    await store.restart();
+    expect(launches()).toBe(2);
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    await expect(waiting).resolves.toBeDefined();
+
+    calls.length = 0;
+    emit(changed("planning.changed", "task-created"));
+    await tick();
+    expect(snapshotRequests()).toEqual(["commissioning.snapshot", "planning.snapshot"]);
     await store.dispose();
   });
 
