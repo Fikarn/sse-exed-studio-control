@@ -3,6 +3,8 @@ name = "sse-exed-tauri-shell"
 version = "2.2.1"
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
 
 [features]
 default = []

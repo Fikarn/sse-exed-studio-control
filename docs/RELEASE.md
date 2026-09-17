@@ -175,6 +175,22 @@ What they enforce:
 - GitHub release notes come directly from the matching changelog section
 - `npm run release:anchor:verify -- --tag vX.Y.Z` confirms the published GitHub release exists, is not a draft, and includes the required native installers, update repositories, and `SHA256` manifests
 
+## Release Evidence (CI)
+
+Pushing a `v*` tag also starts [.github/workflows/release-evidence.yml](../.github/workflows/release-evidence.yml) (production readiness 2026-09, Slice 12). On a clean `windows-latest` and a clean `macos-14` runner it runs `npm ci`, `npm run native:engine:build`, `npm run tauri:build` and `npm run native:package:<win|mac>:local`, then writes the staged SHA256 manifest, checks the manifest against the archive, and writes three CycloneDX 1.5 SBOMs — the npm packages inside the web assets, the crates in the engine, the crates in the shell (`npm run native:sbom:<win|mac>:write`, which refuses an SBOM that is empty or describes the wrong component). Each runner uploads one artifact, `release-evidence-windows` / `release-evidence-macos`, kept for 30 days: the bundle archive, `release/checksums/<target>/` and `release/sbom/<target>/`. The run's summary page names the commit, the toolchain versions, the digest and whether the bundle was signed.
+
+What it is not:
+
+- **It publishes nothing.** The workflow's whole permission set is `contents: read`; it creates or edits no GitHub Release. Publishing is still `npm run release:publish`, run by the operator from the workstation after the target-host gates.
+- **It builds no installer.** QtIFW is not on a GitHub runner. The offline installers, the update repositories and the full-mode SHA256 manifests stay workstation-built, and the target-host lanes above remain the release acceptance gate. The evidence run answers a narrower question: does this tag build into a bundle from the lockfiles alone, on machines nobody has touched — it restores no build cache — and what exactly is inside it.
+- **It does not sign yet.** See Optional Signing below.
+
+A tag ending in `-evidence` (`v0.0.0-evidence`) is a rehearsal: it skips `npm run release:check`, which a real tag must pass (the tag has to match `package.json` and the changelog). Delete a rehearsal tag afterwards (`git push origin :refs/tags/v0.0.0-evidence && git tag -d v0.0.0-evidence`). The workflow can also be started by hand (`gh workflow run release-evidence.yml --ref <branch>`), which GitHub allows only once the workflow file is on the default branch.
+
+## Supply Chain Checks
+
+`npm run supply-chain:check` — and the `supply-chain` job on every push — audits every npm lockfile against `scripts/npm-audit-allowlist.json` and runs `cargo deny check` against `native/deny.toml` (advisories, bans, licences, sources). Exceptions in both lists carry a reason and a date at most 90 days out, and an expired one fails the job. Before tagging, the job should be green on the commit being tagged; [DEVELOPMENT.md §4 Supply chain](./DEVELOPMENT.md) says what to do when it is not.
+
 ## Installer Identity
 
 The product identity is locked for operator rollout:
@@ -215,6 +231,8 @@ The local Windows release commands also have optional signing hooks. Configure t
 - `SSE_WINDOWS_SIGN_CERT_PASSWORD`
 - `SSE_WINDOWS_SIGN_TIMESTAMP_URL`
 - `SSE_WINDOWS_SIGNTOOL_PATH`
+
+On the release-evidence runners the same hooks run as `npm run native:sign:win:bundle` / `native:sign:mac:bundle` (`--bundle-only`: the shell, the engine and the bundle archive — there is no installer there to rebuild or sign), fed from repository secrets of the same names: `SSE_WINDOWS_SIGN_CERT_BASE64`, `SSE_WINDOWS_SIGN_CERT_PASSWORD` and optionally `SSE_WINDOWS_SIGN_TIMESTAMP_URL`; `SSE_MACOS_CODESIGN_IDENTITY` together with `SSE_MACOS_SIGN_CERT_BASE64` and `SSE_MACOS_SIGN_CERT_PASSWORD` (the Developer ID certificate as a base64 `.p12`, imported into a throwaway keychain, because a runner has no keychain to find the identity in), and optionally the Apple ID notary trio. With no secret set the step prints why it skipped and the run stays green; with half a set it fails rather than skip. **The signing path has never run on a runner — no certificate exists yet.** The first evidence run after the secrets are added is its first test: expect to iterate on it, with a rehearsal tag, before relying on it for a release.
 
 Use the keychain-profile path when possible. The Apple ID credential trio is a fallback when the release host cannot rely on a preloaded keychain profile.
 Prefer a local certificate path on the Windows release host; `SSE_WINDOWS_SIGN_CERT_BASE64` remains available when the certificate must be materialized ephemerally.

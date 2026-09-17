@@ -5,6 +5,14 @@ members = ["protocol/rust", "rust-engine", "tauri-shell"]
 [workspace.package]
 edition = "2021"
 rust-version = "1.95"
+# The repository's licence (`LICENSE`, `package.json`). Named here so the
+# licence check and the release SBOMs describe our own three crates instead of
+# reporting them as unlicensed (2026-09 production readiness, Slice 12 — F17).
+license = "MIT"
+# None of the three crates is a crates.io package; refusing `cargo publish`
+# also lets `cargo deny` accept the version-less path dependency on
+# `studio-control-protocol`.
+publish = false
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -85,6 +85,7 @@ Code health:
 - `npm run lint` / `npm run lint:fix` — ESLint check/fix.
 - `npm run scripts:test` — unit tests for repository maintenance/release helper scripts (glob over `scripts/**/*.test.mjs`).
 - `npm run file:health` — tracked-file size and oversized-source guard.
+- `npm run supply-chain:check` — `supply-chain:npm` (`npm audit` for every lockfile against `scripts/npm-audit-allowlist.json`, whose entries expire) then `supply-chain:cargo` (the review dates on `native/deny.toml`'s ignored advisories, then `cargo deny check`). Needs the network and `cargo-deny`; judges today's advisory databases, so it is a CI job and not part of `dev:check`. See `docs/DEVELOPMENT.md §4 Supply chain` before adding an exception — take the fix first, never `npm audit fix`.
 - `npm run frontend:typecheck` — TypeScript typecheck for all npm workspaces that expose `typecheck`.
 - `npm run frontend:test` — Vitest across all frontend workspaces (`@testing-library/react` for components; pure-logic unit tests).
 - `npm run rust:fmt:check` — Rust formatting check under `native/`.
@@ -118,6 +119,7 @@ Native and release:
 - `npm run release:manifest` — write the chain-of-custody release manifest for a tag. Called from `release:publish`; standalone for evidence regeneration.
 - `npm run release:notes` — emit the GitHub Release notes body (artifact hashes embedded from the manifest).
 - `npm run release:publish` — publish artifacts + manifest to GitHub Releases for a tag.
+- `npm run native:sbom:win:write` / `npm run native:sbom:mac:write` — CycloneDX SBOMs of what the packaged bundle carries, under `release/sbom/<target>/` (needs `cargo-cyclonedx` and `npm run native:sbom:tools:install`). The `release-evidence` workflow runs them; see `docs/RELEASE.md §Release Evidence`.
 - `npm run native:release:mac:local` and `npm run native:release:win:local` — target-host shipping release gates when QtIFW tools are installed.
 
 ## Visual Review Discipline
@@ -155,6 +157,9 @@ When the selected Tauri shell is open for user inspection, that exact running sh
 | `rust`               | `rust:fmt:check`, `rust:clippy`, `native:check`, `native:test`, `native:acceptance` (the harness runs the engine in simulated audio input mode by default, so the audio probe, sync and recall assertions run against the simulated console and nothing is ever written to a real TotalMix; `SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1` is the workstation-only live lane, which writes only to unused surfaces and restores them) |
 | `tauri-foundation`   | `tauri:foundation` (protocol generate → engine build → Tauri build → Tauri smoke)                                                                                                                                                                                                                                                                                                                                             |
 | `qualification`      | `tauri:setup-support:qualify` + `tauri:workspaces:qualify` under `xvfb`, with `SSE_TAURI_QUALIFICATION_TIMEOUT_MS=180000`, `LIBGL_ALWAYS_SOFTWARE=1`, and `SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1` (CI cannot supply live OSC). Uploads `tauri-qualification-evidence` artifact.                                                                                                                                          |
+| `supply-chain`       | `supply-chain:npm`, the review dates on `native/deny.toml`'s ignored advisories, and `cargo deny check` (advisories, bans, licenses, sources). Reads lockfiles only. It judges today's advisory databases, so it can turn red on a push that changed nothing — that is its job.                                                                                                                                               |
+
+A second workflow, `.github/workflows/release-evidence.yml`, runs on a `v*` tag or by hand: clean Windows and macOS runners build the packaged bundle, its SHA256 manifest and its CycloneDX SBOMs and keep them as run artifacts. It publishes nothing, builds no installer, and its signing step is dormant until certificate secrets exist.
 
 These jobs are required merge hygiene on `main`. They are **not** the release gate — `npm run native:release:{mac,win}:local` and `npm run release:verify` on the operator workstation remain the release acceptance mechanism.
 

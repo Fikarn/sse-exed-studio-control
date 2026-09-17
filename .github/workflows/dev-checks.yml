@@ -83,6 +83,39 @@ jobs:
       - run: npm ci
       - run: npm run frontend:test
 
+  # Production readiness 2026-09, Slice 12 (finding F17): what the repository
+  # depends on is checked on every push. Three checks, each of which reports
+  # even when another has failed:
+  # - `supply-chain:npm` — `npm audit` for every lockfile (the shipped tree from
+  #   moderate, the build-and-test tree and `tools/sbom` from high) against
+  #   `scripts/npm-audit-allowlist.json`, whose entries expire;
+  # - the "review by" date on every advisory `native/deny.toml` ignores;
+  # - `cargo deny check`: advisories, bans, licenses, sources.
+  # All three read lockfiles only, so nothing is installed or built here. They
+  # also read the advisory databases as they are today: this job can turn red
+  # on a push that changed nothing, and that is the point of it.
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: npm audit against the allowlist
+        run: npm run supply-chain:npm
+      - name: cargo-deny ignore dates
+        if: ${{ !cancelled() }}
+        run: node scripts/check-deny-ignores.mjs
+      - name: cargo deny check (advisories, bans, licenses, sources)
+        if: ${{ !cancelled() }}
+        # Third-party action, pinned to the commit behind v2.1.1; Dependabot's
+        # github-actions updates move the pin.
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          manifest-path: native/Cargo.toml
+          # native/rust-toolchain.toml pins this; the action's image has to match it.
+          rust-version: "1.95.0"
+
   # plan PR 1 / workstream B1 + B2 (consolidated).
   # `frontend:playwright:test` now includes the `visual-review.spec.ts`
   # baseline diff (workstream A1), so this single job covers both the

@@ -22,6 +22,9 @@ temp/
 native/build/
 native/**/build/
 native/**/target/
+# cargo-cyclonedx writes beside each crate's manifest; the release SBOM step
+# moves its files under release/sbom/ (scripts/write-release-sboms.mjs).
+native/**/*.cdx.json
 artifacts/
 frontend/**/dist/
 frontend/**/storybook-static/

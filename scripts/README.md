@@ -27,16 +27,17 @@ risk profile changes.
 These run during the 12-stage release chain. A silent regression
 here ships broken artifacts or breaks rollback.
 
-| Script                                 | Test                                              |
-| -------------------------------------- | ------------------------------------------------- |
-| `native-installer.mjs`                 | `native-installer.test.mjs` (PR 10)               |
-| `native-update-repo.mjs`               | `native-update-repo.test.mjs` (PR 10)             |
-| `write-native-release-checksums.mjs`   | `write-native-release-checksums.test.mjs` (PR 10) |
-| `verify-native-release-artifacts.mjs`  | _accepted gap_ (release:verify exercises it)      |
-| `verify-native-release-continuity.mjs` | _accepted gap_ (release:verify exercises it)      |
-| `release/publish-release.mjs`          | `release/publish-release.test.mjs` (PR 10)        |
-| `native-sign-macos.mjs`                | _accepted gap_ (requires keychain identities)     |
-| `native-sign-windows.mjs`              | _accepted gap_ (requires signtool + cert)         |
+| Script                                 | Test                                                                                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `native-installer.mjs`                 | `native-installer.test.mjs` (PR 10)                                                                                                                                                        |
+| `native-update-repo.mjs`               | `native-update-repo.test.mjs` (PR 10)                                                                                                                                                      |
+| `write-native-release-checksums.mjs`   | `write-native-release-checksums.test.mjs` (PR 10)                                                                                                                                          |
+| `verify-native-release-artifacts.mjs`  | _accepted gap_ (release:verify exercises it)                                                                                                                                               |
+| `verify-native-release-continuity.mjs` | _accepted gap_ (release:verify exercises it)                                                                                                                                               |
+| `release/publish-release.mjs`          | `release/publish-release.test.mjs` (PR 10)                                                                                                                                                 |
+| `native-sign-macos.mjs`                | `native-sign.test.mjs` pins the dormant path (skip, exit 0, the variable named) and that half a configuration fails; signing itself stays an _accepted gap_ (requires keychain identities) |
+| `native-sign-windows.mjs`              | `native-sign.test.mjs`, the same; signing itself stays an _accepted gap_ (requires signtool + cert)                                                                                        |
+| `write-release-sboms.mjs`              | `write-release-sboms.test.mjs` — the plan and the refusal rule; the two generators run in `release-evidence.yml`                                                                           |
 
 ### Tier 2 — build / acceptance
 
@@ -66,6 +67,18 @@ Lower-blast-radius helpers. Tests are nice-to-have.
 - `release/write-release-manifest.test.mjs` (PR 3)
 - `release/helpers.test.mjs` (PR 3)
 - `check-slice-rescope.test.mjs` (PR 9)
+
+### Supply chain (2026-09 production readiness, Slice 12 — finding F17)
+
+| Script                    | Test                                                                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-npm-audit.mjs`     | `check-npm-audit.test.mjs` — on the `npm audit --json` reports recorded under `fixtures/npm-audit/`; the tests never call the registry |
+| `check-deny-ignores.mjs`  | `check-deny-ignores.test.mjs`                                                                                                          |
+| `supply-chain-expiry.mjs` | the date rule both lists share; covered by the two files above                                                                         |
+
+Neither test judges a date against today's: whether an exception has
+expired is the `supply-chain` CI job's to say, so a date can never turn
+`scripts:test` (and with it `dev:check`) red by itself.
 
 ### Repository guards
 

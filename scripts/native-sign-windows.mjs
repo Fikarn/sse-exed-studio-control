@@ -132,11 +132,19 @@ function signFile(signtoolPath, certificatePath, certificatePassword, timestampU
   run(signtoolPath, ["verify", "/pa", targetPath]);
 }
 
+// `--bundle-only` signs the packaged shell and engine, rebuilds the bundle
+// archive and stops: the release-evidence workflow runs where QtIFW is not
+// installed, so there is no installer to rebuild or sign there (production
+// readiness 2026-09, Slice 12). Without the flag nothing changes.
+const bundleOnly = process.argv.slice(2).includes("--bundle-only");
+
 const hasCertificatePath = Boolean(process.env.SSE_WINDOWS_SIGN_CERT_PATH?.trim());
 const hasCertificateBase64 = Boolean(process.env.SSE_WINDOWS_SIGN_CERT_BASE64?.trim());
 
 if (!hasCertificatePath && !hasCertificateBase64) {
-  console.log("Skipping native Windows signing because no signing certificate is configured.");
+  console.log(
+    "Skipping native Windows signing because no signing certificate is configured (SSE_WINDOWS_SIGN_CERT_PATH or SSE_WINDOWS_SIGN_CERT_BASE64)."
+  );
   process.exit(0);
 }
 
@@ -182,13 +190,15 @@ try {
   archiveWindowsDirectory(packagedDirPath, packagedArchivePath);
   console.log(`Rebuilt native Windows package archive: ${packagedArchivePath}`);
 
-  run(process.execPath, [path.join(rootDir, "scripts", "native-installer.mjs"), "--target=windows"]);
-  run(process.execPath, [path.join(rootDir, "scripts", "native-update-repo.mjs"), "--target=windows"]);
+  if (!bundleOnly) {
+    run(process.execPath, [path.join(rootDir, "scripts", "native-installer.mjs"), "--target=windows"]);
+    run(process.execPath, [path.join(rootDir, "scripts", "native-update-repo.mjs"), "--target=windows"]);
 
-  console.log(`Signing native Windows installer: ${installerPath}`);
-  signFile(signtoolPath, certificate.path, certificatePassword, timestampUrl, installerPath);
+    console.log(`Signing native Windows installer: ${installerPath}`);
+    signFile(signtoolPath, certificate.path, certificatePassword, timestampUrl, installerPath);
+  }
 } finally {
   certificate.cleanup?.();
 }
 
-console.log("Native Windows signing completed.");
+console.log(bundleOnly ? "Native Windows bundle signing completed." : "Native Windows signing completed.");

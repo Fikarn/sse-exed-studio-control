@@ -71,6 +71,21 @@ updates:
     commit-message:
       prefix: "chore(frontend-deps)"
 
+  # The SBOM generator's own lockfile (2026-09 production readiness, Slice 12).
+  # Only the release-evidence workflow installs it; the `supply-chain` job
+  # audits it on every push, like the root lockfile.
+  - package-ecosystem: npm
+    directory: "/tools/sbom"
+    target-branch: "main"
+    schedule:
+      interval: monthly
+      time: "09:00"
+      timezone: "Europe/Stockholm"
+    open-pull-requests-limit: 1
+    rebase-strategy: disabled
+    commit-message:
+      prefix: "chore(sbom-tools)"
+
   # Single cargo entry covers the whole native/ workspace (introduced in
   # `bb777ed`). Update-types for the runtime, protocol, and shell crates
   # all flow through here; the patterns below group related dependencies

@@ -67,6 +67,12 @@ function notarizeArchive(artifactLabel, archivePath, appPath, notaryCredentials)
   run("xcrun", ["stapler", "validate", appPath]);
 }
 
+// `--bundle-only` signs (and, with credentials, notarizes) the packaged app and
+// stops: the release-evidence workflow runs where QtIFW is not installed, so
+// there is no installer app there (production readiness 2026-09, Slice 12).
+// Without the flag nothing changes.
+const bundleOnly = process.argv.slice(2).includes("--bundle-only");
+
 const signingIdentity = process.env.SSE_MACOS_CODESIGN_IDENTITY?.trim();
 if (!signingIdentity) {
   console.log("Skipping native macOS signing because SSE_MACOS_CODESIGN_IDENTITY is not configured.");
@@ -104,11 +110,15 @@ const artifacts = [
     appPath: packagedAppPath,
     archivePath: packagedArchivePath,
   },
-  {
-    label: "installer app",
-    appPath: installerAppPath,
-    archivePath: installerArchivePath,
-  },
+  ...(bundleOnly
+    ? []
+    : [
+        {
+          label: "installer app",
+          appPath: installerAppPath,
+          archivePath: installerArchivePath,
+        },
+      ]),
 ];
 
 for (const artifact of artifacts) {
