@@ -1174,3 +1174,109 @@ fn seed_v3_database(db_path: &Path) {
         )
         .expect("v3 schema should seed");
 }
+
+// 2026-09 production readiness, Slice 10 (F18): a thread that opted in keeps
+// one read connection for its settings reads — opened once, replaced when
+// the database file is another one, closed when the thread opts out — and a
+// thread that did not opt in opens one per call as before.
+#[test]
+fn thread_local_read_connection_reused() {
+    let first_dir = TestDir::new("storage-read-connection-a");
+    let second_dir = TestDir::new("storage-read-connection-b");
+    let first_db = first_dir.path().join("native.sqlite3");
+    let second_db = second_dir.path().join("native.sqlite3");
+    initialize_test_database(&first_db).expect("database should initialize");
+    initialize_test_database(&second_db).expect("database should initialize");
+
+    let opens_before = thread_read_connection_opens();
+    list_settings_by_prefix(&first_db, "shell.").expect("settings should load");
+    assert_eq!(
+        thread_read_connection_opens(),
+        opens_before,
+        "a thread that has not opted in keeps no connection"
+    );
+
+    enable_thread_read_connection();
+    for _ in 0..25 {
+        list_settings_by_prefix(&first_db, "shell.").expect("settings should load");
+    }
+    assert_eq!(
+        thread_read_connection_opens(),
+        opens_before + 1,
+        "twenty-five reads share one connection"
+    );
+
+    list_settings_by_prefix(&second_db, "shell.").expect("settings should load");
+    list_settings_by_prefix(&second_db, "shell.").expect("settings should load");
+    assert_eq!(
+        thread_read_connection_opens(),
+        opens_before + 2,
+        "another database file replaces the kept connection"
+    );
+
+    // Opting out closes the connection: on Windows the directory could not
+    // be removed while a handle on the database was open.
+    disable_thread_read_connection();
+    fs::remove_dir_all(second_dir.path()).expect("nothing holds the second database open");
+    fs::remove_dir_all(first_dir.path()).expect("nothing holds the first database open");
+}
+
+// The kept connection reads what was committed after it was opened, refuses
+// to write, and holds no read transaction between calls: a backup copy and
+// a checkpoint of the write-ahead log both go through while it is open.
+#[test]
+fn kept_read_connection_sees_later_writes_and_blocks_neither_backup_nor_checkpoint() {
+    let test_dir = TestDir::new("storage-read-connection-live");
+    let db_path = test_dir.path().join("native.sqlite3");
+    let backups_dir = test_dir.path().join("backups");
+    initialize_test_database(&db_path).expect("database should initialize");
+
+    enable_thread_read_connection();
+    let before = list_settings_by_prefix(&db_path, "app.test.").expect("settings should load");
+    assert!(before.is_empty());
+
+    set_settings_owned(
+        &db_path,
+        &[(
+            String::from("app.test.marker"),
+            String::from("written-later"),
+        )],
+    )
+    .expect("a writer is not blocked by the kept connection");
+    let after = list_settings_by_prefix(&db_path, "app.test.").expect("settings should load");
+    assert_eq!(
+        after.get("app.test.marker").map(String::as_str),
+        Some("written-later")
+    );
+
+    let refused = with_read_connection(&db_path, |connection| {
+        connection.execute(
+            "INSERT INTO app_settings(key, value) VALUES ('app.test.refused', 'x')",
+            [],
+        )
+    });
+    assert!(refused.is_err(), "the kept connection is query_only");
+    let opens = thread_read_connection_opens();
+    list_settings_by_prefix(&db_path, "app.test.").expect("settings should load");
+    assert_eq!(
+        thread_read_connection_opens(),
+        opens + 1,
+        "a failed read drops the connection and the next read opens a fresh one"
+    );
+
+    crate::storage_backups::snapshot_database(
+        &db_path,
+        &backups_dir,
+        crate::storage_backups::SnapshotReason::Daily,
+    )
+    .expect("a backup copy is written while the connection is kept");
+    checkpoint_database(&db_path).expect("the write-ahead log folds in while it is kept");
+    let wal = PathBuf::from(format!("{}-wal", db_path.display()));
+    assert_eq!(
+        fs::metadata(&wal).map(|meta| meta.len()).unwrap_or(0),
+        0,
+        "the checkpoint emptied the write-ahead log"
+    );
+
+    disable_thread_read_connection();
+}

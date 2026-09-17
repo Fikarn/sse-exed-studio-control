@@ -20,7 +20,7 @@ use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{sync_channel, TrySendError};
+use std::sync::mpsc::{sync_channel, Receiver, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -148,12 +148,15 @@ pub fn start_control_surface_bridge(
             let _ = append_log(log_file_path, "INFO", &summary);
             report_health(SUBSYSTEM_BRIDGE, SubsystemState::Ok, summary.clone());
 
-            let context = Arc::new(BridgeContext::new(
-                db_path.to_path_buf(),
-                log_file_path.to_path_buf(),
-                token,
-                port,
-            ));
+            let context = Arc::new(
+                BridgeContext::new(
+                    db_path.to_path_buf(),
+                    log_file_path.to_path_buf(),
+                    token,
+                    port,
+                )
+                .keeping_read_connections(),
+            );
             thread::spawn(move || {
                 run_control_surface_bridge(listener, context, WORKER_COUNT, QUEUE_CAPACITY)
             });
@@ -199,6 +202,10 @@ struct BridgeContext {
     token: String,
     port: u16,
     rejection_log: Mutex<HashMap<u16, Instant>>,
+    /// Whether the workers keep one read connection each (Slice 10 — F18).
+    /// The engine's bridge does; a test's bridge does not, because its
+    /// workers outlive the test and would hold its temporary database open.
+    keep_read_connections: bool,
 }
 
 impl BridgeContext {
@@ -209,7 +216,13 @@ impl BridgeContext {
             token,
             port,
             rejection_log: Mutex::new(HashMap::new()),
+            keep_read_connections: false,
         }
+    }
+
+    fn keeping_read_connections(mut self) -> Self {
+        self.keep_read_connections = true;
+        self
     }
 
     /// A refused request is logged at most once per status per minute, so a
@@ -258,38 +271,7 @@ fn run_control_surface_bridge(
         let worker_context = Arc::clone(&context);
         let spawned = thread::Builder::new()
             .name(format!("control-surface-worker-{index}"))
-            .spawn(move || loop {
-                let next = receiver
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .recv();
-                let Ok(stream) = next else {
-                    break;
-                };
-                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    handle_control_surface_connection(stream, &worker_context)
-                }));
-                match outcome {
-                    Ok(Ok(())) => {}
-                    Ok(Err(error)) => {
-                        let _ = append_log(
-                            worker_context.log_file_path.as_path(),
-                            "WARN",
-                            &format!(
-                                "Control-surface bridge request failed: {}",
-                                error.message()
-                            ),
-                        );
-                    }
-                    Err(_) => {
-                        let _ = append_log(
-                            worker_context.log_file_path.as_path(),
-                            "ERROR",
-                            "Control-surface bridge worker recovered from a panic while serving a request",
-                        );
-                    }
-                }
-            });
+            .spawn(move || serve_queued_connections(&receiver, &worker_context));
         if let Err(error) = spawned {
             let _ = append_log(
                 context.log_file_path.as_path(),
@@ -314,6 +296,44 @@ fn run_control_surface_bridge(
                     &format!("Control-surface bridge accept failed: {error}"),
                 );
                 thread::sleep(Duration::from_millis(50));
+            }
+        }
+    }
+}
+
+/// One worker: serves queued connections until the acceptor goes away. The
+/// engine's workers keep one read connection each for their settings reads
+/// (2026-09 production readiness, Slice 10 — F18).
+fn serve_queued_connections(receiver: &Mutex<Receiver<TcpStream>>, context: &BridgeContext) {
+    if context.keep_read_connections {
+        crate::storage::enable_thread_read_connection();
+    }
+    loop {
+        let next = receiver
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .recv();
+        let Ok(stream) = next else {
+            break;
+        };
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            handle_control_surface_connection(stream, context)
+        }));
+        match outcome {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => {
+                let _ = append_log(
+                    context.log_file_path.as_path(),
+                    "WARN",
+                    &format!("Control-surface bridge request failed: {}", error.message()),
+                );
+            }
+            Err(_) => {
+                let _ = append_log(
+                    context.log_file_path.as_path(),
+                    "ERROR",
+                    "Control-surface bridge worker recovered from a panic while serving a request",
+                );
             }
         }
     }

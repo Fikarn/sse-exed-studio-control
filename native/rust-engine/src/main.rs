@@ -566,6 +566,17 @@ fn main() -> io::Result<()> {
         &log_file_path,
         SnapshotReason::Shutdown,
     );
+    // The sACN, metering and bridge threads keep a read connection each and
+    // are still alive here, so closing the last connection no longer folds
+    // the write-ahead log into the file by itself (Slice 10): ask for it, so
+    // a graceful stop leaves the database file complete on its own.
+    if let Err(error) = storage::checkpoint_database(&db_path) {
+        let _ = append_log(
+            &log_file_path,
+            "WARN",
+            &format!("The database was not checkpointed on shutdown: {error}"),
+        );
+    }
 
     Ok(())
 }

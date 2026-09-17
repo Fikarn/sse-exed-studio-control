@@ -42,9 +42,12 @@ mod preview;
 mod scenes;
 mod settings;
 mod snapshot;
+mod state_lock;
 mod types;
 
-pub use editor_state::{load_lighting_editor_state, save_lighting_editor_state};
+pub use editor_state::load_lighting_editor_state;
+#[cfg(test)]
+use editor_state::save_lighting_editor_state;
 pub use fixture_catalog::*;
 pub use fixtures::*;
 pub use groups::*;
@@ -57,7 +60,10 @@ pub use preview::*;
 pub use scenes::*;
 pub use settings::*;
 pub use snapshot::*;
+pub use state_lock::*;
 pub use types::*;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_state_lock;

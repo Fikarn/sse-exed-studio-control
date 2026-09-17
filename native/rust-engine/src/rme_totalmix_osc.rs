@@ -5,7 +5,7 @@ use crate::audio::{
 use crate::diagnostics::{append_log, log_event, LogLevel};
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_OSC};
 use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
-use crate::storage::list_settings_by_prefix;
+use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
 use rosc::{decoder, encoder, OscMessage, OscPacket, OscType};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -699,6 +699,9 @@ pub fn spawn_rme_totalmix_audio_metering(
 ) {
     let state = shared_meter_state();
     thread::spawn(move || {
+        // One kept read connection for this thread's settings reads
+        // (2026-09 production readiness, Slice 10 — F18).
+        enable_thread_read_connection();
         let poll_interval = configured_poll_interval();
         let bind_override =
             match parse_bind_override(std::env::var(OSC_BIND_HOST_ENV).ok().as_deref()) {

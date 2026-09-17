@@ -17,8 +17,10 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_SACN};
-use crate::lighting::{read_lighting_sacn_output_state, LightingUniverseFrame};
-use crate::storage::list_settings_by_prefix;
+use crate::lighting::{
+    lighting_render_generation, read_lighting_sacn_output_state, LightingUniverseFrame,
+};
+use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use std::path::{Path, PathBuf};
@@ -28,6 +30,7 @@ use std::time::{Duration, Instant};
 pub const SACN_PORT: u16 = 5568;
 const OUTPUT_TICK: Duration = Duration::from_millis(40);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_millis(800);
+const SETTINGS_SAFETY_REREAD: Duration = Duration::from_secs(2);
 const STREAM_TERMINATED_SENDS: usize = 3;
 const E131_PRIORITY: u8 = 100;
 const E131_PACKET_LEN: usize = 638;
@@ -50,6 +53,49 @@ struct UniverseTx {
     last_sent_at: Instant,
 }
 
+/// The settings the output renders from (2026-09 production readiness,
+/// Slice 10 — F18). The database is read when the lighting render generation
+/// has moved since the last read, and otherwise once per
+/// `SETTINGS_SAFETY_REREAD` for a writer that does not advance it; every
+/// other tick renders from what is kept here. Settings are kept, never
+/// frames: a fade and an identify burst are timestamps inside the settings
+/// and move with the clock, so each tick still renders them anew.
+#[derive(Default)]
+struct RenderSettingsCache {
+    settings: Option<HashMap<String, String>>,
+    generation: Option<u64>,
+    read_at: Option<Instant>,
+}
+
+impl RenderSettingsCache {
+    /// The settings for this tick; `read` runs only when they are due. A
+    /// read that fails keeps the last good settings — the wire keeps its
+    /// keep-alives through storage contention — and is tried again on the
+    /// next tick.
+    fn settings_for_tick(
+        &mut self,
+        generation: u64,
+        now: Instant,
+        read: impl FnOnce() -> Option<HashMap<String, String>>,
+    ) -> Option<&HashMap<String, String>> {
+        let due = match (self.generation, self.read_at) {
+            (Some(seen), Some(read_at)) => {
+                seen != generation
+                    || now.saturating_duration_since(read_at) >= SETTINGS_SAFETY_REREAD
+            }
+            _ => true,
+        };
+        if due {
+            if let Some(settings) = read() {
+                self.settings = Some(settings);
+                self.generation = Some(generation);
+                self.read_at = Some(now);
+            }
+        }
+        self.settings.as_ref()
+    }
+}
+
 fn run_output_loop(db_path: &Path, log_file_path: &Path) {
     let socket = match UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)) {
         Ok(socket) => {
@@ -68,18 +114,25 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path) {
         }
     };
 
+    enable_thread_read_connection();
     let mut active_bridge: Option<Ipv4Addr> = None;
     let mut universes: HashMap<u16, UniverseTx> = HashMap::new();
+    let mut render_settings = RenderSettingsCache::default();
 
     loop {
         thread::sleep(OUTPUT_TICK);
 
-        let Ok(settings) = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX) else {
-            // Transient storage contention; keep the last wire state and retry.
+        // The generation is read before the settings, so a change that lands
+        // between the two costs one more read and is never missed.
+        let generation = lighting_render_generation();
+        let Some(settings) = render_settings.settings_for_tick(generation, Instant::now(), || {
+            list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX).ok()
+        }) else {
+            // Nothing read yet (storage contention at start); retry next tick.
             continue;
         };
 
-        match read_lighting_sacn_output_state(&settings) {
+        match read_lighting_sacn_output_state(settings) {
             Some(state) => {
                 if active_bridge != Some(state.bridge_ip) {
                     if let Some(previous_bridge) = active_bridge {
@@ -328,5 +381,176 @@ mod tests {
             .expect("packet should arrive");
         assert_eq!(received, E131_PACKET_LEN);
         assert_eq!(&buffer[..received], &packet[..]);
+    }
+
+    // 2026-09 production readiness, Slice 10 (F18): the output thread read
+    // the database on every 40 ms tick. It now reads when the render
+    // generation has moved, and once per safety interval; the generation and
+    // the clock are handed in here, so nothing process-wide is touched and
+    // nothing sleeps.
+    #[test]
+    fn rerenders_settings_only_on_generation_change() {
+        let reads = std::cell::Cell::new(0_u32);
+        let settings_numbered = |number: u32| {
+            let mut settings = HashMap::new();
+            settings.insert(String::from("app.test.read"), number.to_string());
+            settings
+        };
+        let read = || {
+            reads.set(reads.get() + 1);
+            Some(settings_numbered(reads.get()))
+        };
+        let mut cache = RenderSettingsCache::default();
+        let started = Instant::now();
+        let tick = |ticks: u32| started + OUTPUT_TICK * ticks;
+
+        // The first tick reads; the next second of ticks does not.
+        assert_eq!(
+            cache
+                .settings_for_tick(7, tick(0), read)
+                .map(|s| s["app.test.read"].clone()),
+            Some(String::from("1"))
+        );
+        for ticks in 1..=25 {
+            assert!(cache.settings_for_tick(7, tick(ticks), read).is_some());
+        }
+        assert_eq!(reads.get(), 1, "a second of ticks, one read");
+
+        // One state change, one read — however many ticks follow it.
+        for ticks in 26..=45 {
+            cache.settings_for_tick(8, tick(ticks), read);
+        }
+        assert_eq!(reads.get(), 2, "one read per state change");
+        assert_eq!(
+            cache
+                .settings_for_tick(8, tick(46), read)
+                .map(|s| s["app.test.read"].clone()),
+            Some(String::from("2")),
+            "the ticks in between render from what was read"
+        );
+
+        // The safety read, for a writer that does not advance the generation:
+        // due two seconds after the last read, and not before.
+        let last_read = tick(26);
+        let almost = last_read + SETTINGS_SAFETY_REREAD - Duration::from_millis(1);
+        cache.settings_for_tick(8, almost, read);
+        assert_eq!(reads.get(), 2);
+        cache.settings_for_tick(8, last_read + SETTINGS_SAFETY_REREAD, read);
+        assert_eq!(reads.get(), 3, "the safety read");
+        cache.settings_for_tick(8, last_read + SETTINGS_SAFETY_REREAD + OUTPUT_TICK, read);
+        assert_eq!(reads.get(), 3);
+
+        // A read that fails keeps the last good settings and is tried again
+        // on the next tick; the change is not marked as seen.
+        let later = last_read + SETTINGS_SAFETY_REREAD + OUTPUT_TICK * 2;
+        let failing = || {
+            reads.set(reads.get() + 1);
+            None
+        };
+        assert_eq!(
+            cache
+                .settings_for_tick(9, later, failing)
+                .map(|s| s["app.test.read"].clone()),
+            Some(String::from("3")),
+            "the wire keeps its last good settings through a failed read"
+        );
+        assert_eq!(reads.get(), 4);
+        cache.settings_for_tick(9, later + OUTPUT_TICK, read);
+        assert_eq!(
+            reads.get(),
+            5,
+            "the failed read is retried on the next tick"
+        );
+        cache.settings_for_tick(9, later + OUTPUT_TICK * 2, read);
+        assert_eq!(reads.get(), 5);
+
+        // Nothing read yet and the read fails: nothing to render from.
+        let mut empty = RenderSettingsCache::default();
+        assert!(empty.settings_for_tick(1, started, || None).is_none());
+    }
+
+    // The frames rendered from the kept settings are the frames a fresh read
+    // renders — byte for byte, on a later tick too — and they are the golden
+    // values: 40 % is DMX 102, off is 0. No fade or identify burst is
+    // running, so the clock plays no part. Nothing is sent anywhere.
+    #[test]
+    fn render_frames_identical_before_and_after_cache() {
+        use crate::control_surface::test_support::TestDir;
+        use crate::lighting::{parse_lighting_fixture_update_request, update_lighting_fixture};
+        use crate::storage::{initialize_test_database, set_settings_owned};
+
+        let test_dir = TestDir::new("sacn-golden");
+        let db_path = test_dir.db_path();
+        initialize_test_database(db_path.as_path()).expect("database should initialize");
+        set_settings_owned(
+            db_path.as_path(),
+            &[(
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("127.0.0.1"),
+            )],
+        )
+        .expect("bridge address should persist");
+        for (fixture_id, on, intensity) in [
+            ("fixture-key-left", true, 40),
+            ("fixture-key-right", false, 80),
+        ] {
+            update_lighting_fixture(
+                db_path.as_path(),
+                &parse_lighting_fixture_update_request(&serde_json::json!({
+                    "fixtureId": fixture_id,
+                    "on": on,
+                    "intensity": intensity,
+                }))
+                .expect("the update should parse"),
+            )
+            .expect("the fixture should update");
+        }
+
+        let read = || list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX).ok();
+        let fresh = read_lighting_sacn_output_state(&read().expect("settings should load"))
+            .expect("a commissioned rig renders frames");
+
+        let mut cache = RenderSettingsCache::default();
+        let started = Instant::now();
+        let first = read_lighting_sacn_output_state(
+            cache
+                .settings_for_tick(1, started, read)
+                .expect("the first tick reads"),
+        )
+        .expect("frames from the kept settings");
+        let later = read_lighting_sacn_output_state(
+            cache
+                .settings_for_tick(1, started + OUTPUT_TICK * 10, || {
+                    panic!("an unchanged generation must not read")
+                })
+                .expect("the kept settings"),
+        )
+        .expect("frames from the kept settings");
+
+        assert_eq!(fresh.bridge_ip, Ipv4Addr::LOCALHOST);
+        assert_eq!(fresh.frames.len(), 1);
+        for rendered in [&first, &later] {
+            assert_eq!(rendered.bridge_ip, fresh.bridge_ip);
+            assert_eq!(rendered.frames.len(), fresh.frames.len());
+            assert_eq!(rendered.frames[0].universe, fresh.frames[0].universe);
+            assert_eq!(rendered.frames[0].slots[..], fresh.frames[0].slots[..]);
+        }
+
+        let snapshot = crate::lighting::read_lighting_snapshot(&read().expect("settings"));
+        let slot_of = |fixture_id: &str| {
+            let fixture = snapshot
+                .fixtures
+                .iter()
+                .find(|fixture| fixture.id == fixture_id)
+                .expect("fixture should be present");
+            (fixture.dmx_start_address - 1) as usize
+        };
+        let slots = &fresh.frames[0].slots;
+        assert_eq!(slots[slot_of("fixture-key-left")], 102, "40 % is DMX 102");
+        assert_eq!(slots[slot_of("fixture-key-right")], 0, "an unlit fixture");
+        assert!(
+            slots[slot_of("fixture-key-right") + 1] > 0,
+            "its colour temperature slot still carries its value"
+        );
     }
 }

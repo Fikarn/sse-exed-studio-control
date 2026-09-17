@@ -101,6 +101,50 @@ pub fn read_lighting_snapshot_with_preview(
     snapshot
 }
 
+/// What a fixture is set to as the operator means it: the preview buffer
+/// while previewing, otherwise the stored state with a running fade sampled
+/// now — never the identify, highlight or solo overlays, which exist only
+/// at render time. The Stream Deck's relative keys start from these values
+/// and its LCD shows them (Slice 10 — F12).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LightingFixtureLevels {
+    pub on: bool,
+    pub intensity: i64,
+    pub cct: i64,
+    pub previewing: bool,
+}
+
+pub fn read_lighting_fixture_levels(
+    settings: &HashMap<String, String>,
+    preview: &LightingPreviewRuntimeState,
+    fixture_id: &str,
+) -> Option<LightingFixtureLevels> {
+    let mut editor_state = load_lighting_editor_state(settings);
+    apply_active_fade_sample(&mut editor_state, current_unix_ms());
+    let fixture = editor_state
+        .fixtures
+        .iter()
+        .find(|entry| entry.id == fixture_id)?;
+    let staged = preview
+        .enabled
+        .then(|| preview.fixture_states.get(fixture_id))
+        .flatten();
+    Some(match staged {
+        Some(staged) => LightingFixtureLevels {
+            on: staged.on,
+            intensity: clamp_i64(staged.intensity, 0, 100),
+            cct: staged.cct,
+            previewing: true,
+        },
+        None => LightingFixtureLevels {
+            on: fixture.on,
+            intensity: clamp_i64(fixture.intensity, 0, 100),
+            cct: fixture.cct,
+            previewing: preview.enabled,
+        },
+    })
+}
+
 pub fn set_lighting_preview_mode(
     db_path: &Path,
     request: &LightingPreviewModeRequest,

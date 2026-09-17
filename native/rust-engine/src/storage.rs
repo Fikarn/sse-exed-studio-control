@@ -14,6 +14,7 @@ use crate::shell_settings::{default_settings_entries, WORKSPACE_KEY};
 use crate::storage_backups::{snapshot_database_with, SnapshotReason};
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension, Transaction};
 use serde_json::{json, to_string, Value};
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -87,7 +88,22 @@ pub fn list_settings_by_prefix(
     db_path: &Path,
     prefix: &str,
 ) -> EngineResult<HashMap<String, String>> {
+    if READ_CONNECTION_ENABLED.with(Cell::get) {
+        return with_read_connection(db_path, |connection| {
+            query_settings_by_prefix(connection, prefix)
+        });
+    }
     let connection = open_connection(db_path)?;
+    Ok(query_settings_by_prefix(&connection, prefix)?)
+}
+
+/// The statement and its rows are dropped before this returns, so a
+/// connection that outlives the call never pins a read transaction and the
+/// write-ahead log can always be checkpointed.
+fn query_settings_by_prefix(
+    connection: &Connection,
+    prefix: &str,
+) -> Result<HashMap<String, String>, rusqlite::Error> {
     let mut statement = connection
         .prepare("SELECT key, value FROM app_settings WHERE key LIKE ?1 ORDER BY key ASC")?;
     let rows = statement.query_map([format!("{prefix}%")], |row| {
@@ -103,6 +119,95 @@ pub fn list_settings_by_prefix(
     }
 
     Ok(settings)
+}
+
+struct ReadConnection {
+    db_path: PathBuf,
+    connection: Connection,
+}
+
+thread_local! {
+    static READ_CONNECTION_ENABLED: Cell<bool> = const { Cell::new(false) };
+    static READ_CONNECTION: RefCell<Option<ReadConnection>> = const { RefCell::new(None) };
+    static READ_CONNECTION_OPENS: Cell<u64> = const { Cell::new(0) };
+}
+
+/// Opts the calling thread into one kept read connection for
+/// `list_settings_by_prefix` (2026-09 production readiness, Slice 10 — F18).
+/// Only the three threads that live as long as the engine and read settings
+/// all day call this — the sACN output, the TotalMix metering and the
+/// bridge's workers. Every other thread, the IPC loop and every test thread
+/// among them, keeps opening a connection per call, so nothing holds a
+/// database file open that a test or a restore is about to move.
+pub fn enable_thread_read_connection() {
+    READ_CONNECTION_ENABLED.with(|enabled| enabled.set(true));
+}
+
+/// Runs `read` on this thread's kept read connection, opening it when there
+/// is none yet or when it belongs to another database file. The connection
+/// is opened read-write and then made `query_only`: a read-only open fails
+/// on a write-ahead-log database whose shared-memory file is gone, which is
+/// the state every per-call writer leaves behind. The journal mode and
+/// `synchronous` are left as the file has them. A failed read drops the
+/// connection, so the next call starts from a fresh one.
+pub(crate) fn with_read_connection<T>(
+    db_path: &Path,
+    read: impl FnOnce(&Connection) -> Result<T, rusqlite::Error>,
+) -> EngineResult<T> {
+    READ_CONNECTION.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if slot.as_ref().is_some_and(|kept| kept.db_path != db_path) {
+            *slot = None;
+        }
+        if slot.is_none() {
+            let connection = Connection::open(db_path)?;
+            connection.pragma_update(None, "busy_timeout", 5000)?;
+            connection.pragma_update(None, "query_only", "ON")?;
+            READ_CONNECTION_OPENS.with(|opens| opens.set(opens.get() + 1));
+            *slot = Some(ReadConnection {
+                db_path: db_path.to_path_buf(),
+                connection,
+            });
+        }
+        let outcome = slot.as_ref().map(|kept| read(&kept.connection));
+        match outcome {
+            Some(Ok(value)) => Ok(value),
+            Some(Err(error)) => {
+                *slot = None;
+                Err(error.into())
+            }
+            None => Err("the read connection could not be kept".into()),
+        }
+    })
+}
+
+/// How many read connections this thread has opened; a test's counter.
+#[cfg(test)]
+pub(crate) fn thread_read_connection_opens() -> u64 {
+    READ_CONNECTION_OPENS.with(Cell::get)
+}
+
+/// Closes this thread's read connection and opts the thread out again, so a
+/// test can remove its directory.
+#[cfg(test)]
+pub(crate) fn disable_thread_read_connection() {
+    READ_CONNECTION_ENABLED.with(|enabled| enabled.set(false));
+    READ_CONNECTION.with(|slot| *slot.borrow_mut() = None);
+}
+
+/// Folds the write-ahead log into the database file and empties it. The
+/// threads that keep a read connection never close theirs, so the checkpoint
+/// SQLite runs when the last connection closes no longer happens by itself:
+/// the engine asks for it on a graceful stop, and the pending-restore step
+/// asks for it before it moves the database file aside (Slice 10).
+pub(crate) fn checkpoint_database(db_path: &Path) -> EngineResult<()> {
+    let connection = open_connection(db_path)?;
+    let busy: i64 =
+        connection.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))?;
+    if busy != 0 {
+        return Err("the write-ahead log is in use by a reader and was not folded in".into());
+    }
+    Ok(())
 }
 
 pub fn set_settings(db_path: &Path, settings: &[(&str, String)]) -> EngineResult<()> {

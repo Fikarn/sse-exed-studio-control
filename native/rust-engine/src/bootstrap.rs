@@ -8,8 +8,8 @@ use crate::health::{
 use crate::legacy_import::LegacyImportRequest;
 use crate::planning::planning_data_present;
 use crate::storage::{
-    import_legacy_db, initialize_database, EngineResult, StorageBootstrap, StorageError,
-    STORAGE_SCHEMA_VERSION,
+    checkpoint_database, import_legacy_db, initialize_database, EngineResult, StorageBootstrap,
+    StorageError, STORAGE_SCHEMA_VERSION,
 };
 use crate::storage_backups::{newest_snapshot, reserve_snapshot_path, SnapshotReason};
 use crate::support::{inspect_database_backup, prune_exports, RESTORE_PENDING_FILE_NAME};
@@ -495,6 +495,21 @@ pub(crate) fn apply_pending_restore(runtime_paths: &RuntimePaths) -> EngineResul
     let db_path = &runtime_paths.db_path;
     let mut replaced = None;
     if db_path.exists() {
+        // Fold the write-ahead log into the file before it is moved aside:
+        // the log is deleted below, and an engine that was ended rather than
+        // stopped leaves its last commits there (Slice 10 — the threads that
+        // keep a read connection never close it, so no close folds it in).
+        // Best effort: a database that cannot be opened is the very reason a
+        // restore may be pending, and it is kept as it is.
+        if let Err(error) = checkpoint_database(db_path) {
+            append_log(
+                &runtime_paths.log_file_path,
+                "WARN",
+                &format!(
+                    "The database being replaced could not be checkpointed first ({error}); it is kept as it is"
+                ),
+            )?;
+        }
         let target = reserve_snapshot_path(&runtime_paths.backups_dir, SnapshotReason::Replaced)?;
         fs::rename(db_path, &target)?;
         replaced = Some(target);
@@ -1153,6 +1168,92 @@ mod tests {
         assert_eq!(
             marker.get("app.test.marker").map(String::as_str),
             Some("before")
+        );
+    }
+
+    // Slice 10: an engine that was ended rather than stopped leaves its last
+    // commits in the write-ahead log (the threads that keep a read connection
+    // never close it, so no close folds the log in). The pending restore
+    // deletes that log, so it folds it into the file first — the replaced
+    // copy is the whole database, not the file as of the last checkpoint.
+    #[test]
+    fn pending_restore_folds_the_write_ahead_log_into_the_replaced_copy() {
+        let live_dir = TestDir::new("pending-wal-live");
+        let live = runtime_paths_for(&live_dir);
+        initialize_database(&live.db_path, &live.backups_dir).expect("database should initialize");
+        set_settings_owned(
+            &live.db_path,
+            &[(
+                String::from("app.test.marker"),
+                String::from("checkpointed"),
+            )],
+        )
+        .expect("marker should write");
+        let backup = snapshot_database(&live.db_path, &live.backups_dir, SnapshotReason::Daily)
+            .expect("backup should write");
+
+        // While another connection stays open, a commit stays in the log.
+        let holder = crate::storage::open_connection(&live.db_path).expect("holder should open");
+        set_settings_owned(
+            &live.db_path,
+            &[(
+                String::from("app.test.marker"),
+                String::from("only-in-the-log"),
+            )],
+        )
+        .expect("marker should change");
+
+        // What a killed engine leaves behind: the file and its log, copied
+        // as they are on disk.
+        let killed_dir = TestDir::new("pending-wal-killed");
+        let killed = runtime_paths_for(&killed_dir);
+        fs::create_dir_all(&killed.logs_dir).expect("logs dir");
+        fs::create_dir_all(&killed.backups_dir).expect("backups dir");
+        let wal_of = |path: &Path| PathBuf::from(format!("{}-wal", path.display()));
+        fs::write(
+            &killed.db_path,
+            fs::read(&live.db_path).expect("database file should read"),
+        )
+        .expect("database file should copy");
+        fs::write(
+            wal_of(&killed.db_path),
+            fs::read(wal_of(&live.db_path)).expect("log should read"),
+        )
+        .expect("log should copy");
+
+        // The premise: the file alone does not have the commit.
+        let bare_dir = TestDir::new("pending-wal-bare");
+        let bare_db = bare_dir.path().join("studio-control.sqlite3");
+        fs::write(
+            &bare_db,
+            fs::read(&live.db_path).expect("database file should read"),
+        )
+        .expect("database file should copy");
+        let bare = list_settings_by_prefix(&bare_db, "app.test.").expect("settings");
+        assert_eq!(
+            bare.get("app.test.marker").map(String::as_str),
+            Some("checkpointed"),
+            "the last commit is only in the write-ahead log"
+        );
+        drop(holder);
+
+        let pending = killed.app_data_dir.join(RESTORE_PENDING_FILE_NAME);
+        fs::copy(&backup, &pending).expect("pending should stage");
+        let replaced = apply_pending_restore(&killed)
+            .expect("the pending restore applies")
+            .expect("the database was replaced");
+
+        let kept = list_settings_by_prefix(&replaced, "app.test.").expect("settings");
+        assert_eq!(
+            kept.get("app.test.marker").map(String::as_str),
+            Some("only-in-the-log"),
+            "the replaced copy carries the commit that was still in the log"
+        );
+        let restored = list_settings_by_prefix(&killed.db_path, "app.test.").expect("settings");
+        assert_eq!(
+            restored.get("app.test.marker").map(String::as_str),
+            Some("checkpointed"),
+            "the restored database is the backup, untouched by the old log"
         );
     }
 

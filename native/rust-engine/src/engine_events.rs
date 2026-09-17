@@ -11,7 +11,10 @@ use std::sync::OnceLock;
 
 use serde_json::{json, Value};
 
-use crate::protocol::{event_message, EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED};
+use crate::protocol::{
+    event_message, EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_LIGHTING_CHANGED,
+    EVENT_PLANNING_CHANGED,
+};
 
 static ENGINE_EVENT_SENDER: OnceLock<Sender<Value>> = OnceLock::new();
 
@@ -38,6 +41,29 @@ pub(crate) fn emit_app_changed(reason: &str) {
         let _ = sender.send(event_message(
             EVENT_APP_CHANGED,
             json!({ "reason": reason }),
+        ));
+    }
+}
+
+/// Emits `lighting.changed { reason }`. A Stream Deck lighting key arrives
+/// this way (2026-09 production readiness, Slice 10) as `"control-surface"`,
+/// so an open Lighting workspace follows the deck.
+pub(crate) fn emit_lighting_changed(reason: &str) {
+    if let Some(sender) = ENGINE_EVENT_SENDER.get() {
+        let _ = sender.send(event_message(
+            EVENT_LIGHTING_CHANGED,
+            json!({ "reason": reason }),
+        ));
+    }
+}
+
+/// Emits `planning.changed { reason }` with the payload shape the IPC loop
+/// uses; the deck names no project or task, so both are null.
+pub(crate) fn emit_planning_changed(reason: &str) {
+    if let Some(sender) = ENGINE_EVENT_SENDER.get() {
+        let _ = sender.send(event_message(
+            EVENT_PLANNING_CHANGED,
+            json!({ "reason": reason, "projectId": null, "taskId": null }),
         ));
     }
 }

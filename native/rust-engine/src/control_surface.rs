@@ -8,10 +8,14 @@ use crate::control_surface_audio::{
     AudioDeckStrip,
 };
 use crate::lighting::{
-    load_lighting_editor_state, parse_lighting_scene_recall_request, read_lighting_snapshot,
-    recall_lighting_scene, save_lighting_editor_state, LightingCommandError,
-    LightingEditorFixtureState, LightingEditorSceneFixtureState, LightingEditorSceneState,
-    LightingEditorState,
+    create_lighting_scene_with_preview, delete_lighting_scene, load_lighting_editor_state,
+    lock_shared_lighting_preview, parse_lighting_all_power_request,
+    parse_lighting_fixture_update_request, parse_lighting_scene_create_request,
+    parse_lighting_scene_delete_request, parse_lighting_scene_recall_request,
+    read_lighting_fixture_levels, recall_lighting_scene_with_preview,
+    set_lighting_all_power_with_preview, update_lighting_fixture_with_preview,
+    with_lighting_state_and_preview, LightingCommandError, LightingEditorState,
+    LightingFixtureLevels, LightingPreviewRuntimeState,
 };
 use crate::planning::{
     apply_planning_project_create, apply_planning_project_delete, apply_planning_project_reorder,
@@ -53,11 +57,6 @@ pub struct ControlSurfaceBridgeInfo {
     pub summary: String,
     pub error: Option<String>,
 }
-
-type LightingDeckState = LightingEditorState;
-type LightingDeckFixtureState = LightingEditorFixtureState;
-type LightingDeckSceneState = LightingEditorSceneState;
-type LightingDeckSceneFixtureState = LightingEditorSceneFixtureState;
 
 #[derive(Debug)]
 pub enum ControlSurfaceError {
@@ -203,9 +202,8 @@ pub fn read_control_surface_lcd_text(
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let context = read_planning_context(db_path, &planning_settings)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    let lighting_snapshot = read_lighting_snapshot(&app_settings);
     let audio_snapshot = read_audio_snapshot(&app_settings);
-    let lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
+    let lighting_state = load_lighting_editor_state(&app_settings);
 
     match key {
         "project_nav" => {
@@ -282,14 +280,14 @@ pub fn read_control_surface_lcd_text(
                     .iter()
                     .map(|fixture| fixture.id.as_str()),
             );
-            if let Some(selected_light_id) = selected_light_id {
-                if let Some(fixture) = lighting_state
-                    .fixtures
-                    .iter()
-                    .find(|fixture| fixture.id == selected_light_id)
-                {
-                    return Ok(format!("INTENSITY\\n{}%", fixture.intensity));
-                }
+            if let Some(levels) =
+                selected_light_id.and_then(|fixture_id| deck_fixture_levels(db_path, &fixture_id))
+            {
+                return Ok(format!(
+                    "INTENSITY\\n{}%{}",
+                    levels.intensity,
+                    preview_lcd_line(&levels)
+                ));
             }
             Ok(String::from("INTENSITY\\n--"))
         }
@@ -302,14 +300,14 @@ pub fn read_control_surface_lcd_text(
                     .iter()
                     .map(|fixture| fixture.id.as_str()),
             );
-            if let Some(selected_light_id) = selected_light_id {
-                if let Some(fixture) = lighting_state
-                    .fixtures
-                    .iter()
-                    .find(|fixture| fixture.id == selected_light_id)
-                {
-                    return Ok(format!("CCT\\n{}K", fixture.cct));
-                }
+            if let Some(levels) =
+                selected_light_id.and_then(|fixture_id| deck_fixture_levels(db_path, &fixture_id))
+            {
+                return Ok(format!(
+                    "CCT\\n{}K{}",
+                    levels.cct,
+                    preview_lcd_line(&levels)
+                ));
             }
             Ok(String::from("CCT\\n--"))
         }
@@ -426,8 +424,39 @@ pub fn handle_control_surface_http_action(
     };
     if response.is_ok() {
         let _ = stamp_control_surface_last_event(db_path, path, action, value);
+        match deck_change_event(path, action) {
+            Some(DeckChange::Lighting) => {
+                crate::engine_events::emit_lighting_changed("control-surface")
+            }
+            Some(DeckChange::Planning) => {
+                crate::engine_events::emit_planning_changed("control-surface")
+            }
+            None => {}
+        }
     }
     response
+}
+
+/// What a deck action changed, as the screen needs to hear it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeckChange {
+    Lighting,
+    Planning,
+}
+
+/// The event a successful deck action raises (2026-09 production readiness,
+/// Slice 10), so an open workspace follows the deck instead of waiting for
+/// its next request. The audio route announces itself (`emit_audio_changed`);
+/// the deck mode is a planning setting although its key sits on the lighting
+/// route; `openDetail` changes nothing.
+fn deck_change_event(path: &str, action: &str) -> Option<DeckChange> {
+    match (path, action) {
+        ("/api/deck/action", "openDetail") => None,
+        ("/api/deck/action", _) => Some(DeckChange::Planning),
+        ("/api/deck/light-action", "switchToDeckMode") => Some(DeckChange::Planning),
+        ("/api/deck/light-action", _) => Some(DeckChange::Lighting),
+        _ => None,
+    }
 }
 
 fn stamp_control_surface_last_event(
@@ -669,22 +698,37 @@ fn handle_light_action(
     action: &str,
     value: Option<&str>,
 ) -> Result<Value, ControlSurfaceError> {
+    if action == "switchToDeckMode" {
+        let deck_mode = value.unwrap_or("light");
+        let result = update_planning_settings(
+            db_path,
+            &parse_planning_settings_update(&json!({ "deckMode": deck_mode }))
+                .map_err(ControlSurfaceError::InvalidParams)?,
+        )
+        .map_err(map_planning_error)?;
+        return Ok(json!({ "deckMode": result.settings.deck_mode }));
+    }
+
+    // Every lighting key reads, decides and writes under the lighting state
+    // lock, with the preview the IPC loop uses, and changes lighting state
+    // only through the functions the screen's requests run (2026-09
+    // production readiness, Slice 10 — F12): two keys, or a key and the
+    // screen, can no longer overwrite each other's change, and a key pressed
+    // while previewing edits the preview buffer, not the light output.
+    with_lighting_state_and_preview(|preview| locked_light_action(db_path, action, preview))
+}
+
+fn locked_light_action(
+    db_path: &Path,
+    action: &str,
+    preview: &mut LightingPreviewRuntimeState,
+) -> Result<Value, ControlSurfaceError> {
+    let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
+    let lighting_state = load_lighting_editor_state(&app_settings);
+
     match action {
-        "switchToDeckMode" => {
-            let deck_mode = value.unwrap_or("light");
-            let result = update_planning_settings(
-                db_path,
-                &parse_planning_settings_update(&json!({ "deckMode": deck_mode }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "deckMode": result.settings.deck_mode }))
-        }
         "selectNextLight" | "selectPrevLight" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_snapshot = read_lighting_snapshot(&app_settings);
-            let lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
             let selected_light_id = resolve_selected_inventory_id(
                 &app_settings,
                 SELECTED_LIGHT_ID_KEY,
@@ -705,10 +749,6 @@ fn handle_light_action(
             Ok(json!({ "selectedLightId": next_light_id }))
         }
         "selectNextScene" | "selectPrevScene" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_snapshot = read_lighting_snapshot(&app_settings);
-            let lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
             let selected_scene_id = resolve_selected_inventory_id(
                 &app_settings,
                 SELECTED_SCENE_ID_KEY,
@@ -722,148 +762,106 @@ fn handle_light_action(
             persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, next_scene_id.as_deref())?;
             Ok(json!({ "selectedSceneId": next_scene_id }))
         }
-        "toggleLight" | "allOn" | "allOff" | "intensityUp" | "intensityDown" | "cctUp"
-        | "cctDown" | "resetIntensity" | "resetCct" | "saveScene" | "deleteScene" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_snapshot = read_lighting_snapshot(&app_settings);
-            let mut lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
-
-            match action {
-                "toggleLight" => {
-                    let (fixture_id, next_on) = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        fixture.on = !fixture.on;
-                        (fixture.id.clone(), fixture.on)
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "on": next_on } }))
-                }
-                "allOn" | "allOff" => {
-                    let next_on = action == "allOn";
-                    for fixture in &mut lighting_state.fixtures {
-                        fixture.on = next_on;
-                    }
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "on": next_on }))
-                }
-                "intensityUp" | "intensityDown" => {
-                    let (fixture_id, intensity) = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        let delta = if action == "intensityUp" { 5 } else { -5 };
-                        fixture.intensity = clamp_i64(fixture.intensity + delta, 0, 100);
-                        (fixture.id.clone(), fixture.intensity)
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "intensity": intensity } }))
-                }
-                "cctUp" | "cctDown" => {
-                    let (fixture_id, cct) = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        let delta = if action == "cctUp" { 200 } else { -200 };
-                        fixture.cct = clamp_i64(fixture.cct + delta, 2700, 6500);
-                        (fixture.id.clone(), fixture.cct)
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "cct": cct } }))
-                }
-                "resetIntensity" => {
-                    let fixture_id = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        fixture.intensity = 100;
-                        fixture.id.clone()
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "intensity": 100 } }))
-                }
-                "resetCct" => {
-                    let fixture_id = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        fixture.cct = 4500;
-                        fixture.id.clone()
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "cct": 4500 } }))
-                }
-                "saveScene" => {
-                    if lighting_state.fixtures.is_empty() {
-                        return Err(ControlSurfaceError::Rejected(String::from(
-                            "No lighting fixtures are available.",
-                        )));
-                    }
-                    let next_index = lighting_state.scenes.len() + 1;
-                    let scene_id = format!("scene-custom-{next_index}");
-                    let scene_name = format!("Scene {next_index}");
-                    lighting_state.scenes.push(LightingDeckSceneState {
-                        id: scene_id.clone(),
-                        name: scene_name.clone(),
-                        fixture_states: lighting_state
-                            .fixtures
-                            .iter()
-                            .map(|fixture| LightingDeckSceneFixtureState {
-                                fixture_id: fixture.id.clone(),
-                                intensity: fixture.intensity,
-                                cct: fixture.cct,
-                                on: fixture.on,
-                                control_values: fixture.control_values.clone(),
-                            })
-                            .collect(),
-                        color_index: None,
-                    });
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, Some(&scene_id))?;
-                    Ok(json!({ "scene": { "id": scene_id, "name": scene_name } }))
-                }
-                "deleteScene" => {
-                    let selected_scene_id = resolve_selected_inventory_id(
-                        &app_settings,
-                        SELECTED_SCENE_ID_KEY,
-                        lighting_state.scenes.iter().map(|scene| scene.id.as_str()),
-                    )
-                    .ok_or_else(|| {
-                        ControlSurfaceError::Rejected(String::from(
-                            "No lighting scene is selected.",
-                        ))
-                    })?;
-                    let current_index = lighting_state
-                        .scenes
-                        .iter()
-                        .position(|scene| scene.id == selected_scene_id)
-                        .ok_or_else(|| {
-                            ControlSurfaceError::Rejected(String::from(
-                                "Selected lighting scene was not found.",
-                            ))
-                        })?;
-                    lighting_state
-                        .scenes
-                        .retain(|scene| scene.id != selected_scene_id);
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    let next_scene_id = lighting_state
-                        .scenes
-                        .get(current_index.min(lighting_state.scenes.len().saturating_sub(1)))
-                        .map(|scene| scene.id.clone());
-                    persist_optional_setting(
-                        db_path,
-                        SELECTED_SCENE_ID_KEY,
-                        next_scene_id.as_deref(),
-                    )?;
-                    Ok(json!({ "deleted": true, "sceneId": selected_scene_id }))
-                }
-                _ => Err(ControlSurfaceError::Unsupported(String::from(
-                    "Unsupported lighting mutation",
-                ))),
-            }
+        "toggleLight" | "intensityUp" | "intensityDown" | "cctUp" | "cctDown"
+        | "resetIntensity" | "resetCct" => {
+            let fixture_id = selected_lighting_fixture_id(&app_settings, &lighting_state)?;
+            // The relative keys start from what the operator means the
+            // fixture to be: the preview buffer while previewing, otherwise
+            // the stored value with a running fade sampled now.
+            let levels = read_lighting_fixture_levels(&app_settings, preview, &fixture_id)
+                .ok_or_else(|| {
+                    ControlSurfaceError::Rejected(String::from(
+                        "Selected lighting fixture was not found.",
+                    ))
+                })?;
+            let (field, change) = match action {
+                "toggleLight" => ("on", json!(!levels.on)),
+                "intensityUp" => ("intensity", json!(clamp_i64(levels.intensity + 5, 0, 100))),
+                "intensityDown" => ("intensity", json!(clamp_i64(levels.intensity - 5, 0, 100))),
+                "cctUp" => ("cct", json!(clamp_i64(levels.cct + 200, 2700, 6500))),
+                "cctDown" => ("cct", json!(clamp_i64(levels.cct - 200, 2700, 6500))),
+                "resetIntensity" => ("intensity", json!(100)),
+                _ => ("cct", json!(4500)),
+            };
+            let mut params = json!({ "fixtureId": fixture_id });
+            params[field] = change;
+            let result = update_lighting_fixture_with_preview(
+                db_path,
+                &parse_lighting_fixture_update_request(&params)
+                    .map_err(ControlSurfaceError::InvalidParams)?,
+                preview,
+            )
+            .map_err(map_lighting_error)?;
+            // The reply carries what was stored — the fixture's own CCT range
+            // may be narrower than the deck's 2700–6500 K.
+            let stored = match field {
+                "on" => json!(result.fixture.on),
+                "intensity" => json!(result.fixture.intensity),
+                _ => json!(result.fixture.cct),
+            };
+            let mut light = json!({ "id": result.fixture.id });
+            light[field] = stored;
+            Ok(json!({ "light": light, "preview": result.source == "preview" }))
+        }
+        "allOn" | "allOff" => {
+            let next_on = action == "allOn";
+            let previewing = preview.enabled;
+            set_lighting_all_power_with_preview(
+                db_path,
+                &parse_lighting_all_power_request(&json!({ "on": next_on }))
+                    .map_err(ControlSurfaceError::InvalidParams)?,
+                preview,
+            )
+            .map_err(map_lighting_error)?;
+            Ok(json!({ "on": next_on, "preview": previewing }))
+        }
+        "saveScene" => {
+            // The deck keeps its own name for the scene ("Scene N"); the id
+            // comes from the rule the screen's scenes use, which never hands
+            // out an id a live scene already has.
+            let scene_name = format!("Scene {}", lighting_state.scenes.len() + 1);
+            let result = create_lighting_scene_with_preview(
+                db_path,
+                &parse_lighting_scene_create_request(&json!({ "name": scene_name }))
+                    .map_err(ControlSurfaceError::InvalidParams)?,
+                preview,
+            )
+            .map_err(map_lighting_error)?;
+            persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, Some(&result.scene.id))?;
+            Ok(json!({ "scene": { "id": result.scene.id, "name": result.scene.name } }))
+        }
+        "deleteScene" => {
+            let selected_scene_id = resolve_selected_inventory_id(
+                &app_settings,
+                SELECTED_SCENE_ID_KEY,
+                lighting_state.scenes.iter().map(|scene| scene.id.as_str()),
+            )
+            .ok_or_else(|| {
+                ControlSurfaceError::Rejected(String::from("No lighting scene is selected."))
+            })?;
+            let current_index = lighting_state
+                .scenes
+                .iter()
+                .position(|scene| scene.id == selected_scene_id)
+                .unwrap_or(0);
+            delete_lighting_scene(
+                db_path,
+                &parse_lighting_scene_delete_request(&json!({ "sceneId": selected_scene_id }))
+                    .map_err(ControlSurfaceError::InvalidParams)?,
+            )
+            .map_err(map_lighting_error)?;
+            let remaining = lighting_state
+                .scenes
+                .iter()
+                .filter(|scene| scene.id != selected_scene_id)
+                .collect::<Vec<_>>();
+            let next_scene_id = remaining
+                .get(current_index.min(remaining.len().saturating_sub(1)))
+                .map(|scene| scene.id.clone());
+            persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, next_scene_id.as_deref())?;
+            Ok(json!({ "deleted": true, "sceneId": selected_scene_id }))
         }
         "recallScene" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_snapshot = read_lighting_snapshot(&app_settings);
-            let mut lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
             let scene_id = resolve_selected_inventory_id(
                 &app_settings,
                 SELECTED_SCENE_ID_KEY,
@@ -872,42 +870,20 @@ fn handle_light_action(
             .ok_or_else(|| {
                 ControlSurfaceError::Rejected(String::from("No lighting scene is available."))
             })?;
-            let result = recall_lighting_scene(
+            // The recall writes everything a recall writes; nothing is saved
+            // after it (the deck used to save its pre-recall copy of the
+            // state over what the recall had just written).
+            let result = recall_lighting_scene_with_preview(
                 db_path,
                 &parse_lighting_scene_recall_request(&json!({
                     "sceneId": scene_id,
                     "fadeDurationSeconds": 0.0
                 }))
                 .map_err(ControlSurfaceError::InvalidParams)?,
+                preview,
             )
-            .map_err(|error| match error {
-                crate::lighting::LightingCommandError::Rejected(_, message) => {
-                    ControlSurfaceError::Rejected(message)
-                }
-                crate::lighting::LightingCommandError::Storage(message) => {
-                    ControlSurfaceError::Storage(message)
-                }
-            })?;
-            if let Some(scene) = lighting_state
-                .scenes
-                .iter()
-                .find(|scene| scene.id == scene_id)
-                .cloned()
-            {
-                for fixture in &mut lighting_state.fixtures {
-                    if let Some(scene_state) = scene
-                        .fixture_states
-                        .iter()
-                        .find(|fixture_state| fixture_state.fixture_id == fixture.id)
-                    {
-                        fixture.intensity = scene_state.intensity;
-                        fixture.cct = scene_state.cct;
-                        fixture.on = scene_state.on;
-                    }
-                }
-            }
-            save_lighting_deck_state(db_path, &lighting_state)?;
-            Ok(json!({ "recalled": result.scene_name }))
+            .map_err(map_lighting_error)?;
+            Ok(json!({ "recalled": result.scene_name, "preview": result.preview_mode }))
         }
         _ => Err(ControlSurfaceError::Unsupported(format!(
             "Unsupported lighting deck action: {action}"
@@ -1054,39 +1030,36 @@ fn persist_optional_setting(
     Ok(())
 }
 
-fn save_lighting_deck_state(
-    db_path: &Path,
-    state: &LightingDeckState,
-) -> Result<(), ControlSurfaceError> {
-    save_lighting_editor_state(db_path, state).map_err(map_lighting_error)
-}
-
-fn load_lighting_deck_state(
+fn selected_lighting_fixture_id(
     settings: &HashMap<String, String>,
-    _lighting_snapshot: &crate::lighting::LightingSnapshot,
-) -> LightingDeckState {
-    load_lighting_editor_state(settings)
-}
-
-fn selected_lighting_fixture_mut<'a>(
-    settings: &HashMap<String, String>,
-    state: &'a mut LightingDeckState,
-) -> Result<&'a mut LightingDeckFixtureState, ControlSurfaceError> {
-    let selected_light_id = resolve_selected_inventory_id(
+    state: &LightingEditorState,
+) -> Result<String, ControlSurfaceError> {
+    resolve_selected_inventory_id(
         settings,
         SELECTED_LIGHT_ID_KEY,
         state.fixtures.iter().map(|fixture| fixture.id.as_str()),
-    );
-    let selected_light_id = selected_light_id.ok_or_else(|| {
-        ControlSurfaceError::Rejected(String::from("No lighting fixture is available."))
-    })?;
-    state
-        .fixtures
-        .iter_mut()
-        .find(|fixture| fixture.id == selected_light_id)
-        .ok_or_else(|| {
-            ControlSurfaceError::Rejected(String::from("Selected lighting fixture was not found."))
-        })
+    )
+    .ok_or_else(|| ControlSurfaceError::Rejected(String::from("No lighting fixture is available.")))
+}
+
+/// The LCD is a reader: it takes the shared preview alone, and reads the
+/// settings under it — a preview-aware mutation holds the preview from its
+/// first read to its last write, so the pair read here is from one side of
+/// it, never the stored value of one moment beside the preview of another.
+fn deck_fixture_levels(db_path: &Path, fixture_id: &str) -> Option<LightingFixtureLevels> {
+    let preview = lock_shared_lighting_preview();
+    let settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX).ok()?;
+    read_lighting_fixture_levels(&settings, &preview, fixture_id)
+}
+
+/// A third LCD line while previewing: the number above it is staged, not on
+/// the light output.
+fn preview_lcd_line(levels: &LightingFixtureLevels) -> &'static str {
+    if levels.previewing {
+        "\\nPREVIEW"
+    } else {
+        ""
+    }
 }
 
 pub(crate) fn clamp_i64(value: i64, min: i64, max: i64) -> i64 {
@@ -1226,226 +1199,4 @@ pub(crate) mod test_support {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::test_support::{ready_audio_test_db, TestDir};
-    use super::*;
-    use crate::storage::initialize_test_database;
-
-    #[test]
-    fn truncate_preserves_short_text() {
-        assert_eq!(truncate("Host Mic", 12), "Host Mic");
-    }
-
-    #[test]
-    fn truncate_limits_long_text() {
-        assert_eq!(truncate("Very Long Fixture Name", 12), "Very Long Fi");
-    }
-
-    #[test]
-    fn cycle_value_wraps_forward() {
-        assert_eq!(cycle_value(PROJECT_STATUS_CYCLE, "done", true), "todo");
-    }
-
-    #[test]
-    fn cycle_value_wraps_backward() {
-        assert_eq!(cycle_value(PROJECT_STATUS_CYCLE, "todo", false), "done");
-    }
-
-    #[test]
-    fn audio_strip_lcd_shows_gate_reason_until_verified() {
-        let test_dir = TestDir::new("lcd-gated");
-        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
-
-        let text = read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_strip_1")
-            .expect("lcd text should render");
-        assert_eq!(text, "AUDIO\\nNOT VERIFIED");
-        let key_text = read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_key_5")
-            .expect("lcd text should render");
-        assert_eq!(key_text, "DIM\\n--");
-    }
-
-    #[test]
-    fn audio_strip_lcd_renders_live_state_with_selection_and_mute() {
-        let test_dir = ready_audio_test_db("lcd-live");
-        let db_path = test_dir.db_path();
-
-        let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
-            .expect("lcd text should render");
-        assert!(
-            text.contains("HOST"),
-            "strip should name the channel: {text}"
-        );
-        assert!(text.contains("dB"), "strip should show a level: {text}");
-        assert!(
-            !text.contains("\u{2192}"),
-            "the v2 strip drops the target arrow line: {text}"
-        );
-
-        handle_audio_action(db_path.as_path(), "stripTap", Some("1"))
-            .expect("tap should select the strip");
-        let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
-            .expect("lcd text should render");
-        assert!(
-            text.starts_with("\u{2022} HOST"),
-            "selected strip should carry the marker: {text}"
-        );
-
-        handle_audio_action(db_path.as_path(), "dialPress", Some("1")).expect("mute should engage");
-        let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
-            .expect("lcd text should render");
-        assert!(
-            text.contains("MUTED"),
-            "muted strip should say MUTED instead of a level: {text}"
-        );
-
-        handle_audio_action(db_path.as_path(), "toggleDialMode", None)
-            .expect("gain mode should engage");
-        let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
-            .expect("lcd text should render");
-        assert!(
-            text.contains("GAIN 34 dB"),
-            "gain mode should show the preamp gain: {text}"
-        );
-    }
-
-    #[test]
-    fn audio_key_lcd_reflects_target_bank_and_talk() {
-        let test_dir = ready_audio_test_db("lcd-keys");
-        let db_path = test_dir.db_path();
-
-        assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_key_1")
-                .expect("lcd text should render"),
-            "MAIN"
-        );
-        assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_key_2")
-                .expect("lcd text should render"),
-            "PH 1"
-        );
-        assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_state_target")
-                .expect("state should render"),
-            "main"
-        );
-
-        handle_audio_action(db_path.as_path(), "setMixTarget", Some("phones-a"))
-            .expect("target switch should succeed");
-        assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_state_target")
-                .expect("state should render"),
-            "phones-a"
-        );
-
-        assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_key_4")
-                .expect("lcd text should render"),
-            "BANK\\nINPUTS"
-        );
-        assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_key_7")
-                .expect("lcd text should render"),
-            "TALK\\nHOLD"
-        );
-        handle_audio_action(db_path.as_path(), "talkOn", None).expect("talk should engage");
-        assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_key_7")
-                .expect("lcd text should render"),
-            "TALK\\nLIVE"
-        );
-        handle_audio_action(db_path.as_path(), "talkOff", None).expect("talk should release");
-
-        assert_eq!(
-            read_control_surface_lcd_text(db_path.as_path(), "audio_key_8")
-                .expect("lcd text should render"),
-            "SOLO\\nCLEAR"
-        );
-    }
-
-    #[test]
-    fn workspace_lcd_key_reads_shell_workspace() {
-        let test_dir = TestDir::new("workspace-key");
-        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
-
-        assert_eq!(
-            read_control_surface_lcd_text(test_dir.db_path().as_path(), "workspace")
-                .expect("workspace key should render"),
-            DEFAULT_WORKSPACE
-        );
-
-        set_settings_owned(
-            test_dir.db_path().as_path(),
-            &[(String::from(WORKSPACE_KEY), String::from("audio"))],
-        )
-        .expect("workspace should persist");
-        assert_eq!(
-            read_control_surface_lcd_text(test_dir.db_path().as_path(), "workspace")
-                .expect("workspace key should render"),
-            "audio"
-        );
-    }
-
-    #[test]
-    fn context_includes_workspace_and_audio_deck_block() {
-        let test_dir = ready_audio_test_db("context-audio");
-        let db_path = test_dir.db_path();
-
-        let context = read_control_surface_context(db_path.as_path()).expect("context should load");
-        assert_eq!(context["workspace"], DEFAULT_WORKSPACE);
-        assert_eq!(context["audio"]["bank"], "inputs");
-        assert_eq!(context["audio"]["gated"], false);
-        let strips = context["audio"]["strips"]
-            .as_array()
-            .expect("strips should be an array");
-        assert_eq!(strips.len(), 4);
-        assert_eq!(strips[0]["id"], "audio-input-9");
-
-        handle_audio_action(db_path.as_path(), "cycleBank", None).expect("cycle should succeed");
-        handle_audio_action(db_path.as_path(), "cycleBank", None).expect("cycle should succeed");
-        let context = read_control_surface_context(db_path.as_path()).expect("context should load");
-        assert_eq!(context["audio"]["bank"], "outputs");
-        assert_eq!(context["audio"]["strips"][3]["kind"], "empty");
-    }
-
-    #[test]
-    fn legacy_audio_lcd_keys_are_gone() {
-        let test_dir = ready_audio_test_db("lcd-legacy");
-        assert!(matches!(
-            read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_ch_nav"),
-            Err(ControlSurfaceError::InvalidParams(_))
-        ));
-    }
-
-    #[test]
-    fn successful_actions_stamp_the_last_event_for_verify_echo() {
-        let test_dir = ready_audio_test_db("last-event");
-        let db_path = test_dir.db_path();
-
-        assert!(control_surface_last_event(db_path.as_path()).is_null());
-
-        handle_control_surface_http_action(
-            db_path.as_path(),
-            "/api/deck/audio-action",
-            &json!({"action": "dialPress", "value": "2"}),
-        )
-        .expect("dial press should succeed");
-
-        let event = control_surface_last_event(db_path.as_path());
-        assert_eq!(event["route"], "/api/deck/audio-action");
-        assert_eq!(event["action"], "dialPress");
-        assert_eq!(event["value"], "2");
-        assert!(event["at"].as_u64().unwrap_or(0) > 0);
-
-        let failed = handle_control_surface_http_action(
-            db_path.as_path(),
-            "/api/deck/audio-action",
-            &json!({"action": "nonsense"}),
-        );
-        assert!(failed.is_err());
-        assert_eq!(
-            control_surface_last_event(db_path.as_path())["action"],
-            "dialPress",
-            "failed actions must not stamp the echo event"
-        );
-    }
-}
+mod tests;

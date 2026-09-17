@@ -27,30 +27,32 @@ use crate::diagnostics::{append_log, configured_log_level, request_log_line};
 use crate::exports::{build_control_surface_snapshot, export_companion_config, ExportCommandError};
 use crate::legacy_import::{parse_import_request, ImportLegacyError};
 use crate::lighting::{
-    apply_lighting_palette_with_preview, clear_lighting_identify_bursts, create_lighting_fixture,
-    create_lighting_group, create_lighting_palette, create_lighting_scene_with_preview,
-    delete_lighting_fixture, delete_lighting_group, delete_lighting_palette, delete_lighting_scene,
+    apply_lighting_palette_with_preview, bump_lighting_render_generation,
+    clear_lighting_identify_bursts, create_lighting_fixture, create_lighting_group,
+    create_lighting_palette, create_lighting_scene_with_preview, delete_lighting_fixture,
+    delete_lighting_group, delete_lighting_palette, delete_lighting_scene,
     discard_lighting_preview, identify_lighting_fixture, list_lighting_palettes,
-    parse_lighting_all_power_request, parse_lighting_fixture_create_request,
-    parse_lighting_fixture_delete_request, parse_lighting_fixture_highlight_request,
-    parse_lighting_fixture_identify_clear_all_request, parse_lighting_fixture_identify_request,
-    parse_lighting_fixture_identify_sequence_request, parse_lighting_fixture_update_request,
-    parse_lighting_group_create_request, parse_lighting_group_delete_request,
-    parse_lighting_group_power_request, parse_lighting_group_reorder_request,
-    parse_lighting_group_update_request, parse_lighting_palette_apply_request,
-    parse_lighting_palette_create_request, parse_lighting_palette_delete_request,
-    parse_lighting_palette_update_request, parse_lighting_preview_discard_request,
-    parse_lighting_preview_mode_request, parse_lighting_scene_create_request,
-    parse_lighting_scene_delete_request, parse_lighting_scene_pin_request,
-    parse_lighting_scene_recall_request, parse_lighting_scene_reorder_request,
-    parse_lighting_scene_update_request, parse_lighting_settings_update_request,
-    pin_lighting_scene, read_lighting_dmx_monitor_snapshot, read_lighting_fixture_catalog_snapshot,
-    read_lighting_snapshot_with_preview, recall_lighting_scene_with_preview,
-    reorder_lighting_group, reorder_lighting_scene, set_lighting_all_power_with_preview,
-    set_lighting_fixture_highlight, set_lighting_group_power_with_preview,
-    set_lighting_preview_mode, start_lighting_identify_sequence,
-    update_lighting_fixture_with_preview, update_lighting_group, update_lighting_palette,
-    update_lighting_scene_with_preview, update_lighting_settings, LightingCommandError,
+    lock_shared_lighting_preview, parse_lighting_all_power_request,
+    parse_lighting_fixture_create_request, parse_lighting_fixture_delete_request,
+    parse_lighting_fixture_highlight_request, parse_lighting_fixture_identify_clear_all_request,
+    parse_lighting_fixture_identify_request, parse_lighting_fixture_identify_sequence_request,
+    parse_lighting_fixture_update_request, parse_lighting_group_create_request,
+    parse_lighting_group_delete_request, parse_lighting_group_power_request,
+    parse_lighting_group_reorder_request, parse_lighting_group_update_request,
+    parse_lighting_palette_apply_request, parse_lighting_palette_create_request,
+    parse_lighting_palette_delete_request, parse_lighting_palette_update_request,
+    parse_lighting_preview_discard_request, parse_lighting_preview_mode_request,
+    parse_lighting_scene_create_request, parse_lighting_scene_delete_request,
+    parse_lighting_scene_pin_request, parse_lighting_scene_recall_request,
+    parse_lighting_scene_reorder_request, parse_lighting_scene_update_request,
+    parse_lighting_settings_update_request, pin_lighting_scene, read_lighting_dmx_monitor_snapshot,
+    read_lighting_fixture_catalog_snapshot, read_lighting_snapshot_with_preview,
+    recall_lighting_scene_with_preview, reorder_lighting_group, reorder_lighting_scene,
+    set_lighting_all_power_with_preview, set_lighting_fixture_highlight,
+    set_lighting_group_power_with_preview, set_lighting_preview_mode,
+    start_lighting_identify_sequence, update_lighting_fixture_with_preview, update_lighting_group,
+    update_lighting_palette, update_lighting_scene_with_preview, update_lighting_settings,
+    with_lighting_state, with_lighting_state_and_preview, LightingCommandError,
     LightingPreviewRuntimeState,
 };
 #[cfg(feature = "dev-fixtures")]
@@ -87,12 +89,10 @@ use crate::support::{
     restore_support_backup, verify_support_backup, SupportCommandError,
 };
 use serde_json::json;
-use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
 
 pub struct EngineApp {
     runtime: RuntimeContext,
-    lighting_preview: Mutex<LightingPreviewRuntimeState>,
 }
 
 pub struct EngineReply {
@@ -124,10 +124,7 @@ impl EngineApp {
     pub fn bootstrap() -> EngineResult<Self> {
         let runtime = bootstrap_runtime()?;
         append_log(&runtime.log_file_path, "INFO", "Engine bootstrap completed")?;
-        Ok(Self {
-            runtime,
-            lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
-        })
+        Ok(Self { runtime })
     }
 
     /// The engine after a storage failure at start (Slice 7 — F20): no
@@ -145,7 +142,6 @@ impl EngineApp {
         );
         Self {
             runtime: recovery_runtime_context(runtime_paths),
-            lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
         }
     }
 
@@ -781,7 +777,10 @@ impl EngineApp {
             },
             "support.backup.restore" => match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
                 Ok(restore_request) => {
-                    match restore_support_backup(&self.runtime, &restore_request) {
+                    // The archive restore rewrites every lighting setting in
+                    // one transaction; under the lighting state lock a deck
+                    // key cannot write its older copy back over it (Slice 10).
+                    match with_lighting_state(|| restore_support_backup(&self.runtime, &restore_request)) {
                         Ok(result) => {
                             let response = ok_response(
                                 request.id,
@@ -991,8 +990,11 @@ impl EngineApp {
     }
 
     fn read_lighting_snapshot(&self) -> EngineResult<serde_json::Value> {
+        // A reader takes the shared preview alone, and before the settings:
+        // a preview-aware mutation holds it from its first read to its last
+        // write, so the pair read here is from one side of it (Slice 10).
+        let preview = lock_shared_lighting_preview();
         let app_settings = list_settings_by_prefix(&self.runtime.db_path, APP_SETTINGS_PREFIX)?;
-        let preview = self.lighting_preview();
         Ok(serde_json::to_value(read_lighting_snapshot_with_preview(
             &app_settings,
             &preview,
@@ -1109,12 +1111,6 @@ impl EngineApp {
         }
     }
 
-    fn lighting_preview(&self) -> MutexGuard<'_, LightingPreviewRuntimeState> {
-        self.lighting_preview
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
     fn dispatch_lighting_preview_mutate<P, R, F, H, K>(
         &self,
         request: RequestEnvelope,
@@ -1134,8 +1130,12 @@ impl EngineApp {
     {
         match parse(&request.params) {
             Ok(parsed) => {
-                let mut preview = self.lighting_preview();
-                match handler(&self.runtime.db_path, &parsed, &mut preview) {
+                // The lighting state lock first, then the preview the Stream
+                // Deck bridge shares (Slice 10 — F12).
+                let outcome = with_lighting_state_and_preview(|preview| {
+                    handler(&self.runtime.db_path, &parsed, preview)
+                });
+                match outcome {
                     Ok(result) => Self::reply_with_lighting_change(
                         ok_response(
                             request.id,
@@ -1168,7 +1168,7 @@ impl EngineApp {
         H: FnOnce(&std::path::Path, &P) -> Result<R, LightingCommandError>,
     {
         match parse(&request.params) {
-            Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
+            Ok(parsed) => match with_lighting_state(|| handler(&self.runtime.db_path, &parsed)) {
                 Ok(result) => Self::reply_with_lighting_change(
                     ok_response(
                         request.id,
@@ -1374,13 +1374,18 @@ impl EngineApp {
     {
         match parse(&request.params) {
             Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
-                Ok(result) => Self::reply_with_commissioning_change(
-                    ok_response(
-                        request.id,
-                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                    ),
-                    reason,
-                ),
+                Ok(result) => {
+                    // A lighting probe stores the bridge address and the
+                    // universe it used (Slice 10 — F18).
+                    bump_lighting_render_generation();
+                    Self::reply_with_commissioning_change(
+                        ok_response(
+                            request.id,
+                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                        ),
+                        reason,
+                    )
+                }
                 Err(CommissioningCommandError::InvalidParams(message)) => {
                     Self::reply(invalid_params(request.id, message))
                 }
@@ -1438,7 +1443,7 @@ impl EngineApp {
         H: FnOnce(&RuntimeContext, &P) -> Result<R, ParityFixtureError>,
     {
         match parse(&request.params) {
-            Ok(parsed) => match handler(&self.runtime, &parsed) {
+            Ok(parsed) => match with_lighting_state(|| handler(&self.runtime, &parsed)) {
                 Ok(result) => Self::reply_with_app_commissioning_and_planning_change(
                     ok_response(
                         request.id,
@@ -1704,171 +1709,4 @@ impl EngineApp {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::EngineApp;
-    use crate::bootstrap::RuntimeContext;
-    use crate::control_surface::ControlSurfaceBridgeInfo;
-    use crate::lighting::LightingPreviewRuntimeState;
-    use crate::storage::{initialize_test_database, StorageBootstrap};
-    use serde_json::{json, Value};
-    use std::fs;
-    use std::path::{Path, PathBuf};
-    use std::process;
-    use std::sync::Mutex;
-    use std::time::{SystemTime, UNIX_EPOCH};
-    use studio_control_protocol::RequestEnvelope;
-
-    struct TestDir {
-        path: PathBuf,
-    }
-
-    impl TestDir {
-        fn new(label: &str) -> Self {
-            let unique = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or(0);
-            let path = std::env::temp_dir().join(format!(
-                "studio-control-engine-app-{label}-{}-{unique}",
-                process::id()
-            ));
-            fs::create_dir_all(path.join("logs")).expect("test dir should be created");
-            Self { path }
-        }
-
-        fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-
-    impl Drop for TestDir {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.path);
-        }
-    }
-
-    fn app_for(test_dir: &TestDir) -> EngineApp {
-        let runtime = RuntimeContext {
-            protocol_version: String::from("1"),
-            app_data_dir: test_dir.path().to_path_buf(),
-            backups_dir: test_dir.path().join("backups"),
-            logs_dir: test_dir.path().join("logs"),
-            log_file_path: test_dir.path().join("logs").join("engine.log"),
-            db_path: test_dir.path().join("native.sqlite3"),
-            update_repository_path: None,
-            storage_ready: true,
-            storage_bootstrap: StorageBootstrap {
-                schema_version: 4,
-                format_version: String::from("1"),
-                journal_mode: String::from("wal"),
-                integrity_check: String::from("ok"),
-            },
-            control_surface_token: String::from("bridge-token-for-tests"),
-            control_surface_bridge: ControlSurfaceBridgeInfo {
-                base_url: String::from("http://127.0.0.1:38201"),
-                port: 38201,
-                available: true,
-                status: String::from("ready"),
-                summary: String::from("Test bridge"),
-                error: None,
-            },
-        };
-        initialize_test_database(&runtime.db_path).expect("database should initialize");
-        EngineApp {
-            runtime,
-            lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
-        }
-    }
-
-    fn parity_fixture_request(params: Value) -> RequestEnvelope {
-        RequestEnvelope {
-            kind: String::from("request"),
-            id: json!("parity-1"),
-            method: String::from("dev.parityFixture.load"),
-            params,
-        }
-    }
-
-    // 2026-09 production readiness, Slice 1 (finding F04): a release engine
-    // keeps the method in the contract but does not carry the handler or
-    // the bundled fixture payloads; it answers METHOD_UNAVAILABLE and
-    // touches nothing.
-    #[cfg(not(feature = "dev-fixtures"))]
-    #[test]
-    fn parity_fixture_unavailable_without_feature() {
-        let test_dir = TestDir::new("parity-unavailable");
-        let app = app_for(&test_dir);
-
-        let reply = app.handle_request(parity_fixture_request(
-            json!({ "fixtureId": "planning-empty" }),
-        ));
-
-        assert!(!reply.response.ok, "release engines must refuse the method");
-        assert_eq!(
-            reply
-                .response
-                .error
-                .as_ref()
-                .and_then(|error| error.get("code"))
-                .and_then(Value::as_str),
-            Some("METHOD_UNAVAILABLE")
-        );
-        assert!(reply.events.is_empty(), "a refused load emits no events");
-        assert!(
-            !test_dir
-                .path()
-                .join("parity-fixture-planning-empty.json")
-                .exists(),
-            "a refused load writes no fixture file"
-        );
-    }
-
-    #[cfg(feature = "dev-fixtures")]
-    #[test]
-    fn parity_fixture_loads_with_feature() {
-        let test_dir = TestDir::new("parity-available");
-        let app = app_for(&test_dir);
-
-        let reply = app.handle_request(parity_fixture_request(
-            json!({ "fixtureId": "planning-empty" }),
-        ));
-
-        assert!(
-            reply.response.ok,
-            "a dev-fixtures engine loads the fixture (got {:?})",
-            reply.response.error
-        );
-        assert_eq!(
-            reply
-                .response
-                .result
-                .as_ref()
-                .and_then(|result| result.get("fixtureId"))
-                .and_then(Value::as_str),
-            Some("planning-empty")
-        );
-        assert_eq!(
-            reply.events.len(),
-            3,
-            "app, commissioning and planning change events"
-        );
-    }
-
-    // Finding F27: at the default level a request leaves no line in the log
-    // — neither the old per-request INFO line nor the DEBUG one.
-    #[test]
-    fn handle_request_writes_no_request_line_at_the_default_level() {
-        let test_dir = TestDir::new("request-log");
-        let app = app_for(&test_dir);
-        let reply = app.handle_request(RequestEnvelope {
-            kind: String::from("request"),
-            id: json!("ping-1"),
-            method: String::from("engine.ping"),
-            params: json!({}),
-        });
-        assert!(reply.response.ok);
-        let log = fs::read_to_string(app.runtime.log_file_path.as_path()).unwrap_or_default();
-        assert!(!log.contains("Handling request"), "{log}");
-        assert!(!log.contains("method=engine.ping"), "{log}");
-    }
-}
+mod tests;
