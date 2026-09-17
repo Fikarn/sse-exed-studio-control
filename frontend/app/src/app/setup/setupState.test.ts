@@ -64,6 +64,25 @@ describe("deriveSetupState with the hardware link's health", () => {
     expect(state.sentence).toBe("Commissioning complete and operator mode unlocked.");
   });
 
+  // 2026-09 production readiness, Slice 11 (F31): held light outputs are a
+  // state the operator chose. The hardware link keeps its health `ok` while
+  // held (`health::tests::held_light_outputs_are_not_a_fault` holds that side)
+  // and says so only in the light-output entry's sentence, so the Setup word
+  // stays READY — the header's Lighting lamp and the switch are where a hold
+  // shows, never the fault posture.
+  it("held light outputs leave a green runtime READY", () => {
+    const state = deriveSetupState({
+      ...base,
+      checks: green,
+      healthSummary:
+        "Health 'ok'. Lighting ready. Light outputs held: nothing is sent to the rig until they are armed in Setup / Support.",
+      healthTone: "ok",
+    });
+    expect(state.word).toBe("READY");
+    expect(state.tone).toBe("ok");
+    expect(state.sentence).toBe("Commissioning complete and operator mode unlocked.");
+  });
+
   it("an unpublished runtime reads SETUP REQUIRED whatever the health says", () => {
     const state = deriveSetupState({
       ...base,

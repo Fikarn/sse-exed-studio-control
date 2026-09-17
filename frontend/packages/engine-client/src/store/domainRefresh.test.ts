@@ -57,6 +57,16 @@ describe("domainRefresh", () => {
     // setup-support qualification lane failed on a project count left at 2.
     expect(domainsForMethod("planning.task.create")).toEqual(["planning", "commissioning"]);
     expect(domainsForMethod("lighting.scene.recall")).toEqual(["lighting", "lightingDmxMonitor"]);
+    // Slice 11: the armed switch sits beside the Recent actions list and is a
+    // row in it, so the list moves with the switch. No other lighting request
+    // fetches the support snapshot: recording an action raises no event, and
+    // the list otherwise moves when Setup is opened.
+    expect(domainsForMethod("lighting.output.setArmed")).toEqual(["lighting", "lightingDmxMonitor", "support"]);
+    for (const method of REQUEST_METHODS.filter(
+      (name) => name.startsWith("lighting.") && name !== "lighting.output.setArmed"
+    )) {
+      expect(domainsForMethod(method), method).not.toContain("support");
+    }
     expect(domainsForMethod("support.backup.export")).toEqual(["support"]);
     expect(domainsForMethod("support.backup.restore")).toEqual(CHANGEABLE_DOMAINS);
     expect(domainsForMethod("commissioning.seedPlanningDemo")).toContain("planning");

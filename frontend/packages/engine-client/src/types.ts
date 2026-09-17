@@ -471,6 +471,9 @@ export interface ShellStore {
   deleteLightingFixture(fixtureId: string): Promise<JsonValue>;
   setLightingGroupPower(groupId: string, on: boolean): Promise<JsonValue>;
   setLightingAllPower(on: boolean): Promise<JsonValue>;
+  /** Arms or holds the light outputs (2026-09 production readiness, Slice 11 — F31).
+   *  Held, nothing is sent to the rig; everything else keeps working. */
+  setLightingOutputArmed(armed: boolean): Promise<JsonValue>;
   recallLightingScene(sceneId: string, fadeMs?: number): Promise<JsonValue>;
   seedPlanningDemo(replaceExistingData?: boolean): Promise<JsonValue>;
   createPlanningProject(request: PlanningProjectCreateRequest): Promise<JsonValue>;

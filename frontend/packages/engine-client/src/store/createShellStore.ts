@@ -1422,6 +1422,9 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     async setLightingAllPower(on: boolean) {
       return performRequest("lighting.power.all", { on });
     },
+    async setLightingOutputArmed(armed: boolean) {
+      return performRequest("lighting.output.setArmed", { armed });
+    },
     async recallLightingScene(sceneId: string, fadeMs?: number) {
       return performRequest("lighting.scene.recall", fadeMs === undefined ? { sceneId } : { sceneId, fadeMs });
     },

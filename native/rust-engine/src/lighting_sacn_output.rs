@@ -11,6 +11,12 @@
 //! E1.31 stream-terminated packets and the fixtures hold their last levels;
 //! the engine never fabricates a blackout the operator did not ask for.
 //!
+//! While the light outputs are held (`app.lighting.output_armed` is `false`,
+//! Slice 11 — F31) nothing is sent at all: a launch that starts held puts no
+//! packet on the wire, and a hold while streaming ends the stream the same
+//! way — stream-terminated packets, then silence. The hold is applied here,
+//! not in the renderer, so the DMX monitor keeps showing what would be sent.
+//!
 //! The slot values come from the same renderer as the operator-facing DMX
 //! monitor, so the wire always matches what the UI shows.
 
@@ -18,7 +24,8 @@ use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_SACN};
 use crate::lighting::{
-    lighting_render_generation, read_lighting_sacn_output_state, LightingUniverseFrame,
+    lighting_output_armed, lighting_render_generation, read_lighting_sacn_output_state,
+    LightingUniverseFrame, LIGHTING_OUTPUT_ARMED_KEY,
 };
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
 use std::collections::HashMap;
@@ -98,14 +105,7 @@ impl RenderSettingsCache {
 
 fn run_output_loop(db_path: &Path, log_file_path: &Path) {
     let socket = match UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)) {
-        Ok(socket) => {
-            report_health(
-                SUBSYSTEM_SACN,
-                SubsystemState::Ok,
-                "Light output socket ready (sACN over UDP)",
-            );
-            socket
-        }
+        Ok(socket) => socket,
         Err(error) => {
             let message = format!("Lighting sACN output could not allocate a UDP socket: {error}");
             let _ = append_log(log_file_path, "ERROR", &message);
@@ -115,8 +115,30 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path) {
     };
 
     enable_thread_read_connection();
-    let mut active_bridge: Option<Ipv4Addr> = None;
-    let mut universes: HashMap<u16, UniverseTx> = HashMap::new();
+    let mut output = SacnOutput::new(socket, SACN_PORT);
+    // The output starts from what the saved data says, so a launch that
+    // starts held never reports `ready` first (the bootstrap has already
+    // said held; this keeps it). A flag that cannot be read yet is the
+    // first tick's to settle.
+    output.held = list_settings_by_prefix(db_path, LIGHTING_OUTPUT_ARMED_KEY)
+        .map(|settings| !lighting_output_armed(&settings))
+        .unwrap_or(false);
+    report_health(
+        SUBSYSTEM_SACN,
+        SubsystemState::Ok,
+        if output.held {
+            HELD_DETAIL
+        } else {
+            SOCKET_READY_DETAIL
+        },
+    );
+    if output.held {
+        let _ = append_log(
+            log_file_path,
+            "INFO",
+            "Light outputs held at start: the sACN output sends nothing until they are armed.",
+        );
+    }
     let mut render_settings = RenderSettingsCache::default();
 
     loop {
@@ -132,14 +154,82 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path) {
             continue;
         };
 
-        match read_lighting_sacn_output_state(settings) {
+        output.tick(settings, log_file_path);
+    }
+}
+
+pub(crate) const SOCKET_READY_DETAIL: &str = "Light output socket ready (sACN over UDP)";
+/// A deliberate hold is not a fault: the entry stays `ok` — `attention` would
+/// turn the shell's recovery state to `degraded` — and says so in its detail.
+pub(crate) const HELD_DETAIL: &str =
+    "Light outputs held: nothing is sent to the rig until they are armed in Setup / Support";
+
+/// One sACN source: the socket, where it sends, and what it has on the wire.
+struct SacnOutput {
+    socket: UdpSocket,
+    /// `SACN_PORT` for the engine; a test listens on a port of its own.
+    port: u16,
+    active_bridge: Option<Ipv4Addr>,
+    universes: HashMap<u16, UniverseTx>,
+    held: bool,
+}
+
+impl SacnOutput {
+    fn new(socket: UdpSocket, port: u16) -> Self {
+        Self {
+            socket,
+            port,
+            active_bridge: None,
+            universes: HashMap::new(),
+            held: false,
+        }
+    }
+
+    /// One pass of the output from this tick's settings.
+    fn tick(&mut self, settings: &HashMap<String, String>, log_file_path: &Path) {
+        let held = !lighting_output_armed(settings);
+        if held != self.held {
+            self.held = held;
+            report_health(
+                SUBSYSTEM_SACN,
+                SubsystemState::Ok,
+                if held {
+                    HELD_DETAIL
+                } else {
+                    SOCKET_READY_DETAIL
+                },
+            );
+            // The registry announces a change of state, and this is `ok` to
+            // `ok`: the thread that owns the entry says that its detail
+            // moved, after it has moved, so the screen never reads the entry
+            // of the tick before.
+            crate::engine_events::emit_app_changed(crate::health::APP_CHANGED_REASON_HEALTH);
+            let _ = append_log(
+                log_file_path,
+                "INFO",
+                if held {
+                    "Light outputs held: the sACN output sends nothing until they are armed."
+                } else {
+                    "Light outputs armed: the sACN output follows the lighting state."
+                },
+            );
+        }
+
+        // Held is the same as ineligible as far as the wire goes: whatever
+        // was streaming ends with stream-terminated packets, then silence.
+        let state = if held {
+            None
+        } else {
+            read_lighting_sacn_output_state(settings)
+        };
+        match state {
             Some(state) => {
-                if active_bridge != Some(state.bridge_ip) {
-                    if let Some(previous_bridge) = active_bridge {
-                        let all: Vec<u16> = universes.keys().copied().collect();
-                        terminate_universes(&socket, previous_bridge, &mut universes, all);
+                if self.active_bridge != Some(state.bridge_ip) {
+                    if let Some(previous_bridge) = self.active_bridge {
+                        let all: Vec<u16> = self.universes.keys().copied().collect();
+                        self.terminate_universes(previous_bridge, all);
                     }
-                    active_bridge = Some(state.bridge_ip);
+                    self.active_bridge = Some(state.bridge_ip);
                     let _ = append_log(
                         log_file_path,
                         "INFO",
@@ -147,29 +237,30 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path) {
                             "Lighting sACN output active: streaming {} universe(s) to {}:{}.",
                             state.frames.len(),
                             state.bridge_ip,
-                            SACN_PORT
+                            self.port
                         ),
                     );
                 }
 
                 let current: Vec<u16> = state.frames.iter().map(|frame| frame.universe).collect();
-                let stale: Vec<u16> = universes
+                let stale: Vec<u16> = self
+                    .universes
                     .keys()
                     .copied()
                     .filter(|universe| !current.contains(universe))
                     .collect();
                 if !stale.is_empty() {
-                    terminate_universes(&socket, state.bridge_ip, &mut universes, stale);
+                    self.terminate_universes(state.bridge_ip, stale);
                 }
 
                 for frame in &state.frames {
-                    send_frame(&socket, state.bridge_ip, &mut universes, frame);
+                    self.send_frame(state.bridge_ip, frame);
                 }
             }
             None => {
-                if let Some(previous_bridge) = active_bridge.take() {
-                    let all: Vec<u16> = universes.keys().copied().collect();
-                    terminate_universes(&socket, previous_bridge, &mut universes, all);
+                if let Some(previous_bridge) = self.active_bridge.take() {
+                    let all: Vec<u16> = self.universes.keys().copied().collect();
+                    self.terminate_universes(previous_bridge, all);
                     let _ = append_log(
                         log_file_path,
                         "INFO",
@@ -179,51 +270,43 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path) {
             }
         }
     }
-}
 
-fn send_frame(
-    socket: &UdpSocket,
-    bridge_ip: Ipv4Addr,
-    universes: &mut HashMap<u16, UniverseTx>,
-    frame: &LightingUniverseFrame,
-) {
-    let target = SocketAddrV4::new(bridge_ip, SACN_PORT);
-    let entry = universes
-        .entry(frame.universe)
-        .or_insert_with(|| UniverseTx {
-            sequence: 0,
-            last_slots: [0_u8; 512],
-            last_sent_at: Instant::now() - KEEPALIVE_INTERVAL,
-        });
+    fn send_frame(&mut self, bridge_ip: Ipv4Addr, frame: &LightingUniverseFrame) {
+        let target = SocketAddrV4::new(bridge_ip, self.port);
+        let entry = self
+            .universes
+            .entry(frame.universe)
+            .or_insert_with(|| UniverseTx {
+                sequence: 0,
+                last_slots: [0_u8; 512],
+                last_sent_at: Instant::now() - KEEPALIVE_INTERVAL,
+            });
 
-    let changed = entry.last_slots != frame.slots;
-    if !changed && entry.last_sent_at.elapsed() < KEEPALIVE_INTERVAL {
-        return;
-    }
+        let changed = entry.last_slots != frame.slots;
+        if !changed && entry.last_sent_at.elapsed() < KEEPALIVE_INTERVAL {
+            return;
+        }
 
-    let packet = build_e131_data_packet(frame.universe, entry.sequence, false, &frame.slots);
-    if socket.send_to(&packet, target).is_ok() {
-        entry.sequence = entry.sequence.wrapping_add(1);
-        entry.last_slots = frame.slots;
-        entry.last_sent_at = Instant::now();
-    }
-}
-
-fn terminate_universes(
-    socket: &UdpSocket,
-    bridge_ip: Ipv4Addr,
-    universes: &mut HashMap<u16, UniverseTx>,
-    targets: Vec<u16>,
-) {
-    let target_addr = SocketAddrV4::new(bridge_ip, SACN_PORT);
-    for universe in targets {
-        let Some(mut entry) = universes.remove(&universe) else {
-            continue;
-        };
-        for _ in 0..STREAM_TERMINATED_SENDS {
-            let packet = build_e131_data_packet(universe, entry.sequence, true, &entry.last_slots);
-            let _ = socket.send_to(&packet, target_addr);
+        let packet = build_e131_data_packet(frame.universe, entry.sequence, false, &frame.slots);
+        if self.socket.send_to(&packet, target).is_ok() {
             entry.sequence = entry.sequence.wrapping_add(1);
+            entry.last_slots = frame.slots;
+            entry.last_sent_at = Instant::now();
+        }
+    }
+
+    fn terminate_universes(&mut self, bridge_ip: Ipv4Addr, targets: Vec<u16>) {
+        let target_addr = SocketAddrV4::new(bridge_ip, self.port);
+        for universe in targets {
+            let Some(mut entry) = self.universes.remove(&universe) else {
+                continue;
+            };
+            for _ in 0..STREAM_TERMINATED_SENDS {
+                let packet =
+                    build_e131_data_packet(universe, entry.sequence, true, &entry.last_slots);
+                let _ = self.socket.send_to(&packet, target_addr);
+                entry.sequence = entry.sequence.wrapping_add(1);
+            }
         }
     }
 }
@@ -552,5 +635,218 @@ mod tests {
             slots[slot_of("fixture-key-right") + 1] > 0,
             "its colour temperature slot still carries its value"
         );
+    }
+
+    // -----------------------------------------------------------------
+    // 2026-09 production readiness, Slice 11 (F31): held light outputs.
+    // Everything below sends to 127.0.0.1 on a port the test's own listener
+    // was given by the OS — never to 5568, which other lighting software on
+    // the workstation may hold, and never to the bridge.
+    // -----------------------------------------------------------------
+
+    struct Wire {
+        listener: UdpSocket,
+        probe: UdpSocket,
+    }
+
+    impl Wire {
+        fn open() -> (Self, u16) {
+            let listener = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).expect("listener should bind");
+            listener
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .expect("listener timeout should set");
+            let port = listener.local_addr().expect("listener address").port();
+            let probe = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).expect("probe should bind");
+            (Self { listener, probe }, port)
+        }
+
+        fn next(&self) -> Vec<u8> {
+            let mut buffer = [0_u8; 1024];
+            let (received, _) = self
+                .listener
+                .recv_from(&mut buffer)
+                .expect("a datagram should arrive");
+            buffer[..received].to_vec()
+        }
+
+        /// Nothing is waiting: a marker sent now is the next thing read.
+        /// Loopback delivers in order, so anything the output had sent
+        /// before this call would be read first — no sleep, no timeout.
+        fn assert_silent(&self, when: &str) {
+            let target = self.listener.local_addr().expect("listener address");
+            self.probe
+                .send_to(b"marker", target)
+                .expect("marker should send");
+            assert_eq!(self.next(), b"marker", "the wire should be silent {when}");
+        }
+    }
+
+    fn output_settings(armed: Option<bool>) -> HashMap<String, String> {
+        let mut settings = HashMap::new();
+        settings.insert(
+            String::from(LIGHTING_BRIDGE_IP_KEY),
+            String::from("127.0.0.1"),
+        );
+        if let Some(armed) = armed {
+            let (key, value) = crate::lighting::lighting_output_armed_setting(armed);
+            settings.insert(key, value);
+        }
+        settings
+    }
+
+    fn test_output(port: u16) -> SacnOutput {
+        SacnOutput::new(
+            UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).expect("sender should bind"),
+            port,
+        )
+    }
+
+    // A launch that starts held puts nothing on the wire — not a frame, not a
+    // keep-alive, not a terminate — for as long as it is held. Arming starts
+    // the stream at sequence 0, which is also the proof that nothing was sent
+    // before it. A hold while streaming ends the stream as a receiver expects:
+    // three stream-terminated packets for the universe, then silence.
+    #[test]
+    fn held_outputs_send_nothing() {
+        use crate::control_surface::test_support::TestDir;
+
+        let test_dir = TestDir::new("sacn-held");
+        let log = test_dir.path().join("engine.log");
+        let (wire, port) = Wire::open();
+        let mut output = test_output(port);
+        let held = output_settings(Some(false));
+        let armed = output_settings(Some(true));
+        assert!(
+            read_lighting_sacn_output_state(&held).is_some(),
+            "the premise: this rig would stream if it were armed"
+        );
+
+        for _ in 0..50 {
+            output.tick(&held, &log);
+        }
+        wire.assert_silent("while held from the start");
+        assert!(output.universes.is_empty() && output.active_bridge.is_none());
+
+        output.tick(&armed, &log);
+        let first = wire.next();
+        assert_eq!(first.len(), E131_PACKET_LEN);
+        assert_eq!(first[111], 0, "the first packet ever sent is sequence 0");
+        assert_eq!(first[112], 0x00, "a data packet");
+        let rendered = read_lighting_sacn_output_state(&armed).expect("frames");
+        assert_eq!(&first[126..638], &rendered.frames[0].slots[..]);
+        assert_eq!(
+            first[..],
+            build_e131_data_packet(
+                rendered.frames[0].universe,
+                0,
+                false,
+                &rendered.frames[0].slots
+            )[..],
+            "byte for byte what the packet builder makes"
+        );
+
+        // (No second armed tick here: the keep-alive runs on the real clock,
+        // and a stalled runner must not be able to slip one in.)
+        output.tick(&held, &log);
+        for expected_sequence in 1..=3_u8 {
+            let packet = wire.next();
+            assert_eq!(packet[112], E131_OPTIONS_STREAM_TERMINATED);
+            assert_eq!(packet[111], expected_sequence);
+            assert_eq!(
+                &packet[126..638],
+                &first[126..638],
+                "the last look, not zeros"
+            );
+        }
+        for _ in 0..50 {
+            output.tick(&held, &log);
+        }
+        wire.assert_silent("after the stream was terminated");
+        assert!(output.universes.is_empty() && output.active_bridge.is_none());
+
+        // Armed again: the stream starts over.
+        output.tick(&armed, &log);
+        let resumed = wire.next();
+        assert_eq!((resumed[111], resumed[112]), (0, 0x00));
+
+        // A database that has never had the key is armed: the default launch
+        // is what it was.
+        let (default_wire, default_port) = Wire::open();
+        let mut default_output = test_output(default_port);
+        default_output.tick(&output_settings(None), &log);
+        assert_eq!(default_wire.next()[112], 0x00);
+
+        let logged = std::fs::read_to_string(&log).expect("the log should exist");
+        assert!(logged.contains("Light outputs held"), "{logged}");
+        assert!(logged.contains("Light outputs armed"), "{logged}");
+    }
+
+    // The switch reaches the wire on the next tick: `lighting.output.setArmed`
+    // runs under the lighting state lock, which advances the render
+    // generation, and a moved generation makes the very next tick read the
+    // settings — forty milliseconds on the injected clock, well inside the
+    // two-second safety read.
+    #[test]
+    fn a_hold_reaches_the_wire_on_the_next_tick() {
+        use crate::control_surface::test_support::TestDir;
+        use crate::lighting::{
+            parse_lighting_output_armed_request, set_lighting_output_armed, with_lighting_state,
+        };
+        use crate::storage::{initialize_test_database, set_settings_owned};
+
+        let test_dir = TestDir::new("sacn-hold-next-tick");
+        let db_path = test_dir.db_path();
+        let log = test_dir.path().join("engine.log");
+        initialize_test_database(db_path.as_path()).expect("database should initialize");
+        set_settings_owned(
+            db_path.as_path(),
+            &[(
+                String::from(LIGHTING_BRIDGE_IP_KEY),
+                String::from("127.0.0.1"),
+            )],
+        )
+        .expect("bridge address should persist");
+
+        let (wire, port) = Wire::open();
+        let mut output = test_output(port);
+        let mut cache = RenderSettingsCache::default();
+        let reads = std::cell::Cell::new(0_u32);
+        let read = || {
+            reads.set(reads.get() + 1);
+            list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX).ok()
+        };
+        let started = Instant::now();
+
+        let generation = lighting_render_generation();
+        let settings = cache
+            .settings_for_tick(generation, started, read)
+            .expect("the first tick reads")
+            .clone();
+        output.tick(&settings, &log);
+        assert_eq!(wire.next()[112], 0x00, "streaming");
+
+        with_lighting_state(|| {
+            set_lighting_output_armed(
+                db_path.as_path(),
+                &parse_lighting_output_armed_request(&serde_json::json!({ "armed": false }))
+                    .expect("the request should parse"),
+            )
+        })
+        .expect("the hold should persist");
+        let moved = lighting_render_generation();
+        assert_ne!(moved, generation, "the hold advanced the render generation");
+
+        let reads_before = reads.get();
+        let settings = cache
+            .settings_for_tick(moved, started + OUTPUT_TICK, read)
+            .expect("the kept settings")
+            .clone();
+        assert_eq!(
+            reads.get(),
+            reads_before + 1,
+            "the next tick reads because the generation moved"
+        );
+        output.tick(&settings, &log);
+        assert_eq!(wire.next()[112], E131_OPTIONS_STREAM_TERMINATED);
     }
 }

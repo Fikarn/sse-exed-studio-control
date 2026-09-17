@@ -1331,3 +1331,100 @@ fn recall_in_simulated_mode_is_app_local_and_aligned() {
         .iter()
         .any(|entry| entry.id == "audio-input-9" && entry.mute));
 }
+
+// 2026-09 production readiness, Slice 11 (F30): a switch thrown at TotalMix
+// enters the app through this flush, and the action log names the console.
+// The rows are written in the transaction that writes the state — this runs
+// on the metering thread, where a second wait for the disk shows in the
+// meters — and a fader, a gain and a value that did not change leave none.
+#[test]
+fn console_changes_record_source_console() {
+    use crate::rme_console_link::{
+        ChannelFlag, ConsoleBus, ConsoleUpdate, ConsoleValue, ControlRoomFunction, ParamKey,
+    };
+    let test_dir = TestDir::new("console-action-log");
+    let db_path = test_dir.db_path();
+    initialize_test_database(db_path.as_path()).expect("database should initialize");
+    let rows = || {
+        crate::action_log::list_recent_actions(db_path.as_path(), 20)
+            .expect("the action log should list")
+            .into_iter()
+            .map(|entry| (entry.source, entry.action, entry.detail))
+            .collect::<Vec<_>>()
+    };
+    let update = |key: ParamKey, value: ConsoleValue| ConsoleUpdate {
+        key,
+        value,
+        adjusted: false,
+    };
+    let settings = list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    let input_name = snapshot
+        .channels
+        .iter()
+        .find(|channel| channel.id == "audio-input-9")
+        .expect("input 9")
+        .name
+        .clone();
+    let main_name = snapshot
+        .mix_targets
+        .iter()
+        .find(|target| target.id == "audio-mix-main")
+        .expect("main out")
+        .name
+        .clone();
+
+    let updates = vec![
+        update(
+            ParamKey::ChannelFlag {
+                bus: ConsoleBus::Input,
+                channel: 8,
+                flag: ChannelFlag::Mute,
+            },
+            ConsoleValue::Flag(true),
+        ),
+        update(ParamKey::InputGain { channel: 8 }, ConsoleValue::Db(44.4)),
+        update(
+            ParamKey::MixFader {
+                bus: ConsoleBus::Input,
+                channel: 8,
+                output: 0,
+            },
+            ConsoleValue::Db(-6.0),
+        ),
+        update(
+            ParamKey::OutputVolume { output: 8 },
+            ConsoleValue::Db(-16.6),
+        ),
+        update(
+            ParamKey::ControlRoom(ControlRoomFunction::Dim),
+            ConsoleValue::Flag(true),
+        ),
+    ];
+    let report = apply_console_activity(db_path.as_path(), &updates, &[], false)
+        .expect("the flush should apply");
+    assert!(report.applied >= 2, "the switches changed stored state");
+    assert_eq!(
+        rows(),
+        vec![
+            (
+                String::from("console"),
+                String::from("dim"),
+                format!("Dim on at TotalMix: {main_name}")
+            ),
+            (
+                String::from("console"),
+                String::from("mute"),
+                format!("Mute on at TotalMix: {input_name}")
+            ),
+        ],
+        "the two switches; the gain, the fader and the volume are rides"
+    );
+
+    // The same values again change nothing and leave nothing.
+    let again = apply_console_activity(db_path.as_path(), &updates, &[], false)
+        .expect("the flush should apply");
+    assert_eq!(again.applied, 0, "nothing changed the second time");
+    assert_eq!(rows().len(), 2);
+}

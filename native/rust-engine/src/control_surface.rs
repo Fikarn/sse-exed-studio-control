@@ -29,7 +29,9 @@ use crate::planning::{
 };
 use crate::planning_settings::{PLANNING_SETTINGS_PREFIX, SORT_BY_KEY};
 use crate::shell_settings::{DEFAULT_WORKSPACE, SHELL_SETTINGS_PREFIX, WORKSPACE_KEY};
-use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owned};
+use crate::storage::{
+    list_settings_by_prefix, open_connection, set_settings_owned, set_settings_owned_and,
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -422,8 +424,24 @@ pub fn handle_control_surface_http_action(
             "Unsupported action route: {path}"
         ))),
     };
-    if response.is_ok() {
-        let _ = stamp_control_surface_last_event(db_path, path, action, value);
+    if let Ok(reply) = &response {
+        // The action log (Slice 11 — F30): every key through the bridge is
+        // the Stream Deck's, so this is where a row gets the source `deck`.
+        // The reply says what the key did and whether it was staged in the
+        // preview; the row rides the transaction that stamps the last
+        // event, so a key waits for the disk no more often than before.
+        let actions = crate::action_log::deck_actions(path, action, reply);
+        if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions)
+        {
+            crate::diagnostics::log_event(
+                crate::diagnostics::LogLevel::Warn,
+                &format!(
+                    "Stream Deck key {action}: the last event and {} action-log row(s) could not be written: {}",
+                    actions.len(),
+                    error.message()
+                ),
+            );
+        }
         match deck_change_event(path, action) {
             Some(DeckChange::Lighting) => {
                 crate::engine_events::emit_lighting_changed("control-surface")
@@ -464,6 +482,7 @@ fn stamp_control_surface_last_event(
     route: &str,
     action: &str,
     value: Option<&str>,
+    actions: &[crate::action_log::ActionRecord],
 ) -> Result<(), ControlSurfaceError> {
     let at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -475,9 +494,10 @@ fn stamp_control_surface_last_event(
         "value": value,
         "at": at,
     });
-    set_settings_owned(
+    set_settings_owned_and(
         db_path,
         &[(String::from(LAST_EVENT_KEY), event.to_string())],
+        |transaction| crate::action_log::insert_actions(transaction, actions),
     )
     .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
 }
@@ -799,7 +819,7 @@ fn locked_light_action(
                 "intensity" => json!(result.fixture.intensity),
                 _ => json!(result.fixture.cct),
             };
-            let mut light = json!({ "id": result.fixture.id });
+            let mut light = json!({ "id": result.fixture.id, "name": result.fixture.name });
             light[field] = stored;
             Ok(json!({ "light": light, "preview": result.source == "preview" }))
         }

@@ -3,6 +3,7 @@ import { Danger, Key, PlateHead, Readouts, Section, Segmented } from "@sse/desig
 import { OPERATOR_UI_SCALES } from "../../operatorLayout";
 import type { OperatorTheme } from "../../OperatorLayoutProvider";
 import type { OperatorUiScale } from "../../operatorLayout";
+import { RecentActions, type RecentAction } from "./RecentActions";
 import styles from "./SupportPlate.module.css";
 
 // Visual overhaul A, Slice 7 (A-setup.html's plate): Support is always here,
@@ -33,7 +34,12 @@ export interface SupportPlateProps {
   engineVersion: string;
   hardwareProfile: string;
   lastBackupLabel: string;
+  /** 2026-09 production readiness, Slice 11 (F31): whether the light outputs
+   *  are armed, as the lighting state says; `null` until it has been read. */
+  lightOutputsArmed: boolean | null;
   protocolVersion: string;
+  /** Slice 11 (F30): the action log's newest rows, newest first. */
+  recentActions: readonly RecentAction[];
   theme: OperatorTheme;
   uiScale: OperatorUiScale;
   appVersion: string;
@@ -46,6 +52,7 @@ export interface SupportPlateProps {
   onRestoreLatest: () => void;
   onSelectTheme: (theme: OperatorTheme) => void;
   onSelectUiScale: (scale: OperatorUiScale) => void;
+  onSetLightOutputsArmed: (armed: boolean) => void;
   /** 2026-09 production readiness, Slice 7 (F20): checks the latest backup
    *  without changing anything; the answer lands in the pilot's feedback. */
   onVerifyBackup: () => void;
@@ -59,7 +66,9 @@ export function SupportPlate({
   engineVersion,
   hardwareProfile,
   lastBackupLabel,
+  lightOutputsArmed,
   protocolVersion,
+  recentActions,
   theme,
   uiScale,
   appVersion,
@@ -72,6 +81,7 @@ export function SupportPlate({
   onRestoreLatest,
   onSelectTheme,
   onSelectUiScale,
+  onSetLightOutputsArmed,
   onVerifyBackup,
   restoreDisabled,
 }: SupportPlateProps) {
@@ -114,6 +124,46 @@ export function SupportPlate({
               onClick={() => onSelectUiScale(scale)}
             />
           ))}
+        </Segmented>
+        {/* Held is not a blackout: the rig keeps its last look, or does what
+            the bridge does when its source goes away. The words say what is
+            sent, never what the room looks like. */}
+        <Readouts
+          rows={[
+            {
+              id: "light-outputs",
+              label: "Light outputs",
+              tone: lightOutputsArmed === false ? "attention" : undefined,
+              value:
+                lightOutputsArmed === null
+                  ? "not read yet"
+                  : lightOutputsArmed
+                    ? "the rig follows the app"
+                    : "nothing is sent to the rig",
+            },
+          ]}
+        />
+        <Segmented label="Light outputs" className={styles.segmented} testId="support-outputs-switch">
+          <Key
+            mode="segmented"
+            cap="Armed"
+            take
+            disabled={busy || lightOutputsArmed === null}
+            engaged={lightOutputsArmed === true}
+            aria-pressed={lightOutputsArmed === true}
+            testId="support-outputs-armed"
+            onClick={() => onSetLightOutputsArmed(true)}
+          />
+          <Key
+            mode="segmented"
+            cap="Held"
+            take
+            disabled={busy || lightOutputsArmed === null}
+            engaged={lightOutputsArmed === false}
+            aria-pressed={lightOutputsArmed === false}
+            testId="support-outputs-held"
+            onClick={() => onSetLightOutputsArmed(false)}
+          />
         </Segmented>
       </Section>
 
@@ -174,6 +224,8 @@ export function SupportPlate({
           ]}
         />
       </Section>
+
+      <RecentActions actions={recentActions} />
 
       <Danger className={styles.danger}>
         <Key mode="danger" size="small" testId="support-restart-bridge" onClick={onRestartBridge}>

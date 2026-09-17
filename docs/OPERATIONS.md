@@ -40,20 +40,34 @@ The engine streams the lighting state to the commissioned bridge as unicast sACN
 
 - Output is active only while all three hold: lighting is enabled, the commissioned bridge IP is a valid IPv4 address, and at least one fixture is patched.
 - While active, the engine transmits the current state continuously: changed frames within one 40 ms tick, unchanged frames re-sent as keep-alives about every 800 ms. Scene fades, the grand master, and identify/highlight/solo overlays are rendered into the wire exactly as the DMX monitor shows them.
-- This is an intentional live-state write on engine start: when the app launches with commissioned lighting, the rig immediately receives the persisted fixture state. Review fixture on/off state before launch if the studio must stay dark.
+- This is an intentional live-state write on engine start: when the app launches with commissioned lighting and armed light outputs, the rig immediately receives the persisted fixture state. Review fixture on/off state before launch if the studio must stay dark — or start held ("Holding the light outputs" below) and look first.
 - When output becomes ineligible (lighting toggled off, bridge cleared, all fixtures deleted), the engine sends E1.31 stream-terminated packets and stops. Fixtures then hold their last received levels per DMX convention; use Cut all or fixture controls to black out before disabling output.
 - The bridge must be configured to route the app's sACN universe to its DMX/CRMX output, and each physical fixture must match the patched DMX address, mode, and universe shown on the lighting page.
 - The Stream Deck's lighting keys do what the same control on the Lighting page does, and the page follows a key at once. While Preview is on, a key changes the preview and not the light output: the deck's intensity and colour temperature displays show the previewed number with `PREVIEW` on a third line, and Recall loads the scene into the preview. With Preview off the keys move the rig. A key and the page pressed at the same moment both take effect; neither overwrites the other.
 - A change reaches the light output within one 40 ms tick of being stored. A changed bridge address or universe is picked up the same way; anything that changed the saved data without going through the app is picked up within two seconds.
 
+### Holding the light outputs (safe start)
+
+Setup / Support › Workstation has a **Light outputs** switch: **Armed** (the default, and what every launch was before the switch existed) or **Held** (2026-09 production readiness, Slice 11).
+
+- **Held means nothing is sent to the rig** — no frame, no keep-alive. A launch that starts held puts no sACN packet on the wire at all. Holding while the app is streaming ends the stream the way a receiver expects: three stream-terminated packets per universe, then silence.
+- **Held is not a blackout.** The rig keeps its last look, or does whatever the bridge does when its source goes away (the Apollo Bridge holds the last levels). To make the room dark, use Cut all _while armed_, then hold.
+- Everything else keeps working while held: scenes recall, fixtures move, the Stream Deck's lighting keys act, and the DMX monitor shows **what would be sent**. While held, the monitor and the wire differ on purpose — that is what lets you look before anything reaches the rig. The header's Lighting lamp reads `held` on every workspace, and the switch says `nothing is sent to the rig`.
+- Arming sends the current state within one 40 ms tick. Look at the Lighting page and the DMX monitor first: what they show is what the rig gets.
+- **Safe start:** start Studio Control with the environment variable `SSE_SAFE_START=1` and it holds the light outputs before anything could stream. For the installed app on Windows, either set it for the workstation account once (`setx SSE_SAFE_START 1` in a Command Prompt, then start the app again; remove it with `reg delete HKCU\Environment /v SSE_SAFE_START /f`), or keep a second shortcut whose target is `cmd /c "set SSE_SAFE_START=1 && start "" "<path to the installed Studio Control executable>""`. `0`, `false`, `off`, `no` and an empty value mean no; anything else holds.
+- **The hold is remembered.** A safe start writes the hold into the saved data, and only the switch arms again: the next launch without the variable is still held, and an operator who held the rig and closed the app finds it held. A launch never arms on its own. With the variable set for the account, every launch starts held and you arm each session from Setup / Support.
+- **A restore never arms a held rig, and never holds an armed one.** A backup archive does not carry the switch, and restoring one leaves it as it is. A database restore replaces the whole saved data, so Studio Control carries the switch over from the database it replaces. The one case it cannot: a restore from the recovery surface after the saved data failed its check — the old database cannot be read, so the restored database's own setting stands. Start with `SSE_SAFE_START=1` if that restart must not stream.
+- The hold, the arming and a safe start are rows in Recent actions (below), and `engine.log` says `Light outputs held` / `Light outputs armed` when the output follows.
+
 ## Operator Recovery
 
 ### Lights stop responding
 
-1. Open the Lighting workspace.
-2. Review the native health and lighting summaries.
+1. Look at the header's Lighting lamp. `held` means the light outputs are held and nothing is sent: arm them from Setup / Support › Workstation ("Holding the light outputs" above).
+2. Open the Lighting workspace and review the native health and lighting summaries.
 3. Re-run the lighting commissioning probe if needed.
 4. If the bridge is still unavailable, restart the app and confirm the same issue reproduces before changing hardware state.
+5. Setup / Support › Recent actions says who last switched lights off or held the outputs — the screen, the Stream Deck, or the start of the app.
 
 ### Audio stops responding
 
@@ -173,12 +187,22 @@ To commission or re-commission the deck:
 - Restore path: from Setup / Support or the recovery surface, and only from files inside the backups folder — a JSON backup archive (or a legacy `db.json` placed there) is applied in place; a database backup is checked, staged as `restore-pending.sqlite3` and applied by the restart Studio Control performs on its own ("The app fails before the dashboard" above). An archive or database written by a newer Studio Control is refused (`SUPPORT_RESTORE_UNSUPPORTED_VERSION`)
 - One file on a graceful close: while the app runs, the newest changes sit in the database's write-ahead log (`studio-control.sqlite3-wal`) beside the database; closing the app folds them into `studio-control.sqlite3` and empties the log. After a close that was not graceful (the process was ended, the power went) both files belong together — copy both, or start the app once and close it, before copying the database by hand. A database restore folds the log in before it moves the replaced file aside, so the `replaced` copy is complete either way
 - Rollback safety: an archive restore writes a rollback archive first; a database restore writes a `pre-restore` database backup first and keeps the replaced file
+- Upgrades are one-way for the saved data: a newer Studio Control upgrades the database at its first start (schema 7 adds the action log) and writes a `pre-migration` copy first; an older Studio Control then refuses the upgraded database ("newer than this engine binary"). Going back means reinstalling the older app and, with the app closed, putting that `pre-migration` copy in place of `studio-control.sqlite3` (delete `studio-control.sqlite3-wal` and `-shm` beside it) — everything recorded after the upgrade is lost
 
 ## Health Signals
 
 ### Health status
 
-`health.snapshot`'s `status` says how the hardware link is doing, and it moves on its own (2026-09 production readiness, Slice 8): `ok`; `attention` when something could not bind its port — the Stream Deck bridge (`SSE_CONTROL_SURFACE_PORT`, `38201` by default: another program holds it, or a second copy of the app is still closing), a TotalMix meter port, the light-output socket; `warning` when the last database backup failed or is older than two days; `error` when the saved data is not usable (the recovery surface shows this one). The Setup / Support surface prints the health sentence when a commissioning probe is not green, and the Deck lamp in the monitor follows the bridge. A diagnostics export carries the whole snapshot, including `checks.engine` — one entry per subsystem with its state, the engine's sentence and when it was reported.
+`health.snapshot`'s `status` says how the hardware link is doing, and it moves on its own (2026-09 production readiness, Slice 8): `ok`; `attention` when something could not bind its port — the Stream Deck bridge (`SSE_CONTROL_SURFACE_PORT`, `38201` by default: another program holds it, or a second copy of the app is still closing), a TotalMix meter port, the light-output socket; `warning` when the last database backup failed or is older than two days; `error` when the saved data is not usable (the recovery surface shows this one). Held light outputs are not a fault: the light-output entry stays `ok` and says `Light outputs held` in its sentence. The Setup / Support surface prints the health sentence when a commissioning probe is not green, and the Deck lamp in the monitor follows the bridge. A diagnostics export carries the whole snapshot, including `checks.engine` — one entry per subsystem with its state, the engine's sentence and when it was reported.
+
+### Recent actions
+
+Setup / Support lists the newest eight rows of the action log under **Recent actions**, newest first, each with who did it: **Screen** (a request from the app), **Stream Deck** (a key through the bridge), **Console** (a switch thrown at TotalMix that the desk reported back), **Watchdog** (talkback released because nobody held it) and **Start-up** (a safe start; a database restore applied at start). A diagnostics export carries the newest fifty; the saved data keeps the newest 5,000.
+
+- A row is a discrete action that changed what a device receives: lights and groups on or off, Cut all, a scene recall, a palette, identify and highlight, a patch change, the bridge address, arming or holding the light outputs; mute, solo, 48 V, phase, pad, instrument, AutoSet, dim, mono, talkback, EQ and dynamics switches, a Console snapshot recall, the TotalMix address; an applied backup archive.
+- A ride is not a row: a fader, a gain, an intensity, a colour temperature, the grand master, a Stream Deck dial detent. Neither is a change staged in the lighting Preview (it never reached the rig — the recall that later puts it there is a row), a refused action (the state display and `engine.log` carry those), or a selection.
+- A row is written to disk before the action is confirmed, so the list survives a crash. It moves when Setup / Support is opened and when the Light outputs switch is used; it does not tick while you watch it.
+- A database restore brings the restored database's own, older list; the start that applied it adds a Start-up row saying so.
 
 ### Logs
 

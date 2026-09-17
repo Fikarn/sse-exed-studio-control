@@ -45,6 +45,7 @@ export const REQUEST_METHODS = [
   "lighting.group.power",
   "lighting.group.reorder",
   "lighting.group.update",
+  "lighting.output.setArmed",
   "lighting.palette.apply",
   "lighting.palette.create",
   "lighting.palette.delete",

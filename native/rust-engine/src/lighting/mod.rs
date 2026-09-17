@@ -36,6 +36,7 @@ mod identify;
 // (2026-09 production readiness, Slice 1 — finding F04).
 #[cfg(feature = "dev-fixtures")]
 mod legacy_import;
+mod output_arming;
 mod palettes;
 mod parse;
 mod preview;
@@ -54,6 +55,7 @@ pub use groups::*;
 pub use identify::*;
 #[cfg(feature = "dev-fixtures")]
 pub use legacy_import::*;
+pub use output_arming::*;
 pub use palettes::*;
 pub use parse::*;
 pub use preview::*;

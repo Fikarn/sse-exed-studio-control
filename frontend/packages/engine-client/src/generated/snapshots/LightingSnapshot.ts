@@ -15,6 +15,12 @@ export type LightingSnapshot = {
   grandMaster: number;
   connected: boolean;
   reachable: boolean;
+  /**
+   * False while the light outputs are held (Slice 11 — F31): the sACN
+   * output sends nothing, and everything else in this snapshot — the
+   * fixtures, the DMX monitor built from it — is what would be sent.
+   */
+  outputArmed: boolean;
   lastRecalledSceneId: string | null;
   lastSceneRecallAt: string | null;
   lastActionStatus: string;

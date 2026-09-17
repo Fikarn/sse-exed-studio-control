@@ -35,6 +35,11 @@ pub struct LightingSnapshot {
     pub connected: bool,
     #[serde(rename = "reachable")]
     pub reachable: bool,
+    /// False while the light outputs are held (Slice 11 — F31): the sACN
+    /// output sends nothing, and everything else in this snapshot — the
+    /// fixtures, the DMX monitor built from it — is what would be sent.
+    #[serde(rename = "outputArmed")]
+    pub output_armed: bool,
     #[serde(rename = "lastRecalledSceneId")]
     pub last_recalled_scene_id: Option<String>,
     #[serde(rename = "lastSceneRecallAt")]

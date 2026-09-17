@@ -21,6 +21,7 @@ import { useOperatorLayout } from "../OperatorLayoutProvider";
 import { SetupCluster, type SetupClusterStep } from "./components/SetupCluster";
 import { SetupFooter } from "./components/SetupFooter";
 import { SetupFactCard, SetupRecordHeading, SetupRecordRow, SetupStepScreen } from "./components/SetupStepScreen";
+import { getRecentActions } from "./components/RecentActions";
 import { SupportPlate } from "./components/SupportPlate";
 import { findEchoControlId, parseControlSurfaceLastEvent } from "./setupControlEcho";
 import { deriveSetupState } from "./setupState";
@@ -68,6 +69,8 @@ interface SetupSupportPilotProps {
   commissioningSnapshot: SnapshotRecord | null;
   controlSurfaceSnapshot: SnapshotRecord | null;
   healthSnapshot: SnapshotRecord | null;
+  /** Whether the light outputs are armed, from the lighting state; `null` until it is read. */
+  lightOutputsArmed: boolean | null;
   liveTransportRequested: boolean;
   onRequestRestart: () => void;
   onShowShortcuts: () => void;
@@ -233,6 +236,7 @@ export function SetupSupportPilot({
   commissioningSnapshot,
   controlSurfaceSnapshot,
   healthSnapshot,
+  lightOutputsArmed,
   liveTransportRequested,
   onRequestRestart,
   onShowShortcuts,
@@ -242,6 +246,7 @@ export function SetupSupportPilot({
   const pages = useMemo(() => parseControlSurfacePages(controlSurfaceSnapshot), [controlSurfaceSnapshot]);
   const checks = useMemo(() => getCommissioningChecks(commissioningSnapshot), [commissioningSnapshot]);
   const backups = useMemo(() => getSupportBackups(supportSnapshot), [supportSnapshot]);
+  const recentActions = useMemo(() => getRecentActions(supportSnapshot), [supportSnapshot]);
   const persistedMode = useMemo(() => normalizeSetupMode(appSnapshot), [appSnapshot]);
   const recommendedStepId = useMemo(
     () => deriveRecommendedStepId(commissioningSnapshot, pages),
@@ -601,6 +606,19 @@ export function SetupSupportPilot({
     return result?.ok === true
       ? { message: `Backup checked: ${detail}`, tone: "ok" as const }
       : { message: `Backup failed its check: ${detail}`, tone: "error" as const };
+  };
+
+  // Slice 11 (F31). Held is not a blackout, and the sentence does not promise
+  // one: it says what is sent.
+  const setLightOutputsArmed = async (armed: boolean) => {
+    await store.setLightingOutputArmed(armed);
+    return armed
+      ? { message: "Light outputs armed: the rig follows the app again.", tone: "ok" as const }
+      : {
+          message:
+            "Light outputs held: nothing is sent to the rig until they are armed. The rig keeps its last look, or does what the bridge does without a source.",
+          tone: "info" as const,
+        };
   };
 
   const openReferencePath = async (label: string, path: string, tone: FeedbackTone = "info") => {
@@ -1563,7 +1581,9 @@ export function SetupSupportPilot({
             engineVersion={String(runtime?.engineVersion ?? "—")}
             hardwareProfile={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
             lastBackupLabel={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "no backup exported yet"}
+            lightOutputsArmed={lightOutputsArmed}
             protocolVersion={String(runtime?.protocol ?? runtime?.protocolVersion ?? "1")}
+            recentActions={recentActions}
             restoreDisabled={!lastBackup}
             theme={theme}
             uiScale={uiScale}
@@ -1578,6 +1598,10 @@ export function SetupSupportPilot({
             }}
             onSelectTheme={setTheme}
             onSelectUiScale={setUiScale}
+            onSetLightOutputsArmed={(armed) => {
+              if (armed === lightOutputsArmed) return;
+              void performAction("light-outputs", () => setLightOutputsArmed(armed));
+            }}
             onVerifyBackup={() => {
               if (!lastBackup) return;
               void performAction("verify-backup", () => verifyBackup(lastBackup.path));

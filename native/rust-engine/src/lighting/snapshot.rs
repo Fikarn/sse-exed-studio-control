@@ -183,6 +183,7 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         grand_master,
         connected: reachable,
         reachable,
+        output_armed: lighting_output_armed(settings),
         last_recalled_scene_id,
         last_scene_recall_at,
         last_action_status,

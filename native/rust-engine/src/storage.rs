@@ -22,7 +22,10 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 6;
+/// The newest schema `migrate_schema` knows. Every step there names its own
+/// version as a literal; raising this goes with a new `if schema_version < N`
+/// block, never with a change to the last one.
+pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 7;
 const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
 const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 const LIGHTING_EDITOR_STATE_KEY: &str = "app.lighting.editor.state";
@@ -215,6 +218,18 @@ pub fn set_settings(db_path: &Path, settings: &[(&str, String)]) -> EngineResult
 }
 
 pub fn set_settings_owned(db_path: &Path, settings: &[(String, String)]) -> EngineResult<()> {
+    set_settings_owned_and(db_path, settings, |_| Ok(()))
+}
+
+/// `set_settings_owned` with more work inside the same transaction, so a
+/// writer that already commits — the Stream Deck's last-event stamp, the
+/// console flush — can add its action-log rows without a second wait for the
+/// disk (Slice 11 — F30). Nothing is written when `also` fails.
+pub(crate) fn set_settings_owned_and(
+    db_path: &Path,
+    settings: &[(String, String)],
+    also: impl FnOnce(&Transaction<'_>) -> Result<(), rusqlite::Error>,
+) -> EngineResult<()> {
     let mut connection = open_connection(db_path)?;
     let transaction = connection.transaction()?;
 
@@ -225,6 +240,7 @@ pub fn set_settings_owned(db_path: &Path, settings: &[(String, String)]) -> Engi
             params![key, value],
         )?;
     }
+    also(&transaction)?;
 
     transaction.commit()?;
     Ok(())
@@ -735,17 +751,43 @@ fn migrate_schema(connection: &mut Connection, backups_dir: &Path) -> EngineResu
         schema_version = 5;
     }
 
-    if schema_version < STORAGE_SCHEMA_VERSION {
+    if schema_version < 6 {
         // v5 -> v6 (Wave 34). Seed editable lighting palettes once for
-        // existing editor-state rows that predate the palette pool.
+        // existing editor-state rows that predate the palette pool. The step
+        // names its own version: keyed to the constant, a later version would
+        // seed a v6 database a second time — and an operator's deliberately
+        // empty palette list reads as "unseeded" to the seed.
         let transaction = connection.transaction()?;
         seed_lighting_palettes_v6(&transaction)?;
-        transaction.execute(
-            "INSERT INTO schema_migrations(version) VALUES (?1)",
-            [STORAGE_SCHEMA_VERSION],
-        )?;
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (6)", [])?;
         transaction.commit()?;
-        schema_version = STORAGE_SCHEMA_VERSION;
+        schema_version = 6;
+    }
+
+    if schema_version < 7 {
+        // v6 -> v7 (2026-09 production readiness, Slice 11 — F30): the action
+        // log. One row per discrete action that changed what a device
+        // receives, with who did it; `action_log.rs` owns the rows.
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS event_log (
+              id INTEGER PRIMARY KEY,
+              at TEXT NOT NULL,
+              source TEXT NOT NULL,
+              domain TEXT NOT NULL,
+              action TEXT NOT NULL,
+              target TEXT NOT NULL,
+              detail TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS event_log_at_idx
+              ON event_log(at DESC);
+            "#,
+        )?;
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (7)", [])?;
+        transaction.commit()?;
+        schema_version = 7;
     }
 
     Ok(schema_version)

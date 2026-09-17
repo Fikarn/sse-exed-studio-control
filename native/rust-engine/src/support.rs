@@ -1,3 +1,4 @@
+use crate::action_log::{list_recent_actions, RecordedAction, RECENT_ACTIONS_LIMIT};
 use crate::app_state::{
     COMMISSIONING_COMPLETED_KEY, COMMISSIONING_STAGE_KEY, HARDWARE_PROFILE_KEY,
 };
@@ -8,7 +9,7 @@ use crate::commissioning::{
 };
 use crate::diagnostics::append_log;
 use crate::legacy_import::{ImportLegacyError, LegacyImportRequest};
-use crate::lighting::LIGHTING_SELECTED_FIXTURE_ID_KEY;
+use crate::lighting::{LIGHTING_OUTPUT_ARMED_KEY, LIGHTING_SELECTED_FIXTURE_ID_KEY};
 use crate::planning::{
     read_planning_snapshot, PlanningActivityEntry, PlanningChecklistItem, PlanningProject,
     PlanningTask,
@@ -118,6 +119,11 @@ pub struct SupportSnapshot {
     #[serde(rename = "restoreSummary")]
     pub restore_summary: String,
     pub backups: Vec<SupportFileEntry>,
+    /// The newest rows of the action log, newest first (Slice 11 — F30):
+    /// every discrete action that changed what a device receives, with who
+    /// did it. Empty in recovery mode, where there is no database to ask.
+    #[serde(rename = "recentEvents")]
+    pub recent_events: Vec<RecordedAction>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -379,6 +385,23 @@ pub fn read_support_snapshot(runtime: &RuntimeContext) -> EngineResult<SupportSn
         "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
     );
 
+    // A recovery-mode engine has no database (`support.snapshot` is one of
+    // the requests it answers): the list is empty there and nothing is
+    // queried. With a database, a list that cannot be read is a log line,
+    // never a Support surface that cannot list its backups.
+    let recent_events = if runtime.storage_ready {
+        list_recent_actions(&runtime.db_path, RECENT_ACTIONS_LIMIT).unwrap_or_else(|error| {
+            let _ = append_log(
+                &runtime.log_file_path,
+                "WARN",
+                &format!("Recent actions could not be read: {error}"),
+            );
+            Vec::new()
+        })
+    } else {
+        Vec::new()
+    };
+
     Ok(SupportSnapshot {
         backup_dir: runtime.backups_dir.display().to_string(),
         backup_count: backups.len(),
@@ -386,6 +409,7 @@ pub fn read_support_snapshot(runtime: &RuntimeContext) -> EngineResult<SupportSn
         summary,
         restore_summary,
         backups,
+        recent_events,
     })
 }
 
@@ -835,7 +859,13 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
     let planning_snapshot = read_planning_snapshot(&runtime.db_path, &planning_settings)?;
     let commissioning_snapshot = read_commissioning_snapshot(&runtime.db_path)?;
     let shell_settings_map = list_settings_by_prefix(&runtime.db_path, SHELL_SETTINGS_PREFIX)?;
-    let lighting_settings = list_settings_by_prefix(&runtime.db_path, LIGHTING_SETTINGS_PREFIX)?;
+    // Whether the light outputs are armed is the state of this workstation
+    // now, not part of a backup: the archive leaves it out and a restore
+    // neither clears nor writes it, so restoring a backup made while armed
+    // can never arm a rig the operator is holding (Slice 11 — F31).
+    let mut lighting_settings =
+        list_settings_by_prefix(&runtime.db_path, LIGHTING_SETTINGS_PREFIX)?;
+    lighting_settings.remove(LIGHTING_OUTPUT_ARMED_KEY);
     let audio_settings = list_settings_by_prefix(&runtime.db_path, AUDIO_SETTINGS_PREFIX)?;
     let selected_fixture_settings =
         list_settings_by_prefix(&runtime.db_path, LIGHTING_SELECTED_FIXTURE_ID_KEY)?;
@@ -974,8 +1004,11 @@ fn clear_support_settings(transaction: &Transaction<'_>) -> Result<(), rusqlite:
         [],
     )?;
     transaction.execute(
-        "DELETE FROM app_settings WHERE key LIKE ?1",
-        [format!("{LIGHTING_SETTINGS_PREFIX}%")],
+        "DELETE FROM app_settings WHERE key LIKE ?1 AND key <> ?2",
+        params![
+            format!("{LIGHTING_SETTINGS_PREFIX}%"),
+            LIGHTING_OUTPUT_ARMED_KEY
+        ],
     )?;
     transaction.execute(
         "DELETE FROM app_settings WHERE key LIKE ?1",
@@ -1282,6 +1315,10 @@ fn write_support_settings(
     lighting_setting_keys.sort();
 
     for key in lighting_setting_keys {
+        // An archive from elsewhere may name it; this workstation's stands.
+        if key == LIGHTING_OUTPUT_ARMED_KEY {
+            continue;
+        }
         if let Some(value) = commissioning.lighting.settings.get(&key) {
             upsert_setting(transaction, &key, value)?;
             settings_restored += 1;

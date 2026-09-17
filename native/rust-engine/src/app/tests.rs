@@ -348,3 +348,214 @@ fn deck_and_ipc_mutations_serialize_without_lost_updates() {
         "every step the deck's key took is there"
     );
 }
+
+// ---------------------------------------------------------------------
+// 2026-09 production readiness, Slice 11 (F30, F31): every request over IPC
+// is the screen's, and the action log says so; the armed switch is a
+// lighting mutation like any other.
+// ---------------------------------------------------------------------
+
+fn recent_events(app: &EngineApp) -> Vec<(String, String, String)> {
+    request(app, "support.snapshot", json!({}))["recentEvents"]
+        .as_array()
+        .expect("support.snapshot carries recentEvents")
+        .iter()
+        .map(|entry| {
+            (
+                entry["source"].as_str().unwrap_or_default().to_string(),
+                entry["action"].as_str().unwrap_or_default().to_string(),
+                entry["detail"].as_str().unwrap_or_default().to_string(),
+            )
+        })
+        .collect()
+}
+
+// A discrete request leaves a row with the source `ui`, newest first in
+// `support.snapshot`; a ride, a refused request, a read and a change staged
+// in the preview leave none.
+#[test]
+fn ui_requests_record_source_ui() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = TestDir::new("ui-action-log");
+    let app = lighting_app_for(&test_dir);
+    assert!(recent_events(&app).is_empty());
+
+    request(&app, "lighting.power.all", json!({ "on": false }));
+    assert_eq!(
+        recent_events(&app),
+        vec![(
+            String::from("ui"),
+            String::from("all-off"),
+            String::from("All lights off")
+        )]
+    );
+
+    // A ride, a read and a selection.
+    request(
+        &app,
+        "lighting.fixture.update",
+        json!({ "fixtureId": "fixture-key-left", "intensity": 35 }),
+    );
+    request(&app, "lighting.snapshot", json!({}));
+    request(
+        &app,
+        "lighting.settings.update",
+        json!({ "selectedFixtureId": "fixture-key-left", "grandMaster": 90 }),
+    );
+    assert_eq!(recent_events(&app).len(), 1);
+
+    // Refused: nothing reached the rig.
+    let refused = app.handle_request(RequestEnvelope {
+        kind: String::from("request"),
+        id: json!("refused"),
+        method: String::from("lighting.group.power"),
+        params: json!({ "groupId": "group-that-is-not-there", "on": true }),
+    });
+    assert!(!refused.response.ok);
+    assert_eq!(recent_events(&app).len(), 1);
+
+    // Staged in the preview: the rig did not move.
+    request(
+        &app,
+        "lighting.editor.previewMode",
+        json!({ "enabled": true }),
+    );
+    request(&app, "lighting.power.all", json!({ "on": true }));
+    request(
+        &app,
+        "lighting.fixture.update",
+        json!({ "fixtureId": "fixture-key-left", "on": true }),
+    );
+    assert_eq!(recent_events(&app).len(), 1);
+    request(&app, "lighting.editor.previewDiscard", json!({}));
+
+    request(
+        &app,
+        "lighting.fixture.update",
+        json!({ "fixtureId": "fixture-key-left", "on": true, "intensity": 60 }),
+    );
+    let newest = recent_events(&app).remove(0);
+    assert_eq!((newest.0.as_str(), newest.1.as_str()), ("ui", "light-on"));
+    assert!(newest.2.ends_with(" on"), "{}", newest.2);
+    assert_eq!(recent_events(&app).len(), 2);
+}
+
+// F31: `lighting.output.setArmed` holds and arms. The snapshot says which,
+// the render generation moves (so the sACN thread reads the flag on its next
+// tick), `lighting.changed` is raised, the DMX monitor keeps showing what
+// would be sent, and the switch is a row of its own.
+#[test]
+fn set_armed_holds_and_arms_the_light_outputs() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = TestDir::new("set-armed");
+    let app = lighting_app_for(&test_dir);
+
+    let before = request(&app, "lighting.snapshot", json!({}));
+    assert_eq!(before["outputArmed"], true, "a default launch is armed");
+    let monitor_before = request(&app, "lighting.dmxMonitor.snapshot", json!({}));
+    let generation_before = crate::lighting::lighting_render_generation();
+
+    let reply = app.handle_request(RequestEnvelope {
+        kind: String::from("request"),
+        id: json!("hold"),
+        method: String::from("lighting.output.setArmed"),
+        params: json!({ "armed": false }),
+    });
+    assert!(reply.response.ok, "{:?}", reply.response.error);
+    assert_eq!(
+        reply
+            .response
+            .result
+            .as_ref()
+            .map(|result| &result["armed"]),
+        Some(&json!(false))
+    );
+    assert!(
+        reply
+            .events
+            .iter()
+            .any(|event| event["event"] == "lighting.changed"),
+        "the screen hears about it: {:?}",
+        reply.events
+    );
+    assert_ne!(
+        crate::lighting::lighting_render_generation(),
+        generation_before,
+        "the sACN thread reads the flag on its next tick"
+    );
+
+    let held = request(&app, "lighting.snapshot", json!({}));
+    assert_eq!(held["outputArmed"], false);
+    assert_eq!(held["status"], before["status"], "a hold is not a fault");
+    assert_eq!(
+        request(&app, "lighting.dmxMonitor.snapshot", json!({})),
+        monitor_before,
+        "the monitor shows what would be sent"
+    );
+    assert!(
+        crate::lighting::read_lighting_sacn_output_state(
+            &crate::storage::list_settings_by_prefix(
+                &app.runtime.db_path,
+                crate::app_state::APP_SETTINGS_PREFIX
+            )
+            .expect("settings")
+        )
+        .is_some(),
+        "the renderer answers what would be sent; the output loop is where the hold applies"
+    );
+
+    request(&app, "lighting.output.setArmed", json!({ "armed": true }));
+    assert_eq!(
+        request(&app, "lighting.snapshot", json!({}))["outputArmed"],
+        true
+    );
+    assert_eq!(
+        recent_events(&app)
+            .into_iter()
+            .map(|(source, action, detail)| format!("{source} {action} {detail}"))
+            .collect::<Vec<_>>(),
+        vec![
+            String::from("ui outputs-armed Light outputs armed"),
+            String::from("ui outputs-held Light outputs held"),
+        ]
+    );
+
+    let invalid = app.handle_request(RequestEnvelope {
+        kind: String::from("request"),
+        id: json!("invalid"),
+        method: String::from("lighting.output.setArmed"),
+        params: json!({ "armed": "yes" }),
+    });
+    assert!(!invalid.response.ok);
+}
+
+// Recovery mode answers `support.snapshot` with no database at all: the list
+// is empty and nothing is queried (a query would create a database file).
+#[test]
+fn recovery_mode_support_snapshot_has_no_recent_events_and_opens_no_database() {
+    let test_dir = TestDir::new("recovery-recent-events");
+    let mut app = app_for(&test_dir);
+    fs::remove_file(&app.runtime.db_path).expect("the database should be removable");
+    for suffix in ["-wal", "-shm"] {
+        let _ = fs::remove_file(format!("{}{suffix}", app.runtime.db_path.display()));
+    }
+    app.runtime.storage_ready = false;
+
+    let snapshot = request(&app, "support.snapshot", json!({}));
+    assert_eq!(snapshot["recentEvents"], json!([]));
+    assert!(
+        !app.runtime.db_path.exists(),
+        "a recovery-mode snapshot must not open — and so create — a database"
+    );
+
+    // A restore in recovery mode is a recorded method; with no database the
+    // hook writes nothing and creates nothing either.
+    let refused = app.handle_request(RequestEnvelope {
+        kind: String::from("request"),
+        id: json!("restore"),
+        method: String::from("support.backup.restore"),
+        params: json!({ "path": "nothing-here.json" }),
+    });
+    assert!(!refused.response.ok);
+    assert!(!app.runtime.db_path.exists());
+}

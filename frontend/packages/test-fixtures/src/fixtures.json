@@ -82,7 +82,8 @@
       "restoreSummary": "Restore from a native support archive or a legacy db.json export.",
       "backups": [],
       "summary": "No backup exported yet.",
-      "recentBackups": []
+      "recentBackups": [],
+      "recentEvents": []
     }
   },
   "setup-ready": {
@@ -175,7 +176,90 @@
         }
       ],
       "summary": "Latest backup exported this morning.",
-      "recentBackups": ["2026-04-22T07:12:00.000Z"]
+      "recentBackups": ["2026-04-22T07:12:00.000Z"],
+      "recentEvents": [
+        {
+          "id": 9,
+          "at": "2026-04-22T07:41:12.412Z",
+          "source": "ui",
+          "domain": "lighting",
+          "action": "outputs-armed",
+          "target": "Light outputs",
+          "detail": "Light outputs armed"
+        },
+        {
+          "id": 8,
+          "at": "2026-04-22T07:40:03.118Z",
+          "source": "deck",
+          "domain": "lighting",
+          "action": "scene-recalled",
+          "target": "Interview wide",
+          "detail": "Scene recalled: Interview wide"
+        },
+        {
+          "id": 7,
+          "at": "2026-04-22T07:39:48.905Z",
+          "source": "deck",
+          "domain": "lighting",
+          "action": "all-off",
+          "target": "All lights",
+          "detail": "All lights off"
+        },
+        {
+          "id": 6,
+          "at": "2026-04-22T07:36:20.377Z",
+          "source": "console",
+          "domain": "audio",
+          "action": "mute",
+          "target": "Host",
+          "detail": "Mute on at TotalMix: Host"
+        },
+        {
+          "id": 5,
+          "at": "2026-04-22T07:31:09.640Z",
+          "source": "watchdog",
+          "domain": "audio",
+          "action": "talkback-off",
+          "target": "Talkback",
+          "detail": "Talkback released: nobody held it"
+        },
+        {
+          "id": 4,
+          "at": "2026-04-22T07:31:07.122Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "talkback-on",
+          "target": "Talkback",
+          "detail": "Talkback on"
+        },
+        {
+          "id": 3,
+          "at": "2026-04-22T07:24:51.003Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "phantom",
+          "target": "Host",
+          "detail": "48 V on: Host"
+        },
+        {
+          "id": 2,
+          "at": "2026-04-22T07:22:30.871Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "console-snapshot-recalled",
+          "target": "Panel",
+          "detail": "Console mix recalled: Panel"
+        },
+        {
+          "id": 1,
+          "at": "2026-04-22T07:12:44.250Z",
+          "source": "launch",
+          "domain": "lighting",
+          "action": "outputs-held",
+          "target": "Light outputs",
+          "detail": "Light outputs held at start (safe start)"
+        }
+      ]
     }
   },
   "setup-degraded": {
@@ -273,7 +357,36 @@
         }
       ],
       "summary": "Latest backup exported before the degraded change.",
-      "recentBackups": ["2026-04-22T07:12:00.000Z"]
+      "recentBackups": ["2026-04-22T07:12:00.000Z"],
+      "recentEvents": [
+        {
+          "id": 3,
+          "at": "2026-04-22T07:24:51.003Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "phantom",
+          "target": "Host",
+          "detail": "48 V on: Host"
+        },
+        {
+          "id": 2,
+          "at": "2026-04-22T07:22:30.871Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "console-snapshot-recalled",
+          "target": "Panel",
+          "detail": "Console mix recalled: Panel"
+        },
+        {
+          "id": 1,
+          "at": "2026-04-22T07:12:44.250Z",
+          "source": "launch",
+          "domain": "lighting",
+          "action": "outputs-held",
+          "target": "Light outputs",
+          "detail": "Light outputs held at start (safe start)"
+        }
+      ]
     }
   },
   "startup-loading": {
@@ -356,6 +469,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "lastActionStatus": "ok",
       "selectedFixtureId": "fixture-key",
       "selectedSceneId": "scene-warm-wash",
@@ -572,6 +686,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "lastActionStatus": "warning",
       "selectedFixtureId": "fixture-back",
       "selectedSceneId": "scene-warm-wash",
@@ -770,6 +885,7 @@
       "enabled": true,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "fixtures": [],
       "groups": [],
       "scenes": [],
@@ -802,6 +918,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "lastActionStatus": "ok",
       "selectedFixtureId": null,
       "selectedSceneId": null,
@@ -838,6 +955,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": false,
+      "outputArmed": true,
       "lastActionStatus": "error",
       "selectedFixtureId": "fixture-key",
       "selectedSceneId": "scene-warm-wash",
@@ -2143,6 +2261,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "lastActionStatus": "ok",
       "selectedFixtureId": null,
       "selectedSceneId": "scene-warm-wash",

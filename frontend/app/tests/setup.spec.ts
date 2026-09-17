@@ -318,3 +318,77 @@ test("Support keeps the shell header, tabs and lamps (H1)", async ({ page }) => 
   // The plate does not go away when the bay changes mode.
   await expect(page.getByTestId("support-plate")).toBeVisible();
 });
+
+// 2026-09 production readiness, Slice 11 (F30, F31): the Light outputs switch
+// on the Support plate, in the built app. Held is said in three places — the
+// switch's readout, the header's Lighting lamp (on every workspace, and ahead
+// of an unsaved scene or a probe that has not run) and a Recent actions row
+// with the screen as its source — and nowhere promises a dark room.
+test.describe("Light outputs: Armed / Held", () => {
+  test.use({ viewport: { width: 2560, height: 1440 } });
+
+  test("holding and arming from the plate: the readout, the lamp, the row", async ({ page }) => {
+    await openFixture(page, "lighting-populated");
+    const header = page.getByRole("banner");
+    const lamp = header.getByRole("button", { name: /^Open Setup \/ Support for Lighting/ });
+    await expect(lamp).not.toContainText("held");
+
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: "Setup / Support", exact: true })
+      .click();
+    const plate = page.getByTestId("support-plate");
+    const workstation = plate.getByTestId("support-workstation");
+    await expect(plate.getByTestId("support-outputs-armed")).toHaveAttribute("aria-pressed", "true");
+    await expect(workstation).toContainText("the rig follows the app");
+    await expect(plate.getByTestId("support-recent-actions-empty")).toBeVisible();
+
+    await plate.getByTestId("support-outputs-held").click();
+    await expect(plate.getByTestId("support-outputs-held")).toHaveAttribute("aria-pressed", "true");
+    await expect(plate.getByTestId("support-outputs-armed")).toHaveAttribute("aria-pressed", "false");
+    await expect(workstation).toContainText("nothing is sent to the rig");
+    await expect(lamp).toContainText("held");
+    const feedback = page.getByTestId("setup-feedback");
+    await expect(feedback).toContainText("Light outputs held");
+    await expect(feedback).not.toContainText(/dark|blackout/i);
+    const newest = plate.getByTestId("support-recent-action").first();
+    await expect(newest).toContainText("Light outputs held");
+    await expect(newest).toContainText("Screen");
+    await expect(newest).toHaveAttribute("data-source", "ui");
+
+    // The lamp is the header's: it says held on the other workspaces too.
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: "Lighting", exact: true })
+      .click();
+    await expect(page.getByTestId("lighting-workspace")).toBeVisible();
+    await expect(lamp).toContainText("held");
+
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: "Setup / Support", exact: true })
+      .click();
+    await plate.getByTestId("support-outputs-armed").click();
+    await expect(plate.getByTestId("support-outputs-armed")).toHaveAttribute("aria-pressed", "true");
+    await expect(lamp).not.toContainText("held");
+    await expect(plate.getByTestId("support-recent-action")).toHaveCount(2);
+    await expect(plate.getByTestId("support-recent-action").first()).toContainText("Light outputs armed");
+  });
+
+  test("Recent actions shows the newest eight of the nine the fixture carries, inside the plate", async ({ page }) => {
+    await openFixture(page, "setup-ready");
+    const plate = page.getByTestId("support-plate");
+    const rows = plate.getByTestId("support-recent-action");
+    await expect(rows).toHaveCount(8);
+    await expect(rows.first()).toContainText("Light outputs armed");
+    for (const word of ["Screen", "Stream Deck", "Console", "Watchdog"]) {
+      await expect(plate.getByTestId("support-recent-actions")).toContainText(word);
+    }
+    // Nothing on the plate scrolls, and the list ends above the red key.
+    const fits = await plate.evaluate((element) => element.scrollHeight <= element.clientHeight);
+    expect(fits, "the Support plate must not scroll at 2560x1440").toBe(true);
+    const listBox = await plate.getByTestId("support-recent-actions").boundingBox();
+    const dangerBox = await plate.getByTestId("support-restart-bridge").boundingBox();
+    expect((listBox?.y ?? 0) + (listBox?.height ?? 0)).toBeLessThan(dangerBox?.y ?? 0);
+  });
+});

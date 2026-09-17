@@ -619,3 +619,151 @@ fn deck_light_and_planning_actions_raise_their_events() {
     .expect("the sort should cycle");
     assert!(raised("planning.changed"));
 }
+
+// ---------------------------------------------------------------------
+// 2026-09 production readiness, Slice 11 (F30): every key through the
+// bridge is the Stream Deck's, and the action log says so.
+// ---------------------------------------------------------------------
+
+fn recent_actions(db_path: &Path) -> Vec<(String, String, String)> {
+    crate::action_log::list_recent_actions(db_path, crate::action_log::RECENT_ACTIONS_LIMIT)
+        .expect("the action log should list")
+        .into_iter()
+        .map(|entry| (entry.source, entry.action, entry.detail))
+        .collect()
+}
+
+// The deck's ALL OFF leaves one row with the source `deck`, in the same
+// transaction as the last-event stamp. A dial detent is a ride and leaves
+// none; a key staged in the preview never reached the rig and leaves none; a
+// refused key leaves none.
+#[test]
+fn deck_all_off_records_source_deck() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("deck-action-log");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    assert!(recent_actions(db_path).is_empty());
+
+    light_action(db_path, "allOff");
+    assert_eq!(
+        recent_actions(db_path),
+        vec![(
+            String::from("deck"),
+            String::from("all-off"),
+            String::from("All lights off")
+        )]
+    );
+    assert_eq!(control_surface_last_event(db_path)["action"], "allOff");
+
+    // Rides and selections: the stamp moves, the log does not.
+    for ride in ["intensityUp", "intensityDown", "cctUp", "selectNextLight"] {
+        light_action(db_path, ride);
+        assert_eq!(control_surface_last_event(db_path)["action"], ride);
+    }
+    assert_eq!(recent_actions(db_path).len(), 1);
+
+    // The fixture is named as the screen names it.
+    let reply = light_action(db_path, "toggleLight");
+    let name = reply["light"]["name"]
+        .as_str()
+        .expect("the reply names the fixture")
+        .to_string();
+    let on = reply["light"]["on"]
+        .as_bool()
+        .expect("the reply says what was stored");
+    assert_eq!(
+        recent_actions(db_path)[0],
+        (
+            String::from("deck"),
+            String::from(if on { "light-on" } else { "light-off" }),
+            format!("{name} {}", if on { "on" } else { "off" })
+        )
+    );
+
+    // Staged in the preview: the rig did not move, so there is no row.
+    set_shared_preview_mode(db_path, true);
+    assert_eq!(light_action(db_path, "allOn")["preview"], true);
+    assert_eq!(light_action(db_path, "recallScene")["preview"], true);
+    assert_eq!(recent_actions(db_path).len(), 2);
+    set_shared_preview_mode(db_path, false);
+
+    let recalled = light_action(db_path, "recallScene");
+    assert_eq!(recalled["preview"], false);
+    assert_eq!(
+        recent_actions(db_path)[0],
+        (
+            String::from("deck"),
+            String::from("scene-recalled"),
+            format!(
+                "Scene recalled: {}",
+                recalled["recalled"].as_str().expect("a scene name")
+            )
+        )
+    );
+
+    // A refused key leaves nothing.
+    assert!(handle_control_surface_http_action(
+        db_path,
+        "/api/deck/light-action",
+        &json!({ "action": "nonsense" }),
+    )
+    .is_err());
+    assert_eq!(recent_actions(db_path).len(), 3);
+}
+
+// The audio half: a mute, the dim key and the first and last of a held TALK
+// key are rows; the dial, a strip tap and the repeats Companion sends while
+// TALK is held are not.
+#[test]
+fn deck_audio_keys_record_source_deck() {
+    let test_dir = ready_audio_test_db("deck-audio-action-log");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    let audio_action = |action: &str, value: Option<&str>| {
+        handle_control_surface_http_action(
+            db_path,
+            "/api/deck/audio-action",
+            &json!({ "action": action, "value": value }),
+        )
+        .unwrap_or_else(|error| panic!("{action} should succeed: {}", error.message()))
+    };
+
+    audio_action("dialTurn", Some("1:up"));
+    audio_action("stripTap", Some("1"));
+    audio_action("cycleBank", None);
+    audio_action("cycleBank", None);
+    audio_action("cycleBank", None);
+    assert!(recent_actions(db_path).is_empty(), "rides and selections");
+
+    let muted = audio_action("dialPress", Some("1"));
+    let name = muted["name"]
+        .as_str()
+        .expect("the strip's name")
+        .to_string();
+    assert_eq!(
+        recent_actions(db_path)[0],
+        (
+            String::from("deck"),
+            String::from("mute"),
+            format!("Mute on: {name}")
+        )
+    );
+
+    assert_eq!(audio_action("talkOn", None)["changed"], true);
+    assert_eq!(audio_action("talkOn", None)["changed"], false);
+    assert_eq!(audio_action("talkOn", None)["changed"], false);
+    assert_eq!(audio_action("talkOff", None)["changed"], true);
+    let rows = recent_actions(db_path);
+    assert_eq!(
+        rows.iter()
+            .map(|(source, action, _)| (source.as_str(), action.as_str()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("deck", "talkback-off"),
+            ("deck", "talkback-on"),
+            ("deck", "mute")
+        ],
+        "the press and the release, not the repeats in between"
+    );
+}

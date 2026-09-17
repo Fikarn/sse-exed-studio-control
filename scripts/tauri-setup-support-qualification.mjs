@@ -433,7 +433,7 @@ async function runSetupSupportQualification() {
   const runtime = createRuntimeDirs("sse-tauri-setup-support-");
   const firstSession = createSessionFiles("sse-tauri-session-");
 
-  console.log("Tauri Setup/Support qualification: step 1/7 clean startup and support workflow.");
+  console.log("Tauri Setup/Support qualification: step 1/8 clean startup and support workflow.");
 
   const firstRun = launchTauriShell({
     appDataDir: runtime.appDataDir,
@@ -618,7 +618,7 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
-  console.log("Tauri Setup/Support qualification: step 2/7 persisted restart on the same runtime.");
+  console.log("Tauri Setup/Support qualification: step 2/8 persisted restart on the same runtime.");
 
   // Slice 7 (F20): the database backup step 2 restores is kept for the
   // corrupt-database scenario, which restores it from the recovery surface.
@@ -781,7 +781,7 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
-  console.log("Tauri Setup/Support qualification: step 3/7 recovery posture for bootstrap failure.");
+  console.log("Tauri Setup/Support qualification: step 3/8 recovery posture for bootstrap failure.");
 
   const blockedRuntime = createBlockedRuntimeDirs("sse-tauri-bootstrap-failure-");
   const recoverySession = createSessionFiles("sse-tauri-session-");
@@ -825,7 +825,7 @@ async function runSetupSupportQualification() {
   // where the database should be reaches the recovery surface as
   // STORAGE_CORRUPT, the engine's sentence names a backup, and the damaged
   // file is left exactly as it was — nothing migrates or overwrites it.
-  console.log("Tauri Setup/Support qualification: step 4/7 recovery posture for a corrupt database.");
+  console.log("Tauri Setup/Support qualification: step 4/8 recovery posture for a corrupt database.");
 
   const corruptRuntime = createRuntimeDirs("sse-tauri-corrupt-db-");
   const corruptDbPath = path.join(corruptRuntime.appDataDir, "studio-control.sqlite3");
@@ -944,7 +944,7 @@ async function runSetupSupportQualification() {
   // restart announced, and the engine is restarted on its own — a new
   // process, the next launch number, the dashboard back.
   console.log(
-    "Tauri Setup/Support qualification: step 5/7 an engine ended from outside reaches recovery and restarts on its own."
+    "Tauri Setup/Support qualification: step 5/8 an engine ended from outside reaches recovery and restarts on its own."
   );
 
   const crashRuntime = createRuntimeDirs("sse-tauri-engine-crash-");
@@ -1029,7 +1029,7 @@ async function runSetupSupportQualification() {
     // `<app-data>/engine.lock` refuses the second engine instead, so the
     // second shell stops at ENGINE_ALREADY_RUNNING. Both are recorded; only
     // the plugin's refusal is accepted on Windows and macOS.
-    console.log("Tauri Setup/Support qualification: step 6/7 a second copy of the shell is refused.");
+    console.log("Tauri Setup/Support qualification: step 6/8 a second copy of the shell is refused.");
     const secondSession = createSessionFiles("sse-tauri-second-instance-");
     const secondRun = launchSecondShellInstance({
       appDataDir: crashRuntime.appDataDir,
@@ -1112,7 +1112,7 @@ async function runSetupSupportQualification() {
   // port, and the store derives its degraded recovery state — where before
   // the slice health read `ok` whatever had failed. A throwaway listener
   // holds the port the shell is told to use; the engine scans for no other.
-  console.log("Tauri Setup/Support qualification: step 7/7 a taken Stream Deck bridge port reads as health attention.");
+  console.log("Tauri Setup/Support qualification: step 7/8 a taken Stream Deck bridge port reads as health attention.");
 
   const portHolder = net.createServer();
   const takenPort = await new Promise((resolve, reject) => {
@@ -1177,6 +1177,120 @@ async function runSetupSupportQualification() {
     await new Promise((resolve) => portHolder.close(resolve));
     portSession.cleanup();
     portRuntime.cleanup();
+  }
+
+  await delay(1_500);
+  await assertTcpPortAvailable(devServerPort);
+
+  // Scenario `safe-start` (2026-09 production readiness, Slice 11 — F31):
+  // `SSE_SAFE_START=1` reaches the hardware link through the shell's
+  // environment and holds the light outputs before anything could stream.
+  // The hold is observed where the operator would see it — `outputArmed` on
+  // the lighting state, the `sacn` health entry (still `ok`: a hold is not a
+  // fault), the start-up row in Recent actions — never by listening for
+  // packets: 5568 may belong to other lighting software on the workstation.
+  // The hold is persisted, so a second launch WITHOUT the variable is still
+  // held; only the switch arms, and the switch is a row of its own.
+  console.log("Tauri Setup/Support qualification: step 8/8 a safe start holds the light outputs until they are armed.");
+
+  const safeRuntime = createRuntimeDirs("sse-tauri-safe-start-");
+  const heldOutputs = (value) => {
+    const sacn = value?.shellState?.healthSnapshot?.checks?.engine?.sacn;
+    return (
+      value?.shellState?.lifecycle === "ready" &&
+      value?.shellState?.lightingSnapshot?.outputArmed === false &&
+      typeof sacn?.detail === "string" &&
+      sacn.detail.includes("held")
+    );
+  };
+  const rowsOf = (value) =>
+    Array.isArray(value?.shellState?.supportSnapshot?.recentEvents)
+      ? value.shellState.supportSnapshot.recentEvents
+      : [];
+  let safeEvidence;
+
+  const safeSession = createSessionFiles("sse-tauri-session-");
+  const safeRun = launchTauriShell({
+    appDataDir: safeRuntime.appDataDir,
+    commandPath: safeSession.commandPath,
+    extraEnv: { SSE_SAFE_START: "1" },
+    logsDir: safeRuntime.logsDir,
+    statusPath: safeSession.statusPath,
+    updateRepoDir: safeRuntime.updateRepoDir,
+  });
+  try {
+    const held = await waitForStatus({
+      child: safeRun,
+      label: "held light outputs after a safe start",
+      predicate: heldOutputs,
+      statusPath: safeSession.statusPath,
+    });
+    const sacn = held.shellState.healthSnapshot.checks.engine.sacn;
+    assert(sacn.state === "ok", `Expected the held sacn entry to stay 'ok', got ${JSON.stringify(sacn)}.`);
+    assert(
+      held.shellState.recovery !== "degraded",
+      `A hold is not a fault: expected the store's recovery state not to be 'degraded', got '${held.shellState.recovery}'.`
+    );
+    const launchRow = rowsOf(held).find((row) => row?.source === "launch" && row?.action === "outputs-held");
+    assert(launchRow, `Expected a start-up row for the hold, got ${JSON.stringify(rowsOf(held))}.`);
+    safeEvidence = { heldDetail: sacn.detail, launchRow: launchRow.detail };
+  } finally {
+    await closeTauriShell(safeRun);
+    safeSession.cleanup();
+  }
+
+  await delay(1_500);
+  await assertTcpPortAvailable(devServerPort);
+
+  const armSession = createSessionFiles("sse-tauri-session-");
+  const armRun = launchTauriShell({
+    appDataDir: safeRuntime.appDataDir,
+    commandPath: armSession.commandPath,
+    logsDir: safeRuntime.logsDir,
+    statusPath: armSession.statusPath,
+    updateRepoDir: safeRuntime.updateRepoDir,
+  });
+  try {
+    const stillHeld = await waitForStatus({
+      child: armRun,
+      label: "the hold outliving the launch that made it",
+      predicate: heldOutputs,
+      statusPath: armSession.statusPath,
+    });
+    assert(
+      rowsOf(stillHeld).filter((row) => row?.source === "launch").length === 1,
+      `Expected the second launch to add no start-up row, got ${JSON.stringify(rowsOf(stillHeld))}.`
+    );
+
+    await dispatchCommand(armSession, armRun, "setLightingOutputArmed", { armed: true });
+    const armed = await waitForStatus({
+      child: armRun,
+      label: "armed light outputs after the switch",
+      predicate: (value) => {
+        const sacn = value?.shellState?.healthSnapshot?.checks?.engine?.sacn;
+        return (
+          value?.shellState?.lightingSnapshot?.outputArmed === true &&
+          typeof sacn?.detail === "string" &&
+          !sacn.detail.includes("held") &&
+          rowsOf(value).some((row) => row?.action === "outputs-armed")
+        );
+      },
+      statusPath: armSession.statusPath,
+    });
+    // Found by its action, not by its place: on the workstation the lane's
+    // engine also hears the real TotalMix, and a console row can land after it.
+    const armedRow = rowsOf(armed).find((row) => row?.action === "outputs-armed");
+    assert(armedRow.source === "ui", `Expected the switch's row to be the screen's, got ${JSON.stringify(armedRow)}.`);
+    evidence.recordCheck("safe-start-holds-the-light-outputs-until-armed", {
+      ...safeEvidence,
+      armedDetail: armed.shellState.healthSnapshot.checks.engine.sacn.detail,
+      armedRow: `${armedRow.source}: ${armedRow.detail}`,
+      heldAcrossLaunches: true,
+    });
+  } finally {
+    await closeTauriShell(armRun);
+    armSession.cleanup();
+    safeRuntime.cleanup();
   }
 }
 

@@ -121,6 +121,52 @@ test.describe("UI contract", () => {
       STATE_DISPLAY_X_TOLERANCE_PX
     );
   });
+
+  // 2026-09 production readiness, Slice 11: held light outputs are a state no
+  // fixture board shows — a board of its own would be three more boards, three
+  // more baselines per platform and a re-seed, for one amber readout and one
+  // lit key. It is measured here instead: the Setup board, the Held key
+  // pressed, and the same census against the same board's ratchet, in every
+  // theme. What the state adds — the amber `nothing is sent to the rig`, the
+  // engaged Held key, the new Recent actions row — may not move a measure the
+  // wrong way.
+  //
+  // One thing on screen is not this slice's: the pilot's feedback band, which
+  // every plate action shows (Verify latest since Slice 7) and no board ever
+  // has, so nothing measured it until now. It still carries a pre-A gradient
+  // (`SetupSupportPilot.module.css .feedbackBanner`, shared with `.utilityRow`),
+  // which the light census counts as off policy. That is recorded in the
+  // readiness ledger under Slice 11 for the front-end slice that owns it; here
+  // it is allowed by name and by count — the band's test id, exactly once —
+  // so nothing else can come in behind it.
+  for (const theme of THEMES) {
+    test(`setup-ready @ ${theme} holds its ratchet with the light outputs held`, async ({ page }) => {
+      const ratchet = RATCHETS[boardName("setup-ready", theme)];
+      expect(ratchet, "no ratchet seeded for setup-ready").toBeTruthy();
+      await openBoard(page, "setup-ready", theme);
+      await page.getByTestId("support-outputs-held").click();
+      await expect(page.getByTestId("support-outputs-held")).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByTestId("setup-feedback")).toContainText("nothing is sent to the rig");
+      await expect(page.getByTestId("support-recent-action").first()).toContainText("Light outputs held");
+      // The band's enter transition and the key's press have to be at rest.
+      await page.waitForTimeout(1000);
+      const { census, measures, contrast } = await measureBoard(page);
+      const offPolicy: string[] = census.light.gradientsOffEls;
+      const bandGradients = offPolicy.filter((element) => element.includes("[setup-feedback]"));
+      expect(bandGradients, "the feedback band's known gradient, once").toHaveLength(1);
+      const problems = checkRatchet(
+        { ...measures, gradientsOff: measures.gradientsOff - bandGradients.length },
+        ratchet!
+      );
+      const detail = problems.length
+        ? `\n${JSON.stringify(measures, null, 1)}\noff-policy gradients: ${offPolicy.join(", ")}\nworst contrast: ${contrast.fails
+            .slice(0, 8)
+            .map((f) => `${f.ratio}:1 ${f.size}px "${f.text}" ${f.el} ${f.color} on ${f.bg}`)
+            .join("\n")}`
+        : "";
+      expect(problems, `setup-ready @ ${theme}, held, moved the wrong way:${detail}`).toEqual([]);
+    });
+  }
 });
 
 // Visual overhaul A, Slice 3: the primitives' Storybook pages pass the

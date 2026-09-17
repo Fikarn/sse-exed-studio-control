@@ -106,6 +106,29 @@ function validateFixture(scenario, entry) {
     if (entry.lightingSnapshot.groups !== undefined) {
       requireArray(scenario, entry.lightingSnapshot.groups, "lightingSnapshot.groups");
     }
+    // 2026-09 production readiness, Slice 11: the hardware link always says
+    // whether the light outputs are armed, so a fixture that carries the
+    // bridge's state carries this beside it.
+    if (entry.lightingSnapshot.reachable !== undefined) {
+      requireBoolean(scenario, entry.lightingSnapshot.outputArmed, "lightingSnapshot.outputArmed");
+    }
+  }
+
+  // Slice 11: `recentEvents` is the action log's newest rows — a list of rows
+  // with a number id and the five strings the Support plate prints.
+  if (entry.supportSnapshot !== undefined && entry.supportSnapshot !== null) {
+    requireObject(scenario, entry.supportSnapshot, "supportSnapshot");
+    requireArray(scenario, entry.supportSnapshot.recentEvents, "supportSnapshot.recentEvents");
+    entry.supportSnapshot.recentEvents.forEach((row, index) => {
+      const at = `supportSnapshot.recentEvents[${index}]`;
+      requireObject(scenario, row, at);
+      if (typeof row.id !== "number") {
+        fail(scenario, `${at}.id must be a number`);
+      }
+      for (const key of ["at", "source", "domain", "action", "target", "detail"]) {
+        requireString(scenario, row[key], `${at}.${key}`);
+      }
+    });
   }
 
   if (entry.healthSnapshot !== undefined) {

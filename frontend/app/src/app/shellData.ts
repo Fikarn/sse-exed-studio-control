@@ -649,12 +649,39 @@ export interface LatchedShellState {
  *  state — so the header lamp mirrors the worst of the engine's health check
  *  and the workspace's state, with the workspace's word when it is the
  *  worse one. */
+export interface WorkspaceStateTone {
+  tone: StatusToneLike;
+  word: string;
+  /** 2026-09 production readiness, Slice 11: the word also wins when the health
+   *  check is at the same tone. Held light outputs are `attention`, like a probe
+   *  that has not been run — but held means nothing reaches the rig at all, and
+   *  it is a state the operator chose and has to remember to undo. */
+  winsTies?: boolean;
+}
+
 export interface WorkspaceStateTones {
-  audio?: { tone: StatusToneLike; word: string } | null;
-  lighting?: { tone: StatusToneLike; word: string } | null;
+  audio?: WorkspaceStateTone | null;
+  lighting?: WorkspaceStateTone | null;
 }
 
 const TONE_RANK: Record<StatusToneLike, number> = { error: 3, attention: 2, info: 1, ok: 0 };
+
+/** What the Lighting workspace shows as its own state, for the header lamp:
+ *  no bridge, then held light outputs (Slice 11 — only an explicit `false` is a
+ *  hold, as on the hardware link, and it outranks an unsaved scene because
+ *  nothing reaches the rig at all), then an unsaved scene. */
+export function deriveLightingWorkspaceTone(
+  lightingSnapshot: { outputArmed?: boolean; reachable?: boolean } | null | undefined,
+  sceneDrift: boolean
+): WorkspaceStateTone | null {
+  if (lightingSnapshot?.reachable === false) {
+    return { tone: "error", word: "no bridge" };
+  }
+  if (lightingSnapshot?.outputArmed === false) {
+    return { tone: "attention", winsTies: true, word: "held" };
+  }
+  return sceneDrift ? { tone: "attention", word: "unsaved" } : null;
+}
 
 export function buildMonitorItems(
   healthSnapshot: SnapshotRecord | null,
@@ -670,11 +697,14 @@ export function buildMonitorItems(
     id: "lighting" | "audio",
     label: string,
     check: { status?: string } | undefined,
-    workspace: { tone: StatusToneLike; word: string } | null | undefined
+    workspace: WorkspaceStateTone | null | undefined
   ) => {
     const health = asStatusTone(check?.status, "attention");
     const tone = toneForSubsystem(health, workspace?.tone ?? null) as StatusToneLike;
-    const workspaceWorse = workspace ? TONE_RANK[workspace.tone] > TONE_RANK[health] : false;
+    const workspaceWorse = workspace
+      ? TONE_RANK[workspace.tone] > TONE_RANK[health] ||
+        (workspace.winsTies === true && TONE_RANK[workspace.tone] === TONE_RANK[health])
+      : false;
     return {
       id,
       label,

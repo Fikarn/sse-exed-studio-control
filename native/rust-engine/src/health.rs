@@ -586,4 +586,38 @@ mod tests {
             .expect("summary")
             .starts_with("Health 'error'."));
     }
+
+    // 2026-09 production readiness, Slice 11 (F31): held light outputs are a
+    // state the operator chose, not a fault. The entry stays `ok` and says so
+    // in its detail — `attention` would turn the shell's recovery state to
+    // `degraded` and put the Setup word and the Deck lamp into their fault
+    // posture for something that is working as asked.
+    #[test]
+    fn held_light_outputs_are_not_a_fault() {
+        use crate::lighting_sacn_output::{HELD_DETAIL, SOCKET_READY_DETAIL};
+
+        let now = 1_757_000_000;
+        let mut entries = all_ok(now);
+        entries.insert(SUBSYSTEM_SACN, entry(SubsystemState::Ok, HELD_DETAIL, now));
+        assert_eq!(derive_status(&entries, true), "ok");
+
+        let mut registry = HealthRegistry::default();
+        assert!(!registry.report(
+            SUBSYSTEM_SACN,
+            SubsystemState::Ok,
+            String::from(SOCKET_READY_DETAIL),
+            now
+        ));
+        assert!(
+            !registry.report(
+                SUBSYSTEM_SACN,
+                SubsystemState::Ok,
+                String::from(HELD_DETAIL),
+                now
+            ),
+            "ok to ok is no transition; the output thread announces its own detail"
+        );
+        assert_eq!(registry.entries()[SUBSYSTEM_SACN].detail, HELD_DETAIL);
+        assert!(HELD_DETAIL.contains("held") && HELD_DETAIL.contains("armed"));
+    }
 }

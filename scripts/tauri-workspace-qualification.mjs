@@ -614,6 +614,33 @@ async function runWorkspaceQualification() {
       projectTitle: planningProjectTitle,
       taskTitle: "Live shell acceptance task",
     });
+
+    // 2026-09 production readiness, Slice 11 (F30): what this lane did on
+    // screen is in the action log with the screen as its source. The scene
+    // recall above is a row; the fixture's intensity and colour temperature
+    // were rides and are not. Recording an action raises no event (it would
+    // cost every action a request), so the list is fetched — as opening
+    // Setup fetches it — and needs no wait: the row is on disk before the
+    // hardware link answers the request that made it.
+    const refreshed = await dispatchCommand(firstSession, firstRun, "refresh");
+    const recentEvents = asArray(refreshed.status.shellState.supportSnapshot?.recentEvents);
+    const recallRow = recentEvents.find((row) => row?.action === "scene-recalled");
+    assert(
+      recallRow?.source === "ui" && typeof recallRow.detail === "string" && recallRow.detail.length > 0,
+      `Expected the scene recall in Recent actions with the screen as its source, got ${JSON.stringify(recentEvents)}.`
+    );
+    assert(
+      recentEvents.every((row) => ["ui", "deck", "console", "watchdog", "launch"].includes(row?.source)),
+      `Expected every recent action to name a known source, got ${JSON.stringify(recentEvents)}.`
+    );
+    assert(
+      !recentEvents.some((row) => row?.action === "light-on" || row?.action === "light-off"),
+      `Expected the fixture's intensity ride to leave no row, got ${JSON.stringify(recentEvents)}.`
+    );
+    evidence.recordCheck("ui-actions-appear-in-recent-actions", {
+      recallRow: `${recallRow.source}: ${recallRow.detail}`,
+      rows: recentEvents.length,
+    });
   } finally {
     await closeTauriShell(firstRun);
     firstSession.cleanup();

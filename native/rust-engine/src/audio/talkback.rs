@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+use crate::action_log::{record_actions_or_log, ActionRecord, ActionSource, DOMAIN_AUDIO};
 use crate::diagnostics::{log_event, LogLevel};
 use crate::engine_events::emit_audio_changed;
 
@@ -120,24 +121,44 @@ fn run_watchdog() {
     loop {
         thread::sleep(WATCHDOG_TICK);
         for (db_path, mix_target_id) in take_expired_holds(Instant::now()) {
-            match release_talkback_hold(&db_path, &mix_target_id) {
-                Ok(true) => log_event(
-                    LogLevel::Info,
-                    &format!(
-                        "Talkback watchdog: released {mix_target_id} after {} ms without a hold",
-                        AUDIO_TALKBACK_HOLD_TTL.as_millis()
-                    ),
-                ),
-                Ok(false) => {}
-                Err(error) => log_event(
-                    LogLevel::Warn,
-                    &format!(
-                        "Talkback watchdog: could not release {mix_target_id}: {}",
-                        describe_error(&error)
-                    ),
-                ),
-            }
+            release_expired_hold(&db_path, &mix_target_id);
         }
+    }
+}
+
+/// What the watchdog does with one hold whose deadline has passed: release
+/// it, say so in the log, and leave the action-log row that names the
+/// watchdog as the one who did it (Slice 11 — F30) — nobody at a surface
+/// released this talkback, and the trail has to say so.
+pub(super) fn release_expired_hold(db_path: &Path, mix_target_id: &str) {
+    match release_talkback_hold(db_path, mix_target_id) {
+        Ok(true) => {
+            log_event(
+                LogLevel::Info,
+                &format!(
+                    "Talkback watchdog: released {mix_target_id} after {} ms without a hold",
+                    AUDIO_TALKBACK_HOLD_TTL.as_millis()
+                ),
+            );
+            record_actions_or_log(
+                db_path,
+                &[ActionRecord::new(
+                    ActionSource::Watchdog,
+                    DOMAIN_AUDIO,
+                    "talkback-off",
+                    "Talkback",
+                    "Talkback released: nobody held it",
+                )],
+            );
+        }
+        Ok(false) => {}
+        Err(error) => log_event(
+            LogLevel::Warn,
+            &format!(
+                "Talkback watchdog: could not release {mix_target_id}: {}",
+                describe_error(&error)
+            ),
+        ),
     }
 }
 
@@ -498,5 +519,49 @@ mod tests {
             error,
             AudioCommandError::Rejected("AUDIO_MIX_TARGET_NOT_FOUND", _)
         ));
+    }
+
+    // 2026-09 production readiness, Slice 11 (F30): a talkback nobody
+    // released is released by the watchdog, and the action log names the
+    // watchdog — not the surface that opened it. This calls what the
+    // watchdog's loop calls for one expired hold; the loop itself only adds
+    // the sleep and the scan of a table every test shares.
+    #[test]
+    fn watchdog_release_records_source_watchdog() {
+        let _guard = TEST_LOCK
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let test_dir = ready_db("talkback-watchdog-row");
+        let db = test_dir.db_path();
+        let rows = |db: &Path| {
+            crate::action_log::list_recent_actions(db, 10)
+                .expect("the action log should list")
+                .into_iter()
+                .map(|entry| (entry.source, entry.action, entry.detail))
+                .collect::<Vec<_>>()
+        };
+
+        assert!(hold(&db, true).changed);
+        assert!(main_talkback(&db));
+        assert!(
+            rows(&db).is_empty(),
+            "the hold itself is recorded by the surface that asked, not by this function"
+        );
+
+        release_expired_hold(&db, "audio-mix-main");
+        assert!(!main_talkback(&db));
+        assert!(talkback_hold_deadline(&db, "audio-mix-main").is_none());
+        assert_eq!(
+            rows(&db),
+            vec![(
+                String::from("watchdog"),
+                String::from("talkback-off"),
+                String::from("Talkback released: nobody held it"),
+            )]
+        );
+
+        // Nothing to release: nothing is recorded.
+        release_expired_hold(&db, "audio-mix-main");
+        assert_eq!(rows(&db).len(), 1);
     }
 }

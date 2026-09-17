@@ -9,7 +9,7 @@ import styles from "./OperatorShell.module.css";
 import { createShellEnvironment } from "./createShellEnvironment";
 import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
 import { OPERATOR_UI_SCALES } from "./operatorLayout";
-import { asRecord, buildMonitorItems, isEditableTarget } from "./shellData";
+import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone, isEditableTarget } from "./shellData";
 import { describeAudioStatus } from "./audio/audioFormatting";
 import { computeLiveSceneDrift } from "./lighting/lightingDrift";
 import { SetupSupportPilot } from "./setup/SetupSupportPilot";
@@ -129,12 +129,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const workspaceTones = useMemo(
     () => ({
       audio: shellState.audioSnapshot ? { tone: audioStatus.tone, word: audioStatus.label.toLowerCase() } : null,
-      lighting:
-        shellState.lightingSnapshot?.reachable === false
-          ? { tone: "error" as const, word: "no bridge" }
-          : lightingSceneDrift
-            ? { tone: "attention" as const, word: "unsaved" }
-            : null,
+      lighting: deriveLightingWorkspaceTone(shellState.lightingSnapshot, lightingSceneDrift),
     }),
     [audioStatus, lightingSceneDrift, shellState.audioSnapshot, shellState.lightingSnapshot]
   );
@@ -532,6 +527,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         commissioningSnapshot={shellState.commissioningSnapshot}
         controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
         healthSnapshot={shellState.healthSnapshot}
+        lightOutputsArmed={shellState.lightingSnapshot ? shellState.lightingSnapshot.outputArmed !== false : null}
         liveTransportRequested={environment.liveTransportRequested}
         onRequestRestart={requestRestart}
         onShowShortcuts={showShortcuts}

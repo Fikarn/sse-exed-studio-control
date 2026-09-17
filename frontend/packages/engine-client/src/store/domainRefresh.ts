@@ -102,6 +102,11 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
   // Seeds planning data and publishes commissioning in one request.
   ["commissioning.seedPlanningDemo", [...COMMISSIONING_DOMAINS, "planning"]],
   ["commissioning.", COMMISSIONING_DOMAINS],
+  // The armed switch is an action-log row of its own, and Setup / Support
+  // lists those rows beside the switch: the list moves with it. (Recording
+  // an action raises no `support.changed` — that would cost every action
+  // one more request — so the list otherwise moves when Setup is opened.)
+  ["lighting.output.setArmed", [...LIGHTING_DOMAINS, "support"]],
   // `lighting.settings.update` included: the store's request carries the
   // selection and the grand master only (`LightingSettingsUpdateRequest`),
   // never the bridge address whose change would reset the lighting probe.

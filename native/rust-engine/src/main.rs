@@ -1,3 +1,4 @@
+mod action_log;
 mod app;
 mod app_state;
 mod audio;

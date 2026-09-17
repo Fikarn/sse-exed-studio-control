@@ -324,6 +324,20 @@ pub(super) fn persist_audio_state(
         .map_err(|error| AudioCommandError::Storage(error.to_string()))
 }
 
+/// `persist_audio_state` with action-log rows in the same transaction: the
+/// console flush runs on the metering thread, where a second wait for the
+/// disk would show in the meters (Slice 11 — F30).
+pub(super) fn persist_audio_state_with_actions(
+    db_path: &Path,
+    updates: &[(String, String)],
+    actions: &[crate::action_log::ActionRecord],
+) -> Result<(), AudioCommandError> {
+    crate::storage::set_settings_owned_and(db_path, updates, |transaction| {
+        crate::action_log::insert_actions(transaction, actions)
+    })
+    .map_err(|error| AudioCommandError::Storage(error.to_string()))
+}
+
 /// Serialises every read-modify-write of the two JSON state blobs
 /// (`channels_state`, `mix_targets_state`). SQLite already serialises the
 /// writes themselves; this protects the read → modify → write window against

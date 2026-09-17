@@ -1096,6 +1096,176 @@ fn blob_migration_failure_rolls_back() {
     assert_eq!(bootstrap.schema_version, STORAGE_SCHEMA_VERSION);
 }
 
+// 2026-09 production readiness, Slice 11 (F30): schema 7 adds the action
+// log. Three roads lead to it and each leaves a row for every step it took,
+// 6 and 7 both: the last step used to be keyed to the constant, so with the
+// constant at 7 a v5 database would have recorded 7 and never created the
+// table, and a v6 database would have run the v6 palette seed a second time —
+// which reads an EMPTY palette list as unseeded, so an operator who deleted
+// every palette would have got the defaults back. The copy taken before the
+// step is still schema 6.
+#[test]
+fn migrate_v6_to_v7_after_snapshot() {
+    let versions = |db_path: &Path| -> Vec<i64> {
+        let connection = open_connection(db_path).expect("connection should open");
+        let mut statement = connection
+            .prepare("SELECT version FROM schema_migrations ORDER BY version")
+            .expect("versions should prepare");
+        let rows = statement
+            .query_map([], |row| row.get::<_, i64>(0))
+            .expect("versions should query")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("versions should read");
+        rows
+    };
+    let action_log_objects = |db_path: &Path| -> Vec<(String, String)> {
+        let connection = open_connection(db_path).expect("connection should open");
+        let mut statement = connection
+            .prepare(
+                "SELECT type, name FROM sqlite_master
+                 WHERE tbl_name = 'event_log' AND name NOT LIKE 'sqlite_%' ORDER BY type, name",
+            )
+            .expect("objects should prepare");
+        let rows = statement
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .expect("objects should query")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("objects should read");
+        rows
+    };
+    let the_log_is_there = |db_path: &Path| {
+        assert_eq!(
+            action_log_objects(db_path),
+            vec![
+                (String::from("index"), String::from("event_log_at_idx")),
+                (String::from("table"), String::from("event_log")),
+            ]
+        );
+        let connection = open_connection(db_path).expect("connection should open");
+        let index_sql: String = connection
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE name = 'event_log_at_idx'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("index sql should read");
+        assert!(index_sql.contains("event_log(at"), "{index_sql}");
+    };
+
+    // A v6 database — the operator's — whose palette list is empty on purpose.
+    let emptied = r#"{"fixtures":[],"groups":[],"scenes":[],"palettes":[],"paletteOrder":[]}"#;
+    let v6_dir = TestDir::new("storage-v6-to-v7");
+    let v6_path = v6_dir.path().join("native.sqlite3");
+    let v6_backups = v6_dir.path().join("backups");
+    seed_v5_database(&v6_path);
+    open_connection(&v6_path)
+        .expect("connection should open")
+        .execute("INSERT INTO schema_migrations(version) VALUES (6)", [])
+        .expect("the v6 row should insert");
+    set_settings_owned(
+        &v6_path,
+        &[(
+            String::from("app.lighting.editor.state"),
+            String::from(emptied),
+        )],
+    )
+    .expect("the editor state should write");
+
+    let bootstrap =
+        initialize_database(&v6_path, &v6_backups).expect("the v7 migration should succeed");
+    assert_eq!(bootstrap.schema_version, 7);
+    assert_eq!(bootstrap.schema_version, STORAGE_SCHEMA_VERSION);
+    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7]);
+    the_log_is_there(&v6_path);
+    let stored: String = open_connection(&v6_path)
+        .expect("connection should open")
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'app.lighting.editor.state'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("the editor state should read");
+    assert_eq!(
+        stored, emptied,
+        "the v6 palette seed does not run again on a v6 database"
+    );
+
+    let backup = newest_snapshot(&v6_backups).expect("a pre-migration backup should exist");
+    assert!(
+        backup.to_string_lossy().ends_with("-pre-migration.sqlite3"),
+        "{}",
+        backup.display()
+    );
+    let copy = Connection::open_with_flags(&backup, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .expect("backup should open");
+    let copy_version: i64 = copy
+        .query_row("SELECT MAX(version) FROM schema_migrations", [], |row| {
+            row.get(0)
+        })
+        .expect("backup version should read");
+    assert_eq!(copy_version, 6, "the copy is the database before the step");
+    let copy_has_the_log: i64 = copy
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'event_log'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("backup objects should read");
+    assert_eq!(copy_has_the_log, 0);
+    drop(copy);
+
+    // A second start changes nothing and writes no copy.
+    initialize_database(&v6_path, &v6_backups).expect("second start should succeed");
+    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7]);
+    let copies = fs::read_dir(&v6_backups)
+        .expect("backups dir should list")
+        .filter_map(Result::ok)
+        .filter(|entry| snapshot_reason_of(&entry.file_name().to_string_lossy()).is_some())
+        .count();
+    assert_eq!(copies, 1);
+
+    // A v5 database takes both steps, in order, and is seeded once.
+    let v5_dir = TestDir::new("storage-v5-to-v7");
+    let v5_path = v5_dir.path().join("native.sqlite3");
+    seed_v5_database(&v5_path);
+    set_settings_owned(
+        &v5_path,
+        &[(
+            String::from("app.lighting.editor.state"),
+            String::from(r#"{"fixtures":[],"groups":[],"scenes":[]}"#),
+        )],
+    )
+    .expect("the editor state should write");
+    let bootstrap = initialize_database(&v5_path, &v5_dir.path().join("backups"))
+        .expect("the v5 database should upgrade");
+    assert_eq!(bootstrap.schema_version, 7);
+    assert_eq!(versions(&v5_path), vec![1, 2, 3, 4, 5, 6, 7]);
+    the_log_is_there(&v5_path);
+    let seeded: String = open_connection(&v5_path)
+        .expect("connection should open")
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = 'app.lighting.editor.state'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("the editor state should read");
+    let seeded: Value = serde_json::from_str(&seeded).expect("the editor state parses");
+    assert_eq!(seeded["palettes"].as_array().map(Vec::len), Some(8));
+
+    // A new database.
+    let fresh_dir = TestDir::new("storage-fresh-v7");
+    let fresh_path = fresh_dir.path().join("native.sqlite3");
+    let bootstrap = initialize_database(&fresh_path, &fresh_dir.path().join("backups"))
+        .expect("a new database should initialize");
+    assert_eq!(bootstrap.schema_version, 7);
+    assert_eq!(versions(&fresh_path), vec![1, 2, 3, 4, 5, 6, 7]);
+    the_log_is_there(&fresh_path);
+    assert!(
+        newest_snapshot(&fresh_dir.path().join("backups")).is_none(),
+        "a new database has nothing to copy first"
+    );
+}
+
 fn seed_v5_database(db_path: &Path) {
     seed_v3_database(db_path);
     let connection = open_connection(db_path).expect("connection should open");

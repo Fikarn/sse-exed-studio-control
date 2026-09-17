@@ -597,6 +597,9 @@ describe("createShellStore scoped refresh", () => {
     ]);
 
     expect(await after(() => store.setLightingAllPower(true))).toEqual(lighting);
+    // Slice 11: the armed switch is a row in the Recent actions list beside
+    // it, so it — and no other lighting request — fetches the support snapshot.
+    expect(await after(() => store.setLightingOutputArmed(false))).toEqual([...lighting, "support.snapshot"]);
     // Selecting a fixture is the hot path of the Lighting workspace.
     expect(await after(() => store.updateLightingSettings({ selectedFixtureId: "fixture-key" }))).toEqual(lighting);
     expect(await after(() => store.togglePlanningTaskComplete("task-1"))).toEqual([

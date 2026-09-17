@@ -1,3 +1,6 @@
+use crate::action_log::{
+    record_actions_or_log, ui_actions, ui_method_class, ui_method_stages_in_preview, UiMethodClass,
+};
 use crate::app_state::{
     build_app_snapshot, parse_commissioning_override, parse_commissioning_update,
     APP_SETTINGS_PREFIX, COMMISSIONING_COMPLETED_KEY,
@@ -39,21 +42,21 @@ use crate::lighting::{
     parse_lighting_fixture_update_request, parse_lighting_group_create_request,
     parse_lighting_group_delete_request, parse_lighting_group_power_request,
     parse_lighting_group_reorder_request, parse_lighting_group_update_request,
-    parse_lighting_palette_apply_request, parse_lighting_palette_create_request,
-    parse_lighting_palette_delete_request, parse_lighting_palette_update_request,
-    parse_lighting_preview_discard_request, parse_lighting_preview_mode_request,
-    parse_lighting_scene_create_request, parse_lighting_scene_delete_request,
-    parse_lighting_scene_pin_request, parse_lighting_scene_recall_request,
-    parse_lighting_scene_reorder_request, parse_lighting_scene_update_request,
-    parse_lighting_settings_update_request, pin_lighting_scene, read_lighting_dmx_monitor_snapshot,
-    read_lighting_fixture_catalog_snapshot, read_lighting_snapshot_with_preview,
-    recall_lighting_scene_with_preview, reorder_lighting_group, reorder_lighting_scene,
-    set_lighting_all_power_with_preview, set_lighting_fixture_highlight,
-    set_lighting_group_power_with_preview, set_lighting_preview_mode,
-    start_lighting_identify_sequence, update_lighting_fixture_with_preview, update_lighting_group,
-    update_lighting_palette, update_lighting_scene_with_preview, update_lighting_settings,
-    with_lighting_state, with_lighting_state_and_preview, LightingCommandError,
-    LightingPreviewRuntimeState,
+    parse_lighting_output_armed_request, parse_lighting_palette_apply_request,
+    parse_lighting_palette_create_request, parse_lighting_palette_delete_request,
+    parse_lighting_palette_update_request, parse_lighting_preview_discard_request,
+    parse_lighting_preview_mode_request, parse_lighting_scene_create_request,
+    parse_lighting_scene_delete_request, parse_lighting_scene_pin_request,
+    parse_lighting_scene_recall_request, parse_lighting_scene_reorder_request,
+    parse_lighting_scene_update_request, parse_lighting_settings_update_request,
+    pin_lighting_scene, read_lighting_dmx_monitor_snapshot, read_lighting_fixture_catalog_snapshot,
+    read_lighting_snapshot_with_preview, recall_lighting_scene_with_preview,
+    reorder_lighting_group, reorder_lighting_scene, set_lighting_all_power_with_preview,
+    set_lighting_fixture_highlight, set_lighting_group_power_with_preview,
+    set_lighting_output_armed, set_lighting_preview_mode, start_lighting_identify_sequence,
+    update_lighting_fixture_with_preview, update_lighting_group, update_lighting_palette,
+    update_lighting_scene_with_preview, update_lighting_settings, with_lighting_state,
+    with_lighting_state_and_preview, LightingCommandError, LightingPreviewRuntimeState,
 };
 #[cfg(feature = "dev-fixtures")]
 use crate::parity_fixtures::{
@@ -199,7 +202,14 @@ impl EngineApp {
         let started_at = Instant::now();
         let method = request.method.clone();
         let id = request.id.clone();
+        // The action log (Slice 11 — F30): what was asked is kept only for
+        // the methods that can leave a row.
+        let recorded_params = (ui_method_class(&method) == Some(UiMethodClass::Recorded))
+            .then(|| request.params.clone());
         let reply = self.dispatch(request);
+        if let Some(params) = recorded_params {
+            self.record_ui_actions(&method, &params, &reply);
+        }
         if let Some(line) = request_log_line(
             configured_log_level(),
             &method,
@@ -210,6 +220,27 @@ impl EngineApp {
             let _ = append_log(&self.runtime.log_file_path, "DEBUG", &line);
         }
         reply
+    }
+
+    /// Every request over IPC is the screen's, so this is where a row gets
+    /// the source `ui`; `action_log::ui_actions` holds the table. A refused
+    /// request leaves nothing, and neither does a change staged in the
+    /// lighting preview: only this thread switches the preview on or off, so
+    /// what it reads here is what the mutation saw.
+    fn record_ui_actions(&self, method: &str, params: &serde_json::Value, reply: &EngineReply) {
+        if !reply.response.ok || !self.runtime.storage_ready {
+            return;
+        }
+        let staged = ui_method_stages_in_preview(method) && lock_shared_lighting_preview().enabled;
+        let result = reply
+            .response
+            .result
+            .as_ref()
+            .unwrap_or(&serde_json::Value::Null);
+        record_actions_or_log(
+            &self.runtime.db_path,
+            &ui_actions(method, params, result, staged),
+        );
     }
 
     fn dispatch(&self, request: RequestEnvelope) -> EngineReply {
@@ -437,6 +468,15 @@ impl EngineApp {
                 parse_lighting_all_power_request,
                 set_lighting_all_power_with_preview,
                 |_| "all-powered",
+            ),
+            // Armed / held (Slice 11 — F31): a lighting mutation like any
+            // other, so the lock and the render generation come with it and
+            // the sACN thread sees the flag on its next tick.
+            "lighting.output.setArmed" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_output_armed_request,
+                set_lighting_output_armed,
+                "output-armed-changed",
             ),
             // -------------------------------------------------------------
             // Audio mutations (M-1event)

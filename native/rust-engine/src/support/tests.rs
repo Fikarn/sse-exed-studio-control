@@ -1017,3 +1017,156 @@ fn exports_older_than_thirty_days_are_pruned() {
         .expect("a missing folder is nothing to prune")
         .is_empty());
 }
+
+// 2026-09 production readiness, Slice 11 (F31): whether the light outputs
+// are armed is the state of this workstation now, not part of a backup. The
+// key sits under `app.lighting.`, which an archive restore deletes and writes
+// back as a whole — so without its exception, restoring a backup made while
+// armed would arm a rig the operator is holding. The archive leaves the key
+// out, the restore neither clears nor writes it, and an archive from
+// elsewhere that names it is not believed.
+#[test]
+fn restore_never_changes_whether_the_light_outputs_are_armed() {
+    use crate::lighting::{
+        lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
+    };
+    let test_dir = TestDir::new("restore-armed-flag");
+    let runtime = seeded_runtime(&test_dir);
+    let armed_now = |runtime: &RuntimeContext| {
+        lighting_output_armed(
+            &list_settings_by_prefix(&runtime.db_path, LIGHTING_OUTPUT_ARMED_KEY)
+                .expect("settings should load"),
+        )
+    };
+
+    // Exported while armed, with a lighting setting that must round-trip.
+    set_settings_owned(
+        &runtime.db_path,
+        &[
+            lighting_output_armed_setting(true),
+            (
+                String::from("app.lighting.grand_master"),
+                String::from("80"),
+            ),
+        ],
+    )
+    .expect("settings should seed");
+    let export = export_support_backup(&runtime).expect("export should succeed");
+    let archive: SupportBackupArchive =
+        serde_json::from_slice(&fs::read(&export.path).expect("archive should read"))
+            .expect("archive should parse");
+    assert!(
+        !archive
+            .commissioning
+            .lighting
+            .settings
+            .contains_key(LIGHTING_OUTPUT_ARMED_KEY),
+        "the archive does not carry the flag"
+    );
+    assert_eq!(
+        archive
+            .commissioning
+            .lighting
+            .settings
+            .get("app.lighting.grand_master")
+            .map(String::as_str),
+        Some("80")
+    );
+
+    // The operator holds the rig, then restores that backup.
+    set_settings_owned(
+        &runtime.db_path,
+        &[
+            lighting_output_armed_setting(false),
+            (
+                String::from("app.lighting.grand_master"),
+                String::from("20"),
+            ),
+        ],
+    )
+    .expect("the hold should persist");
+    restore_support_backup(&runtime, &request_for(&runtime, Path::new(&export.path)))
+        .expect("restore should succeed");
+    assert!(!armed_now(&runtime), "a restore must not arm a held rig");
+    let lighting =
+        list_settings_by_prefix(&runtime.db_path, "app.lighting.").expect("settings should load");
+    assert_eq!(
+        lighting
+            .get("app.lighting.grand_master")
+            .map(String::as_str),
+        Some("80"),
+        "everything else under the prefix is restored"
+    );
+
+    // An archive from elsewhere that names the flag is not believed.
+    let mut forged: Value =
+        serde_json::from_slice(&fs::read(&export.path).expect("archive should read"))
+            .expect("archive should parse");
+    forged["commissioning"]["lighting"]["settings"][LIGHTING_OUTPUT_ARMED_KEY] = json!("true");
+    let forged_path = runtime.backups_dir.join("native-support-forged.json");
+    fs::write(
+        &forged_path,
+        serde_json::to_vec(&forged).expect("archive should serialize"),
+    )
+    .expect("forged archive should write");
+    restore_support_backup(&runtime, &request_for(&runtime, &forged_path))
+        .expect("restore should succeed");
+    assert!(!armed_now(&runtime));
+
+    // And the other way round: an armed rig stays armed.
+    set_settings_owned(&runtime.db_path, &[lighting_output_armed_setting(true)])
+        .expect("arming should persist");
+    forged["commissioning"]["lighting"]["settings"][LIGHTING_OUTPUT_ARMED_KEY] = json!("false");
+    fs::write(
+        &forged_path,
+        serde_json::to_vec(&forged).expect("archive should serialize"),
+    )
+    .expect("forged archive should write");
+    restore_support_backup(&runtime, &request_for(&runtime, &forged_path))
+        .expect("restore should succeed");
+    assert!(armed_now(&runtime));
+}
+
+// Slice 11 (F30): `support.snapshot` carries the newest fifty rows of the
+// action log, newest first.
+#[test]
+fn support_snapshot_carries_the_newest_fifty_actions() {
+    use crate::action_log::{
+        record_actions, ActionRecord, ActionSource, DOMAIN_LIGHTING, RECENT_ACTIONS_LIMIT,
+    };
+    let test_dir = TestDir::new("recent-events");
+    let runtime = test_dir.runtime();
+    assert!(read_support_snapshot(&runtime)
+        .expect("snapshot should read")
+        .recent_events
+        .is_empty());
+
+    let rows = (0..RECENT_ACTIONS_LIMIT + 5)
+        .map(|number| {
+            ActionRecord::new(
+                ActionSource::Ui,
+                DOMAIN_LIGHTING,
+                "all-off",
+                "All lights",
+                format!("row {number}"),
+            )
+        })
+        .collect::<Vec<_>>();
+    record_actions(&runtime.db_path, &rows).expect("rows should write");
+
+    let snapshot = read_support_snapshot(&runtime).expect("snapshot should read");
+    assert_eq!(snapshot.recent_events.len(), RECENT_ACTIONS_LIMIT);
+    assert_eq!(snapshot.recent_events[0].detail, "row 54");
+    assert_eq!(snapshot.recent_events[49].detail, "row 5");
+    let serialized = serde_json::to_value(&snapshot).expect("snapshot should serialize");
+    assert_eq!(serialized["recentEvents"][0]["source"], "ui");
+    let mut keys = serialized["recentEvents"][0]
+        .as_object()
+        .map(|entry| entry.keys().cloned().collect::<Vec<_>>())
+        .expect("a row is an object");
+    keys.sort();
+    assert_eq!(
+        keys,
+        ["action", "at", "detail", "domain", "id", "source", "target"]
+    );
+}

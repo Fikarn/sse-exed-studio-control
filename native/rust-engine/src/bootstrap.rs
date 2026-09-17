@@ -1,15 +1,21 @@
+use crate::action_log::{
+    insert_actions, ActionRecord, ActionSource, DOMAIN_LIGHTING, DOMAIN_SETUP,
+};
 use crate::control_surface::{resolve_control_surface_port, ControlSurfaceBridgeInfo};
 use crate::control_surface_http::{load_or_create_bridge_token, start_control_surface_bridge};
 use crate::diagnostics::append_log;
 use crate::health::{
     report as report_health, report_at as report_health_at, SubsystemState, SUBSYSTEM_BACKUPS,
-    SUBSYSTEM_RESTORE, SUBSYSTEM_STORAGE,
+    SUBSYSTEM_RESTORE, SUBSYSTEM_SACN, SUBSYSTEM_STORAGE,
 };
 use crate::legacy_import::LegacyImportRequest;
+use crate::lighting::{
+    lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
+};
 use crate::planning::planning_data_present;
 use crate::storage::{
-    checkpoint_database, import_legacy_db, initialize_database, EngineResult, StorageBootstrap,
-    StorageError, STORAGE_SCHEMA_VERSION,
+    checkpoint_database, import_legacy_db, initialize_database, list_settings_by_prefix,
+    set_settings_owned_and, EngineResult, StorageBootstrap, StorageError, STORAGE_SCHEMA_VERSION,
 };
 use crate::storage_backups::{newest_snapshot, reserve_snapshot_path, SnapshotReason};
 use crate::support::{inspect_database_backup, prune_exports, RESTORE_PENDING_FILE_NAME};
@@ -45,6 +51,9 @@ pub struct RuntimePaths {
     pub log_file_path: PathBuf,
     pub db_path: PathBuf,
     pub update_repository_path: Option<PathBuf>,
+    /// `SSE_SAFE_START` asked for a safe start (Slice 11 — F31): the light
+    /// outputs are held before anything could stream.
+    pub safe_start: bool,
 }
 
 pub struct RuntimeContext {
@@ -205,6 +214,8 @@ where
     let db_path = app_data_dir.join("studio-control.sqlite3");
     let update_repository_path =
         env_string("SSE_UPDATE_REPOSITORY_PATH", &mut get_env).map(PathBuf::from);
+    let safe_start = env_string("SSE_SAFE_START", &mut get_env)
+        .is_some_and(|value| safe_start_requested(&value));
 
     Ok(RuntimePaths {
         protocol_version: String::from(SUPPORTED_PROTOCOL_VERSION),
@@ -215,7 +226,19 @@ where
         log_file_path,
         db_path,
         update_repository_path,
+        safe_start,
     })
+}
+
+/// `SSE_SAFE_START=1` is the documented form. The variable holds the light
+/// outputs, so anything that is not plainly a "no" counts as asking for it:
+/// an operator who wrote `yes` wanted a hold, and a stream is the one thing a
+/// safe start must not answer with.
+fn safe_start_requested(value: &str) -> bool {
+    !matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "" | "0" | "false" | "off" | "no"
+    )
 }
 
 pub fn validate_protocol_version(requested_protocol_version: &str) -> Result<(), String> {
@@ -269,14 +292,17 @@ pub(crate) fn bootstrap_runtime_from_paths(
     hold_instance_lock(&runtime_paths.app_data_dir, instance_lock);
     // A database restore the Support surface staged is applied here (Slice 7
     // — F20): after the lock, before the database is opened.
-    if let Err(error) = apply_pending_restore(&runtime_paths) {
-        let _ = append_log(
-            &runtime_paths.log_file_path,
-            "ERROR",
-            &format!("Pending database restore could not be applied: {error}"),
-        );
-        return Err(error);
-    }
+    let applied_restore = match apply_pending_restore_carrying(&runtime_paths) {
+        Ok(applied) => applied,
+        Err(error) => {
+            let _ = append_log(
+                &runtime_paths.log_file_path,
+                "ERROR",
+                &format!("Pending database restore could not be applied: {error}"),
+            );
+            return Err(error);
+        }
+    };
     let storage_bootstrap =
         match initialize_database(&runtime_paths.db_path, &runtime_paths.backups_dir) {
             Ok(storage_bootstrap) => storage_bootstrap,
@@ -312,6 +338,11 @@ pub(crate) fn bootstrap_runtime_from_paths(
             storage_bootstrap.integrity_check, storage_bootstrap.schema_version
         ),
     );
+    // Before any thread exists — the bridge below, the sACN output after the
+    // bootstrap — so nothing can stream ahead of a hold (Slice 11 — F31).
+    // A failure here stops the start: a safe start that could not hold must
+    // not go on to stream.
+    hold_or_carry_light_outputs(&runtime_paths, applied_restore.as_ref())?;
     // The newest database backup on disk seeds the backups entry, so the
     // two-day rule holds across restarts (Slice 8 — F14).
     if let Some(path) = newest_snapshot(&runtime_paths.backups_dir) {
@@ -457,6 +488,24 @@ pub(crate) fn recovery_runtime_context(runtime_paths: &RuntimePaths) -> RuntimeC
     }
 }
 
+/// A database restore the bootstrap applied.
+pub(crate) struct AppliedRestore {
+    /// Where the replaced database went; `None` when there was none. The
+    /// tests read it; the bootstrap has already logged it.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) replaced: Option<PathBuf>,
+    /// Whether the light outputs were armed in the database that was
+    /// replaced; `None` when it could not be read (the recovery surface
+    /// restores over a database that failed its check).
+    pub(crate) output_armed_before: Option<bool>,
+}
+
+/// The replaced file's new path, as the restore tests ask for it.
+#[cfg(test)]
+pub(crate) fn apply_pending_restore(runtime_paths: &RuntimePaths) -> EngineResult<Option<PathBuf>> {
+    Ok(apply_pending_restore_carrying(runtime_paths)?.and_then(|applied| applied.replaced))
+}
+
 /// Applies a database restore the Support surface staged as
 /// `<app-data>/restore-pending.sqlite3` (Slice 7 — F20). The pending file is
 /// checked again first; one that fails is removed and the live database is
@@ -464,9 +513,16 @@ pub(crate) fn recovery_runtime_context(runtime_paths: &RuntimePaths) -> RuntimeC
 /// live database file is moved aside as a `replaced` backup, its `-wal` /
 /// `-shm` files are removed (they belong to the old file; the `pre-restore`
 /// copy taken when the restore was requested holds what they held), and the
-/// pending file takes its name. Returns the replaced file's new path when a
-/// restore was applied.
-pub(crate) fn apply_pending_restore(runtime_paths: &RuntimePaths) -> EngineResult<Option<PathBuf>> {
+/// pending file takes its name. `None` when nothing was pending or the
+/// pending file was refused.
+///
+/// A restore replaces the whole file, the armed flag of the light outputs
+/// with it, and a backup made while armed must not arm a rig the operator is
+/// holding (Slice 11 — F31): the flag of the database being replaced is read
+/// first and handed back, for the bootstrap to carry into the restored one.
+pub(crate) fn apply_pending_restore_carrying(
+    runtime_paths: &RuntimePaths,
+) -> EngineResult<Option<AppliedRestore>> {
     let pending = runtime_paths.app_data_dir.join(RESTORE_PENDING_FILE_NAME);
     if !pending.is_file() {
         return Ok(None);
@@ -494,7 +550,11 @@ pub(crate) fn apply_pending_restore(runtime_paths: &RuntimePaths) -> EngineResul
 
     let db_path = &runtime_paths.db_path;
     let mut replaced = None;
+    let mut output_armed_before = None;
     if db_path.exists() {
+        output_armed_before = list_settings_by_prefix(db_path, LIGHTING_OUTPUT_ARMED_KEY)
+            .ok()
+            .map(|settings| lighting_output_armed(&settings));
         // Fold the write-ahead log into the file before it is moved aside:
         // the log is deleted below, and an engine that was ended rather than
         // stopped leaves its last commits there (Slice 10 — the threads that
@@ -532,7 +592,83 @@ pub(crate) fn apply_pending_restore(runtime_paths: &RuntimePaths) -> EngineResul
     );
     append_log(&runtime_paths.log_file_path, "INFO", &message)?;
     report_health(SUBSYSTEM_RESTORE, SubsystemState::Ok, message);
-    Ok(replaced)
+    Ok(Some(AppliedRestore {
+        replaced,
+        output_armed_before,
+    }))
+}
+
+/// The light outputs at the start (Slice 11 — F31), in one transaction with
+/// the action-log rows that say so. After a database restore the armed flag
+/// of the replaced database is carried into the restored one, so a restore
+/// neither arms a held rig nor holds an armed one; when the replaced
+/// database could not be read, the restored one's flag stands. Then
+/// `SSE_SAFE_START` holds, whatever the flag was.
+fn hold_or_carry_light_outputs(
+    runtime_paths: &RuntimePaths,
+    applied_restore: Option<&AppliedRestore>,
+) -> EngineResult<()> {
+    let db_path = &runtime_paths.db_path;
+    let stored = lighting_output_armed(&list_settings_by_prefix(
+        db_path,
+        LIGHTING_OUTPUT_ARMED_KEY,
+    )?);
+    let mut armed = stored;
+    let mut actions = Vec::new();
+    if let Some(applied) = applied_restore {
+        armed = applied.output_armed_before.unwrap_or(stored);
+        actions.push(ActionRecord::new(
+            ActionSource::Launch,
+            DOMAIN_SETUP,
+            "database-restored",
+            "Saved data",
+            format!(
+                "Database backup restored at start; light outputs stay {}",
+                if armed { "armed" } else { "held" }
+            ),
+        ));
+    }
+    if runtime_paths.safe_start {
+        if armed {
+            actions.push(ActionRecord::new(
+                ActionSource::Launch,
+                DOMAIN_LIGHTING,
+                "outputs-held",
+                "Light outputs",
+                "Light outputs held at start (safe start)",
+            ));
+        }
+        armed = false;
+        append_log(
+            &runtime_paths.log_file_path,
+            "INFO",
+            "Safe start (SSE_SAFE_START): the light outputs are held until they are armed in Setup / Support.",
+        )?;
+    }
+    if armed != stored || !actions.is_empty() {
+        let settings = if armed == stored {
+            Vec::new()
+        } else {
+            vec![lighting_output_armed_setting(armed)]
+        };
+        set_settings_owned_and(db_path, &settings, |transaction| {
+            insert_actions(transaction, &actions)
+        })?;
+    }
+    // The light-output health entry belongs to the sACN thread, which starts
+    // after the ready event — and the shell's first `health.snapshot`
+    // follows that event at once. A launch that starts held says so here,
+    // before either: the setup-support lane caught the first health request
+    // reading `socket ready` on a held rig, with the thread's own
+    // announcement arriving while the shell was still starting.
+    if !armed {
+        report_health(
+            SUBSYSTEM_SACN,
+            SubsystemState::Ok,
+            crate::lighting_sacn_output::HELD_DETAIL,
+        );
+    }
+    Ok(())
 }
 
 /// `studio-control.sqlite3-wal` beside `studio-control.sqlite3`.
@@ -674,12 +810,15 @@ mod tests {
     use super::{
         acquire_instance_lock, apply_pending_restore, bootstrap_runtime_from_paths,
         current_runtime_platform, default_app_data_dir_for_platform,
-        resolve_legacy_import_source_from, resolve_runtime_paths_from, startup_failure_code,
-        storage_startup_failure, validate_protocol_version, RuntimePaths, RuntimePlatform,
-        StartupFailure, DEFAULT_APP_DATA_DIR_NAME, INSTANCE_LOCK_FILE_NAME,
+        resolve_legacy_import_source_from, resolve_runtime_paths_from, safe_start_requested,
+        startup_failure_code, storage_startup_failure, validate_protocol_version, RuntimePaths,
+        RuntimePlatform, StartupFailure, DEFAULT_APP_DATA_DIR_NAME, INSTANCE_LOCK_FILE_NAME,
         STARTUP_CODE_BOOTSTRAP_FAILED, STARTUP_CODE_ENGINE_ALREADY_RUNNING,
         STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
         SUPPORTED_PROTOCOL_VERSION,
+    };
+    use crate::lighting::{
+        lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
     };
     use crate::storage::{
         initialize_database, list_settings_by_prefix, set_settings_owned, StorageError,
@@ -937,6 +1076,7 @@ mod tests {
             log_file_path: app_data_dir.join("logs").join("engine.log"),
             db_path: app_data_dir.join("studio-control.sqlite3"),
             update_repository_path: None,
+            safe_start: false,
             app_data_dir,
         }
     }
@@ -1312,5 +1452,190 @@ mod tests {
             ),
             None
         );
+    }
+
+    // -----------------------------------------------------------------
+    // 2026-09 production readiness, Slice 11 (F31): safe start.
+    // -----------------------------------------------------------------
+
+    fn output_armed(db_path: &Path) -> bool {
+        lighting_output_armed(
+            &list_settings_by_prefix(db_path, LIGHTING_OUTPUT_ARMED_KEY)
+                .expect("settings should load"),
+        )
+    }
+
+    fn launch_rows(db_path: &Path) -> Vec<(String, String, String)> {
+        crate::action_log::list_recent_actions(db_path, 10)
+            .expect("the action log should list")
+            .into_iter()
+            .map(|entry| (entry.source, entry.action, entry.detail))
+            .collect()
+    }
+
+    // `SSE_SAFE_START=1` — read through the injected reader, like every
+    // other variable here — holds the light outputs before the bootstrap
+    // starts a single thread, and says so in the action log and the engine
+    // log. The hold is persisted: it outlives the launch that made it, and a
+    // later launch without the variable is still held until the operator
+    // arms. A launch that never had the variable is armed, as it always was.
+    #[test]
+    fn safe_start_env_holds() {
+        for (value, asked) in [
+            ("1", true),
+            ("true", true),
+            ("yes", true),
+            (" 1 ", true),
+            ("0", false),
+            ("false", false),
+            ("off", false),
+            ("no", false),
+        ] {
+            assert_eq!(safe_start_requested(value), asked, "{value:?}");
+        }
+        let (base_name, base_value) = host_platform_base();
+        let resolved = |entries: &[(&str, &str)]| {
+            resolve_runtime_paths_from(current_runtime_platform(), env_fixture(entries))
+                .expect("paths should resolve")
+                .safe_start
+        };
+        assert!(
+            !resolved(&[(base_name, base_value)]),
+            "unset is a default launch"
+        );
+        assert!(resolved(&[
+            (base_name, base_value),
+            ("SSE_SAFE_START", "1")
+        ]));
+        assert!(!resolved(&[
+            (base_name, base_value),
+            ("SSE_SAFE_START", "0")
+        ]));
+
+        // A default launch: armed, no key written, no row.
+        let test_dir = TestDir::new("safe-start");
+        let runtime = bootstrap_runtime_from_paths(runtime_paths_for(&test_dir))
+            .expect("a default launch boots");
+        assert!(output_armed(&runtime.db_path));
+        assert!(
+            list_settings_by_prefix(&runtime.db_path, LIGHTING_OUTPUT_ARMED_KEY)
+                .expect("settings should load")
+                .is_empty(),
+            "a default launch writes nothing: it is what it was before this key existed"
+        );
+        assert!(launch_rows(&runtime.db_path).is_empty());
+        drop(runtime);
+
+        // A safe start.
+        let mut paths = runtime_paths_for(&test_dir);
+        paths.safe_start = true;
+        let log_file_path = paths.log_file_path.clone();
+        let runtime = bootstrap_runtime_from_paths(paths).expect("a safe start boots");
+        assert!(!output_armed(&runtime.db_path));
+        assert_eq!(
+            launch_rows(&runtime.db_path),
+            vec![(
+                String::from("launch"),
+                String::from("outputs-held"),
+                String::from("Light outputs held at start (safe start)"),
+            )]
+        );
+        let log = fs::read_to_string(&log_file_path).expect("engine log should exist");
+        assert!(log.contains("Safe start (SSE_SAFE_START)"), "{log}");
+        drop(runtime);
+
+        // The next launch has no variable: still held, and nothing new to say.
+        let runtime = bootstrap_runtime_from_paths(runtime_paths_for(&test_dir))
+            .expect("the next launch boots");
+        assert!(
+            !output_armed(&runtime.db_path),
+            "only the operator arms; a launch never does"
+        );
+        assert_eq!(launch_rows(&runtime.db_path).len(), 1);
+        drop(runtime);
+
+        // A second safe start over a hold changes nothing and adds no row.
+        let mut paths = runtime_paths_for(&test_dir);
+        paths.safe_start = true;
+        let runtime = bootstrap_runtime_from_paths(paths).expect("a second safe start boots");
+        assert!(!output_armed(&runtime.db_path));
+        assert_eq!(launch_rows(&runtime.db_path).len(), 1);
+    }
+
+    // A database restore replaces the whole file, the armed flag with it. The
+    // flag of the database being replaced is carried into the restored one —
+    // a backup made while armed must not arm a rig the operator is holding —
+    // and the start that applied the restore leaves the row that says so,
+    // because the restored file brought its own, older action log.
+    #[test]
+    fn database_restore_carries_the_armed_flag() {
+        let test_dir = TestDir::new("restore-carries-armed");
+        let paths = runtime_paths_for(&test_dir);
+        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
+        initialize_database(&paths.db_path, &paths.backups_dir)
+            .expect("database should initialize");
+        // The backup is made while armed (no key at all)...
+        let backup = snapshot_database(&paths.db_path, &paths.backups_dir, SnapshotReason::Daily)
+            .expect("backup should write");
+        // ...then the operator holds the rig and restores it.
+        set_settings_owned(&paths.db_path, &[lighting_output_armed_setting(false)])
+            .expect("the hold should persist");
+        fs::copy(&backup, paths.app_data_dir.join(RESTORE_PENDING_FILE_NAME))
+            .expect("pending should stage");
+
+        let db_path = paths.db_path.clone();
+        let runtime = bootstrap_runtime_from_paths(paths).expect("the restored database boots");
+        assert!(
+            !output_armed(&db_path),
+            "the restored database said armed; the rig was held, and stays held"
+        );
+        assert_eq!(
+            launch_rows(&db_path),
+            vec![(
+                String::from("launch"),
+                String::from("database-restored"),
+                String::from("Database backup restored at start; light outputs stay held"),
+            )]
+        );
+        drop(runtime);
+
+        // The other way round: an armed rig restoring a backup made while
+        // held stays armed.
+        let held_backup = snapshot_database(
+            &db_path,
+            &test_dir.path().join("backups"),
+            SnapshotReason::Daily,
+        )
+        .expect("backup should write");
+        set_settings_owned(&db_path, &[lighting_output_armed_setting(true)])
+            .expect("arming should persist");
+        fs::copy(
+            &held_backup,
+            test_dir.path().join(RESTORE_PENDING_FILE_NAME),
+        )
+        .expect("pending should stage");
+        let runtime = bootstrap_runtime_from_paths(runtime_paths_for(&test_dir))
+            .expect("the restored database boots");
+        assert!(output_armed(&db_path));
+        drop(runtime);
+
+        // With a safe start the hold wins, whatever was carried.
+        fs::copy(&backup, test_dir.path().join(RESTORE_PENDING_FILE_NAME))
+            .expect("pending should stage");
+        let mut paths = runtime_paths_for(&test_dir);
+        paths.safe_start = true;
+        let runtime = bootstrap_runtime_from_paths(paths).expect("the restored database boots");
+        assert!(!output_armed(&db_path));
+        assert_eq!(
+            launch_rows(&db_path)
+                .into_iter()
+                .map(|(_, action, _)| action)
+                .collect::<Vec<_>>(),
+            vec![
+                String::from("outputs-held"),
+                String::from("database-restored")
+            ]
+        );
+        drop(runtime);
     }
 }

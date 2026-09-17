@@ -776,7 +776,13 @@ fn handle_audio_talk(db_path: &Path, engage: bool) -> Result<Value, ControlSurfa
     if result.changed {
         emit_audio_changed();
     }
-    Ok(json!({ "mixTargetId": result.mix_target_id, "talkback": result.talkback }))
+    // `changed` tells the press and the release from the repeats Companion
+    // sends while the key is held; only those two are action-log rows.
+    Ok(json!({
+        "mixTargetId": result.mix_target_id,
+        "talkback": result.talkback,
+        "changed": result.changed,
+    }))
 }
 
 fn handle_audio_solo_clear_all(db_path: &Path) -> Result<Value, ControlSurfaceError> {

@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::action_log::{ActionRecord, ActionSource, DOMAIN_AUDIO};
 use crate::rme_console_link::{
     link_now_ms, shared_console_link, ChannelFlag, ConsoleBus, ConsoleUpdate, ConsoleValue,
     ControlRoomFunction, ParamKey, PendingSend,
@@ -80,10 +81,15 @@ pub(crate) fn apply_console_activity(
     let mut channel_state = read_channel_state_map(&app_settings);
     let mut mix_target_state = read_mix_target_state_map(&app_settings);
 
+    // The action log (Slice 11 — F30): a change made at TotalMix is the
+    // console's, and this flush is where it enters the app. A switch that
+    // actually changed is a row; a fader, a gain and a volume are rides.
     let mut applied = 0usize;
+    let mut actions: Vec<ActionRecord> = Vec::new();
     for update in updates {
         if apply_console_update(&snapshot, &mut channel_state, &mut mix_target_state, update) {
             applied += 1;
+            actions.extend(console_update_action(&snapshot, update));
         }
     }
 
@@ -165,7 +171,7 @@ pub(crate) fn apply_console_activity(
         writes.push(confidence_setting(ConsoleConfidence::Unknown));
     }
     if !writes.is_empty() {
-        persist_audio_state(db_path, &writes)?;
+        persist_audio_state_with_actions(db_path, &writes, &actions)?;
     }
 
     Ok(ConsoleFlushReport {
@@ -383,6 +389,74 @@ pub(crate) fn apply_console_update(
         | ParamKey::StatusDsp
         | ParamKey::SnapshotLoad { .. } => false,
     }
+}
+
+/// The action-log row for a console change that was applied: the switches,
+/// named as the screen names them. `None` for a ride and for the status
+/// parameters.
+pub(crate) fn console_update_action(
+    snapshot: &AudioSnapshot,
+    update: &ConsoleUpdate,
+) -> Option<ActionRecord> {
+    let on = value_to_flag(&update.value)?;
+    let word = if on { "on" } else { "off" };
+    let channel_name = |surface_id: &str| {
+        snapshot
+            .channels
+            .iter()
+            .find(|entry| entry.id == surface_id)
+            .map(|entry| entry.name.clone())
+    };
+    let mix_target_name = |target_id: &str| {
+        snapshot
+            .mix_targets
+            .iter()
+            .find(|entry| entry.id == target_id)
+            .map(|entry| entry.name.clone())
+    };
+    let (action, label, target) = match &update.key {
+        ParamKey::ChannelFlag {
+            bus: ConsoleBus::Output,
+            channel,
+            flag: ChannelFlag::Mute,
+        } => (
+            "mute",
+            "Mute",
+            mix_target_name(global_output_mix_target(*channel)?)?,
+        ),
+        ParamKey::ChannelFlag { bus, channel, flag } => {
+            let name = channel_name(&global_channel_surface(bus.word(), *channel)?)?;
+            match flag {
+                ChannelFlag::Mute => ("mute", "Mute", name),
+                ChannelFlag::Phantom => ("phantom", "48 V", name),
+                ChannelFlag::Phase => ("phase", "Phase invert", name),
+                ChannelFlag::Instrument => ("instrument", "Instrument input", name),
+                ChannelFlag::AutoSet => ("auto-set", "AutoSet", name),
+                ChannelFlag::Pad => ("pad", "Pad", name),
+            }
+        }
+        ParamKey::MixSolo { bus, channel, .. } => (
+            "solo",
+            "Solo",
+            channel_name(&global_channel_surface(bus.word(), *channel)?)?,
+        ),
+        ParamKey::ControlRoom(function) => {
+            let name = mix_target_name(MAIN_MIX_TARGET_ID)?;
+            match function {
+                ControlRoomFunction::Dim => ("dim", "Dim", name),
+                ControlRoomFunction::MainMono => ("mono", "Mono", name),
+                ControlRoomFunction::Talkback => ("talkback", "Talkback", name),
+            }
+        }
+        _ => return None,
+    };
+    Some(ActionRecord::new(
+        ActionSource::Console,
+        DOMAIN_AUDIO,
+        action,
+        target.clone(),
+        format!("{label} {word} at TotalMix: {target}"),
+    ))
 }
 
 /// The console-link part of `audio.snapshot`, read from the shared link plus

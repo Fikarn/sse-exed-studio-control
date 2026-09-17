@@ -177,6 +177,11 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("setLightingGroupPower requires boolean on.");
       }
       return store.setLightingGroupPower(command.groupId, command.on);
+    case "setLightingOutputArmed":
+      if (typeof command.armed !== "boolean") {
+        throw new Error("setLightingOutputArmed requires boolean armed.");
+      }
+      return store.setLightingOutputArmed(command.armed);
     case "syncAudio":
       return store.syncAudio();
     case "togglePlanningTaskComplete":
