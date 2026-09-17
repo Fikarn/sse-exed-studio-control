@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+use crate::diagnostics::{log_event, LogLevel};
 use crate::engine_events::emit_audio_changed;
 
 use super::helpers::*;
@@ -120,14 +121,20 @@ fn run_watchdog() {
         thread::sleep(WATCHDOG_TICK);
         for (db_path, mix_target_id) in take_expired_holds(Instant::now()) {
             match release_talkback_hold(&db_path, &mix_target_id) {
-                Ok(true) => eprintln!(
-                    "Talkback watchdog: released {mix_target_id} after {} ms without a hold",
-                    AUDIO_TALKBACK_HOLD_TTL.as_millis()
+                Ok(true) => log_event(
+                    LogLevel::Info,
+                    &format!(
+                        "Talkback watchdog: released {mix_target_id} after {} ms without a hold",
+                        AUDIO_TALKBACK_HOLD_TTL.as_millis()
+                    ),
                 ),
                 Ok(false) => {}
-                Err(error) => eprintln!(
-                    "Talkback watchdog: could not release {mix_target_id}: {}",
-                    describe_error(&error)
+                Err(error) => log_event(
+                    LogLevel::Warn,
+                    &format!(
+                        "Talkback watchdog: could not release {mix_target_id}: {}",
+                        describe_error(&error)
+                    ),
                 ),
             }
         }
@@ -278,9 +285,12 @@ pub fn release_all_talkback_holds(db_path: &Path) -> usize {
         match release_talkback_hold(db_path, &mix_target_id) {
             Ok(true) => released += 1,
             Ok(false) => {}
-            Err(error) => eprintln!(
-                "Talkback release on shutdown failed for {mix_target_id}: {}",
-                describe_error(&error)
+            Err(error) => log_event(
+                LogLevel::Warn,
+                &format!(
+                    "Talkback release on shutdown failed for {mix_target_id}: {}",
+                    describe_error(&error)
+                ),
             ),
         }
     }

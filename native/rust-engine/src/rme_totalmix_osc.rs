@@ -2,7 +2,8 @@ use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::audio::{
     read_audio_snapshot, AudioChannelSnapshot, AudioMixTargetSnapshot, AudioSnapshot,
 };
-use crate::diagnostics::append_log;
+use crate::diagnostics::{append_log, log_event, LogLevel};
+use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_OSC};
 use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
 use crate::storage::list_settings_by_prefix;
 use rosc::{decoder, encoder, OscMessage, OscPacket, OscType};
@@ -589,7 +590,7 @@ fn send_osc_messages(
     }
     #[cfg(test)]
     if test_guard_blocks_console_port(send_port) {
-        eprintln!(
+        println!(
             "test guard: dropped {} TotalMix datagram(s) aimed at {}:{send_port}",
             messages.len(),
             send_host.trim()
@@ -730,7 +731,10 @@ pub fn spawn_rme_totalmix_audio_metering(
                 let settings = match list_settings_by_prefix(&db_path, APP_SETTINGS_PREFIX) {
                     Ok(settings) => settings,
                     Err(error) => {
-                        eprintln!("Failed to read audio settings for RME metering: {error}");
+                        log_event(
+                            LogLevel::Warn,
+                            &format!("Failed to read audio settings for RME metering: {error}"),
+                        );
                         thread::sleep(Duration::from_millis(50));
                         continue;
                     }
@@ -748,19 +752,29 @@ pub fn spawn_rme_totalmix_audio_metering(
                     match resolve_console_address(&snapshot.send_host) {
                         Some(console) => {
                             let policy = ReceivePolicy::for_console(console, bind_override);
-                            sockets = bind_slots(policy, snapshot.send_port, snapshot.receive_port);
+                            let (bound, failures) = bind_slots_reporting(
+                                policy,
+                                snapshot.send_port,
+                                snapshot.receive_port,
+                            );
+                            sockets = bound;
                             global_slot =
                                 bind_global_slot(policy, snapshot.send_port, snapshot.receive_port);
+                            report_meter_port_health(
+                                policy,
+                                snapshot.receive_port,
+                                &sockets,
+                                global_slot.is_some(),
+                                &failures,
+                            );
                         }
                         None => {
-                            let _ = append_log(
-                                &log_file_path,
-                                "WARN",
-                                &format!(
-                                    "RME TotalMix metering is not listening: the TotalMix address {:?} does not resolve to an IP address (Setup, TotalMix address)",
-                                    snapshot.send_host
-                                ),
+                            let message = format!(
+                                "RME TotalMix metering is not listening: the TotalMix address {:?} does not resolve to an IP address (Setup, TotalMix address)",
+                                snapshot.send_host
                             );
+                            let _ = append_log(&log_file_path, "WARN", &message);
+                            report_health(SUBSYSTEM_OSC, SubsystemState::Attention, message);
                             sockets = Vec::new();
                             global_slot = None;
                         }
@@ -774,7 +788,13 @@ pub fn spawn_rme_totalmix_audio_metering(
                     sockets.clear();
                     global_slot = None;
                     mark_console_link_slot(false);
-                    bound_key = None;
+                    if bound_key.take().is_some() {
+                        report_health(
+                            SUBSYSTEM_OSC,
+                            SubsystemState::Ok,
+                            "TotalMix metering is off; no meter port is bound",
+                        );
+                    }
                 }
                 cached_snapshot = Some(snapshot);
                 last_settings_refresh_at = Some(now);
@@ -1025,22 +1045,37 @@ fn local_port_of(socket: &UdpSocket) -> u16 {
         .unwrap_or(0)
 }
 
+#[cfg(test)]
 fn bind_slots(policy: ReceivePolicy, send_port: i64, receive_port: i64) -> Vec<BoundRmeSlot> {
+    bind_slots_reporting(policy, send_port, receive_port).0
+}
+
+/// Binds the classic remotes' receive ports; the second half names every
+/// port that could not be bound, for the log and the health registry.
+fn bind_slots_reporting(
+    policy: ReceivePolicy,
+    send_port: i64,
+    receive_port: i64,
+) -> (Vec<BoundRmeSlot>, Vec<String>) {
     let Ok(slots) = slot_configs(send_port, receive_port) else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
-    slots
+    let mut failures = Vec::new();
+    let bound = slots
         .into_iter()
         .filter_map(|slot| {
-            let socket = bind_receive_socket(policy.bind_host, slot.receive_port)
-                .map_err(|error| {
-                    eprintln!(
+            let socket = match bind_receive_socket(policy.bind_host, slot.receive_port) {
+                Ok(socket) => socket,
+                Err(error) => {
+                    let message = format!(
                         "RME TotalMix metering could not bind receive port {} on {}: {}",
                         slot.receive_port, policy.bind_host, error
                     );
-                    error
-                })
-                .ok()?;
+                    log_event(LogLevel::Warn, &message);
+                    failures.push(message);
+                    return None;
+                }
+            };
             Some(BoundRmeSlot {
                 bus: slot.bus,
                 send_port: slot.send_port,
@@ -1048,7 +1083,45 @@ fn bind_slots(policy: ReceivePolicy, send_port: i64, receive_port: i64) -> Vec<B
                 console: policy.console,
             })
         })
-        .collect()
+        .collect();
+    (bound, failures)
+}
+
+/// The `osc` health entry (Slice 8 — F14): `ok` when every meter port is
+/// bound, `attention` naming the ones that are not.
+fn report_meter_port_health(
+    policy: ReceivePolicy,
+    receive_port: i64,
+    sockets: &[BoundRmeSlot],
+    global_bound: bool,
+    failures: &[String],
+) {
+    if failures.is_empty() && global_bound {
+        report_health(
+            SUBSYSTEM_OSC,
+            SubsystemState::Ok,
+            format!(
+                "Listening for TotalMix on {} meter port(s) from {} on {}",
+                sockets.len() + 1,
+                receive_port,
+                policy.bind_host
+            ),
+        );
+        return;
+    }
+    let mut problems = failures.to_vec();
+    if !global_bound {
+        problems.push(format!(
+            "the Global OSC receive port {} could not be bound on {} (or is out of range)",
+            receive_port + i64::from(GLOBAL_OSC_PORT_OFFSET),
+            policy.bind_host
+        ));
+    }
+    report_health(
+        SUBSYSTEM_OSC,
+        SubsystemState::Attention,
+        problems.join("; "),
+    );
 }
 
 fn bus_select_address(bus: RmeTotalMixBus) -> &'static str {
@@ -1107,7 +1180,10 @@ fn read_available_packets(
                                 state.apply_packet(slot.bus, &packet, now_ms);
                             }
                         }
-                        Err(error) => eprintln!("RME TotalMix OSC decode failed: {error}"),
+                        Err(error) => log_event(
+                            LogLevel::Debug,
+                            &format!("RME TotalMix OSC decode failed: {error}"),
+                        ),
                     }
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
@@ -1116,7 +1192,10 @@ fn read_available_packets(
                 // A disabled classic slot is a normal state, not an error.
                 Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => break,
                 Err(error) => {
-                    eprintln!("RME TotalMix OSC receive failed: {error}");
+                    log_event(
+                        LogLevel::Warn,
+                        &format!("RME TotalMix OSC receive failed: {error}"),
+                    );
                     break;
                 }
             }
@@ -1258,7 +1337,10 @@ pub(crate) fn flush_console_link_to_db(db_path: &std::path::Path) {
         }
         Ok(_) => {}
         Err(error) => {
-            eprintln!("Console link flush failed: {error:?}");
+            log_event(
+                LogLevel::Warn,
+                &format!("Console link flush failed: {error:?}"),
+            );
         }
     }
 }

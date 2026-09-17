@@ -173,6 +173,16 @@ To commission or re-commission the deck:
 
 ## Health Signals
 
+### Health status
+
+`health.snapshot`'s `status` says how the hardware link is doing, and it moves on its own (2026-09 production readiness, Slice 8): `ok`; `attention` when something could not bind its port — the Stream Deck bridge (`SSE_CONTROL_SURFACE_PORT`, `38201` by default: another program holds it, or a second copy of the app is still closing), a TotalMix meter port, the light-output socket; `warning` when the last database backup failed or is older than two days; `error` when the saved data is not usable (the recovery surface shows this one). The Setup / Support surface prints the health sentence when a commissioning probe is not green, and the Deck lamp in the monitor follows the bridge. A diagnostics export carries the whole snapshot, including `checks.engine` — one entry per subsystem with its state, the engine's sentence and when it was reported.
+
+### Logs
+
+- `engine.log` in the logs folder (`SSE_LOG_DIR`, `<app-data>/logs` by default; the Diagnostics keys open it). It rotates at 5 MiB into `engine.log.1` … `engine.log.5`, newest first; the recovery surface and the diagnostics export carry its last 12 lines.
+- `shell.log` beside it keeps everything the hardware link wrote to its standard error stream — the failures before its own log exists, a crash — with the same rotation. A release build has no console, so this file is the only place those lines go.
+- `SSE_ENGINE_LOG_LEVEL` (`DEBUG`, `INFO`, `WARN`, `ERROR`; default `INFO`) sets what the engine writes; `DEBUG` adds one line per request with its timing, for a support session only.
+
 ### Engine snapshots
 
 - `health.snapshot`

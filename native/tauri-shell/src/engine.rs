@@ -12,6 +12,8 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+
+use crate::shell_log::{SharedShellLog, ShellLog, SHELL_LOG_FILE_NAME};
 use studio_control_protocol::{
     error_response, RequestEnvelope, ResponseEnvelope, EVENT_ENGINE_EXITED, PROTOCOL_VERSION,
 };
@@ -52,6 +54,11 @@ fn app_event_sink(app: AppHandle) -> EventSink {
 pub struct EngineBridge {
     process: Arc<Mutex<Option<EngineProcess>>>,
     pending: Arc<Mutex<HashMap<String, Sender<Value>>>>,
+    /// `<logs>/shell.log`, where every engine stderr line is kept (2026-09
+    /// production readiness, Slice 8 — finding F16). Opened by the first
+    /// start and shared by every launch after it, so the rotation counts
+    /// across engine restarts.
+    shell_log: Mutex<Option<SharedShellLog>>,
     /// Counts engine launches for the life of the shell. Each launch's
     /// generation tags its `engine.exited` event, so the front-end can tell
     /// a report about a process it already replaced from one about the
@@ -124,17 +131,45 @@ impl EngineBridge {
             command.creation_flags(CREATE_NO_WINDOW);
         }
 
-        self.launch(command, binary_path, app_event_sink(app.clone()))
+        let shell_log = self.shell_log_for(&logs_dir)?;
+        self.launch(
+            command,
+            binary_path,
+            app_event_sink(app.clone()),
+            Some(shell_log),
+        )
     }
 
-    /// Spawns `command` as the engine process, wires its stdout to `sink`,
-    /// and starts the exit watcher for it. A running engine is returned as it
-    /// is; nothing is spawned twice.
+    /// The shell log for `logs_dir`, opened once per shell.
+    fn shell_log_for(&self, logs_dir: &Path) -> Result<SharedShellLog, String> {
+        let mut slot = self
+            .shell_log
+            .lock()
+            .map_err(|_| "Engine shell log poisoned".to_string())?;
+        if let Some(log) = slot.as_ref() {
+            let same_file = log
+                .lock()
+                .map(|log| log.path() == logs_dir.join(SHELL_LOG_FILE_NAME))
+                .unwrap_or(false);
+            if same_file {
+                return Ok(Arc::clone(log));
+            }
+        }
+        let log = ShellLog::open(logs_dir).shared();
+        *slot = Some(Arc::clone(&log));
+        Ok(log)
+    }
+
+    /// Spawns `command` as the engine process, wires its stdout to `sink`
+    /// and its stderr to `shell_log` (the production path always has one),
+    /// and starts the exit watcher for it. A running engine is returned as
+    /// it is; nothing is spawned twice.
     fn launch(
         &self,
         mut command: Command,
         binary_path: PathBuf,
         sink: EventSink,
+        shell_log: Option<SharedShellLog>,
     ) -> Result<EngineBootstrapSummary, String> {
         let mut process_guard = self
             .process
@@ -169,7 +204,7 @@ impl EngineBridge {
         let generation = self.generations.fetch_add(1, Ordering::SeqCst) + 1;
         let pid = child.id();
         spawn_stdout_thread(Arc::clone(&sink), stdout, Arc::clone(&self.pending));
-        spawn_stderr_thread(stderr);
+        spawn_stderr_thread(stderr, shell_log);
 
         let process = EngineProcess {
             child,
@@ -465,13 +500,23 @@ fn spawn_stdout_thread(
     });
 }
 
-fn spawn_stderr_thread(stderr: ChildStderr) {
+/// Every engine stderr line goes to `<logs>/shell.log` (finding F16): the
+/// engine keeps its own log once its runtime paths resolve, so what arrives
+/// here is what it could not log — the failures before that point, a
+/// panic. Debug builds echo the line to the console as well.
+fn spawn_stderr_thread(stderr: ChildStderr, shell_log: Option<SharedShellLog>) {
     thread::spawn(move || {
         let reader = BufReader::new(stderr);
         for line in reader.lines() {
             let Ok(line) = line else {
                 continue;
             };
+            if let Some(log) = shell_log.as_ref() {
+                if let Ok(mut log) = log.lock() {
+                    let _ = log.write_line("ENGINE-STDERR", &line);
+                }
+            }
+            #[cfg(debug_assertions)]
             eprintln!("engine stderr: {line}");
         }
     });
@@ -693,6 +738,19 @@ mod tests {
         std::process::Command::new("sort")
     }
 
+    /// A process that writes one line to stderr and exits.
+    fn stderr_process() -> std::process::Command {
+        if cfg!(windows) {
+            let mut command = std::process::Command::new("cmd");
+            command.args(["/C", "echo engine-stderr-probe 1>&2"]);
+            command
+        } else {
+            let mut command = std::process::Command::new("sh");
+            command.args(["-c", "echo engine-stderr-probe >&2"]);
+            command
+        }
+    }
+
     /// An event sink that records into a channel, standing in for the Tauri
     /// event channel the production sink wraps.
     fn recording_sink() -> (EventSink, Receiver<Value>) {
@@ -725,7 +783,12 @@ mod tests {
             .insert("app.snapshot:7:abc".to_string(), waiter_sender);
 
         let summary = bridge
-            .launch(short_lived_process(), PathBuf::from("short-lived"), sink)
+            .launch(
+                short_lived_process(),
+                PathBuf::from("short-lived"),
+                sink,
+                None,
+            )
             .expect("the short-lived process should launch");
         assert!(summary.running);
         assert_eq!(summary.generation, 1);
@@ -765,6 +828,42 @@ mod tests {
         assert!(events.try_recv().is_err(), "the exit is reported once");
     }
 
+    // 2026-09 production readiness, Slice 8 (finding F16): what the engine
+    // writes to stderr is kept in `<logs>/shell.log`.
+    #[test]
+    fn stderr_lines_reach_shell_log() {
+        let bridge = EngineBridge::default();
+        let (sink, _events) = recording_sink();
+        let tree = TempTree::new("stderr-to-shell-log");
+        let logs_dir = tree.path("logs");
+        let shell_log = ShellLog::open(&logs_dir).shared();
+
+        bridge
+            .launch(
+                stderr_process(),
+                PathBuf::from("stderr-probe"),
+                sink,
+                Some(Arc::clone(&shell_log)),
+            )
+            .expect("the stderr process should launch");
+
+        let log_path = logs_dir.join(SHELL_LOG_FILE_NAME);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut content = String::new();
+        while Instant::now() < deadline {
+            content = fs::read_to_string(&log_path).unwrap_or_default();
+            if content.contains("engine-stderr-probe") {
+                break;
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+        assert!(
+            content.contains("ENGINE-STDERR engine-stderr-probe"),
+            "shell.log should carry the engine's stderr line, got: {content:?}"
+        );
+        assert!(content.starts_with('['), "{content:?}");
+    }
+
     // 2026-09 production readiness, Slice 5 (finding F09), replacing the
     // audit Slice 11 wait_for_exit test: a graceful stop closes stdin, waits
     // for the process to exit, and reports `graceful: true`; a process that
@@ -776,7 +875,12 @@ mod tests {
         let (sink, events) = recording_sink();
 
         bridge
-            .launch(stdin_bound_process(), PathBuf::from("stdin-bound"), sink)
+            .launch(
+                stdin_bound_process(),
+                PathBuf::from("stdin-bound"),
+                sink,
+                None,
+            )
             .expect("the stdin-bound process should launch");
         let started = Instant::now();
         bridge
@@ -796,7 +900,7 @@ mod tests {
 
         let (sink, events) = recording_sink();
         let summary = bridge
-            .launch(lingering_process(), PathBuf::from("lingering"), sink)
+            .launch(lingering_process(), PathBuf::from("lingering"), sink, None)
             .expect("the lingering process should launch");
         assert_eq!(summary.generation, 2);
         let started = Instant::now();

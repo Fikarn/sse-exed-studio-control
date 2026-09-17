@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 
 use serde_json::{json, Value};
 
-use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
+use crate::protocol::{event_message, EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED};
 
 static ENGINE_EVENT_SENDER: OnceLock<Sender<Value>> = OnceLock::new();
 
@@ -28,5 +28,16 @@ pub(crate) fn emit_audio_changed(reason: &str) {
 pub(crate) fn emit_audio_changed_with(payload: Value) {
     if let Some(sender) = ENGINE_EVENT_SENDER.get() {
         let _ = sender.send(event_message(EVENT_AUDIO_CHANGED, payload));
+    }
+}
+
+/// Emits `app.changed { reason }`. The health registry's transitions arrive
+/// this way (2026-09 production readiness, Slice 8 — F14) as `"health"`.
+pub(crate) fn emit_app_changed(reason: &str) {
+    if let Some(sender) = ENGINE_EVENT_SENDER.get() {
+        let _ = sender.send(event_message(
+            EVENT_APP_CHANGED,
+            json!({ "reason": reason }),
+        ));
     }
 }

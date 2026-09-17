@@ -3,21 +3,18 @@ use crate::app_state::{
     APP_SETTINGS_PREFIX, COMMISSIONING_COMPLETED_KEY,
 };
 use crate::audio::{
-    build_audio_health_check, clear_all_audio_solo, clear_audio_clips, create_audio_snapshot,
-    delete_audio_snapshot, hold_audio_talkback, parse_audio_channel_update_request,
-    parse_audio_clip_clear_request, parse_audio_dynamics_update_request,
-    parse_audio_eq_update_request, parse_audio_mix_target_update_request,
-    parse_audio_send_mode_update_request, parse_audio_settings_update_request,
-    parse_audio_snapshot_create_request, parse_audio_snapshot_delete_request,
-    parse_audio_snapshot_recall_request, parse_audio_snapshot_update_request,
-    parse_audio_talkback_hold_request, read_audio_snapshot, recall_audio_snapshot,
-    sync_audio_console, update_audio_channel, update_audio_channel_dynamics,
+    clear_all_audio_solo, clear_audio_clips, create_audio_snapshot, delete_audio_snapshot,
+    hold_audio_talkback, parse_audio_channel_update_request, parse_audio_clip_clear_request,
+    parse_audio_dynamics_update_request, parse_audio_eq_update_request,
+    parse_audio_mix_target_update_request, parse_audio_send_mode_update_request,
+    parse_audio_settings_update_request, parse_audio_snapshot_create_request,
+    parse_audio_snapshot_delete_request, parse_audio_snapshot_recall_request,
+    parse_audio_snapshot_update_request, parse_audio_talkback_hold_request, read_audio_snapshot,
+    recall_audio_snapshot, sync_audio_console, update_audio_channel, update_audio_channel_dynamics,
     update_audio_channel_eq, update_audio_channel_send_mode, update_audio_mix_target,
     update_audio_settings, update_audio_snapshot, AudioCommandError,
 };
-use crate::bootstrap::{
-    bootstrap_runtime, recovery_runtime_context, RuntimeContext, RuntimePaths, EXPORTS_DIR_NAME,
-};
+use crate::bootstrap::{bootstrap_runtime, recovery_runtime_context, RuntimeContext, RuntimePaths};
 use crate::commissioning::{
     evaluate_publish_gate, publish_override_timestamp, PublishGate, PUBLISH_OVERRIDE_AT_KEY,
 };
@@ -26,15 +23,13 @@ use crate::commissioning::{
     read_commissioning_snapshot, run_commissioning_check, seed_sample_planning_data,
     CommissioningCommandError,
 };
-use crate::control_surface::build_control_surface_health_check;
-use crate::diagnostics::{append_log, read_log_excerpt};
+use crate::diagnostics::{append_log, configured_log_level, request_log_line};
 use crate::exports::{build_control_surface_snapshot, export_companion_config, ExportCommandError};
 use crate::legacy_import::{parse_import_request, ImportLegacyError};
 use crate::lighting::{
-    apply_lighting_palette_with_preview, build_lighting_health_check,
-    clear_lighting_identify_bursts, create_lighting_fixture, create_lighting_group,
-    create_lighting_palette, create_lighting_scene_with_preview, delete_lighting_fixture,
-    delete_lighting_group, delete_lighting_palette, delete_lighting_scene,
+    apply_lighting_palette_with_preview, clear_lighting_identify_bursts, create_lighting_fixture,
+    create_lighting_group, create_lighting_palette, create_lighting_scene_with_preview,
+    delete_lighting_fixture, delete_lighting_group, delete_lighting_palette, delete_lighting_scene,
     discard_lighting_preview, identify_lighting_fixture, list_lighting_palettes,
     parse_lighting_all_power_request, parse_lighting_fixture_create_request,
     parse_lighting_fixture_delete_request, parse_lighting_fixture_highlight_request,
@@ -86,15 +81,14 @@ use crate::protocol::{
     EVENT_LIGHTING_CHANGED, EVENT_PLANNING_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
-use crate::storage::{
-    import_legacy_db, list_settings_by_prefix, read_sqlite_version, set_settings, EngineResult,
-};
+use crate::storage::{import_legacy_db, list_settings_by_prefix, set_settings, EngineResult};
 use crate::support::{
     export_support_backup, parse_support_restore_request, read_support_snapshot,
     restore_support_backup, verify_support_backup, SupportCommandError,
 };
 use serde_json::json;
 use std::sync::{Mutex, MutexGuard};
+use std::time::Instant;
 
 pub struct EngineApp {
     runtime: RuntimeContext,
@@ -126,19 +120,6 @@ fn support_error_response(id: serde_json::Value, error: SupportCommandError) -> 
     }
 }
 
-fn format_health_summary(
-    status: &str,
-    storage_summary: &str,
-    lighting_summary: &str,
-    audio_summary: &str,
-    control_surface_summary: &str,
-) -> String {
-    format!(
-        "Health '{}'. Storage {}. Lighting {}. Audio {}. Control surface {}.",
-        status, storage_summary, lighting_summary, audio_summary, control_surface_summary
-    )
-}
-
 impl EngineApp {
     pub fn bootstrap() -> EngineResult<Self> {
         let runtime = bootstrap_runtime()?;
@@ -154,6 +135,14 @@ impl EngineApp {
     /// verify and restore backups are answered, so the recovery surface can
     /// put a database backup in place and restart into it.
     pub fn recovery(runtime_paths: &RuntimePaths) -> Self {
+        // The registry says why (Slice 8 — F14); `health.snapshot` is not
+        // among the recovery requests, so the recovery surface reads the
+        // startup failure, but the state is on record for any later reader.
+        crate::health::report(
+            crate::health::SUBSYSTEM_STORAGE,
+            crate::health::SubsystemState::Error,
+            "The saved data failed its check; verify and restore a database backup from Setup / Support",
+        );
         Self {
             runtime: recovery_runtime_context(runtime_paths),
             lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
@@ -206,13 +195,28 @@ impl EngineApp {
             .unwrap_or(false)
     }
 
+    /// Answers one request. One `DEBUG` line per request — method, id,
+    /// milliseconds, outcome — replaces the `INFO` line every request used
+    /// to write (Slice 8 — F27); it exists only while `SSE_ENGINE_LOG_LEVEL`
+    /// is `DEBUG`.
     pub fn handle_request(&self, request: RequestEnvelope) -> EngineReply {
-        let _ = append_log(
-            &self.runtime.log_file_path,
-            "INFO",
-            &format!("Handling request: {}", request.method),
-        );
+        let started_at = Instant::now();
+        let method = request.method.clone();
+        let id = request.id.clone();
+        let reply = self.dispatch(request);
+        if let Some(line) = request_log_line(
+            configured_log_level(),
+            &method,
+            &id,
+            started_at.elapsed(),
+            reply.response.ok,
+        ) {
+            let _ = append_log(&self.runtime.log_file_path, "DEBUG", &line);
+        }
+        reply
+    }
 
+    fn dispatch(&self, request: RequestEnvelope) -> EngineReply {
         // Recovery mode (Slice 7 — F20): the database could not be opened,
         // so only the requests that verify and restore a backup are served;
         // anything else would touch the file that failed its check.
@@ -1036,74 +1040,7 @@ impl EngineApp {
     }
 
     fn read_health_snapshot(&self) -> EngineResult<serde_json::Value> {
-        let app_settings = list_settings_by_prefix(&self.runtime.db_path, APP_SETTINGS_PREFIX)?;
-        let lighting = build_lighting_health_check(&app_settings);
-        let audio = build_audio_health_check(&app_settings);
-        let control_surface = build_control_surface_health_check(&self.runtime);
-        let sqlite_version = read_sqlite_version(&self.runtime.db_path)?;
-        let status = if self.runtime.storage_ready {
-            "ok"
-        } else {
-            "starting"
-        };
-        let lighting_summary = lighting.summary.clone();
-        let audio_summary = audio.summary.clone();
-        let control_surface_summary = control_surface
-            .get("summary")
-            .and_then(|value| value.as_str())
-            .unwrap_or("Control-surface diagnostics unavailable.")
-            .to_string();
-        let storage_summary = format!(
-            "Schema v{}, journal mode {}, integrity {}, SQLite {}",
-            self.runtime.storage_bootstrap.schema_version,
-            self.runtime.storage_bootstrap.journal_mode,
-            self.runtime.storage_bootstrap.integrity_check,
-            sqlite_version,
-        );
-        let health_summary = format_health_summary(
-            status,
-            &storage_summary,
-            &lighting_summary,
-            &audio_summary,
-            &control_surface_summary,
-        );
-        Ok(json!({
-            "status": status,
-            "startupPhase": "storage-bootstrap",
-            "summary": health_summary,
-            "paths": {
-                "appDataDir": self.runtime.app_data_dir.display().to_string(),
-                "logsDir": self.runtime.logs_dir.display().to_string(),
-                "logFilePath": self.runtime.log_file_path.display().to_string(),
-                "dbPath": self.runtime.db_path.display().to_string(),
-                "backupDir": self.runtime.backups_dir.display().to_string(),
-                "exportsDir": self.runtime.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
-                "updateRepositoryPath": self.runtime
-                    .update_repository_path
-                    .as_ref()
-                    .map(|path| path.display().to_string())
-            },
-            "details": {
-                "storage": storage_summary,
-                "lighting": lighting_summary,
-                "audio": audio_summary,
-                "controlSurface": control_surface_summary,
-            },
-            "recentLogExcerpt": read_log_excerpt(&self.runtime.log_file_path, 12),
-            "checks": {
-                "storage": {
-                    "ok": self.runtime.storage_ready,
-                    "dbPathExists": self.runtime.db_path.exists(),
-                    "schemaVersion": self.runtime.storage_bootstrap.schema_version,
-                    "journalMode": self.runtime.storage_bootstrap.journal_mode,
-                    "integrityCheck": self.runtime.storage_bootstrap.integrity_check,
-                    "sqliteVersion": sqlite_version
-                },
-                "lighting": lighting,
-                "audio": audio,
-                "controlSurface": control_surface,
-            }
-        }))
+        crate::health::read_health_snapshot(&self.runtime)
     }
 
     fn format_settings_updates(updates: &[(&str, String)]) -> String {
@@ -1307,7 +1244,11 @@ impl EngineApp {
     pub fn shutdown(&self) {
         let released = crate::audio::release_all_talkback_holds(&self.runtime.db_path);
         if released > 0 {
-            eprintln!("Released {released} talkback hold(s) on shutdown");
+            let _ = append_log(
+                &self.runtime.log_file_path,
+                "INFO",
+                &format!("Released {released} talkback hold(s) on shutdown"),
+            );
         }
     }
 
@@ -1764,7 +1705,7 @@ impl EngineApp {
 
 #[cfg(test)]
 mod tests {
-    use super::{format_health_summary, EngineApp};
+    use super::EngineApp;
     use crate::bootstrap::RuntimeContext;
     use crate::control_surface::ControlSurfaceBridgeInfo;
     use crate::lighting::LightingPreviewRuntimeState;
@@ -1913,20 +1854,21 @@ mod tests {
         );
     }
 
+    // Finding F27: at the default level a request leaves no line in the log
+    // — neither the old per-request INFO line nor the DEBUG one.
     #[test]
-    fn health_summary_includes_all_native_domains() {
-        let summary = format_health_summary(
-            "ok",
-            "Schema v1, journal mode wal, integrity ok",
-            "Lighting ready.",
-            "Audio ready.",
-            "Bridge ready at http://127.0.0.1:38201",
-        );
-
-        assert!(summary.contains("Health 'ok'."));
-        assert!(summary.contains("Storage Schema v1"));
-        assert!(summary.contains("Lighting ready."));
-        assert!(summary.contains("Audio ready."));
-        assert!(summary.contains("Control surface Bridge ready"));
+    fn handle_request_writes_no_request_line_at_the_default_level() {
+        let test_dir = TestDir::new("request-log");
+        let app = app_for(&test_dir);
+        let reply = app.handle_request(RequestEnvelope {
+            kind: String::from("request"),
+            id: json!("ping-1"),
+            method: String::from("engine.ping"),
+            params: json!({}),
+        });
+        assert!(reply.response.ok);
+        let log = fs::read_to_string(app.runtime.log_file_path.as_path()).unwrap_or_default();
+        assert!(!log.contains("Handling request"), "{log}");
+        assert!(!log.contains("method=engine.ping"), "{log}");
     }
 }

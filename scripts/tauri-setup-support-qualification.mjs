@@ -433,7 +433,7 @@ async function runSetupSupportQualification() {
   const runtime = createRuntimeDirs("sse-tauri-setup-support-");
   const firstSession = createSessionFiles("sse-tauri-session-");
 
-  console.log("Tauri Setup/Support qualification: step 1/6 clean startup and support workflow.");
+  console.log("Tauri Setup/Support qualification: step 1/7 clean startup and support workflow.");
 
   const firstRun = launchTauriShell({
     appDataDir: runtime.appDataDir,
@@ -618,7 +618,7 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
-  console.log("Tauri Setup/Support qualification: step 2/6 persisted restart on the same runtime.");
+  console.log("Tauri Setup/Support qualification: step 2/7 persisted restart on the same runtime.");
 
   // Slice 7 (F20): the database backup step 2 restores is kept for the
   // corrupt-database scenario, which restores it from the recovery surface.
@@ -781,7 +781,7 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
-  console.log("Tauri Setup/Support qualification: step 3/6 recovery posture for bootstrap failure.");
+  console.log("Tauri Setup/Support qualification: step 3/7 recovery posture for bootstrap failure.");
 
   const blockedRuntime = createBlockedRuntimeDirs("sse-tauri-bootstrap-failure-");
   const recoverySession = createSessionFiles("sse-tauri-session-");
@@ -825,7 +825,7 @@ async function runSetupSupportQualification() {
   // where the database should be reaches the recovery surface as
   // STORAGE_CORRUPT, the engine's sentence names a backup, and the damaged
   // file is left exactly as it was — nothing migrates or overwrites it.
-  console.log("Tauri Setup/Support qualification: step 4/6 recovery posture for a corrupt database.");
+  console.log("Tauri Setup/Support qualification: step 4/7 recovery posture for a corrupt database.");
 
   const corruptRuntime = createRuntimeDirs("sse-tauri-corrupt-db-");
   const corruptDbPath = path.join(corruptRuntime.appDataDir, "studio-control.sqlite3");
@@ -944,7 +944,7 @@ async function runSetupSupportQualification() {
   // restart announced, and the engine is restarted on its own — a new
   // process, the next launch number, the dashboard back.
   console.log(
-    "Tauri Setup/Support qualification: step 5/6 an engine ended from outside reaches recovery and restarts on its own."
+    "Tauri Setup/Support qualification: step 5/7 an engine ended from outside reaches recovery and restarts on its own."
   );
 
   const crashRuntime = createRuntimeDirs("sse-tauri-engine-crash-");
@@ -1029,7 +1029,7 @@ async function runSetupSupportQualification() {
     // `<app-data>/engine.lock` refuses the second engine instead, so the
     // second shell stops at ENGINE_ALREADY_RUNNING. Both are recorded; only
     // the plugin's refusal is accepted on Windows and macOS.
-    console.log("Tauri Setup/Support qualification: step 6/6 a second copy of the shell is refused.");
+    console.log("Tauri Setup/Support qualification: step 6/7 a second copy of the shell is refused.");
     const secondSession = createSessionFiles("sse-tauri-second-instance-");
     const secondRun = launchSecondShellInstance({
       appDataDir: crashRuntime.appDataDir,
@@ -1100,6 +1100,83 @@ async function runSetupSupportQualification() {
     await closeTauriShell(crashRun);
     crashSession.cleanup();
     crashRuntime.cleanup();
+  }
+
+  await delay(1_500);
+  await assertTcpPortAvailable(devServerPort);
+
+  // Scenario `bridge-port-taken` (2026-09 production readiness, Slice 8 —
+  // F14): when the Stream Deck bridge cannot bind its port, the engine's
+  // health reads `attention` — the registry entry under checks.engine names
+  // the bridge, the app snapshot reports the bridge unavailable on that
+  // port, and the store derives its degraded recovery state — where before
+  // the slice health read `ok` whatever had failed. A throwaway listener
+  // holds the port the shell is told to use; the engine scans for no other.
+  console.log("Tauri Setup/Support qualification: step 7/7 a taken Stream Deck bridge port reads as health attention.");
+
+  const portHolder = net.createServer();
+  const takenPort = await new Promise((resolve, reject) => {
+    portHolder.once("error", reject);
+    portHolder.listen(0, "127.0.0.1", () => resolve(portHolder.address().port));
+  });
+  const portRuntime = createRuntimeDirs("sse-tauri-bridge-port-");
+  const portSession = createSessionFiles("sse-tauri-session-");
+  const portRun = launchTauriShell({
+    appDataDir: portRuntime.appDataDir,
+    commandPath: portSession.commandPath,
+    extraEnv: { SSE_CONTROL_SURFACE_PORT: String(takenPort) },
+    logsDir: portRuntime.logsDir,
+    statusPath: portSession.statusPath,
+    updateRepoDir: portRuntime.updateRepoDir,
+  });
+
+  try {
+    const portStatus = await waitForStatus({
+      child: portRun,
+      label: "ready state with the bridge port taken",
+      predicate: (value) => value?.shellState?.lifecycle === "ready",
+      statusPath: portSession.statusPath,
+    });
+    const health = portStatus.shellState.healthSnapshot;
+    const bridgeEntry = health?.checks?.engine?.bridge;
+    const controlSurface = portStatus.shellState.appSnapshot?.runtime?.controlSurface;
+    assert(
+      health?.status === "attention",
+      `Expected health status 'attention' with the bridge port taken, got '${health?.status}'.`
+    );
+    assert(
+      bridgeEntry?.state === "attention",
+      `Expected checks.engine.bridge.state 'attention', got ${JSON.stringify(bridgeEntry)}.`
+    );
+    assert(
+      typeof bridgeEntry?.detail === "string" && bridgeEntry.detail.includes("could not bind"),
+      `Expected the bridge entry to say the listener could not bind, got '${bridgeEntry?.detail}'.`
+    );
+    assert(
+      controlSurface?.available === false && controlSurface?.port === takenPort,
+      `Expected the app snapshot to report the bridge unavailable on port ${takenPort}, got ${JSON.stringify(controlSurface)}.`
+    );
+    assert(
+      portStatus.shellState.recovery === "degraded",
+      `Expected the store's recovery state 'degraded', got '${portStatus.shellState.recovery}'.`
+    );
+    assert(
+      typeof health?.recentLogExcerpt === "string" && health.recentLogExcerpt.length <= 64 * 1024,
+      "Expected the health snapshot's log excerpt to be a bounded string."
+    );
+    const engineLogPath = path.join(portRuntime.logsDir, "engine.log");
+    assert(existsSync(engineLogPath), `Expected the engine log at ${engineLogPath}.`);
+    evidence.recordCheck("bridge-port-taken-reads-as-health-attention", {
+      bridgeDetail: bridgeEntry.detail,
+      healthStatus: health.status,
+      port: takenPort,
+      recovery: portStatus.shellState.recovery,
+    });
+  } finally {
+    await closeTauriShell(portRun);
+    await new Promise((resolve) => portHolder.close(resolve));
+    portSession.cleanup();
+    portRuntime.cleanup();
   }
 }
 

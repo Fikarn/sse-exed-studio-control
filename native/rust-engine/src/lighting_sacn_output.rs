@@ -16,6 +16,7 @@
 
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::diagnostics::append_log;
+use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_SACN};
 use crate::lighting::{read_lighting_sacn_output_state, LightingUniverseFrame};
 use crate::storage::list_settings_by_prefix;
 use std::collections::HashMap;
@@ -51,13 +52,18 @@ struct UniverseTx {
 
 fn run_output_loop(db_path: &Path, log_file_path: &Path) {
     let socket = match UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)) {
-        Ok(socket) => socket,
-        Err(error) => {
-            let _ = append_log(
-                log_file_path,
-                "ERROR",
-                &format!("Lighting sACN output could not allocate a UDP socket: {error}"),
+        Ok(socket) => {
+            report_health(
+                SUBSYSTEM_SACN,
+                SubsystemState::Ok,
+                "Light output socket ready (sACN over UDP)",
             );
+            socket
+        }
+        Err(error) => {
+            let message = format!("Lighting sACN output could not allocate a UDP socket: {error}");
+            let _ = append_log(log_file_path, "ERROR", &message);
+            report_health(SUBSYSTEM_SACN, SubsystemState::Attention, message);
             return;
         }
     };

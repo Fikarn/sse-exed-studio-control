@@ -12,6 +12,7 @@ use crate::control_surface::{
     DEFAULT_CONTROL_SURFACE_HOST,
 };
 use crate::diagnostics::append_log;
+use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BRIDGE};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -145,6 +146,7 @@ pub fn start_control_surface_bridge(
             );
 
             let _ = append_log(log_file_path, "INFO", &summary);
+            report_health(SUBSYSTEM_BRIDGE, SubsystemState::Ok, summary.clone());
 
             let context = Arc::new(BridgeContext::new(
                 db_path.to_path_buf(),
@@ -165,16 +167,23 @@ pub fn start_control_surface_bridge(
                 error: None,
             }
         }
-        Err(message) => ControlSurfaceBridgeInfo {
-            base_url: format!("http://{DEFAULT_CONTROL_SURFACE_HOST}:{requested_port}"),
-            port: requested_port,
-            available: false,
-            status: String::from("unavailable"),
-            summary: format!(
+        Err(message) => {
+            let summary = format!(
                 "Native control-surface bridge is unavailable because the listener could not bind: {message}"
-            ),
-            error: Some(message),
-        },
+            );
+            // Health `attention` (Slice 8 — F14): the deck cannot reach the
+            // app until the port is free or SSE_CONTROL_SURFACE_PORT names
+            // another one; there is no fallback port.
+            report_health(SUBSYSTEM_BRIDGE, SubsystemState::Attention, summary.clone());
+            ControlSurfaceBridgeInfo {
+                base_url: format!("http://{DEFAULT_CONTROL_SURFACE_HOST}:{requested_port}"),
+                port: requested_port,
+                available: false,
+                status: String::from("unavailable"),
+                summary,
+                error: Some(message),
+            }
+        }
     }
 }
 

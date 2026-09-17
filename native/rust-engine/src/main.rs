@@ -12,6 +12,7 @@ mod diagnostics;
 mod engine_events;
 mod exports;
 mod exports_audio;
+mod health;
 mod legacy_import;
 mod lighting;
 mod lighting_backend;
@@ -38,7 +39,8 @@ use crate::bootstrap::{
     resolve_runtime_paths, startup_failure_code, validate_protocol_version, EXPORTS_DIR_NAME,
     STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
 };
-use crate::diagnostics::append_log;
+use crate::diagnostics::{append_log, init_log, log_event, LogLevel};
+use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BACKUPS};
 use crate::protocol::{
     event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
 };
@@ -88,7 +90,10 @@ fn spawn_output_writer(receiver: Receiver<Value>) {
         let mut writer = stdout.lock();
         for message in receiver {
             if let Err(error) = write_json(&mut writer, &message) {
-                eprintln!("Engine output writer failed: {error}");
+                log_event(
+                    LogLevel::Error,
+                    &format!("Engine output writer failed: {error}"),
+                );
                 break;
             }
         }
@@ -328,7 +333,7 @@ fn serve_requests(
         let request = match serde_json::from_str::<RequestEnvelope>(trimmed) {
             Ok(value) => value,
             Err(error) => {
-                eprintln!("Malformed request: {error}");
+                log_event(LogLevel::Warn, &format!("Malformed request: {error}"));
                 continue;
             }
         };
@@ -353,22 +358,18 @@ fn write_database_backup(
 ) {
     match snapshot_database(db_path, backups_dir, reason) {
         Ok(path) => {
-            let _ = append_log(
-                log_file_path,
-                "INFO",
-                &format!(
-                    "Database backup ({}) written: {}",
-                    reason.as_str(),
-                    path.display()
-                ),
+            let message = format!(
+                "Database backup ({}) written: {}",
+                reason.as_str(),
+                path.display()
             );
+            let _ = append_log(log_file_path, "INFO", &message);
+            report_health(SUBSYSTEM_BACKUPS, SubsystemState::Ok, message);
         }
         Err(error) => {
-            let _ = append_log(
-                log_file_path,
-                "WARN",
-                &format!("Database backup ({}) failed: {error}", reason.as_str()),
-            );
+            let message = format!("Database backup ({}) failed: {error}", reason.as_str());
+            let _ = append_log(log_file_path, "WARN", &message);
+            report_health(SUBSYSTEM_BACKUPS, SubsystemState::Warning, message);
         }
     }
 }
@@ -430,10 +431,22 @@ fn main() -> io::Result<()> {
                 }),
             );
             let _ = write_json(&mut writer, &startup_failure);
+            // No runtime paths means no log file to write to: this is one of
+            // the two stderr sites the readiness ledger documents
+            // (Slice 8 — F16); the shell keeps engine stderr in shell.log.
             eprintln!("Engine bootstrap failed: {message}");
             return Err(io::Error::other(message));
         }
     };
+
+    // The engine log is open from here on (Slice 8 — F16): one writer for
+    // every thread, rotating at 5 MiB, at the level SSE_ENGINE_LOG_LEVEL
+    // names. Everything below logs through it, the recovery mode included.
+    let (log_level, log_level_warning) = LogLevel::from_env();
+    init_log(&planned_paths.log_file_path, log_level);
+    if let Some(warning) = log_level_warning {
+        log_event(LogLevel::Warn, &warning);
+    }
 
     if let Err(message) = validate_protocol_version(&planned_paths.requested_protocol_version) {
         let startup_failure = event_message(
@@ -459,7 +472,10 @@ fn main() -> io::Result<()> {
             }),
         );
         let _ = write_json(&mut writer, &startup_failure);
-        eprintln!("Engine protocol mismatch: {message}");
+        log_event(
+            LogLevel::Error,
+            &format!("Engine protocol mismatch: {message}"),
+        );
         return Err(io::Error::other(message));
     }
 
@@ -490,7 +506,10 @@ fn main() -> io::Result<()> {
                 }),
             );
             let _ = write_json(&mut writer, &startup_failure);
-            eprintln!("Engine bootstrap failed: {error}");
+            log_event(
+                LogLevel::Error,
+                &format!("Engine bootstrap failed: {error}"),
+            );
             if code == STARTUP_CODE_STORAGE_CORRUPT || code == STARTUP_CODE_STORAGE_MIGRATION_FAILED
             {
                 // Recovery mode (Slice 7 — F20): the saved data needs a

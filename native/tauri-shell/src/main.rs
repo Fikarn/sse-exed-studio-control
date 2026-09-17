@@ -4,6 +4,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod engine;
+mod shell_log;
 
 use engine::{EngineBootstrapSummary, EngineBridge};
 use serde_json::{json, Value};

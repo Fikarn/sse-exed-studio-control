@@ -434,7 +434,7 @@ fn audio_sync_refuses_when_the_global_slot_is_unbound() {
 #[ignore]
 fn live_totalmix_pull_round_trip() {
     if std::env::var("SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES").as_deref() != Ok("1") {
-        eprintln!("skipping: set SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1 to let the pull request leave the machine");
+        println!("skipping: set SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1 to let the pull request leave the machine");
         return;
     }
     let _serial = serialize_shared_link();
@@ -461,7 +461,7 @@ fn live_totalmix_pull_round_trip() {
     assert!(result.complete);
     assert_eq!(result.connection, "connected");
     assert!(result.pulled_values > 500, "{}", result.summary);
-    eprintln!("live pull: {}", result.summary);
+    println!("live pull: {}", result.summary);
 }
 
 // ---------------------------------------------------------------------------

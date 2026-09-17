@@ -1,6 +1,10 @@
 use crate::control_surface::{resolve_control_surface_port, ControlSurfaceBridgeInfo};
 use crate::control_surface_http::{load_or_create_bridge_token, start_control_surface_bridge};
 use crate::diagnostics::append_log;
+use crate::health::{
+    report as report_health, report_at as report_health_at, SubsystemState, SUBSYSTEM_BACKUPS,
+    SUBSYSTEM_RESTORE, SUBSYSTEM_STORAGE,
+};
 use crate::legacy_import::LegacyImportRequest;
 use crate::planning::planning_data_present;
 use crate::storage::{
@@ -300,6 +304,30 @@ pub(crate) fn bootstrap_runtime_from_paths(
             storage_bootstrap.integrity_check
         ),
     )?;
+    report_health(
+        SUBSYSTEM_STORAGE,
+        SubsystemState::Ok,
+        format!(
+            "Integrity {}, schema v{}",
+            storage_bootstrap.integrity_check, storage_bootstrap.schema_version
+        ),
+    );
+    // The newest database backup on disk seeds the backups entry, so the
+    // two-day rule holds across restarts (Slice 8 — F14).
+    if let Some(path) = newest_snapshot(&runtime_paths.backups_dir) {
+        if let Some(written) = fs::metadata(&path)
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+        {
+            report_health_at(
+                SUBSYSTEM_BACKUPS,
+                SubsystemState::Ok,
+                format!("Last database backup on disk: {}", path.display()),
+                written.as_secs(),
+            );
+        }
+    }
     // Diagnostics exports are not kept forever (Slice 7): thirty days.
     match prune_exports(
         &runtime_paths.app_data_dir.join(EXPORTS_DIR_NAME),
@@ -478,19 +506,17 @@ pub(crate) fn apply_pending_restore(runtime_paths: &RuntimePaths) -> EngineResul
         }
     }
     fs::rename(&pending, db_path)?;
-    append_log(
-        &runtime_paths.log_file_path,
-        "INFO",
-        &format!(
-            "Database restore applied: {} is now {}; the replaced database is kept as {}",
-            pending.display(),
-            db_path.display(),
-            replaced
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .unwrap_or_else(|| String::from("nothing (there was no database)"))
-        ),
-    )?;
+    let message = format!(
+        "Database restore applied: {} is now {}; the replaced database is kept as {}",
+        pending.display(),
+        db_path.display(),
+        replaced
+            .as_ref()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| String::from("nothing (there was no database)"))
+    );
+    append_log(&runtime_paths.log_file_path, "INFO", &message)?;
+    report_health(SUBSYSTEM_RESTORE, SubsystemState::Ok, message);
     Ok(replaced)
 }
 
