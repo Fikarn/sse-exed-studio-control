@@ -46,6 +46,7 @@ import {
 } from "./helpers/meter-canvas";
 import { modifierShortcut } from "./helpers/modifier-shortcut";
 import { fixtureMap, openFixture } from "./helpers/openFixture";
+import { pausePageClock } from "./helpers/pageClock";
 import { audioPaletteSignatureForSnapshot, cloneValue } from "./helpers/view-models";
 
 // plan PR 4 / workstream D4: audio workspace specs split out of
@@ -1052,6 +1053,8 @@ test("supports audio group filtering and source/output selection flow", async ({
 });
 
 test("aligns audio input hardware controls with UFX III preamps", async ({ page }) => {
+  // The 48 V double-click below runs on a stopped page clock (S13).
+  await page.clock.install();
   await openFixture(page, "audio-populated");
 
   await page.getByTestId("audio-strip-audio-input-9").click();
@@ -1085,6 +1088,13 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
   await page.keyboard.press("Escape");
   await expect(phantom).not.toHaveAttribute("data-armed", "true");
   await expect(phantom).toHaveText("48 V");
+  // Production readiness S13. Old: the second click followed the first in real
+  // time and was expected inside the 350 ms dwell. New: the page's clock is
+  // stopped for the two presses and moved past the dwell for the confirm.
+  // Reason: on a CI runner the two clicks are over a second apart, so the
+  // second one confirmed and 48 V moved — nineteen of the branch's first thirty
+  // runs (helpers/pageClock.ts). What is checked is unchanged.
+  await pausePageClock(page);
   await phantom.click();
   await expect(phantom).toHaveAttribute("data-armed", "true");
   // 2026-09 audit Slice 7: a second click inside the dwell is a double-click,
@@ -1092,7 +1102,8 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
   await phantom.click();
   await expect(phantom).toHaveAttribute("data-armed", "true");
   await expect(phantom).toHaveAttribute("data-active", phantomBefore ?? "");
-  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
+  await page.clock.fastForward(AUDIO_ARM_MIN_DWELL_MS + 50);
+  await page.clock.resume();
   await phantom.click();
   await expect(phantom).not.toHaveAttribute("data-active", phantomBefore ?? "");
 

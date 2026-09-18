@@ -1,7 +1,9 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { liveAudioMasks } from "./helpers/liveAudioMasks";
 
 // plan PR 5 / workstream D5: Storybook visual integration. The
 // storybook-static build (produced by `npm run frontend:storybook:build`,
@@ -44,17 +46,6 @@ const stories: StoryEntry[] = Object.values(index.entries).map((entry) => ({
   name: entry.name,
   title: entry.title,
 }));
-
-// Live JS-driven surfaces that drift between captures — same as
-// visual-review.spec.ts. The mask is a no-op for component stories that
-// don't render these elements.
-function liveAudioMasks(page: Page): Locator[] {
-  return [
-    page.locator('[data-meter-component="stereo"]'),
-    page.locator('[data-testid="audio-meter-canvas"]'),
-    page.locator('[data-testid="audio-signal-canvas"]'),
-  ];
-}
 
 function shouldFreezeClock(storyId: string) {
   // Planning stories render relative time labels ("in 5 minutes"), and every

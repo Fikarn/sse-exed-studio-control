@@ -766,6 +766,10 @@ fn parse_json_body(body: &[u8]) -> Result<Value, ControlSurfaceError> {
         .map_err(|error| ControlSurfaceError::InvalidParams(error.to_string()))
 }
 
+// Property tests for the request reader and the query decoder (Slice 13).
+#[cfg(test)]
+mod fuzz;
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -64,6 +64,13 @@ test("a click never latches talkback", async ({ page }) => {
 test("holding T talks; releasing T, or the window losing focus, stops", async ({ page }) => {
   await openFixture(page, "audio-populated");
   const button = page.getByTestId("audio-monitor-talkback");
+  // Production readiness S13. `audio-workspace` is also the test id of the
+  // "Loading the console…" surface, which has no Talkback key and nothing
+  // listening for T. When the click landed there the T that followed went to
+  // nobody, and a held key is not sent twice — six of the branch's first thirty
+  // CI runs (the trace of 35263526586: T went down 6 ms after the click, with
+  // the cluster still empty). Wait for the key the hold belongs to.
+  await expect(button).toBeEnabled();
   await page.getByTestId("audio-workspace").click({ position: { x: 4, y: 4 } });
 
   await page.keyboard.down("t");

@@ -487,8 +487,16 @@ fn parse_global_level(message: &OscMessage) -> Option<(RmeTotalMixBus, usize, f6
     if parts.next().is_some() {
         return None;
     }
-    let dbfs = numeric_arg(message.args.first()?)?;
+    let dbfs = numeric_arg(message.args.first()?).filter(|dbfs| is_level_dbfs(*dbfs))?;
     Some((bus, channel, dbfs))
+}
+
+/// A level in dBFS is a number, or −∞ for silence. NaN and +∞ are not levels:
+/// a NaN would travel through the meter state into the snapshot and reach the
+/// meters as `null` (Slice 13 — found by `fuzz::accepted_*_levels_are_levels`
+/// with `/level/in/0 [NaN]` and `/1/level1LeftVal [NaN]`).
+fn is_level_dbfs(dbfs: f64) -> bool {
+    dbfs.is_finite() || dbfs == f64::NEG_INFINITY
 }
 
 /// Maps a 0-based hardware channel from the Global OSC namespace to the
@@ -565,10 +573,13 @@ pub fn parse_totalmix_meter_message(message: &OscMessage) -> Option<RmeTotalMixM
         .checked_sub(1)?;
     let raw_value = message.args.first()?;
     let (normalized, dbfs) = if is_display_value {
-        let dbfs = parse_dbfs_arg(raw_value)?;
+        let dbfs = parse_dbfs_arg(raw_value).filter(|dbfs| is_level_dbfs(*dbfs))?;
         (dbfs_to_normalized(dbfs), dbfs)
     } else {
-        let normalized = numeric_arg(raw_value)?.clamp(0.0, 1.0);
+        // `NaN.clamp(0.0, 1.0)` is NaN: only a finite value is a fader-scale level.
+        let normalized = numeric_arg(raw_value)
+            .filter(|value| value.is_finite())?
+            .clamp(0.0, 1.0);
         (normalized, normalized_to_dbfs(normalized))
     };
 
@@ -1768,5 +1779,9 @@ fn monotonic_now_ms() -> u64 {
         .min(u128::from(u64::MAX)) as u64
 }
 
+// Property tests for the datagram path: decode, meter state, console link
+// (Slice 13).
+#[cfg(test)]
+mod fuzz;
 #[cfg(test)]
 mod tests;

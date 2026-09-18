@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
+import { liveAudioMasks } from "./helpers/liveAudioMasks";
 
 // Visual review baselines for the operator shell across the hardware-profile
 // fallback ladder plus the Scaled Studio Preview surface. Replaces the
@@ -46,26 +47,8 @@ const STUDIO_PREVIEW_HOST: Viewport = { width: 1512, height: 982, label: "1512x9
 // diff budget (first hit: lighting-populated bone 2560x1440, 2026-08-12).
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 
-// Live, JS-driven surfaces that drift between captures (meter tracks redraw
-// every engine tick, the overlay canvas accumulates sample history, the
-// inspector signal canvas paints peaks). Mask these on audio fixtures so the
-// baseline diff covers layout + chrome, not live values.
-function liveAudioMasks(page: Page): Locator[] {
-  // The meter overlay (`audio-meter-canvas`) is a full-workspace
-  // position:absolute layer, so masking it blanked the entire audio surface and
-  // left nothing pixel-tested. It paints live values only inside
-  // [data-meter-component="stereo"] and [data-mini-meter-kind] slots, and the
-  // only other per-tick values are the inspector/monitor dB numerals
-  // ([data-meter-readout-mode] / the monitor master meter). Masking just those
-  // keeps the static mixer / inspector / snapshot-deck / top + monitor bar
-  // layout in the diff so it is actually regression-tested.
-  return [
-    page.locator('[data-meter-component="stereo"]'),
-    page.locator("[data-mini-meter-kind]"),
-    page.locator('[data-testid="audio-monitor-master-meter"]'),
-    page.locator("[data-meter-readout-mode]"),
-  ];
-}
+// The live-audio masks are shared with storybook.spec.ts since production
+// readiness S13: helpers/liveAudioMasks.ts (moved from here unchanged).
 
 // AA / font rendering on the unmasked full-page renders jitters run-to-run
 // (a stable element rendered a shade off at its edges) — e.g.

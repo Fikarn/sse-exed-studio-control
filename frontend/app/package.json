@@ -8,6 +8,7 @@
     "dev": "vite",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",

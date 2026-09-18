@@ -32,6 +32,45 @@ fn parses_numbered_totalmix_level_messages() {
     assert!((parsed.dbfs + 6.020_6).abs() < 0.001);
 }
 
+/// Slice 13: found by `fuzz::accepted_*_levels_are_levels`. `NaN.clamp(0, 1)`
+/// is NaN, and `"nan".parse::<f64>()` succeeds, so both namespaces took a NaN
+/// as a level; it would have reached the meters as `null`.
+#[test]
+fn a_level_that_is_not_a_number_is_not_a_level() {
+    for not_a_level in [
+        OscType::Float(f32::NAN),
+        OscType::Double(f64::NAN),
+        OscType::Float(f32::INFINITY),
+    ] {
+        assert!(
+            parse_totalmix_meter_message(&message("/1/level9Left", not_a_level.clone())).is_none()
+        );
+        assert!(
+            parse_totalmix_meter_message(&message("/1/level9LeftVal", not_a_level.clone()))
+                .is_none()
+        );
+        assert!(parse_global_level(&message("/level/in/0", not_a_level)).is_none());
+    }
+    for text in ["nan", "NaN dB", "inf", "1e400 dB"] {
+        let display = message("/1/level9LeftVal", OscType::String(text.to_string()));
+        assert!(parse_totalmix_meter_message(&display).is_none(), "{text}");
+    }
+
+    // Silence is a level, in both spellings the console uses.
+    let silent = message("/1/level9LeftVal", OscType::String(String::from("-oo")));
+    let parsed = parse_totalmix_meter_message(&silent).expect("-oo is silence");
+    assert_eq!(parsed.normalized, 0.0);
+    assert_eq!(parsed.dbfs, f64::NEG_INFINITY);
+    let (_, _, dbfs) =
+        parse_global_level(&message("/level/in/0", OscType::Float(f32::NEG_INFINITY)))
+            .expect("-inf dB is silence");
+    assert_eq!(dbfs, f64::NEG_INFINITY);
+
+    let mut meters = RmeTotalMixMeterState::new();
+    assert!(!meters.apply_global_message(&message("/level/in/0", OscType::Float(f32::NAN)), 1_000));
+    assert!(meters.entries.is_empty());
+}
+
 #[test]
 fn clamps_configured_poll_interval() {
     assert_eq!(poll_interval_from_value(None), Duration::from_millis(16));

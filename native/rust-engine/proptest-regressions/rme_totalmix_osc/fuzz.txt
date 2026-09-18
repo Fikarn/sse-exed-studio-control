@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc d3daf66f54bef7b6dce9c80390cb0e58116065a9783cfc2a6553fe06abd5a22d # shrinks to message = OscMessage { addr: "/1/level1LeftVal", args: [Float(NaN)] }
+cc 246b8157c7de7bd129e822811ca0449d1516c2fb52bb974e35224cc2ec7c42d0 # shrinks to message = OscMessage { addr: "/level/in/0", args: [Float(NaN)] }

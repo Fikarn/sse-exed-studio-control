@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { AUDIO_ARM_MIN_DWELL_MS, AUDIO_ARM_TIMEOUT_MS } from "../src/app/audio/audioConstants";
 import { openFixture } from "./helpers/openFixture";
+import { pausePageClock } from "./helpers/pageClock";
 
 async function recallRequests(page: import("@playwright/test").Page) {
   return page.evaluate(() => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.snapshot.recall"] ?? 0);
@@ -45,9 +46,18 @@ test("snapshot recall arming renders a countdown bar that respects AUDIO_ARM_TIM
 test("a second click inside the dwell keeps the arm; after the dwell it applies the recall", async ({ page }) => {
   // 2026-09 audit Slice 7. This spec used to click twice back to back and
   // expect the apply — that immediate double-fire was the defect.
+  // Production readiness S13. Old: the second click followed the first in real
+  // time and was expected inside the 350 ms dwell. New: the page's clock is
+  // stopped for the two presses and moved past the dwell for the third.
+  // Reason: two Playwright clicks are over a second apart on a CI runner, so
+  // the press landed outside the dwell and applied — the case failed on every
+  // run (helpers/pageClock.ts). What is checked is unchanged.
+  await page.clock.install();
   await openFixture(page, "audio-populated");
   const recalledTile = page.getByTestId("audio-snapshot-snapshot-interview-block");
   const recallSurface = recalledTile.getByTestId(/audio-snapshot-recall-/);
+  await expect(recalledTile).toBeVisible();
+  await pausePageClock(page);
   await recallSurface.click();
   await expect(recalledTile.getByTestId("audio-arm-countdown")).toHaveCount(1);
 
@@ -57,7 +67,8 @@ test("a second click inside the dwell keeps the arm; after the dwell it applies 
   await expect(recalledTile.getByTestId("audio-arm-countdown")).toHaveCount(1);
   expect(await recallRequests(page)).toBe(0);
 
-  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
+  await page.clock.fastForward(AUDIO_ARM_MIN_DWELL_MS + 50);
+  await page.clock.resume();
   await recallSurface.click();
   // Apply collapses the arm and the countdown must come off the tile.
   await expect(recalledTile.getByTestId("audio-arm-countdown")).toHaveCount(0);
@@ -68,6 +79,11 @@ test("a second click inside the dwell keeps the arm; after the dwell it applies 
 test("a held Shift+digit arms once and its key repeats never apply", async ({ page }) => {
   await openFixture(page, "audio-populated");
   const tile = page.getByTestId("audio-snapshot-snapshot-interview-block");
+  // Production readiness S13. `audio-workspace` is also the test id of the
+  // "Loading the console…" surface, where nothing listens for the snapshot
+  // keys yet; a click that lands there sends Shift+3 to nobody, and a held key
+  // is not sent twice (run 35211159050). Wait for the console itself.
+  await expect(tile).toBeVisible();
   await page.getByTestId("audio-workspace").click({ position: { x: 4, y: 4 } });
 
   // Playwright marks a second keyboard.down of the same key as repeat=true,

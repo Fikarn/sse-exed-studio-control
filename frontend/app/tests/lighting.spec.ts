@@ -762,6 +762,12 @@ test("rotates the selected fixture from the plot and inspector", async ({ page }
   // wider and the same pixel offset maps to a slightly different angle; what
   // the test is for — dragging the handle right and a little up rotates the
   // fixture to about a right angle — is unchanged.
+  // Production readiness S13. Old: the field was read once, straight after the
+  // pointer came up. New: wait for it to leave 0 first. Reason: the field shows
+  // the fixture's stored rotation, which moves when the reply to the drag's
+  // commit has been fetched, not when the pointer comes up; a read that beat
+  // the reply saw 0 (runs 34487837771 and 34595097112).
+  await expect(rotationInput).not.toHaveValue("0");
   const draggedRotation = Number(await rotationInput.inputValue());
   expect(draggedRotation, "the rotate handle drag lands near 82°").toBeGreaterThanOrEqual(80);
   expect(draggedRotation, "the rotate handle drag lands near 82°").toBeLessThanOrEqual(85);

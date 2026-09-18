@@ -27,5 +27,12 @@ serde_json.workspace = true
 studio-control-protocol.workspace = true
 ts-rs = { workspace = true, optional = true }
 
+[dev-dependencies]
+# Property tests for the two parsers that read bytes from outside the process:
+# the control-surface bridge's HTTP reader and the TotalMix OSC ingest (2026-09
+# production readiness, Slice 13 - finding F25). Test builds only; `std` alone
+# leaves out the process-forking runner and its crates, which nothing here uses.
+proptest = { version = "1.11", default-features = false, features = ["std"] }
+
 [lints]
 workspace = true
