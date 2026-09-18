@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { expectNoDocumentScroll } from "./helpers/geometry";
 import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
 import { modifierShortcut } from "./helpers/modifier-shortcut";
-import { openFixture } from "./helpers/openFixture";
+import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: lighting workspace specs split out of
 // operator-shell.spec.ts. Covers the snapshot loading posture, fixture
@@ -325,6 +325,9 @@ test("renders scaled studio preview inside the current MacBook-sized viewport", 
   await expect(root).toHaveAttribute("data-layout-width", "2560");
   await expect(root).toHaveAttribute("data-layout-height", "1440");
   await expect(page.getByText(/Studio Preview/)).toBeVisible();
+  // S14: the helper reads the primary controls once; the workspace is a chunk
+  // of its own now, so wait until it is the thing on screen.
+  await expectWorkspaceMounted(page, "lighting");
   await expectToolbarPrimaryControlsFit(page);
   await expectNoDocumentScroll(page);
 
@@ -338,6 +341,7 @@ test("enters and exits scaled studio preview from the command palette", async ({
   await page.setViewportSize({ width: 1512, height: 982 });
   await openFixture(page, "lighting-populated");
 
+  await expectWorkspaceMounted(page, "lighting");
   await page.keyboard.press("Meta+K");
   await page.locator("input[placeholder*=command]").fill("studio preview");
   await expect(page.getByRole("option", { name: "Enter Studio Preview at 2560 × 1440" })).toBeVisible();
@@ -574,6 +578,7 @@ test("supports lighting drag-lasso multi-select and group save", async ({ page }
 test("saves the current lighting selection as a scene from the inspector prompt", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
+  await expectWorkspaceMounted(page, "lighting");
   await page.keyboard.press(modifierShortcut("Shift+KeyS"));
   const saveSceneDialog = page.getByRole("dialog", { name: "Save as new scene" });
   await expect(saveSceneDialog.getByLabel("Scene name")).toBeFocused();
@@ -784,6 +789,7 @@ test("rotates the selected fixture from the plot and inspector", async ({ page }
 test("toggles the expanded DMX monitor from the keyboard", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
+  await expectWorkspaceMounted(page, "lighting");
   await page.keyboard.press(modifierShortcut("Shift+KeyM"));
   const dmxMonitorDialog = page.getByRole("dialog", { name: "DMX universe U1" });
   await expect(dmxMonitorDialog).toBeVisible();

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { modifierShortcut } from "./helpers/modifier-shortcut";
-import { openFixture } from "./helpers/openFixture";
+import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: shell-level specs split out of
 // operator-shell.spec.ts. Covers shell-wide keyboard overlays + workspace
@@ -10,6 +10,7 @@ import { openFixture } from "./helpers/openFixture";
 test("supports shell keyboard overlays and workspace switching", async ({ page }) => {
   await openFixture(page, "setup-required");
 
+  await expectWorkspaceMounted(page, "setup");
   await page.keyboard.press("Shift+/");
   await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -123,6 +124,7 @@ test("command palette traps focus, closes on Escape from anywhere, and restores 
 test("opening the palette dismisses the shortcut guide", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
+  await expectWorkspaceMounted(page, "lighting");
   await page.keyboard.press("Shift+/");
   await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
 
@@ -340,4 +342,65 @@ test("the crash hook is absent unless the fixture URL asks for it", async ({ pag
   await expect(page.getByTestId("lighting-stage")).toBeVisible();
   expect(await page.evaluate(() => typeof window.__SSE_TEST_DISARM_CRASH__)).toBe("undefined");
   await expect(page.getByTestId("background-failure-band")).toHaveCount(0);
+});
+
+// Production readiness S14 (finding F26): every workspace used to be part of the
+// one script the shell starts from, so all four were fetched and evaluated
+// before the startup surface drew. Each is a chunk of its own now. The markers
+// are test ids only that workspace draws: if a workspace is imported statically
+// again its marker moves into the entry script and this fails.
+const WORKSPACE_CHUNKS = {
+  LightingWorkspace: "lighting-stage-lock-note",
+  AudioWorkspace: "audio-monitor-bar",
+  PlanningWorkspace: "planning-unscheduled-tray",
+  SetupSupportPilot: "setup-screen-support",
+} as const;
+
+test("lazy workspace loads", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  await expectWorkspaceMounted(page, "lighting");
+
+  // The active workspace's chunk is asked for once the shell has drawn, the
+  // other three once it is ready and idle.
+  const scriptUrls = () =>
+    page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .map((entry) => entry.name)
+        .filter((name) => name.endsWith(".js"))
+    );
+  for (const chunk of Object.keys(WORKSPACE_CHUNKS)) {
+    await expect.poll(async () => (await scriptUrls()).some((url) => url.includes(`/assets/${chunk}-`))).toBe(true);
+  }
+
+  const entryUrl = await page.evaluate(
+    () => document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.src ?? ""
+  );
+  expect(entryUrl).toContain("/assets/index-");
+  const entrySource = await (await page.request.get(entryUrl)).text();
+  const urls = await scriptUrls();
+  for (const [chunk, marker] of Object.entries(WORKSPACE_CHUNKS)) {
+    const chunkUrl = urls.find((url) => url.includes(`/assets/${chunk}-`));
+    expect(chunkUrl, `${chunk} should be a script of its own`).toBeTruthy();
+    const chunkSource = await (await page.request.get(chunkUrl!)).text();
+    expect(chunkSource, `${chunk} should carry its workspace`).toContain(marker);
+    expect(entrySource, `the entry script should not carry ${chunk}`).not.toContain(marker);
+  }
+
+  // A workspace whose chunk is in hand mounts in the commit that asks for it:
+  // the shell's loading surface is never drawn on the way to the Console.
+  await page.evaluate(() => {
+    const seen = { loading: false };
+    (window as unknown as { __sawWorkspaceLoading: typeof seen }).__sawWorkspaceLoading = seen;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="workspace-loading"]')) seen.loading = true;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await page.keyboard.press(modifierShortcut("Digit3"));
+  await expectWorkspaceMounted(page, "audio");
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __sawWorkspaceLoading: { loading: boolean } }).__sawWorkspaceLoading.loading
+    )
+  ).toBe(false);
 });

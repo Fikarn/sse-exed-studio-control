@@ -44,3 +44,21 @@ export async function openFixture(
   expect(response!.status(), `fixture ${fixtureId} should not fail to load`).toBeLessThan(400);
   expect(page.url()).toContain(`fixture=${fixtureId}`);
 }
+
+// Production readiness S14. Each workspace is a chunk of its own, fetched after
+// the shell has drawn, so `openFixture` returning says nothing about whether
+// the workspace is on screen. A key sent before it has mounted goes to nobody
+// (S13 found two flakes of exactly that shape on the Console's loading
+// surface). A spec whose first step is a key waits for the workspace first.
+// Each mark is an element only the mounted workspace draws: never its loading
+// surface, never the shell's `workspace-loading`.
+const WORKSPACE_MARKS = {
+  setup: "setup-workspace",
+  lighting: "lighting-stage",
+  audio: "audio-monitor-bar",
+  planning: "planning-screen",
+} as const;
+
+export async function expectWorkspaceMounted(page: Page, workspace: keyof typeof WORKSPACE_MARKS) {
+  await expect(page.getByTestId(WORKSPACE_MARKS[workspace])).toBeVisible();
+}

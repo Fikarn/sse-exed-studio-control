@@ -131,14 +131,10 @@ test.describe("UI contract", () => {
   // engaged Held key, the new Recent actions row — may not move a measure the
   // wrong way.
   //
-  // One thing on screen is not this slice's: the pilot's feedback band, which
-  // every plate action shows (Verify latest since Slice 7) and no board ever
-  // has, so nothing measured it until now. It still carries a pre-A gradient
-  // (`SetupSupportPilot.module.css .feedbackBanner`, shared with `.utilityRow`),
-  // which the light census counts as off policy. That is recorded in the
-  // readiness ledger under Slice 11 for the front-end slice that owns it; here
-  // it is allowed by name and by count — the band's test id, exactly once —
-  // so nothing else can come in behind it.
+  // The pilot's feedback band is on screen here (every plate action shows it)
+  // and on no board. Until readiness Slice 14 it carried a pre-A gradient and
+  // this case allowed it by name and count; it is on system A's material now
+  // and is measured like everything else.
   for (const theme of THEMES) {
     test(`setup-ready @ ${theme} holds its ratchet with the light outputs held`, async ({ page }) => {
       const ratchet = RATCHETS[boardName("setup-ready", theme)];
@@ -152,12 +148,7 @@ test.describe("UI contract", () => {
       await page.waitForTimeout(1000);
       const { census, measures, contrast } = await measureBoard(page);
       const offPolicy: string[] = census.light.gradientsOffEls;
-      const bandGradients = offPolicy.filter((element) => element.includes("[setup-feedback]"));
-      expect(bandGradients, "the feedback band's known gradient, once").toHaveLength(1);
-      const problems = checkRatchet(
-        { ...measures, gradientsOff: measures.gradientsOff - bandGradients.length },
-        ratchet!
-      );
+      const problems = checkRatchet(measures, ratchet!);
       const detail = problems.length
         ? `\n${JSON.stringify(measures, null, 1)}\noff-policy gradients: ${offPolicy.join(", ")}\nworst contrast: ${contrast.fails
             .slice(0, 8)

@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Calendar, Mic, Sliders, Sun } from "lucide-react";
 
 import { AppShellFrame } from "@sse/design-system";
@@ -12,7 +12,6 @@ import { OPERATOR_UI_SCALES } from "./operatorLayout";
 import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone, isEditableTarget } from "./shellData";
 import { describeAudioStatus } from "./audio/audioFormatting";
 import { computeLiveSceneDrift } from "./lighting/lightingDrift";
-import { SetupSupportPilot } from "./setup/SetupSupportPilot";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
 import {
   confirmShellClose,
@@ -22,10 +21,7 @@ import {
   switchToWindowedLayout,
 } from "./shellCommands";
 import { useTauriShellTestBridge } from "./tauriShellTestBridge";
-import { AudioWorkspace } from "./audio/AudioWorkspace";
-import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
-import { PlanningWorkspaceSurface } from "./planning/PlanningWorkspace";
 import { BackgroundFailureBand } from "./shared/BackgroundFailureBand";
 import { PaletteProvider, usePalette } from "./shared/paletteContext";
 import { ShellDialog } from "./shared/ShellDialog";
@@ -39,6 +35,8 @@ import { StartupSurface } from "./startup/StartupSurface";
 import { deriveShellExperience } from "./startup/startupHelpers";
 import { WorkspaceCrashProbe } from "./startup/WorkspaceCrashProbe";
 import { WorkspaceErrorBoundary } from "./startup/WorkspaceErrorBoundary";
+import { WorkspaceLoadingSurface } from "./startup/WorkspaceLoadingSurface";
+import { preloadWorkspace, whenIdle, workspaceChunks, WORKSPACE_IDS } from "./workspaceChunks";
 
 type ConfirmIntent = "restart-engine" | "close-window" | null;
 
@@ -429,6 +427,23 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
 
   const shellExperience = deriveShellExperience(shellState);
 
+  // Slice 14 (F26): the workspaces are chunks of their own. This effect runs
+  // after the shell has drawn, so the startup surface is on screen before any
+  // workspace's code is fetched; the hardware link takes longer to start than
+  // a chunk takes to arrive, so the active workspace is in hand at `ready`.
+  useEffect(() => {
+    void preloadWorkspace(activeWorkspace);
+  }, [activeWorkspace]);
+  // The other three follow once the shell is ready and idle: a workspace whose
+  // chunk is in hand mounts in the commit that asks for it, with no loading
+  // surface in between.
+  useEffect(() => {
+    if (shellExperience !== "ready") return undefined;
+    return whenIdle(() => {
+      for (const workspaceId of WORKSPACE_IDS) void preloadWorkspace(workspaceId);
+    });
+  }, [shellExperience]);
+
   // CHROME-08: pre-ready surfaces (startup / recovery / setup-recovery) have no
   // bottom footer, so the toast portal (mounted at document.body) should dock at
   // the true edge rather than reserve the health-bar offset. The toast lives
@@ -509,6 +524,11 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         ? "Recovery"
         : "Startup";
 
+  const SetupSurface = workspaceChunks.setup.Surface;
+  const LightingSurface = workspaceChunks.lighting.Surface;
+  const AudioSurface = workspaceChunks.audio.Surface;
+  const PlanningSurface = workspaceChunks.planning.Surface;
+
   let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
     surface = (
@@ -522,7 +542,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
     surface = <StartupSurface lifecycle={shellState.lifecycle} onShowShortcuts={showShortcuts} />;
   } else if (setupModalActive && shellExperience === "ready") {
     surface = (
-      <SetupSupportPilot
+      <SetupSurface
         appSnapshot={shellState.appSnapshot}
         commissioningSnapshot={shellState.commissioningSnapshot}
         controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
@@ -559,7 +579,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
     );
   } else if (activeWorkspace === "lighting") {
     surface = (
-      <LightingWorkspaceSurface
+      <LightingSurface
         appSnapshot={shellState.appSnapshot}
         lightingFixtureCatalogSnapshot={deferredLightingFixtureCatalogSnapshot}
         lightingDmxMonitorSnapshot={deferredLightingDmxMonitorSnapshot}
@@ -569,7 +589,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
     );
   } else if (activeWorkspace === "audio") {
     surface = (
-      <AudioWorkspace
+      <AudioSurface
         appSnapshot={shellState.appSnapshot}
         audioSnapshot={deferredAudioSnapshot}
         store={environment.store}
@@ -577,7 +597,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
     );
   } else {
     surface = (
-      <PlanningWorkspaceSurface
+      <PlanningSurface
         appSnapshot={shellState.appSnapshot}
         planningSnapshot={deferredPlanningSnapshot}
         store={environment.store}
@@ -624,7 +644,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
             {shellExperience === "ready" && environment.crashWorkspace === activeWorkspace ? (
               <WorkspaceCrashProbe area={areaLabel} />
             ) : null}
-            {surface}
+            <Suspense fallback={<WorkspaceLoadingSurface area={areaLabel} />}>{surface}</Suspense>
           </WorkspaceErrorBoundary>
         </div>
       </AppShellFrame>

@@ -45,7 +45,7 @@ import {
   readMeterCanvasSample,
 } from "./helpers/meter-canvas";
 import { modifierShortcut } from "./helpers/modifier-shortcut";
-import { fixtureMap, openFixture } from "./helpers/openFixture";
+import { expectWorkspaceMounted, fixtureMap, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
 import { audioPaletteSignatureForSnapshot, cloneValue } from "./helpers/view-models";
 
@@ -655,6 +655,8 @@ test("does not refresh audio snapshots for meter-only ticks", async ({ page }) =
     window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ = {};
   });
   await openFixture(page, "audio-populated");
+  // S14: a baseline read once, so it is read with the Console on screen.
+  await expectWorkspaceMounted(page, "audio");
 
   const initialAudioSnapshotRequests = await page.evaluate(
     () => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.snapshot"] ?? 0
@@ -680,6 +682,7 @@ test("switches audio output targets without a full-domain refresh", async ({ pag
     window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ = {};
   });
   await openFixture(page, "audio-populated");
+  await expectWorkspaceMounted(page, "audio");
 
   const initialCounts = await page.evaluate(() => ({ ...window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ }));
   await page.getByTestId("audio-output-audio-mix-phones-a").click();
@@ -1483,6 +1486,7 @@ test("supports engine-backed audio send mode controls", async ({ page }) => {
 test("supports audio command palette and shortcut overlay parity", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
+  await expectWorkspaceMounted(page, "audio");
   await page.keyboard.press(modifierShortcut("K"));
   const palette = page.getByRole("dialog", { name: "Command palette" });
   const commandInput = page.getByPlaceholder(/Type a command/i);
@@ -1562,6 +1566,7 @@ test("snapshot recall reports the push and lists 48V differences without touchin
 test("audio command palette snapshot recall arms before applying", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
+  await expectWorkspaceMounted(page, "audio");
   await page.keyboard.press(modifierShortcut("K"));
   await page.getByPlaceholder(/Type a command/i).fill("snapshot 1");
   await page.getByRole("option", { name: /Recall snapshot 1/ }).click();
@@ -1645,6 +1650,7 @@ test("prefers live-console level fields in compact audio meter entries", () => {
 test("audio workspace custom faders drag and accept numeric dB entry", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
+  await expectWorkspaceMounted(page, "audio");
   await page.keyboard.press(modifierShortcut("K"));
   await page.getByPlaceholder(/Type a command/i).fill("reset selected audio");
   await expect(page.getByText(/Reset selected fader/i)).toBeVisible();

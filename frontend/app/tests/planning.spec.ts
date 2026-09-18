@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { openFixture } from "./helpers/openFixture";
+import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: planning workspace specs split out of
 // operator-shell.spec.ts. Covers timeline, board, the plate, reschedule + drag
@@ -71,6 +71,7 @@ test("supports retained planning board drag reorder and status moves", async ({ 
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
+  await expectWorkspaceMounted(page, "planning");
   await page.keyboard.press("Shift+KeyB");
 
   const inProgressColumn = workspace.getByTestId("planning-board-column-in-progress");
@@ -96,6 +97,7 @@ test("moves a planning board card across status columns from the keyboard", asyn
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
+  await expectWorkspaceMounted(page, "planning");
   await page.keyboard.press("Shift+KeyB");
 
   const inProgressColumn = workspace.getByTestId("planning-board-column-in-progress");
@@ -121,6 +123,7 @@ test("reorders a planning board card within its column from the keyboard", async
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
+  await expectWorkspaceMounted(page, "planning");
   await page.keyboard.press("Shift+KeyB");
 
   const inProgressColumn = workspace.getByTestId("planning-board-column-in-progress");
@@ -139,6 +142,7 @@ test("selects a planning board card with Enter from the keyboard", async ({ page
   await openFixture(page, "planning-populated");
 
   const workspace = page.getByTestId("planning-workspace");
+  await expectWorkspaceMounted(page, "planning");
   await page.keyboard.press("Shift+KeyB");
 
   // proj-booth-2 is the seeded selection; selecting another card via the

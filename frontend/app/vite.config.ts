@@ -12,6 +12,12 @@ export default defineConfig({
   plugins: [react()],
   build: {
     chunkSizeWarningLimit: 900,
+    // 2026-09 production readiness, Slice 14 (finding F26): the workspaces are
+    // chunks of their own (`src/app/workspaceChunks.ts`), and the stylesheet is
+    // deliberately NOT split with them. Split styles are appended when their
+    // chunk arrives, so which of two equally specific rules wins would depend
+    // on which workspace the operator opened first. One stylesheet, one order.
+    cssCodeSplit: false,
     rolldownOptions: {
       output: {
         manualChunks(id) {

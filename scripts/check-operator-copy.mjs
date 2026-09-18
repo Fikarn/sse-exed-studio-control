@@ -61,6 +61,9 @@ const SKIP_ATTRIBUTES = new Set(["className", "data-testid", "id", "key", "href"
 // double — its strings stand in for what the Rust process would say, never run
 // on the workstation, and are the engine copy pass's (F4) to rename.
 export const SKIP_FILES = new Set(["frontend/packages/engine-client/src/transports/fixtureTransport.ts"]);
+// Readiness Slice 14 split that double by domain; its modules are under `fixture/`
+// beside it and are skipped for the same reason. Nothing else may live there.
+export const SKIP_DIRECTORIES = ["frontend/packages/engine-client/src/transports/fixture/"];
 
 export const DEFAULT_ROOTS = [
   "frontend/app/src",
@@ -145,7 +148,7 @@ export function scanRoots(repoRoot, roots) {
     const dir = path.join(repoRoot, root);
     for (const file of walk(dir)) {
       const relative = path.relative(repoRoot, file).split(path.sep).join("/");
-      if (SKIP_FILES.has(relative)) continue;
+      if (SKIP_FILES.has(relative) || SKIP_DIRECTORIES.some((directory) => relative.startsWith(directory))) continue;
       hits.push(...scanSource(readFileSync(file, "utf8"), relative));
     }
   }

@@ -4,26 +4,11 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 const MAX_SOURCE_LINES = 2_000;
 const MAX_TRACKED_FILE_BYTES = 1_500_000;
 
-const oversizedSourceAllowlist = new Map(
-  [
-    [
-      "frontend/packages/engine-client/src/transports/fixtureTransport.ts",
-      "fixture transport keeps all browser-side protocol simulation in one test-only boundary; split when the next transport feature touches it",
-    ],
-    [
-      "frontend/app/src/app/audio/AudioWorkspace.module.css",
-      "audio desk styling landed as one parity pass; split by rail/mixer/inspector during the next audio UI change",
-    ],
-    [
-      "native/rust-engine/src/lighting/tests.rs",
-      "lighting integration tests deliberately cover engine-owned fixture, scene, preview, and DMX behavior together",
-    ],
-    [
-      "frontend/app/src/app/lighting/LightingWorkspace.tsx",
-      "lighting orchestrator remains the selected workspace assembly point; keep extracting components as features touch it",
-    ],
-  ].map(([path, reason]) => [path, reason])
-);
+// 2026-09 production readiness, Slice 14 (finding F26): there is no allowlist for
+// oversized source files. There used to be one, it only ever grew, and it was
+// how a 3,170-line component stayed green. The last four entries were split in
+// Slice 14; a source file over the limit is split, not excused.
+// `scripts/file-health.test.mjs` holds the guard to that.
 
 const largeFileAllowlist = new Map([
   [
@@ -53,7 +38,6 @@ function lineCount(filePath) {
 
 const sourceViolations = [];
 const largeFileViolations = [];
-const allowedLargeSources = [];
 const allowedLargeFiles = [];
 
 for (const filePath of gitTrackedFiles()) {
@@ -81,19 +65,7 @@ for (const filePath of gitTrackedFiles()) {
     continue;
   }
 
-  const reason = oversizedSourceAllowlist.get(filePath);
-  if (reason) {
-    allowedLargeSources.push({ filePath, lines, reason });
-  } else {
-    sourceViolations.push({ filePath, lines });
-  }
-}
-
-if (allowedLargeSources.length > 0) {
-  console.log("Allowed oversized source files:");
-  for (const entry of allowedLargeSources) {
-    console.log(`- ${entry.filePath}: ${entry.lines} lines (${entry.reason})`);
-  }
+  sourceViolations.push({ filePath, lines });
 }
 
 if (allowedLargeFiles.length > 0) {
@@ -107,7 +79,7 @@ if (allowedLargeFiles.length > 0) {
 if (sourceViolations.length > 0 || largeFileViolations.length > 0) {
   for (const violation of sourceViolations) {
     console.error(
-      `Source file exceeds ${MAX_SOURCE_LINES} lines and is not allowlisted: ${violation.filePath} (${violation.lines} lines)`
+      `Source file exceeds ${MAX_SOURCE_LINES} lines: ${violation.filePath} (${violation.lines} lines). Split it; there is no allowlist for source files.`
     );
   }
   for (const violation of largeFileViolations) {

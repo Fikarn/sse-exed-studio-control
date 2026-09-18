@@ -113,19 +113,13 @@
     justify-content: space-between;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-screen);
-    background:
-      linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--color-surface-800) 94%, transparent),
-        color-mix(in srgb, var(--color-surface-700) 92%, transparent)
-      ),
-      radial-gradient(
-        circle at top right,
-        color-mix(in srgb, var(--color-primary-500) 12%, transparent),
-        transparent 56%
-      );
+    /* 2026-09 production readiness, Slice 14: the band is on system A's material
+       now, the one the design system's StatusBand is made of. It carried a pre-A
+       gradient pair that no board ever showed, so nothing measured it until
+       Slice 11's held-state case pressed a key that raises it. */
+    border: 1px solid var(--color-surface-border);
+    border-radius: var(--radius-key);
+    background: var(--color-surface-raised);
   }
 
   .degradedBanner {
