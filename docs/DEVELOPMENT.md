@@ -408,6 +408,8 @@ npm run clean:local
 
 `clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It intentionally does not remove `.tools/`.
 
+**The packaged app is kept.** `release/` is not only build output: on a workstation that runs Studio Control from the repository — the studio workstation does — `release/native/<platform>/` is the installed app, and nothing in the repository can rebuild that exact build. Both commands therefore keep the whole `release/native` folder whenever a packaged shell or engine executable is anywhere inside it (a `windows.production-keep` folder left by a packaging lane counts), remove everything else as before — the other children of `release/` included — and say what they kept, with each file's size and date. `npm run clean -- --include-release` (or `clean:local`) removes the app as well; it refuses, before removing anything at all, while a process is running from that folder or when the running processes cannot be listed. `--dry-run` prints what would happen and removes nothing. A mistyped option stops the command instead of falling back to a plain clean. Until 2026-09-18 both commands deleted `release/` whole, the installed app with it; `scripts/clean.test.mjs` holds the rule, in temporary directories only. `scripts/native-package.mjs` is a different matter and is **not** guarded: it rebuilds `release/native/<platform>` by design, so on the workstation it runs only with that folder moved aside first (the procedure in the production readiness ledger).
+
 ## Recommended Development Rules
 
 ### 1. Always preserve working software

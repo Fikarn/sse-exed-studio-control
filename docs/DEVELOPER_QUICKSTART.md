@@ -226,6 +226,8 @@ npm run clean:local
 
 `clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It does not remove `.tools/`.
 
+Both commands keep `release/native` when a packaged app is in it — on a workstation that runs Studio Control from the repository that folder is the installed app — and say so. `npm run clean -- --include-release` removes it too, and refuses while the app is running; `--dry-run` removes nothing. Details in [DEVELOPMENT.md §4a](./DEVELOPMENT.md).
+
 ## Dependency Policy
 
 The active baseline is Node 24 LTS and TypeScript 6.0. Dependabot is allowed to propose routine npm and Cargo maintenance updates, but major TypeScript and `@types/node` upgrades are intentional engineering tasks, not background merges.

@@ -54,7 +54,7 @@ These run during foundation and visual-review lanes.
 
 Lower-blast-radius helpers. Tests are nice-to-have.
 
-- `clean.mjs`
+- `clean.mjs` — `clean.test.mjs` (2026-09-18). Not low-blast-radius after all: until then it deleted `release/` whole, and on the studio workstation `release/native/windows` is the installed app. It now keeps `release/native` when a packaged executable is in it, needs `--include-release` to remove it, and refuses while a process runs from the folder — one test starts a real process from a temp-dir app folder. Every test works in a temporary root; `clean()` has no default root.
 - `dev-doctor.mjs`
 - `file-health.mjs` _(covered by the `file:health` lane itself)_
 
