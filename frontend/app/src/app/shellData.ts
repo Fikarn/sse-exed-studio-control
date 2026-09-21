@@ -625,6 +625,16 @@ function statusLabelFor(check: { status?: string } | undefined, fallback: string
       // Slice 8 (system §9): one word per state — "passed" and "ok" are the
       // same healthy subsystem, and the header said them two different ways.
       return "ready";
+    case "ready":
+      // The hardware link's own words (see `healthCheckTone`).
+      return "ready";
+    case "not-verified":
+      return "not verified";
+    case "unconfigured":
+      return "not set up";
+    case "disabled":
+    case "unavailable":
+      return check.status;
     case "info":
     case "idle":
     case "attention":
@@ -632,6 +642,29 @@ function statusLabelFor(check: { status?: string } | undefined, fallback: string
       return check.status;
     default:
       return fallback;
+  }
+}
+
+/** The tone of a health check in the header. The hardware link reports its
+ *  subsystems in words of its own — audio and lighting `ready` /
+ *  `not-verified` / `attention` (lighting also `unconfigured` / `disabled`),
+ *  the Stream Deck bridge `ready` / `unavailable` — while the fixture double
+ *  says `ok` / `attention`. Until 2026-09-21 only the fixture's words were
+ *  mapped, so on the workstation a healthy Audio, Lighting and Deck all read as
+ *  a yellow "pending". */
+export function healthCheckTone(status: unknown): StatusToneLike {
+  switch (status) {
+    case "ready":
+    case "passed":
+      return "ok";
+    case "not-verified":
+    case "unconfigured":
+    case "disabled":
+      return "attention";
+    case "unavailable":
+      return "error";
+    default:
+      return asStatusTone(status, "attention");
   }
 }
 
@@ -699,7 +732,7 @@ export function buildMonitorItems(
     check: { status?: string } | undefined,
     workspace: WorkspaceStateTone | null | undefined
   ) => {
-    const health = asStatusTone(check?.status, "attention");
+    const health = healthCheckTone(check?.status);
     const tone = toneForSubsystem(health, workspace?.tone ?? null) as StatusToneLike;
     const workspaceWorse = workspace
       ? TONE_RANK[workspace.tone] > TONE_RANK[health] ||
@@ -724,7 +757,7 @@ export function buildMonitorItems(
       // Surface's pending dot blue and the others yellow on the same page,
       // even though all three were semantically "pending". Aligning on
       // "attention" makes the three pills agree on tone for the same state.
-      status: asStatusTone(checks.controlSurface?.status, "attention"),
+      status: healthCheckTone(checks.controlSurface?.status),
     },
   ] as Array<{
     id: string;

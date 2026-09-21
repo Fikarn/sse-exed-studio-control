@@ -54,3 +54,76 @@ describe("the Lighting lamp and held light outputs", () => {
     expect(lamp.detail).not.toBe("held");
   });
 });
+
+// 2026-09-21: the header lamps must read the hardware link's own health words.
+// The fixture double says `ok` / `attention`; the engine says `ready`,
+// `not-verified`, `attention` (audio and lighting, which also say
+// `unconfigured` / `disabled`) and `ready` / `unavailable` (the Stream Deck
+// bridge, `native/rust-engine/src/control_surface_http.rs`). Only the fixture's
+// words were mapped, so on the workstation a verified Audio, a probed Lighting
+// and a serving Deck all showed a yellow "pending". These cases are written in
+// the engine's words, from `audio/snapshot.rs`, `lighting/snapshot.rs` and
+// `control_surface_http.rs`, not from what the header happens to produce.
+describe("the header lamps read the hardware link's own words", () => {
+  function lamps(checks: Record<string, { status: string }>) {
+    const items = buildMonitorItems({ checks }, undefined, undefined);
+    const byId = (id: string) => {
+      const item = items.find((entry) => entry.id === id);
+      if (!item) throw new Error(`the ${id} lamp is missing`);
+      return { detail: item.detail, status: item.status };
+    };
+    return { audio: byId("audio"), lighting: byId("lighting"), deck: byId("surface") };
+  }
+
+  it("a subsystem the hardware link calls ready is ready and green, never pending", () => {
+    const healthy = lamps({
+      audio: { status: "ready" },
+      lighting: { status: "ready" },
+      controlSurface: { status: "ready" },
+    });
+    expect(healthy.audio).toEqual({ detail: "ready", status: "ok" });
+    expect(healthy.lighting).toEqual({ detail: "ready", status: "ok" });
+    expect(healthy.deck).toEqual({ detail: "ready", status: "ok" });
+  });
+
+  it("a probe that has not run says so, in the attention tone", () => {
+    const unprobed = lamps({ audio: { status: "not-verified" }, lighting: { status: "not-verified" } });
+    expect(unprobed.audio).toEqual({ detail: "not verified", status: "attention" });
+    expect(unprobed.lighting).toEqual({ detail: "not verified", status: "attention" });
+  });
+
+  it("lighting that is not set up or is switched off says which", () => {
+    expect(lamps({ lighting: { status: "unconfigured" } }).lighting).toEqual({
+      detail: "not set up",
+      status: "attention",
+    });
+    expect(lamps({ lighting: { status: "disabled" } }).lighting).toEqual({
+      detail: "disabled",
+      status: "attention",
+    });
+  });
+
+  it("a Stream Deck bridge that could not start is an error", () => {
+    expect(lamps({ controlSurface: { status: "unavailable" } }).deck).toEqual({
+      detail: "unavailable",
+      status: "error",
+    });
+  });
+
+  it("a failed probe is still attention, and a missing check is still pending", () => {
+    expect(lamps({ audio: { status: "attention" } }).audio).toEqual({ detail: "attention", status: "attention" });
+    expect(lamps({}).audio).toEqual({ detail: "pending", status: "attention" });
+    expect(lamps({}).deck).toEqual({ detail: "pending", status: "attention" });
+  });
+
+  it("the fixture double's words keep what they showed", () => {
+    const fixture = lamps({
+      audio: { status: "ok" },
+      lighting: { status: "attention" },
+      controlSurface: { status: "ok" },
+    });
+    expect(fixture.audio).toEqual({ detail: "ready", status: "ok" });
+    expect(fixture.lighting).toEqual({ detail: "attention", status: "attention" });
+    expect(fixture.deck).toEqual({ detail: "ready", status: "ok" });
+  });
+});
