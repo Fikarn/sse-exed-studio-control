@@ -136,13 +136,17 @@ test("the repository's own list names real tests (date not judged here)", () => 
 // no server, and SSE_PLAYWRIGHT_QUARANTINE_LIST points it at a list of this
 // test's own. Until S15 an empty list made `new RegExp("")`, which matches every
 // title: the `default` project — the one CI fails on — listed nothing.
+// Only one spec is listed: loading every spec would need the builds some of them
+// read at load time (`storybook.spec.ts` reads `storybook-static/index.json`),
+// which the `format-protocol` job does not have.
 const appDir = path.join(scriptsDir, "..", "frontend", "app");
 const playwrightCli = createRequire(import.meta.url).resolve("@playwright/test/cli");
+const LISTED_SPEC = "audio-render-budget.spec.ts";
 
 function listedInProject(listPath, project) {
   const result = spawnSync(
     process.execPath,
-    [playwrightCli, "test", "--list", `--project=${project}`, "--pass-with-no-tests"],
+    [playwrightCli, "test", "--list", `--project=${project}`, "--pass-with-no-tests", `tests/${LISTED_SPEC}`],
     { cwd: appDir, encoding: "utf8", env: { ...process.env, SSE_PLAYWRIGHT_QUARANTINE_LIST: listPath } }
   );
   assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -156,12 +160,12 @@ test("an empty list quarantines nothing, and a listed case moves from default to
   const empty = path.join(root, "empty.json");
   writeFileSync(empty, list([], { exit: null }));
   const inDefault = listedInProject(empty, "default");
-  assert.ok(inDefault > 0, "with nothing quarantined the default project must list the suite");
+  assert.ok(inDefault > 1, `with nothing quarantined the default project must list every case of ${LISTED_SPEC}`);
   assert.equal(listedInProject(empty, "quarantine"), 0);
 
   const one = path.join(root, "one.json");
   const title = "idle meter ticks do not bump the audio inspector render counter";
-  writeFileSync(one, list([entry({ file: "audio-render-budget.spec.ts", title })]));
+  writeFileSync(one, list([entry({ file: LISTED_SPEC, title })]));
   assert.equal(listedInProject(one, "default"), inDefault - 1);
   assert.equal(listedInProject(one, "quarantine"), 1);
 });
