@@ -1041,6 +1041,12 @@ impl ConsoleLinkState {
         self.pending.len()
     }
 
+    /// Read-backs still waiting for their replies to go quiet.
+    #[cfg(test)]
+    pub fn outstanding_count(&self) -> usize {
+        self.outstanding.len()
+    }
+
     #[cfg(test)]
     pub fn has_pending(&self, key: &ParamKey) -> bool {
         self.pending.contains_key(key)

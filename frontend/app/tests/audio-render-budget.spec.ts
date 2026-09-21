@@ -1,29 +1,58 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function openFixture(page: Page, fixtureId: string) {
-  const params = new URLSearchParams({ fixture: fixtureId, transport: "fixture" });
-  const response = await page.goto(`/?${params.toString()}`);
-  expect(response).not.toBeNull();
-  expect(response!.status()).toBeLessThan(400);
-}
+import { AUDIO_RECALL_PULSE_MS } from "../src/app/audio/audioConstants";
+import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
+
+const SETTLE_TIMEOUT_MS = 20_000;
 
 async function getInspectorRenderCount(page: Page) {
   return page.evaluate(() => window.__SSE_TEST_RENDER_COUNTS__?.audioInspector ?? null);
 }
 
-test("idle meter ticks do not bump the audio inspector render counter", async ({ page }) => {
+// Production readiness S15. Old: both cases waited out the Console's start-up
+// renders with a fixed 500 ms window after `audio-workspace` appeared, then took
+// their baseline. New: they wait for what ends those renders. Reason: the
+// Console renders three times as it starts — its mount, then the recall pulse
+// on the snapshot key the fixture says was just recalled, then that pulse's end
+// on a 1.5 s timer (AUDIO_RECALL_PULSE_MS) — and `audio-workspace` is also the
+// id of the Console's loading surface. On a loaded machine the baseline was
+// read before the mount or before the pulse ended, and the rest of the burst
+// was counted in the idle window; with the burst over, an idle Console renders
+// nothing, on any machine. The pulse is recorded in the page as it happens, so
+// no read from here can miss it.
+async function openSettledConsole(page: Page, fixtureId: string) {
   await page.addInitScript(() => {
     window.__SSE_TEST_RENDER_COUNTS__ = {};
+    const pulse = { started: false, ended: false };
+    (window as unknown as { __SSE_TEST_RECALL_PULSE__: typeof pulse }).__SSE_TEST_RECALL_PULSE__ = pulse;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        if ((record.target as Element).getAttribute("data-flash") === "true") pulse.started = true;
+        else if (pulse.started) pulse.ended = true;
+      }
+    }).observe(document, { attributeFilter: ["data-flash"], subtree: true });
   });
-  await openFixture(page, "audio-populated");
-  await page.getByTestId("audio-workspace").waitFor();
-  // plan PR 5 / D8 flake sweep: this `waitForTimeout` is load-bearing —
-  // it's measuring the *initial render burst* that completes within a
-  // fixed wall-clock window. Replacing with a deterministic predicate
-  // would either over-count (poll-driven re-renders) or under-count
-  // (settle before the burst is finished). 500ms covers the documented
-  // 1-render baseline plus jitter.
-  await page.waitForTimeout(500);
+  await openFixture(page, fixtureId);
+  // Nothing is measured yet, so these two waits can be as long as a slow
+  // machine needs (the old `waitFor()` also waited out the test's own time).
+  await expectWorkspaceMounted(page, "audio", { timeout: SETTLE_TIMEOUT_MS });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __SSE_TEST_RECALL_PULSE__?: { ended: boolean } }).__SSE_TEST_RECALL_PULSE__?.ended
+        ),
+      {
+        message: `${fixtureId}: the recall pulse the Console starts at mount (the fixture double's snapshot was just recalled) should come and go`,
+        timeout: AUDIO_RECALL_PULSE_MS + SETTLE_TIMEOUT_MS,
+      }
+    )
+    .toBe(true);
+}
+
+test("idle meter ticks do not bump the audio inspector render counter", async ({ page }) => {
+  await openSettledConsole(page, "audio-populated");
 
   const baseline = await getInspectorRenderCount(page);
   expect(baseline, "audioInspector counter should be initialised by the inspector mount").not.toBeNull();
@@ -46,6 +75,8 @@ test("idle meter ticks do not bump the audio inspector render counter", async ({
   // re-render storm bumps the counter by 100+ in 1.5 s) while keeping
   // the budget tight enough to flag subtle drift the previous ≤ 10
   // budget would have hidden.
+  // Production readiness S15: that 1 was the recall pulse ending inside the
+  // window; with the start-up renders waited out the measured Δ is 0.
   expect(delta).toBeLessThanOrEqual(3);
 });
 
@@ -55,14 +86,7 @@ test("moving between plate sections does not multiply the audio inspector render
   // `aria-selected`. New: the accelerators move the plate between its sections.
   // Reason: the plate has no tab row; the same keys are the way around it, and
   // the budget they must stay inside is the same.
-  await page.addInitScript(() => {
-    window.__SSE_TEST_RENDER_COUNTS__ = {};
-  });
-  await openFixture(page, "audio-selected-channel");
-  await page.getByTestId("audio-workspace").waitFor();
-  // plan PR 5 / D8: load-bearing initial-burst settle (see twin comment
-  // in the test above).
-  await page.waitForTimeout(500);
+  await openSettledConsole(page, "audio-selected-channel");
 
   const baseline = await getInspectorRenderCount(page);
   expect(baseline).not.toBeNull();

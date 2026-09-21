@@ -1,24 +1,5 @@
 {
-  "exit": "2026-10-31",
-  "rule": "A case belongs here only when what it asserts is a wall-clock measurement, so a loaded runner can fail it with no defect behind the failure. A case that fails for a reason that can be found is fixed instead (production readiness S13 found and fixed five). By the exit date every case below is made independent of the runner's speed and returned to the default project, or deleted with the reason written down; scripts/check-playwright-quarantine.mjs fails the frontend-e2e job after that day.",
-  "cases": [
-    {
-      "file": "audio-render-budget.spec.ts",
-      "title": "idle meter ticks do not bump the audio inspector render counter",
-      "reason": "Counts inspector renders in two fixed windows (500 ms for the start-up burst, then 1.5 s idle); on a loaded machine the burst's tail falls into the idle window and the budget of 3 is spent with no render storm.",
-      "seen": "docs/DEVELOPMENT.md 2c as visual overhaul A wrote it (production readiness S13 replaced the sentence): flakes under full-suite parallel load on the workstation and passes in isolation; never on CI in the branch's first thirty runs."
-    },
-    {
-      "file": "audio-render-budget.spec.ts",
-      "title": "moving between plate sections does not multiply the audio inspector render count",
-      "reason": "Same measurement as the idle case: a 500 ms settle window before the baseline is read, then a render budget across the section accelerators.",
-      "seen": "docs/DEVELOPMENT.md 2c as visual overhaul A wrote it (production readiness S13 replaced the sentence): flakes under full-suite parallel load on the workstation and passes in isolation; never on CI in the branch's first thirty runs."
-    },
-    {
-      "file": "audio.spec.ts",
-      "title": "marks simulated audio metering as test-stage movement",
-      "reason": "Waits up to 5 s of real time for four independently seeded simulated meters to read as more than one level. The levels move on the fixture's metering interval; on an overloaded runner all four read as one level for the whole window. Not pinned further: the failing attempt's trace was not read.",
-      "seen": "CI run 34514042594, first attempt (2026-09-10): one level for 5 s on a runner that also took 28.65 s for the 8 s engine suite; green on the re-run and on every run since."
-    }
-  ]
+  "exit": null,
+  "rule": "A case belongs here only when what it asserts is a wall-clock measurement, so a loaded runner can fail it with no defect behind the failure. A case that fails for a reason that can be found is fixed instead (production readiness S13 found and fixed five; S15 found the cause of the last three and emptied this list). A listed case carries an exit date at most 90 days out, and by that date it is made independent of the runner's speed and returned to the default project, or deleted with the reason written down; scripts/check-playwright-quarantine.mjs fails the frontend-e2e job after that day.",
+  "cases": []
 }

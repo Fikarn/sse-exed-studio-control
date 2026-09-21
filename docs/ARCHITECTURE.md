@@ -80,7 +80,15 @@ Any native studio domain should follow the same shape:
 - `native/rust-engine/src/audio/`: audio snapshot, sync, recall, and simulated backend boundary
 - `native/rust-engine/src/support.rs`: backup, restore, and diagnostics support flows
 - `native/rust-engine/src/control_surface.rs`: Stream Deck bridge and Companion export generation
-- `frontend/app/src/app/OperatorShell.tsx`: Tauri operator shell surface derived from engine state
+- `native/rust-engine/src/control_surface_http.rs`: the bridge's HTTP reader, bearer-token authorization and worker pool (2026-09 production readiness, Slice 2)
+- `native/rust-engine/src/storage.rs`, `storage_backups.rs`: SQLite storage, schema migrations, the integrity check at start and the verified database backups (Slice 3)
+- `native/rust-engine/src/health.rs`: the health registry `health.snapshot` derives its status from (Slice 8)
+- `native/rust-engine/src/lighting/state_lock.rs`, `lighting/output_arming.rs`, `lighting_sacn_output.rs`: the one lighting lock, preview and render generation; held light outputs; the sACN output (Slices 10, 11)
+- `native/rust-engine/src/action_log.rs`: the action log with sources (Slice 11); `engine_events.rs` sends protocol events
+- `native/rust-engine/src/rme_totalmix_osc.rs`, `rme_console_link.rs`, `audio/console_link.rs`: TotalMix metering and its ingress rule, the console link that confirms every send
+- `native/tauri-shell/src/engine.rs`, `shell_log.rs`: the engine process, its exit watcher and restart hand-off, the shell's copy of its stderr (Slices 5, 8)
+- `frontend/packages/engine-client/src/store/`: the shell store, the domain-scoped refresh (`domainRefresh.ts`) and the reply guards (`snapshotGuards.ts`) (Slice 9)
+- `frontend/app/src/app/OperatorShell.tsx`: Tauri operator shell surface derived from engine state; each workspace is a chunk of its own (`workspaceChunks.ts`, Slice 14) — the map is in `docs/DEVELOPMENT.md` §2c, "Front-end map"
 
 ## Refactor Rule
 

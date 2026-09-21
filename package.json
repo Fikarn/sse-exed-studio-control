@@ -57,7 +57,7 @@
     "frontend:fixtures:check": "npm run fixtures:check --workspace frontend/packages/test-fixtures",
     "frontend:playwright:test": "npm run build --workspace frontend/app && npm run frontend:storybook:build && npm run playwright:test --workspace frontend/app",
     "frontend:playwright:test:blocking": "npm run build --workspace frontend/app && npm run frontend:storybook:build && npm run playwright:test --workspace frontend/app -- --project=default",
-    "frontend:playwright:test:quarantine": "npm run playwright:test --workspace frontend/app -- --project=quarantine",
+    "frontend:playwright:test:quarantine": "npm run playwright:test --workspace frontend/app -- --project=quarantine --pass-with-no-tests",
     "frontend:playwright:quarantine:check": "node scripts/check-playwright-quarantine.mjs",
     "frontend:foundation": "npm run protocol:generate && npm run frontend:tokens:build && npm run frontend:typecheck && npm run frontend:storybook:build && npm run frontend:fixtures:check && npm run frontend:playwright:test",
     "tauri:dev": "npm run tauri:dev --workspace frontend/app",

@@ -204,6 +204,7 @@
 }
 
 .inspectorSubtitle {
+  display: block;
   font-family: var(--font-mono);
   font-size: var(--font-size-tick);
   color: var(--fg-3);

@@ -157,6 +157,8 @@ Required selected-runtime workflow:
 
 Treat raw window width alone as an invalid authority for operator layout. The primary target is fullscreen `2560x1440` on the permanent second monitor.
 
+**Operator ruling, 2026-09-18: only the Windows build and only `2560x1440` matter.** The Linux and macOS captures, the macOS release-evidence runner and the smaller-viewport guards (`audio-legibility`, `viewport-contract`, the captures below `2560x1440`) stay where they are, but nobody works on them: if one turns red for a reason that is not also a Windows `2560x1440` reason, say so, record it, and move on — and ask before deleting such a guard. The win32 gates at `2560x1440` (the 81 UI-contract boards, the win32 visual-review and Storybook captures, both Tauri qualification lanes on the workstation) are the ones that count.
+
 Responsive operator modes are based on logical viewport/CSS pixels, not physical monitor pixels or Retina/Windows backing scale:
 
 - `studioFull`: `>=1920x1080`, the full live-operation rail/stage/inspector layout.
@@ -294,6 +296,22 @@ npm run test --workspace @sse/design-system          # incl. the CSS-literal all
   (wait for the control the key belongs to), a field read once straight after the
   pointer came up (wait for it to move). Only a wall-clock measurement goes on the
   quarantine list — see "Quarantined Playwright cases" under §4.
+- Each workspace is a chunk of its own (production readiness S14), fetched after
+  the shell has drawn, so `openFixture` returning says nothing about whether the
+  workspace is on screen. A spec whose first step after `openFixture` is a key or
+  a one-shot DOM read calls `expectWorkspaceMounted(page, workspace)` first
+  (`tests/helpers/openFixture.ts`; it waits for a mark only the mounted workspace
+  draws). `data-testid="audio-workspace"` is also on the Console's loading
+  surface — never wait for that id to mean "the Console is up".
+- A value that depends on the page's clock is pinned or driven, never waited out
+  (S15). The fixture double's simulated meters are a function of `Date.now()`, and
+  the four strip levels are the Console's audio state as it was fetched at start —
+  they do not move with the meter ticks, only the painter's canvas does; a timer
+  that ends something (the recall pulse, 1.5 s) is waited for by what it ends. Use
+  `page.clock.install()` before `openFixture`, `pausePageClock(page)` once the
+  workspace is mounted, then `page.clock.runFor(...)` to run the metering
+  interval and the painter's frames; `audio-metering.spec.ts` and
+  `audio-render-budget.spec.ts` are the worked examples.
 
 **Fixtures.** Every board is a fixture id from
 `frontend/packages/test-fixtures/src/fixtures.json`, and any of them opens in the
@@ -309,6 +327,37 @@ npm run preview --workspace @sse/frontend-app -- --host 127.0.0.1 --port 4180 --
 
 Use a port other than `4173`: Playwright binds that one with `--strictPort` and
 will fail to start if you are holding it.
+
+**Front-end map** (after production readiness S14). The shell is
+`frontend/app/src/app/OperatorShell.tsx`; each workspace is a chunk cut by the four
+`import()` calls in `workspaceChunks.ts` (the active one is fetched after the
+shell's first draw, the other three at idle once ready; the fallback is
+`startup/WorkspaceLoadingSurface.tsx`, test id `workspace-loading`). There is
+deliberately no `manualChunks` rule by folder, and `build.cssCodeSplit` is `false`
+so rule order never depends on which workspace opened first. The three large
+workspaces are assemblers:
+
+- Lighting — `lighting/LightingWorkspace.tsx` over `lighting/useLightingEditor.ts`,
+  which composes the six hooks in `lighting/editor/` (rig, session, scene editor,
+  fixture editor, rig controls, commands); the render is the six components in
+  `lighting/regions/` (cluster, plate, bay, quick palette, bottom strips, dialogs),
+  and `lighting/lightingWorkspaceModel.ts` holds the module-level helpers.
+- Planning — `planning/PlanningWorkspace.tsx` over `planning/usePlanningEditor.ts`,
+  the three hooks in `planning/editor/` (view, actions, shortcuts) and the six
+  components in `planning/bays/`.
+- Setup / Support — `setup/SetupSupportPilot.tsx` over `setup/useSetupPilot.ts`,
+  `setup/pilot/` (state, actions, shortcuts, chrome), the runner's four steps in
+  `setup/steps/` and `setup/support/` (the support screen, the dialogs, and
+  `SetupWorkstationPlate.tsx` with Recent actions and the light-outputs switch).
+
+The Console (`audio/AudioWorkspace.tsx` and `audio/components/`) was never over
+the size guard and was not split. The fixture double is
+`frontend/packages/engine-client/src/transports/fixtureTransport.ts` over twelve
+modules in `transports/fixture/`, one request handler per domain
+(`lightingRequests.ts`, `audioRequests.ts`, `planningRequests.ts`,
+`setupRequests.ts`); `scripts/check-operator-copy.mjs` skips that folder. The
+boundaries are `startup/ShellErrorBoundary.tsx` (root) and
+`startup/WorkspaceErrorBoundary.tsx` (per workspace).
 
 ### 3. Implement in small batches
 
@@ -335,6 +384,8 @@ npm run native:check
 npm run native:test
 npm run native:engine:build
 ```
+
+Tests that drive the shared console link against a fake TotalMix on loopback (`audio/tests_console_link.rs`) wait on the link's own state, never on a sleep (production readiness S15): `settle_console_link(&pump)` returns once no send is pending, no read-back is outstanding and the test pump has flushed twice more, and a pull that must end incomplete gets a quiet window its timeout cannot reach. Two of them failed under load before that — a 150 ms quiet window raced a fake that streamed every 40 ms from another thread, and a recall test slept 500 ms between phases whose read-backs could still be in flight.
 
 `npm run native:engine:build:dev-fixtures` builds the engine with the `dev-fixtures` cargo feature — the only build that answers `dev.parityFixture.load`; release engines and every current lane run without it and answer `METHOD_UNAVAILABLE`. `cd native && cargo test -p studio-control-engine --features dev-fixtures` runs that build's tests (2026-09 production readiness, Slice 1).
 
@@ -417,6 +468,8 @@ The list is the membership — there is no tag to add in a spec — and a listed
 
 Before listing a case, find out why it fails: download the run's `playwright-test-results` artifact and read the case's `trace.zip` (action timings and DOM snapshots), and reproduce it locally by throttling the page's CPU over CDP (`Emulation.setCPUThrottlingRate`, rate 6–20). Only an assertion that _is_ a wall-clock measurement belongs on the list.
 
+**The list has been empty since production readiness S15 (2026-09-21).** The last three cases were not wall-clock measurements after all, once their cause was found: the two `audio-render-budget.spec.ts` cases read their baseline inside the Console's own start-up renders (its mount, and a recall pulse that a 1.5 s timer ends) and now wait for the pulse to end; the metering case compared four strip levels rounded to whole percent that are fixed when the Console fetches its state — at 2 % of instants they round to one value — and now compares them as they are, with the page's clock running the canvas checks. An empty list quarantines nothing: `playwright.config.ts` builds `(?!)` for it (an empty `new RegExp("")` would match every title and leave `default` with no case), `frontend:playwright:test:quarantine` passes with no tests (`--pass-with-no-tests`), and `check-playwright-quarantine.test.mjs` lists both projects with an empty and a one-case list. A case put back on the list needs an `exit` date again.
+
 #### Pull Request CI
 
 Every pull request, and since production readiness Slice 0 (2026-09-10) every branch push (Dependabot branches excluded — their pull requests already run), triggers the ten-job workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `supply-chain`, `frontend-e2e`, `rust`, `rust-coverage`, `tauri-foundation`, and `qualification`. `format-protocol` runs `format:check`, repository script tests, `release:check`, `file:health`, and `protocol:check`; `frontend-test` runs `frontend:test` (Vitest across the frontend workspaces) and `frontend:test:coverage` (the coverage floors, production readiness Slice 13); `supply-chain` (production readiness Slice 12) runs the npm audit gate, the date check on `native/deny.toml`'s ignored advisories and `cargo deny check` — see "Supply chain" above; it reads today's advisory databases, so it can turn red on a push that changed nothing; `frontend-e2e` checks the quarantine list, then runs Playwright's `default` project (`frontend:playwright:test:blocking`, which includes the `visual-review.spec.ts` and `storybook.spec.ts` baselines) and fails on it, then the `quarantine` project in a step that reports and never fails the job — see "Quarantined Playwright cases" above — and uploads the Playwright report plus snapshot diffs as the `playwright-report`, `playwright-test-results` and `playwright-quarantine` artifacts; `rust` runs `rust:fmt:check`, `rust:clippy`, `native:check`, `native:test`, and `native:acceptance` (the acceptance harness runs the engine in simulated audio input mode by default, so the audio probe passes honestly, sync and recall answer from the simulated console, and nothing is ever written to a real TotalMix — the same default applies on the workstation; `SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1` opts into the live lane, which binds the real Global OSC remote, confirms every write by read-back, touches only unused surfaces (Phones 2, playback 7/8) and restores them in a `finally`; `native:test` runs unsimulated so the probe's no-traffic failure test stays honest); `rust-coverage` (production readiness Slice 13) runs `rust:coverage`, the instrumented `cargo test --workspace` with its line-coverage floor; `tauri-foundation` runs `tauri:foundation` (protocol generate → engine build → Tauri build → smoke); `qualification` runs `tauri:setup-support:qualify` and `tauri:workspaces:qualify` under `xvfb` with extended timeouts and the audio-probe skipped. These jobs are required merge hygiene on `main`. A second workflow, [.github/workflows/release-evidence.yml](../.github/workflows/release-evidence.yml), runs only on a `v*` tag or by hand and builds the packaged bundle, its SHA256 manifest and its SBOMs on clean Windows and macOS runners ([RELEASE.md §Release Evidence](./RELEASE.md#release-evidence-ci)); it publishes nothing. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
@@ -479,6 +532,8 @@ should be treated as high risk and tested more carefully.
 ### 5. Keep files modular
 
 If a file starts becoming hard to read, split it before it becomes a problem.
+
+`npm run file:health` (in `dev:check` and the `format-protocol` CI job) fails any tracked `.ts`, `.tsx`, `.css`, `.mjs` or `.rs` file over 2,000 lines, and since production readiness S14 it has **no allowlist for source files** — `scripts/file-health.test.mjs` fails if one comes back. Split before a file gets there, along the lines the code already has: S14 split the three workspace orchestrators, the fixture double and the Rust lighting tests by line range, every body verbatim ("Front-end map" in §2c), and S15 moved `audio.spec.ts`'s metering cases into `audio-metering.spec.ts` the same way. The largest product source is now `native/rust-engine/src/rme_totalmix_osc.rs`.
 
 ### 6. Update docs when behavior changes
 

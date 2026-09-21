@@ -59,6 +59,10 @@ const WORKSPACE_MARKS = {
   planning: "planning-screen",
 } as const;
 
-export async function expectWorkspaceMounted(page: Page, workspace: keyof typeof WORKSPACE_MARKS) {
-  await expect(page.getByTestId(WORKSPACE_MARKS[workspace])).toBeVisible();
+export async function expectWorkspaceMounted(
+  page: Page,
+  workspace: keyof typeof WORKSPACE_MARKS,
+  options?: { timeout?: number }
+) {
+  await expect(page.getByTestId(WORKSPACE_MARKS[workspace])).toBeVisible(options);
 }

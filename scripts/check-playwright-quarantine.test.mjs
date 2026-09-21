@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -128,6 +129,41 @@ test("the repository's own list names real tests (date not judged here)", () => 
     }
   };
   assert.deepEqual(quarantineProblems(text, readRealSpec, { today: null }), []);
+});
+
+// Production readiness S15. `frontend/app/playwright.config.ts` builds the two
+// projects from the list; `playwright test --list` loads that config and starts
+// no server, and SSE_PLAYWRIGHT_QUARANTINE_LIST points it at a list of this
+// test's own. Until S15 an empty list made `new RegExp("")`, which matches every
+// title: the `default` project — the one CI fails on — listed nothing.
+const appDir = path.join(scriptsDir, "..", "frontend", "app");
+const playwrightCli = createRequire(import.meta.url).resolve("@playwright/test/cli");
+
+function listedInProject(listPath, project) {
+  const result = spawnSync(
+    process.execPath,
+    [playwrightCli, "test", "--list", `--project=${project}`, "--pass-with-no-tests"],
+    { cwd: appDir, encoding: "utf8", env: { ...process.env, SSE_PLAYWRIGHT_QUARANTINE_LIST: listPath } }
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const total = /Total: (\d+) tests? in/.exec(result.stdout);
+  assert.ok(total, result.stdout);
+  return Number(total[1]);
+}
+
+test("an empty list quarantines nothing, and a listed case moves from default to quarantine", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "sse-quarantine-projects-"));
+  const empty = path.join(root, "empty.json");
+  writeFileSync(empty, list([], { exit: null }));
+  const inDefault = listedInProject(empty, "default");
+  assert.ok(inDefault > 0, "with nothing quarantined the default project must list the suite");
+  assert.equal(listedInProject(empty, "quarantine"), 0);
+
+  const one = path.join(root, "one.json");
+  const title = "idle meter ticks do not bump the audio inspector render counter";
+  writeFileSync(one, list([entry({ file: "audio-render-budget.spec.ts", title })]));
+  assert.equal(listedInProject(one, "default"), inDefault - 1);
+  assert.equal(listedInProject(one, "quarantine"), 1);
 });
 
 test("the command: exit 0 on a good list, 1 on a bad one, 2 when there is no list or an unknown option", () => {

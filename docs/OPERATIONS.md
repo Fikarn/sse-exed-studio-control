@@ -72,17 +72,24 @@ Setup / Support › Workstation has a **Light outputs** switch: **Armed** (the d
 ### Audio stops responding
 
 1. Open the Audio workspace and read the state display down the left; it names the state, says what happened
-   and what to do, and carries the key that does it:
-   - `NOT VERIFIED` — the audio probe has not passed since the last transport change. Every control on the Console is locked until it does; press **Run audio probe** on the state display.
+   and what to do, and carries the key that does it. When everything is right it reads `VERIFIED`.
+   - `NOT VERIFIED` — the audio probe has not passed since TotalMix's address or ports last changed in Setup. Every control on the Console is locked until it does; press **Run audio probe** on the state display.
+   - `OFFLINE`, saying the app cannot see or change the desk — the last audio probe failed. Studio Control keeps that result and never runs the probe again on its own, so a probe that failed days ago still reads `OFFLINE` after TotalMix is back. Press **Run audio probe**.
+   - `OFFLINE`, saying TotalMix is not sending meter data, or `STALE` — the probe passed, but no meter data has arrived from TotalMix for two seconds (`OFFLINE`) or for more than half a second (`STALE`). Work through the metering checklist below.
    - `DISCONNECTED` — TotalMix itself reports the interface is gone (`/status/connection 0`). Check the UFX III's USB link and power.
-   - `OFFLINE` / `STALE` — no meter data is arriving from TotalMix. Work through the metering checklist below.
    - `ASSUMED` — a send was not confirmed by the desk within 1.5 s, or a recall was only partly confirmed. Press
      **Sync from TotalMix**: it pulls the desk's real state and never changes hardware.
-   - `TALKBACK REFUSED` — TotalMix has no talkback input channel assigned (see step 4 under Metering over Global OSC).
+   - `ACTION FAILED` with the code `AUDIO_TALKBACK_REFUSED` beside it — TotalMix has no talkback input channel assigned (see step 4 under Metering over Global OSC). Any other code there names the action that failed; its sentence says what to do.
 2. Review the native health and audio summaries.
 3. Confirm the TotalMix OSC checklists below still match the workstation (Global OSC remote 4 for control and metering, remotes 1-3 as the classic metering fallback).
 4. Re-run the audio commissioning probe if needed.
 5. If the desk is still unavailable, restart the app and confirm the failure is not limited to one session.
+
+### When the Console's meters stay still
+
+The Console moves its meters only while it knows what the desk is set to (2026-09 production readiness, seen on the workstation on 2026-09-21). After the audio probe passes for the first time, and again after TotalMix reported the interface gone, after the desk did not confirm a change Studio Control sent (talkback, for example, when TotalMix has no talkback input assigned), after an action on the Console failed, or after TotalMix's address or ports changed in Setup, the state display may read `VERIFIED` while every meter stays empty. Press **Sync from TotalMix** once: it reads the desk without changing it, and the meters move from then on. Studio Control keeps that confirmation when it is closed and opened again, so an ordinary restart does not ask for it.
+
+The Console's footer says what the meters are fed by and whether data is arriving: **Metering** `TotalMix · live` while meter data arrives (a meter message within the last half second), `stale` after half a second without one, `offline` after two seconds. It is measured, not assumed — but for a moment after the Console fetches its state it can read `live` until the next meter update, about a quarter of a second later, corrects it.
 
 ### RME TotalMix OSC Metering Checklist
 
@@ -108,7 +115,7 @@ Audio-page edits are transmitted to TotalMix over the Global OSC remote (send po
 - **Sync from TotalMix = pull.** `/sendall` + `/sendstate` over remote 4, the answer is ingested, then `aligned`. Sync never changes hardware. `AUDIO_SYNC_NO_ECHO` means remote 4 did not answer: check it is In Use in Global OSC mode; `AUDIO_SYNC_INCOMPLETE` keeps what arrived and stays `unknown`.
 - **Recall = push, except 48 V.** A snapshot recall sends mutes-on first, then faders, gains, polarity, solo and output levels, then mutes-off, then dim / mono, and waits for the confirmations; 48 V is never sent — differences are listed on the Console's signal canvas and each one is armed and confirmed
   per channel.
-- **Gating.** While the state display does not read `READY` (probe not passed, the hardware link disabled, the desk disconnected) the engine refuses every write to the desk and the app and the deck disable the controls with the reason; app-local edits (names, snapshot slots, settings) stay allowed. A request with any invalid field is rejected before a single OSC message leaves.
+- **Gating.** While the audio probe has not passed — never run since the last change of TotalMix's address or ports, or failed the last time it ran — or OSC is switched off in Setup (the state display reads `NOT VERIFIED`, `OFFLINE` after a failed probe, or `DISABLED`), Studio Control refuses every write to the desk and the app and the deck disable the controls with the reason; app-local edits (names, snapshot slots, settings) stay allowed. A request with any invalid field is rejected before a single OSC message leaves.
 - **Arm-then-apply** (48 V, snapshot recall, snapshot overwrite) needs a second press at least 350 ms after the first; held keys do not repeat.
 - Channel faders ride `/mix/{in|pb}/{ch}/{out}/faderlin` (linear 0..1, the app's own fader scale; the dB the app prints for a position follows RME's published fader curve, unity at step 836 of 1023) to the requested submix — Main (out 0), Phones 1 (out 8), or Phones 2 (out 10). Output levels ride `/output/{ch}/faderlin`.
 - Mute (`/input|playback|output/{ch}/mute`), solo (`/mix/{in|pb}/{ch}/0/solo`, main submix), phantom (`/input/{ch}/48v`), phase, pad, instrument, and auto-set are absolute 0/1 states.
@@ -128,7 +135,7 @@ To commission it on the workstation:
 1. TotalMix FX must be version `2.1` or newer (Global OSC is the 2.1 headline feature; `2.0x` does not have it). The 2.1 beta is distributed on the RME TotalMix FX beta page as a manual file replacement — keep a backup of the previous `TotalMixFX_x64.exe` for rollback.
 2. In `Options → Settings → OSC`, select remote controller `4`: `In Use` checked, compatibility/mode set to `Global OSC`, IP `127.0.0.1`, port incoming `7004`, port outgoing `9004`, and enable the send-changes/send-status details if the dialog offers them. Leave remotes 1-3 untouched in classic mode.
 3. No app restart is needed — the engine re-primes the slot within seconds and the Main Out / Phones meters go live.
-4. For talkback, assign the studio's talkback microphone as the Talkback input channel in `Options → Settings → Mixer` (TotalMix reports the choice as `/controlroom/talkchannel`; `-1` means none). With no channel assigned TotalMix ignores `/controlroom/talkback` from every remote and answers `0`; the app then shows `TALKBACK REFUSED` with this instruction and the deck's `TALK` key never goes green. Found live on the studio UFX III on 2026-09-04 — the channel was unassigned.
+4. For talkback, assign the studio's talkback microphone as the Talkback input channel in `Options → Settings → Mixer` (TotalMix reports the choice as `/controlroom/talkchannel`; `-1` means none). With no channel assigned TotalMix ignores `/controlroom/talkback` from every remote and answers `0`; the Console's state display then reads `ACTION FAILED` with the code `AUDIO_TALKBACK_REFUSED` and this instruction, and the deck's `TALK` key never goes green. Found live on the studio UFX III on 2026-09-04 — the channel was unassigned.
 
 ### Stream Deck Audio Surface
 
@@ -176,6 +183,23 @@ To commission or re-commission the deck:
 3. If the display reads `SAVED DATA NEEDS ATTENTION` (code `STORAGE_CORRUPT` or `STORAGE_MIGRATION_FAILED`), the database failed its integrity check or could not be upgraded. The sentence names the file and the newest database backup; the file itself was left untouched, and nothing was migrated. The hardware link stays up for exactly one job here (production readiness Slice 7): the recovery surface lists the backups folder — the JSON backup archives and the `db-<timestamp>-<reason>.sqlite3` database backups — and Restore latest, or a backup named in the Restore-from-path field, restores a database backup from it: the backup is checked first, Studio Control restarts its hardware link, and the restart moves the backup into place, keeping the damaged file as `backups/db-<timestamp>-replaced.sqlite3`. After `STORAGE_MIGRATION_FAILED` the newest `…-pre-migration.sqlite3` copy holds the data exactly as it was before the upgrade attempt. Only files inside the backups folder can be named; a backup from elsewhere is copied into that folder first (the Archive key opens it). A JSON backup archive cannot be applied while the saved data is unreadable — restore a database backup first, then the archive from Setup / Support if it is the newer one.
 4. If the display reads `STUDIO CONTROL IS ALREADY OPEN` (code `ENGINE_ALREADY_RUNNING`), another copy of the app holds the app-data directory: find its window (a second launch brings it to the front), or wait for a copy that is still closing, then start again. Nothing was changed.
 5. If startup still fails, reinstall the latest known-good native build without deleting the app-data directory.
+
+### What the recovery screen says
+
+The state display on the recovery screen names what happened in a word, says it in a sentence, and prints the code small beside it — the code is for a support ticket and for this table (2026-09 production readiness, Slices 3, 5, 7 and 9).
+
+| The screen says                        | Code                                                    | What happened                                                         | What to do                                                                                                                                      |
+| -------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SAVED DATA NEEDS ATTENTION`           | `STORAGE_CORRUPT`                                       | The saved data failed its check at start; the file was left as it was | Restore a database backup from the recovery surface ("The app fails before the dashboard", step 3)                                              |
+| `SAVED DATA NEEDS ATTENTION`           | `STORAGE_MIGRATION_FAILED`                              | An upgrade of the saved data could not finish; nothing was changed    | The newest `…-pre-migration.sqlite3` backup holds the data as it was before the attempt; restore it and export diagnostics                      |
+| `THE HARDWARE LINK STOPPED`            | `ENGINE_EXITED`                                         | The hardware link stopped during the session                          | Nothing: Studio Control restarts it on its own, three times in five minutes. After a fourth stop, Retry startup once the desk and rig are ready |
+| `STUDIO CONTROL IS ALREADY OPEN`       | `ENGINE_ALREADY_RUNNING`                                | Another copy of the app holds the saved data                          | Use the window that is open (a second launch brings it to the front), or wait for a copy that is still closing                                  |
+| `PROTOCOL MISMATCH`                    | `PROTOCOL_MISMATCH`                                     | The window and the hardware link come from different builds           | Install Studio Control again from one package: the window and the hardware link must be the same build                                          |
+| `STARTUP FAILED`                       | `ENGINE_STARTUP_FAILED`, `ENGINE_READY_TIMEOUT`, others | The hardware link did not come up                                     | Export diagnostics, then Retry startup                                                                                                          |
+| `THIS SCREEN STOPPED`                  | —                                                       | The window failed to draw                                             | Export diagnostics, then Reload; the desk, the rig and the deck keep their state                                                                |
+| `LIGHTING STOPPED`, `AUDIO STOPPED`, … | —                                                       | One workspace failed to draw                                          | Reload this area; the rest keeps working ("When part of the screen stops" below)                                                                |
+
+Two refusals come from Setup / Support rather than the recovery screen: `SUPPORT_RESTORE_UNSUPPORTED_VERSION` (the backup was written by a newer Studio Control; install that version, or pick an older backup) and `PATH_OUTSIDE_APP_DATA` (a folder key was asked for a folder outside Studio Control's own; nothing was opened). A Stream Deck profile exported before 2026-09-10 is refused with `401` in Companion's log ("Control-surface bridge stops responding" above).
 
 ## Data Safety
 
@@ -235,10 +259,10 @@ A band at the foot of the screen — "Studio Control hit a problem in the backgr
 
 ## Recommended Checks Before A Live Session
 
-1. Launch the packaged native app and confirm it reaches the expected target surface. On the `1920x1080` studio monitor the Console runs at compact density (4 input / 4 playback / 3 output strips, the rest banked with `[` `]`); nothing should scroll sideways.
-2. Confirm lighting, audio, and support summaries show the expected ready state.
+1. Launch the packaged native app and confirm it reaches the expected target surface, fullscreen on the studio monitor (display 3, 2560×1440 at 100 % scaling — the only size the app is built for). If it opens on the other screen or in a window, run **Reset the window layout** from the command palette (`Ctrl+K`).
+2. Confirm lighting, audio, and support summaries show the expected ready state; the header's Lighting lamp reads `held` if the light outputs are held.
 3. Trigger a test light scene recall if lighting is in scope.
-4. Confirm the Console's state display reads `READY` with live RME TotalMix OSC metering — not simulated, stale, or offline. If it reads `NOT VERIFIED`, run the audio probe.
+4. Confirm the Console's state display reads `VERIFIED` and its footer `Metering TotalMix · live` — not simulated, stale, or offline. If it reads `NOT VERIFIED` or `OFFLINE`, run the audio probe; if the meters stay still, press **Sync from TotalMix** ("When the Console's meters stay still" above).
 5. Walk the desk link checklist below if audio is in scope.
 6. Export a manual support backup before the session starts.
 
@@ -247,7 +271,7 @@ A band at the foot of the screen — "Studio Control hit a problem in the backgr
 1. Move one fader and toggle one mute in TotalMix — the app strip follows within about a second (the link is reading the desk).
 2. Press **Sync** — the toast reports the values pulled, the badge goes `aligned`, and nothing moves in TotalMix.
 3. Recall the session's opening snapshot — the band reports "N values pushed, N confirmed"; any 48 V difference is listed by channel and is only applied when armed there.
-4. Hold **Talkback** (or `T`, or the deck's `TALK`) — TotalMix's talkback lights and clears on release. If the app says `TALKBACK REFUSED`, assign the talkback input channel in TotalMix first.
+4. Hold **Talkback** (or `T`, or the deck's `TALK`) — TotalMix's talkback lights and clears on release. If the state display reads `ACTION FAILED` with the code `AUDIO_TALKBACK_REFUSED`, assign the talkback input channel in TotalMix first.
 5. On the Stream Deck, `→ MAIN` / `DIM` / `TALK` mirror the app; the Companion profile must have been re-imported after the fader-curve update (Setup step 1, Full Reset & Import).
 
 ## Bridge Qualification

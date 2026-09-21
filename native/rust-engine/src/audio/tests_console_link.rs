@@ -148,13 +148,17 @@ impl Drop for FakeTotalMix {
 
 struct SlotPump {
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Completed pumps: read the slot, service the link, flush to the database.
+    cycles: std::sync::Arc<std::sync::atomic::AtomicU64>,
     handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl SlotPump {
     fn start(slot: crate::rme_totalmix_osc::GlobalOscSlot, db_path: PathBuf) -> Self {
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let cycles = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let stop_flag = stop.clone();
+        let cycle_count = cycles.clone();
         let handle = std::thread::spawn(move || {
             let mut slot = slot;
             while !stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
@@ -163,14 +167,60 @@ impl SlotPump {
                     "127.0.0.1",
                     &db_path,
                 );
+                cycle_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 std::thread::sleep(Duration::from_millis(10));
             }
         });
         Self {
             stop,
+            cycles,
             handle: Some(handle),
         }
     }
+
+    /// Returns once `count` more pumps have completed after the call.
+    fn wait_for_cycles(&self, count: u64) {
+        let target = self.cycles.load(std::sync::atomic::Ordering::SeqCst) + count;
+        let deadline = std::time::Instant::now() + SETTLE_DEADLINE;
+        while self.cycles.load(std::sync::atomic::Ordering::SeqCst) < target {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the slot pump made no progress for {SETTLE_DEADLINE:?}"
+            );
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+}
+
+/// How long a settle may take before the test gives up — a guard against a
+/// hang, never a timing the test depends on.
+const SETTLE_DEADLINE: Duration = Duration::from_secs(20);
+
+/// Production readiness S15. Waits until every send the shared link tracks has
+/// settled (confirmed, adjusted or expired), every read-back has had its
+/// replies, and the pump has flushed what arrived — the link's own state, where
+/// the recall test used to sleep 500 ms and hope. With it, one phase of a test
+/// can no longer overlap the read-back cycle of the phase before it.
+fn settle_console_link(pump: &SlotPump) {
+    let deadline = std::time::Instant::now() + SETTLE_DEADLINE;
+    loop {
+        let settled = {
+            let link = crate::rme_console_link::shared_console_link();
+            let guard = link.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            guard.pending_count() == 0 && guard.outstanding_count() == 0
+        };
+        if settled {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the console link did not settle within {SETTLE_DEADLINE:?}"
+        );
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    // Two full pumps after the link went quiet: whatever the last one read has
+    // been flushed to the database.
+    pump.wait_for_cycles(2);
 }
 
 impl Drop for SlotPump {
@@ -328,11 +378,21 @@ fn console_pull_that_never_goes_quiet_is_incomplete() {
     crate::rme_totalmix_osc::mark_console_link_slot(true);
     let _pump = SlotPump::start(slot, test_dir.db_path());
 
+    // Production readiness S15. Old: quiet_ms 150, timeout_ms 500 — the verdict
+    // rested on the fake's 40 ms stream never leaving a 150 ms gap, across two
+    // threads; a loaded runner left one three times and the pull completed
+    // (run 35356465640: `complete: true`, 21 values). New: a quiet window the
+    // timeout cannot reach, so the fake still never goes quiet and the pull
+    // cannot see it go quiet either, however the threads are scheduled. The
+    // engine's rule under test is unchanged: not quiet by the timeout, with
+    // something received, is incomplete (the quiet rule itself is
+    // `rme_console_link`'s `is_complete`, tested there). One second for the
+    // dump to arrive is a hundred of the pump's cycles.
     let error = sync_audio_console_with_timing(
         test_dir.db_path().as_path(),
         PullTiming {
-            quiet_ms: 150,
-            timeout_ms: 500,
+            quiet_ms: 60_000,
+            timeout_ms: 1_000,
             poll_ms: 10,
         },
     )
@@ -1137,8 +1197,17 @@ fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
     console.start(slot.local_port());
     let test_dir = pull_test_db("recall-push-confirmed", console.port);
     crate::rme_totalmix_osc::mark_console_link_slot(true);
-    let _pump = SlotPump::start(slot, test_dir.db_path());
+    let pump = SlotPump::start(slot, test_dir.db_path());
     let db = test_dir.db_path();
+
+    // Production readiness S15. Old: `sleep(500 ms)` after each phase. New:
+    // `settle_console_link` — the phase's sends settled, their read-backs
+    // answered, the replies flushed — here and after the recall, before the
+    // stored state is read. Reason: under the instrumented build on a loaded
+    // workstation the recall confirmed everything and `main_after.dim` still
+    // read false (2026-09-18, not reproduced since): with fixed sleeps, one
+    // phase's read-back cycle could still be in flight when the next began.
+    // What is asserted is unchanged.
 
     // The scene worth keeping: Host muted at 30 dB with its main send at the
     // curve knee, Main dimmed at half fader.
@@ -1151,7 +1220,7 @@ fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
     main.dim = Some(true);
     main.volume = Some(0.5);
     update_audio_mix_target(&db, &main).expect("main edit should send");
-    std::thread::sleep(Duration::from_millis(500));
+    settle_console_link(&pump);
     let created = create_audio_snapshot(
         &db,
         &AudioSnapshotCreateRequest {
@@ -1170,7 +1239,7 @@ fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
     let mut main_drift = mix_target_request("audio-mix-main");
     main_drift.dim = Some(false);
     update_audio_mix_target(&db, &main_drift).expect("main drift should send");
-    std::thread::sleep(Duration::from_millis(500));
+    settle_console_link(&pump);
 
     let result = recall_audio_snapshot_with_timing(
         &db,
@@ -1191,6 +1260,7 @@ fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
     assert!(result.phantom_differences.is_empty());
     assert!(result.summary.contains("confirmed"), "{}", result.summary);
 
+    settle_console_link(&pump);
     let settings = list_settings_by_prefix(&db, APP_SETTINGS_PREFIX).expect("settings should load");
     let snapshot = read_audio_snapshot(&settings);
     assert_eq!(snapshot.console_state_confidence, "aligned");

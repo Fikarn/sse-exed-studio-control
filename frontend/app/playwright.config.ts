@@ -25,8 +25,16 @@ interface QuarantinedCase {
   title: string;
 }
 
+// Production readiness S15: `SSE_PLAYWRIGHT_QUARANTINE_LIST` reads another list,
+// so scripts/check-playwright-quarantine.test.mjs can list the two projects an
+// empty list and a one-case list make.
 const quarantined = (
-  JSON.parse(readFileSync(new URL("./tests/quarantine.json", import.meta.url), "utf-8")) as {
+  JSON.parse(
+    readFileSync(
+      process.env.SSE_PLAYWRIGHT_QUARANTINE_LIST ?? new URL("./tests/quarantine.json", import.meta.url),
+      "utf-8"
+    )
+  ) as {
     cases: QuarantinedCase[];
   }
 ).cases;
@@ -36,11 +44,17 @@ function escapeForRegExp(text: string) {
 }
 
 // Playwright matches `grep` against "<project> <file> <describe titles> <title> <tags>".
-const QUARANTINE = new RegExp(
-  quarantined
-    .map((entry) => `(?:^| )${escapeForRegExp(entry.file)} (?:.+ )?${escapeForRegExp(entry.title)}(?: |$)`)
-    .join("|")
-);
+// An empty list quarantines nothing (S15 emptied it): `new RegExp("")` matches
+// every title, which would leave `default` with no case at all and run the
+// whole suite as advisory, so the empty list is `(?!)`, which matches nothing.
+const QUARANTINE =
+  quarantined.length === 0
+    ? /(?!)/
+    : new RegExp(
+        quarantined
+          .map((entry) => `(?:^| )${escapeForRegExp(entry.file)} (?:.+ )?${escapeForRegExp(entry.title)}(?: |$)`)
+          .join("|")
+      );
 
 export default defineConfig({
   testDir: "./tests",
