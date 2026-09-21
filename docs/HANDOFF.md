@@ -132,13 +132,13 @@ The highest-value unresolved work is:
    | `studio-bringup-sacn-globalosc` | 11                      | sACN DMX output, TotalMix Global OSC, the Stream Deck+ audio surface (S1–S6)                         |
    | `audit-remediation-2026-09`     | 26                      | the above + the 13-slice 2026-09-02 audit remediation                                                |
    | `ui-gold-standard-2026-09`      | 64                      | the above + visual overhaul A (13 slices, 2 follow-ups, these hand-over docs)                        |
-   | `production-readiness-2026-09`  | 102                     | the above + the 16-slice production readiness remediation (S0–S15) and two fixes that are not slices |
+   | `production-readiness-2026-09`  | 105                     | the above + the 16-slice production readiness remediation (S0–S15) and two fixes that are not slices |
 
    `production-readiness-2026-09` is therefore the whole program, and it is also what the studio workstation runs (Current Operating Truth). Merging it merges all four.
 
    Where each thing that stood between here and `main` stands:
 
-   1. **CI runs on every branch push** since production readiness Slice 0 (2026-09-10) — before that no job had ever run on these branches. Every job has been green on the pushes of Slices 13 and 14 and on `db2df4d`; the Slice 15 run is recorded in the ledger.
+   1. **CI runs on every branch push** since production readiness Slice 0 (2026-09-10) — before that no job had ever run on these branches. Every job has been green on the pushes of Slices 13 and 14, on `db2df4d` and on Slice 15's (run 35607162991, on its quarantine-test follow-up `b098233`; the slice commit's own run failed only `format-protocol`, on a new test that needed a Storybook build the job does not make); both runs are recorded in the ledger.
    2. **The `linux` baselines are current** (production readiness Slice 13 refreshed the 91 stale or missing ones, every capture inspected; the repository carries 93 `linux` beside 93 `win32`), and `frontend-e2e` is green and fails on its `default` project. `darwin` (75) was pending the macOS host; by the operator's ruling of 2026-09-18 (Windows only, `2560×1440` only) it is nobody's work.
    3. **Three operator checklists are unsigned**, all walked on the studio hardware, not in CI: `docs/plans/audit-remediation-2026-09.md` Appendix B (TotalMix talkback channel assignment first, then B1–B8), `docs/plans/visual-overhaul-a-2026-09.md` Appendix B (nine items on the 2560×1440 monitor; item 7 — Bone and Graphite from the chair — is the one the gates can least stand in for) and `docs/plans/production-readiness-2026-09.md` Appendix B (items 1–5 move Slices 2, 5, 6, 7, 10 and 11 from `landed` to `verified`; items 6–8 are the pull request and its required checks, the signing certificates and the sign-off).
    4. **Decide how it lands.** One PR for the whole stack, or stacked PRs merged bottom-up. The repo is squash-merge-only, which would collapse the stack into one or four commits on `main` and lose the per-slice `git log` that all three ledgers reference by subject line. That is a deliberate decision for the maintainer, not a default; the required checks to set are listed under Slice 13 of the production readiness ledger (D4).
@@ -171,24 +171,24 @@ Completed rollout record:
 
 Branch `production-readiness-2026-09`, one commit per slice (`Readiness S<N>: …`) with its CI run recorded in a `Readiness S<N> (ledger): …` follow-up. Ledger: [docs/plans/production-readiness-2026-09.md](plans/production-readiness-2026-09.md) — the traceability table names each of the 32 findings' commit and guard, Appendix A the lane that runs each guard, Appendix B the operator's hardware checklist. `verified` = every lane green and no hardware exposure; `landed` = waiting only on its Appendix B item.
 
-| Slice | Commit         | What landed                                                                                               | State             |
-| ----- | -------------- | --------------------------------------------------------------------------------------------------------- | ----------------- |
-| S0    | `d935aaa`      | CI on every branch push; the ledger                                                                       | verified          |
-| S1    | `b9da9dc`      | the dev-fixtures method compiled out, a durable app-data default, no CWD import, Vite on loopback         | verified          |
-| S2    | `c2b7361`      | the Stream Deck bridge's token, request caps, worker pool, percent decoding                               | landed (B item 1) |
-| S3    | `e4c283d`      | integrity check at start, verified database backups, `synchronous = FULL`                                 | verified          |
-| S4    | `f3db990`      | async shell commands, unique request ids, CSP, folder keys limited to the app's folders                   | verified          |
-| S5    | `f1dc897`      | the engine watched and restarted, one instance per workstation                                            | landed (B item 2) |
-| S6    | `bee067b`      | the TotalMix meter ports on loopback, reading TotalMix only                                               | landed (B item 3) |
-| S7    | `9bb1f8d`      | backup verify and restore from Setup / Support and the recovery screen, database backups included         | landed (B item 4) |
-| S8    | `b00ecaf`      | a health status that moves, a rotating log, stderr kept                                                   | verified          |
-| S9    | `96ae4e9`      | error boundaries, domain-scoped refresh, reply guards, the background-failure band                        | verified          |
-| S10   | `957acc9`      | one lighting lock, deck keys through the preview, the sACN settings cache                                 | landed (B item 5) |
-| S11   | `9c45d36`      | the action log with sources, held light outputs and safe start (schema 7)                                 | landed (B item 5) |
-| S12   | `d507356`      | the `supply-chain` job, release evidence on a tag, SBOMs                                                  | verified          |
-| S13   | `cf681ad`      | blocking e2e, coverage floors, property tests, the linux baselines                                        | verified          |
-| S14   | `354306c`      | the three orchestrators split, a chunk per workspace, no file-size allowlist                              | verified          |
-| S15   | see the ledger | these documents; the Playwright quarantine emptied at the causes; two Rust tests that raced their threads | verified          |
+| Slice | Commit    | What landed                                                                                               | State             |
+| ----- | --------- | --------------------------------------------------------------------------------------------------------- | ----------------- |
+| S0    | `d935aaa` | CI on every branch push; the ledger                                                                       | verified          |
+| S1    | `b9da9dc` | the dev-fixtures method compiled out, a durable app-data default, no CWD import, Vite on loopback         | verified          |
+| S2    | `c2b7361` | the Stream Deck bridge's token, request caps, worker pool, percent decoding                               | landed (B item 1) |
+| S3    | `e4c283d` | integrity check at start, verified database backups, `synchronous = FULL`                                 | verified          |
+| S4    | `f3db990` | async shell commands, unique request ids, CSP, folder keys limited to the app's folders                   | verified          |
+| S5    | `f1dc897` | the engine watched and restarted, one instance per workstation                                            | landed (B item 2) |
+| S6    | `bee067b` | the TotalMix meter ports on loopback, reading TotalMix only                                               | landed (B item 3) |
+| S7    | `9bb1f8d` | backup verify and restore from Setup / Support and the recovery screen, database backups included         | landed (B item 4) |
+| S8    | `b00ecaf` | a health status that moves, a rotating log, stderr kept                                                   | verified          |
+| S9    | `96ae4e9` | error boundaries, domain-scoped refresh, reply guards, the background-failure band                        | verified          |
+| S10   | `957acc9` | one lighting lock, deck keys through the preview, the sACN settings cache                                 | landed (B item 5) |
+| S11   | `9c45d36` | the action log with sources, held light outputs and safe start (schema 7)                                 | landed (B item 5) |
+| S12   | `d507356` | the `supply-chain` job, release evidence on a tag, SBOMs                                                  | verified          |
+| S13   | `cf681ad` | blocking e2e, coverage floors, property tests, the linux baselines                                        | verified          |
+| S14   | `354306c` | the three orchestrators split, a chunk per workspace, no file-size allowlist                              | verified          |
+| S15   | `93603e1` | these documents; the Playwright quarantine emptied at the causes; two Rust tests that raced their threads | verified          |
 
 Two commits in the range are not slices: `235241c` (`npm run clean` keeps a packaged app) and `db2df4d` (the header lamps read the hardware link's own words, found on the workstation the day the operator moved to this branch's build).
 
