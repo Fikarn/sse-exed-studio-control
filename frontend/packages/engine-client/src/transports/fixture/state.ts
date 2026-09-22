@@ -23,6 +23,7 @@ import {
   refreshAudioCapabilities,
 } from "./audioConsole";
 import { buildDefaultPlanningSnapshot, normalizePlanningViewFilter, normalizePlanningModeSection } from "./planning";
+import type { IdentifyBursts } from "./lightingOverlay";
 
 export interface MutableFixtureState {
   appSnapshot: JsonObject;
@@ -31,6 +32,8 @@ export interface MutableFixtureState {
   commissioningSnapshot: JsonObject;
   lightingFixtureCatalogSnapshot: JsonObject;
   lightingSnapshot: JsonObject;
+  /** The identify flashes; they show in `lighting.snapshot` while they last, never in the stored rig. */
+  lightingIdentifyBursts: IdentifyBursts;
   audioSnapshot: JsonObject | null;
   planningSnapshot: JsonObject | null;
   supportSnapshot: JsonObject;
@@ -215,6 +218,7 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
       (scenario.lightingFixtureCatalogSnapshot ?? DEFAULT_LIGHTING_FIXTURE_CATALOG) as JsonObject
     ),
     lightingSnapshot: cloneJson((scenario.lightingSnapshot ?? buildDefaultLightingSnapshot()) as JsonObject),
+    lightingIdentifyBursts: {},
     audioSnapshot:
       "audioSnapshot" in scenario
         ? scenario.audioSnapshot === null

@@ -32,6 +32,15 @@ import {
 } from "./lighting";
 import { synchronizeFixtureState } from "./state";
 import {
+  type IdentifyBursts,
+  IDENTIFY_DEFAULT_DURATION_MS,
+  IDENTIFY_MAX_MS,
+  IDENTIFY_MIN_MS,
+  IDENTIFY_SEQUENCE_MAX_FIXTURES,
+  lightingIdList,
+  lightingSnapshotView,
+} from "./lightingOverlay";
+import {
   fixtureDefinitionByIdentity,
   fixtureDefinitionSelectable,
   fixtureModeForDefinition,
@@ -51,12 +60,16 @@ export function handleFixtureLightingRequest(
 ): FixtureRequestResult {
   const { state, emit } = context;
   switch (method) {
+    // Read as the hardware link reads it: identify, highlight and solo shown
+    // over the stored rig, the scenes pinned first — the DMX monitor included.
     case "lighting.snapshot":
-      return cloneJson(state.lightingSnapshot);
+      return lightingSnapshotView(state.lightingSnapshot, state.lightingIdentifyBursts, Date.now());
     case "lighting.fixtureCatalog.snapshot":
       return cloneJson(state.lightingFixtureCatalogSnapshot);
     case "lighting.dmxMonitor.snapshot":
-      return buildLightingDmxMonitorSnapshot(asRecord(state.lightingSnapshot));
+      return buildLightingDmxMonitorSnapshot(
+        lightingSnapshotView(state.lightingSnapshot, state.lightingIdentifyBursts, Date.now())
+      );
     case "lighting.editor.previewMode": {
       const enabled = asBoolean(params.enabled, false);
       const patchModeActive = asBoolean(params.patchModeActive, asBoolean(params.patchMode, false));
@@ -628,6 +641,46 @@ export function handleFixtureLightingRequest(
         summary,
       };
     }
+    // The stored scene list is the rail's order; `lighting.snapshot` shows the
+    // pinned ones first, so an unpinned scene goes back to its own place.
+    case "lighting.scene.reorder": {
+      const sceneId = requiredText(params, "sceneId");
+      const beforeSceneId = reorderAnchor(params, "beforeSceneId", sceneId, "sceneId");
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      const scenes = lightingScenes(lightingSnapshot);
+      const movedScene = scenes.find((scene) => asString(scene.id) === sceneId);
+      if (!movedScene) {
+        throw new Error(`Lighting scene '${sceneId}' is not exposed by the native editor state.`);
+      }
+      if (beforeSceneId !== null && !scenes.some((scene) => asString(scene.id) === beforeSceneId)) {
+        throw new Error(`Reorder anchor scene '${beforeSceneId}' is not exposed by the native editor state.`);
+      }
+      lightingSnapshot.scenes = movedBefore(scenes, movedScene, beforeSceneId);
+      const summary = `Lighting scene '${sceneId}' was reordered in the rail.`;
+      finishLightingAction(context, lightingSnapshot, summary, "scene-reordered");
+      return { sceneId, summary };
+    }
+    case "lighting.scene.pin": {
+      const sceneId = requiredText(params, "sceneId");
+      if (typeof params.pinned !== "boolean") {
+        throw new Error("pinned must be a boolean");
+      }
+      const pinned = params.pinned;
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      const scenes = lightingScenes(lightingSnapshot);
+      const targetScene = scenes.find((scene) => asString(scene.id) === sceneId);
+      if (!targetScene) {
+        throw new Error(`Lighting scene '${sceneId}' is not exposed by the native editor state.`);
+      }
+      const pinnedScene: JsonObject = { ...targetScene, pinned };
+      lightingSnapshot.scenes = scenes.map((scene) => (scene === targetScene ? pinnedScene : scene));
+      const sceneName = asString(targetScene.name);
+      const summary = pinned
+        ? `Lighting scene '${sceneName}' was pinned.`
+        : `Lighting scene '${sceneName}' was unpinned.`;
+      finishLightingAction(context, lightingSnapshot, summary, "scene-pinned");
+      return { scene: cloneJson(pinnedScene), summary };
+    }
     case "lighting.settings.update": {
       const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
       const hasSelectedSceneId = Object.prototype.hasOwnProperty.call(params, "selectedSceneId");
@@ -1139,6 +1192,129 @@ export function handleFixtureLightingRequest(
         summary,
       };
     }
+    case "lighting.fixture.delete": {
+      const fixtureId = requiredText(params, "fixtureId");
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      const deletedFixture = storedFixture(lightingSnapshot, fixtureId);
+      lightingSnapshot.fixtures = lightingFixtures(lightingSnapshot).filter(
+        (fixture) => asString(fixture.id) !== fixtureId
+      );
+      // The light leaves every scene with it (`remove_fixture_from_scenes`).
+      lightingSnapshot.scenes = lightingScenes(lightingSnapshot).map((scene) => ({
+        ...scene,
+        fixtureStates: asArray(scene.fixtureStates).filter(
+          (fixtureState) => asString(asRecord(fixtureState)?.fixtureId) !== fixtureId
+        ),
+      }));
+      if (asString(lightingSnapshot.selectedFixtureId) === fixtureId) {
+        lightingSnapshot.selectedFixtureId = null;
+      }
+      synchronizeLightingGroupCounts(lightingSnapshot);
+      const summary = `Lighting fixture '${asString(deletedFixture.name)}' was deleted.`;
+      finishLightingAction(context, lightingSnapshot, summary, "fixture-deleted");
+      return { deleted: true, fixtureId, summary };
+    }
+    // Identify, Highlight, Solo and Find are overrides: they change what
+    // `lighting.snapshot` shows, never the stored rig (`lightingOverlay.ts`).
+    case "lighting.fixture.identify": {
+      const fixtureId = requiredText(params, "fixtureId");
+      const requestedDurationMs = params.durationMs;
+      if (
+        requestedDurationMs !== undefined &&
+        requestedDurationMs !== null &&
+        !(typeof requestedDurationMs === "number" && Number.isInteger(requestedDurationMs))
+      ) {
+        throw new Error("durationMs must be a number");
+      }
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      const fixture = storedFixture(lightingSnapshot, fixtureId);
+      const durationMs = clampNumber(
+        typeof requestedDurationMs === "number" ? requestedDurationMs : IDENTIFY_DEFAULT_DURATION_MS,
+        IDENTIFY_MIN_MS,
+        IDENTIFY_MAX_MS
+      );
+      const nowMs = Date.now();
+      // Finished flashes leave with this write; a Find's scheduled ones stay.
+      const bursts: IdentifyBursts = Object.fromEntries(
+        Object.entries(state.lightingIdentifyBursts).filter(([, burst]) => nowMs - burst.startedAtMs < burst.durationMs)
+      );
+      bursts[fixtureId] = { startedAtMs: nowMs, durationMs };
+      state.lightingIdentifyBursts = bursts;
+      const summary = `Identify burst for ${asString(fixture.name)} (${durationMs} ms on universe ${asNumber(lightingSnapshot.universe, 1)})`;
+      finishLightingAction(context, lightingSnapshot, summary, "fixture-identified");
+      return { fixtureId, durationMs, summary };
+    }
+    case "lighting.fixture.highlight": {
+      const mode = typeof params.mode === "string" ? params.mode.trim() : null;
+      if (mode === null) {
+        throw new Error("mode is required");
+      }
+      if (mode !== "highlight" && mode !== "solo" && mode !== "off") {
+        throw new Error('mode must be one of "highlight", "solo", or "off"');
+      }
+      const fixtureIds = fixtureIdList(params, "fixtureIds");
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      for (const fixtureId of fixtureIds) {
+        storedFixture(lightingSnapshot, fixtureId);
+      }
+      // Highlight and Solo never stand together: the other one is cleared
+      // first, and the hardware link refuses rather than drop it silently.
+      if (mode === "highlight" && lightingIdList(lightingSnapshot.soloFixtureIds).length > 0) {
+        throw new Error("Solo is active; clear solo before activating highlight.");
+      }
+      if (mode === "solo" && lightingIdList(lightingSnapshot.highlightFixtureIds).length > 0) {
+        throw new Error("Highlight is active; clear highlight before activating solo.");
+      }
+      lightingSnapshot.highlightFixtureIds = mode === "highlight" ? lightingIdList(fixtureIds) : [];
+      lightingSnapshot.soloFixtureIds = mode === "solo" ? lightingIdList(fixtureIds) : [];
+      const fixtureCount = mode === "off" ? 0 : fixtureIds.length;
+      const summary =
+        mode === "highlight"
+          ? `Highlight on ${fixtureCount} fixture(s)`
+          : mode === "solo"
+            ? `Solo on ${fixtureCount} fixture(s)`
+            : "Cleared highlight + solo overlays";
+      finishLightingAction(context, lightingSnapshot, summary, "fixture-highlighted");
+      return { mode, fixtureCount, summary };
+    }
+    // Find: one flash per light, each a step after the one before; a new
+    // sequence replaces whatever was flashing or waiting.
+    case "lighting.fixture.identifySequence": {
+      const fixtureIds = fixtureIdList(params, "fixtureIds");
+      if (fixtureIds.length === 0) {
+        throw new Error("fixtureIds must contain at least one id");
+      }
+      const requestedStepMs = wholeMilliseconds(params, "stepMs");
+      const requestedDurationMs = wholeMilliseconds(params, "durationMs");
+      if (fixtureIds.length > IDENTIFY_SEQUENCE_MAX_FIXTURES) {
+        throw new Error(`identifySequence accepts at most ${IDENTIFY_SEQUENCE_MAX_FIXTURES} fixtures.`);
+      }
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      for (const fixtureId of fixtureIds) {
+        storedFixture(lightingSnapshot, fixtureId);
+      }
+      const stepMs = clampNumber(requestedStepMs, IDENTIFY_MIN_MS, IDENTIFY_MAX_MS);
+      const durationMs = clampNumber(requestedDurationMs, IDENTIFY_MIN_MS, IDENTIFY_MAX_MS);
+      const nowMs = Date.now();
+      const bursts: IdentifyBursts = {};
+      fixtureIds.forEach((fixtureId, index) => {
+        bursts[fixtureId] = { startedAtMs: nowMs + index * stepMs, durationMs };
+      });
+      state.lightingIdentifyBursts = bursts;
+      const totalDurationMs = Math.max(fixtureIds.length - 1, 0) * stepMs + durationMs;
+      const summary = `Identify sequence on ${fixtureIds.length} fixture(s) (step ${stepMs} ms, ${durationMs} ms each)`;
+      finishLightingAction(context, lightingSnapshot, summary, "identify-sequence-started");
+      return { fixtureCount: fixtureIds.length, stepMs, durationMs, totalDurationMs, summary };
+    }
+    case "lighting.fixture.identify.clearAll": {
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      // Every flash counts, the finished ones not yet pruned among them.
+      const clearedCount = Object.keys(state.lightingIdentifyBursts).length;
+      state.lightingIdentifyBursts = {};
+      const summary = `Cleared ${clearedCount} identify burst(s)`;
+      finishLightingAction(context, lightingSnapshot, summary, "identify-cleared");
+      return { clearedCount, summary };
+    }
     case "lighting.group.power": {
       const groupId = asString(params.groupId).trim();
       if (!groupId) {
@@ -1326,6 +1502,25 @@ export function handleFixtureLightingRequest(
         summary,
       };
     }
+    case "lighting.group.reorder": {
+      const groupId = requiredText(params, "groupId");
+      const beforeGroupId = reorderAnchor(params, "beforeGroupId", groupId, "groupId");
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      const groups = asArray(lightingSnapshot.groups)
+        .map((group) => asRecord(group))
+        .filter((group): group is JsonObject => group !== null);
+      const movedGroup = groups.find((group) => asString(group.id) === groupId);
+      if (!movedGroup) {
+        throw new Error(`Lighting group '${groupId}' is not exposed by the native editor state.`);
+      }
+      if (beforeGroupId !== null && !groups.some((group) => asString(group.id) === beforeGroupId)) {
+        throw new Error(`Reorder anchor group '${beforeGroupId}' is not exposed by the native editor state.`);
+      }
+      lightingSnapshot.groups = movedBefore(groups, movedGroup, beforeGroupId);
+      const summary = `Lighting group '${groupId}' was reordered in the rail.`;
+      finishLightingAction(context, lightingSnapshot, summary, "group-reordered");
+      return { groupId, summary };
+    }
     case "lighting.power.all": {
       const on = typeof params.on === "boolean" ? params.on : null;
       if (on === null) {
@@ -1399,4 +1594,95 @@ export function handleFixtureLightingRequest(
     default:
       return NOT_HANDLED;
   }
+}
+
+// What a lighting action leaves behind on the hardware link: the last action
+// on the snapshot, the rest of the double brought in line, one `lighting.changed`.
+function finishLightingAction(
+  context: FixtureRequestContext,
+  lightingSnapshot: JsonObject,
+  summary: string,
+  reason: string
+) {
+  lightingSnapshot.lastActionStatus = "succeeded";
+  lightingSnapshot.lastActionCode = null;
+  lightingSnapshot.lastActionMessage = summary;
+  lightingSnapshot.summary = summary;
+  context.state.lightingSnapshot = lightingSnapshot;
+  synchronizeFixtureState(context.state);
+  context.emit("lighting.changed", { reason });
+}
+
+function storedFixture(lightingSnapshot: JsonObject, fixtureId: string): JsonObject {
+  const fixture = lightingFixtures(lightingSnapshot).find((entry) => asString(entry.id) === fixtureId);
+  if (!fixture) {
+    throw new Error(`Lighting fixture '${fixtureId}' is not exposed by the native editor state.`);
+  }
+  return fixture;
+}
+
+// The rails' reorder rule (`reorder_lighting_scene`, `reorder_lighting_group`):
+// out of the list, then in before the anchor, or last when there is none.
+function movedBefore(entries: readonly JsonObject[], moved: JsonObject, beforeId: string | null): JsonObject[] {
+  const rest = entries.filter((entry) => entry !== moved);
+  const anchorIndex = beforeId === null ? -1 : rest.findIndex((entry) => asString(entry.id) === beforeId);
+  return anchorIndex < 0 ? [...rest, moved] : [...rest.slice(0, anchorIndex), moved, ...rest.slice(anchorIndex)];
+}
+
+// The request checks below say what `E/lighting/parse.rs` says, word for word.
+function requiredText(params: JsonObject, key: string): string {
+  const raw = params[key];
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (!value) {
+    throw new Error(`${key} is required`);
+  }
+  return value;
+}
+
+function fixtureIdList(params: JsonObject, field: string): string[] {
+  const value = params[field];
+  if (!Array.isArray(value)) {
+    throw new Error(`${field} must be an array of strings`);
+  }
+  return value.map((entry) => {
+    const fixtureId = typeof entry === "string" ? entry.trim() : "";
+    if (!fixtureId) {
+      throw new Error(`${field} entries must be non-empty strings`);
+    }
+    return fixtureId;
+  });
+}
+
+// Absent, null or blank is "move to the end".
+function reorderAnchor(params: JsonObject, key: string, movedId: string, movedKey: string): string | null {
+  const value = params[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`${key} must be a string or null`);
+  }
+  const anchorId = value.trim();
+  if (!anchorId) {
+    return null;
+  }
+  if (anchorId === movedId) {
+    throw new Error(`${key} must differ from ${movedKey}`);
+  }
+  return anchorId;
+}
+
+// `parse_i64_value`: a whole number, or a finite one rounded.
+function wholeMilliseconds(params: JsonObject, key: string): number {
+  const value = params[key];
+  if (value === undefined) {
+    throw new Error(`${key} is required`);
+  }
+  if (typeof value !== "number") {
+    throw new Error("value must be a number");
+  }
+  if (!Number.isFinite(value)) {
+    throw new Error("value must be a finite number");
+  }
+  return Math.round(value);
 }
