@@ -623,6 +623,12 @@ fn audio_snapshot_recall_marks_last_recalled_snapshot() {
 
 #[test]
 fn audio_snapshot_crud_uses_persisted_native_state() {
+    // The recall below starts and finishes a push on the process-wide console
+    // link, so it runs one at a time with the console-link tests: in parallel
+    // it finished a push one of them had begun (2026-09-22).
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("snapshot-crud");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
@@ -696,6 +702,11 @@ fn audio_snapshot_crud_uses_persisted_native_state() {
 
 #[test]
 fn audio_channel_update_persists_front_preamp_controls() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("channel-front-preamp");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
@@ -812,6 +823,11 @@ fn assert_console_datagram_received(receiver: &std::net::UdpSocket, context: &st
 
 #[test]
 fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("clear-all-solo");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     // Solo is a console write, so this test now runs under the same gate the
@@ -868,6 +884,11 @@ fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
 // the console "aligned" — the exact behaviour the audit flagged.
 #[test]
 fn audio_channel_update_is_refused_before_probe_passes() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("channel-not-verified");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
@@ -989,6 +1010,11 @@ fn audio_channel_name_only_update_is_allowed_before_probe_passes() {
 
 #[test]
 fn audio_channel_update_validates_before_sending() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("channel-validate-first");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     // Bind (which re-points the transport and therefore resets the probe
@@ -1116,6 +1142,11 @@ fn audio_channel_update_rejects_unsupported_gain_controls() {
 // control-room path (replaces `audio_mix_target_update_succeeds_before_probe_passes`).
 #[test]
 fn audio_mix_target_update_is_refused_before_probe_passes() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("mix-target-not-verified");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());

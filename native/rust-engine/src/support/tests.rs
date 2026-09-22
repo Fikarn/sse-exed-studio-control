@@ -172,6 +172,11 @@ fn export_support_backup_writes_archive_and_lists_it() {
 
 #[test]
 fn restore_support_backup_round_trips_native_archive() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("restore-native");
     let runtime = test_dir.runtime();
     let legacy_path = test_dir.path().join("legacy-db.json");

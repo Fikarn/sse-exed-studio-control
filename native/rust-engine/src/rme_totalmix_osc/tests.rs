@@ -756,6 +756,11 @@ fn service_console_link_reads_back_over_the_global_slot_and_confirms() {
 
 #[test]
 fn test_guard_drops_sends_to_real_totalmix_ports_only() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     // The studio workstation runs this suite with TotalMix listening on
     // 7001-7004; nothing a test sends may reach it.
     assert!(super::test_guard_blocks_console_port(7001));
@@ -868,6 +873,11 @@ fn global_channel_target_maps_hardware_numbering() {
 
 #[test]
 fn send_totalmix_channel_update_emits_global_absolute_commands() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let (receiver, port) = bind_test_receiver();
     // Global OSC commands go to the global slot at send_port + 3.
     let base_port = port as i64 - 3;
@@ -941,6 +951,11 @@ fn send_totalmix_channel_update_emits_global_absolute_commands() {
 
 #[test]
 fn send_totalmix_channel_update_reaches_non_main_submixes_and_absolute_off() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let (receiver, port) = bind_test_receiver();
     let base_port = port as i64 - 3;
     let snapshot = read_audio_snapshot(&HashMap::new());
@@ -988,6 +1003,11 @@ fn send_totalmix_channel_update_reaches_non_main_submixes_and_absolute_off() {
 
 #[test]
 fn send_totalmix_channel_update_handles_lines_and_playback_channels() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let (receiver, port) = bind_test_receiver();
     let base_port = port as i64 - 3;
     let snapshot = read_audio_snapshot(&HashMap::new());
@@ -1057,6 +1077,11 @@ fn send_totalmix_channel_update_handles_lines_and_playback_channels() {
 
 #[test]
 fn send_totalmix_mix_target_update_uses_output_faderlin_and_control_room() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let (receiver, port) = bind_test_receiver();
     let base_port = port as i64 - 3;
 
@@ -1087,6 +1112,11 @@ fn send_totalmix_mix_target_update_uses_output_faderlin_and_control_room() {
 
 #[test]
 fn send_totalmix_mix_target_update_keeps_phones_control_room_functions_local() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let (receiver, port) = bind_test_receiver();
     let base_port = port as i64 - 3;
 
