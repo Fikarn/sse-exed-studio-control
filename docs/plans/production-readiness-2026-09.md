@@ -485,7 +485,7 @@ This follow-up's own run is not recorded, by convention.
 
 The second half of the item, the double's Recent-actions rows, is the next entry.
 
-**2026-09-22 — the fixture double's Recent actions** (commit `fix(fixture-double): Recent actions list every action the screen asks for, as the hardware link records it`; not a slice; the second half of the item Slice 14 handed on in its Rescope (12)). The double wrote a Recent-actions row for `lighting.output.setArmed` only, from inside that one handler. Against it nothing done on the Lighting page, the Console or in Setup showed in Setup / Support's Recent actions, where the hardware link writes a row for every discrete action that reaches a device (Slice 11, F30).
+**2026-09-22 — the fixture double's Recent actions** (commit `a598b11` `fix(fixture-double): Recent actions list every action the screen asks for, as the hardware link records it`; not a slice; the second half of the item Slice 14 handed on in its Rescope (12)). The double wrote a Recent-actions row for `lighting.output.setArmed` only, from inside that one handler. Against it nothing done on the Lighting page, the Console or in Setup showed in Setup / Support's Recent actions, where the hardware link writes a row for every discrete action that reaches a device (Slice 11, F30).
 
 The fix, in `frontend/packages/engine-client/src/transports/`:
 
@@ -502,6 +502,8 @@ Guards:
 Found on the way, not changed (open): **the Lighting page goes on showing an identify flash after it has ended.** The flash is shown over the rig while it lasts (`E/lighting/snapshot.rs`, and now the double), the page reads the lighting state right after the press, and nothing reads it again when the flash ends: no event is raised when a flash ends, and nothing on the page re-reads the lighting state on a timer. So after Identify the light reads 100 percent at its highest colour temperature, the header says "Scene drift: unsaved", and both stay until something else refreshes Lighting — leaving the page then asks about unsaved changes nobody made. Seen with the double three seconds after a press; not checked on the live app, where the hardware link does the same by its code. A Find leaves its first light's flash on screen the same way; the later flashes are never read. The browser case above runs the flash out on a stopped clock before the recall for that reason.
 
 Validation (workstation, 2026-09-22): `frontend:typecheck` clean; `frontend:test` 381 (app 97, design-system 175, engine-client 94 — was 53 — tokens 15); `frontend:playwright:test` 432 passed in 3.5 min (the new case among them; nothing quarantined), no capture and no ratchet moved; `npm run dev:check` green. No engine, shell or screen source changed, so the live app is untouched and no board or baseline moved.
+
+CI (result, 2026-09-22): run 35762169673 on `a598b11`. All ten jobs green on the first attempt, 13.4 min from push to the last job: `frontend-e2e` 8.2 min (`default` 432 passed in 7.2 min, the new Recent-actions case among them, nothing quarantined), `qualification` 11.2, `rust-coverage` 3.9 (80.17 % of 34,965 lines), `rust` 2.3 (430 passed / 1 ignored), `tauri-foundation` 2.1, `format-protocol` 1.5, `frontend-test` 1.1 (381 cases: app 97, design-system 175, engine-client 94, tokens 15), `supply-chain` 0.9, `frontend-typecheck` 0.6, `lint` 0.4. This follow-up's own run is not recorded, by convention.
 
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
