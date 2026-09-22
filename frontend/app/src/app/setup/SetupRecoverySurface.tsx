@@ -9,6 +9,7 @@ import {
   describeBackupKind,
   formatBackupTimestamp,
   getSupportBackups,
+  healthCheckTone,
   statusToneLabel,
   type SnapshotRecord,
 } from "../shellData";
@@ -93,7 +94,10 @@ export function SetupRecoverySurface({
     return {
       detail: String(check?.summary ?? `${label} reported nothing at startup.`),
       label,
-      tone: asStatusTone(check?.status, failure ? "attention" : "info"),
+      // The hardware link reports each check in its own words (`ready`,
+      // `not-verified`, `unavailable`, …); `healthCheckTone` reads them as the
+      // header does. A check that said nothing keeps the fallback.
+      tone: check?.status === undefined ? (failure ? "attention" : "info") : healthCheckTone(check.status),
     };
   });
 

@@ -1,5 +1,5 @@
 import { SetupStepScreen, SetupFactCard, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
-import { formatBackupTimestamp, asStatusTone } from "../../shellData";
+import { formatBackupTimestamp, healthCheckTone } from "../../shellData";
 import { Key } from "@sse/design-system";
 import { runnerStepOrder } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
@@ -127,7 +127,7 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
               <SetupRecordRow
                 label="Companion profile"
                 value={String(controlSurface?.summary ?? "not exported yet")}
-                tone={asStatusTone(controlSurface?.status, "info") === "ok" ? "ok" : "attention"}
+                tone={healthCheckTone(controlSurface?.status) === "ok" ? "ok" : "attention"}
               />
               <SetupRecordRow
                 label="Override"

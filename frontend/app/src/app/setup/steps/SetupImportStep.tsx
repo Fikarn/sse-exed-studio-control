@@ -1,7 +1,7 @@
 import { SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
 import styles from "../SetupSupportPilot.module.css";
 import { Key } from "@sse/design-system";
-import { asStatusTone } from "../../shellData";
+import { healthCheckTone } from "../../shellData";
 import { runnerStepOrder } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
@@ -72,7 +72,7 @@ export function SetupImportStep({ editor }: { editor: SetupPilot }) {
               <SetupRecordRow
                 label="Companion link"
                 value={String(controlSurface?.summary ?? "Pending")}
-                tone={asStatusTone(controlSurface?.status, "info") === "ok" ? "ok" : "attention"}
+                tone={healthCheckTone(controlSurface?.status) === "ok" ? "ok" : "attention"}
               />
               <SetupRecordRow label="Deck pages" value={String(pages.length)} tone={pages.length > 0 ? "ok" : "off"} />
               <SetupRecordRow
