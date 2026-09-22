@@ -16,6 +16,7 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { carriesLaunchNumber, launchNumberOf } from "./tauri-launch-number.mjs";
 import { createQualificationEvidence } from "./tauri-qualification-evidence.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -672,15 +673,33 @@ async function runSetupSupportQualification() {
       seededStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
       "Expected demo seeding to populate two planning projects before the database backup."
     );
-    const generationBeforeRestart = seededStatus.status.testBridge.engineGeneration;
+    // Launch numbers reach the status file after the fact, so each count starts
+    // from a number that was waited for and waits for the next one
+    // (`tauri-launch-number.mjs`).
+    const generationBeforeRestart = launchNumberOf(
+      await waitForStatus({
+        child: secondRun,
+        label: "launch number before the requested restart",
+        predicate: carriesLaunchNumber(),
+        statusPath: secondSession.statusPath,
+      })
+    );
     const restartedStatus = await dispatchCommand(secondSession, secondRun, "restart");
     assert(
       restartedStatus.status.shellState.lifecycle === "ready",
       `Expected the shell to be ready after the requested restart, got '${restartedStatus.status.shellState.lifecycle}'.`
     );
+    const launchAfterRestart = launchNumberOf(
+      await waitForStatus({
+        child: secondRun,
+        label: "launch number after the requested restart",
+        predicate: carriesLaunchNumber(generationBeforeRestart),
+        statusPath: secondSession.statusPath,
+      })
+    );
     assert(
-      restartedStatus.status.testBridge.engineGeneration === generationBeforeRestart + 1,
-      `Expected launch ${generationBeforeRestart + 1} after the requested restart, got ${restartedStatus.status.testBridge.engineGeneration}.`
+      launchAfterRestart === generationBeforeRestart + 1,
+      `Expected launch ${generationBeforeRestart + 1} after the requested restart, got ${launchAfterRestart}.`
     );
     const backupsDir = restartedStatus.status.shellState.supportSnapshot?.backupDir;
     assert(
@@ -749,9 +768,17 @@ async function runSetupSupportQualification() {
         restoreDatabaseStatus.status.shellState.startupFailure === null,
       `Expected the shell to be ready again after the restart the restore asked for, got '${restoreDatabaseStatus.status.shellState.lifecycle}'.`
     );
+    const launchAfterRestore = launchNumberOf(
+      await waitForStatus({
+        child: secondRun,
+        label: "launch number after the restore's restart",
+        predicate: carriesLaunchNumber(launchAfterRestart),
+        statusPath: secondSession.statusPath,
+      })
+    );
     assert(
-      restoreDatabaseStatus.status.testBridge.engineGeneration === generationBeforeRestart + 2,
-      `Expected launch ${generationBeforeRestart + 2} after the restore's restart, got ${restoreDatabaseStatus.status.testBridge.engineGeneration}.`
+      launchAfterRestore === generationBeforeRestart + 2,
+      `Expected launch ${generationBeforeRestart + 2} after the restore's restart, got ${launchAfterRestore}.`
     );
     assert(
       restoreDatabaseStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
@@ -885,14 +912,19 @@ async function runSetupSupportQualification() {
     // restored from the recovery surface stages without a rollback copy (the
     // damaged file cannot be copied), the shell restarts into it, and the
     // damaged file is kept as a `replaced` backup, byte for byte.
+    // The launch number is waited for as well: on run 35714853611 the list
+    // arrived before it, `null + 1` made 1, and a restore that restarted the
+    // engine once (launch 1 -> 2) failed as a restart too many.
     const listedInRecovery = await waitForStatus({
       child: corruptRun,
       label: "backup list on the recovery surface",
       predicate: (value) =>
-        value?.shellState?.lifecycle === "failed" && (value?.shellState?.supportSnapshot?.backupCount ?? 0) >= 1,
+        value?.shellState?.lifecycle === "failed" &&
+        (value?.shellState?.supportSnapshot?.backupCount ?? 0) >= 1 &&
+        carriesLaunchNumber()(value),
       statusPath: corruptSession.statusPath,
     });
-    const recoveryGeneration = listedInRecovery.testBridge.engineGeneration;
+    const recoveryGeneration = launchNumberOf(listedInRecovery);
     const recoveryVerify = await dispatchCommand(corruptSession, corruptRun, "verifySupportBackup", {
       path: recoveryBackupPath,
     });
@@ -912,9 +944,17 @@ async function runSetupSupportQualification() {
         recoveryRestore.status.shellState.startupFailure === null,
       `Expected the shell to reach ready after restoring from the recovery surface, got '${recoveryRestore.status.shellState.lifecycle}'.`
     );
+    const launchAfterRecoveryRestore = launchNumberOf(
+      await waitForStatus({
+        child: corruptRun,
+        label: "launch number after the restore's restart",
+        predicate: carriesLaunchNumber(recoveryGeneration),
+        statusPath: corruptSession.statusPath,
+      })
+    );
     assert(
-      recoveryRestore.status.testBridge.engineGeneration === recoveryGeneration + 1,
-      `Expected launch ${recoveryGeneration + 1} after the restore's restart, got ${recoveryRestore.status.testBridge.engineGeneration}.`
+      launchAfterRecoveryRestore === recoveryGeneration + 1,
+      `Expected launch ${recoveryGeneration + 1} after the restore's restart, got ${launchAfterRecoveryRestore}.`
     );
     assert(
       recoveryRestore.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
@@ -926,7 +966,7 @@ async function runSetupSupportQualification() {
       `Expected the damaged file to be kept as one replaced backup, byte for byte, got ${JSON.stringify(replacedJunk)}.`
     );
     evidence.recordCheck("corrupt-db-restores-from-database-backup", {
-      generation: recoveryRestore.status.testBridge.engineGeneration,
+      generation: launchAfterRecoveryRestore,
       replaced: replacedJunk[0],
     });
   } finally {
