@@ -6,6 +6,7 @@ import { handleFixtureSetupRequest } from "./fixture/setupRequests";
 import type { FixtureScenario, EngineTransport } from "../types";
 import type { EventEnvelope, EventName, JsonObject, RequestMethod, JsonValue } from "../generated/protocol";
 import { createMutableFixtureState, synchronizeFixtureState } from "./fixture/state";
+import { recordUiActions } from "./fixture/actionLog";
 import { fixtureEvent, asRecord, cloneJson } from "./fixture/json";
 import {
   refreshFixtureAudioMetering,
@@ -108,7 +109,12 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       default: {
         for (const handleDomainRequest of FIXTURE_REQUEST_HANDLERS) {
           const result = handleDomainRequest(context, method, params);
-          if (result !== NOT_HANDLED) return result;
+          if (result !== NOT_HANDLED) {
+            // The action log, as the hardware link writes it at its one entry
+            // point: after the answer, and never while storage is refused.
+            if (startupFailure === null) recordUiActions(state, method, params, result);
+            return result;
+          }
         }
         return {};
       }

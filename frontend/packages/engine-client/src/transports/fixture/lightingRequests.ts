@@ -1558,8 +1558,9 @@ export function handleFixtureLightingRequest(
       };
     }
     // 2026-09 production readiness, Slice 11 (F31): as the hardware link
-    // does it — the flag on the lighting snapshot, the row in the action
-    // log (the screen's, newest first, fifty kept) and `lighting.changed`.
+    // does it — the flag on the lighting snapshot and `lighting.changed`; the
+    // Recent-actions row is the action log's (`actionLog.ts`), as for every
+    // action the screen asks for.
     case "lighting.output.setArmed": {
       const armed = typeof params.armed === "boolean" ? params.armed : null;
       if (armed === null) {
@@ -1568,20 +1569,6 @@ export function handleFixtureLightingRequest(
       const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
       lightingSnapshot.outputArmed = armed;
       state.lightingSnapshot = lightingSnapshot;
-      const recentEvents = asArray(state.supportSnapshot.recentEvents)
-        .map((entry) => asRecord(entry))
-        .filter((entry): entry is JsonObject => entry !== null);
-      const newestId = recentEvents.reduce((highest, entry) => Math.max(highest, asNumber(entry.id, 0)), 0);
-      recentEvents.unshift({
-        id: newestId + 1,
-        at: new Date().toISOString(),
-        source: "ui",
-        domain: "lighting",
-        action: armed ? "outputs-armed" : "outputs-held",
-        target: "Light outputs",
-        detail: armed ? "Light outputs armed" : "Light outputs held",
-      });
-      state.supportSnapshot.recentEvents = recentEvents.slice(0, 50);
       synchronizeFixtureState(state);
       emit("lighting.changed", { reason: "output-armed-changed" });
       return {

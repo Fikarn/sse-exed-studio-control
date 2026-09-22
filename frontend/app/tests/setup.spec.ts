@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import { openFixture } from "./helpers/openFixture";
+import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
+import { pausePageClock } from "./helpers/pageClock";
 
 // plan PR 4 / workstream D4: setup / commissioning surface specs split
 // out of operator-shell.spec.ts. Covers the setup-required runner walk,
@@ -391,4 +392,48 @@ test.describe("Light outputs: Armed / Held", () => {
     const dangerBox = await plate.getByTestId("support-restart-bridge").boundingBox();
     expect((listBox?.y ?? 0) + (listBox?.height ?? 0)).toBeLessThan(dangerBox?.y ?? 0);
   });
+});
+
+// 2026-09-22, after the production readiness program: the fixture double writes
+// the rows the hardware link writes for every action the screen asks for
+// (`transports/fixture/actionLog.ts`, after `native/rust-engine/src/action_log.rs`).
+// Until then it wrote one for the light-outputs switch only, so nothing done on
+// the Lighting page ever showed here.
+test("Recent actions lists what was done on the Lighting page, newest first, from the screen", async ({ page }) => {
+  // The identify flash is shown over the rig while it lasts, and a rig that
+  // differs from its scene makes leaving Lighting ask about unsaved changes;
+  // the page's clock is stopped so the flash can be run out before the recall.
+  await page.clock.install();
+  await openFixture(page, "lighting-populated");
+  await expectWorkspaceMounted(page, "lighting");
+  await pausePageClock(page);
+
+  const highlight = page.getByTestId("lighting-highlight-toggle");
+  await highlight.click();
+  await expect(highlight).toHaveAttribute("aria-pressed", "true");
+  await highlight.click();
+  await expect(highlight).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "Identify", exact: true }).click();
+  await expect(page.getByText("Identify burst sent to 'Key'.")).toBeVisible();
+  await page.clock.runFor(1_300);
+  await page.getByRole("button", { name: "Recall scene Interview", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Recall scene Interview \(active/ })).toBeVisible();
+
+  await page
+    .getByRole("navigation", { name: "Workspace navigation" })
+    .getByRole("button", { name: "Setup / Support", exact: true })
+    .click();
+  const rows = page.getByTestId("support-plate").getByTestId("support-recent-action");
+  await expect(rows).toHaveCount(4);
+  const details = [
+    "Scene recalled: Interview",
+    "Identify flash (fixture-key)",
+    "Highlight and light solo off",
+    "Highlight on · 1 light(s)",
+  ];
+  for (const [index, detail] of details.entries()) {
+    await expect(rows.nth(index)).toContainText(detail);
+    await expect(rows.nth(index)).toContainText("Screen");
+    await expect(rows.nth(index)).toHaveAttribute("data-source", "ui");
+  }
 });
