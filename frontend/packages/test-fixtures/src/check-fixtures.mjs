@@ -55,11 +55,41 @@ function requireBoolean(scenario, value, fieldPath) {
 // satisfy. The check tolerates absent fields — only validates the shape
 // when present, so fixtures that intentionally omit a workspace (e.g.
 // `startup-loading` has no audioSnapshot) don't trip the gate.
+// 2026-09-22: the fixtures say what the hardware link says. It reports the rig
+// and the console in their own words (`native/rust-engine/src/lighting/snapshot.rs`,
+// `audio/snapshot.rs`) and the Stream Deck bridge by whether it is serving
+// (`control_surface.rs`); the browser double used to answer `ok` / `attention`
+// for all three, and the screen only knew those. The lighting state may also say
+// `loading`, the fixtures' own word for the board where the rig has not
+// answered yet; a health check never does.
+const RIG_WORDS = new Set(["unconfigured", "disabled", "ready", "attention", "not-verified"]);
+const LIGHTING_STATE_WORDS = new Set([...RIG_WORDS, "loading"]);
+const CONSOLE_WORDS = new Set(["ready", "attention", "not-verified"]);
+const BRIDGE_WORDS = new Set(["ready", "unavailable"]);
+
+function requireWord(scenario, value, allowed, fieldPath) {
+  if (value === undefined) {
+    return;
+  }
+  requireString(scenario, value, fieldPath);
+  if (!allowed.has(value)) {
+    fail(scenario, `${fieldPath} must be one of ${[...allowed].join(", ")}; got "${value}"`);
+  }
+}
+
 function validateFixture(scenario, entry) {
   requireObject(scenario, entry, "scenario root");
 
   if (entry.appSnapshot !== undefined) {
     requireObject(scenario, entry.appSnapshot, "appSnapshot");
+    if (entry.appSnapshot.runtime !== undefined) {
+      requireObject(scenario, entry.appSnapshot.runtime, "appSnapshot.runtime");
+      const bridge = entry.appSnapshot.runtime.controlSurface;
+      if (bridge !== undefined) {
+        requireObject(scenario, bridge, "appSnapshot.runtime.controlSurface");
+        requireWord(scenario, bridge.status, BRIDGE_WORDS, "appSnapshot.runtime.controlSurface.status");
+      }
+    }
     if (entry.appSnapshot.startup !== undefined) {
       requireObject(scenario, entry.appSnapshot.startup, "appSnapshot.startup");
       if (entry.appSnapshot.startup.targetSurface !== undefined) {
@@ -86,6 +116,7 @@ function validateFixture(scenario, entry) {
     if (entry.audioSnapshot.verified !== undefined) {
       requireBoolean(scenario, entry.audioSnapshot.verified, "audioSnapshot.verified");
     }
+    requireWord(scenario, entry.audioSnapshot.status, CONSOLE_WORDS, "audioSnapshot.status");
   }
 
   if (entry.planningSnapshot !== undefined && entry.planningSnapshot !== null) {
@@ -112,6 +143,7 @@ function validateFixture(scenario, entry) {
     if (entry.lightingSnapshot.reachable !== undefined) {
       requireBoolean(scenario, entry.lightingSnapshot.outputArmed, "lightingSnapshot.outputArmed");
     }
+    requireWord(scenario, entry.lightingSnapshot.status, LIGHTING_STATE_WORDS, "lightingSnapshot.status");
   }
 
   // Slice 11: `recentEvents` is the action log's newest rows — a list of rows
@@ -139,6 +171,16 @@ function validateFixture(scenario, entry) {
     // on the workstation.
     if (entry.healthSnapshot.recentLogExcerpt !== undefined) {
       requireString(scenario, entry.healthSnapshot.recentLogExcerpt, "healthSnapshot.recentLogExcerpt");
+    }
+    if (entry.healthSnapshot.checks !== undefined) {
+      requireObject(scenario, entry.healthSnapshot.checks, "healthSnapshot.checks");
+      const words = { lighting: RIG_WORDS, audio: CONSOLE_WORDS, controlSurface: BRIDGE_WORDS };
+      for (const [key, allowed] of Object.entries(words)) {
+        const check = entry.healthSnapshot.checks[key];
+        if (check === undefined) continue;
+        requireObject(scenario, check, `healthSnapshot.checks.${key}`);
+        requireWord(scenario, check.status, allowed, `healthSnapshot.checks.${key}.status`);
+      }
     }
   }
 

@@ -56,7 +56,7 @@ describe("the Lighting lamp and held light outputs", () => {
 });
 
 // 2026-09-21: the header lamps must read the hardware link's own health words.
-// The fixture double says `ok` / `attention`; the engine says `ready`,
+// The fixture double said `ok` / `attention` until 2026-09-22; the engine says `ready`,
 // `not-verified`, `attention` (audio and lighting, which also say
 // `unconfigured` / `disabled`) and `ready` / `unavailable` (the Stream Deck
 // bridge, `native/rust-engine/src/control_surface_http.rs`). Only the fixture's
@@ -116,7 +116,7 @@ describe("the header lamps read the hardware link's own words", () => {
     expect(lamps({}).deck).toEqual({ detail: "pending", status: "attention" });
   });
 
-  it("the fixture double's words keep what they showed", () => {
+  it("the older words `ok` / `attention` keep what they showed", () => {
     const fixture = lamps({
       audio: { status: "ok" },
       lighting: { status: "attention" },

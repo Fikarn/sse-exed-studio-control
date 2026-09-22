@@ -648,10 +648,11 @@ function statusLabelFor(check: { status?: string } | undefined, fallback: string
 /** The tone of a health check in the header. The hardware link reports its
  *  subsystems in words of its own — audio and lighting `ready` /
  *  `not-verified` / `attention` (lighting also `unconfigured` / `disabled`),
- *  the Stream Deck bridge `ready` / `unavailable` — while the fixture double
- *  says `ok` / `attention`. Until 2026-09-21 only the fixture's words were
- *  mapped, so on the workstation a healthy Audio, Lighting and Deck all read as
- *  a yellow "pending". */
+ *  the Stream Deck bridge `ready` / `unavailable`. Until 2026-09-21 only the
+ *  fixture double's `ok` / `attention` were mapped, so on the workstation a
+ *  healthy Audio, Lighting and Deck all read as a yellow "pending"; the double
+ *  has said the hardware link's words since 2026-09-22, and the older two
+ *  still map as they did. */
 export function healthCheckTone(status: unknown): StatusToneLike {
   switch (status) {
     case "ready":

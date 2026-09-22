@@ -34,6 +34,10 @@ export interface MutableFixtureState {
   lightingSnapshot: JsonObject;
   /** The identify flashes; they show in `lighting.snapshot` while they last, never in the stored rig. */
   lightingIdentifyBursts: IdentifyBursts;
+  /** What the scenario itself said about the rig, before any default: its status
+   *  stands in for a lighting probe until one runs, and an explicit `enabled`
+   *  is kept (the hardware link's `app.lighting.enabled`). */
+  lightingAuthored: { status: string | null; enabled: boolean | null };
   audioSnapshot: JsonObject | null;
   planningSnapshot: JsonObject | null;
   supportSnapshot: JsonObject;
@@ -219,6 +223,16 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
     ),
     lightingSnapshot: cloneJson((scenario.lightingSnapshot ?? buildDefaultLightingSnapshot()) as JsonObject),
     lightingIdentifyBursts: {},
+    lightingAuthored: {
+      status:
+        typeof asRecord(scenario.lightingSnapshot)?.status === "string"
+          ? asString(asRecord(scenario.lightingSnapshot)?.status)
+          : null,
+      enabled:
+        typeof asRecord(scenario.lightingSnapshot)?.enabled === "boolean"
+          ? asBoolean(asRecord(scenario.lightingSnapshot)?.enabled)
+          : null,
+    },
     audioSnapshot:
       "audioSnapshot" in scenario
         ? scenario.audioSnapshot === null
@@ -276,6 +290,66 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
   }
 
   return state;
+}
+
+// The words the hardware link uses, and the state it reads them from.
+// `native/rust-engine/src/`: a probe is `idle`, `passed` or `failed`
+// (`commissioning.rs`); the rig is `unconfigured`, `disabled`, `ready`,
+// `attention` or `not-verified` (`lighting/snapshot.rs`); the console is
+// `ready`, `attention` or `not-verified` (`audio/snapshot.rs`); the Stream
+// Deck bridge is `ready` or `unavailable` (`control_surface.rs`). Until
+// 2026-09-22 this double said `ok` / `attention` for all of them.
+
+type ProbeOutcome = "idle" | "passed" | "failed";
+
+/** A probe's outcome. Scenarios written before 2026-09-22 say `ok` for a probe
+ *  that passed and `attention` for one not run or not confirmed; the double's
+ *  audio state has always read `attention` as not run, and so does this. */
+function probeOutcome(status: unknown): ProbeOutcome {
+  const value = asString(status);
+  if (value === "passed" || value === "ok") return "passed";
+  if (value === "failed" || value === "error") return "failed";
+  return "idle";
+}
+
+/** A scenario's own rig status, standing in for a probe that has not run in this session. */
+function authoredProbe(status: string | null): ProbeOutcome {
+  return status === "ready" ? "passed" : status === "attention" ? "failed" : "idle";
+}
+
+/**
+ * The rig's word by the hardware link's rule (`E/lighting/snapshot.rs` over
+ * `resolve_lighting_config`), worked out again on every sync as the hardware
+ * link does on every read: the bridge address the lighting probe stores, the
+ * rig on unless it was switched off (on by default once there is an address),
+ * then the probe's outcome. Until a probe runs, a scenario's own status stands
+ * in for it. The probe stores the address it was given before it runs
+ * (`E/commissioning.rs`), so a probe that has run means an address, even where
+ * a scenario leaves it out.
+ */
+function rigStatusWord(state: MutableFixtureState, lightingProbe: ProbeOutcome): string {
+  const addressed = rigAddressed(state, lightingProbe);
+  if (!rigSwitchedOn(state, lightingProbe)) return addressed ? "disabled" : "unconfigured";
+  const probe = lightingProbe === "idle" ? authoredProbe(state.lightingAuthored.status) : lightingProbe;
+  return probe === "passed" ? "ready" : probe === "failed" ? "attention" : "not-verified";
+}
+
+function rigAddressed(state: MutableFixtureState, lightingProbe: ProbeOutcome): boolean {
+  const probedBridge = asString(asRecord(state.commissioningSnapshot.lighting)?.bridgeIp).trim();
+  const bridgeIp = probedBridge || asString(asRecord(state.lightingSnapshot)?.bridgeIp).trim();
+  return bridgeIp !== "" || lightingProbe !== "idle";
+}
+
+/** Lighting is on unless the scenario switched it off, and on by default once there is an address. */
+function rigSwitchedOn(state: MutableFixtureState, lightingProbe: ProbeOutcome): boolean {
+  return state.lightingAuthored.enabled ?? rigAddressed(state, lightingProbe);
+}
+
+/** The console's word by the hardware link's rule (`E/audio/snapshot.rs`): the
+ *  probe's outcome alone. (The double's own audio state still says
+ *  `not-verified` while OSC is off; the hardware link does not.) */
+function consoleStatusWord(audioProbe: ProbeOutcome): string {
+  return audioProbe === "passed" ? "ready" : audioProbe === "failed" ? "attention" : "not-verified";
 }
 
 export function ensureCommissioningChecks(state: MutableFixtureState) {
@@ -510,7 +584,10 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
   );
 
   controlSurface.available = asBoolean(controlSurface.available, true);
-  controlSurface.status = controlSurface.available ? "ok" : "attention";
+  // The hardware link says whether the bridge is serving, in its own words
+  // (`E/control_surface.rs`: ready / unavailable), not whether the deck has
+  // been verified.
+  controlSurface.status = controlSurface.available ? "ready" : "unavailable";
   controlSurface.summary = asString(
     controlSurface.summary,
     controlSurface.available ? "Companion bridge ready." : "Companion bridge unavailable."
@@ -557,8 +634,9 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
 
   const lightingCheck = checks.find((check) => check.id === "lighting");
   const audioCheck = checks.find((check) => check.id === "audio");
-  const controlSurfaceCheck = checks.find((check) => check.id === "control-surface");
-  const lightingReady = asString(lightingCheck?.status) === "passed" || asString(lightingCheck?.status) === "ok";
+  const lightingCheckStatus = probeOutcome(lightingCheck?.status);
+  const audioCheckStatus = probeOutcome(audioCheck?.status);
+  const lightingReady = lightingCheckStatus === "passed";
 
   state.healthSnapshot.status = hasCompletedSetup && allChecksPassed ? "ok" : "attention";
   state.healthSnapshot.startupPhase = hasCompletedSetup ? "ready" : "waiting-for-app-snapshot";
@@ -574,25 +652,6 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
     : allChecksPassed
       ? "System healthy and ready."
       : `Operator mode is available, but ${unsettledCheckLabels.join(" and ")} need attention.`;
-  state.healthSnapshot.checks = {
-    lighting: {
-      status:
-        asString(lightingCheck?.status) === "passed" || asString(lightingCheck?.status) === "ok" ? "ok" : "attention",
-      summary: asString(lightingCheck?.message, "Bridge not commissioned."),
-    },
-    audio: {
-      status: asString(audioCheck?.status) === "passed" || asString(audioCheck?.status) === "ok" ? "ok" : "attention",
-      summary: asString(audioCheck?.message, "Console not commissioned."),
-    },
-    controlSurface: {
-      status:
-        asString(controlSurfaceCheck?.status) === "passed" || asString(controlSurfaceCheck?.status) === "ok"
-          ? "ok"
-          : "attention",
-      summary: asString(controlSurfaceCheck?.message, "Control surface not verified."),
-    },
-  };
-
   state.supportSnapshot.backups = backups;
   state.supportSnapshot.backupDir = asString(
     state.supportSnapshot.backupDir,
@@ -627,13 +686,15 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
     lightingSnapshot.universe,
     asNumber(state.commissioningSnapshot.lighting.universe, 1)
   );
-  lightingSnapshot.enabled = asBoolean(lightingSnapshot.enabled, lightingSnapshot.bridgeIp !== "");
+  state.lightingSnapshot = lightingSnapshot;
+  // The switch and the word are worked out again on every sync, as the
+  // hardware link does on every read; only the fixtures' own `loading` (the
+  // board where the rig has not answered yet) is kept as the scenario wrote it.
+  lightingSnapshot.enabled = rigSwitchedOn(state, lightingCheckStatus);
   lightingSnapshot.connected = asBoolean(lightingSnapshot.connected, lightingReady);
   lightingSnapshot.reachable = asBoolean(lightingSnapshot.reachable, lightingReady);
-  lightingSnapshot.status = asString(
-    lightingSnapshot.status,
-    lightingReady ? "ready" : lightingSnapshot.bridgeIp ? "attention" : "unconfigured"
-  );
+  lightingSnapshot.status =
+    state.lightingAuthored.status === "loading" ? "loading" : rigStatusWord(state, lightingCheckStatus);
   lightingSnapshot.summary = asString(
     lightingSnapshot.summary,
     asString(asRecord(asRecord(state.healthSnapshot.checks)?.lighting)?.summary, "Lighting snapshot pending.")
@@ -700,6 +761,7 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
   const audioSnapshotRecord = asRecord(state.audioSnapshot);
   if (!audioSnapshotRecord) {
     state.audioSnapshot = null;
+    applyHealthChecks(state, lightingCheck, audioCheck, controlSurface, lightingCheckStatus, audioCheckStatus);
     return;
   }
 
@@ -853,6 +915,44 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
   refreshAudioCapabilities(audioSnapshotRecord, state);
   state.audioSnapshot = audioSnapshotRecord;
   refreshFixtureAudioMetering(state);
+  applyHealthChecks(state, lightingCheck, audioCheck, controlSurface, lightingCheckStatus, audioCheckStatus);
+}
+
+/**
+ * Each health check in the hardware link's own words, read from the rig and the
+ * console as they now stand and from whether the Stream Deck bridge is serving
+ * (`E/health.rs`, which copies the rig's and the console's own words and the
+ * bridge's state from `control_surface.rs`; the deck's check never says
+ * whether the deck was verified). The words are worked out from the probes and
+ * the bridge address on every sync, never kept from an earlier one.
+ */
+function applyHealthChecks(
+  state: MutableFixtureState,
+  lightingCheck: JsonObject | undefined,
+  audioCheck: JsonObject | undefined,
+  controlSurface: JsonObject,
+  lightingProbe: ProbeOutcome,
+  audioProbe: ProbeOutcome
+) {
+  const lightingStatus = rigStatusWord(state, lightingProbe);
+  const audioStatus = consoleStatusWord(audioProbe);
+  state.healthSnapshot.checks = {
+    lighting: {
+      ok: lightingStatus === "ready",
+      status: lightingStatus,
+      summary: asString(lightingCheck?.message, "Bridge not commissioned."),
+    },
+    audio: {
+      ok: audioStatus === "ready",
+      status: audioStatus,
+      summary: asString(audioCheck?.message, "Console not commissioned."),
+    },
+    controlSurface: {
+      ok: asBoolean(controlSurface.available, true),
+      status: asString(controlSurface.status, "ready"),
+      summary: asString(controlSurface.summary, "Companion bridge ready."),
+    },
+  };
 }
 
 export function updateFixtureCheck(

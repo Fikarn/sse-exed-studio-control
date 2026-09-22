@@ -6,7 +6,7 @@
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,
-          "status": "attention",
+          "status": "ready",
           "summary": "Companion bridge available but setup incomplete."
         }
       },
@@ -36,15 +36,15 @@
       "summary": "Storage healthy. Operator mode locked pending setup.",
       "checks": {
         "lighting": {
-          "status": "attention",
+          "status": "unconfigured",
           "summary": "Bridge not commissioned."
         },
         "audio": {
-          "status": "attention",
+          "status": "not-verified",
           "summary": "Console not commissioned."
         },
         "controlSurface": {
-          "status": "ok",
+          "status": "ready",
           "summary": "Bridge reachable."
         }
       }
@@ -93,7 +93,7 @@
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,
-          "status": "ok",
+          "status": "ready",
           "summary": "Companion bridge ready."
         }
       },
@@ -123,15 +123,15 @@
       "summary": "System healthy and ready.",
       "checks": {
         "lighting": {
-          "status": "ok",
+          "status": "ready",
           "summary": "DMX bridge online."
         },
         "audio": {
-          "status": "ok",
+          "status": "ready",
           "summary": "OSC connection synchronized."
         },
         "controlSurface": {
-          "status": "ok",
+          "status": "ready",
           "summary": "Companion bridge responding."
         }
       }
@@ -269,7 +269,7 @@
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,
-          "status": "attention",
+          "status": "ready",
           "summary": "Companion bridge responding but the deck export is stale."
         }
       },
@@ -304,15 +304,15 @@
       "recentLogExcerpt": "[WARN] Lighting bridge changed universe after commissioning.\n[WARN] Companion profile export is older than the current planning data.",
       "checks": {
         "lighting": {
-          "status": "attention",
+          "status": "unconfigured",
           "summary": "DMX bridge needs re-verification."
         },
         "audio": {
-          "status": "ok",
+          "status": "ready",
           "summary": "OSC connection synchronized."
         },
         "controlSurface": {
-          "status": "attention",
+          "status": "ready",
           "summary": "Companion export stale."
         }
       }
