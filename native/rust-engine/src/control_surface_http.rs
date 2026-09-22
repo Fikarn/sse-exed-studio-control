@@ -41,7 +41,14 @@ const BUSY_WRITE_TIMEOUT: Duration = Duration::from_millis(200);
 const DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 const DRAIN_LIMIT_BYTES: usize = 64 * 1024;
 const WORKER_COUNT: usize = 4;
-const QUEUE_CAPACITY: usize = 16;
+/// Sized for the deck's worst instant: the exported profile's once-a-second
+/// LCD poll sends one request per audio LCD key, all at once, and the control
+/// with the most LCD refreshes sends its own burst on one press (25 + 17 on
+/// 2026-09-22). All of them must fit the workers and the queue together, with
+/// room for another press (`the_pool_holds_the_decks_worst_instant`); a queue
+/// of 16 turned the poll's last five requests away every second on the studio
+/// workstation. The thread count stays fixed whatever the queue holds.
+const QUEUE_CAPACITY: usize = 64;
 const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 
 /// The bearer token the bridge demands on every request (finding F01):
@@ -201,7 +208,7 @@ struct BridgeContext {
     log_file_path: PathBuf,
     token: String,
     port: u16,
-    rejection_log: Mutex<HashMap<u16, Instant>>,
+    rejection_log: Mutex<HashMap<u16, RejectionTally>>,
     /// Whether the workers keep one read connection each (Slice 10 — F18).
     /// The engine's bridge does; a test's bridge does not, because its
     /// workers outlive the test and would hold its temporary database open.
@@ -226,30 +233,70 @@ impl BridgeContext {
     }
 
     /// A refused request is logged at most once per status per minute, so a
-    /// flood of bad requests cannot become a flood of log lines (F06).
+    /// flood of bad requests cannot become a flood of log lines (F06). Each
+    /// line also counts the refusals with its status that went unwritten since
+    /// the one before: a line a minute was read as "refused about once a
+    /// minute" while every request was being refused (2026-09-22).
     fn note_rejection(&self, status_code: u16, message: &str) {
-        let now = Instant::now();
-        let should_log = {
+        self.note_rejection_at(status_code, message, Instant::now());
+    }
+
+    fn note_rejection_at(&self, status_code: u16, message: &str, now: Instant) {
+        let unwritten = {
             let mut recent = self
                 .rejection_log
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
-            match recent.get(&status_code) {
-                Some(last) if now.duration_since(*last) < REJECTION_LOG_INTERVAL => false,
-                _ => {
-                    recent.insert(status_code, now);
-                    true
+            match recent.get_mut(&status_code) {
+                Some(tally)
+                    if now.saturating_duration_since(tally.last_written)
+                        < REJECTION_LOG_INTERVAL =>
+                {
+                    tally.unwritten += 1;
+                    None
+                }
+                Some(tally) => {
+                    let unwritten = tally.unwritten;
+                    *tally = RejectionTally {
+                        last_written: now,
+                        unwritten: 0,
+                    };
+                    Some(unwritten)
+                }
+                None => {
+                    recent.insert(
+                        status_code,
+                        RejectionTally {
+                            last_written: now,
+                            unwritten: 0,
+                        },
+                    );
+                    Some(0)
                 }
             }
         };
-        if should_log {
+        if let Some(unwritten) = unwritten {
+            let more = if unwritten == 0 {
+                String::new()
+            } else {
+                format!(" ({unwritten} more with this status since the last such line)")
+            };
             let _ = append_log(
                 self.log_file_path.as_path(),
                 "WARN",
-                &format!("Control-surface bridge refused a request ({status_code}): {message}"),
+                &format!(
+                    "Control-surface bridge refused a request ({status_code}): {message}{more}"
+                ),
             );
         }
     }
+}
+
+/// When a refusal status was last written to the log, and how many refusals
+/// with it have gone unwritten since.
+struct RejectionTally {
+    last_written: Instant,
+    unwritten: u64,
 }
 
 /// One acceptor, a bounded queue and a fixed pool of workers (F06). A
@@ -1374,6 +1421,99 @@ mod tests {
             status_of(&last),
             200,
             "the pool must recover after the idle connections time out: {last}"
+        );
+    }
+
+    // 2026-09-22, found on the studio workstation after the profile was
+    // imported with its token: the exported profile's once-a-second LCD poll
+    // sends a request per audio LCD key all at once, and a queue of 16 turned
+    // the last five away every second — the same five keys each time. The
+    // engine's own pool must hold the deck's worst instant, the poll meeting
+    // the press that sends the most.
+    #[test]
+    fn the_pool_holds_the_decks_worst_instant() {
+        let burst = crate::exports::deck_worst_instant_requests();
+        assert!(
+            burst > crate::exports_audio::AUDIO_LCD_KEYS.len(),
+            "the poll and a press: {burst}"
+        );
+        let test_dir = ready_audio_test_db("bridge-deck-burst");
+        let port = start_test_bridge(&test_dir, WORKER_COUNT, QUEUE_CAPACITY);
+        let host = format!("127.0.0.1:{port}");
+
+        // Every connection is open before any request is sent, so no worker can
+        // finish one and make room: the whole burst waits at once.
+        let mut streams: Vec<TcpStream> = (0..burst)
+            .map(|_| TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect"))
+            .collect();
+        thread::sleep(Duration::from_millis(200));
+        for stream in &mut streams {
+            let request = format!(
+                "GET /api/deck/lcd?key=audio_strip_1 HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
+            );
+            let _ = stream.write_all(request.as_bytes());
+            let _ = stream.shutdown(Shutdown::Write);
+        }
+        let statuses: Vec<u16> = streams
+            .into_iter()
+            .map(|mut stream| {
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .expect("read timeout");
+                let mut response = Vec::new();
+                let _ = stream.read_to_end(&mut response);
+                status_of(&String::from_utf8_lossy(&response))
+            })
+            .collect();
+        let unserved = statuses.iter().filter(|status| **status != 200).count();
+        assert_eq!(
+            unserved, 0,
+            "{unserved} of {burst} requests at the deck's worst instant were not served: {statuses:?}"
+        );
+    }
+
+    #[test]
+    fn a_refusal_line_counts_the_refusals_it_stood_for() {
+        let test_dir = TestDir::new("bridge-refusal-count");
+        let log_path = test_dir.path().join("engine.log");
+        let context = BridgeContext::new(
+            test_dir.db_path(),
+            log_path.clone(),
+            TEST_TOKEN.to_string(),
+            38201,
+        );
+        let start = Instant::now();
+        let token_required = "A bearer token is required.";
+        for tenth in 0..5 {
+            context.note_rejection_at(
+                401,
+                token_required,
+                start + Duration::from_millis(tenth * 100),
+            );
+        }
+        context.note_rejection_at(503, "busy", start + Duration::from_secs(1));
+        context.note_rejection_at(401, token_required, start + Duration::from_secs(61));
+        context.note_rejection_at(401, token_required, start + Duration::from_secs(62));
+        context.note_rejection_at(401, token_required, start + Duration::from_secs(122));
+
+        let log = fs::read_to_string(&log_path).expect("the refusals were logged");
+        let lines: Vec<&str> = log
+            .lines()
+            .filter(|line| line.contains("refused a request"))
+            .collect();
+        assert_eq!(lines.len(), 4, "{log}");
+        assert!(
+            lines[0].ends_with("(401): A bearer token is required."),
+            "{log}"
+        );
+        assert!(lines[1].ends_with("(503): busy"), "{log}");
+        assert!(
+            lines[2].ends_with("(401): A bearer token is required. (4 more with this status since the last such line)"),
+            "{log}"
+        );
+        assert!(
+            lines[3].ends_with("(401): A bearer token is required. (1 more with this status since the last such line)"),
+            "{log}"
         );
     }
 }

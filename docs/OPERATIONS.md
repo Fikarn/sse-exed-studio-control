@@ -166,9 +166,10 @@ To commission or re-commission the deck:
 
 1. Open Setup or Support and verify the control-surface base URL is present in native diagnostics.
 2. If the app is up but the deck keys do nothing and Companion's log shows `401`, the Stream Deck profile predates the bridge token or was exported on another install: export it again from Setup step 1 and import it with Full Reset & Import.
-3. If the bridge is unavailable, restart the app before changing deck mappings or network assumptions.
-4. If the problem persists, collect diagnostics and confirm the host can still bind `127.0.0.1` on the configured control-surface port.
-5. Reinstall the latest known-good native build only after preserving the app-data directory and the latest support backup.
+3. Read the refusals in `engine.log` by their count, not by how often they appear. The app writes at most one line per refusal status per minute, and each line ends with how many more refusals with that status it stands for: `(1512 more with this status since the last such line)` means nearly every request is being refused, not one a minute. A `503` (`The bridge is busy with other requests`) means more requests arrived at once than the bridge holds. Since 2026-09-22 it holds the profile's worst moment, the once-a-second LCD poll meeting the busiest key, so a steady run of `503`s points at something else sending to the bridge.
+4. If the bridge is unavailable, restart the app before changing deck mappings or network assumptions.
+5. If the problem persists, collect diagnostics and confirm the host can still bind `127.0.0.1` on the configured control-surface port.
+6. Reinstall the latest known-good native build only after preserving the app-data directory and the latest support backup.
 
 ### Planning data looks wrong or missing
 

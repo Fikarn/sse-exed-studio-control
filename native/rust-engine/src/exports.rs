@@ -1407,6 +1407,44 @@ pub(crate) fn next_action_id() -> String {
     format!("act-{next}")
 }
 
+/// The most bridge requests the exported profile can have in flight at one
+/// instant: its once-a-second LCD poll, which sends every request at once,
+/// meeting the one press or turn that sends the most. The bridge's worker pool
+/// is sized to hold them all (`control_surface_http`,
+/// `the_pool_holds_the_decks_worst_instant`).
+#[cfg(test)]
+pub(crate) fn deck_worst_instant_requests() -> usize {
+    fn bridge_requests(value: &Value) -> usize {
+        match value {
+            Value::Object(map) => {
+                usize::from(map.get("connectionId").and_then(Value::as_str) == Some(INSTANCE_ID))
+                    + map.values().map(bridge_requests).sum::<usize>()
+            }
+            Value::Array(items) => items.iter().map(bridge_requests).sum(),
+            _ => 0,
+        }
+    }
+    fn entries(value: &Value) -> impl Iterator<Item = &Value> {
+        value.as_object().into_iter().flat_map(Map::values)
+    }
+
+    let config = generate_companion_config(
+        "http://127.0.0.1:38201",
+        Some("streamdeck:TESTSERIAL"),
+        "token",
+    );
+    let poll = bridge_requests(&config["triggers"]["sse-trigger-lcd-poll"]["actions"]);
+    let largest_press = entries(&config["pages"])
+        .flat_map(|page| entries(&page["controls"]))
+        .flat_map(entries)
+        .flat_map(|control| entries(&control["steps"]))
+        .flat_map(|step| entries(&step["action_sets"]))
+        .map(bridge_requests)
+        .max()
+        .unwrap_or(0);
+    poll + largest_press
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -127,12 +127,12 @@ The highest-value unresolved work is:
 
    Four bodies of work sit stacked on `origin/main`, each containing the one below it, all pushed to GitHub and **none merged**. Counts are as of `2026-09-21`:
 
-   | Branch                          | Commits ahead of `main` | What it is                                                                                           |
-   | ------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------- |
-   | `studio-bringup-sacn-globalosc` | 11                      | sACN DMX output, TotalMix Global OSC, the Stream Deck+ audio surface (S1–S6)                         |
-   | `audit-remediation-2026-09`     | 26                      | the above + the 13-slice 2026-09-02 audit remediation                                                |
-   | `ui-gold-standard-2026-09`      | 64                      | the above + visual overhaul A (13 slices, 2 follow-ups, these hand-over docs)                        |
-   | `production-readiness-2026-09`  | 105                     | the above + the 16-slice production readiness remediation (S0–S15) and two fixes that are not slices |
+   | Branch                          | Commits ahead of `main` | What it is                                                                                             |
+   | ------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+   | `studio-bringup-sacn-globalosc` | 11                      | sACN DMX output, TotalMix Global OSC, the Stream Deck+ audio surface (S1–S6)                           |
+   | `audit-remediation-2026-09`     | 26                      | the above + the 13-slice 2026-09-02 audit remediation                                                  |
+   | `ui-gold-standard-2026-09`      | 64                      | the above + visual overhaul A (13 slices, 2 follow-ups, these hand-over docs)                          |
+   | `production-readiness-2026-09`  | 105                     | the above + the 16-slice production readiness remediation (S0–S15) and three fixes that are not slices |
 
    `production-readiness-2026-09` is therefore the whole program, and it is also what the studio workstation runs (Current Operating Truth). Merging it merges all four.
 
@@ -190,7 +190,7 @@ Branch `production-readiness-2026-09`, one commit per slice (`Readiness S<N>: �
 | S14   | `354306c` | the three orchestrators split, a chunk per workspace, no file-size allowlist                              | verified          |
 | S15   | `93603e1` | these documents; the Playwright quarantine emptied at the causes; two Rust tests that raced their threads | verified          |
 
-Two commits in the range are not slices: `235241c` (`npm run clean` keeps a packaged app) and `db2df4d` (the header lamps read the hardware link's own words, found on the workstation the day the operator moved to this branch's build).
+Three commits in the range are not slices: `235241c` (`npm run clean` keeps a packaged app), `db2df4d` (the header lamps read the hardware link's own words, found on the workstation the day the operator moved to this branch's build) and the bridge fix of 2026-09-22 (the deck's once-a-second LCD burst is no longer partly refused as busy, found the moment the profile was imported with its token; the ledger's After the program).
 
 ### Visual overhaul A (Slices 0-11, 2026-09-07 → 2026-09-09)
 
