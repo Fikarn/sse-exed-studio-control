@@ -97,7 +97,7 @@
     "native:test": "cd native && cargo test --workspace",
     "native:engine:build": "cd native && cargo build --package studio-control-engine",
     "native:engine:build:dev-fixtures": "cd native && cargo build --package studio-control-engine --features dev-fixtures",
-    "native:test:dev-fixtures": "cd native && cargo clippy --package studio-control-engine --all-targets --features dev-fixtures -- -D warnings && cargo test --package studio-control-engine --features dev-fixtures",
+    "native:test:dev-fixtures": "cd native && cargo clippy --package studio-control-engine --all-targets --features dev-fixtures -- -D warnings && cargo test --package studio-control-engine --features dev-fixtures && cargo build --package studio-control-engine",
     "native:shipping:build": "npm run native:engine:build && npm run tauri:build",
     "native:release:build": "node scripts/native-release-build.mjs",
     "native:release:win:evidence": "node scripts/native-windows-release-evidence.mjs",
