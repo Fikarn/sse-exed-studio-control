@@ -227,6 +227,10 @@ jobs:
       - run: npm run rust:clippy
       - run: npm run native:check
       - run: npm run native:test
+      # The development build's parity-fixture method and its F04 guards
+      # (`parity_fixture_loads_with_feature`, `load_defaults_to_merge`) exist
+      # only with the `dev-fixtures` feature, which no other step builds.
+      - run: npm run native:test:dev-fixtures
       - run: npm run native:acceptance
 
   # Production readiness 2026-09, Slice 13 (finding F25): the line-coverage floor
