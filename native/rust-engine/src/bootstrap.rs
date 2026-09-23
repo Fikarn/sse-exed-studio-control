@@ -422,21 +422,11 @@ pub(crate) fn bootstrap_runtime_from_paths(
 
     let control_surface_token =
         load_or_create_bridge_token(&runtime_paths.app_data_dir).map_err(std::io::Error::other)?;
-    let requested_control_surface_port = resolve_control_surface_port();
-    let control_surface_bridge = start_control_surface_bridge(
+    let control_surface_bridge = start_logged_control_surface_bridge(
         &runtime_paths.db_path,
         &runtime_paths.log_file_path,
-        requested_control_surface_port,
+        resolve_control_surface_port(),
         control_surface_token.clone(),
-    );
-    append_log(
-        &runtime_paths.log_file_path,
-        if control_surface_bridge.available {
-            "INFO"
-        } else {
-            "WARN"
-        },
-        &control_surface_bridge.summary,
     )?;
 
     Ok(RuntimeContext {
@@ -452,6 +442,23 @@ pub(crate) fn bootstrap_runtime_from_paths(
         control_surface_bridge,
         control_surface_token,
     })
+}
+
+/// Starts the Stream Deck bridge and writes the one line that says how it went:
+/// `INFO` while it serves, `WARN` when its port was refused.
+fn start_logged_control_surface_bridge(
+    db_path: &Path,
+    log_file_path: &Path,
+    requested_port: u16,
+    token: String,
+) -> EngineResult<ControlSurfaceBridgeInfo> {
+    let bridge = start_control_surface_bridge(db_path, log_file_path, requested_port, token);
+    append_log(
+        log_file_path,
+        if bridge.available { "INFO" } else { "WARN" },
+        &bridge.summary,
+    )?;
+    Ok(bridge)
 }
 
 /// The context a recovery-mode engine runs with after a storage failure at
@@ -1079,6 +1086,53 @@ mod tests {
             safe_start: false,
             app_data_dir,
         }
+    }
+
+    // 2026-09-22: starting the Stream Deck bridge is one line in the engine
+    // log — `INFO` while it serves, `WARN` when its port is refused. Every
+    // start that served wrote it twice until then: the bridge wrote it, and the
+    // bootstrap wrote its summary again. Ports the system picks and a port
+    // another listener holds, never the bridge's own 38201.
+    #[test]
+    fn starting_the_bridge_is_one_log_line() {
+        let test_dir = TestDir::new("bridge-log-line");
+        let paths = runtime_paths_for(&test_dir);
+        fs::create_dir_all(&paths.logs_dir).expect("the logs dir should be created");
+        let lines = |needle: &str| {
+            fs::read_to_string(&paths.log_file_path)
+                .unwrap_or_default()
+                .lines()
+                .filter(|line| line.contains(needle))
+                .map(String::from)
+                .collect::<Vec<_>>()
+        };
+
+        let serving = super::start_logged_control_surface_bridge(
+            &paths.db_path,
+            &paths.log_file_path,
+            0,
+            String::from("bridge-token-for-tests"),
+        )
+        .expect("the line should be written");
+        assert!(serving.available);
+        let served = lines("control-surface bridge is serving");
+        assert_eq!(served.len(), 1, "{served:?}");
+        assert!(served[0].contains(" INFO "), "{served:?}");
+
+        let holder = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("a listener should bind");
+        let taken = holder.local_addr().expect("its address").port();
+        let refused = super::start_logged_control_surface_bridge(
+            &paths.db_path,
+            &paths.log_file_path,
+            taken,
+            String::from("bridge-token-for-tests"),
+        )
+        .expect("the line should be written");
+        assert!(!refused.available);
+        let unavailable = lines("control-surface bridge is unavailable");
+        assert_eq!(unavailable.len(), 1, "{unavailable:?}");
+        assert!(unavailable[0].contains(" WARN "), "{unavailable:?}");
+        assert_eq!(lines("control-surface bridge is serving").len(), 1);
     }
 
     // 2026-09 production readiness, Slice 3 (F02): a database SQLite refuses

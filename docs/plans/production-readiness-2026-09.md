@@ -608,6 +608,14 @@ Found on the way, not changed (open; each older than this fix, which neither cau
 
 Validation (workstation, 2026-09-22 → 23): `npm run rust:clippy` clean; the engine suite 12 full runs in a row, 409 passed / 1 ignored (was 401: the eight new cases); `npm run dev:check` green. No front-end source changed and no board moved. The live app runs `7b85f04` and does not have this fix; it reaches the workstation with the next build of this branch.
 
+**2026-09-22 — starting the Stream Deck bridge is one line in the engine log** (commit `fix(bridge): starting the bridge writes one log line, from the bootstrap`; not a slice). Every start of the hardware link that served the bridge wrote `INFO Native control-surface bridge is serving deck actions and LCD payloads at …` twice, in the same second — a copy of the live app's log read 2026-09-22 holds 84 such lines, two at each of 42 starts. Why: both writers date from the first bridge (`15b3a12`, 2026-04-16). `start_control_surface_bridge` wrote the line when it served, and nothing when it did not; the bootstrap then wrote the bridge's summary for either outcome (`INFO` or `WARN`). Slice 2 moved the starter into `E/control_surface_http.rs` with its line (`c2b7361`).
+
+The fix: the bootstrap is the one writer. `start_logged_control_surface_bridge` (`E/bootstrap.rs`) starts the bridge and writes its line, `INFO` while it serves and `WARN` when its port was refused; the starter writes none. Nothing reads or counts the line (lanes, scripts, OPERATIONS).
+
+Guard: `starting_the_bridge_is_one_log_line` (`E/bootstrap.rs` tests) starts the bridge on a port the system picks and then on a port another listener holds — never 38201 — and requires one `INFO` line and one `WARN` line. On the code before the fix it failed with the serving line twice.
+
+Validation (workstation, 2026-09-23): `npm run rust:clippy` clean; `npm run native:test` three full runs, 430 passed / 1 ignored (shell 20, engine 410 + 1 — was 409: the new case — contract 4, e2e 5); `npm run dev:check` green. The live app keeps writing the pair until the next build of this branch reaches it.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.

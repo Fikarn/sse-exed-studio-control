@@ -152,7 +152,8 @@ pub fn start_control_surface_bridge(
                 "Native control-surface bridge is serving deck actions and LCD payloads at {base_url}."
             );
 
-            let _ = append_log(log_file_path, "INFO", &summary);
+            // The bootstrap writes the one log line about this start, serving
+            // or not (`start_logged_control_surface_bridge`).
             report_health(SUBSYSTEM_BRIDGE, SubsystemState::Ok, summary.clone());
 
             let context = Arc::new(
