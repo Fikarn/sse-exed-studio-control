@@ -802,6 +802,47 @@ Review, the same day. The code stood; the operator document did not. Its paragra
 
 No `frontend-e2e` run quarantined or retried a case, and no board moved (the linux captures refreshed in `8e7d8a5` held). This follow-up's own run is not recorded, by convention.
 
+**2026-09-23 — the fixes landed on `main` (#204)** (recorded here). The operator's go-ahead: "Yes, open and merge". Pull request [#204](https://github.com/Fikarn/sse-exed-studio-control/pull/204) from `after-the-program-2026-09` at `1f20dd0` was opened after the branch's review had finished (every medium finding the skeptics confirmed was already fixed on the branch, the phones one was refuted because `ad29444` had fixed it, and every low was acted on). Its runs on `1f20dd0` were all green: push 35846207859 and pull request 35846227478 (ten jobs each), and CodeQL 35846225902. The tag `archive/after-the-program-2026-09` was pushed on `1f20dd0` first. Then the PR was squash-merged with `--match-head-commit 1f20dd0` as `1104f0e` at 10:14:06Z; `git diff archive/after-the-program-2026-09 1104f0e` is empty, and GitHub deleted the remote branch.
+
+`main`'s run 35847606835 on `1104f0e` was **red on its first attempt**. `frontend-e2e` failed one case: `audio-talkback.spec.ts` "holding T talks; releasing T, or the window losing focus, stops" expected 2 hold requests after T came up and counted 3. 440 passed. The page re-sends a held talkback every 750 ms (`AUDIO_TALKBACK_HEARTBEAT_MS`), and on that runner more than 750 ms passed between T going down and coming up, so a heartbeat was counted. The tree is the one that passed on the push and pull-request runs. It is the first failure of that kind. The case's four earlier failures (runs 34595097112, 34602095638, 35208750697 and 35263526586) had the cause Slice 13 fixed: talkback never came on (`aria-pressed` stayed "false" for 5 s). The 46 `dev-checks` runs between the last of those and this one did not fail the case. By the talkback ruling the case is not changed, and the operator decided: "Re-run it only". The failed job was re-run, and attempt 2 was green (ten jobs). If the flake comes back often, it goes to the operator again.
+
+**2026-09-23 — the Dependabot queue after the landings** (recorded here; the operator's decision 8 of this day, with the go-ahead "Yes, one at a time"). Every merge followed the same steps: `@dependabot rebase`, ten green on the pull request, a squash-merge with `--match-head-commit`, and `main`'s run green before the next merge.
+
+- **Closed as overtaken** (`main` has newer versions since #201): [#198](https://github.com/Fikarn/sse-exed-studio-control/pull/198) `browserslist` 4.28.9 (`main` has 4.29.0) and [#199](https://github.com/Fikarn/sse-exed-studio-control/pull/199) `baseline-browser-mapping` 2.11.22 (`main` has 2.11.25).
+- **Replaced by Dependabot** right after the landing: #197 by [#203](https://github.com/Fikarn/sse-exed-studio-control/pull/203) (`storybook` 10.6.0 instead of 10.5.10), and #194 by [#202](https://github.com/Fikarn/sse-exed-studio-control/pull/202) (the same `serde_json` and `rusqlite` updates plus `serde` 1.0.229). The operator took the replacements in their places: "Yes, both".
+- **Closed, not merged:** [#200](https://github.com/Fikarn/sse-exed-studio-control/pull/200), `vitest` 4.1.11. Dependabot refused the rebase because the config entry that opened it no longer exists; every entry in `.github/dependabot.yml` has `rebase-strategy: disabled` and targets `main`. The operator's decision was "Close it". Dependabot opens a fresh `vitest` pull request under the current config on a later check.
+- **Merged:**
+
+| PR   | What                                                                                 | Rebased head | Its run     | Squash on `main`      | `main`'s run |
+| ---- | ------------------------------------------------------------------------------------ | ------------ | ----------- | --------------------- | ------------ |
+| #203 | `storybook` 10.6.0                                                                   | `1a7dbc5`    | 35848424289 | `1fb57bf` (10:44:33Z) | 35850531214  |
+| #196 | `tauri` 2.11.6                                                                       | `588feb4`    | 35850674137 | `8827c1e` (11:06:45Z) | 35852642354  |
+| #195 | `eslint` 10.11.0, `lint-staged` 17.5.1, `prettier` 3.9.8, `typescript-eslint` 8.70.0 | `7a0a835`    | 35852813556 | `7075956` (11:22:02Z) | 35854115541  |
+| #202 | `serde` 1.0.229, `serde_json` 1.0.151, `rusqlite` 0.40.2                             | `d5015ba`    | 35854267167 | `b09654f` (11:39:33Z) | 35855816883  |
+| #192 | `actions/setup-node` 7                                                               | `1eb8bdb`    | 35855924885 | `98bbb06` (11:56:03Z) | 35857413180  |
+
+Every run in the table was ten green on its first attempt.
+
+- **Still open:** [#193](https://github.com/Fikarn/sse-exed-studio-control/pull/193) `fuzzysort` 4.0.2 (left open by the operator's decision), and [#205](https://github.com/Fikarn/sse-exed-studio-control/pull/205) `@babel/core` 7.29.7. Dependabot opened #205 during the sequence; it is not decided yet.
+- **Dependabot alerts:** four open alerts remain, all development scope: `vitest` and `@vitest/mocker` (medium), `@babel/core` and `esbuild` (low).
+
+**2026-09-23 — a new live build from `main` (`98bbb06`)** (recorded here; the operator's go-ahead: "Yes, close it now"). It carries the fixes of #204 and the Dependabot merges above, among them Tauri 2.11.6.
+
+- **Built from `main` at `98bbb06`.** First `npm ci` (no audit fix), then `npm run dev:check`, then `npm run native:engine:build`, then `npm run tauri:build`. `npm run native:acceptance` also passed: it is simulated, uses a scratch app-data and points lighting at 127.0.0.1. All exited 0. The live app kept running throughout.
+- **The switch, 14:14:51–14:15:17 local.**
+  - The shell (PID 2156) was ended with `taskkill //F`. The hardware link wrote the shutdown backup `db-2026-09-23T12-14-51-966Z-shutdown.sqlite3` and exited, and port 38201 was free within 2 s. TotalMix FX and Companion ran on untouched.
+  - The `e62bcba` build was moved aside, kept as the rollback, to `release\native\windows.e62bcba-2026-09-23\` (shell 10,378,752 bytes, sha256 `ecbc1c83…`; engine 9,355,264, `fffc8756…`).
+  - `npm run native:package:win:local` exited 0, and `npm run native:bridge:win:verify` exited 0.
+  - The new shell is 10,395,136 bytes, sha256 `f565bf0568f36aba5bdbe8a0e5f2b4d1f6b295307a91dd6a2daa2ad109c52d1b`. The new engine is 9,349,120 bytes, sha256 `f7796fc93e26eafbfb7df82856b6ab548cbaf031933fff9734ac19b478b23383`.
+- **Reopened at 14:15:16** from its folder with no `SSE_*` variable.
+  - The shell is 17156, and the hardware link, 12268, is its child.
+  - The window sits at x 2560–5120, y 0–1440, fullscreen on display 3.
+  - The hardware link holds 127.0.0.1:38201 and UDP 127.0.0.1:9001–9004, with no wildcard port.
+  - `engine.log` since the start reads: `Storage initialized: schema=7, format=1, journal_mode=wal, integrity=ok`, the bridge's serving line once, `Engine bootstrap completed`, and `Light outputs held at start`. It has nothing else.
+  - The app was down 26 s.
+- **The operator's check:** a deck key and the LCD strips, "Both work".
+- **Not walked here:** the walk checklist is updated for this build. On it, the Console's state display now reads `SYNC NEEDED`, where `e62bcba` showed `VERIFIED` with still meters.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.
