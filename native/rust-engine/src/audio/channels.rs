@@ -6,6 +6,8 @@ use super::helpers::*;
 use super::types::*;
 use super::*;
 
+const MAIN_MIX_TARGET_ID: &str = "audio-mix-main";
+
 pub fn update_audio_channel(
     db_path: &Path,
     request: &AudioChannelUpdateRequest,
@@ -82,7 +84,13 @@ pub fn update_audio_channel(
                 message,
             ));
         }
-        next_state.fader = fader;
+        // `fader` is the channel's Main Out level; every other output's level
+        // lives in `mix_levels` alone, as the console link and Sync write them.
+        // A phones edit used to overwrite `fader` too, so what the channel's
+        // main fader showed depended on which was written last.
+        if mix_target_id == MAIN_MIX_TARGET_ID {
+            next_state.fader = fader;
+        }
         next_state.mix_levels.insert(mix_target_id, fader);
     }
     if let Some(mute) = request.mute {

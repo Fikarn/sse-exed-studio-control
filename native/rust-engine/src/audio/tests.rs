@@ -1364,3 +1364,78 @@ fn gain_reduction_remains_unsupported_by_rme_totalmix_osc() {
         hits
     );
 }
+
+// 2026-09-23 (a finding recorded under `919047b`): `fader` is a channel's Main
+// Out level and `mix_levels` holds every output's; the console link and Sync
+// write `fader` for Main alone. A fader edit aimed at a phones mix wrote the
+// phones level into `fader` as well, so the channel's main fader showed
+// whichever of the two was written last.
+#[test]
+fn a_phones_fader_edit_leaves_the_main_fader_alone() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let test_dir = TestDir::new("channel-phones-fader");
+    let db_path = test_dir.db_path();
+    initialize_test_database(db_path.as_path()).expect("database should initialize");
+    set_settings_owned(
+        db_path.as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
+    let settings = list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let before = read_audio_snapshot(&settings)
+        .channels
+        .into_iter()
+        .find(|entry| entry.id == "audio-playback-7-8")
+        .expect("playback 7/8 should be present");
+    let fader_edit = |mix_target_id: Option<&str>, level: f64| AudioChannelUpdateRequest {
+        channel_id: String::from("audio-playback-7-8"),
+        mix_target_id: mix_target_id.map(String::from),
+        name: None,
+        gain: None,
+        fader: Some(level),
+        mute: None,
+        solo: None,
+        phantom: None,
+        phase: None,
+        pad: None,
+        instrument: None,
+        auto_set: None,
+    };
+    let phones_level = if (before.fader - 0.3).abs() < 1e-6 {
+        0.35
+    } else {
+        0.3
+    };
+
+    let updated = update_audio_channel(
+        db_path.as_path(),
+        &fader_edit(Some("audio-mix-phones-b"), phones_level),
+    )
+    .expect("a phones fader edit should succeed");
+    assert_eq!(
+        updated.fader, before.fader,
+        "the main fader is Main Out's level"
+    );
+    assert_eq!(
+        updated.mix_levels.get("audio-mix-phones-b").copied(),
+        Some(phones_level)
+    );
+
+    // A Main edit writes both.
+    let updated = update_audio_channel(db_path.as_path(), &fader_edit(None, 0.5))
+        .expect("a main fader edit should succeed");
+    assert_eq!(updated.fader, 0.5);
+    assert_eq!(updated.mix_levels.get("audio-mix-main").copied(), Some(0.5));
+    assert_eq!(
+        updated.mix_levels.get("audio-mix-phones-b").copied(),
+        Some(phones_level)
+    );
+}

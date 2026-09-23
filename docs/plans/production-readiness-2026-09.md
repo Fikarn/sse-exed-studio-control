@@ -739,6 +739,10 @@ Guards:
 
 The store case fails with the store as it was at `1911559` ("expected 0 to be 1"). So does the Playwright case, at the Identify flash's end: the light still reads 100 percent.
 
+**2026-09-23 — a phones fader edit leaves the main fader alone** (branch `after-the-program-2026-09`; the finding recorded under `919047b`; decision 7). A channel's `fader` is its Main Out level, and `mix_levels` holds every output's. The console link and Sync write `fader` for `audio-mix-main` alone (`E/audio/console_link.rs`, `E/audio/sync.rs`). `update_audio_channel` (`E/audio/channels.rs`) wrote the level into `fader` for every mix target, so a fader edit on Phones 1 or 2 overwrote the channel's Main level, and what the main fader showed depended on which was written last. Now it writes `fader` only for a Main edit, and `mix_levels` for every edit, as before.
+
+Guard: `audio::tests::a_phones_fader_edit_leaves_the_main_fader_alone`. A Phones 2 edit on playback 7/8 keeps `fader` at its Main level and stores the Phones 2 level; a Main edit then writes both. It fails on `channels.rs` as it was at `1911559` (`left: 0.3`, `right: 0.52`).
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.
