@@ -128,6 +128,32 @@ test("Esc ends a Find sequence, the flashes still waiting included (lighting.fix
   await expect(marker(page, "Key")).toHaveAccessibleName(/^Fixture Key, 76 percent, /);
 });
 
+// 2026-09-23 (a finding recorded 2026-09-22 under `a598b11`): nothing read the
+// rig again when a flash ended, so the page went on showing it until something
+// else refreshed Lighting — the cases above select another light to force that
+// read. The store now reads again as each flash starts and ends, a little after
+// the moment (`identifyFlashes.ts`); here nothing else is pressed.
+test("The page shows each flash start and end by itself: Identify, then Find", async ({ page }) => {
+  await openPopulatedRig(page, { stopClock: true });
+  await selectFixture(page, "Back");
+  await page.getByRole("button", { name: "Identify", exact: true }).click();
+  await expect(marker(page, "Back")).toHaveAccessibleName(/^Fixture Back, 100 percent, /);
+  await page.clock.runFor(1_300);
+  await expect(marker(page, "Back")).toHaveAccessibleName(/^Fixture Back, off, /);
+
+  // Find over Key and Back: as in the Find case above, Back (added last)
+  // flashes first, 400 ms, and Key 500 ms after it.
+  await selectFixture(page, "Key");
+  await selectFixture(page, "Back", { additive: true });
+  await page.getByTestId("lighting-identify-find").click();
+  await expect(marker(page, "Back")).toHaveAccessibleName(/^Fixture Back, 100 percent, /);
+  await page.clock.runFor(560);
+  await expect(marker(page, "Back")).toHaveAccessibleName(/^Fixture Back, off, /);
+  await expect(marker(page, "Key")).toHaveAccessibleName(/^Fixture Key, 100 percent, /);
+  await page.clock.runFor(500);
+  await expect(marker(page, "Key")).toHaveAccessibleName(/^Fixture Key, 76 percent, /);
+});
+
 test("Delete fixture takes the light off the plot and out of every scene (lighting.fixture.delete)", async ({
   page,
 }) => {
@@ -178,6 +204,34 @@ test("Dragging a scene reorders the scene rail (lighting.scene.reorder)", async 
   );
   await expect(tiles.first()).toHaveAccessibleName("Recall scene Interview");
   await expect(tiles.nth(1)).toHaveAccessibleName(/^Recall scene Warm wash/);
+});
+
+// 2026-09-23: the double refused `grandMaster` (a finding recorded under
+// `f29bbad`), so moving the Grand master against it put up an error toast
+// with its refusal ("lighting.settings.update requires one or more supported
+// fields") and a re-read put the master back at 100 %. The page commits a move
+// 200 ms after the last one (`useLightingRigControls.ts`), so the case moves
+// the stopped clock past that, then leaves Lighting and comes back: the value
+// on screen is then the one the double stored, and no error toast is up.
+test("The Grand master is taken and kept (lighting.settings.update { grandMaster })", async ({ page }) => {
+  await openPopulatedRig(page, { stopClock: true });
+  const readout = page.getByTestId("lighting-grand-master-readout");
+  await expect(readout).toHaveText("100 %");
+
+  await page.getByRole("slider", { name: "Grand master intensity" }).focus();
+  await page.keyboard.press("Home");
+  await expect(readout).toHaveText("0 %");
+  await page.clock.runFor(250);
+  await page.clock.resume();
+
+  await page.keyboard.press("Control+1");
+  await expectWorkspaceMounted(page, "setup");
+  await page.keyboard.press("Control+2");
+  await expectWorkspaceMounted(page, "lighting");
+  await expect(page.getByTestId("lighting-grand-master-readout")).toHaveText("0 %");
+  // An error toast stays until it is dismissed (`toastContext.tsx`) and is the
+  // design system's alert (`Toast.tsx`: role "alert", tone "error").
+  await expect(page.locator('[role="alert"][data-tone="error"]')).toHaveCount(0);
 });
 
 test("Dragging a group reorders the group rail (lighting.group.reorder)", async ({ page }) => {

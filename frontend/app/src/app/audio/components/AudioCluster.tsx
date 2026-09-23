@@ -59,6 +59,7 @@ function wayOutFor(label: string): "probe" | "sync" | "setup" | "failed" | null 
     case "DISCONNECTED":
       return "probe";
     case "ASSUMED":
+    case "SYNC NEEDED":
       return "sync";
     case "DISABLED":
       return "setup";

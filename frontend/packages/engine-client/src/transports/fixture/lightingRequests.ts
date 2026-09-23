@@ -685,9 +685,26 @@ export function handleFixtureLightingRequest(
       const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
       const hasSelectedSceneId = Object.prototype.hasOwnProperty.call(params, "selectedSceneId");
       const hasSelectedFixtureId = Object.prototype.hasOwnProperty.call(params, "selectedFixtureId");
+      // The Lighting page's Grand master sends `grandMaster` alone
+      // (`useLightingRigControls.ts`). The hardware link reads it as a number,
+      // rounds it and clamps it to 0–100 (`E/lighting/parse.rs`,
+      // `parse_i64_value`); the double refused it until 2026-09-23.
+      const hasGrandMaster = Object.prototype.hasOwnProperty.call(params, "grandMaster");
 
-      if (!hasSelectedSceneId && !hasSelectedFixtureId) {
+      if (!hasSelectedSceneId && !hasSelectedFixtureId && !hasGrandMaster) {
         throw new Error("lighting.settings.update requires one or more supported fields");
+      }
+
+      let grandMaster: number | null = null;
+      if (hasGrandMaster) {
+        const raw = params.grandMaster;
+        if (typeof raw !== "number") {
+          throw new Error("value must be a number");
+        }
+        if (!Number.isFinite(raw)) {
+          throw new Error("value must be a finite number");
+        }
+        grandMaster = Math.min(100, Math.max(0, Math.round(raw)));
       }
 
       const fixtures = asArray(lightingSnapshot.fixtures)
@@ -697,6 +714,33 @@ export function handleFixtureLightingRequest(
         .map((scene) => asRecord(scene))
         .filter((scene): scene is JsonObject => scene !== null);
       const summaryParts: string[] = [];
+
+      // Validated like the hardware link (`E/lighting/settings.rs`): the
+      // fixture, then the scene, each checked before anything is stored, so a
+      // refused request changes nothing, and refused in its words.
+      if (hasSelectedFixtureId && params.selectedFixtureId !== null) {
+        const fixtureId = asString(params.selectedFixtureId).trim();
+        if (!fixtureId) {
+          throw new Error("selectedFixtureId must be a string or null");
+        }
+        if (!fixtures.some((entry) => asString(entry.id) === fixtureId)) {
+          throw new Error(`Lighting fixture '${fixtureId}' is not exposed by the native editor state.`);
+        }
+      }
+      if (hasSelectedSceneId && params.selectedSceneId !== null) {
+        const sceneId = asString(params.selectedSceneId).trim();
+        if (!sceneId) {
+          throw new Error("selectedSceneId must be a string or null");
+        }
+        if (!scenes.some((entry) => asString(entry.id) === sceneId)) {
+          throw new Error(`Lighting scene '${sceneId}' is not exposed by the native editor state.`);
+        }
+      }
+
+      if (grandMaster !== null) {
+        lightingSnapshot.grandMaster = grandMaster;
+        summaryParts.push(`grand master -> ${grandMaster}%`);
+      }
 
       if (hasSelectedSceneId) {
         if (params.selectedSceneId === null) {
@@ -750,6 +794,7 @@ export function handleFixtureLightingRequest(
       synchronizeFixtureState(state);
       emit("lighting.changed", { reason: "settings-updated" });
       return {
+        grandMaster: asNumber(lightingSnapshot.grandMaster, 100),
         selectedSceneId: lightingSnapshot.selectedSceneId ?? null,
         selectedFixtureId: lightingSnapshot.selectedFixtureId ?? null,
         summary,

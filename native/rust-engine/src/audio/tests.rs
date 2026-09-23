@@ -1364,3 +1364,157 @@ fn gain_reduction_remains_unsupported_by_rme_totalmix_osc() {
         hits
     );
 }
+
+// 2026-09-23 (a finding recorded under `919047b`): `fader` is a channel's Main
+// Out level and `mix_levels` holds every output's; the console link and Sync
+// write `fader` for Main alone. A fader edit aimed at a phones mix wrote the
+// phones level into `fader` as well, so the channel's main fader showed
+// whichever of the two was written last.
+#[test]
+fn a_phones_fader_edit_leaves_the_main_fader_alone() {
+    // Registers sends on the process-wide console link, so it runs one at a
+    // time with the tests that push, pull or read back through it.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let test_dir = TestDir::new("channel-phones-fader");
+    let db_path = test_dir.db_path();
+    initialize_test_database(db_path.as_path()).expect("database should initialize");
+    set_settings_owned(
+        db_path.as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
+    let settings = list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let before = read_audio_snapshot(&settings)
+        .channels
+        .into_iter()
+        .find(|entry| entry.id == "audio-playback-7-8")
+        .expect("playback 7/8 should be present");
+    let fader_edit = |mix_target_id: Option<&str>, level: f64| AudioChannelUpdateRequest {
+        channel_id: String::from("audio-playback-7-8"),
+        mix_target_id: mix_target_id.map(String::from),
+        name: None,
+        gain: None,
+        fader: Some(level),
+        mute: None,
+        solo: None,
+        phantom: None,
+        phase: None,
+        pad: None,
+        instrument: None,
+        auto_set: None,
+    };
+    let phones_level = if (before.fader - 0.3).abs() < 1e-6 {
+        0.35
+    } else {
+        0.3
+    };
+
+    let updated = update_audio_channel(
+        db_path.as_path(),
+        &fader_edit(Some("audio-mix-phones-b"), phones_level),
+    )
+    .expect("a phones fader edit should succeed");
+    assert_eq!(
+        updated.fader, before.fader,
+        "the main fader is Main Out's level"
+    );
+    assert_eq!(
+        updated.mix_levels.get("audio-mix-phones-b").copied(),
+        Some(phones_level)
+    );
+
+    // A Main edit writes both.
+    let updated = update_audio_channel(db_path.as_path(), &fader_edit(None, 0.5))
+        .expect("a main fader edit should succeed");
+    assert_eq!(updated.fader, 0.5);
+    assert_eq!(updated.mix_levels.get("audio-mix-main").copied(), Some(0.5));
+    assert_eq!(
+        updated.mix_levels.get("audio-mix-phones-b").copied(),
+        Some(phones_level)
+    );
+}
+
+// 2026-09-23 (a finding recorded under `919047b`): every channel edit reads,
+// changes and writes the stored channel map under `AUDIO_STATE_LOCK`, which the
+// console flush on the metering thread holds while it writes what the desk
+// reported. The dynamics and send-mode edits and the clip clear did not take
+// it, so a flush committed between their read and their write was undone. The lock is held
+// here on the test's thread; each edit, run on a second one, must wait for it.
+#[test]
+fn dynamics_and_send_mode_edits_wait_for_the_audio_state_lock() {
+    let test_dir = TestDir::new("channel-edits-take-the-lock");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
+
+    for edit in ["dynamics", "send mode", "clip clear"] {
+        let guard = super::helpers::lock_audio_state();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let db_path = test_dir.db_path();
+        let worker = std::thread::spawn(move || {
+            let outcome = if edit == "dynamics" {
+                update_audio_channel_dynamics(
+                    db_path.as_path(),
+                    &AudioDynamicsUpdateRequest {
+                        channel_id: String::from("audio-input-9"),
+                        section: String::from("compressor"),
+                        enabled: Some(true),
+                        threshold_db: Some(-18.0),
+                        ratio: None,
+                        attack_ms: None,
+                        release_ms: None,
+                        makeup_db: None,
+                    },
+                )
+                .map(|_| ())
+            } else if edit == "clip clear" {
+                clear_audio_clips(
+                    db_path.as_path(),
+                    &AudioClipClearRequest {
+                        channel_id: Some(String::from("audio-input-9")),
+                    },
+                )
+                .map(|_| ())
+            } else {
+                update_audio_channel_send_mode(
+                    db_path.as_path(),
+                    &AudioSendModeUpdateRequest {
+                        channel_id: String::from("audio-playback-7-8"),
+                        mix_target_id: String::from("audio-mix-phones-b"),
+                        pre_fader: Some(true),
+                        mute: None,
+                        link_stereo: None,
+                        solo: None,
+                    },
+                )
+                .map(|_| ())
+            };
+            let _ = sender.send(outcome.is_ok());
+        });
+        let early = receiver.recv_timeout(Duration::from_millis(300));
+        drop(guard);
+        assert!(
+            early.is_err(),
+            "the {edit} edit went ahead while the audio state lock was held"
+        );
+        assert!(
+            receiver
+                .recv_timeout(Duration::from_secs(10))
+                .expect("the edit should finish once the lock is free"),
+            "the {edit} edit should succeed"
+        );
+        worker.join().expect("the edit's thread should finish");
+    }
+}

@@ -8,6 +8,10 @@ pub fn clear_audio_clips(
     db_path: &Path,
     request: &AudioClipClearRequest,
 ) -> Result<AudioClipClearResult, AudioCommandError> {
+    // Reads, changes and writes the stored channel map, so under the state
+    // lock like every channel edit: the console flush writes that map under it
+    // too, and without the lock a flush committed in between was undone.
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     if !snapshot.capabilities.can_clear_clips {

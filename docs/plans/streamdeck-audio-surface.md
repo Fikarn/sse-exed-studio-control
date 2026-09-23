@@ -1,6 +1,6 @@
 # Stream Deck+ Audio Surface
 
-Status: **complete.** Approved by the operator 2026-08-31; all six slices landed on branch `studio-bringup-sacn-globalosc` by 2026-09-01 and the deck is deployed and live-verified. Pushed to GitHub, not merged. The one thing still open is the physical sign-off noted in S5's status.
+Status: **complete.** Approved by the operator 2026-08-31; all six slices landed on branch `studio-bringup-sacn-globalosc` by 2026-09-01 and the deck is deployed and live-verified. Landed on `main` on 2026-09-23 with the whole 2026-09 program (#201, squash commit `1911559`; the per-commit history under the tag `archive/program-2026-09`). The one thing still open is the physical sign-off noted in S5's status.
 
 Tracking: the per-slice `Status:` lines below are the authoritative execution record (same convention as the audio gold-standard ledger). Each slice lands as its own commit referencing the slice id; any divergence from a slice's written scope gets a `Rescope:` paragraph in that slice per the AGENTS.md rescope protocol — no silent substitution.
 

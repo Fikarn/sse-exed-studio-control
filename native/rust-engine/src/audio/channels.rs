@@ -6,6 +6,8 @@ use super::helpers::*;
 use super::types::*;
 use super::*;
 
+const MAIN_MIX_TARGET_ID: &str = "audio-mix-main";
+
 pub fn update_audio_channel(
     db_path: &Path,
     request: &AudioChannelUpdateRequest,
@@ -82,7 +84,13 @@ pub fn update_audio_channel(
                 message,
             ));
         }
-        next_state.fader = fader;
+        // `fader` is the channel's Main Out level; every other output's level
+        // lives in `mix_levels` alone, as the console link and Sync write them.
+        // A phones edit used to overwrite `fader` too, so what the channel's
+        // main fader showed depended on which was written last.
+        if mix_target_id == MAIN_MIX_TARGET_ID {
+            next_state.fader = fader;
+        }
         next_state.mix_levels.insert(mix_target_id, fader);
     }
     if let Some(mute) = request.mute {
@@ -456,6 +464,10 @@ pub fn update_audio_channel_dynamics(
     db_path: &Path,
     request: &AudioDynamicsUpdateRequest,
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    // Read, change and write the channel map under the state lock, like every
+    // other channel edit: without it a console flush committed in between
+    // (the metering thread's, under the lock) was undone by this write.
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     if !snapshot.capabilities.can_edit_processing {
@@ -545,6 +557,9 @@ pub fn update_audio_channel_send_mode(
     db_path: &Path,
     request: &AudioSendModeUpdateRequest,
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    // Under the state lock, like every other channel edit (see the dynamics
+    // edit above).
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     if !snapshot.capabilities.can_edit_mixer_state {

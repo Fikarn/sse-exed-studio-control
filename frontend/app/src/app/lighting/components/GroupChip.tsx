@@ -135,6 +135,20 @@ export function GroupChip({
     }
   };
 
+  // dnd-kit's `listeners` carry an `onKeyDown` of their own (the keyboard
+  // sensor's activator). Spread after `handleKeyDown`, it replaced it: Enter
+  // picked the chip up for a drag instead of switching the group, as its label
+  // says it does. The chip's own keys go first; the sensor sees only the keys
+  // they leave alone (Space picks the chip up). Only keys pressed on the chip
+  // at rest count: while it is being dragged every key is the sensor's (Enter
+  // and Space drop it, Esc puts it back), heard on the document.
+  const { onKeyDown: sortableKeyDown, ...sortableListeners } = listeners ?? {};
+  const handleChipKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || isDragging) return;
+    handleKeyDown(event);
+    if (!event.defaultPrevented) sortableKeyDown?.(event);
+  };
+
   return (
     <div className={styles.groupChipRow} onContextMenu={handleContextMenu}>
       {/* Chip body — sortable wrapper. Switched from <button> to
@@ -146,11 +160,11 @@ export function GroupChip({
         className={className}
         style={chipDragStyle}
         onClick={() => onTogglePower(id, !on)}
-        onKeyDown={handleKeyDown}
+        onKeyDown={handleChipKeyDown}
         aria-label={powerAriaLabel}
         data-dragging={isDragging || undefined}
         {...attributes}
-        {...listeners}
+        {...sortableListeners}
         // dnd-kit's `attributes` provides role + tabIndex (and toggles
         // aria-pressed under sortable). Override after the spread so the
         // chip's button-toggle semantics win, but inherit sortable aria

@@ -11,6 +11,7 @@ import type { AudioSnapshot } from "../generated/snapshots/AudioSnapshot";
 import { transitionStartupState } from "../machines/startupMachine";
 import { deriveRecoveryState } from "../machines/recoveryMachine";
 import { ALL_DOMAINS, DOMAIN_REQUESTS, domainsForEvent, domainsForMethod, type DomainKey } from "./domainRefresh";
+import { identifyFlashMoments } from "./identifyFlashes";
 import { SnapshotShapeError, snapshotProblem } from "./snapshotGuards";
 
 // Boundary cast for a command result that may or may not be a whole audio
@@ -910,6 +911,40 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
 
   const inBackground = (context: string) => (error: unknown) => recordBackgroundFailure(error, context);
 
+  // An Identify or a Find changes what the lighting state shows as each flash
+  // starts and ends, and the hardware link announces neither
+  // (`identifyFlashes.ts`). From the reply on (before the read that follows
+  // every command, which may fail although the flash is lit) the store reads
+  // the lighting state again at each of those moments, a little after it: the
+  // hardware link timed the flashes from before its reply left, so the store's
+  // moment is never early. The flashes are stored and outlive a restart of the
+  // hardware link, so a restart keeps what is waiting: a moment that falls
+  // while the link is down is skipped, and the restart's own full read covers
+  // it. A clear-all and a dispose drop what is waiting.
+  const IDENTIFY_REFRESH_MARGIN_MS = 60;
+  let identifyRefreshTimeoutIds: number[] = [];
+
+  const cancelIdentifyRefreshes = () => {
+    for (const timeoutId of identifyRefreshTimeoutIds) {
+      window.clearTimeout(timeoutId);
+    }
+    identifyRefreshTimeoutIds = [];
+  };
+
+  const scheduleIdentifyRefreshes = (reply: unknown) => {
+    for (const moment of identifyFlashMoments(reply)) {
+      const timeoutId = window.setTimeout(() => {
+        identifyRefreshTimeoutIds = identifyRefreshTimeoutIds.filter((pending) => pending !== timeoutId);
+        if (state.lifecycle === "ready") {
+          void refreshDomains(["lighting", "lightingDmxMonitor"]).catch(
+            inBackground("refresh after an identify flash")
+          );
+        }
+      }, moment + IDENTIFY_REFRESH_MARGIN_MS);
+      identifyRefreshTimeoutIds.push(timeoutId);
+    }
+  };
+
   const cancelAutomaticRestart = () => {
     if (automaticRestartTimeoutId !== null) {
       window.clearTimeout(automaticRestartTimeoutId);
@@ -1201,8 +1236,13 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
   // on the hardware link, so a workspace switch reaches the screen only from
   // here — and the two share the one queue above, so they never run side by
   // side.
-  const performRequest = async (method: string, params: JsonObject = {}) => {
+  const performRequest = async (
+    method: string,
+    params: JsonObject = {},
+    onReply: ((result: unknown) => void) | null = null
+  ) => {
     const result = await transport.request(method as never, params);
+    onReply?.(result);
     if (state.lifecycle === "ready") {
       await refreshDomains(domainsForMethod(method, params));
     }
@@ -1394,7 +1434,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     async identifyLightingFixture(fixtureId: string, durationMs?: number) {
       return performRequest(
         "lighting.fixture.identify",
-        durationMs === undefined ? { fixtureId } : { fixtureId, durationMs }
+        durationMs === undefined ? { fixtureId } : { fixtureId, durationMs },
+        scheduleIdentifyRefreshes
       );
     },
     async highlightLightingFixtures(fixtureIds: readonly string[], mode: "highlight" | "solo" | "off") {
@@ -1404,14 +1445,16 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       });
     },
     async startLightingIdentifySequence(fixtureIds: readonly string[], stepMs: number, durationMs: number) {
-      return performRequest("lighting.fixture.identifySequence", {
-        fixtureIds: [...fixtureIds],
-        stepMs,
-        durationMs,
-      });
+      return performRequest(
+        "lighting.fixture.identifySequence",
+        { fixtureIds: [...fixtureIds], stepMs, durationMs },
+        scheduleIdentifyRefreshes
+      );
     },
     async clearLightingIdentifyBursts() {
-      return performRequest("lighting.fixture.identify.clearAll");
+      const reply = await performRequest("lighting.fixture.identify.clearAll");
+      cancelIdentifyRefreshes();
+      return reply;
     },
     async deleteLightingFixture(fixtureId: string) {
       return performRequest("lighting.fixture.delete", { fixtureId });
@@ -1509,6 +1552,7 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     async dispose() {
       cancelAutomaticRestart();
       cancelQueuedRefresh();
+      cancelIdentifyRefreshes();
       bootstrapGeneration++;
       initializePromise = null;
       clearStartupGate();
