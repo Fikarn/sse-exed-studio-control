@@ -1521,3 +1521,38 @@ fn dropped_source_log_notes_a_source_once_a_minute() {
     assert!(!flood.record_at(extra, LOOPBACK, 9001, start + Duration::from_secs(30)));
     assert!(flood.record_at(extra, LOOPBACK, 9001, start + Duration::from_secs(60)));
 }
+
+#[test]
+fn a_failing_flush_is_logged_once_a_minute_and_its_end_is_logged_once() {
+    let mut failures = FlushFailureLog::default();
+    assert_eq!(
+        failures.wrote(),
+        None,
+        "a write with no failures before it is quiet"
+    );
+    let start = Instant::now();
+    assert_eq!(
+        failures.failed(start),
+        Some(0),
+        "the first failure is a line"
+    );
+    for step in 1..=29u64 {
+        // Retried every 2 s (LOST_REPORTS_RETRY_MS) with the desk quiet.
+        assert_eq!(failures.failed(start + Duration::from_secs(2 * step)), None);
+    }
+    assert_eq!(
+        failures.failed(start + Duration::from_secs(60)),
+        Some(29),
+        "a minute later, one line counting the 29 it left out"
+    );
+    assert_eq!(
+        failures.wrote(),
+        Some(31),
+        "the first write that works counts the run"
+    );
+    assert_eq!(
+        failures.failed(start + Duration::from_secs(61)),
+        Some(0),
+        "a new run starts with a line of its own and no old count"
+    );
+}

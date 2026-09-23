@@ -300,6 +300,12 @@ fn console_pull_ingests_a_fake_totalmix_dump() {
     let test_dir = pull_test_db("console-pull-dump", fake.port);
     crate::rme_totalmix_osc::mark_console_link_slot(true);
     let _pump = SlotPump::start(slot, test_dir.db_path());
+    // An earlier flush's write failed (2026-09-23). The pull's own flushes
+    // take the mark and write `unknown` before the Sync writes `aligned`, so
+    // the Sync still ends aligned and leaves no mark to overturn it. (Set far
+    // in the link's future, the mark is never due on its own here.)
+    let link = crate::rme_console_link::shared_console_link();
+    link.lock().expect("link").mark_reports_lost(u64::MAX / 2);
 
     let result = sync_audio_console_with_timing(test_dir.db_path().as_path(), fast_pull_timing())
         .expect("the pull should complete against the fake console");
@@ -307,6 +313,10 @@ fn console_pull_ingests_a_fake_totalmix_dump() {
     assert!(result.complete);
     assert_eq!(result.console_state_confidence, "aligned");
     assert_eq!(result.connection, "connected");
+    assert!(
+        !link.lock().expect("link").take_reports_lost(),
+        "the pull's flushes took the lost-reports mark before `aligned`"
+    );
     assert_eq!(
         result.pulled_values, 13,
         "every modelled parameter counts, EQ detail does not"
@@ -673,6 +683,69 @@ fn console_echo_updates_channel_and_mix_target_state() {
         .expect("re-apply should succeed");
     assert_eq!(again.applied, 0);
     assert!(!again.changed());
+}
+
+#[test]
+fn a_flush_whose_write_fails_marks_the_desk_unread_for_the_next_write() {
+    use crate::rme_console_link::{
+        ChannelFlag, ConsoleBus, ConsoleUpdate, ConsoleValue, ParamKey, LOST_REPORTS_RETRY_MS,
+    };
+    let _link = serialize_shared_link();
+    let test_dir = TestDir::new("console-flush-lost");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[super::helpers::confidence_setting(
+            super::helpers::ConsoleConfidence::Aligned,
+        )],
+    )
+    .expect("confidence should store");
+    let link = crate::rme_console_link::shared_console_link();
+    link.lock().expect("link").queue_for_test(ConsoleUpdate {
+        key: ParamKey::ChannelFlag {
+            bus: ConsoleBus::Input,
+            channel: 8,
+            flag: ChannelFlag::Mute,
+        },
+        value: ConsoleValue::Flag(true),
+        adjusted: false,
+        confirms_send: false,
+    });
+
+    // A database the flush cannot open: its folder does not exist.
+    let unreachable = test_dir
+        .db_path()
+        .with_file_name("missing")
+        .join("native.sqlite3");
+    let failed_at = 10_000;
+    assert!(flush_console_link_at(&unreachable, failed_at).is_err());
+    {
+        let link = link.lock().expect("link");
+        assert_eq!(link.queued_count(), 0, "nothing is kept to pile up");
+        assert!(
+            !link.has_activity_at(failed_at + LOST_REPORTS_RETRY_MS - 1),
+            "with nothing else waiting, no retry on every tick"
+        );
+        assert!(link.has_activity_at(failed_at + LOST_REPORTS_RETRY_MS));
+    }
+
+    let report = flush_console_link_at(
+        test_dir.db_path().as_path(),
+        failed_at + LOST_REPORTS_RETRY_MS,
+    )
+    .expect("the next flush should write");
+    assert!(report.desk_unread && report.changed());
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    assert_eq!(
+        read_audio_snapshot(&settings).console_state_confidence,
+        "unknown",
+        "the desk is unread, so the Console asks for a Sync"
+    );
+    assert!(
+        !link.lock().expect("link").has_activity_at(u64::MAX),
+        "the mark is written once"
+    );
 }
 
 #[test]
@@ -1201,6 +1274,7 @@ fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
     crate::rme_totalmix_osc::mark_console_link_slot(true);
     let pump = SlotPump::start(slot, test_dir.db_path());
     let db = test_dir.db_path();
+    let link = crate::rme_console_link::shared_console_link();
 
     // Production readiness S15. Old: `sleep(500 ms)` after each phase. New:
     // `settle_console_link` — the phase's sends settled, their read-backs
@@ -1242,6 +1316,10 @@ fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
     main_drift.dim = Some(false);
     update_audio_mix_target(&db, &main_drift).expect("main drift should send");
     settle_console_link(&pump);
+    // An earlier flush's write failed (2026-09-23). The recall's confirmations
+    // are flushed, and the mark with them, before it writes `aligned`. (Set
+    // far in the link's future, the mark is never due on its own here.)
+    link.lock().expect("link").mark_reports_lost(u64::MAX / 2);
 
     let result = recall_audio_snapshot_with_timing(
         &db,
@@ -1259,6 +1337,10 @@ fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
     assert_eq!(result.adjusted, 0, "{}", result.summary);
     assert_eq!(result.confirmed, result.pushed, "{}", result.summary);
     assert_eq!(result.console_state_confidence, "aligned");
+    assert!(
+        !link.lock().expect("link").take_reports_lost(),
+        "the recall's flushes took the lost-reports mark before `aligned`"
+    );
     assert!(result.phantom_differences.is_empty());
     assert!(result.summary.contains("confirmed"), "{}", result.summary);
 

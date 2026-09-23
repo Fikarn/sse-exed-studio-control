@@ -1342,22 +1342,89 @@ pub(crate) fn service_console_link(slot: &GlobalOscSlot, send_host: &str) {
 /// Persists whatever the console link produced since the last flush and tells
 /// every consumer through `audio.changed { reason: "console-echo" }`.
 pub(crate) fn flush_console_link_to_db(db_path: &std::path::Path) {
+    let failures = || match FLUSH_FAILURES.lock() {
+        Ok(failures) => failures,
+        Err(poisoned) => poisoned.into_inner(),
+    };
     match crate::audio::flush_console_link(db_path) {
         Ok(report) if report.changed() => {
+            if let Some(failed) = failures().wrote() {
+                log_event(
+                    LogLevel::Info,
+                    &format!("Console link flush writes again after {failed} failed attempt(s)."),
+                );
+            }
             crate::engine_events::emit_audio_changed_with(serde_json::json!({
                 "reason": "console-echo",
                 "applied": report.applied,
                 "unconfirmed": report.unconfirmed,
                 "connectionLost": report.connection_lost,
+                "deskUnread": report.desk_unread,
             }));
         }
         Ok(_) => {}
         Err(error) => {
-            log_event(
-                LogLevel::Warn,
-                &format!("Console link flush failed: {error:?}"),
-            );
+            let due = failures().failed(Instant::now());
+            if let Some(unlogged) = due {
+                let also = if unlogged > 0 {
+                    format!(" ({unlogged} more since the last such line)")
+                } else {
+                    String::new()
+                };
+                log_event(
+                    LogLevel::Warn,
+                    &format!("Console link flush failed{also}: {error:?}"),
+                );
+            }
         }
+    }
+}
+
+/// A flush whose write fails is tried again on the desk's next report and,
+/// with the desk marked unread, every `LOST_REPORTS_RETRY_MS`; its warning is
+/// written at most once a minute and counts the failures that line left out,
+/// and the first write that works again says how many failed before it.
+const FLUSH_FAILURE_LOG_INTERVAL: Duration = Duration::from_secs(60);
+
+static FLUSH_FAILURES: Mutex<FlushFailureLog> = Mutex::new(FlushFailureLog {
+    last_line_at: None,
+    unlogged: 0,
+    in_run: 0,
+});
+
+#[derive(Debug, Default)]
+pub(crate) struct FlushFailureLog {
+    last_line_at: Option<Instant>,
+    unlogged: u64,
+    in_run: u64,
+}
+
+impl FlushFailureLog {
+    /// A failed flush. `Some(n)` when a warning is due, `n` being the failures
+    /// since the last warning that were not written; `None` while that warning
+    /// is under a minute old.
+    pub(crate) fn failed(&mut self, now: Instant) -> Option<u64> {
+        self.in_run += 1;
+        if self
+            .last_line_at
+            .is_some_and(|at| now.saturating_duration_since(at) < FLUSH_FAILURE_LOG_INTERVAL)
+        {
+            self.unlogged += 1;
+            return None;
+        }
+        self.last_line_at = Some(now);
+        Some(std::mem::take(&mut self.unlogged))
+    }
+
+    /// A flush that wrote. `Some(n)` when it ends a run of `n` failures; the
+    /// next failure starts a new run with a warning of its own.
+    pub(crate) fn wrote(&mut self) -> Option<u64> {
+        if self.in_run == 0 {
+            return None;
+        }
+        let failed = self.in_run;
+        *self = Self::default();
+        Some(failed)
     }
 }
 

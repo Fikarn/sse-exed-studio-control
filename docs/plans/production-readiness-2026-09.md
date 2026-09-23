@@ -902,6 +902,38 @@ Guard: `support::tests::backup_times_are_milliseconds_since_the_epoch`: a fresh 
 - **The Console's loading surface has its own test id**, `audio-workspace-loading`. `audio-workspace` now means the mounted Console, which closes the note Slice 14 left open. The degraded-and-loading case asserts both, and fails with the old id. Locally, the audio, shell, startup and UI-contract specs passed, 190 of them, and the loading boards measure the same. The comment in `audio-talkback.spec.ts` is left as it is (the talkback ruling).
 - **Stale comments** corrected in `dev-checks.yml`, the two `vitest.config.ts` files, `domainRefresh.ts`, `rme_totalmix_osc.rs` (`DroppedSourceLog`) and `tools/sbom/package.json`.
 
+**2026-09-23 — after a failed flush the Console asks for a Sync** (branch `fix/sync-needed-after-a-failed-flush`; the finding "found, not changed" under `919047b`, found again by the check of the plan). `flush_console_link` (`E/audio/console_link.rs`) takes what the console link holds (the desk's reports, expired sends, a lost connection) and writes it. If that write failed, it was gone, and nothing said so: the app could go on holding an older value than the desk.
+
+- **First fix, not merged.** It kept the reports and put them back for the next flush (branch `fix/keep-desk-reports-on-failed-flush`, never pushed). Its review found three problems:
+  - while the database stayed down, the kept reports piled up without limit and were re-applied every 100 ms under the audio state lock, and a locked database made each try wait up to 5 s;
+  - a report kept past a newer edit of the app's could be written over that edit, once the edit's own send had expired;
+  - its test could not fail on the ordering it claimed.
+
+  The operator chose the simpler fix: "Simpler: ask for a Sync".
+
+- **The fix.** A failed flush still drops what it took, but the link is marked (`ConsoleLinkState::mark_reports_lost`, `E/rme_console_link.rs`). The next flush that writes takes the mark and writes the confidence `unknown`, like a lost connection does, so the Console reads `SYNC NEEDED` and **Sync from TotalMix** reads the desk again.
+  - Nothing is kept, so nothing piles up, and no old report can be written over a newer edit.
+  - With nothing else waiting, the mark is tried again at most every `LOST_REPORTS_RETRY_MS` (2 s), not on every 100 ms tick.
+  - Any flush that has something to write takes the mark, so a Sync's or a recall's own flushes write it before their `aligned`. If a flush fails during a Sync, the new mark correctly says that some of what the Sync read was lost.
+  - `ConsoleFlushReport` carries `desk_unread`, and `audio.changed` carries `deskUnread`, so the screen refreshes.
+  - The metering thread's "Console link flush failed" warning is written at most once a minute, counting the failures it left out. The first write that works again writes one line saying how many failed before it, and the next failure starts a fresh count (`FlushFailureLog`, `E/rme_totalmix_osc.rs`).
+
+Guards:
+
+- `audio::tests_console_link::a_flush_whose_write_fails_marks_the_desk_unread_for_the_next_write`:
+  - a flush against a database it cannot open fails and keeps nothing;
+  - there is no retry before 2 s, and one at 2 s;
+  - that flush writes `unknown` over `aligned` and reports `desk_unread`;
+  - the mark is written once.
+
+  With the mark removed it fails.
+
+- `rme_totalmix_osc::tests::a_failing_flush_is_logged_once_a_minute_and_its_end_is_logged_once`: with the reset on a working write removed, it fails.
+- `console_pull_ingests_a_fake_totalmix_dump` and `recall_pushes_the_snapshot_and_the_console_confirms_it` now set a mark first, and still end `aligned` with no mark left.
+- `console_confidence_has_one_writer` still passes: the confidence is written only through `confidence_setting`.
+
+`rme_console_link.rs` is 1,978 lines, under the guard's 2,000.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.
