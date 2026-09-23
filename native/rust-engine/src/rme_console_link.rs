@@ -41,6 +41,9 @@ pub const READBACK_DELAY_MS: u64 = 120;
 pub const REPLY_QUIET_MS: u64 = 80;
 /// How often queued console changes are written to the database.
 pub const FLUSH_INTERVAL_MS: u64 = 100;
+/// After a flush's write failed, how long before the link tries again to mark
+/// the desk unread when nothing else is waiting.
+pub const LOST_REPORTS_RETRY_MS: u64 = 2_000;
 const GAIN_MATCH_TOLERANCE_DB: f64 = 0.5;
 const MAX_UNCONFIRMED_ADDRESSES: usize = 20;
 
@@ -520,6 +523,8 @@ pub struct ConsoleLinkState {
     pub slot_bound: bool,
     connection: ConsoleConnection,
     connection_lost: bool,
+    reports_lost: bool,
+    reports_lost_retry_at_ms: u64,
     device: Option<String>,
     dsp_load: Option<f64>,
     last_echo_at_ms: Option<u64>,
@@ -1069,6 +1074,27 @@ impl ConsoleLinkState {
         std::mem::take(&mut self.connection_lost)
     }
 
+    /// A flush whose write failed has dropped what it took, so the app may
+    /// hold an older value than the desk: the next flush that writes marks
+    /// the desk unread (the Console asks for a Sync). With nothing else
+    /// waiting it is tried at most every `LOST_REPORTS_RETRY_MS`.
+    pub fn mark_reports_lost(&mut self, now_ms: u64) {
+        self.reports_lost = true;
+        self.reports_lost_retry_at_ms = now_ms.saturating_add(LOST_REPORTS_RETRY_MS);
+    }
+
+    /// [`Self::has_activity`], or a lost-reports mark whose retry time has come.
+    pub fn has_activity_at(&self, now_ms: u64) -> bool {
+        self.has_activity() || (self.reports_lost && now_ms >= self.reports_lost_retry_at_ms)
+    }
+
+    /// Takes the lost-reports mark, for the flush that writes it. Any flush
+    /// that has something to write takes it, so a Sync's or a recall's own
+    /// flushes write it before their `aligned`.
+    pub fn take_reports_lost(&mut self) -> bool {
+        std::mem::take(&mut self.reports_lost)
+    }
+
     /// Forgets the unconfirmed history, e.g. after a complete console pull has
     /// re-established the truth.
     pub fn reset_unconfirmed(&mut self) {
@@ -1144,6 +1170,11 @@ impl ConsoleLinkState {
         self.pull = None;
         self.push = None;
         self.connection_lost = false;
+        self.reports_lost = false;
+    }
+
+    pub fn queue_for_test(&mut self, update: ConsoleUpdate) {
+        self.queued.push(update);
     }
 }
 

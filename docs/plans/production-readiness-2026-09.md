@@ -902,6 +902,49 @@ Guard: `support::tests::backup_times_are_milliseconds_since_the_epoch`: a fresh 
 - **The Console's loading surface has its own test id**, `audio-workspace-loading`. `audio-workspace` now means the mounted Console, which closes the note Slice 14 left open. The degraded-and-loading case asserts both, and fails with the old id. Locally, the audio, shell, startup and UI-contract specs passed, 190 of them, and the loading boards measure the same. The comment in `audio-talkback.spec.ts` is left as it is (the talkback ruling).
 - **Stale comments** corrected in `dev-checks.yml`, the two `vitest.config.ts` files, `domainRefresh.ts`, `rme_totalmix_osc.rs` (`DroppedSourceLog`) and `tools/sbom/package.json`.
 
+**2026-09-23 — after a failed flush the Console asks for a Sync** (branch `fix/sync-needed-after-a-failed-flush`; the finding "found, not changed" under `919047b`, found again by the check of the plan). `flush_console_link` (`E/audio/console_link.rs`) takes what the console link holds (the desk's reports, expired sends, a lost connection) and writes it. If that write failed, it was gone, and nothing said so: the app could go on holding an older value than the desk.
+
+- **First fix, not merged.** It kept the reports and put them back for the next flush (branch `fix/keep-desk-reports-on-failed-flush`, never pushed). Its review found three problems:
+  - while the database stayed down, the kept reports piled up without limit and were re-applied every 100 ms under the audio state lock, and a locked database made each try wait up to 5 s;
+  - a report kept past a newer edit of the app's could be written over that edit, once the edit's own send had expired;
+  - its test could not fail on the ordering it claimed.
+
+  The operator chose the simpler fix: "Simpler: ask for a Sync".
+
+- **The fix.** A failed flush still drops what it took, but the link is marked (`ConsoleLinkState::mark_reports_lost`, `E/rme_console_link.rs`). The next flush that writes takes the mark and writes the confidence `unknown`, like a lost connection does, so the Console reads `SYNC NEEDED` and **Sync from TotalMix** reads the desk again.
+  - Nothing is kept, so nothing piles up, and no old report can be written over a newer edit.
+  - With nothing else waiting, the mark is tried again at most every `LOST_REPORTS_RETRY_MS` (2 s), not on every 100 ms tick.
+  - Any flush that has something to write takes the mark, so a Sync's or a recall's own flushes write it before their `aligned`.
+  - `ConsoleFlushReport` carries `desk_unread`, and `audio.changed` carries `deskUnread`, so the screen refreshes.
+  - The metering thread's "Console link flush failed" warning is written at most once a minute, counting the failures it left out. The first write that works again writes one line saying how many failed before it, and the next failure starts a fresh count (`FlushFailureLog`, `E/rme_totalmix_osc.rs`).
+
+Review, the same day (one reviewer, then a second reader for the medium finding). Two changes followed:
+
+- The retry is counted from the failure, not from the start of the flush. A write that waited out a locked database (up to 5 s) was otherwise tried again on the very next tick. No test covers this: it needs a database that takes seconds to fail.
+- The two doc comments that list how the confidence becomes `unknown` (`E/audio/helpers.rs`, the module doc of `E/audio/console_link.rs`) now name the failed flush.
+
+Recorded as limits, not changed:
+
+1. **A failure during a Sync or a recall can be hidden.** A flush can fail while a Sync is reading the desk or a recall is waiting for its read-backs, and a later flush of the same Sync or recall can then take the mark and write `unknown` before the Sync or recall writes `aligned`. The Console then reads `VERIFIED` over a value the desk reported and the app dropped. The second reader rated it low: it needs a failed write inside that window, then a working one. A fix would have Sync and recall refuse `aligned` when the mark moved during them, which changes what they report. It is the same kind of question as the open one above, a Sync over an expiry during its pull, so it goes to the operator with it.
+2. **The mark lives in memory.** A restart before the next working write loses it, and the stored confidence stays what it was.
+3. **Any failed write sets the mark,** even one that dropped only confirmations of the app's own sends. The Console may then ask for a Sync with nothing lost. This is deliberate, because telling the two apart would mean judging what the dropped reports held.
+
+Guards:
+
+- `audio::tests_console_link::a_flush_whose_write_fails_marks_the_desk_unread_for_the_next_write`:
+  - a flush against a database it cannot open fails and keeps nothing;
+  - there is no retry before 2 s, and one at 2 s;
+  - that flush writes `unknown` over `aligned` and reports `desk_unread`;
+  - the mark is written once.
+
+  With the mark removed it fails.
+
+- `rme_totalmix_osc::tests::a_failing_flush_is_logged_once_a_minute_and_its_end_is_logged_once`: with the reset on a working write removed, it fails.
+- `console_pull_ingests_a_fake_totalmix_dump` and `recall_pushes_the_snapshot_and_the_console_confirms_it` now set a mark first, and still end `aligned` with no mark left.
+- `console_confidence_has_one_writer` still passes: the confidence is written only through `confidence_setting`.
+
+`rme_console_link.rs` is 1,978 lines, under the guard's 2,000.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.

@@ -10,8 +10,9 @@
 //! `audio.changed { reason: "console-echo" }` follows when that changed
 //! anything. Sends that were never
 //! confirmed downgrade console-state confidence to `assumed` and surface as
-//! `AUDIO_CONSOLE_UNCONFIRMED`; a `/status/connection 0` resets it to
-//! `unknown`. Nothing here ever raises confidence — only a complete pull or a
+//! `AUDIO_CONSOLE_UNCONFIRMED`; a `/status/connection 0`, or an earlier
+//! flush whose write failed and dropped what the desk reported (the link's
+//! lost-reports mark), resets it to `unknown`. Nothing here ever raises confidence — only a complete pull or a
 //! fully confirmed push may do that.
 
 use std::collections::HashMap;
@@ -41,11 +42,18 @@ pub struct ConsoleFlushReport {
     /// The desk refused a talkback the app asked for; the refusal is recorded
     /// even when a newer talkback send meant nothing else was written.
     pub talkback_refused: bool,
+    /// An earlier flush's write failed and dropped desk reports, so this one
+    /// marked the desk unread: the Console asks for a Sync.
+    pub desk_unread: bool,
 }
 
 impl ConsoleFlushReport {
     pub fn changed(&self) -> bool {
-        self.applied > 0 || self.unconfirmed > 0 || self.connection_lost || self.talkback_refused
+        self.applied > 0
+            || self.unconfirmed > 0
+            || self.connection_lost
+            || self.talkback_refused
+            || self.desk_unread
     }
 }
 
@@ -59,16 +67,33 @@ impl ConsoleFlushReport {
 /// them after a write of the app's that came later — a recall's, an edit's, or
 /// another flush that took the confirmations that followed them.
 pub fn flush_console_link(db_path: &Path) -> Result<ConsoleFlushReport, AudioCommandError> {
+    flush_console_link_at(db_path, link_now_ms())
+}
+
+/// [`flush_console_link`] on the link's clock at `now_ms`, which decides
+/// whether a lost-reports mark is due again (tests hand it in).
+///
+/// A flush whose write fails has already taken what it wrote from the link,
+/// and it is not put back: kept, it would pile up while the database stays
+/// down, and a report kept past a newer edit of the app's could later be
+/// written over it. Instead the link is marked, so the next flush that writes
+/// marks the desk unread and the Console asks for a Sync, which reads the
+/// desk again.
+pub(crate) fn flush_console_link_at(
+    db_path: &Path,
+    now_ms: u64,
+) -> Result<ConsoleFlushReport, AudioCommandError> {
+    let started = std::time::Instant::now();
     let link = shared_console_link();
     let lock_link = || match link.lock() {
         Ok(link) => link,
         Err(poisoned) => poisoned.into_inner(),
     };
-    if !lock_link().has_activity() {
+    if !lock_link().has_activity_at(now_ms) {
         return Ok(ConsoleFlushReport::default());
     }
     let _state_guard = lock_audio_state();
-    let (updates, superseded, expired, connection_lost) = {
+    let (updates, superseded, expired, connection_lost, desk_unread) = {
         let mut link = lock_link();
         // A report or a confirmation of a parameter the app has sent again
         // since is older than that send: the desk takes the app's newer value,
@@ -85,9 +110,27 @@ pub fn flush_console_link(db_path: &Path) -> Result<ConsoleFlushReport, AudioCom
             superseded,
             link.take_expired(),
             link.take_connection_lost(),
+            link.take_reports_lost(),
         )
     };
-    apply_console_activity_locked(db_path, &updates, &superseded, &expired, connection_lost)
+    let result = apply_console_activity_locked(
+        db_path,
+        &updates,
+        &superseded,
+        &expired,
+        connection_lost,
+        desk_unread,
+    );
+    if result.is_err() {
+        // Under the state lock, so no Sync or recall writes `aligned` between
+        // this failure and the mark. The retry is counted from the failure,
+        // not from the start: a write that waited out a locked database (up
+        // to 5 s) must not be tried again on the very next tick.
+        let failed_at =
+            now_ms.saturating_add(u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX));
+        lock_link().mark_reports_lost(failed_at);
+    }
+    result
 }
 
 /// The persistence half of [`flush_console_link`], separated so tests can
@@ -100,7 +143,7 @@ pub(crate) fn apply_console_activity(
     connection_lost: bool,
 ) -> Result<ConsoleFlushReport, AudioCommandError> {
     let _state_guard = lock_audio_state();
-    apply_console_activity_locked(db_path, updates, &[], expired, connection_lost)
+    apply_console_activity_locked(db_path, updates, &[], expired, connection_lost, false)
 }
 
 /// The persistence half of `flush_console_link`, for a caller that holds
@@ -114,6 +157,7 @@ fn apply_console_activity_locked(
     superseded: &[ConsoleUpdate],
     expired: &[PendingSend],
     connection_lost: bool,
+    desk_unread: bool,
 ) -> Result<ConsoleFlushReport, AudioCommandError> {
     // A talkback the app asked for that the console answered with "off" is a
     // refusal, not a mystery. Live on the studio UFX III (2026-09-04): with
@@ -131,7 +175,12 @@ fn apply_console_activity_locked(
             )
             && matches!(update.value, ConsoleValue::Flag(false))
     });
-    if updates.is_empty() && superseded.is_empty() && expired.is_empty() && !connection_lost {
+    if updates.is_empty()
+        && superseded.is_empty()
+        && expired.is_empty()
+        && !connection_lost
+        && !desk_unread
+    {
         return Ok(ConsoleFlushReport::default());
     }
 
@@ -234,7 +283,10 @@ fn apply_console_activity_locked(
             ),
         ));
     }
-    if connection_lost {
+    // TotalMix reported the interface gone, or an earlier write failed and
+    // dropped what the desk reported: either way the app no longer knows what
+    // the desk is set to.
+    if connection_lost || desk_unread {
         writes.push(confidence_setting(ConsoleConfidence::Unknown));
     }
     if !writes.is_empty() || !actions.is_empty() {
@@ -246,6 +298,7 @@ fn apply_console_activity_locked(
         unconfirmed: expired.len(),
         connection_lost,
         talkback_refused,
+        desk_unread,
     })
 }
 

@@ -354,7 +354,9 @@ pub(super) fn lock_audio_state() -> std::sync::MutexGuard<'static, ()> {
 /// The only vocabulary for console-state confidence. `Aligned` is written
 /// solely after a complete console pull or a fully confirmed push; `Assumed`
 /// when a push starts or a send goes unconfirmed; `Unknown` when the
-/// transport changes, the console reports disconnected, or a pull fails.
+/// transport changes, the console reports disconnected, a pull fails, or a
+/// flush's write failed and dropped what the desk reported (written by the
+/// next flush that works).
 /// Ordinary edits never write confidence at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ConsoleConfidence {
