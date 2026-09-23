@@ -27,7 +27,7 @@ export default defineConfig({
       exclude: ["**/*.test.{ts,tsx}", "**/*.stories.{ts,tsx}", "**/*.d.ts", "src/generated/**"],
       reporter: ["text-summary", "json-summary"],
       reportsDirectory: "coverage",
-      thresholds: { statements: 6.75, branches: 5.79, functions: 6.01, lines: 6.89 },
+      thresholds: { statements: 8.11, branches: 7.79, functions: 6.97, lines: 8.32 },
     },
   },
 });
