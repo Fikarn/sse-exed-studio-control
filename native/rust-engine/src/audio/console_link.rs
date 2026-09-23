@@ -10,8 +10,9 @@
 //! `audio.changed { reason: "console-echo" }` follows when that changed
 //! anything. Sends that were never
 //! confirmed downgrade console-state confidence to `assumed` and surface as
-//! `AUDIO_CONSOLE_UNCONFIRMED`; a `/status/connection 0` resets it to
-//! `unknown`. Nothing here ever raises confidence — only a complete pull or a
+//! `AUDIO_CONSOLE_UNCONFIRMED`; a `/status/connection 0`, or an earlier
+//! flush whose write failed and dropped what the desk reported (the link's
+//! lost-reports mark), resets it to `unknown`. Nothing here ever raises confidence — only a complete pull or a
 //! fully confirmed push may do that.
 
 use std::collections::HashMap;
@@ -82,6 +83,7 @@ pub(crate) fn flush_console_link_at(
     db_path: &Path,
     now_ms: u64,
 ) -> Result<ConsoleFlushReport, AudioCommandError> {
+    let started = std::time::Instant::now();
     let link = shared_console_link();
     let lock_link = || match link.lock() {
         Ok(link) => link,
@@ -120,9 +122,13 @@ pub(crate) fn flush_console_link_at(
         desk_unread,
     );
     if result.is_err() {
-        // Still under the state lock, so no Sync can read the desk between
-        // this failure and the mark.
-        lock_link().mark_reports_lost(now_ms);
+        // Under the state lock, so no Sync or recall writes `aligned` between
+        // this failure and the mark. The retry is counted from the failure,
+        // not from the start: a write that waited out a locked database (up
+        // to 5 s) must not be tried again on the very next tick.
+        let failed_at =
+            now_ms.saturating_add(u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX));
+        lock_link().mark_reports_lost(failed_at);
     }
     result
 }

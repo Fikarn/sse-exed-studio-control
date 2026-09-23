@@ -726,12 +726,13 @@ fn a_flush_whose_write_fails_marks_the_desk_unread_for_the_next_write() {
             !link.has_activity_at(failed_at + LOST_REPORTS_RETRY_MS - 1),
             "with nothing else waiting, no retry on every tick"
         );
-        assert!(link.has_activity_at(failed_at + LOST_REPORTS_RETRY_MS));
+        // Counted from the failure; the failed open took well under a second.
+        assert!(link.has_activity_at(failed_at + LOST_REPORTS_RETRY_MS + 1_000));
     }
 
     let report = flush_console_link_at(
         test_dir.db_path().as_path(),
-        failed_at + LOST_REPORTS_RETRY_MS,
+        failed_at + LOST_REPORTS_RETRY_MS + 1_000,
     )
     .expect("the next flush should write");
     assert!(report.desk_unread && report.changed());

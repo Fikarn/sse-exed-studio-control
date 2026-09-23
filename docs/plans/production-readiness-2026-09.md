@@ -914,9 +914,20 @@ Guard: `support::tests::backup_times_are_milliseconds_since_the_epoch`: a fresh 
 - **The fix.** A failed flush still drops what it took, but the link is marked (`ConsoleLinkState::mark_reports_lost`, `E/rme_console_link.rs`). The next flush that writes takes the mark and writes the confidence `unknown`, like a lost connection does, so the Console reads `SYNC NEEDED` and **Sync from TotalMix** reads the desk again.
   - Nothing is kept, so nothing piles up, and no old report can be written over a newer edit.
   - With nothing else waiting, the mark is tried again at most every `LOST_REPORTS_RETRY_MS` (2 s), not on every 100 ms tick.
-  - Any flush that has something to write takes the mark, so a Sync's or a recall's own flushes write it before their `aligned`. If a flush fails during a Sync, the new mark correctly says that some of what the Sync read was lost.
+  - Any flush that has something to write takes the mark, so a Sync's or a recall's own flushes write it before their `aligned`.
   - `ConsoleFlushReport` carries `desk_unread`, and `audio.changed` carries `deskUnread`, so the screen refreshes.
   - The metering thread's "Console link flush failed" warning is written at most once a minute, counting the failures it left out. The first write that works again writes one line saying how many failed before it, and the next failure starts a fresh count (`FlushFailureLog`, `E/rme_totalmix_osc.rs`).
+
+Review, the same day (one reviewer, then a second reader for the medium finding). Two changes followed:
+
+- The retry is counted from the failure, not from the start of the flush. A write that waited out a locked database (up to 5 s) was otherwise tried again on the very next tick. No test covers this: it needs a database that takes seconds to fail.
+- The two doc comments that list how the confidence becomes `unknown` (`E/audio/helpers.rs`, the module doc of `E/audio/console_link.rs`) now name the failed flush.
+
+Recorded as limits, not changed:
+
+1. **A failure during a Sync or a recall can be hidden.** A flush can fail while a Sync is reading the desk or a recall is waiting for its read-backs, and a later flush of the same Sync or recall can then take the mark and write `unknown` before the Sync or recall writes `aligned`. The Console then reads `VERIFIED` over a value the desk reported and the app dropped. The second reader rated it low: it needs a failed write inside that window, then a working one. A fix would have Sync and recall refuse `aligned` when the mark moved during them, which changes what they report. It is the same kind of question as the open one above, a Sync over an expiry during its pull, so it goes to the operator with it.
+2. **The mark lives in memory.** A restart before the next working write loses it, and the stored confidence stays what it was.
+3. **Any failed write sets the mark,** even one that dropped only confirmations of the app's own sends. The Console may then ask for a Sync with nothing lost. This is deliberate, because telling the two apart would mean judging what the dropped reports held.
 
 Guards:
 
