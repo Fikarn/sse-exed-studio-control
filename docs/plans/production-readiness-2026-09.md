@@ -759,6 +759,25 @@ Guard: `rme_console_link::tests::a_dump_line_for_a_send_made_during_the_pull_doe
 
 It fails with the old rule (`left: Adjusted`, `right: Stale`). Test changed: `pull_applies_every_dump_value_even_when_it_confirms_a_pending_send` keeps its assertions (its gain was sent before the pull began, so the dump still wins); its comment "never stale" now says that it concerns a send made before the pull. The console-link, pull and ordering suites pass (40 cases).
 
+**2026-09-23 — the Console says SYNC NEEDED when the desk has not been read** (branch `after-the-program-2026-09`; the operator's decision 6, option D, with the operator's approval of the word and the sentence). The Console moves its meters only while it knows what the desk is set to (`audioMeterSimulationState`: the console confidence `aligned` or `verified`, the last action not failed, OSC on). A probe never writes the confidence. So after the first green probe, after TotalMix reported the interface gone and back, or after a failed Sync followed by an action that worked, the confidence is `unknown`, the meters stay still, and the state display fell through to `VERIFIED` with no key.
+
+`describeAudioStatus` (`frontend/app/src/app/audio/audioFormatting.ts`) now reads `SYNC NEEDED` in that case: the probe passed, TotalMix metering (`rme-totalmix-osc`) neither stale nor offline, the confidence neither `aligned` nor `verified`, nothing failed. The tone is attention, with the sentence "The desk has not been read since the link changed, so the meters wait. Press Sync from TotalMix — it reads the desk and changes nothing." `AudioCluster.tsx` gives that word the **Sync from TotalMix** key, as it does for `ASSUMED`. The states before it (`DISABLED`, `DISCONNECTED`, `OFFLINE`, `NOT VERIFIED`, `STALE`, `ASSUMED`, `ACTION FAILED`) are unchanged, and simulated metering still reads `SIMULATED`. Nothing new is sent to TotalMix, and the pull stays the operator's press.
+
+`@sse/test-fixtures` builds a scenario, `audio-probe-passed-unsynced` (`audio-hardware-metering` with the confidence `unknown`), in code rather than in `fixtures.json`, so it adds no UI-contract board. No existing board uses TotalMix metering, so no capture moves.
+
+Docs: `docs/OPERATIONS.md` lists `SYNC NEEDED` under "Audio stops responding" and in "When the Console's meters stay still".
+
+Guards:
+
+- `audioFormatting.test.ts`, "describeAudioStatus: SYNC NEEDED", 4 cases:
+  - the word, the tone and the sentence;
+  - `VERIFIED` once `aligned` or `verified`;
+  - `ASSUMED`, `ACTION FAILED`, `STALE`, `NOT VERIFIED` and `DISABLED` still first;
+  - `SIMULATED` for simulated metering.
+- `frontend/app/tests/audio-sync-needed.spec.ts`: on the new scenario, the state display carries the word and the sentence and the meters are held (`data-canvas-metering="false"`); its **Sync from TotalMix** turns it to `VERIFIED` with no key, and the meters run.
+
+The Playwright case fails with the two screen files as they were at `1911559`: the display read "VERIFIED … 0 values confirmed · last sync not yet". The operator-copy gate holds at 0.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.

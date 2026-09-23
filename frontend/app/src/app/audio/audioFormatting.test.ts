@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import type { AudioSnapshot } from "@sse/engine-client";
+
 import {
   AUDIO_DB_NEG_INFINITY,
   AUDIO_FADER_UNITY,
   AUDIO_METER_NEG_INFINITY,
   dbfsToMeterPercent,
   deriveSendStatusLabel,
+  describeAudioStatus,
   faderDbToNormalized,
   formatAudioDb,
   formatAudioRole,
@@ -202,5 +205,52 @@ describe("formatAudioRole", () => {
 
   it("falls back to a humanised version of unknown roles", () => {
     expect(formatAudioRole("aux-send-1")).toBe("aux send 1");
+  });
+});
+
+// 2026-09-23, the operator's decision (option D): with the probe passed,
+// TotalMix meters arriving and nothing failed, a desk that has not been read
+// since the link changed (`consoleStateConfidence` neither aligned nor
+// verified) reads SYNC NEEDED, with the approved sentence. Before, it fell
+// through to VERIFIED with still meters and no key.
+describe("describeAudioStatus: SYNC NEEDED", () => {
+  const passedWithTotalMix = (fields: Record<string, unknown>) =>
+    ({
+      oscEnabled: true,
+      status: "ready",
+      verified: true,
+      meteringSource: "rme-totalmix-osc",
+      meteringState: "live",
+      consoleStateConfidence: "unknown",
+      lastActionStatus: "succeeded",
+      ...fields,
+    }) as unknown as AudioSnapshot;
+
+  it("names a desk nobody has read yet and says what to press", () => {
+    const status = describeAudioStatus(passedWithTotalMix({}));
+    expect(status.label).toBe("SYNC NEEDED");
+    expect(status.tone).toBe("attention");
+    expect(status.warningBody).toBe(
+      "The desk has not been read since the link changed, so the meters wait. Press Sync from TotalMix — it reads the desk and changes nothing."
+    );
+  });
+
+  it("reads VERIFIED once the desk has been read", () => {
+    expect(describeAudioStatus(passedWithTotalMix({ consoleStateConfidence: "aligned" })).label).toBe("VERIFIED");
+    expect(describeAudioStatus(passedWithTotalMix({ consoleStateConfidence: "verified" })).label).toBe("VERIFIED");
+  });
+
+  it("leaves the states that come first as they were", () => {
+    expect(describeAudioStatus(passedWithTotalMix({ consoleStateConfidence: "assumed" })).label).toBe("ASSUMED");
+    expect(describeAudioStatus(passedWithTotalMix({ lastActionStatus: "failed" })).label).toBe("ACTION FAILED");
+    expect(describeAudioStatus(passedWithTotalMix({ meteringState: "stale" })).label).toBe("STALE");
+    expect(describeAudioStatus(passedWithTotalMix({ status: "not-verified", verified: false })).label).toBe(
+      "NOT VERIFIED"
+    );
+    expect(describeAudioStatus(passedWithTotalMix({ oscEnabled: false })).label).toBe("DISABLED");
+  });
+
+  it("does not apply to simulated metering", () => {
+    expect(describeAudioStatus(passedWithTotalMix({ meteringSource: "simulated" })).label).toBe("SIMULATED");
   });
 });

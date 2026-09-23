@@ -351,6 +351,26 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
     };
   }
 
+  // 2026-09-23, the operator's decision (option D, with these words): the
+  // probe has passed, TotalMix meters are arriving and nothing failed, but the
+  // desk has not been read since the link changed (the first green probe,
+  // TotalMix reporting the interface back, a failed Sync followed by a good
+  // action). The meters wait for a confirmed desk (`audioMeterSimulationState`),
+  // so the display names that and offers the one press that reads the desk.
+  // Before, it read VERIFIED with still meters and no key.
+  const confidence = String(snapshot?.consoleStateConfidence ?? "unknown");
+  if (meteringSource === "rme-totalmix-osc" && confidence !== "aligned" && confidence !== "verified") {
+    return {
+      bannerEligible: true,
+      label: "SYNC NEEDED",
+      tone: "attention" satisfies StatusToneLike,
+      warningBody:
+        "The desk has not been read since the link changed, so the meters wait. Press Sync from TotalMix — it reads the desk and changes nothing.",
+      warningCode: null,
+      warningTitle: "SYNC NEEDED",
+    };
+  }
+
   if (meteringSource === "simulated" || meteringSource === "fixture") {
     return {
       bannerEligible: false,

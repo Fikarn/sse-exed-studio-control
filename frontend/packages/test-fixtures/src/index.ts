@@ -154,6 +154,26 @@ function buildAudioHardwareMeteringFixture(): FixtureScenarioRecord {
   return scenario;
 }
 
+// 2026-09-23: the probe has passed and TotalMix meters are arriving, but the
+// desk has not been read since the link changed, so the console confidence is
+// `unknown` and the meters wait (the Console reads SYNC NEEDED). Built here,
+// not in `fixtures.json`, so it adds no UI-contract board.
+function buildAudioProbePassedUnsyncedFixture(): FixtureScenarioRecord {
+  const scenario = buildAudioHardwareMeteringFixture() as FixtureScenarioRecord & {
+    audioSnapshot: Record<string, unknown>;
+  };
+  scenario.audioSnapshot = {
+    ...scenario.audioSnapshot,
+    consoleStateConfidence: "unknown",
+    lastConsoleSyncAt: null,
+    lastConsoleSyncReason: null,
+    lastActionStatus: "succeeded",
+    lastActionCode: null,
+    lastActionMessage: "The desk probe passed.",
+  };
+  return scenario;
+}
+
 function buildAudioNoSendFixture(): FixtureScenarioRecord {
   const scenario = cloneFixture(fixtureMap["audio-populated"]) as FixtureScenarioRecord & {
     audioSnapshot: Record<string, unknown>;
@@ -177,6 +197,7 @@ const derivedFixtureMap: FixtureMap = {
   } as FixtureScenarioRecord,
   "audio-clipped": buildAudioClippedFixture(),
   "audio-hardware-metering": buildAudioHardwareMeteringFixture(),
+  "audio-probe-passed-unsynced": buildAudioProbePassedUnsyncedFixture(),
   "audio-no-send": buildAudioNoSendFixture(),
   "lighting-palettes-empty": buildLightingPaletteFixture("empty"),
   "lighting-palettes-patch-disabled": buildLightingPaletteFixture("patch-disabled"),
