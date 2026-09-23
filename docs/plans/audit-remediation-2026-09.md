@@ -228,7 +228,7 @@ Operator hands: none. The operator-visible behaviour on the workstation: Publish
 
 ## Slice 9 — 1920×1080 compact density + overflow test
 
-Status: landed 2026-09-04 (operator verification pending — checklist B7 on the studio monitor). Commit `Audit S9`.
+Status: closed — not applicable (the operator's ruling of 2026-09-18: only Windows and only 2560×1440 matter; checklist B7 recorded as not applicable with the operator's OK on 2026-09-23 — `docs/plans/production-readiness-2026-09.md`, After the program); landed 2026-09-04, when it waited on checklist B7 on the studio monitor. The 1920 guards (`audio-legibility`, `viewport-contract`) stay as they are. Commit `Audit S9`.
 
 Scope: audio density from `bodyWidth < 2200`; view-model table desktop 4/6/12, compact 4/4/8; remove the `[data-layout-mode="studioFull"]` 504 px inspector override that out-specified the 380 px container rule; compact tier columns and 176 px output lanes; `expectNoHorizontalOverflow` helper.
 
@@ -388,7 +388,7 @@ Operator hands (all still open on 2026-09-04 — the operator was away from Slic
 
 ## Appendix B — Operator hardware checklist
 
-Sign-off state (2026-09-04): none signed yet — every item below is open. Sign each with the date next to the item; the matching slice's `Status:` then flips to `complete`. Since the operator's ruling of 2026-09-23 that talkback is not needed, item 5 and its talkback clause in item 8 are not applicable (below).
+Sign-off state (2026-09-04): none signed yet — every item below is open. Sign each with the date next to the item; the matching slice's `Status:` then flips to `complete`. Since the operator's ruling of 2026-09-23 that talkback is not needed, item 5 and its talkback clause in item 8 are not applicable (below). Item 7 is recorded as not applicable with the operator's OK of 2026-09-23.
 
 1. TotalMix remote 4 (Global OSC, in 7004 / out 9004): "Send changes" on, "Follow Submix" off, remote active.
 2. After Slice 3: move a fader and toggle a mute in TotalMix → app follows within ~1 s; press Sync → toast reports the value count, badge aligned, nothing moved in TotalMix.
@@ -396,7 +396,7 @@ Sign-off state (2026-09-04): none signed yet — every item below is open. Sign 
 4. After Slice 5: TotalMix fader at 0 dB → app 0.0 dB at the notch; −6 dB → app −6.0; deck LCD the same; Companion profile re-imported.
 5. After Slice 6: **not applicable** — the operator's ruling of 2026-09-23: talkback is not needed, so this item is not walked and no talkback input channel is assigned (Slice 6's `Status:`). As written before the ruling: first assign the talkback input channel in TotalMix (`Options → Settings → Mixer → Talkback`; on 2026-09-04 it was unassigned and the desk refused every talkback write). Then: hold the button → TotalMix talkback lights; release → clears; hold `T` → same; deck `TALK` → same; graceful stop mid-hold releases it.
 6. After Slice 1: reset the audio probe → every fader/mute/48V disabled with the reason and "Run audio probe"; run it → controls return.
-7. After Slice 9: studio monitor at 1920×1080 → no tier scrolls; 4/4/3 strips visible.
+7. After Slice 9: studio monitor at 1920×1080 → no tier scrolls; 4/4/3 strips visible. **Not applicable** — by the operator's ruling of 2026-09-18 (Windows only, 2560×1440 only) the 1920×1080 check is not walked; recorded with the operator's OK on 2026-09-23 ("I want to go with your recommendation on all items please").
 8. After Slice 11: X / Alt+F4 → dialog; Cancel keeps the session; Confirm quits and no `studio-control-engine.exe` remains. The talkback clause (a close with a talkback hold active releases it: Slice 11's operator hands and the end of item 5) is not applicable under the talkback ruling of 2026-09-23; the rest of the item stands.
 
 ## Baseline refresh procedure

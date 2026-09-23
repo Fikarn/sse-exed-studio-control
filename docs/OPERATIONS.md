@@ -24,6 +24,7 @@ This document describes runtime behavior and operator recovery for the native `S
 - Closing the native shell is a full workstation-control shutdown, not a browser-tab close.
 - Native updates are delivered through offline installers and maintenance-tool update repositories, not through background Electron-style auto-update polling.
 - Apply updates deliberately during a safe workstation window and preserve the app-data directory unless you are intentionally resetting the machine.
+- Studio Control's Windows files are not code-signed: the operator decided on 2026-09-23 to stay unsigned on the single workstation (production readiness Appendix B item 7). Keep Windows' **Smart App Control** switched off on the studio workstation (Windows Security › App & browser control › Smart App Control). When it is on, it checks every program as it starts and blocks unsigned ones, so neither the window nor the hardware link would start. A build downloaded from GitHub Releases shows a SmartScreen prompt the first time; choose "More info", then "Run anyway".
 
 ### Restart / recovery
 
