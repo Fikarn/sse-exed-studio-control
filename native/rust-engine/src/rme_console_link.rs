@@ -909,15 +909,18 @@ impl ConsoleLinkState {
             // adjusting the send, it was written, the send was never read back,
             // and Sync wrote aligned over a value the desk no longer held. It is
             // stale like any older reply; the send's own read-back decides it.
-            let pull_requested_at = self.pull.as_ref().map(|tracker| tracker.started_at_ms);
-            let newest_request_at = match (newest_request_at, pull_requested_at) {
-                (Some(read_back), Some(pull)) => Some(read_back.max(pull)),
-                (read_back, pull) => read_back.or(pull),
-            };
-            let reply_is_stale = match newest_request_at {
-                Some(requested_at) => pending.sent_at_ms > requested_at,
-                None => true,
-            };
+            // The pull's time is stamped before its request leaves, in whole
+            // milliseconds, so a send stamped in the same millisecond may have
+            // left after the request: only a pull that began strictly after the
+            // send can answer it. A read-back is asked at least
+            // READBACK_DELAY_MS after its send, so it has no such tie.
+            let answered_by_read_back =
+                newest_request_at.is_some_and(|requested_at| requested_at >= pending.sent_at_ms);
+            let answered_by_pull = self
+                .pull
+                .as_ref()
+                .is_some_and(|tracker| tracker.started_at_ms > pending.sent_at_ms);
+            let reply_is_stale = !(answered_by_read_back || answered_by_pull);
             if reply_is_stale {
                 return Classification::Stale;
             }
@@ -1843,6 +1846,28 @@ mod tests {
         assert_eq!(queued[0].value, ConsoleValue::Db(47.0));
         assert!(queued[0].adjusted);
         link.finish_pull(asked + 40);
+    }
+
+    #[test]
+    fn a_send_stamped_in_the_pulls_own_millisecond_is_not_answered_by_the_dump() {
+        // The review of the fix above: the pull's time is stamped before its
+        // request leaves, in whole milliseconds, so a send stamped in the same
+        // millisecond may have left after the request. Its dump line may
+        // predate it, so it is stale; a send made the millisecond before the
+        // pull is still settled by the dump.
+        let mut link = ConsoleLinkState::default();
+        link.register_outgoing(&[(String::from("/input/2/mute"), f(1.0))], 99);
+        link.begin_pull(100);
+        link.register_outgoing(&[(String::from("/input/3/mute"), f(1.0))], 100);
+        assert_eq!(
+            link.ingest(&msg("/input/3/mute", f(0.0)), 101),
+            Classification::Stale
+        );
+        assert_eq!(
+            link.ingest(&msg("/input/2/mute", f(0.0)), 102),
+            Classification::Adjusted
+        );
+        link.finish_pull(103);
     }
 
     #[test]
