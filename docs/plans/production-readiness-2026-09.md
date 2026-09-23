@@ -883,6 +883,10 @@ Every run in the table was ten green on its first attempt.
   - whether the packaged app should carry the release build of the hardware link instead of the debug one (`scripts/native-package.mjs` copies `target/debug`);
   - a clean-install check on a second Windows machine, which the design lists as a risk the plan cannot remove.
 
+**2026-09-23 — backup times on screen are real dates** (branch `fix/backup-times-in-ms`; found by the check of the plan, recorded above). `list_backup_files` (`E/support.rs`) sent each backup's `modifiedAt` in seconds since the epoch, and the screen reads it with `new Date(value)`, which takes milliseconds, so every backup time on screen read January 1970: Support's `Backups` rows, `Latest backup`, the Publish step and the recovery surface. It now sends milliseconds (`unix_millis`), and `native/protocol/v1.md` names the unit. The fixture double, the fixtures and the front-end tests already used milliseconds; no lane, script or other engine code reads the field, and the only sort compares values.
+
+Guard: `support::tests::backup_times_are_milliseconds_since_the_epoch`: a fresh backup's `modifiedAt` lies within a minute of now in milliseconds. With the old seconds it fails ("modifiedAt 1790177177 is not within a minute of now (1790177177762 ms)"). `npm run dev:check` and `npm run native:acceptance` pass. The live app (`98bbb06`) still shows 1970; the walk checklist treats that as a known finding, and the fix reaches the workstation with the next live build.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.
