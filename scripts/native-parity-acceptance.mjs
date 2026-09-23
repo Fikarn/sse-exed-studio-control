@@ -895,9 +895,12 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
       "audio.channel.update",
       playbackRequest
     );
+    // A send edit on a phones mix sets that mix's level only; `fader` is the
+    // channel's Main Out level and stays as it was (2026-09-23, after the
+    // program: a phones edit used to overwrite it).
     assert(
       updatedPlayback.id === targets.playbackChannelId &&
-        updatedPlayback.fader === targets.playbackFader &&
+        Math.abs(updatedPlayback.fader - baselinePlayback.fader) < 0.003 &&
         updatedPlayback.mute === true &&
         (LIVE_CONSOLE || updatedPlayback.solo === true) &&
         updatedPlayback.mixLevels?.[targets.playbackSendTargetId] === targets.playbackFader,
